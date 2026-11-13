@@ -1,29 +1,24 @@
 /**
  * Public-API guard test. Pins the shape and presence of every symbol
- * the root plus retained host, media transport, fs, todos and surface
- * subpaths export.
+ * the root plus retained host, media transport and fs subpaths export.
  *
  * This is intentionally separate from the behavioural tests in
- * `fs/fs.test.ts` and `todos/todos.test.ts`.
+ * `fs/fs.test.ts`.
  * Those exercise behaviour; this one exercises the **contract**. A
  * rename, signature change, or accidental drop here = a breaking change
  * for consumers — the test should fail until the README / CHANGELOG has
  * been updated to advertise it.
  *
- * `AgentFs` and `AgentTodos` are each a class + same-named namespace.
- * New public additions go inside one of those namespaces.
+ * `AgentFs` is a class + same-named namespace. New public additions go
+ * inside that namespace.
  */
 import { describe, expect, expectTypeOf, it } from "vitest";
 import type { MediaItem } from "@grida/daemon";
 
 import * as root from ".";
 import {
-  AGENT_SESSION_AGENT,
-  AGENT_TIERS,
   BYOK_PROVIDER_METADATA,
   BYOK_PROVIDER_IDS,
-  type AgentRunOptions,
-  type AgentUIMessageChunk,
   type ByokProviderId,
   type ImageGenerateResult,
   type VideoGenerateResult,
@@ -37,16 +32,7 @@ import {
   type TextToSpeechGenerateResult,
   type TextToSpeechListVoicesResult,
   type TextToSpeechVoice,
-  type ChatMessageWithParts,
-  type ChatSessionRow,
-  type CreateSessionOptions,
-  type PatchSessionOptions,
-  type SessionListFilter,
-  type SessionListPage,
-  type SessionRunState,
-  type SessionStatus,
 } from ".";
-import { AGENT_DEFAULT_TIER, type ModelTier } from "./tiers";
 import {
   ChatGptSubscriptionHost,
   type ChatGptProviderConfig,
@@ -59,29 +45,10 @@ import {
 import { DaemonServer } from "@grida/daemon/server";
 import { MediaTransport } from "./media-transport";
 import { AgentFs } from "./fs";
-import { AgentTodos } from "./todos";
-import { AgentSurface } from "./surface";
 import { OpfsBackend } from "./fs/backends/opfs";
 
 describe("@grida/agent public API", () => {
   describe("root protocol exports", () => {
-    it("exposes client-safe protocol constants and types", () => {
-      const run: AgentRunOptions = {
-        messages: [],
-        feature: AGENT_SESSION_AGENT,
-        surface: { active: "/canvas.canvas", open: ["/canvas.canvas"] },
-      };
-      expect(run.feature).toBe("grida");
-      expect(run.surface?.active).toBe("/canvas.canvas");
-
-      // Session status shapes the earlier chat pane still reads.
-      const idle: SessionStatus = { state: "idle" };
-      const state: SessionRunState = idle.state;
-      expect(state).toBe("idle");
-      const waiting: SessionStatus = { state: "waiting_on_approval" };
-      expect(waiting.state).toBe("waiting_on_approval");
-    });
-
     it("exposes no agent execution, tool or event vocabulary", () => {
       for (const name of [
         "createAgent",
@@ -98,7 +65,7 @@ describe("@grida/agent public API", () => {
       }
     });
 
-    it("exposes BYOK provider identity, media shapes, tiers, and session-row types", () => {
+    it("exposes BYOK provider identity and media shapes", () => {
       // Media-only providers remain excluded from the text resolver via their
       // modality markers while still joining the closed secrets vocabulary.
       expect(BYOK_PROVIDER_IDS).toEqual([
@@ -181,51 +148,6 @@ describe("@grida/agent public API", () => {
       expectTypeOf<TextToSpeechGenerateResult["stored_media"]>().toEqualTypeOf<
         MediaItem | undefined
       >();
-
-      // Tier constants.
-      expect(AGENT_TIERS).toContain(AGENT_DEFAULT_TIER);
-      const tier: ModelTier = AGENT_DEFAULT_TIER;
-      expect(typeof tier).toBe("string");
-
-      // Earlier chat pane wire vocabulary.
-      type _U = AgentUIMessageChunk;
-      const run: AgentRunOptions = {
-        messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
-        tier: "pro",
-        provider_id: "openrouter",
-        model_id: "anthropic/claude-sonnet-5",
-      };
-      expect(run.messages[0]?.role).toBe("user");
-
-      // Session-layer row contract (the persisted chat-history shapes).
-      type _MW = ChatMessageWithParts;
-      type _LF = SessionListFilter;
-      type _LP = SessionListPage;
-      type _CS = CreateSessionOptions;
-      type _PS = PatchSessionOptions;
-      const row: ChatSessionRow = {
-        id: "s",
-        title: "t",
-        agent: "grida",
-        workspace_id: null,
-        model: null,
-        mode: null,
-        parent_id: null,
-        parent_message_id: null,
-        permissions: [],
-        metadata: {},
-        prompt_tokens: 0,
-        completion_tokens: 0,
-        reasoning_tokens: 0,
-        cache_read: 0,
-        cache_write: 0,
-        total_tokens: 0,
-        cost_usd: 0,
-        created_at: 0,
-        updated_at: 0,
-        archived_at: null,
-      };
-      expect(row.agent).toBe("grida");
     });
 
     it("exposes the endpoint-provider contract (issue #806)", () => {
@@ -339,9 +261,7 @@ describe("@grida/agent public API", () => {
     });
 
     it("exposes failure-reason vocabularies (zod + TS share a source)", () => {
-      // The const tuples that back the zod enums on `AgentFs.tools` are
-      // also the source of the `*FailureReason` TS unions. Catching a
-      // drop here = catching it before zod and TS get out of sync.
+      // The const tuples are the source of the `*FailureReason` TS unions.
       // Const tuples — readonly arrays of literal-typed strings.
       expect(Array.isArray(AgentFs.WRITE_FAILURE_REASONS)).toBe(true);
       expect(Array.isArray(AgentFs.EDIT_FAILURE_REASONS)).toBe(true);
@@ -361,16 +281,6 @@ describe("@grida/agent public API", () => {
       expect(AgentFs.WRITE_FAILURE_REASONS).toContain("stale");
       expect(AgentFs.EDIT_FAILURE_REASONS).toContain("ambiguous");
       expect(AgentFs.DELETE_FAILURE_REASONS).toContain("mounted");
-    });
-
-    it("exposes the AI-SDK tool table + dispatcher", () => {
-      expectTypeOf(AgentFs.tools).toBeObject();
-      expectTypeOf(AgentFs.TOOL_NAMES).toBeObject();
-      expectTypeOf<AgentFs.ToolName>().toEqualTypeOf<
-        "read_file" | "edit_file" | "write_file" | "list_files" | "grep_files"
-      >();
-      expectTypeOf<AgentFs.Tools>().toEqualTypeOf<typeof AgentFs.tools>();
-      expectTypeOf(AgentFs.resolveToolCall).toBeFunction();
     });
 
     it("exposes MemoryBackend as the default in-process backend", () => {
@@ -401,63 +311,6 @@ describe("@grida/agent public API", () => {
       expectTypeOf(OpfsBackend).toBeConstructibleWith(["x"]);
       const b: AgentFs.Backend = new OpfsBackend(["x"]);
       void b;
-    });
-  });
-
-  describe("AgentTodos (class + namespace)", () => {
-    it("is constructible with no args", () => {
-      expectTypeOf(AgentTodos).toBeConstructibleWith();
-    });
-
-    it("exposes Todo, Status, WriteSuccess", () => {
-      type _S = AgentTodos.Status;
-      type _T = AgentTodos.Todo;
-      type _W = AgentTodos.WriteSuccess;
-
-      // Runtime anchor — the types above must compose into a real value.
-      const sample: AgentTodos.Todo = {
-        content: "x",
-        active_form: "x",
-        status: "pending",
-      };
-      expect(sample.status).toBe("pending");
-    });
-
-    it("exposes the AI-SDK tool table + dispatcher", () => {
-      expectTypeOf(AgentTodos.tools).toBeObject();
-      expectTypeOf(AgentTodos.TOOL_NAMES).toBeObject();
-      expectTypeOf<AgentTodos.ToolName>().toEqualTypeOf<"todo_write">();
-      expectTypeOf<AgentTodos.Tools>().toEqualTypeOf<typeof AgentTodos.tools>();
-      expectTypeOf(AgentTodos.resolveToolCall).toBeFunction();
-    });
-  });
-
-  describe("AgentSurface namespace", () => {
-    it("exposes the surface names, host contract and browser observer", () => {
-      expect(AgentSurface.TOOL_NAMES).toEqual({
-        surface_open: "surface_open",
-        surface_list_open: "surface_list_open",
-      });
-      expectTypeOf<AgentSurface.ToolName>().toEqualTypeOf<
-        "surface_open" | "surface_list_open"
-      >();
-      expectTypeOf(AgentSurface.observeToolCall).toBeFunction();
-      const host: AgentSurface.Host = {
-        open: () => undefined,
-        listOpen: () => ({
-          active: "/canvas.canvas",
-          open: ["/canvas.canvas"],
-        }),
-      };
-      const snapshot: AgentSurface.Snapshot = host.listOpen();
-      expect(snapshot.active).toBe("/canvas.canvas");
-      for (const name of [
-        "createTools",
-        "parseSnapshot",
-        "toModelOpenOutput",
-      ]) {
-        expect(name in AgentSurface).toBe(false);
-      }
     });
   });
 });

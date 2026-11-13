@@ -18,7 +18,7 @@
  * Subscription / a live Grida session / the generic fallback. Every resolved
  * product default carries provider identity; a user pick always wins.
  */
-import { TIER_MODEL_IDS } from "@grida/ai/catalogue";
+import { AGENT_DEFAULT_TIER, TIER_MODEL_IDS } from "@grida/ai/catalogue";
 import {
   CHATGPT_PROVIDER_ID,
   GG_PROVIDER_ID,
@@ -36,22 +36,23 @@ export type DefaultModelSelection = Readonly<{
  * ACP models are a separate external-agent class and are not part of this
  * model picker.
  */
-export const DEFAULT_MODEL_ID: string = TIER_MODEL_IDS.pro;
+export const DEFAULT_MODEL_ID: string = TIER_MODEL_IDS[AGENT_DEFAULT_TIER];
 
 /**
  * The included hosted tier a live Grida Gateway session upgrades the
- * keyless default to — a catalog model id served by `gg` (the "pro" tier).
+ * keyless default to — a catalog model id served by `gg` (the default tier).
  * A catalog id so it remains compatible with native model providers.
  */
-export const GG_INCLUDED_MODEL_ID: string = TIER_MODEL_IDS.pro;
+export const GG_INCLUDED_MODEL_ID: string = TIER_MODEL_IDS[AGENT_DEFAULT_TIER];
 
 /**
  * Desktop-only default for an untouched, ready subscription-backed chat.
- * The compile-time check keeps the catalogue's `pro` tier on the closed,
+ * The compile-time check keeps the catalogue's default tier on the closed,
  * observed ChatGPT subscription allowlist even when `max` moves ahead of it.
  */
-export const CHATGPT_READY_DEFAULT_MODEL_ID =
-  TIER_MODEL_IDS.pro satisfies ChatGptSubscriptionModelId;
+export const CHATGPT_READY_DEFAULT_MODEL_ID = TIER_MODEL_IDS[
+  AGENT_DEFAULT_TIER
+] satisfies ChatGptSubscriptionModelId;
 
 /**
  * The initial default. A ready subscription chooses ChatGPT/Sol, a live

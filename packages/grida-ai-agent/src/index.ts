@@ -83,42 +83,4 @@ export {
   type EndpointProviderConfig,
   type ProbedEndpointModel,
 } from "./protocol/endpoints";
-// Earlier chat client contract (run options, context parts, modes, session
-// rows and status). Only the renderer's earlier chat pane consumes these; they
-// leave with that pane.
-export {
-  AGENT_SESSION_AGENT,
-  SCRATCH_SEED_LIMITS,
-  type AgentRunOptions,
-  type ScratchSeedEntry,
-} from "./protocol/run";
-export { normalizeSdkToolPartFields } from "./protocol/tool-part-fields";
-export {
-  DIRECTORY_SCOPE_MOUNT_ROOT,
-  USER_TEMPLATE_SELECTION,
-  USER_FILE_ATTACHMENTS,
-  USER_DIRECTORY_REFERENCES,
-  type DirectoryScopeDescriptor,
-  type UserFileAttachmentsData,
-} from "./protocol/context";
-export {
-  AGENT_MODES,
-  AGENT_DEFAULT_MODE,
-  asAgentMode,
-  type AgentMode,
-} from "./protocol/mode";
-export type { SessionRunState, SessionStatus } from "./protocol/session-status";
-export type { AgentUIMessageChunk } from "./protocol/wire";
-export type {
-  ChatSessionRow,
-  ChatMessageWithParts,
-  RewindResult,
-  SessionListFilter,
-  SessionListPage,
-  CreateSessionOptions,
-  PatchSessionOptions,
-} from "./session/rows";
-
-export { AGENT_TIERS } from "./tiers";
-
 export type { GGModelsView } from "./protocol/gg-models";

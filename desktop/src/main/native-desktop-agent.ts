@@ -3,8 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { lstatSync, realpathSync } from "node:fs";
 import { GG_PROVIDER_ID } from "@grida/agent";
-import { AGENT_DEFAULT_TIER } from "@grida/agent/tiers";
-import { TIER_MODEL_IDS } from "@grida/ai/catalogue";
+import { AGENT_DEFAULT_TIER, TIER_MODEL_IDS } from "@grida/ai/catalogue";
 import type { Workspace } from "@grida/daemon";
 import {
   ProtectedRoots,

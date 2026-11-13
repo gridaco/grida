@@ -275,10 +275,10 @@ describe("AgentFs.list_directory", () => {
     });
   });
 
-  it("resolveToolCallAsync falls back to the in-memory directory listing", async () => {
-    const out = await AgentFs.resolveToolCallAsync(seed(), {
-      tool_name: AgentFs.TOOL_NAMES.list_files,
-      input: { path: "/public", limit: 1 },
+  it("list_directory_fresh falls back to the in-memory directory listing", async () => {
+    const out = await seed().list_directory_fresh({
+      path: "/public",
+      limit: 1,
     });
     expect(out).toEqual({
       path: "/public",
@@ -446,25 +446,21 @@ describe("AgentFs — server-bound current-content edits", () => {
     const backend = new AgentFs.MemoryBackend();
     const first = new AgentFs(backend);
     expect(
-      await AgentFs.resolveToolCallAsync(first, {
-        tool_name: "write_file",
-        input: { path: "/new.md", content: "alpha beta" },
+      await first.write_fresh("/new.md", {
+        content: "alpha beta",
+        expected_version: null,
       })
-    ).toEqual({ ok: true });
+    ).toMatchObject({ ok: true });
     expect(await backend.read("/new.md")).toBe("alpha beta");
 
     const resumed = new AgentFs(backend);
     await resumed.hydrate();
     expect(
-      await AgentFs.resolveToolCallAsync(resumed, {
-        tool_name: "edit_file",
-        input: {
-          path: "/new.md",
-          old_string: "alpha",
-          new_string: "ALPHA",
-        },
+      await resumed.edit_fresh("/new.md", {
+        old_string: "alpha",
+        new_string: "ALPHA",
       })
-    ).toEqual({ ok: true, occurrences: 1 });
+    ).toMatchObject({ ok: true, occurrences: 1 });
     expect(await backend.read("/new.md")).toBe("ALPHA beta");
   });
 
@@ -475,12 +471,9 @@ describe("AgentFs — server-bound current-content edits", () => {
     await fs.hydrate();
 
     await backend.write("/notes.md", "human alpha beta");
-    expect(
-      await AgentFs.resolveToolCallAsync(fs, {
-        tool_name: "read_file",
-        input: { path: "/notes.md" },
-      })
-    ).toEqual({ content: "human alpha beta" });
+    expect((await fs.read_fresh("/notes.md"))?.content).toBe(
+      "human alpha beta"
+    );
     const staleContext = await fs.edit_fresh("/notes.md", {
       old_string: "alpha beta",
       new_string: "agent",
@@ -524,18 +517,12 @@ describe("AgentFs — server-bound current-content edits", () => {
     failRead = true;
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    const result = await AgentFs.resolveToolCallAsync(fs, {
-      tool_name: "read_file",
-      input: { path: "/notes.md" },
-    });
+    await expect(fs.read_fresh("/notes.md")).rejects.toThrow(
+      "temporary read failure"
+    );
 
     warn.mockRestore();
-    expect(result).toMatchObject({ ok: false, reason: "io_error" });
     expect(fs.read("/notes.md")).toMatchObject({ content: "persisted" });
-    const readSchema = AgentFs.tools.read_file.outputSchema as {
-      safeParse(value: unknown): { success: boolean };
-    };
-    expect(readSchema.safeParse(result).success).toBe(true);
   });
 
   it("serializes concurrent compatible edits on one path", async () => {
@@ -743,177 +730,6 @@ describe("AgentFs — server-bound current-content edits", () => {
     warn.mockRestore();
     expect(result).toMatchObject({ ok: false, reason: "io_error" });
     expect(fs.read("/notes.md")).toBeNull();
-  });
-});
-
-describe("AgentFs — model tool contract", () => {
-  it("does not expose ephemeral versions in schemas or results", async () => {
-    const readSchema = AgentFs.tools.read_file.outputSchema as {
-      safeParse(value: unknown): {
-        success: boolean;
-        data?: Record<string, unknown>;
-      };
-    };
-    const editSchema = AgentFs.tools.edit_file.inputSchema as {
-      safeParse(value: unknown): {
-        success: boolean;
-        data?: Record<string, unknown>;
-      };
-    };
-    const writeSchema = AgentFs.tools.write_file.inputSchema as {
-      safeParse(value: unknown): {
-        success: boolean;
-        data?: Record<string, unknown>;
-      };
-    };
-
-    expect(readSchema.safeParse({ content: "x" }).success).toBe(true);
-    const parsedRead = readSchema.safeParse({ content: "x", version: 7 });
-    expect(parsedRead.success).toBe(true);
-    expect(parsedRead.data).not.toHaveProperty("version");
-    expect(
-      editSchema.safeParse({
-        path: "/x",
-        old_string: "a",
-        new_string: "b",
-        version: 7,
-      }).data
-    ).not.toHaveProperty("version");
-    expect(
-      writeSchema.safeParse({
-        path: "/x",
-        content: "b",
-        version: 7,
-      }).data
-    ).not.toHaveProperty("version");
-
-    const fs = new AgentFs(new AgentFs.MemoryBackend());
-    expect(
-      AgentFs.resolveToolCall(fs, {
-        tool_name: "write_file",
-        input: { path: "/x", content: "a" },
-      })
-    ).toEqual({ ok: true });
-    expect(
-      AgentFs.resolveToolCall(fs, {
-        tool_name: "read_file",
-        input: { path: "/x" },
-      })
-    ).toEqual({ content: "a" });
-    expect(
-      AgentFs.resolveToolCall(fs, {
-        tool_name: "edit_file",
-        input: {
-          path: "/x",
-          old_string: "a",
-          new_string: "b",
-        },
-      })
-    ).toEqual({ ok: true, occurrences: 1 });
-    const editFailure = AgentFs.resolveToolCall(fs, {
-      tool_name: "edit_file",
-      input: {
-        path: "/x",
-        old_string: "missing",
-        new_string: "c",
-      },
-    });
-    expect(editFailure).toMatchObject({ ok: false, reason: "not_found" });
-    expect(editFailure).not.toHaveProperty("version");
-    expect(editFailure).not.toHaveProperty("current_version");
-
-    const asyncFs = new AgentFs(new AgentFs.MemoryBackend());
-    const asyncWrite = await AgentFs.resolveToolCallAsync(asyncFs, {
-      tool_name: "write_file",
-      input: { path: "/async", content: "a" },
-    });
-    expect(asyncWrite).toEqual({ ok: true });
-    expect(asyncWrite).not.toHaveProperty("version");
-    const asyncEdit = await AgentFs.resolveToolCallAsync(asyncFs, {
-      tool_name: "edit_file",
-      input: {
-        path: "/async",
-        old_string: "a",
-        new_string: "b",
-      },
-    });
-    expect(asyncEdit).toEqual({ ok: true, occurrences: 1 });
-    expect(asyncEdit).not.toHaveProperty("version");
-  });
-
-  it("returns too_large consistently for model text beyond the shared bound", async () => {
-    const oversized = "x".repeat(AgentFs.MAX_TEXT_FILE_BYTES + 1);
-    const backend = new AgentFs.MemoryBackend();
-    const fs = new AgentFs(backend);
-
-    expect(
-      AgentFs.resolveToolCall(fs, {
-        tool_name: "write_file",
-        input: { path: "/large.txt", content: oversized },
-      })
-    ).toMatchObject({ ok: false, reason: "too_large" });
-    expect(
-      AgentFs.resolveToolCall(fs, {
-        tool_name: "write_file",
-        input: {
-          path: "/large-unicode.txt",
-          content: "😀".repeat(AgentFs.MAX_TEXT_FILE_BYTES / 4 + 1),
-        },
-      })
-    ).toMatchObject({ ok: false, reason: "too_large" });
-    expect(await backend.read("/large.txt")).toBeNull();
-
-    const directLarge = "x".repeat(AgentFs.MAX_TEXT_FILE_BYTES) + "a";
-    expect(
-      fs.write("/direct-large.txt", {
-        content: directLarge,
-        expected_version: null,
-      })
-    ).toMatchObject({ ok: true });
-    expect(
-      fs.edit("/direct-large.txt", {
-        old_string: "a",
-        new_string: "b",
-      })
-    ).toMatchObject({ ok: true });
-    await fs.flush();
-    expect((await backend.read("/direct-large.txt"))?.endsWith("b")).toBe(true);
-
-    await backend.write("/large.txt", oversized);
-    const resumed = new AgentFs(backend);
-    await resumed.hydrate();
-    expect(
-      await AgentFs.resolveToolCallAsync(resumed, {
-        tool_name: "read_file",
-        input: { path: "/large.txt" },
-      })
-    ).toMatchObject({ ok: false, reason: "too_large" });
-    expect(
-      await AgentFs.resolveToolCallAsync(resumed, {
-        tool_name: "edit_file",
-        input: {
-          path: "/large.txt",
-          old_string: "x",
-          new_string: "y",
-        },
-      })
-    ).toMatchObject({ ok: false, reason: "too_large" });
-
-    const bounded = "x".repeat(AgentFs.MAX_TEXT_FILE_BYTES - 1) + "a";
-    await backend.write("/bounded.txt", bounded);
-    const boundedFs = new AgentFs(backend);
-    await boundedFs.hydrate();
-    expect(
-      await AgentFs.resolveToolCallAsync(boundedFs, {
-        tool_name: "edit_file",
-        input: {
-          path: "/bounded.txt",
-          old_string: "a",
-          new_string: "aa",
-        },
-      })
-    ).toMatchObject({ ok: false, reason: "too_large" });
-    expect(await backend.read("/bounded.txt")).toBe(bounded);
   });
 });
 

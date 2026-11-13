@@ -732,31 +732,6 @@ Rust host and sandbox helper, independently of these retained service roots.
 that the created project is empty (an unexpected `seed` body is inert), and the
 no-managed-root refusal.
 
-**Read-only directory references.** A native folder drop adds a deliberately
-narrow host capability without registering the folder as a workspace or copying
-its descendants into session scratch. Preload accepts only an OS-backed `File`
-whose path Electron can resolve, and sends that raw path once to the authenticated
-`POST /directory-scopes` route; the renderer receives only an opaque descriptor
-with a virtual `/__references__/dir_<uuid>` path. The in-memory registry
-canonicalizes the selected root, rejects either-direction overlap with the
-daemon secret root and every sensitive-read root in the outer sandbox policy,
-and bounds unclaimed grants by count and TTL. A run can atomically claim an exact
-descriptor for one session only, before any incoming message or scratch mutation
-is persisted. Persisted descriptors, copied/forked messages, expired grants, and
-host restarts therefore cannot recreate authority; session deletion revokes the
-live grant.
-
-The agent filesystem exposes each claimed root only through lazy
-`list_files`/`read_file`/`grep_files` traversal. It never hydrates the tree, adds
-the root to shell cwd authority, or admits it to scratch/workspace writes;
-`write_file` and `edit_file` return `read_only`. Every descendant operation uses
-the daemon filesystem scope's realpath containment, so an escaping symlink is
-rejected. Raw host paths never enter chat IR, model context, logs, or transport
-responses. `directory-scopes.test.ts`, `run-input.test.ts`,
-`workspace-agent-bindings.test.ts`, and `agent.test.ts` pin acquisition,
-descriptor/session ownership, claim-before-persistence, no-path-persistence,
-lazy reads, read-only mutation, and symlink escape refusal.
-
 The [private network host](desktop/src/main/agent-network-host.ts) establishes
 bootstrap and control before provider-network initialization. Only an authorized
 provider request starts the memory-only Chromium session; it still waits for
@@ -1588,7 +1563,6 @@ Today:
 - [Standalone package proof](scripts/ai-local/proof.mjs), [cleanup/report tests](scripts/ai-local/proof.test.mjs), [runtime guard](scripts/ai-local/network.cjs), [image consumer](scripts/ai-local/consumer.mjs), [video consumer](scripts/ai-local/video-consumer.mjs), [music consumer](scripts/ai-local/music-consumer.mjs), [sound-effect consumer](scripts/ai-local/sound-effect-consumer.mjs), [speech and voice consumer](scripts/ai-local/text-to-speech-consumer.mjs), [3D consumer](scripts/ai-local/three-d-consumer.mjs), and [guide](scripts/ai-local/README.md) — packed public exports with only declared production dependencies, synthetic transports, and guarded ambient network/credential/state access. No Grida host is installed or started.
 - [packages/grida-daemon/src/path-contains.ts](packages/grida-daemon/src/path-contains.ts) — shared `path.sep`-prefix containment used by the media store's containment asserts, protected-root overlap checks, and `createProject`'s managed-root assert (one source so the discipline can't drift).
 - [packages/grida-daemon/src/media.ts](packages/grida-daemon/src/media.ts) and [protocol/resources.ts](packages/grida-daemon/src/protocol/resources.ts) — host-rooted durable binary-media store and its path-free DTO vocabulary. Entries use opaque UUID directories, validated single-segment filenames and MIME types, owner-only atomic writes with metadata committed last, bounded whole-file reads (64 MiB), descriptor-relative realpath containment, exact-root symlink refusal, and `O_NOFOLLOW` file handles. Save admission is serialized per store instance and refuses new items past 512 committed records or 4 GiB logical bytes; it never evicts published media. Corrupt or incomplete entries fail independently. Native path resolution exists only on the Node-only server export and is omitted from the tenant's persistence-only `DaemonServices.media` view; there is no media HTTP route or generic renderer filesystem capability.
-- [packages/grida-ai-agent/src/protocol/context.ts](packages/grida-ai-agent/src/protocol/context.ts) — renderer-safe, persistable directory-reference descriptor vocabulary; the virtual path and read-only access are fixed by the host contract, while the descriptor itself carries no authority.
 - [packages/grida-ai-agent/src/http/routes/generated-media-persistence.ts](packages/grida-ai-agent/src/http/routes/generated-media-persistence.ts), [images.ts](packages/grida-ai-agent/src/http/routes/images.ts), [video.ts](packages/grida-ai-agent/src/http/routes/video.ts), [three-d.ts](packages/grida-ai-agent/src/http/routes/three-d.ts), [music.ts](packages/grida-ai-agent/src/http/routes/music.ts), [sound-effects.ts](packages/grida-ai-agent/src/http/routes/sound-effects.ts), and [text-to-speech.ts](packages/grida-ai-agent/src/http/routes/text-to-speech.ts) — generated image/video/3D/music/sound-effect/speech bytes are best-effort persisted through the optional host media service. Only a neutral filename, MIME type, and bytes enter the store: prompts, provider/model identity, credentials, and native paths do not. Text-to-speech voice discovery additionally projects upstream rows to bounded `{ voice_id, name }` values. A persistence failure is reduced to a generic warning and cannot discard or replace the already-generated response.
 - [Shared text-to-speech operation](packages/grida-ai/src/text-to-speech-client.ts), [speech tests](packages/grida-ai/src/text-to-speech-client.test.ts), and [voice discovery tests](packages/grida-ai/src/text-to-speech-voices.test.ts) — exact-origin ElevenLabs BYOK speech and bounded voice discovery. Generation validates text and one encoded voice path segment before submission; listing keeps one key snapshot across bounded pages and projects only IDs/names. The existing [media invocation](packages/grida-ai/src/media-request.ts) bounds key lookup, provider requests and result reads. Nonempty MP3 output is capped at 16 MiB; no GG or download authority is available. Safe failures retain actionable provider denial without upstream bodies or credentials. The [text-to-speech routes](packages/grida-ai-agent/src/http/routes/text-to-speech.ts) and [their tests](packages/grida-ai-agent/src/http/routes/text-to-speech.test.ts) retain admission, wire/status adaptation and optional root-level receipts. This replaces the former agent `elevenlabs-text-to-speech.ts` adapter.
 - [packages/grida-daemon/src/workspaces.ts](packages/grida-daemon/src/workspaces.ts) — opened workspace registry and root canonicalization.
@@ -3673,9 +3647,9 @@ durable or discard unrelated OAuth records.
    descendant and alias overlap, including an absent subtree; unresolved/dangling
    aliases fail closed. File/workspace registries recheck stored handles and roots,
    so earlier registration cannot retain newly forbidden authority. Agent structured
-   filesystem and directory-reference admission use the same topology rule before
-   granting reads. Desktop's finite-command policy denies this exact directory
-   while its long-lived credential host retains custody access. Native read-only
+   filesystem admission uses the same topology rule before granting reads.
+   Desktop's finite-command policy denies this exact directory while its
+   long-lived credential host retains custody access. Native read-only
    adapters require a current directory grant and recheck supplied protected
    roots before opening a target and delivering results. The native permission
    profile carries the same protected paths into finite command confinement.

@@ -4,12 +4,5 @@
     "types": [],
     "lib": ["esnext"]
   },
-  "include": [
-    "src/neutral-globals.d.ts",
-    "src/index.ts",
-    "src/tiers.ts",
-    "src/fs/index.ts",
-    "src/todos/index.ts",
-    "src/surface/index.ts"
-  ]
+  "include": ["src/neutral-globals.d.ts", "src/index.ts", "src/fs/index.ts"]
 }

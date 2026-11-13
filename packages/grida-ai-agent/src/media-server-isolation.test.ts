@@ -59,14 +59,13 @@ beforeAll(async () => {
   const contract = `
     import { createMediaDaemon, type MediaDaemonOptions } from "@grida/agent/media-server";
     import { ChatGptSubscriptionHost, type ChatGptProviderConfig } from "@grida/agent/chatgpt-host";
-    import type { AgentRunOptions, ChatSessionRow } from "@grida/agent";
     // @ts-expect-error Historical chat construction is not distributed.
     import { createAgent, createToolset, composeSystemPrompt } from "@grida/agent";
     // @ts-expect-error Historical chat server is not a public entrypoint.
     import type { AgentDaemonOptions } from "@grida/agent/server";
-    const verify = (configuration: ChatGptProviderConfig, media: MediaDaemonOptions, run: AgentRunOptions, row: ChatSessionRow) => {
+    const verify = (configuration: ChatGptProviderConfig, media: MediaDaemonOptions) => {
       const accepts: ConstructorParameters<typeof ChatGptSubscriptionHost>[0]["configuration"] = configuration;
-      return [accepts, createMediaDaemon(media), run.messages, row.id];
+      return [accepts, createMediaDaemon(media)];
     };
     void verify;
   `;

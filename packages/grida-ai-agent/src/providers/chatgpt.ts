@@ -14,7 +14,7 @@ import {
   isChatGptSubscriptionModelId,
   type ChatGptSubscriptionModelId,
 } from "../protocol/chatgpt";
-import type { ModelTier } from "../tiers";
+import type { ModelTier } from "@grida/ai/catalogue";
 import {
   ChatGptCredentialError,
   type ChatGptAccessCredentials,

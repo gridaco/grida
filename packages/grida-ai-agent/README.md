@@ -11,9 +11,7 @@ custody and endpoint settings), the native ChatGPT subscription host, the media
 transport client and client-safe protocol contracts. Shared model operations
 belong to [`@grida/ai`](../grida-ai/README.md).
 
-The `fs`, `todos` and `surface` subpaths and the run, mode, context and
-session-row contracts serve the renderer's earlier chat pane. The `fs` storage
-core also backs the web SVG document store.
+The `fs` storage core backs the web SVG document store.
 
 ## Exports
 
@@ -22,17 +20,14 @@ stays browser-safe, and the Node-only entry points are quarantined
 behind their own subpaths so they never pull `node:*` into a client
 bundle.
 
-| Subpath              | What                                                                                                                | Platform |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------- | -------- |
-| `.`                  | provider identity and metadata, ChatGPT subscription status, endpoint contracts, media DTOs, earlier chat contracts | neutral  |
-| `./tiers`            | model tier constants (`AGENT_TIERS`, `AGENT_DEFAULT_TIER`)                                                          | neutral  |
-| `./fs`               | virtual filesystem (`AgentFs`, `MemoryBackend`, live bindings)                                                      | neutral  |
-| `./fs/backends/opfs` | browser OPFS backend                                                                                                | browser  |
-| `./todos`            | plan store used by the earlier chat pane                                                                            | neutral  |
-| `./surface`          | artifact-surface host contract and browser observer used by the earlier chat pane                                   | neutral  |
-| `./media-server`     | `createMediaTenant` + `createMediaDaemon`, media options and provider transport type                                | Node     |
-| `./chatgpt-host`     | `ChatGptSubscriptionHost` and `ChatGptProviderConfig`; host-owned OAuth and captured subscription requests          | Node     |
-| `./media-transport`  | `MediaTransport` namespace — extends `DaemonTransport.Client` with the media service's routes                       | neutral  |
+| Subpath              | What                                                                                                       | Platform |
+| -------------------- | ---------------------------------------------------------------------------------------------------------- | -------- |
+| `.`                  | provider identity and metadata, ChatGPT subscription status, endpoint contracts, media DTOs                | neutral  |
+| `./fs`               | virtual filesystem (`AgentFs`, `MemoryBackend`, live bindings)                                             | neutral  |
+| `./fs/backends/opfs` | browser OPFS backend                                                                                       | browser  |
+| `./media-server`     | `createMediaTenant` + `createMediaDaemon`, media options and provider transport type                       | Node     |
+| `./chatgpt-host`     | `ChatGptSubscriptionHost` and `ChatGptProviderConfig`; host-owned OAuth and captured subscription requests | Node     |
+| `./media-transport`  | `MediaTransport` namespace — extends `DaemonTransport.Client` with the media service's routes              | neutral  |
 
 Only `dist` is included in the package file allowlist.
 
@@ -253,8 +248,8 @@ models}` — Ollama is the preset) and resolves media providers. There is no
   outside this package.
 - **Not a chat runtime.** The native agent owns chat execution, scheduling,
   sessions, prompts and tool assembly.
-- **Not a UI framework.** The protocol retains AI-SDK UI-message frame types;
-  rendering, transcript state and history navigation are the client's job.
+- **Not a UI framework.** Rendering, transcript state and history navigation
+  are the client's job.
 - **Not a Desktop bridge package.** `@grida/daemon/transport` +
   `@grida/agent/media-transport` own the daemon HTTP seam. Electron-specific
   window, dialog, shell, host-app, and file-path capabilities stay in
@@ -263,9 +258,7 @@ models}` — Ollama is the preset) and resolves media providers. There is no
   routes (files, recents, workspaces, the secrets
   store) live in `@grida/daemon`. A non-AI host capability never
   lands here.
-- **Not a chat-history store.** Session, message and part row types in
-  `session/rows.ts` are type-only contracts for the earlier chat pane.
-  Importing them opens no store and starts no work.
+- **Not a chat-history store.** The native agent owns chat history.
 
 ## Package Docs
 

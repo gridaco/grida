@@ -1,7 +1,6 @@
 // GRIDA-SEC-004 / GRIDA-SEC-008 — native Desktop provider lifetime fixtures.
 import { AuthStore, SecretsStore } from "@grida/daemon/server";
-import { AGENT_DEFAULT_TIER } from "@grida/agent/tiers";
-import { TIER_MODEL_IDS } from "@grida/ai/catalogue";
+import { AGENT_DEFAULT_TIER, TIER_MODEL_IDS } from "@grida/ai/catalogue";
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";

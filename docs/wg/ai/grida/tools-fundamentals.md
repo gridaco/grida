@@ -320,7 +320,6 @@ next thing to ship.
 
 - `packages/grida-ai-agent/src/fs/` — filesystem fundamentals
   ([source](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/src/fs/index.ts))
-- `packages/grida-ai-agent/src/todos/` — planning fundamentals
 - `packages/grida-ai-agent/src/tool-search/` — _not yet created; see proposal above_
 - Document-specific tools belong to their editor implementations. See
   [`tools-canvas.md`](./tools-canvas.md) for the canvas capability catalog.

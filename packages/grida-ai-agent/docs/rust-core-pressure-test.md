@@ -350,7 +350,7 @@ that implementation. The master chooses its next action using this evidence.
 `surface_open` acknowledges an auxiliary presentation request. The renderer can
 observe it later, and the model's continuation does not depend on successful
 rendering. This fits a recorded tool result plus an optional client projection.
-It needs no surface-specific execution framework. [Surface contract](../src/surface/index.ts).
+It needs no surface-specific execution framework. [Desktop editor surfaces](../../../desktop/src/main/native-editor-surfaces.ts).
 
 The product already asks for a meaningful renderable artifact early in a task.
 That is a master policy and a useful performance measure, time to first usable
@@ -421,7 +421,7 @@ staged working files. Native Desktop chat sends one PNG as image input or one
 other file per message, and the host retains the bytes for file tools. An
 attachment is therefore still represented in the message, while file tools can
 use a separate materialization.
-[Descriptor contract](../src/protocol/context.ts).
+[Retained file process tests](../../../crates/grida-agent/tests/process/retained_files.rs).
 
 Scratch storage is shared by the filesystem, vision, and command bindings.
 Cleanup must not remove files while descriptors that depend on them remain in

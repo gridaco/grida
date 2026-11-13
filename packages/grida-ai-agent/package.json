@@ -53,16 +53,6 @@
         "default": "./dist/media-transport.cjs"
       }
     },
-    "./tiers": {
-      "import": {
-        "types": "./dist/tiers.d.mts",
-        "default": "./dist/tiers.mjs"
-      },
-      "require": {
-        "types": "./dist/tiers.d.ts",
-        "default": "./dist/tiers.js"
-      }
-    },
     "./fs": {
       "import": {
         "types": "./dist/fs/index.d.mts",
@@ -82,26 +72,6 @@
         "types": "./dist/fs/backends/opfs.d.ts",
         "default": "./dist/fs/backends/opfs.js"
       }
-    },
-    "./todos": {
-      "import": {
-        "types": "./dist/todos/index.d.mts",
-        "default": "./dist/todos/index.mjs"
-      },
-      "require": {
-        "types": "./dist/todos/index.d.ts",
-        "default": "./dist/todos/index.js"
-      }
-    },
-    "./surface": {
-      "import": {
-        "types": "./dist/surface/index.d.mts",
-        "default": "./dist/surface/index.mjs"
-      },
-      "require": {
-        "types": "./dist/surface/index.d.ts",
-        "default": "./dist/surface/index.js"
-      }
     }
   },
   "scripts": {
@@ -115,9 +85,7 @@
   "dependencies": {
     "@grida/ai": "workspace:*",
     "@grida/daemon": "workspace:*",
-    "ai": "6.0.197",
-    "hono": "^4.6.14",
-    "zod": "^4"
+    "hono": "^4.6.14"
   },
   "devDependencies": {
     "tsdown": "^0.22.1",
