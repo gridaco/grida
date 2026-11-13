@@ -3510,6 +3510,24 @@ namespace cmath {
         return [x, y];
       };
 
+      // Zero tangents make the curve a straight line traced at the easing
+      // `B(t) = a + (3t² - 2t³)(b - a)`, whose derivative vanishes at both
+      // ends: the Newton step below cannot leave `t = 0` or `t = 1`, and a
+      // coarse sample can win there for a cursor well inside a long segment.
+      // Project onto the chord and invert the easing instead.
+      if (ta[0] === 0 && ta[1] === 0 && tb[0] === 0 && tb[1] === 0) {
+        const dx = b[0] - a[0];
+        const dy = b[1] - a[1];
+        const len2 = dx * dx + dy * dy;
+        if (len2 === 0) return 0;
+        const s = Math.min(
+          1,
+          Math.max(0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / len2)
+        );
+        // Trigonometric root of `3t² - 2t³ = s` on [0, 1].
+        return 0.5 - Math.sin(Math.asin(1 - 2 * s) / 3);
+      }
+
       // coarse sampling for initial guess
       let bestT = 0;
       let bestDist = Infinity;
