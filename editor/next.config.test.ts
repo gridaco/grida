@@ -15,6 +15,7 @@ let config: NextConfig;
 beforeAll(async () => {
   vi.stubEnv("NEXT_PUBLIC_GRIDA_USE_TELEMETRY", "0");
   vi.stubEnv("NEXT_PUBLIC_BLOG_URL", "https://blog.example.test");
+  vi.stubEnv("NEXT_PUBLIC_WWW_URL", "https://www.example.test");
   config = (await import("./next.config")).default;
 });
 afterAll(() => vi.unstubAllEnvs());
@@ -38,5 +39,42 @@ describe("Standalone blog routing", () => {
     expect(path.replace(new RegExp(route.src), route.dest)).toBe(
       `https://blog.example.test${path}`
     );
+  });
+});
+
+describe("Standalone marketing routing", () => {
+  it.each([
+    "/index",
+    "/index/games",
+    "/index/sitemap.xml",
+    "/index/_next/static/example.js",
+    "/index/_next/image",
+    "/index/assets/example.png",
+    "/index/canvas-demo",
+  ])("preserves the exact upstream path for %s", async (path) => {
+    const rewrites = await config.rewrites!();
+    expect(Array.isArray(rewrites)).toBe(true);
+    const routes = convertRewrites(
+      rewrites as { source: string; destination: string }[]
+    );
+    const route = routes.find(({ src }) => new RegExp(src).test(path))!;
+    expect(route).toBeDefined();
+    expect(path.replace(new RegExp(route.src), route.dest)).toBe(
+      `https://www.example.test${path}`
+    );
+  });
+
+  it.each([
+    "/index/canvas",
+    "/index/canvas/",
+    "/index/canvas/nested",
+    "/indexation",
+    "/home",
+  ])("leaves %s with the existing Grida application", async (path) => {
+    const rewrites = await config.rewrites!();
+    const routes = convertRewrites(
+      rewrites as { source: string; destination: string }[]
+    );
+    expect(routes.some(({ src }) => new RegExp(src).test(path))).toBe(false);
   });
 });

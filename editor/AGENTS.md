@@ -73,6 +73,20 @@ Tenant sites are primarily accessed via **tenant domains** (e.g. `xyz.grida.site
 | `(canvas)`    | Canvas playground & dev tools                          | —                                                    | Canvas playground, examples, experimental canvas features, and canvas-specific dev tools (e.g. I/O, AI).                                                                                                           |
 | `(dev)`       | Dev-only pages/tools                                   | —                                                    | Development-only routes; avoid linking from production UI.                                                                                                                                                         |
 
+## Standalone marketing pages
+
+- [`gridaco/www`](https://github.com/gridaco/www) owns the standalone marketing
+  site under `/index`, including its framework assets and `/index/sitemap.xml`.
+  `next.config.ts` forwards these paths to `NEXT_PUBLIC_WWW_URL` (the deployment
+  origin only, without `/index`; defaults to `https://grida-www.vercel.app`).
+- **Exception: `/index/canvas` stays here**, including its canonical URL, links,
+  and root sitemap entry. The external rewrite explicitly excludes that subtree;
+  moving it requires a separate migration.
+- The standalone `/index` entry temporarily redirects to `https://grida.co/home`.
+  Blank marketing scaffolds stay `noindex` and out of navigation and sitemaps.
+  When the first indexable page ships, add it to the standalone site's sitemap
+  and register `https://grida.co/index/sitemap.xml` in `app/robots.txt` together.
+
 ## Navigation, sitemaps, and docs links
 
 - **Header/nav config**: [`www/data/sitemap.ts`](www/data/sitemap.ts) (drives `www/header.tsx`; despite the name, this is **not** `sitemap.xml`)
