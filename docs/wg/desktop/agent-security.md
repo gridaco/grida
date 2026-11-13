@@ -162,24 +162,10 @@ session's exact workspace or scratch root, and explicit secret-root args are
 rejected before host execution; the fs-edit tools additionally refuse
 no-clobber paths (`fs/scope.ts`).
 
-The sidecar never raw-spawns a model command. It sends one bounded request over
-its inherited private capability channel; Electron main canonicalizes the
-exact roots and asks SRT for a fresh kernel profile for that process tree. The
-profile denies the shared scratch parent and host-secret directory, re-allows
-only this session's scratch, grants writes only to that scratch, the exact
-workspace, and a private command temp directory, and grants no direct network
-destination or local binding. The whole-sidecar profile remains a coarse
-backstop; per-command confinement is the command boundary. See the
+Desktop's retained sidecar runs no model command, and its private capability
+channel has no command lane. Model commands run in the native Rust host, whose
+sandbox helper confines each one. See the
 [Desktop authority binding](https://github.com/gridaco/grida/blob/main/desktop/docs/agent-authority.md).
-
-Cancellation is also host-acknowledged. `command.abort` does not settle the
-tool immediately: main first waits for the confined executor to return, remove
-its private temp, and release per-command SRT state, then replies
-`command.aborted`. The agent runtime holds turn settlement through that
-acknowledgement and through the model pump consuming the aborted tool result,
-so another turn or session deletion cannot overlap cleanup. POSIX process-group
-termination reclaims ordinary descendants; a macOS process that deliberately
-escapes with `setsid(2)` remains outside that hard-revocation claim.
 
 **Secret-dir containment — the srt / in-process split.** There are two
 classes of secret on disk, owned by two different gates:

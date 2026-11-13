@@ -1,10 +1,9 @@
 # ChatGPT subscription OAuth binding
 
 This document binds the native ChatGPT model-provider contract to Grida
-Desktop. Grida owns the model loop, sessions, tools, and approvals. Standard
-Desktop runs them in AgentSidecar. The disposable native profile runs them
-in Grida's Rust executable and uses private ACP stdio for Desktop control.
-ChatGPT supplies model inference in either composition.
+Desktop. Grida owns the model loop, sessions, tools, and approvals in its Rust
+executable, which Desktop controls over private ACP stdio. ChatGPT supplies
+model inference.
 
 The implementation is experimental because OpenAI client registration and
 the stable legal/support contract are external release gates. Desktop keeps
@@ -47,10 +46,10 @@ The current closed model compatibility projection consists of
 observed Zed/Codex-compatible surface, not authenticated discovery; it may
 drift, and an account can refuse a listed model.
 
-The main-owned provider network grant admits exact `auth.openai.com` and
-`chatgpt.com` HTTPS origins only on the credential-bearing provider lane.
-Neither joins the credential-free asset-download lane, and lookalike
-subdomains are refused.
+A Main-only provider network grant admits exact `auth.openai.com` and
+`chatgpt.com` HTTPS origins only on the credential-bearing provider lane. It is
+never published to the retained media sidecar. Neither origin joins the
+credential-free asset-download lane, and lookalike subdomains are refused.
 
 ## Ceremony
 
@@ -58,7 +57,7 @@ subdomains are refused.
    redirect, code, or provider parameters.
 2. Electron main binds the configured callback port on both `127.0.0.1` and
    `::1` when available. It emits the registered `http://localhost` URI.
-3. Main sends that URI to the selected owner's `/auth/chatgpt/start` handler.
+3. Main passes that URI to the credential owner's `start` call.
 4. The owner generates state plus PKCE verifier/challenge, retains the
    verifier in one launch-scoped attempt, and returns the authorization URL.
 5. Main reconstructs and validates the fixed authorization authority,
@@ -69,8 +68,7 @@ subdomains are refused.
    listener; a valid callback is atomically claimed, closing both listeners to
    replays.
 7. Main forwards the code, state, and attempt id directly to the owner's
-   `/auth/chatgpt/complete` handler. The callback's abort signal is attached to
-   that request.
+   `complete` call. A callback already aborted does not reach the owner.
 8. The owner exchanges the code through the host-routed provider transport
    and durably stores the refreshable credential.
 9. Only after completion returns a ready, secret-free account status does the
@@ -97,8 +95,9 @@ endpoint and platform TLS trust path, not a second JWT-verification layer.
 
 Every result is `ChatGptSubscriptionStatus`: booleans, optional expiry, and
 bounded account display fields. Main explicitly reconstructs that DTO rather
-than forwarding arbitrary sidecar JSON, so a future accidental token field
-cannot cross the bridge.
+than forwarding the owner's result object, so a future accidental token field
+cannot cross the bridge. Owner failures reach the renderer only as a safe
+error code.
 
 There is no renderer route for OAuth start/complete and no bridge method that
 accepts an authorization URL, code, state, verifier, token, or redirect URI.
@@ -108,9 +107,9 @@ sender guard.
 ## Cancellation and sign-out
 
 The coordinator records cancellation even while the callback is still
-binding, so an early Cancel click cannot be lost. Once the sidecar has returned
+binding, so an early Cancel click cannot be lost. Once the owner has returned
 an attempt id, cancellation closes the callback and invalidates that exact
-server attempt.
+attempt.
 
 The credential manager also binds in-flight exchange persistence to the
 attempt generation. Cancelling after the valid callback was claimed but before
@@ -126,11 +125,11 @@ separate subscription record.
 
 ## Storage and process boundary
 
-The selected credential owner uses the daemon's `AuthStore` and its owner-only
-`auth.json` file. Standard Desktop runs the owner in AgentSidecar. The
-disposable native profile uses one in-process owner in Electron main, with
-the same storage and ceremony handlers. The renderer and Rust executable
-receive no OAuth tokens. The native model request passes through the private
+The credential owner uses the daemon's `AuthStore` and its owner-only
+`auth.json` file. It runs in-process in Electron main and exposes the ceremony
+as direct start, complete, cancel, status and sign-out calls with bounded
+inputs; there is no HTTP route. The renderer, the retained sidecar and the
+Rust executable receive no OAuth tokens. The native model request passes through the private
 provider broker, which injects credentials on the exact route.
 
 The disposable profile defaults to Gateway. Select ChatGPT explicitly with
@@ -155,7 +154,8 @@ The focused offline contract covers:
   persistence;
 - token-claim parsing only after the exact token endpoint response, without
   claiming nonce/JWT signature/JWKS verification;
-- exact provider-lane network grants with no asset-lane grant.
+- exact provider-lane network grants, held Main-only and never published to
+  the sidecar, with no asset-lane grant.
 
 A live-account smoke remains manual because it opens the system browser,
 requires the user's ChatGPT account, and may consume plan quota.

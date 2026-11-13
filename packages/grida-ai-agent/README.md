@@ -34,7 +34,8 @@ bundle.
 | `./vision`              | image perception primitives                                                                                                                   | neutral  |
 | `./tools/design-search` | reference search tool vocabulary and result contracts                                                                                         | neutral  |
 | `./sandbox`             | composed sandbox policy (`buildAgentDaemonSandboxPolicy` — daemon frame + AI upstream hosts)                                                  | Node     |
-| `./transport`           | `AgentTransport` namespace — extends `DaemonTransport.Client` with the agent tenant's routes                                                  | neutral  |
+| `./media-transport`     | `MediaTransport` namespace — extends `DaemonTransport.Client` with the media service's routes only; no chat code                              | Node     |
+| `./transport`           | `AgentTransport` namespace — extends `MediaTransport.Client` with the chat routes                                                             | neutral  |
 
 The Node fs backend (`NodeFsBackend`) is internal + test-only — it is not a
 public subpath; workspace bindings use it in-process.
@@ -301,7 +302,7 @@ crosses one of these is the wrong tool, not a missing feature.
 - **Not a UI framework.** The protocol retains AI-SDK UI-message frame types;
   rendering, transcript state and history navigation are the client's job.
 - **Not a Desktop bridge package.** `@grida/daemon/transport` +
-  `@grida/agent/transport` own the daemon HTTP seam. Electron-specific
+  `@grida/agent/media-transport` own the daemon HTTP seam. Electron-specific
   window, dialog, shell, host-app, and file-path capabilities stay in
   Desktop's bridge contract.
 - **Not the host layer.** The loopback perimeter, daemon discovery, and

@@ -37,7 +37,7 @@ Electron main/preload (desktop)
 Desktop sidecar composition
   -> @grida/daemon owns the perimeter, shared-provider adapter and local resources
   -> @grida/agent/media-server serves media through @grida/ai without chat startup
-  -> never loads a TypeScript chat server; the retired entrypoint is unavailable
+  -> never loads a TypeScript chat server; Main is its only spawner
   -> serves authenticated daemon HTTP only on main-transferred sockets
   -> requires a host transport over bounded framed stdin/stdout for provider
      requests and credential-free provider-asset downloads
@@ -52,8 +52,7 @@ Old chats and their inputs remain in place, while new chats use `native-chat/`
 beside the browser profile. This is a fresh history boundary, not an archive or
 a migration. An interrupted first launch can reopen the separate native store.
 An unavailable native executable or failed handshake never starts the old agent.
-Current builds do not distribute or start the old chat runtime. Retired chat
-launch options fail before opening historical chat storage.
+Current builds do not distribute or start the old chat runtime.
 Windows currently starts retained services with chat unavailable pending an
 ACL-aware native storage contract.
 
@@ -70,7 +69,7 @@ sound effects, speech and 3D routes keep the same authenticated transport,
 BYOK key store, GG memory custody and durable media root. Agent/session routes,
 configured text-provider routes and native ChatGPT auth are absent; the
 handshake reports those capabilities as unavailable. No chat database, skill
-discovery, scratch preparation or finite-command authority is initialized.
+discovery, scratch preparation or command authority is initialized.
 This is a host launch choice, not a renderer setting or fallback after failure.
 
 On packaged macOS arm64, `--disable-agent` reuses a verified existing managed
@@ -135,9 +134,9 @@ ownership. The same physical files and SQLite lock inodes remain shared with
 native clients outside that namespace. Its working temp is namespace-local;
 durable media stays in the existing media library.
 
-The agent's finite commands use the separate Rust native sandbox helper and
+The agent's commands use the separate Rust native sandbox helper and
 per-action permission scope. Neither command nor chat execution is owned by
-the retained sidecar. The narrow managed macOS retained-media profile remains
+the retained sidecar, and its private channel has no command lane. The narrow managed macOS retained-media profile remains
 available independently of ordinary file/workspace services.
 
 Windows retains its existing unwrapped file/media services with chat and local

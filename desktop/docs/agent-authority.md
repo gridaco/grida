@@ -4,9 +4,8 @@ This document binds the language-agnostic
 [execution-authority model](https://github.com/gridaco/grida/blob/main/docs/wg/ai/agent/execution-authority.md)
 to Grida Desktop. Issue
 [#974](https://github.com/gridaco/grida/issues/974) lands the native provider
-transport slice described below; issue
-[#916](https://github.com/gridaco/grida/issues/916) binds finite shell workers
-to supervisor-owned per-command confinement.
+transport slice described below. Model commands run in the native host and its
+sandbox helper; see [Raw execution and extensions](#raw-execution-and-extensions).
 
 ## Current enforcement
 
@@ -28,8 +27,8 @@ composition without direct destinations or socket creation. An admitted managed 
 native retained-media launcher described below.
 
 The historical TypeScript chat runtime is absent from distributed entrypoints.
-Retired chat launch modes and options fail before storage startup. Native
-startup failure never selects another chat engine. Windows starts retained services with chat unavailable
+Main is the retained sidecar's only spawner and selects only retained services.
+Native startup failure never selects another chat engine. Windows starts retained services with chat unavailable
 until native private storage is supported. Its retained filesystem routes have
 no kernel containment; HTTP admission does not establish that boundary.
 
@@ -103,10 +102,11 @@ jar, or receive its durable login. Proxy authentication belongs to the host
 route; provider authorization comes only from the provider grant.
 
 The native ChatGPT-subscription provider is a narrow instance of this split:
-AgentSidecar owns OAuth persistence, refresh, account scoping, and request
-credential injection; Electron main owns the system-browser launch, temporary
-dual-stack loopback callback, and the exact `auth.openai.com` / `chatgpt.com`
-network route. The renderer receives only a reconstructed secret-free status
+a Main-owned subscription host owns OAuth persistence, refresh, account scoping,
+and request credential injection; Electron main also owns the system-browser
+launch, temporary dual-stack loopback callback, and the exact
+`auth.openai.com` / `chatgpt.com` network route. That route is a Main-only grant
+the retained sidecar never receives. The renderer receives only a reconstructed secret-free status
 DTO. The experimental binding defaults to the public Codex native OAuth client
 id with a host override; it never starts Codex or ACP. Account/display claims
 are parsed only from the exact TLS-authenticated token response, without an
@@ -215,10 +215,8 @@ published until the sidecar acknowledges application; the host re-authorizes a
 completed upload against its current grant snapshot immediately before I/O.
 Unknown, stale, out-of-order, oversized, or grant-mismatched messages terminate
 the channel. A bounded network-cancellation tombstone accepts only the late
-response frames that an in-flight abort can legitimately race. A finite command
-instead has a terminal handshake: `command.abort` keeps its tool promise pending
-until main has joined the worker and completed per-command cleanup, then
-`command.aborted` releases the turn's settlement barrier. Channel failure exits
+response frames that an in-flight abort can legitimately race. The channel has
+no command lane. Channel failure exits
 the sidecar so supervision restarts a fresh pair. The renderer can invoke the
 existing typed product bridge, but never receives the channel or a service
 credential.
@@ -294,10 +292,8 @@ failed or unavailable boundary refuses the command rather than selecting an
 unconfined executor. Native macOS/Linux confinement, cancellation and trusted
 checks have built-process coverage.
 
-The historical TypeScript/SRT finite-command host is removed. The retained
-service supervisor supplies no command executor, scratch sweep or skills root.
-Retired entrypoint flags are rejected before old chat storage is opened.
-The native master retains operation identity and uncertain outcomes independently
+The retained service supervisor supplies no command executor, scratch sweep or
+skills root, and its private channel has no command lane. The native master retains operation identity and uncertain outcomes independently
 of provider networking and editor semantics. Shutdown and Stop join the work
 owned by each process; platform-specific descendant revocation limits still
 follow the native sandbox contract.
@@ -320,21 +316,6 @@ means Grida does not intercept that extension's network stack; the extension is
 responsible for consuming the user's OS configuration like any other installed
 software. Filesystem/process containment and tool-call permission remain in
 force.
-
-## Permission modes
-
-`accept-edits` and `auto` decide when a cleared action needs user approval.
-They do not widen a kernel authority set:
-
-- `accept-edits` keeps the supervised Allow/Deny gate for non-read-only command
-  execution;
-- `auto` removes that interaction gate but still uses the same host-issued
-  confinement ceiling; and
-- neither mode converts an unavailable enforcer into ambient execution.
-
-The explicit CLI development posture may inject an honestly named unsandboxed
-execution host. It is not available to Desktop by default and must never set or
-return a `sandbox_enforced` assertion.
 
 ## Unsupported platforms
 
@@ -535,8 +516,6 @@ reviews. The architecture does not justify a dependency-version bump by
 itself; the version decision belongs to the implementing change set.
 
 Shared provider credentials also remain outside structured file access: the
-daemon refuses overlapping file/workspace grants and rechecks saved IDs, while
-agent bindings refuse overlapping workspace, scratch and directory-reference
-roots before hydration and recheck them before backend I/O. This covers ancestor
-selections and resolved aliases without granting the worker access to the shared
-provider directory.
+daemon refuses overlapping file/workspace grants and rechecks saved IDs. This
+covers ancestor selections and resolved aliases without granting the worker
+access to the shared provider directory.

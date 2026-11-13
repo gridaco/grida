@@ -42,23 +42,21 @@ client identity is Grida-owned or that OpenAI approves/supports Grida.
 
 ## Native-host auth seam
 
-`ceremonyRequest(route, init)` invokes the private ceremony routes in-process,
-without opening an HTTP listener. Each is a POST with a string body of at most
-32 KiB:
+`ChatGptSubscriptionHost` exposes the ceremony as direct calls, without an HTTP
+listener or route. Their string inputs are non-empty and total at most 32 KiB:
 
-| Route      | Purpose                                                   |
+| Call       | Purpose                                                   |
 | ---------- | --------------------------------------------------------- |
 | `start`    | Validate a configured redirect URI and create PKCE state. |
 | `complete` | Exchange one valid callback code and persist credentials. |
 | `cancel`   | Invalidate the named pending attempt.                     |
 | `status`   | Return the secret-free subscription status DTO.           |
-| `sign-out` | Remove the persisted credential and pending attempt.      |
+| `signOut`  | Remove the persisted credential and pending attempt.      |
 
-These routes never appear in a renderer transport. The trusted native host
-drives the system-browser and loopback-callback ceremony through
-`ceremonyRequest`. A renderer may receive only
-`ChatGptSubscriptionStatus`; it never receives the authorization code, state,
-PKCE verifier, access token, or refresh token.
+These calls never appear in a renderer transport. The trusted native host
+drives the system-browser and loopback-callback ceremony through them. A
+renderer may receive only `ChatGptSubscriptionStatus`; it never receives the
+authorization code, state, PKCE verifier, access token, or refresh token.
 
 The callback listener is a host concern. The package validates the exact
 redirect URI again before constructing the authorization URL, consumes a
