@@ -40,6 +40,9 @@ struct Worker {
     parent: String,
     chosen_child: Option<String>,
     pending_parent: Option<Value>,
+    /// A parent follow-up upload held until the child's upload rotates the
+    /// saved key, so its dispatch can only come after the rotation.
+    pending_rotation: Option<Value>,
 }
 
 impl Worker {
@@ -77,6 +80,7 @@ impl Worker {
             parent: String::new(),
             chosen_child: None,
             pending_parent: None,
+            pending_rotation: None,
         };
         let mut initialize = extension_initialize();
         for capability in [
@@ -242,6 +246,12 @@ impl Worker {
                     && !self.rotated
                     && called(&request, "delegate_review")
                     && !called(&request, "collect_review");
+                // The parent's follow-up step runs concurrently with the
+                // delegated child. Hold its upload until the child's upload
+                // rotates the key; otherwise it could legitimately dispatch
+                // under the original key before the rotation happens.
+                let defer_rotation =
+                    !child && self.rotate.is_some() && called(&request, "delegate_review");
                 if child {
                     assert!(request.get("tools").is_none(), "{request}");
                     if let Some((store, provider)) = self.rotate.take() {
@@ -263,6 +273,10 @@ impl Worker {
                 );
                 if defer_parent {
                     assert!(self.pending_parent.replace(frame["id"].clone()).is_none());
+                    return;
+                }
+                if defer_rotation {
+                    assert!(self.pending_rotation.replace(frame["id"].clone()).is_none());
                     return;
                 }
                 json!({"status":"accepted"})
@@ -325,6 +339,13 @@ impl Worker {
             _ => panic!("unexpected exchange {frame}"),
         };
         self.client.respond(&frame["id"], reply).await;
+        if self.rotated
+            && let Some(upload) = self.pending_rotation.take()
+        {
+            self.client
+                .respond(&upload, json!({"status":"accepted"}))
+                .await;
+        }
     }
 
     async fn wait(
@@ -1023,6 +1044,7 @@ async fn goal_review_key_rotation_between_upload_and_dispatch_cannot_run_either_
                 )
                 .await;
             assert!(worker.rotated);
+            assert!(worker.pending_rotation.is_none());
             assert_eq!(
                 worker.dispatches.len(),
                 1,
