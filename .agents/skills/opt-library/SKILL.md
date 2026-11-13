@@ -37,8 +37,9 @@ Grida's configured query-embedding provider; cold browse works without it.
 The Library deliberately spans two repositories:
 
 - [`gridaco/grida`](https://github.com/gridaco/grida) owns the data plane:
-  Supabase schema and migration history, the public `library` storage bucket,
-  product retrieval surfaces, and this local importer.
+  Supabase schema and migration history, the public Library object contract,
+  product retrieval surfaces, and this local importer. The importer writes object
+  bytes only to local Supabase Storage, independently of production delivery.
 - [`gridaco/library`](https://github.com/gridaco/library) owns content
   operations: curation, batch producers, enrichment, and bounded developer
   corpus releases.
@@ -115,8 +116,13 @@ pinned and must never silently follow `latest`.
   on the command line. The importer must discover the local stack itself and
   reject anything except the exact configured `127.0.0.1` endpoints.
 - Verify the complete archive before the first database or storage write.
-- Preserve content-derived identity. Store new assets at
-  `<sha256>.<extension>` and use the local Storage object ID as catalog identity.
+- Preserve content-derived addressing. Store new assets at
+  `<sha256>.<extension>` without overwrites; adopt an already stored path only
+  after verifying its bytes. Generate catalog UUIDs independently of Storage
+  response IDs. For existing duplicate hashes, adopt the earliest `created_at`,
+  then UUID, while retaining every historical record. Explicit seeding keeps
+  its existing metadata and fixed-vector refresh semantics. Concurrent local
+  seeds may fail on a unique path and can safely be retried.
 - Preserve archive license values verbatim. Do not infer a broader license.
 - Run `supabase db reset --local` before database-test suites that expect the
   canonical empty corpus. The reset intentionally removes this optional seed.

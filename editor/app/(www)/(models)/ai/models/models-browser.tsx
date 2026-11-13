@@ -33,15 +33,17 @@ import {
 } from "lucide-react";
 import {
   filterModels,
-  kindLabels,
+  kindLabel,
+  modalityLabel,
   emptyFilters,
   serializeFilters,
   parseFilters,
   type Filters,
   type PublicModel,
 } from "@/lib/gg/public-models/catalogue";
-import { ModelFilters, modalityLabels } from "./model-filters";
+import { ModelFilters } from "./model-filters";
 import { ModelDetails } from "./model-details";
+import { CostPreview, MediaCostHelp } from "./cost-preview";
 import { LabLogo } from "./lab-logo";
 import {
   modelPricing,
@@ -147,11 +149,18 @@ function ModalityIcons({
   values: PublicModel["gg"]["input_modalities"];
 }) {
   return values.map((value) => {
-    const Icon = modalityIcons[value];
+    const label = modalityLabel(value);
+    const Icon = Object.hasOwn(modalityIcons, value)
+      ? modalityIcons[value as keyof typeof modalityIcons]
+      : null;
     return (
-      <span key={value} title={modalityLabels[value]}>
-        <Icon className="size-3.5" aria-hidden="true" />
-        <span className="sr-only">{modalityLabels[value]}</span>
+      <span key={value} title={label}>
+        {Icon ? (
+          <Icon className="size-3.5" aria-hidden="true" />
+        ) : (
+          <span className="text-xs">{label}</span>
+        )}
+        {Icon ? <span className="sr-only">{label}</span> : null}
       </span>
     );
   });
@@ -168,7 +177,8 @@ const ModelRow = memo(function ModelRow({
   const [expanded, setExpanded] = useState(false);
   const detailsId = useId();
   const pricing = modelPricing(model);
-  const toggle = () => setExpanded(!expanded);
+  const illustrations = gg.illustrative_costs ?? [];
+  const toggle = () => setExpanded((value) => !value);
   return (
     <>
       <TableRow data-state={expanded ? "selected" : undefined}>
@@ -182,6 +192,18 @@ const ModelRow = memo(function ModelRow({
               </code>
             </div>
           </div>
+        </TableCell>
+        <TableCell className="min-w-36">
+          {illustrations[0] ? (
+            <CostPreview examples={illustrations} modelLabel={gg.card.label} />
+          ) : (
+            <span
+              className="text-muted-foreground"
+              title="No estimate available."
+            >
+              —
+            </span>
+          )}
         </TableCell>
         <PriceCell
           lines={pricing.input}
@@ -202,11 +224,11 @@ const ModelRow = memo(function ModelRow({
         />
         <TableCell>
           <Badge variant="secondary" className="font-normal">
-            {kindLabels[gg.kind]}
+            {kindLabel(gg.kind)}
           </Badge>
           <div
             className="mt-2 flex items-center gap-1.5 text-muted-foreground"
-            aria-label={`Input: ${gg.input_modalities.map((m) => modalityLabels[m]).join(", ") || "none"}. Output: ${gg.output_modalities.map((m) => modalityLabels[m]).join(", ")}`}
+            aria-label={`Input: ${gg.input_modalities.map(modalityLabel).join(", ") || "none"}. Output: ${gg.output_modalities.map(modalityLabel).join(", ")}`}
           >
             <ModalityIcons values={gg.input_modalities} />
             <span aria-hidden="true" className="mx-0.5 text-xs">
@@ -225,7 +247,9 @@ const ModelRow = memo(function ModelRow({
               title={
                 gg.card.release.basis === "provider_endpoint"
                   ? "Provider endpoint release; the model may have been released earlier."
-                  : "Model release"
+                  : gg.card.release.basis === "model"
+                    ? "Model release"
+                    : `Release basis: ${gg.card.release.basis}`
               }
             >
               <time dateTime={gg.card.release.date}>
@@ -235,6 +259,12 @@ const ModelRow = memo(function ModelRow({
               </time>
               {gg.card.release.basis === "provider_endpoint" ? (
                 <span className="mt-1 block text-[10px]">Endpoint release</span>
+              ) : null}
+              {gg.card.release.basis !== "model" &&
+              gg.card.release.basis !== "provider_endpoint" ? (
+                <span className="mt-1 block text-[10px]">
+                  Release basis: {gg.card.release.basis}
+                </span>
               ) : null}
             </a>
           ) : (
@@ -260,7 +290,7 @@ const ModelRow = memo(function ModelRow({
       </TableRow>
       {expanded ? (
         <TableRow id={detailsId} className="bg-muted/20 hover:bg-muted/20">
-          <TableCell colSpan={6} className="py-5 pl-16 pr-5 whitespace-normal">
+          <TableCell colSpan={7} className="py-5 pl-16 pr-5 whitespace-normal">
             <ModelDetails
               model={model}
               pricing={pricing}
@@ -496,13 +526,19 @@ export function ModelsBrowser({
         <div className="overflow-hidden rounded-lg border">
           <Table>
             <caption className="sr-only">
-              Models available through Grida AI Gateway, with capabilities and
-              usage pricing.
+              Models available through Grida AI Gateway, with capabilities,
+              estimated costs and usage pricing.
             </caption>
             <TableHeader className="bg-muted/30">
               <TableRow className="hover:bg-transparent">
                 <TableHead scope="col" className="pl-5">
                   Model
+                </TableHead>
+                <TableHead scope="col">
+                  <span className="inline-flex items-center gap-1">
+                    Media cost
+                    <MediaCostHelp />
+                  </span>
                 </TableHead>
                 <TableHead scope="col">
                   Input{" "}

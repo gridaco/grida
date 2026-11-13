@@ -26,10 +26,12 @@ hashes. Existing installed dependencies are linked into the snapshot; dotenv
 files, the ordinary editor environment, and existing build output are not copied.
 Next receives a newly constructed environment, private HOME, and build directory.
 
-The configuration wrapper changes only Turbopack's dependency resolution root
-and its alias for the unrelated Edge Config test replacement. The original
-headers, redirects, and other settings remain in effect. The test runs the real
-Next build and server, without mocking `next/server`, requests, responses, the
+The configuration wrapper changes Turbopack's dependency resolution root
+and its alias for the unrelated Edge Config test replacement. It omits the blog
+proxy rewrites because this API-only snapshot does not serve blog content. The
+proof requires `/blog` and `/blog/refig` to return local 404s without proxying.
+The original headers, redirects, and remaining settings stay in effect. The test
+runs the real Next build and server, without mocking `next/server`, requests, responses, the
 proxy, API handlers, bearer verification, or GG signing/verification.
 
 ## Coverage and deliberate fixtures

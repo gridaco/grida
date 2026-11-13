@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { createCatalogueReader, MAX_RESPONSE_BYTES } from "./cache";
-import { catalogueFixture } from "./fixtures";
+import {
+  catalogueFixture,
+  speechCatalogueFixture,
+  futureCatalogueFixture,
+} from "./fixtures";
 
 const base = Date.parse("2030-01-01T00:00:00Z");
 const response = (
@@ -17,6 +21,55 @@ const response = (
   });
 
 describe("bounded public catalogue cache", () => {
+  it("refreshes the whole catalogue when a future display vocabulary arrives", async () => {
+    let time = base;
+    const fetcher = vi.fn<typeof fetch>();
+    fetcher.mockResolvedValueOnce(response());
+    const read = createCatalogueReader({
+      origin: "https://gateway.example",
+      fetcher,
+      now: () => time,
+    });
+    expect((await read()).catalogue?.data).toHaveLength(3);
+    time += 60000;
+    fetcher.mockResolvedValueOnce(response(futureCatalogueFixture(), time));
+    const refreshed = await read();
+    expect(refreshed.state).toBe("fresh");
+    expect(refreshed.catalogue?.data).toHaveLength(4);
+    expect(refreshed.catalogue?.data.at(-1)?.gg).toMatchObject({
+      kind: "audio-analysis",
+      input_modalities: ["constructor", "pdf", "text"],
+      pricing_context: "session_input",
+      card: { lab: { logo: null } },
+    });
+    expect(refreshed.catalogue?.data.slice(0, 3)).toEqual(
+      catalogueFixture().data
+    );
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+  it("refreshes a good snapshot when speech/character-priced offerings arrive instead of expiring the whole catalogue", async () => {
+    let time = base;
+    const fetcher = vi.fn<typeof fetch>();
+    fetcher.mockResolvedValueOnce(response());
+    const read = createCatalogueReader({
+      origin: "https://gateway.example",
+      fetcher,
+      now: () => time,
+    });
+    expect((await read()).catalogue?.data).toHaveLength(3);
+    time += 60000;
+    fetcher.mockResolvedValueOnce(response(speechCatalogueFixture(), time));
+    const refreshed = await read();
+    expect(refreshed.state).toBe("fresh");
+    expect(refreshed.catalogue?.data).toHaveLength(6);
+    expect(
+      refreshed.catalogue?.data.filter((model) => model.gg.kind === "speech")
+    ).toHaveLength(3);
+    expect(
+      refreshed.catalogue?.data.some((model) => model.id === "alpha/Éclair")
+    ).toBe(true);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
   it("deduplicates reads, omits all credentials and never keys by query or user", async () => {
     const fetcher = vi.fn<typeof fetch>(async () => response());
     const read = createCatalogueReader({

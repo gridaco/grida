@@ -81,3 +81,123 @@ export function catalogueFixture(): Catalogue {
     ],
   };
 }
+
+/** Mixed snapshot covering additive speech kinds and their measured price units. */
+export function speechCatalogueFixture(): Catalogue {
+  const catalogue = catalogueFixture();
+  const speech = (
+    id: string,
+    operation: string,
+    unit: "character" | "second",
+    rate_mills: string
+  ): PublicModel => {
+    const model = structuredClone(catalogue.data[0]);
+    const tts = unit === "character";
+    model.id = id;
+    model.owned_by = "elevenlabs";
+    model.gg.kind = "speech";
+    model.gg.input_modalities = ["text"];
+    model.gg.output_modalities = ["audio"];
+    model.gg.operation_ids = [operation];
+    model.gg.interfaces = ["endpoints"];
+    model.gg.capabilities = {
+      streaming: false,
+      speech_generation: tts,
+      sound_effects_generation: !tts,
+    };
+    model.gg.card.label = id;
+    model.gg.card.lab = {
+      id: "elevenlabs",
+      name: "ElevenLabs",
+      url: "https://example.com",
+      logo: null,
+    };
+    model.gg.pricing.components = [
+      {
+        id: tts ? "speech_characters" : "audio_seconds",
+        meter: tts ? "speech_characters" : "audio_seconds",
+        unit,
+        rate_mills,
+        per_quantity: "1",
+        quantity_rounding: { mode: "none", increment: null },
+        when: {},
+        description: "Original measured usage.",
+      },
+    ];
+    return model;
+  };
+  catalogue.data.push(
+    speech(
+      "eleven_v4",
+      "speech.elevenlabs.eleven-v4.generate",
+      "character",
+      "0.08"
+    ),
+    speech(
+      "eleven_v4_turbo",
+      "speech.elevenlabs.eleven-v4-turbo.generate",
+      "character",
+      "0.04"
+    ),
+    speech(
+      "eleven_text_to_sound_v3",
+      "speech.elevenlabs.sound-effects-v3.generate",
+      "second",
+      "2"
+    )
+  );
+  catalogue.data.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return catalogue;
+}
+
+/** A future additive vocabulary, without teaching the consumer those values. */
+export function futureCatalogueFixture() {
+  const catalogue = catalogueFixture();
+  const model = structuredClone(catalogue.data[0]);
+  model.id = "future/audio-analysis";
+  model.gg.kind = "audio-analysis";
+  model.gg.input_modalities = ["constructor", "pdf", "text"];
+  model.gg.output_modalities = ["audio", "spatial"];
+  model.gg.pricing_context = "session_input";
+  model.gg.card.release = {
+    date: "2026-11-12",
+    source_url: "https://example.com/release",
+    basis: "provider_revision",
+  };
+  model.gg.pricing.components = [
+    {
+      id: "session_input_frames",
+      meter: "session_input_frames",
+      unit: "audio_frame",
+      rate_mills: "12.500",
+      per_quantity: "3",
+      quantity_rounding: { mode: "none", increment: null },
+      when: {},
+      description: "Measured frame usage.",
+    },
+  ];
+  return {
+    ...catalogue,
+    data: [
+      ...catalogue.data,
+      {
+        ...model,
+        gg: {
+          ...model.gg,
+          future_metadata: { ignored: true },
+          card: {
+            ...model.gg.card,
+            lab: {
+              ...model.gg.card.lab,
+              logo: {
+                url: "https://example.com/animated.avif",
+                media_type: "image/avif",
+                kind: "animated",
+              },
+            },
+          },
+        },
+      },
+    ],
+  };
+}

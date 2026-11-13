@@ -145,6 +145,10 @@ network sandbox. The proof separately restricts browser traffic to the exact
 editor, API, and callback origins. Google Fonts use local test CSS, and telemetry
 is disabled.
 
+The snapshot omits the main site's blog proxy rewrites. Blog content is outside
+this auth fixture, so `/blog` requests remain local without proxying to the hosted
+blog or back to the same editor route.
+
 Run the proof from another terminal after the editor reports ready:
 
 ```sh

@@ -11,6 +11,8 @@
  * The `'unsafe-eval'` tail is dev-only — pinned at module load.
  */
 
+import { LibraryStorage } from "@/lib/library/storage";
+
 const IS_DEV = process.env.NODE_ENV === "development";
 
 const DESKTOP_CSP_SCRIPT_TAIL = IS_DEV
@@ -29,16 +31,17 @@ const DESKTOP_CSP_CONNECT_SRC = IS_DEV
   : `connect-src 'self' http://127.0.0.1:*; `;
 
 /**
- * GRIDA-SEC-004 carve-out — the Grida Library is FIRST-PARTY storage (the app's
- * own Supabase bucket, `NEXT_PUBLIC_SUPABASE_URL`). Its public image URLs
- * (`getPublicUrl` → that origin) are the reference images the user picks in the
+ * GRIDA-SEC-004 carve-out — the Grida Library is FIRST-PARTY storage. Its
+ * explicitly selected public origin serves the reference images picked in the
  * artwork-station gather step; they are kept as URLs and rendered directly, so
- * the one first-party origin is allowlisted in `img-src` (image only).
+ * the first-party origin is allowlisted in `img-src` (image only). When Tigris
+ * is selected, retain the configured Supabase origin for saved reference URLs.
  *
  * This is NOT a generation-provider CDN: GENERATED media (fal/openrouter/…) is
  * still sidecar bytes via `data:`/`blob:`/`grida-workspace:` and those hosts stay
- * excluded (pinned by `proxy.test.ts`). Derived from env at module load; empty
- * (omitted) when unset — a malformed value can't widen the policy.
+ * excluded (pinned by `proxy.test.ts`). Derived from explicit configuration at
+ * module load; an unset Supabase origin is omitted, and malformed values can't
+ * widen the policy.
  */
 /**
  * Reduce an arbitrary string to a single bare `scheme://host[:port]` origin, or
@@ -57,20 +60,32 @@ function normalizeLibraryImgOrigin(value: string): string {
   }
 }
 
-const LIBRARY_IMG_ORIGIN = normalizeLibraryImgOrigin(
-  process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""
-);
+const LIBRARY_IMG_ORIGINS =
+  LibraryStorage.provider() === "tigris"
+    ? [LibraryStorage.origin(), process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""]
+    : [process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""];
 
 /** `img-src` with the first-party library origin appended when present. The
  *  origin is re-normalized here so the directive is safe regardless of caller. */
-function imgSrcDirective(libraryImgOrigin: string): string {
+function imgSrcDirective(
+  libraryImgOrigins: string | readonly string[]
+): string {
   // `grida-workspace:` is the privileged streaming scheme for workspace media
   // (#924): the main process serves it by proxying to the sidecar's
   // `/workspaces/file` route (Range-capable, no 1 MiB base64 cap). It's a local
   // privileged origin, NOT an external host.
   const base = "img-src 'self' data: blob: grida-workspace:";
-  const origin = normalizeLibraryImgOrigin(libraryImgOrigin);
-  return origin ? `${base} ${origin}` : base;
+  const origins = Array.from(
+    new Set(
+      (typeof libraryImgOrigins === "string"
+        ? [libraryImgOrigins]
+        : libraryImgOrigins
+      )
+        .map(normalizeLibraryImgOrigin)
+        .filter(Boolean)
+    )
+  );
+  return origins.length ? `${base} ${origins.join(" ")}` : base;
 }
 
 /**
@@ -79,13 +94,13 @@ function imgSrcDirective(libraryImgOrigin: string): string {
  * media modality) can't silently fall back to `default-src` and break at
  * runtime — the way video did before `media-src` was added (#908).
  *
- * `libraryImgOrigin` defaults to the env-derived first-party library origin; the
+ * `libraryImgOrigins` defaults to the selected first-party Library origins; the
  * contract test passes an explicit value to pin both the allow (library host)
  * and the deny (generation-provider hosts).
  */
 export function buildDesktopCsp(
   nonce: string,
-  libraryImgOrigin: string = LIBRARY_IMG_ORIGIN
+  libraryImgOrigins: string | readonly string[] = LIBRARY_IMG_ORIGINS
 ): string {
   return (
     DESKTOP_CSP_PREFIX +
@@ -95,7 +110,7 @@ export function buildDesktopCsp(
     // at build/SSR — keep `'unsafe-inline'` for now; tightening style-src is a
     // separate change.
     `style-src 'self' 'unsafe-inline'; ` +
-    `${imgSrcDirective(libraryImgOrigin)}; ` +
+    `${imgSrcDirective(libraryImgOrigins)}; ` +
     // media-src for BYOK video (#908): clips are downloaded by the sidecar and
     // handed to the renderer as base64 `data:`/`blob:` — never streamed from an
     // external origin (no provider hosts added). `grida-workspace:` (#924)

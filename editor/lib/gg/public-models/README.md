@@ -10,7 +10,17 @@ validated origin. `ggConfig.publicModels()` in `../config.ts` is the only
 environment reader; it is separate from signing/workload credential settings.
 
 `schema.ts` validates and projects only the page's supported fields; its Zod
-validator stays out of the browser bundle. `catalogue.ts` owns local query
+validator stays out of the browser bundle. Additive display values (model kinds,
+modalities, component units, pricing contexts and release bases) use bounded
+opaque tokens. Known values get friendly labels/icons; unfamiliar ones retain
+raw text and can be filtered from the observed snapshot. Unused unsupported logo
+metadata is omitted. Additional object fields are stripped. Unknown units keep
+their exact unit, quantity and rate without inferred conversions or pluralization.
+Essential structure, USD/mill denomination, decimals/divisors, rounding, safe
+clickable URLs, ordering and validity deadlines remain strict: incompatible
+changes to those contracts require a coordinated consumer update.
+
+`catalogue.ts` owns local query
 filter parsing and exact decimal formatting. `pricing.ts` groups the published
 rates into input, output and ancillary schedules for the table. Different meters
 remain separate: cached input is not the ordinary input price, and additive
@@ -18,9 +28,35 @@ components are never summed or silently discarded. Only provably disjoint quanti
 bands share a “From” summary; overlapping or opaque conditions stay separate.
 Unknown meters retain their identities under additional charges. Descriptions,
 conditions, tiers and rounding remain in the expanded row, mounted only on demand.
-Normalized usage units stay usage units. The current feed does not provide enough
-information to turn them into per-image or per-second quotes; the page must not
-invent that conversion or maintain its own model-specific price list.
+Normalized usage units stay usage units. Unit rates alone do not establish a
+general per-image or per-second conversion; the page must not invent that
+conversion or maintain its own model-specific price list.
+
+Optional `gg.illustrative_costs` supplies GG's own example amounts separately from
+usage rates. Every item has an advertised `operation_id`, exact decimal USD
+`amount`, `scenario`, `coverage`, and manual provenance (`description`,
+`reviewed_on`, optional HTTPS `source_urls`). The “Media cost” column shows a compact
+amount and an additional-example count. Hovering, focusing or clicking it opens a
+small Configuration/Cost table, using an optional authored `label` or the original
+scenario. The row's details chevron reveals complete scenarios, coverage,
+operations and provenance. Amounts apply only to the stated scenario and included
+charges; they are not unit rates or guaranteed request totals. USD strings are
+formatted without floating-point conversion or rounding. There is no fallback to
+another provider's examples or a model-specific local price list.
+
+Optional `unit` and `per_quantity` occur together and describe the amount's selected
+quantity, such as `image`/`1` or `character`/`500`. The amount is the total for that
+quantity; the page never divides it into another rate. Exact-one quantities display
+as `/image` for the known image unit; other quantities remain verbatim. Unfamiliar
+bounded unit tokens retain their raw spelling without invented pluralization.
+The page never infers a denominator or configuration label from model kind or
+English prose. An absent or unsupported pair leaves a bare amount; an unsupported
+label falls back to the scenario without discarding the cost.
+
+Older feeds without this field remain valid. Unsupported or malformed optional
+examples, including unknown operation IDs or unsafe source links, are omitted
+without hiding a model or weakening validation of its actual usage prices. Only
+the supported fields are projected; unfamiliar additive metadata is ignored.
 
 `cache.ts` owns one snapshot and one in-flight fetch per server process. Reads
 have a five-second deadline and a 2 MiB decoded limit. Successful validation is

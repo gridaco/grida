@@ -3,13 +3,19 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import {
   filterModels,
+  kindLabel,
+  modalityLabel,
   formatRate,
   millsToUSD,
   parseFilters,
   parsePageFilters,
   serializeFilters,
 } from "./catalogue";
-import { catalogueFixture } from "./fixtures";
+import {
+  catalogueFixture,
+  speechCatalogueFixture,
+  futureCatalogueFixture,
+} from "./fixtures";
 import { catalogueSchema } from "./schema";
 import { ModelDetails } from "../../../app/(www)/(models)/ai/models/model-details";
 import { LabLogo } from "../../../app/(www)/(models)/ai/models/lab-logo";
@@ -17,6 +23,223 @@ import { modelPricing } from "./pricing";
 import { ModelsBrowser } from "../../../app/(www)/(models)/ai/models/models-browser";
 
 describe("public models projection and local query", () => {
+  it("renders future display vocabularies and preserves their exact unit prices and filters", () => {
+    const catalogue = catalogueSchema.parse(futureCatalogueFixture());
+    expect(catalogue.data).toHaveLength(4);
+    const future = catalogue.data.at(-1)!;
+    expect(future.gg.card.lab.logo).toBeNull();
+    expect(JSON.stringify(catalogue)).not.toContain("future_metadata");
+    const filters = parseFilters(
+      new URLSearchParams(
+        "kind=audio-analysis&input_modalities=pdf&output_modalities=spatial"
+      )
+    );
+    expect(parseFilters(serializeFilters(filters))).toEqual(filters);
+    expect(filterModels(catalogue.data, filters)).toEqual([future]);
+    const initial = {
+      state: "fresh" as const,
+      catalogue,
+      served_at: 0,
+      validated_at: 0,
+      refresh_at: 60000,
+      expires_at: 300000,
+    };
+    const html = renderToStaticMarkup(
+      createElement(ModelsBrowser, {
+        initial,
+        initialFilters: filters,
+        gatewayOrigin: "https://gateway.example",
+      })
+    );
+    expect(html).toContain("future/audio-analysis");
+    expect(html).toContain("audio-analysis");
+    expect(html).toContain(
+      "Input: constructor, pdf, Text. Output: Audio, spatial"
+    );
+    expect(html).toContain("Release basis: provider_revision");
+    expect(html).not.toContain("Models are temporarily unavailable");
+    const details = renderToStaticMarkup(
+      createElement(ModelDetails, {
+        model: future,
+        pricing: modelPricing(future),
+        gatewayOrigin: "https://gateway.example",
+      })
+    );
+    expect(details).toContain("session_input_frames");
+    expect(details).toContain("session_input");
+    expect(details).toContain("$0.0125 / 3 audio_frame");
+    expect(details).not.toContain("audio_frames");
+    expect(details).not.toContain("audio frame");
+    const unfiltered = renderToStaticMarkup(
+      createElement(ModelsBrowser, {
+        initial,
+        initialFilters: parseFilters(new URLSearchParams()),
+        gatewayOrigin: "https://gateway.example",
+      })
+    );
+    for (const model of catalogue.data) expect(unfiltered).toContain(model.id);
+    // Prototype properties are raw labels, never inherited functions/components.
+    for (const token of ["constructor", "toString"]) {
+      expect(kindLabel(token)).toBe(token);
+      expect(modalityLabel(token)).toBe(token);
+      future.gg.kind = token;
+      future.gg.output_modalities = [token];
+      const raw = renderToStaticMarkup(
+        createElement(ModelsBrowser, {
+          initial,
+          initialFilters: parseFilters(new URLSearchParams()),
+          gatewayOrigin: "https://gateway.example",
+        })
+      );
+      expect(raw).toContain(`>${token}<`);
+      expect(raw).not.toContain("function Object");
+    }
+    const grown = futureCatalogueFixture();
+    grown.data[0].gg.input_modalities = [
+      "audio",
+      "image",
+      "json",
+      "pdf",
+      "text",
+      "three-d",
+      "video",
+    ];
+    expect(catalogueSchema.safeParse(grown).success).toBe(true);
+  });
+  it("keeps essential financial, link, ordering and validity contracts strict", () => {
+    const catalogue = futureCatalogueFixture();
+    const model = catalogue.data[0];
+    const withGG = (gg: unknown) => ({
+      ...catalogue,
+      data: [{ ...model, gg }, ...catalogue.data.slice(1)],
+    });
+    const withPrice = (pricing: unknown) => withGG({ ...model.gg, pricing });
+    const withRate = (change: Record<string, unknown>) =>
+      withPrice({
+        ...model.gg.pricing,
+        components: [{ ...model.gg.pricing.components[0], ...change }],
+      });
+    const invalid = [
+      { ...catalogue, object: "future-list" },
+      {
+        ...catalogue,
+        data: [
+          { ...model, object: "future-model" },
+          ...catalogue.data.slice(1),
+        ],
+      },
+      withGG({ ...model.gg, kind: null }),
+      withGG({ ...model.gg, kind: "x".repeat(65) }),
+      withGG({ ...model.gg, kind: "audio,analysis" }),
+      withGG({ ...model.gg, kind: "audio-analysis\n" }),
+      withGG({ ...model.gg, input_modalities: ["text", "text"] }),
+      withGG({ ...model.gg, input_modalities: ["text", "pdf"] }),
+      withGG({ ...model.gg, output_modalities: [] }),
+      withPrice({ ...model.gg.pricing, currency: "EUR" }),
+      withPrice({ ...model.gg.pricing, unit: "dollar" }),
+      ...["-1", "1e3", "NaN", "1\n"].map((rate_mills) =>
+        withRate({ rate_mills })
+      ),
+      withRate({ per_quantity: "0" }),
+      withRate({ unit: { label: "frame" } }),
+      withRate({ unit: "x".repeat(65) }),
+      withRate({ quantity_rounding: { mode: "floor", increment: "1" } }),
+      withRate({ quantity_rounding: { mode: "ceil", increment: null } }),
+      withRate({ quantity_rounding: { mode: "none", increment: "1" } }),
+      withGG({
+        ...model.gg,
+        card: {
+          ...model.gg.card,
+          lab: { ...model.gg.card.lab, url: "javascript:alert(1)" },
+        },
+      }),
+      withGG({
+        ...model.gg,
+        card: {
+          ...model.gg.card,
+          release: {
+            ...model.gg.card.release,
+            source_url: "https://user:secret@example.com",
+            date: "invalid",
+          },
+        },
+      }),
+      withGG({
+        ...model.gg,
+        card: {
+          ...model.gg.card,
+          release: {
+            ...model.gg.card.release,
+            source_url: "https://user:secret@example.com",
+          },
+        },
+      }),
+      withGG({
+        ...model.gg,
+        card: {
+          ...model.gg.card,
+          release: { ...model.gg.card.release, date: "invalid" },
+        },
+      }),
+      {
+        ...catalogue,
+        cards: { ...catalogue.cards, url: "http://example.com" },
+      },
+      { ...catalogue, data: [model, model, ...catalogue.data.slice(1)] },
+      { ...catalogue, data: [...catalogue.data].reverse() },
+      withGG({ ...model.gg, availability_ends_on: "2030-01-01" }),
+    ];
+    for (const fixture of invalid)
+      expect(catalogueSchema.safeParse(fixture).success).toBe(false);
+  });
+  it("keeps mixed speech/character and sound-effect/second offerings valid, filterable and renderable", () => {
+    const catalogue = catalogueSchema.parse(speechCatalogueFixture());
+    expect(catalogue.data).toHaveLength(6);
+    const filters = parseFilters(new URLSearchParams("kind=speech"));
+    expect(filters.kinds).toEqual(["speech"]);
+    const speech = filterModels(catalogue.data, filters);
+    expect(speech.map((model) => model.id)).toEqual([
+      "eleven_text_to_sound_v3",
+      "eleven_v4",
+      "eleven_v4_turbo",
+    ]);
+    expect(
+      filterModels(catalogue.data, parseFilters(new URLSearchParams()))
+    ).toHaveLength(6);
+    const html = renderToStaticMarkup(
+      createElement(ModelsBrowser, {
+        initial: {
+          state: "fresh",
+          catalogue,
+          served_at: 0,
+          validated_at: 0,
+          refresh_at: 60000,
+          expires_at: 300000,
+        },
+        initialFilters: filters,
+        gatewayOrigin: "https://gateway.example",
+      })
+    );
+    expect(html).toContain("Speech");
+    expect(html).not.toContain("Models are temporarily unavailable");
+    expect(html).not.toContain("alpha/Éclair");
+    for (const model of speech) expect(html).toContain(model.id);
+    for (const [id, price] of [
+      ["eleven_v4", "$0.00008 / character"],
+      ["eleven_v4_turbo", "$0.00004 / character"],
+      ["eleven_text_to_sound_v3", "$0.002 / second"],
+    ]) {
+      const model = speech.find((item) => item.id === id)!;
+      const details = renderToStaticMarkup(
+        createElement(ModelDetails, {
+          model,
+          pricing: modelPricing(model),
+          gatewayOrigin: "https://gateway.example",
+        })
+      );
+      expect(details).toContain(price);
+    }
+  });
   it("validates a complete snapshot, strips unused wire data and rejects inconsistent retirement/order", () => {
     const fixture = catalogueFixture();
     const projected = catalogueSchema.parse({
@@ -89,13 +312,13 @@ describe("public models projection and local query", () => {
     );
     expect(parsed).toEqual({
       q: "Éclair + music",
-      kinds: ["music", "text"],
+      kinds: ["music", "text", "unknown"],
       labs: ["alpha", "beta"],
-      input: ["image", "text"],
+      input: ["image", "text", "unknown"],
       output: ["audio", "three-d"],
     });
     const serialized = serializeFilters(parsed);
-    expect(serialized.get("kind")).toBe("music,text");
+    expect(serialized.get("kind")).toBe("music,text,unknown");
     expect(serialized.get("lab")).toBe("alpha,beta");
     expect(parseFilters(serialized)).toEqual(parsed);
     expect(
@@ -104,7 +327,7 @@ describe("public models projection and local query", () => {
     expect(
       serializeFilters({
         ...parsed,
-        kinds: ["text", "music", "text"],
+        kinds: ["text", "music", "text", "unknown"],
         labs: ["beta", "alpha"],
       }).toString()
     ).toBe(serialized.toString());
@@ -129,6 +352,7 @@ describe("public models projection and local query", () => {
         })
       );
     expect(render("openai")).toContain("<svg");
+    expect(render("elevenlabs")).toContain("<svg");
     expect(render("constructor")).toContain(">T</span>");
     expect(render("unknown")).not.toContain("<svg");
   });
@@ -151,11 +375,11 @@ describe("public models projection and local query", () => {
     expect(html).toContain("output_tokens");
     expect(html).toContain("Applies when");
   });
-  it("bounds query length and retained selections, accepting only known values and valid lab IDs", () => {
+  it("bounds query length and retained selections, accepting bounded display values and valid lab IDs", () => {
     const parsed = parseFilters(
       new URLSearchParams({
         q: "😀".repeat(129),
-        kind: [...Array(20).fill("image"), "text", "invalid"].join(","),
+        kind: [...Array(20).fill("image"), "text", "invalid type"].join(","),
         lab: [
           "x".repeat(65),
           ...Array.from({ length: 70 }, (_, i) => `lab-${i}`),
@@ -167,7 +391,7 @@ describe("public models projection and local query", () => {
     expect(parsed.kinds).toEqual(["image", "text"]);
     expect(parsed.labs).toHaveLength(64);
     expect(parsed.labs).not.toContain("x".repeat(65));
-    expect(parsed.input).toEqual(["image"]);
+    expect(parsed.input).toEqual(["image", "unknown"]);
     expect(parseFilters(serializeFilters(parsed))).toEqual(parsed);
   });
   it("preserves exact USD decimal rates without confusing mills and dollars", () => {

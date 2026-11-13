@@ -58,6 +58,7 @@ const copiedFiles = [
   "lib/platform/product-billing.ts",
   "lib/ai/openai-compat/wire.ts",
   "lib/desktop/csp.ts",
+  "lib/library/storage.ts",
   "lib/domains/index.ts",
   "lib/platform/index.ts",
   "lib/platform/billing-consumer.ts",
@@ -636,12 +637,12 @@ async function snapshot(editor, workspace) {
         .digest("hex"),
     });
   }
-  // The original config and every header/redirect are unchanged. Only Turbopack's
-  // dependency resolution root and the unrelated Edge Config tripwire are adapted.
+  // Preserve headers and redirects, but omit the unrelated blog proxy so this
+  // API-only snapshot cannot contact the hosted blog or proxy back to itself.
   await put(
     path.join(editor, "next.config.ts"),
     `import original from './next.actual.config';
-export default { ...original, turbopack: { ...original.turbopack, root: ${JSON.stringify(repository)}, resolveAlias: { ...original.turbopack?.resolveAlias, "@vercel/edge-config": './proof-edge-config.ts' } } };\n`
+export default { ...original, rewrites: async () => (await original.rewrites()).filter(({ source }) => !/^\\/blog(?:\\/|$)/.test(source)), turbopack: { ...original.turbopack, root: ${JSON.stringify(repository)}, resolveAlias: { ...original.turbopack?.resolveAlias, "@vercel/edge-config": './proof-edge-config.ts' } } };\n`
   );
   await put(
     path.join(editor, "lib/supabase/proxy.ts"),
@@ -2415,6 +2416,19 @@ async function assertions(
   );
   count++;
   await writeFile(tripwire, "");
+  for (const pathname of ["/blog", "/blog/refig"]) {
+    const response = await request(port, pathname);
+    check(
+      response.status === 404 && !response.headers.location,
+      `${pathname}: API fixture must return a local 404 without proxying`
+    );
+    check(
+      (await readFile(tripwire, "utf8")) === "maintenance\ncookies\ntenant\n",
+      `${pathname}: fixture request traversed web middleware more than once`
+    );
+    count++;
+    await writeFile(tripwire, "");
+  }
   return count;
 }
 
@@ -2646,7 +2660,6 @@ async function main() {
       GRIDA_OAUTH_ISSUER: `${issuer.authOrigin}/auth/v1`,
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "synthetic-publishable-key",
       NEXT_PUBLIC_DOCS_URL: apiOrigin,
-      NEXT_PUBLIC_BLOG_URL: apiOrigin,
       GRIDA_OAUTH_CLIENT_IDS: issuer.client,
       GRIDA_API_ORIGIN: apiOrigin,
       GRIDA_API_MAINTENANCE: "0",

@@ -168,7 +168,7 @@ describe("friendly public pricing", () => {
       ["constructor", "$1000.00 / 1M tokens"],
       ["duration", "$0.01 / generation"],
       ["duration", "$0.05 / second"],
-      ["input megapixels", "$0.10 / megapixel"],
+      ["input_megapixels", "$0.10 / megapixel"],
     ]);
     expect(
       summary.additional.every((line) => !line.from && line.extraRates === 0)

@@ -1,4 +1,8 @@
-import { formatRate, type PublicModel } from "./catalogue";
+import {
+  formatRate,
+  type PublicModel,
+  type PublicIllustrativeCost,
+} from "./catalogue";
 
 export type PublicRate = PublicModel["gg"]["pricing"]["components"][number];
 export type PriceSummaryLine = {
@@ -19,6 +23,34 @@ export type ModelPricing = {
   output: PriceSummaryLine[];
   additional: PriceSummaryLine[];
 };
+
+/** An illustration is already in USD; preserve every decimal without meter conversion. */
+export function formatIllustrativeAmount(amount: string): string {
+  const [whole, fraction = ""] = amount.split(".");
+  return `$${whole}.${fraction.padEnd(2, "0")}`;
+}
+
+const exampleUnits: Record<string, readonly [string, string]> = {
+  image: ["image", "images"],
+  video: ["video", "videos"],
+  generation: ["generation", "generations"],
+  task: ["task", "tasks"],
+  character: ["character", "characters"],
+  second: ["second", "seconds"],
+};
+
+/** The amount covers the authored quantity; a denominator is never a conversion. */
+export function formatIllustrativeCost(
+  example: PublicIllustrativeCost
+): string {
+  const amount = formatIllustrativeAmount(example.amount);
+  if (!example.unit || !example.per_quantity) return amount;
+  const one = /^1(?:\.0+)?$/.test(example.per_quantity);
+  const unit = Object.hasOwn(exampleUnits, example.unit)
+    ? exampleUnits[example.unit][one ? 0 : 1]
+    : example.unit;
+  return `${amount}/${one ? "" : `${example.per_quantity} `}${unit}`;
+}
 
 const labels: Record<string, string> = {
   input_tokens: "Input",
@@ -143,7 +175,7 @@ export function modelPricing(model: PublicModel): ModelPricing {
       key,
       label: Object.hasOwn(labels, first.meter)
         ? labels[first.meter]
-        : first.meter.replaceAll("_", " "),
+        : first.meter,
       price: `${from ? "From " : ""}${displayRate(first)}`,
       conditional: hasConditions,
       from,

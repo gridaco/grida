@@ -3,6 +3,28 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { fixture, guards } from "./guards.mjs";
 
+test("the isolated editor omits blog proxies without changing other routes", () => {
+  const retained = [
+    { source: "/_/:path*", destination: "/universal/:path*" },
+    {
+      source: "/docs/:path*",
+      destination: `${fixture.editorOrigin}/:path*`,
+    },
+    { source: "/blogger", destination: "/people" },
+  ];
+  for (const origin of [fixture.editorOrigin, "https://blog.grida.co"]) {
+    const rewrites = [
+      ...retained,
+      { source: "/blog", destination: `${origin}/blog` },
+      { source: "/blog/:path*", destination: `${origin}/blog/:path*` },
+      { source: "/blog/archive", destination: `${origin}/blog/archive` },
+    ];
+    assert.deepEqual(guards.editorRewrites(rewrites), retained);
+    assert.equal(rewrites.length, 6);
+  }
+  assert.throws(() => guards.editorRewrites({}), /editor rewrite list/);
+});
+
 test("fixture images admit pinned versions from Supabase registry fallbacks", () => {
   for (const auth of [
     "supabase/gotrue:v2.196.0",

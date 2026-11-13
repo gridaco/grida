@@ -1,7 +1,9 @@
 "use server";
+import { Env } from "@/env";
 import type { Library } from "@/lib/library";
 import { createLibraryClient } from "@/lib/supabase/server";
 import { embedLibraryQuery } from "@/lib/library/embedding";
+import { LibraryStorage } from "@/lib/library/storage";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { headers } from "next/headers";
@@ -81,6 +83,7 @@ const __select_object_with_author = `
   prompt,
   public_domain,
   score,
+  sha256,
   title,
   transparency,
   updated_at,
@@ -93,16 +96,12 @@ const __select_object_with_author = `
 // Attach public + download URLs to library object rows. Shared by the
 // listing, similar, and search paths.
 function __with_object_urls(
-  client: Awaited<ReturnType<typeof createLibraryClient>>,
   objects: ObjectWithAuthor[]
 ): Library.ObjectDetail[] {
   return objects.map((object) => ({
     ...object,
-    url: client.storage.from("library").getPublicUrl(object.path).data
-      .publicUrl,
-    download: client.storage
-      .from("library")
-      .getPublicUrl(object.path, { download: true }).data.publicUrl,
+    url: LibraryStorage.url(object),
+    download: new URL(LibraryStorage.download(object), Env.web.HOST).href,
   }));
 }
 
@@ -118,7 +117,7 @@ export async function _getObject(id: string): Promise<Library.ObjectDetail> {
     throw error;
   }
 
-  return __with_object_urls(client, [data as unknown as ObjectWithAuthor])[0];
+  return __with_object_urls([data as unknown as ObjectWithAuthor])[0];
 }
 
 export const getObject = cache(_getObject);
@@ -147,7 +146,7 @@ export async function random({ text }: { text?: string }) {
     throw error;
   }
 
-  return __with_object_urls(client, [data as unknown as ObjectWithAuthor])[0];
+  return __with_object_urls([data as unknown as ObjectWithAuthor])[0];
 }
 
 export async function _similar(
@@ -170,15 +169,9 @@ export async function _similar(
     .range(options.range[0], options.range[1]);
 
   return {
-    data:
-      (data as unknown as ObjectWithAuthor[])?.map((object) => ({
-        ...object,
-        url: client.storage.from("library").getPublicUrl(object.path).data
-          .publicUrl,
-        download: client.storage
-          .from("library")
-          .getPublicUrl(object.path, { download: true }).data.publicUrl,
-      })) || null,
+    data: data
+      ? __with_object_urls(data as unknown as ObjectWithAuthor[])
+      : null,
     error,
   };
 }
@@ -243,7 +236,7 @@ export async function browse({
     throw error;
   }
   return {
-    data: __with_object_urls(client, data as unknown as ObjectWithAuthor[]),
+    data: __with_object_urls(data as unknown as ObjectWithAuthor[]),
     count: count ?? undefined,
   };
 }
@@ -318,10 +311,7 @@ export async function search({
   }
 
   return {
-    data: __with_object_urls(
-      client,
-      (data as unknown as ObjectWithAuthor[]) ?? []
-    ),
+    data: __with_object_urls((data as unknown as ObjectWithAuthor[]) ?? []),
     count: totalRes.count ?? undefined,
   };
 }
