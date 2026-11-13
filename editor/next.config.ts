@@ -220,11 +220,6 @@ const nextConfig: NextConfig = {
       },
       // Standalone marketing pages — source: https://github.com/gridaco/www.
       // Keep /index/canvas in this editor; its migration is a separate change.
-      // The exact base path avoids an empty wildcard adding a slash upstream.
-      {
-        source: "/index",
-        destination: `${WWW_INDEX_URL}/index`,
-      },
       {
         source: "/index/:path((?!canvas(?:/|$)).+)",
         destination: `${WWW_INDEX_URL}/index/:path*`,

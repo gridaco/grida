@@ -3,12 +3,20 @@ import type { NextConfig } from "next";
 import { createRequire } from "node:module";
 
 // Exercise Vercel's compiled routes: an empty wildcard retains its preceding slash.
-const { convertRewrites } = createRequire(import.meta.url)(
+const { convertRewrites, convertRedirects } = createRequire(import.meta.url)(
   "next/dist/compiled/@vercel/routing-utils"
 ) as {
   convertRewrites(
     rules: { source: string; destination: string }[]
   ): { src: string; dest: string }[];
+  convertRedirects(
+    rules: {
+      source: string;
+      destination: string;
+      permanent?: boolean;
+      statusCode?: number;
+    }[]
+  ): { src: string; status: number; headers?: Record<string, string> }[];
 };
 
 let config: NextConfig;
@@ -48,6 +56,16 @@ describe("Standalone marketing routing", () => {
     "/index/games",
     "/index/sitemap.xml",
     "/index/_next/static/example.js",
+    "/index/canvas",
+  ])("leaves %s for host-aware routing before redirects", async (path) => {
+    const routes = convertRedirects(await config.redirects!());
+    expect(routes.some(({ src }) => new RegExp(src).test(path))).toBe(false);
+  });
+
+  it.each([
+    "/index/games",
+    "/index/sitemap.xml",
+    "/index/_next/static/example.js",
     "/index/_next/image",
     "/index/assets/example.png",
     "/index/canvas-demo",
@@ -65,6 +83,7 @@ describe("Standalone marketing routing", () => {
   });
 
   it.each([
+    "/index",
     "/index/canvas",
     "/index/canvas/",
     "/index/canvas/nested",

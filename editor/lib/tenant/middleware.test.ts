@@ -121,13 +121,31 @@ describe("TenantMiddleware hosted routing", () => {
     expect(mocks.serviceRolePublicClient).not.toHaveBeenCalled();
   });
 
-  it("preserves canonical platform tenant rewriting", async () => {
-    const response = await route("studio.grida.site", "/portfolio?q=one");
+  it.each(["/portfolio", "/index"])(
+    "preserves canonical platform tenant rewriting for %s",
+    async (path) => {
+      const response = await route("studio.grida.site", `${path}?q=one`);
+      const rewritten = new URL(response!.headers.get("x-middleware-rewrite")!);
+      expect(rewritten.pathname).toBe(`/~/studio${path}`);
+      expect(rewritten.search).toBe("?q=one");
+      expect(mocks.rpc).toHaveBeenCalledWith("www_get_canonical_hostname", {
+        p_www_name: "studio",
+      });
+    }
+  );
+
+  it("preserves a custom domain's /index page under its tenant root", async () => {
+    mocks.rpc.mockResolvedValueOnce({
+      data: [{ www_name: "studio", canonical_hostname: "studio.example.test" }],
+      error: null,
+    });
+    const response = await route("studio.example.test", "/index?q=one");
     const rewritten = new URL(response!.headers.get("x-middleware-rewrite")!);
-    expect(rewritten.pathname).toBe("/~/studio/portfolio");
+    expect(rewritten.pathname).toBe("/~/studio/index");
     expect(rewritten.search).toBe("?q=one");
-    expect(mocks.rpc).toHaveBeenCalledWith("www_get_canonical_hostname", {
-      p_www_name: "studio",
+    expect(response!.headers.get("location")).toBeNull();
+    expect(mocks.rpc).toHaveBeenCalledWith("www_resolve_hostname", {
+      p_hostname: "studio.example.test",
     });
   });
 
