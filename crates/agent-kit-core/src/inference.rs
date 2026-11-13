@@ -186,6 +186,11 @@ pub struct PreparedRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     input_limit: Option<NonZeroU64>,
     fingerprint: Fingerprint,
+    /// The fingerprint of the request, binding and capabilities alone, from
+    /// which the fingerprint with an input limit derives without hashing the
+    /// request again.
+    #[serde(skip)]
+    unbounded: Fingerprint,
 }
 
 impl PreparedRequest {
@@ -195,23 +200,42 @@ impl PreparedRequest {
         binding: ProviderBinding,
         capabilities: ModelCapabilities,
     ) -> Result<Self> {
-        request.validate(&capabilities)?;
-        let fingerprint = Fingerprint::of(&(&request, &binding, &capabilities))?;
-        Ok(Self {
-            request,
-            binding,
-            capabilities,
-            input_limit: None,
-            fingerprint,
-        })
+        Self::prepared(request, binding, capabilities, None)
     }
 
     /// Bind a caller-selected input token ceiling to this request's identity.
     pub fn with_input_limit(mut self, limit: NonZeroU64) -> Result<Self> {
+        self.fingerprint = Self::identity(self.unbounded, Some(limit))?;
         self.input_limit = Some(limit);
-        self.fingerprint =
-            Fingerprint::of(&(&self.request, &self.binding, &self.capabilities, limit))?;
         Ok(self)
+    }
+
+    /// Validate once and hash the request once, whatever the limit.
+    fn prepared(
+        request: InferenceRequest,
+        binding: ProviderBinding,
+        capabilities: ModelCapabilities,
+        input_limit: Option<NonZeroU64>,
+    ) -> Result<Self> {
+        request.validate(&capabilities)?;
+        let unbounded = Fingerprint::of(&(&request, &binding, &capabilities))?;
+        Ok(Self {
+            request,
+            binding,
+            capabilities,
+            input_limit,
+            fingerprint: Self::identity(unbounded, input_limit)?,
+            unbounded,
+        })
+    }
+
+    /// A request without a limit is identified by its content; a limit binds
+    /// to that identity rather than to the content again.
+    fn identity(unbounded: Fingerprint, limit: Option<NonZeroU64>) -> Result<Fingerprint> {
+        match limit {
+            None => Ok(unbounded),
+            Some(limit) => Fingerprint::of(&(unbounded, limit)),
+        }
     }
 
     pub fn input_limit(&self) -> Option<NonZeroU64> {
@@ -246,13 +270,13 @@ impl<'de> Deserialize<'de> for PreparedRequest {
             fingerprint: Fingerprint,
         }
         let data = Data::deserialize(deserializer)?;
-        let mut request = Self::from_validated(data.request, data.binding, data.capabilities)
-            .map_err(serde::de::Error::custom)?;
-        if let Some(limit) = data.input_limit {
-            request = request
-                .with_input_limit(limit)
-                .map_err(serde::de::Error::custom)?;
-        }
+        let request = Self::prepared(
+            data.request,
+            data.binding,
+            data.capabilities,
+            data.input_limit,
+        )
+        .map_err(serde::de::Error::custom)?;
         if request.fingerprint != data.fingerprint {
             return Err(serde::de::Error::custom("request fingerprint mismatch"));
         }

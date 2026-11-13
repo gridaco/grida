@@ -592,6 +592,15 @@ fn an_input_limit_changes_prepared_identity_and_roundtrips() {
     let limit = NonZeroU64::new(123).unwrap();
     let bounded = prepared.clone().with_input_limit(limit).unwrap();
     assert_ne!(bounded.fingerprint(), prepared.fingerprint());
+    assert_eq!(
+        bounded.fingerprint(),
+        Fingerprint::of(&(prepared.fingerprint(), limit)).unwrap()
+    );
+    let other = NonZeroU64::new(456).unwrap();
+    assert_eq!(
+        bounded.clone().with_input_limit(other).unwrap(),
+        prepared.clone().with_input_limit(other).unwrap()
+    );
     assert_eq!(bounded.request(), prepared.request());
     let mut encoded = serde_json::to_value(&bounded).unwrap();
     assert_eq!(encoded["input_limit"], 123);
