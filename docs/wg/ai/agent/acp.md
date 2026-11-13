@@ -16,7 +16,7 @@ tags: [internal, wg, agent-system]
 
 # ACP Integration
 
-The proposed client boundary uses the Agent Client Protocol for shared agent
+The client boundary uses the Agent Client Protocol for shared agent
 interactions and negotiated extensions for additional behavior. A host adapter
 translates that protocol into the [component contracts](./components.md).
 The [master](./master.md) owns strategy and product policy. Clients own their
@@ -64,10 +64,11 @@ only when its complete behavior is available through the selected host.
 | Durable work                         | Explicit acceptance, control, retention, and recovery guarantees beyond baseline protocol delivery.      |
 | Client filesystem and editor actions | Supported callbacks plus host-granted access to a specific resource and operation.                       |
 
-The active subagent proposal initially permits child cancellation and restricts
-direct child prompt, steering, configuration, and resume. A product promising
-richer controls needs an extension or an upstream revision that defines them.
-[Subagent proposal](https://agentclientprotocol.com/rfds/subagents).
+ACP's subagent draft permits child cancellation and restricts direct child
+prompt, steering, configuration, and resume. Richer child controls are
+therefore negotiated extensions, each with its own advertised semantics, until
+an upstream revision defines them.
+[Subagent draft](https://agentclientprotocol.com/rfds/subagents).
 
 ## Tool kind mapping
 
@@ -116,6 +117,8 @@ must preserve protocol semantics and document connection establishment. The
 reviewed remote transport remains under specification. Transport selection
 adds no access rights. [Transports](https://agentclientprotocol.com/protocol/v1/transports).
 
-The native host's baseline, proposed extensions, client compatibility checks,
-and later shared-service binding are defined in its
-[client protocol proposal](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-client-protocol.md).
+A host may also offer an authenticated local shared-service binding that
+carries the same vocabulary to independent clients. The native host's
+baseline, negotiated extensions, client compatibility checks, and shared-service
+binding are defined in its
+[client protocol binding](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-client-protocol.md).

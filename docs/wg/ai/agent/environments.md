@@ -180,13 +180,15 @@ in-process services. Any permitted connection uses a compatible host network
 route within its destination grant. An incompatible opaque client fails closed.
 See [Execution authority](./execution-authority.md).
 
-The proposed rebuild uses a native confinement adapter whose platform backends
-must satisfy these authority boundaries. The host supplies routing and transport
-trust, and concurrent executions retain independent grants. The
-[existing srt backend study](./srt.md) records capabilities and limitations relevant
-to replacing that dependency. The concrete platform choices and initial support
-boundary live in the
-[native sandbox proposal](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-sandbox.md).
+Native confinement is the current backend: a deny-default platform sandbox
+profile on macOS, and user, mount, PID, IPC and network namespaces with a
+syscall filter on Linux. Raw networking is denied, and native Windows raw
+execution is unavailable. Its platform backends satisfy these authority
+boundaries. The host supplies routing and transport trust, and concurrent
+executions retain independent grants. The
+[retired srt backend study](./srt.md) records the findings that informed it. The
+concrete platform choices and support boundary live in the
+[native sandbox binding](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-sandbox.md).
 
 For `shell.run`, the host creates a confined process tree from the effective
 grant: the host/user ceiling ∩ declared requirements ∩ parent-delegable

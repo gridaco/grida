@@ -1,6 +1,6 @@
 ---
 title: Agent Components
-description: Proposed boundaries for messages, inference, tools, history, context, live execution, and durable sessions, with explicit dependencies and independently testable contracts.
+description: Component boundaries for messages, inference, tools, history, context, live execution, and durable sessions, with explicit dependencies and independently testable contracts.
 keywords: [agent, components, runtime, sessions, inference, history, durability]
 format: md
 sidebar_position: 3
@@ -9,7 +9,8 @@ tags: [internal, wg, ai, architecture]
 
 # Agent Components
 
-This proposal defines a reusable agent component kit. The starting point is
+This contract defines a reusable agent component kit. Release availability
+belongs to the [feature catalog](../../../agent/features.md). The starting point is
 seven specific responsibilities with small contracts. Each can be understood
 and tested at its own level. Product judgment belongs to the
 [master](./master.md), and user-visible promises belong to the
@@ -873,9 +874,9 @@ A completed inference releases its inference permit before waiting for tools or
 children. Retained usage-budget reservations have a separate lifetime and do not
 justify retaining an idle execution slot.
 
-## What can be fixed now
+## Stable commitments
 
-The proposed stable commitments are the seven responsibilities and their dependency
+The stable commitments are the seven responsibilities and their dependency
 direction, independently usable lower components, captured step identity, explicit
 terminal evidence, scoped authority, journal barriers, and single session ownership.
 These have concrete conformance tests independent of product taste.

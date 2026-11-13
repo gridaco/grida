@@ -76,10 +76,9 @@ test here; it need not grow a second implementation or a shared testing crate.
 See the [fixture policy](tests/fixtures/README.md) for normalization and checks
 against the continuing TypeScript SDK consumers.
 
-This follows the approach inspected in Zed's injectable
-[HTTP client](https://github.com/zed-industries/zed/blob/74c134a3c12418cc095122fff938ef1c2504ae06/crates/http_client/src/http_client.rs)
-and handcrafted [provider transport tests](https://github.com/zed-industries/zed/blob/74c134a3c12418cc095122fff938ef1c2504ae06/crates/open_ai/src/chat_completion_transport_tests.rs).
-No Zed implementation is copied. No recording framework is needed.
+Clients take an injectable HTTP transport, so each test drives a handcrafted
+wire exchange through the real request and response code. Fixtures stay
+reviewable and deterministic, and no recording framework is needed.
 
 The baseline detects regressions in the contracts we assert; it cannot certify
 that an upstream API or account entitlement is unchanged. Budgeted live smoke

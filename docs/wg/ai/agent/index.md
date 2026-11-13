@@ -1,6 +1,6 @@
 ---
 title: Agent System (WG)
-description: A fresh agent design defined through user expectations, the product master, and agnostic execution components.
+description: The agent system's behavior, product policy, and agnostic execution component contracts.
 keywords: [agent, agent system, product, harness, components, durability]
 format: md
 sidebar_position: 0
@@ -10,8 +10,8 @@ tags: [internal, wg, ai, architecture]
 # Agent System (WG)
 
 This working group defines an agent system through reusable mechanisms,
-product decisions, and expected behavior. The three proposals below establish
-the contract for a fresh implementation.
+product decisions, and expected behavior. The three documents below are its
+current contracts.
 
 Start with the compact [Agent Features](../../../agent/features.md) catalog for
 the product's features, delivery status, and scope. The documents below provide
@@ -29,17 +29,18 @@ Then use distinct masters and the experience scenarios to test whether those
 contracts are sufficient. Product review starts with User experience so that
 the resulting behavior remains the measure of success.
 
-These are design proposals. Their requirements describe the product to build.
-Release availability belongs in the documentation for each shipped product.
-The proposals are language- and stack-agnostic. Implementations choose their
+These are the current behavior, policy, and component contracts. Release
+availability for each feature belongs to the feature catalog. The contracts are
+language- and stack-agnostic. Implementations choose their
 language, storage engine, provider adapters, and client protocols while
 satisfying the stated contracts.
 
-The concrete Rust design includes a
-[native sandbox proposal](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-sandbox.md)
-with the srt replacement, launch contract, platform boundaries, and source study.
+The native implementation's
+[sandbox binding](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-sandbox.md)
+defines native command confinement, its launch contract, and platform
+boundaries.
 
-The native delivery includes a headless agent executable. Its service and
+The native implementation includes a headless agent executable. Its service and
 unattended entrypoints run the same master and components used by Desktop.
 Desktop, automation, and test clients exercise one execution contract. The
 [executable design](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-core.md#native-executable-and-headless-host)
@@ -47,7 +48,10 @@ defines process boundaries, interaction policy, and machine-readable outcomes.
 The [ACP integration contract](./acp.md) defines the shared client vocabulary
 and how custom presentation and durable controls extend it.
 The [hooks contract](./hooks.md) defines configurable lifecycle automation and
-its boundaries against observers, permissions, and completion.
+its boundaries against observers, permissions, and completion. The
+[permission policy](./permissions.md) defines presets, scoped rules, and
+approval, and [Workspaces](./workspace.md) defines folder binding and
+authority during work.
 
 ## Design ownership
 
@@ -64,15 +68,12 @@ composition of components. Components retain their meaning across products.
 Task quality, useful initiative, context relevance, and appropriate completion
 are evaluated at the master and experience layers.
 
-Codex and Zed are peer implementation references for this study. Their code
-supplies examples of execution mechanisms, integration constraints, and product
-choices. Each proposed invariant still needs its own rationale and conformance
-case. [Codex source](https://github.com/openai/codex),
-[Zed source](https://github.com/zed-industries/zed).
+Each invariant carries its own domain rationale and conformance case. No
+other implementation serves as the model for these contracts.
 
 ## Vocabulary
 
-The [components proposal](./components.md) owns the execution vocabulary.
+The [components contract](./components.md) owns the execution vocabulary.
 Across these documents, a **session** contains an ongoing conversation and its
 work, a **turn** addresses accepted input, and an **effect** is an operation
 that can change or interact with the outside world. The **master** is the
@@ -101,21 +102,21 @@ state the task, success criteria, available capabilities, and resource allowance
 
 The following pages retain detailed studies and contracts from the earlier
 agent design. They are useful source material when refining a component or
-product behavior. The three proposals above govern the rebuild where their
-requirements differ. Each older page's implementation or feature-status claims
+product behavior. The current contracts above govern where their requirements
+differ. Each older page's implementation or feature-status claims
 remain scoped to the design it describes.
 
 In particular, the earlier fixed tool profile, universal loop, internal stream
 format, storage schema, and default queue-drain behavior are earlier design
-choices. Their concrete representations do not constrain the fresh design.
+choices. Their concrete representations do not constrain the current design.
 The product's new Stop behavior pauses automatic queue advancement until the
 user resumes it.
 
 | Topic                         | Existing studies                                                                                                                                                                                                                                                  |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Foundations and environment   | [Foundations](./foundations.md), [Environments](./environments.md), [Execution authority](./execution-authority.md), [Permission policy](./permissions.md), [Existing sandbox backend](./srt.md)                                                                  |
+| Foundations and environment   | [Foundations](./foundations.md), [Environments](./environments.md), [Execution authority](./execution-authority.md), [Retired sandbox backend study](./srt.md)                                                                                                    |
 | Durable work and control      | [Session lifecycle](./session.md), [Persistency](./persistency.md), [Turn queue](./queue.md), [Turn authority](./turn-authority.md), [Lifecycle events](./events.md)                                                                                              |
-| Capability and context design | [Tools](./tools.md), [Tool design](./tool-design.md), [Skills and project instructions](./skills.md), [MCP and connectors](./mcp.md), [Visual perception](./vision.md), [Binary files](./binary.md), [Scratch](./scratch.md), [Workspaces](./workspace.md)        |
+| Capability and context design | [Tools](./tools.md), [Tool design](./tool-design.md), [Skills and project instructions](./skills.md), [MCP and connectors](./mcp.md), [Visual perception](./vision.md), [Binary files](./binary.md), [Scratch](./scratch.md)                                      |
 | Product behavior              | [Compositor](./compositor.md), [UX patterns](./ux.md), [Plan mode](./mode-plan.md), [Subagents](./subagents.md), [Triggers](./triggers.md), [Cost optimization](./cost-optimization.md)                                                                           |
 | Inspection and hosting        | [Debugging](./debugging.md), [Local daemon](./daemon.md), [FAQ](./faq.md)                                                                                                                                                                                         |
 | Protocol and provider studies | [ACP integration](./acp.md), [ACP provider class](./acp-provider.md), [Codex provider profile](./acp-provider-codex.md), [Subscription provider](./chatgpt-subscription-provider.md), [AI SDK](./ai-sdk/index.md), [Vision lowering](./ai-sdk/vision-lowering.md) |

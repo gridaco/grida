@@ -9,7 +9,7 @@ tags: [internal, wg, ai, architecture]
 
 # Agent Master
 
-This proposal defines the **master**, the thin product layer that decides how
+This contract defines the **master**, the thin product layer that decides how
 an agent works toward a user's goal. It is written for people designing an
 agent product. The [experience contract](./experience.md) defines the promises
 the master must fulfill. The [components contract](./components.md) defines
@@ -571,7 +571,7 @@ A rapid Pause followed by Resume still preserves why an in-flight response was
 interrupted. The master uses that recorded cause when choosing continuation.
 Uncertain tool effects keep their reconciliation requirement after resumption.
 
-The proposed product's Stop action cancels active work and pauses automatic
+The product's Stop action cancels active work and pauses automatic
 queue advancement. Queued requests remain visible for editing, removal, or
 explicit resumption. The pause and cancellation request are committed together
 before another queued turn can be admitted. The pause survives a restart and

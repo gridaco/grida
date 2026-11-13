@@ -14,9 +14,25 @@ waits for a decision, or is refused. [Execution authority](./execution-authority
 decides where confinement applies; [Tools](./tools.md) defines what each
 operation does. This document owns the decision between them.
 
-The policy follows the established convention for interactive coding agents,
-so behavior is familiar and defaults are productive: an agent works freely
-inside the project it was given, and asks before reaching beyond it.
+The policy places the boundary where the person's intent is clearest: by
+opening a project, the person has already decided the agent may work on it.
+An agent therefore works freely inside the project it was given, and asks
+before reaching beyond it. Asking for every in-project step would cost more
+attention than it protects, while anything beyond the project is a decision
+the person has not yet made.
+
+## Availability and unresolved requirements
+
+This policy states the intended behavior. The
+[feature catalog](../../../agent/features.md) records which parts each product
+surface provides. The following requirements are unresolved; each names the
+decision it awaits and the owner of that decision:
+
+| Requirement                                                 | Unresolved decision                                                                                                           | Owner                                     |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| Network escalation (on request, or after a sandbox refusal) | Raw execution currently has no network; reaching the network needs an attributable, enforceable network grant per action.     | Execution authority and sandbox contracts |
+| The Full access preset                                      | Whether an unconfined, network-enabled preset is offered at all, and under what trust signal.                                 | Product policy (master)                   |
+| Layered configuration (user, project, launch)               | How user-level profiles and trusted project files combine with the host's launch-scoped permission profile and settings file. | Host configuration contract               |
 
 ## Vocabulary
 
@@ -175,4 +191,4 @@ individual fields.
 
 [Execution authority](./execution-authority.md) ·
 [Tools](./tools.md) · [Hooks](./hooks.md) ·
-[Existing sandbox backend](./srt.md)
+[Retired sandbox backend study](./srt.md)

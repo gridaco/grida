@@ -55,12 +55,16 @@ and layout. Standard ACP carries the common content. Negotiated extensions
 supply richer controls and optional view data. A generic client supports the
 shared subset. See [ACP integration](./acp.md#custom-presentation).
 
-#### Does the rebuild support hooks?
+#### Does the agent support hooks?
 
-Yes, as a proposed feature. Hooks can contribute context, check a pending tool
-action, and request verification before completion. The current implementation
-has internal event callbacks only. Hook execution retains the task's permissions,
-limits, and controls. See [Hooks](./hooks.md).
+Yes. Configured hooks run at five lifecycle moments: when a turn's execution
+starts, before accepted input runs, before and after a tool action, and before
+completion. Each hook is either required, so a failure blocks its governed
+action, or observing, so it only records diagnostics and contributes context.
+Hooks can contribute context, check a pending tool action, and request
+verification before completion. Hook execution retains the task's permissions,
+limits, and controls. The [feature catalog](../../../agent/features.md) records
+which surfaces offer them; see [Hooks](./hooks.md).
 
 #### How do I design a "plan mode"?
 

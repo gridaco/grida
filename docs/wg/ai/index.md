@@ -24,8 +24,9 @@ For product review, read the three proposals in this order.
    History, Context, Runtime, and Sessions, including their independence,
    execution authority, durability, and failure behavior.
 
-These proposals are the design basis for a fresh implementation. Their
-contracts are independent of programming language and transport. The
+These are the current contracts, with release availability recorded in the
+[feature catalog](../../agent/features.md). They are independent of programming
+language and transport. The
 [agent index](./agent/index.md#earlier-design-studies) also locates the earlier
 studies on sessions, tools, queues, permissions, context, and hosting.
 

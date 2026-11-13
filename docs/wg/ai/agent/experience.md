@@ -1,6 +1,6 @@
 ---
 title: Agent Experience
-description: Proposed user experience for the rebuilt agent, including agent effort, planning, progress, control, recovery, and a final summary of every turn.
+description: The agent's user experience contract, including agent effort, planning, progress, control, recovery, and a final summary of every turn.
 keywords: [agent, user-experience, ultra, planning, progress, recovery, summary]
 format: md
 sidebar_position: 1
@@ -9,7 +9,7 @@ tags: [internal, wg, ai]
 
 # Agent Experience
 
-**Proposed behavior specification.** The [feature catalog](../../../agent/features.md)
+**Behavior specification.** The [feature catalog](../../../agent/features.md)
 owns feature identity, minimum promises, delivery status, and supported scope.
 This document expands those promises into behavior and acceptance scenarios that
 a user can recognize and a reviewer can verify.

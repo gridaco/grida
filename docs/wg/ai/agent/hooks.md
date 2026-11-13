@@ -33,9 +33,10 @@ recorded result merely by claiming authority.
 
 ## Lifecycle boundaries
 
-The initial useful surface covers the following moments. The exact public names
-are fixed with the executable contract. An event is advertised only when its
-behavior is supported through the selected host and backend.
+The surface covers the following five moments. The
+[feature catalog](../../../agent/features.md) records which hosts provide them.
+An event is advertised only when its behavior is supported through the
+selected host and backend.
 
 | Moment                         | Meaning and allowed response                                                                                                                                  |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -130,8 +131,7 @@ run, where, with which access, and when the change becomes active.
 | A hook was interrupted with an unknown external outcome | Recovery reports uncertainty and follows its declared recovery policy.           |
 | A client reconnects or reads history                    | No hook execution or new work occurs.                                            |
 
-Codex provides a reference for configurable lifecycle events, command/MCP
-handlers, hook review, and event-specific outcomes. Its documented error and
-concurrency behavior differs from the required-check and ordered-decision
-semantics selected here. Exact compatibility with its configuration is a
-separate integration decision. [Codex hooks](https://learn.chatgpt.com/docs/hooks).
+Required checks run in a declared order and decide before their governed
+action, because a check that races its target or reports after the effect
+cannot prevent it. Compatibility with another product's hook configuration
+format is a separate integration decision.

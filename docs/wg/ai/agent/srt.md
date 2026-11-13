@@ -1,6 +1,6 @@
 ---
-title: Existing sandbox backend — srt
-description: Evaluation of the existing srt backend and the confinement guarantees a replacement must preserve, including host routing and independent authority domains.
+title: Retired sandbox backend study — srt
+description: Historical evaluation of the retired srt backend and the confinement guarantees its native replacement preserves, including host routing and independent authority domains.
 keywords:
   [
     agent-system,
@@ -20,22 +20,23 @@ tags:
   - agent-system
 ---
 
-# Existing sandbox backend — srt
+# Retired sandbox backend study — srt
 
-The proposed Rust rebuild replaces srt with a native confinement adapter.
-This page records the existing backend's capabilities and limitations as evidence
-for that replacement. The current TypeScript host still uses srt. The
-[native sandbox proposal](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-sandbox.md)
-now selects the initial platform mechanisms, launch contract, and support limits.
+This is a historical study. Native confinement has replaced srt, and no
+current host depends on it. The page records the retired backend's capabilities
+and limitations because its findings informed the native adapter's
+requirements. The
+[native sandbox binding](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-sandbox.md)
+defines the current platform mechanisms, launch contract, and support limits.
 
 For the `computer` environment
 ([`environments / computer`](./environments.md#computer)), every raw
 agent-controlled process tree requires an attributable OS-level sandbox.
-The existing host also selects outer containment for its trusted service.
+The retired host also selected outer containment for its trusted service.
 These have independent profiles and availability. [Execution authority](./execution-authority.md)
 owns the distinction and the deployment-level choice of host containment.
 
-The existing implementation uses
+The retired implementation used
 [`anthropic-experimental/sandbox-runtime`](https://github.com/anthropic-experimental/sandbox-runtime)
 (`srt`). The audited release has macOS and Linux backends plus an alpha Windows
 backend whose lifecycle is assessed separately below. It
