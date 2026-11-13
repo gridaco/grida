@@ -75,6 +75,7 @@ import {
   type AgentDaemonSandboxPolicy,
 } from "./sandbox";
 import { AgentTransport } from "./transport";
+import { MediaTransport } from "./media-transport";
 import { AgentFs } from "./fs";
 import { AgentTodos } from "./todos";
 import { AgentSurface } from "./surface";
@@ -416,6 +417,22 @@ describe("@grida/agent public API", () => {
       // socketless host can remove it without changing provider egress policy.
       expect(policy.network.allow_local_binding).toBe(false);
       expect(policy.network.allowed_domains).toContain("openrouter.ai");
+    });
+  });
+
+  describe("media-transport subpath", () => {
+    it("exposes a media client without the chat route groups", () => {
+      const client = new MediaTransport.Client({
+        base_url: MediaTransport.baseUrl(49152),
+        password: "pw",
+      });
+      expect(typeof client.images.generate).toBe("function");
+      expect(typeof client.providers.list_endpoints).toBe("function");
+      expect(typeof client.gg.status).toBe("function");
+      expect("sessions" in client).toBe(false);
+      expect("agent" in client).toBe(false);
+      expect("events" in client).toBe(false);
+      expect("directory_scopes" in client).toBe(false);
     });
   });
 

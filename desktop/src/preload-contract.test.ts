@@ -25,8 +25,9 @@ describe("Desktop preload agent seam", () => {
       /nativeDocumentId !== undefined\s*\? ipcRenderer.invoke\(IPC_CHANNELS.DOCUMENT_WRITE, docId, content\)/
     );
   });
-  it("delegates AgentHost HTTP routes to AgentTransport.Client", () => {
-    expect(preloadSource).toContain("new AgentTransport.Client");
+  it("delegates media-service HTTP routes to the chat-free MediaTransport.Client", () => {
+    expect(preloadSource).toContain("new MediaTransport.Client");
+    expect(preloadSource).not.toContain("@grida/agent/transport");
     expect(preloadSource).not.toContain('"/agent/run"');
     expect(preloadSource).not.toContain('"/secrets/has"');
     expect(preloadSource).not.toContain('"/sessions"');
@@ -36,10 +37,7 @@ describe("Desktop preload agent seam", () => {
   it("exposes a versioned Electron-specific bridge protocol", () => {
     expect(preloadSource).toContain("protocol: DESKTOP_BRIDGE_PROTOCOL");
     expect(preloadSource).toContain("native:");
-    expect(preloadSource).toContain("scratch_seed_base64: true");
-    expect(preloadSource).toContain(
-      'scratch_binary_tools: process.platform !== "win32"'
-    );
+    expect(preloadSource).not.toContain("scratch_seed_base64");
     expect(preloadSource).not.toContain("agentServer:");
   });
 
@@ -49,28 +47,28 @@ describe("Desktop preload agent seam", () => {
     );
   });
 
-  it("delegates media generation through the agent transport", () => {
+  it("delegates media generation through the media transport", () => {
     expect(preloadSource).toContain("rigging: true");
     expect(preloadSource).toContain(
-      "check: (req) => agentClient.rigging.check(req)"
+      "check: (req) => mediaClient.rigging.check(req)"
     );
     expect(preloadSource).toContain(
-      "generate: (req) => agentClient.rigging.generate(req)"
+      "generate: (req) => mediaClient.rigging.generate(req)"
     );
     expect(preloadSource).toContain(
-      "generate: (req) => agentClient.threeD.generate(req)"
+      "generate: (req) => mediaClient.threeD.generate(req)"
     );
     expect(preloadSource).toContain(
-      "generate: (req) => agentClient.audio.music.generate(req)"
+      "generate: (req) => mediaClient.audio.music.generate(req)"
     );
     expect(preloadSource).toContain(
-      "generate: (req) => agentClient.audio.soundEffects.generate(req)"
+      "generate: (req) => mediaClient.audio.soundEffects.generate(req)"
     );
     expect(preloadSource).toContain(
-      "listVoices: () => agentClient.audio.textToSpeech.listVoices()"
+      "listVoices: () => mediaClient.audio.textToSpeech.listVoices()"
     );
     expect(preloadSource).toContain(
-      "generate: (req) => agentClient.audio.textToSpeech.generate(req)"
+      "generate: (req) => mediaClient.audio.textToSpeech.generate(req)"
     );
   });
 
@@ -90,7 +88,7 @@ describe("Desktop preload agent seam", () => {
     expect(preloadSource).toContain(
       "ipcRenderer.invoke(IPC_CHANNELS.MEDIA_OPEN_FOLDER)"
     );
-    expect(preloadSource).not.toContain("agentClient.media");
+    expect(preloadSource).not.toContain("mediaClient.media");
   });
 
   it("routes the existing recents bridge through Main", () => {
@@ -104,7 +102,7 @@ describe("Desktop preload agent seam", () => {
         new RegExp(`ipcRenderer\\.invoke\\(\\s*IPC_CHANNELS\\.${channel}`)
       );
     }
-    expect(preloadSource).not.toContain("agentClient.recent");
+    expect(preloadSource).not.toContain("mediaClient.recent");
   });
 
   it("delivers native chat updates only to the matching preload subscription", () => {

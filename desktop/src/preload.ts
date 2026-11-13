@@ -17,20 +17,12 @@
  */
 
 import { contextBridge, ipcRenderer, webUtils } from "electron";
-import { AgentTransport } from "@grida/agent/transport";
+import { MediaTransport } from "@grida/agent/media-transport";
 import {
   NativeEditorSurfaces,
   NativeEditorSvgText,
   type NativeEditorSurfaceOpen,
 } from "@grida/desktop-bridge";
-import type {
-  AgentRunOptions,
-  AgentUIMessageChunk,
-  CreateSessionOptions,
-  DirectoryScopeDescriptor,
-  PatchSessionOptions,
-  SessionListFilter,
-} from "@grida/agent";
 import {
   DESKTOP_BRIDGE_PROTOCOL,
   IPC_CHANNELS,
@@ -73,7 +65,7 @@ function isDesktopPath(pathname: string): boolean {
   );
 }
 
-const agentServerFetch: AgentTransport.Fetcher = async (path, init) => {
+const mediaServiceFetch: MediaTransport.Fetcher = async (path, init) => {
   // GRIDA-SEC-004 — fetch fresh connection info for every request.
   // The sidecar can restart on a new port with a new password; caching
   // `{port,password}` in preload would make the next renderer call leak
@@ -82,25 +74,14 @@ const agentServerFetch: AgentTransport.Fetcher = async (path, init) => {
     port: number;
     password: string;
   };
-  const fetcher = AgentTransport.makeFetcher({
+  const fetcher = MediaTransport.makeFetcher({
     port: info.port,
     password: info.password,
   });
   return await fetcher(path, init);
 };
 
-const agentClient = new AgentTransport.Client({ fetcher: agentServerFetch });
-
-// One controller per active agent stream, keyed by sessionId. The
-// AgentHost's StreamRegistry enforces one-run-per-session so a Map keyed
-// by sessionId is enough — we don't need a separate streamId reverse-
-// index. Fresh runs hold a UUID placeholder until the server's in-band
-// `grida-session` frame yields the real id; the entry is then re-keyed.
-const agentRuns = new Map<string, AbortController>();
-// Long-lived session-status subscriptions, keyed by a per-subscription id so
-// two subscribers to the same session never collide (cf. `agentRuns`, keyed by
-// session). Each owns an AbortController that `unsubscribe_status` trips.
-const statusSubs = new Map<string, AbortController>();
+const mediaClient = new MediaTransport.Client({ fetcher: mediaServiceFetch });
 
 const nativeChatHandlers = new Map<
   string,
@@ -265,7 +246,7 @@ ipcRenderer.on(
 );
 
 async function handshake(): Promise<HandshakeResponse> {
-  const response = await agentClient.handshake();
+  const response = await mediaClient.handshake();
   return {
     ...response,
     capabilities: {
@@ -407,98 +388,11 @@ function installDesktopNavigationGuard(): void {
   window.addEventListener("hashchange", clearNativeChatDelivery);
 }
 
-/**
- * Open an agent SSE stream and fan out chunks to `onChunk`. Returns `null` only on the
- * reconnect path when the agent server has no in-flight run for the given
- * session — the caller falls back to DB hydration.
- *
- * Resolves with `{streamId, sessionId, done}`:
- *   - `streamId` is internal preload bookkeeping (today: equals the
- *     sessionId once the server echoes it; a UUID placeholder before
- *     that for fresh runs).
- *   - `done` resolves when upstream emits `[DONE]` or the socket
- *     closes cleanly; rejects on transport error; resolves on abort.
- *
- * **Why a hand-rolled SSE reader.** The browser's `EventSource` doesn't
- * support custom headers (we need `Authorization: Basic`) and can't
- * carry a request body. We use `fetch` + a manual line buffer on the
- * `ReadableStream<Uint8Array>` body. `TextDecoderStream` would be
- * cleaner but isn't reliably available across all Electron webContents.
- *
- * **Frame format**: standard AI SDK UI-message SSE —
- * `data: <UIMessageChunk JSON>\n\n`, then `data: [DONE]\n\n`.
- */
-type AgentOpenSpec =
-  | { kind: "run"; opts: AgentRunOptions }
-  | { kind: "reconnect"; session_id: string; last_event_id: number };
-
-async function openAgentStream(
-  spec: AgentOpenSpec,
-  onChunk: (chunk: AgentUIMessageChunk) => void
-): Promise<{
-  stream_id: string;
-  session_id: string;
-  done: Promise<void>;
-} | null> {
-  const placeholderKey =
-    spec.kind === "reconnect" ? spec.session_id : crypto.randomUUID();
-  const controller = new AbortController();
-  agentRuns.set(placeholderKey, controller);
-
-  let handle: AgentTransport.AgentStreamHandle | null;
-  try {
-    handle =
-      spec.kind === "run"
-        ? await agentClient.agent.run(spec.opts, onChunk, {
-            signal: controller.signal,
-          })
-        : await agentClient.agent.reconnect(
-            spec.session_id,
-            spec.last_event_id,
-            onChunk,
-            { signal: controller.signal }
-          );
-  } catch (err) {
-    agentRuns.delete(placeholderKey);
-    throw err;
-  }
-
-  if (handle === null) {
-    agentRuns.delete(placeholderKey);
-    return null;
-  }
-
-  // Promote the registry key from the placeholder UUID to the real
-  // session id once the server echoes it. `abort(sessionId)` can then
-  // hit the controller in O(1) without scanning a reverse-index map.
-  const sessionId =
-    spec.kind === "reconnect" ? spec.session_id : handle.session_id;
-  let runKey = placeholderKey;
-  if (sessionId && sessionId !== placeholderKey) {
-    agentRuns.delete(placeholderKey);
-    agentRuns.set(sessionId, controller);
-    runKey = sessionId;
-  }
-
-  const done = handle.done.finally(() => {
-    agentRuns.delete(runKey);
-  });
-
-  return { stream_id: runKey, session_id: sessionId, done };
-}
-
 const bridge: DesktopBridge = {
   protocol: DESKTOP_BRIDGE_PROTOCOL,
   app: { version: appVersion, platform: appPlatform },
   caps: {
     media: { tripo: true, rigging: true, tripo_gg: true, rigging_gg: true },
-    agent: {
-      // This host accepts `{ path, base64 }` scratch seeds on agent runs.
-      scratch_seed_base64: true,
-      // Windows intentionally withholds confined run_command; a scratch-only
-      // PDF/archive would therefore be a path the agent cannot operate on.
-      scratch_binary_tools: process.platform !== "win32",
-    },
     native: {
       host_apps: true,
       // Native-OS surfaces — always present in a desktop build.
@@ -1047,11 +941,11 @@ const bridge: DesktopBridge = {
     read: (docId) =>
       nativeDocumentId !== undefined
         ? ipcRenderer.invoke(IPC_CHANNELS.DOCUMENT_READ, docId)
-        : agentClient.files.read(docId),
+        : mediaClient.files.read(docId),
     write: (docId, content) =>
       nativeDocumentId !== undefined
         ? ipcRenderer.invoke(IPC_CHANNELS.DOCUMENT_WRITE, docId, content)
-        : agentClient.files.write(docId, content),
+        : mediaClient.files.write(docId, content),
   },
 
   recent: {
@@ -1219,39 +1113,38 @@ const bridge: DesktopBridge = {
   },
 
   secrets: {
-    has: (providerId) => agentClient.secrets.has(providerId),
+    has: (providerId) => mediaClient.secrets.has(providerId),
     set: async (providerId, key) => {
-      await agentClient.secrets.set(providerId, key);
+      await mediaClient.secrets.set(providerId, key);
     },
     delete: async (providerId) => {
-      await agentClient.secrets.delete(providerId);
+      await mediaClient.secrets.delete(providerId);
     },
   },
 
   providers: {
-    gg_models: () => agentClient.providers.gg_models(),
-    list_endpoints: () => agentClient.providers.list_endpoints(),
+    gg_models: () => mediaClient.providers.gg_models(),
+    list_endpoints: () => mediaClient.providers.list_endpoints(),
     set_endpoint: async (config) => {
       await ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_ENDPOINT_SET, config);
     },
     delete_endpoint: async (id) => {
       await ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_ENDPOINT_DELETE, id);
     },
-    info: () => agentClient.providers.info(),
+    info: () => mediaClient.providers.info(),
     probe_endpoint: (baseUrl) =>
       ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_ENDPOINT_PROBE, baseUrl),
-    detect_claude: () => agentClient.providers.detect_claude(),
   },
 
   // GRIDA-SEC-006 — hosted-session custody push (renderer → sidecar).
   gg: {
     set_session: async (session) => {
-      await agentClient.gg.set_session(session);
+      await mediaClient.gg.set_session(session);
     },
     clear_session: async () => {
-      await agentClient.gg.clear_session();
+      await mediaClient.gg.clear_session();
     },
-    status: () => agentClient.gg.status(),
+    status: () => mediaClient.gg.status(),
   },
 
   // Native provider OAuth is main-owned. The renderer can start/cancel the
@@ -1267,135 +1160,34 @@ const bridge: DesktopBridge = {
   },
 
   images: {
-    generate: (req) => agentClient.images.generate(req),
+    generate: (req) => mediaClient.images.generate(req),
   },
 
   video: {
-    generate: (req) => agentClient.video.generate(req),
+    generate: (req) => mediaClient.video.generate(req),
   },
 
   threeD: {
-    generate: (req) => agentClient.threeD.generate(req),
+    generate: (req) => mediaClient.threeD.generate(req),
   },
   rigging: {
-    check: (req) => agentClient.rigging.check(req),
-    generate: (req) => agentClient.rigging.generate(req),
+    check: (req) => mediaClient.rigging.check(req),
+    generate: (req) => mediaClient.rigging.generate(req),
   },
   modelGeneration: {
-    generate: (req) => agentClient.modelGeneration.generate(req),
+    generate: (req) => mediaClient.modelGeneration.generate(req),
   },
 
   audio: {
     music: {
-      generate: (req) => agentClient.audio.music.generate(req),
+      generate: (req) => mediaClient.audio.music.generate(req),
     },
     soundEffects: {
-      generate: (req) => agentClient.audio.soundEffects.generate(req),
+      generate: (req) => mediaClient.audio.soundEffects.generate(req),
     },
     textToSpeech: {
-      listVoices: () => agentClient.audio.textToSpeech.listVoices(),
-      generate: (req) => agentClient.audio.textToSpeech.generate(req),
-    },
-  },
-
-  agent: {
-    attach_directory: async (file): Promise<DirectoryScopeDescriptor> => {
-      // GRIDA-SEC-004 — keep trusted-gesture provenance and path custody in
-      // preload. `getPathForFile` resolves only an OS-backed File (a JS-created
-      // File yields an empty string); the renderer receives only the daemon's
-      // opaque scope descriptor, never this absolute path.
-      let directoryPath = "";
-      try {
-        directoryPath = webUtils.getPathForFile(file);
-      } catch {
-        // Invalid/non-File values fail closed below; no daemon call is made.
-      }
-      if (!directoryPath) {
-        throw new Error("directory drop is not backed by a local path");
-      }
-      return await agentClient.directory_scopes.attach(directoryPath);
-    },
-    run: (opts, onChunk) =>
-      // Fresh runs always return a stream (only `reconnect` may return
-      // null on 404); cast to the non-nullable shape DesktopBridge expects.
-      openAgentStream({ kind: "run", opts }, onChunk) as Promise<{
-        stream_id: string;
-        session_id: string;
-        done: Promise<void>;
-      }>,
-    abort: async (sessionId) => {
-      await agentClient.agent.abort(sessionId);
-      const controller = agentRuns.get(sessionId);
-      if (controller) {
-        agentRuns.delete(sessionId);
-        controller.abort();
-      }
-    },
-    reconnect: (sessionId, lastEventId, onChunk) =>
-      openAgentStream(
-        {
-          kind: "reconnect",
-          session_id: sessionId,
-          last_event_id: lastEventId,
-        },
-        onChunk
-      ),
-  },
-
-  sessions: {
-    list: (filter?: SessionListFilter) => agentClient.sessions.list(filter),
-    get: (id: string) => agentClient.sessions.get(id),
-    create: (opts: CreateSessionOptions) => agentClient.sessions.create(opts),
-    patch: (id: string, opts: PatchSessionOptions) =>
-      agentClient.sessions.patch(id, opts),
-    delete: (id: string) => agentClient.sessions.delete(id),
-    list_messages: (id: string) => agentClient.sessions.list_messages(id),
-    rewind: (id: string, fromMessageId: string, opts?: { restore?: boolean }) =>
-      agentClient.sessions.rewind(id, fromMessageId, opts),
-    fork: (
-      id: string,
-      fromMessageId: string,
-      metadata?: Record<string, unknown>
-    ) => agentClient.sessions.fork(id, fromMessageId, metadata),
-    compact: (id: string) => agentClient.sessions.compact(id),
-    enqueue: (id: string, message: { id?: string; text: string }) =>
-      agentClient.sessions.enqueue(id, message),
-    list_queued: (id: string) => agentClient.sessions.list_queued(id),
-    cancel_queued: (id: string, messageId: string) =>
-      agentClient.sessions.cancel_queued(id, messageId),
-    subscribe_status: async (id, onStatus) => {
-      const subscriptionId = crypto.randomUUID();
-      const controller = new AbortController();
-      statusSubs.set(subscriptionId, controller);
-      try {
-        const { done } = await agentClient.sessions.subscribe_status(
-          id,
-          onStatus,
-          { signal: controller.signal }
-        );
-        return {
-          subscription_id: subscriptionId,
-          done: done.finally(() => {
-            statusSubs.delete(subscriptionId);
-          }),
-        };
-      } catch (err) {
-        // `useSessionStatus` reconnects indefinitely. A failed handshake has
-        // no `done` promise whose finally can clean this registry entry, so
-        // release it here or every retry leaks one controller in preload.
-        if (statusSubs.get(subscriptionId) === controller) {
-          statusSubs.delete(subscriptionId);
-        }
-        controller.abort();
-        throw err;
-      }
-    },
-    unsubscribe_status: async (subscriptionId) => {
-      const controller = statusSubs.get(subscriptionId);
-      if (controller) {
-        statusSubs.delete(subscriptionId);
-        controller.abort();
-      }
+      listVoices: () => mediaClient.audio.textToSpeech.listVoices(),
+      generate: (req) => mediaClient.audio.textToSpeech.generate(req),
     },
   },
 };

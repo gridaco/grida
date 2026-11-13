@@ -342,7 +342,7 @@ function AgentComposerInner({
   // In particular, a File from paste/drop/picker is bytes-only until a trusted
   // file-scope contract exists; folders can use today's opaque directory scope.
   const attachDirectory = operableFiles
-    ? desktopBridge?.agent.attach_directory
+    ? desktopBridge?.agent?.attach_directory
     : undefined;
   const scratchSeedBase64Supported =
     desktopAi.supportsScratchSeedBase64(desktopBridge);

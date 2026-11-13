@@ -1,20 +1,19 @@
-import type { GGModelsView } from "./protocol/gg-models";
-// GRIDA-GG: provider — the `gg` client namespace (set/clear/status) (docs/wg/platform/hosted-ai.md)
 /**
  * GRIDA-SEC-004 — the agent tenant's HTTP transport.
  *
  * `@grida/daemon/transport` owns the seam primitives (Basic-Auth signing,
  * fetch plumbing, SSE frame decoding, typed errors) and the client methods
  * for the daemon-owned route groups (handshake, files, recents,
- * workspaces). This module extends that client with the agent tenant's
- * groups — sessions, agent run/stream, lifecycle events, secrets,
- * providers, image, video, 3D, music, Sound Effects, and Text to Speech — and
- * re-exposes the primitives under
+ * workspaces). `./media-transport` adds the media service's groups (secrets,
+ * providers, hosted-AI session and media generation). This module extends
+ * that with the chat groups — sessions, agent run/stream, lifecycle events
+ * and directory scopes — and re-exposes the primitives under
  * `AgentTransport` so callers deal with ONE namespace. Consumers should
  * not hand-build route strings.
  */
 
 import { DaemonTransport } from "@grida/daemon/transport";
+import { MediaTransport } from "./media-transport";
 import { GRIDA_SESSION_SSE_EVENT, type AgentRunOptions } from "./protocol/run";
 import {
   GRIDA_STATUS_SSE_EVENT,
@@ -24,47 +23,6 @@ import {
   GRIDA_EVENTS_SSE_EVENT,
   type AgentLifecycleEvent,
 } from "./protocol/events";
-import type {
-  ImageGenerateRequest,
-  ImageGenerateResult,
-} from "./protocol/images";
-// Type-only (erased): the wire shapes of /auth/gg/* — the store class
-// itself never crosses to clients.
-import type {
-  GridaGatewaySession,
-  GridaGatewaySessionStatus,
-} from "./providers/gg-session";
-import type {
-  VideoGenerateRequest,
-  VideoGenerateResult,
-} from "./protocol/video";
-import type {
-  ThreeDGenerateRequest,
-  ThreeDGenerateResult,
-} from "./protocol/three-d";
-import type {
-  MusicGenerateRequest,
-  MusicGenerateResult,
-} from "./protocol/music";
-import type {
-  SoundEffectGenerateRequest,
-  SoundEffectGenerateResult,
-} from "./protocol/sound-effects";
-import type {
-  TextToSpeechGenerateRequest,
-  TextToSpeechGenerateResult,
-  TextToSpeechListVoicesResult,
-} from "./protocol/text-to-speech";
-import type {
-  ModelGenerationGenerateRequest,
-  ModelGenerationGenerateResult,
-} from "./protocol/model-generation";
-import type {
-  RigCheckRequest,
-  RigCheckResult,
-  RiggingGenerateRequest,
-  RiggingGenerateResult,
-} from "./protocol/rigging";
 import type { AgentUIMessageChunk } from "./protocol/wire";
 import type { DirectoryScopeDescriptor } from "./protocol/context";
 import type {
@@ -76,10 +34,6 @@ import type {
   SessionListFilter,
   SessionListPage,
 } from "./session/rows";
-import type {
-  EndpointProviderConfig,
-  ProbedEndpointModel,
-} from "./protocol/endpoints";
 
 export namespace AgentTransport {
   // ── daemon seam primitives, re-exposed ────────────────────────────
@@ -151,7 +105,7 @@ export namespace AgentTransport {
    * The full agent-daemon client: the daemon groups (handshake, files,
    * recent, workspaces) by inheritance + the agent tenant's groups below.
    */
-  export class Client extends DaemonTransport.Client {
+  export class Client extends MediaTransport.Client {
     /**
      * GRIDA-SEC-004 — mint an opaque, read-only directory reference. The raw
      * host path belongs ONLY on this acquisition call: Desktop preload obtains
@@ -163,162 +117,6 @@ export namespace AgentTransport {
         await this.postJson<DirectoryScopeDescriptor>("/directory-scopes", {
           path,
         }),
-    } as const;
-
-    readonly secrets = {
-      has: async (providerId: string): Promise<boolean> => {
-        const res = await this.postJson<{ has: boolean }>("/secrets/has", {
-          provider_id: providerId,
-        });
-        return res.has;
-      },
-      set: async (providerId: string, key: string): Promise<void> => {
-        await this.postJson<unknown>("/secrets/set", {
-          provider_id: providerId,
-          key,
-        });
-      },
-      delete: async (providerId: string): Promise<void> => {
-        await this.postJson<unknown>("/secrets/delete", {
-          provider_id: providerId,
-        });
-      },
-    } as const;
-
-    readonly providers = {
-      gg_models: async (): Promise<GGModelsView> =>
-        await this.getJson<GGModelsView>("/providers/gg/models"),
-      /** Endpoint provider configs (issue #806) — readable plain config,
-       *  unlike secrets. */
-      list_endpoints: async (): Promise<EndpointProviderConfig[]> =>
-        await this.postJson<EndpointProviderConfig[]>(
-          "/providers/endpoints/list"
-        ),
-      set_endpoint: async (config: EndpointProviderConfig): Promise<void> => {
-        await this.postJson<unknown>("/providers/endpoints/set", { config });
-      },
-      delete_endpoint: async (id: string): Promise<void> => {
-        await this.postJson<unknown>("/providers/endpoints/delete", { id });
-      },
-      /** Where the endpoint config JSON lives on disk. */
-      info: async (): Promise<{ path: string }> =>
-        await this.postJson<{ path: string }>("/providers/endpoints/info"),
-      /** Discover the models an endpoint serves (host-side fetch). */
-      probe_endpoint: async (
-        baseUrl: string
-      ): Promise<{
-        source: "ollama" | "openai";
-        models: ProbedEndpointModel[];
-      }> =>
-        await this.postJson("/providers/endpoints/probe", {
-          base_url: baseUrl,
-        }),
-      /** Is the user's `claude` CLI resolvable on the host (issue #813)?
-       *  Cheap filesystem probe — NOT a login check. */
-      detect_claude: async (): Promise<{
-        installed: boolean;
-        path?: string;
-      }> => await this.postJson("/providers/claude/detect"),
-    } as const;
-
-    /** Grida hosted ("included") AI session (GRIDA-SEC-006). Push-only
-     *  custody: the renderer mints and pushes the short-lived token;
-     *  `status` never returns it. Gated by the `gg` capability. */
-    readonly gg = {
-      set_session: async (session: GridaGatewaySession): Promise<void> => {
-        await this.postJson<unknown>("/auth/gg/set", session);
-      },
-      clear_session: async (): Promise<void> => {
-        await this.postJson<unknown>("/auth/gg/clear");
-      },
-      status: async (): Promise<GridaGatewaySessionStatus> =>
-        await this.postJson<GridaGatewaySessionStatus>("/auth/gg/status"),
-    } as const;
-
-    /** BYOK image generation (#908). Desktop-only; gated by the `images`
-     *  capability. Returns base64 bytes — never the user's key. */
-    readonly images = {
-      generate: async (
-        req: ImageGenerateRequest
-      ): Promise<ImageGenerateResult> =>
-        await this.postJson<ImageGenerateResult>("/images/generate", req),
-    } as const;
-
-    /** BYOK video generation (#908). Desktop-only; gated by the `video`
-     *  capability. Returns base64 bytes only — never a provider URL or the
-     *  user's key. */
-    readonly video = {
-      generate: async (
-        req: VideoGenerateRequest
-      ): Promise<VideoGenerateResult> =>
-        await this.postJson<VideoGenerateResult>("/video/generate", req),
-    } as const;
-
-    /** fal BYOK 3D generation. Returns primary GLB bytes only. */
-    readonly threeD = {
-      generate: async (
-        req: ThreeDGenerateRequest
-      ): Promise<ThreeDGenerateResult> =>
-        await this.postJson<ThreeDGenerateResult>("/three-d/generate", req),
-    } as const;
-
-    /** Explicit model-generation feature, with typed input variants. */
-    readonly modelGeneration = {
-      generate: async (
-        req: ModelGenerationGenerateRequest
-      ): Promise<ModelGenerationGenerateResult> =>
-        await this.postJson<ModelGenerationGenerateResult>(
-          "/model-generation/generate",
-          req
-        ),
-    } as const;
-
-    /** Eligibility is structured; explicit rigging returns portable GLB bytes. */
-    readonly rigging = {
-      check: async (req: RigCheckRequest): Promise<RigCheckResult> =>
-        await this.postJson<RigCheckResult>("/rigging/check", req),
-      generate: async (
-        req: RiggingGenerateRequest
-      ): Promise<RiggingGenerateResult> =>
-        await this.postJson<RiggingGenerateResult>("/rigging/generate", req),
-    } as const;
-
-    /**
-     * Output-format grouping only: hosted music, ElevenLabs Sound Effects, and
-     * ElevenLabs Text to Speech remain independent provider/request contracts.
-     */
-    readonly audio = {
-      music: {
-        generate: async (
-          req: MusicGenerateRequest
-        ): Promise<MusicGenerateResult> =>
-          await this.postJson<MusicGenerateResult>(
-            "/audio/music/generate",
-            req
-          ),
-      },
-      soundEffects: {
-        generate: async (
-          req: SoundEffectGenerateRequest
-        ): Promise<SoundEffectGenerateResult> =>
-          await this.postJson<SoundEffectGenerateResult>(
-            "/audio/sound-effects/generate",
-            req
-          ),
-      },
-      textToSpeech: {
-        listVoices: async (): Promise<TextToSpeechListVoicesResult> =>
-          await this.getJson<TextToSpeechListVoicesResult>(
-            "/audio/text-to-speech/voices"
-          ),
-        generate: async (
-          req: TextToSpeechGenerateRequest
-        ): Promise<TextToSpeechGenerateResult> =>
-          await this.postJson<TextToSpeechGenerateResult>(
-            "/audio/text-to-speech/generate",
-            req
-          ),
-      },
     } as const;
 
     readonly sessions = {

@@ -53,6 +53,16 @@
         "default": "./dist/sandbox/index.cjs"
       }
     },
+    "./media-transport": {
+      "import": {
+        "types": "./dist/media-transport.d.mts",
+        "default": "./dist/media-transport.mjs"
+      },
+      "require": {
+        "types": "./dist/media-transport.d.cts",
+        "default": "./dist/media-transport.cjs"
+      }
+    },
     "./transport": {
       "import": {
         "types": "./dist/transport.d.mts",

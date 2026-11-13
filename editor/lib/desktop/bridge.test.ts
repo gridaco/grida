@@ -84,7 +84,11 @@ describe("desktop bridge client contract", () => {
         caps: { native: {} },
         agent: {
           attach_directory:
-            vi.fn<NonNullable<DesktopBridge["agent"]["attach_directory"]>>(),
+            vi.fn<
+              NonNullable<
+                NonNullable<DesktopBridge["agent"]>["attach_directory"]
+              >
+            >(),
         },
       } as unknown as DesktopBridge,
     });
@@ -113,7 +117,7 @@ describe("desktop bridge client contract", () => {
   });
 
   it("refuses base64 scratch seeds before calling an old host", async () => {
-    const run = vi.fn<DesktopBridge["agent"]["run"]>();
+    const run = vi.fn<NonNullable<DesktopBridge["agent"]>["run"]>();
     installBridge({
       grida: {
         protocol: DESKTOP_BRIDGE_PROTOCOL,
@@ -136,11 +140,13 @@ describe("desktop bridge client contract", () => {
   });
 
   it("keeps text scratch seeds compatible with an old host", async () => {
-    const run = vi.fn<DesktopBridge["agent"]["run"]>().mockResolvedValue({
-      stream_id: "stream-1",
-      session_id: "session-1",
-      done: Promise.resolve(),
-    });
+    const run = vi
+      .fn<NonNullable<DesktopBridge["agent"]>["run"]>()
+      .mockResolvedValue({
+        stream_id: "stream-1",
+        session_id: "session-1",
+        done: Promise.resolve(),
+      });
     installBridge({
       grida: {
         protocol: DESKTOP_BRIDGE_PROTOCOL,
@@ -166,11 +172,13 @@ describe("desktop bridge client contract", () => {
   });
 
   it("forwards base64 scratch seeds when the host advertises the capability", async () => {
-    const run = vi.fn<DesktopBridge["agent"]["run"]>().mockResolvedValue({
-      stream_id: "stream-1",
-      session_id: "session-1",
-      done: Promise.resolve(),
-    });
+    const run = vi
+      .fn<NonNullable<DesktopBridge["agent"]>["run"]>()
+      .mockResolvedValue({
+        stream_id: "stream-1",
+        session_id: "session-1",
+        done: Promise.resolve(),
+      });
     installBridge({
       grida: {
         protocol: DESKTOP_BRIDGE_PROTOCOL,

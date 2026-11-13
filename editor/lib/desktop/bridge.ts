@@ -308,6 +308,22 @@ function bridgeOrThrow(): DesktopBridge {
   return b;
 }
 
+/** TypeScript chat members exist only on Desktop builds before the native
+ * agent; native-agent builds omit them. */
+function legacyAgentOrThrow(
+  bridge: DesktopBridge = bridgeOrThrow()
+): NonNullable<DesktopBridge["agent"]> {
+  if (!bridge.agent) throw new Error("agent: not served by this Desktop build");
+  return bridge.agent;
+}
+
+function legacySessionsOrThrow(): NonNullable<DesktopBridge["sessions"]> {
+  const bridge = bridgeOrThrow();
+  if (!bridge.sessions)
+    throw new Error("sessions: not served by this Desktop build");
+  return bridge.sessions;
+}
+
 /* ─────────────────────── secrets namespace ───────────────────── */
 
 export const BYOK_PROVIDER_LABELS = Object.fromEntries(
@@ -920,7 +936,7 @@ export namespace ai {
         "agent.run: base64 scratch seeds are not supported by this desktop binary"
       );
     }
-    const handle = await bridge.agent.run(opts, onChunk);
+    const handle = await legacyAgentOrThrow(bridge).run(opts, onChunk);
     return {
       streamId: handle.stream_id,
       sessionId: handle.session_id,
@@ -932,7 +948,7 @@ export namespace ai {
    * Abort an in-flight agent run by session id. Idempotent.
    */
   export async function abortAgentRun(sessionId: string): Promise<void> {
-    await bridgeOrThrow().agent.abort(sessionId);
+    await legacyAgentOrThrow().abort(sessionId);
   }
 
   /**
@@ -955,7 +971,7 @@ export namespace ai {
     sessionId: string;
     done: Promise<void>;
   } | null> {
-    const handle = await bridgeOrThrow().agent.reconnect(
+    const handle = await legacyAgentOrThrow().reconnect(
       sessionId,
       lastEventId,
       onChunk
@@ -989,42 +1005,42 @@ export namespace sessions {
   export async function list(
     filter?: SessionListFilter
   ): Promise<SessionListPage> {
-    return await bridgeOrThrow().sessions.list(filter);
+    return await legacySessionsOrThrow().list(filter);
   }
 
   export async function get(id: string): Promise<ChatSessionRow | null> {
-    return await bridgeOrThrow().sessions.get(id);
+    return await legacySessionsOrThrow().get(id);
   }
 
   export async function create(
     opts: CreateSessionOptions
   ): Promise<ChatSessionRow> {
-    return await bridgeOrThrow().sessions.create(opts);
+    return await legacySessionsOrThrow().create(opts);
   }
 
   export async function rename(
     id: string,
     title: string
   ): Promise<ChatSessionRow> {
-    return await bridgeOrThrow().sessions.patch(id, { title });
+    return await legacySessionsOrThrow().patch(id, { title });
   }
 
   export async function archive(id: string): Promise<ChatSessionRow> {
-    return await bridgeOrThrow().sessions.patch(id, { archived: true });
+    return await legacySessionsOrThrow().patch(id, { archived: true });
   }
 
   export async function unarchive(id: string): Promise<ChatSessionRow> {
-    return await bridgeOrThrow().sessions.patch(id, { archived: false });
+    return await legacySessionsOrThrow().patch(id, { archived: false });
   }
 
   export async function remove(id: string): Promise<void> {
-    await bridgeOrThrow().sessions.delete(id);
+    await legacySessionsOrThrow().delete(id);
   }
 
   export async function listMessages(
     id: string
   ): Promise<ChatMessageWithParts[]> {
-    return await bridgeOrThrow().sessions.list_messages(id);
+    return await legacySessionsOrThrow().list_messages(id);
   }
 
   /** Soft-truncate the session to a prior message (RFC `session / rewinding`).
@@ -1034,7 +1050,7 @@ export namespace sessions {
     fromMessageId: string,
     opts?: { restore?: boolean }
   ): Promise<RewindResult> {
-    return await bridgeOrThrow().sessions.rewind(id, fromMessageId, opts);
+    return await legacySessionsOrThrow().rewind(id, fromMessageId, opts);
   }
 
   /** Fork the session at a message into a new forked session
@@ -1044,7 +1060,7 @@ export namespace sessions {
     fromMessageId: string,
     metadata?: Record<string, unknown>
   ): Promise<ChatSessionRow> {
-    return await bridgeOrThrow().sessions.fork(id, fromMessageId, metadata);
+    return await legacySessionsOrThrow().fork(id, fromMessageId, metadata);
   }
 
   /** User-fired compaction (RFC `session / compaction`). */
@@ -1053,7 +1069,7 @@ export namespace sessions {
     reason?: string;
     summaryMessageId?: string;
   }> {
-    return await bridgeOrThrow().sessions.compact(id);
+    return await legacySessionsOrThrow().compact(id);
   }
 
   /** Queued sends (RFC `queue`): enqueue a pending user message while a turn
@@ -1063,14 +1079,14 @@ export namespace sessions {
     id: string,
     message: { id?: string; text: string }
   ): Promise<ChatMessageWithParts> {
-    return await bridgeOrThrow().sessions.enqueue(id, message);
+    return await legacySessionsOrThrow().enqueue(id, message);
   }
 
   /** The pending queue for a session, FIFO by `queued_at`. */
   export async function listQueued(
     id: string
   ): Promise<ChatMessageWithParts[]> {
-    return await bridgeOrThrow().sessions.list_queued(id);
+    return await legacySessionsOrThrow().list_queued(id);
   }
 
   /** Cancel (remove) a queued message before it fires. */
@@ -1078,7 +1094,7 @@ export namespace sessions {
     id: string,
     messageId: string
   ): Promise<void> {
-    await bridgeOrThrow().sessions.cancel_queued(id, messageId);
+    await legacySessionsOrThrow().cancel_queued(id, messageId);
   }
 
   /**
@@ -1095,7 +1111,7 @@ export namespace sessions {
     onStatus: (status: SessionStatus) => void
   ): Promise<{ subscriptionId: string; done: Promise<void> }> {
     const { subscription_id, done } =
-      await bridgeOrThrow().sessions.subscribe_status(id, onStatus);
+      await legacySessionsOrThrow().subscribe_status(id, onStatus);
     return { subscriptionId: subscription_id, done };
   }
 
@@ -1103,7 +1119,7 @@ export namespace sessions {
   export async function unsubscribeStatus(
     subscriptionId: string
   ): Promise<void> {
-    await bridgeOrThrow().sessions.unsubscribe_status(subscriptionId);
+    await legacySessionsOrThrow().unsubscribe_status(subscriptionId);
   }
 }
 

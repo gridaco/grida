@@ -32,6 +32,7 @@ export default defineConfig([
     entry: [
       "src/chatgpt-host.ts",
       "src/media-server.ts",
+      "src/media-transport.ts",
       "src/sandbox/index.ts",
       "src/transport.ts",
     ],

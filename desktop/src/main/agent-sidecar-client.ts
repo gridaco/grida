@@ -45,7 +45,7 @@ import { NativeWorkspaceReads } from "./native-workspace-reads";
 import { NativeWorkspaceWrites } from "./native-workspace-writes";
 import { nativeWorkspaceMedia } from "./workspace-media-access";
 import { EDITOR_BASE_URL } from "../env";
-import { AgentTransport } from "@grida/agent/transport";
+import { MediaTransport } from "@grida/agent/media-transport";
 import type { Workspace } from "@grida/daemon";
 import type { EndpointProviderConfig, ProbedEndpointModel } from "@grida/agent";
 
@@ -291,16 +291,16 @@ export namespace agentSidecarClient {
 // re-spawns under a different password (defensive — never expected).
 let cached: {
   info: AgentSidecarInfo;
-  client: AgentTransport.Client;
+  client: MediaTransport.Client;
 } | null = null;
-function client(): AgentTransport.Client {
+function client(): MediaTransport.Client {
   const live = getAgentSidecarInfo();
   if (!live) throw new agentSidecarClient.AgentSidecarNotReadyError();
   if (cached?.info !== live) {
     cached = {
       info: live,
-      client: new AgentTransport.Client({
-        base_url: AgentTransport.baseUrl(live.port),
+      client: new MediaTransport.Client({
+        base_url: MediaTransport.baseUrl(live.port),
         password: live.password,
         origin: EDITOR_ORIGIN,
         referer: REFERER,

@@ -6,7 +6,7 @@
  * This package carries only the `window.grida` contract that a URL-loaded
  * renderer may compile against. Electron IPC channel names and native
  * implementation details stay in the Desktop app; daemon HTTP stays in
- * `@grida/daemon/transport` + `@grida/agent/transport`.
+ * `@grida/daemon/transport` + `@grida/agent/media-transport`.
  */
 
 import type {
@@ -125,7 +125,10 @@ export type DesktopCapabilities = {
     /** Grida credits for eligibility and rigging, including native signed uploads. */
     rigging_gg?: boolean;
   };
-  /** Optional because protocol-1 hosts shipped before agent capabilities. */
+  /**
+   * TypeScript chat capabilities. Optional because protocol-1 hosts shipped
+   * before them and native-agent hosts omit them.
+   */
   agent?: DesktopAgentCapabilities;
 };
 
@@ -550,7 +553,12 @@ export type DesktopBridge = {
       ) => Promise<TextToSpeechGenerateResult>;
     };
   };
-  agent: {
+  /**
+   * TypeScript chat runtime served by Desktop builds that predate the native
+   * agent. Builds that run the native agent omit it; renderers must treat a
+   * missing value as "no TypeScript chat".
+   */
+  agent?: {
     /**
      * Turn an OS-backed directory `File` from a real drop into an opaque,
      * read-only agent scope. Optional on protocol 1: older desktop binaries and
@@ -577,7 +585,8 @@ export type DesktopBridge = {
       done: Promise<void>;
     } | null>;
   };
-  sessions: {
+  /** TypeScript chat sessions; omitted with {@link DesktopBridge.agent}. */
+  sessions?: {
     list: (filter?: SessionListFilter) => Promise<SessionListPage>;
     get: (id: string) => Promise<ChatSessionRow | null>;
     create: (opts: CreateSessionOptions) => Promise<ChatSessionRow>;
