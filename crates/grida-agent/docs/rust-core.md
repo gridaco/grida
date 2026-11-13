@@ -1209,11 +1209,11 @@ work available for reconciliation under a new fenced owner.
 The concrete adapters expose construction APIs and implement the interfaces
 above.
 
-| Adapter                                                        | Construction contract                                                                                |
-| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `SqliteStore::open`                                            | An explicit database path inside an existing application-owned directory                             |
-| `OpenAiCompatible`, `Anthropic`, `Responses`, `Gemini` (`new`) | A provider binding, an explicit model registry, a host-owned `StreamingTransport`, and stream limits |
-| Host file tools                                                | A filesystem capability whose implementation enforces granted roots, versions, and read limits       |
+| Adapter                                                        | Construction contract                                                                                                            |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `SqliteStore::open`                                            | An explicit database path inside an existing application-owned directory; only an empty database or one this store created opens |
+| `OpenAiCompatible`, `Anthropic`, `Responses`, `Gemini` (`new`) | A provider binding, an explicit model registry, a host-owned `StreamingTransport`, and stream limits                             |
+| Host file tools                                                | A filesystem capability whose implementation enforces granted roots, versions, and read limits                                   |
 
 `Responses` and `Gemini` also take a replay binding that the host retains only
 while provider account and endpoint continuity is verified.

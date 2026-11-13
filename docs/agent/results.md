@@ -25,8 +25,7 @@ failed turn shows **Failed after …**. A turn whose outcome Grida could not
 confirm shows **Worked for … · result uncertain**; review its partial work
 before asking again, because an action may already have happened. Opening a
 turn only shows what was recorded; it never repeats work or asks the model
-again. Turns recorded before timing was kept show **Worked** without a
-duration.
+again.
 
 ## Save a cropped image
 

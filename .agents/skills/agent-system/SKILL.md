@@ -64,7 +64,8 @@ Feature status: [`docs/agent/features.md`](../../../docs/agent/features.md).
   unconfined fallback. Windows starts no chat engine.
 - **Desktop chat state** lives under Electron `userData/native-chat/`
   (`workspaces/<key>/`, `documents/<key>/runtime/`), one SQLite
-  `runtime.sqlite` per state directory with one owning process. The earlier
+  `agent.sqlite` per state directory with one owning process. The store opens
+  only an empty database or one it created; there are no schema upgrades. The earlier
   TypeScript `sessions.db` and its session scratch stay in place, denied to
   the retained sidecar; never reopen them.
 - **Retained sidecar perimeter** (GRIDA-SEC-004): Main owns the loopback

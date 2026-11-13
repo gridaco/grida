@@ -237,8 +237,8 @@ A durable store records when each turn starts and when it settles. Replaying a
 bounded window of history attributes every record to its turn and carries each
 turn's outcome and those times. Tool calls and their results remain in the
 replayed sequence, so a client can reconstruct chronological activity without
-rerunning work. Times recorded before this capability existed are absent, never
-estimated.
+rerunning work. Every turn records its start; its settle time is absent until
+it settles, never estimated.
 
 Context performs pure operations over supplied data. It selects, orders,
 measures, trims, and assembles content according to explicit inputs. Its output
