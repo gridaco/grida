@@ -1,15 +1,14 @@
 # Rust core pressure test
 
-This is a design walkthrough of the [Rust core proposal](./rust-core.md).
-It follows a minimal master and a durable session through their public contracts,
-then checks those contracts against current Grida features and comparable agent
-runtimes. The traces are paper executions. They establish contract consistency
-and identify implementation work that still needs proof.
+This is a design walkthrough of the [Rust agent core](./rust-core.md). It
+follows a minimal master and a durable session through their public contracts,
+then checks those contracts against Grida's features. The traces are paper
+executions that establish contract consistency; the regression obligations
+below record where each outcome has actually been observed.
 
-Grida evidence comes from the current source and its adjacent tests. Other
-runtimes appear only as evidence that a behavior is achievable, never as the
-model. Each guarantee is stated independently of how any implementation
-currently provides it.
+Grida evidence comes from the current source and its adjacent tests. Each
+guarantee is stated by its domain rationale, independently of how any
+implementation currently provides it.
 
 ## Existing harness assessment
 
@@ -74,7 +73,7 @@ establish that the implementation will behave correctly.
 
 ## Regression obligations
 
-These are product situations worth carrying into the rebuild. Each states what
+These are product situations the native implementation preserves. Each states what
 a person should be able to observe, followed by the existing evidence and its
 limits. The mechanics of a supporting test can change while that expectation
 remains. The following distinctions guide that extraction.
@@ -91,7 +90,7 @@ explicit authority, accurate effect accounting, and correctly routed invocations
 are requirements to preserve. Document behavior belongs to its implementation.
 
 Each case records the available proof and its scope. The legacy tests document
-the failure or invariant, and the native tests show where the rebuilt path has
+the failure or invariant, and the native tests show where the native path has
 been exercised.
 
 | Case                                                             | Product situation and required outcome                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Existing evidence and limit                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
@@ -130,7 +129,7 @@ and provider execution still require their own acceptance evidence.
 | R16 — switch chats during work                | After switching from chat A to B, A's delayed output stays in A. B retains its own activity and controls.                                                                  | [Transport tests](../../../editor/lib/agent-chat/bridge-transport.test.ts) and [ownership tests](../../../editor/lib/agent-chat/stream-attach-owner.test.ts) exercise delayed work against replaced chat bindings. The composed UI still needs verification.                                                                                                                                                                                                                                   |
 | R17 — a submitted message cannot start        | A rejected message remains available to queue or retry. An existing question stays answerable, and repairing the displayed history preserves valid ongoing work.           | [Recovery tests](../../../editor/lib/agent-chat/stream-recovery.test.ts) cover automatic recovery of a text-only tail. The [manual pending-answer case](../../../test/desktop-agent-chat-human-input-queue.md) includes attachment preservation and remains untested.                                                                                                                                                                                                                          |
 | R18 — change models after attaching images    | Same-named images keep their identities. At submission, the selected model and available tools can use the intended image, or the person receives an actionable rejection. | The [native chat controller cases](../../../editor/lib/agent-chat/native-chat-controller.test.ts) preserve the selected PNG during model selection and refuse the switch until the attachment is sent or removed. They check same-named replacements and exact submission bytes. The [older routing cases](../../../editor/lib/agent-chat/input-resource-router.test.ts) cover the separate omission notice and file fallback behavior. Installed model use and display need further evidence. |
-| R9 — a completed change cannot be announced   | A completed change remains effective even if its notification fails. Retrying recognizes that the change already happened.                                                 | The [historical catalogue test](https://github.com/gridaco/grida/blob/5bd69ca22740fcb4b0f4db02210903c8503b7f34/packages/grida-ai-agent/src/providers/model-catalog.test.ts#L324) preserves applied state after a listener throws. Broader action recovery is a proposed requirement.                                                                                                                                                                                                           |
+| R9 — a completed change cannot be announced   | A completed change remains effective even if its notification fails. Retrying recognizes that the change already happened.                                                 | The [historical catalogue test](https://github.com/gridaco/grida/blob/5bd69ca22740fcb4b0f4db02210903c8503b7f34/packages/grida-ai-agent/src/providers/model-catalog.test.ts#L324) preserves applied state after a listener throws. Broader action recovery is an unresolved requirement.                                                                                                                                                                                                        |
 | R10 — repeated service failures               | Repeated unavailable or oversized responses leave the application usable, and cancellation releases the work it owns.                                                      | The [historical response-body test](https://github.com/gridaco/grida/blob/3a0966dc116ea2f76845a5abd269f1a4d0939632/packages/grida-ai-agent/src/providers/model-catalog.test.ts#L342) checks cleanup for selected rejected responses. It does not establish long-running UI responsiveness or every exit path.                                                                                                                                                                                  |
 | R11 — replace an image used by an open canvas | The canvas and its previews refresh while preserving unsaved edits. If edits delay refresh, it becomes visible after save or reload.                                       | [Reload tests](../../../editor/scaffolds/desktop/workbench/workspace-file-reload-guard.test.ts) cover races. The [visual case](../../../test/desktop-workbench-canvas-resource-refresh.md) records the composed outcome for editor-owned changes. A file written directly by the agent under the Default preset has no recorded run of this case.                                                                                                                                              |
 | R12 — an attached folder changes destination  | Permission to a folder cannot silently expand to protected content when its underlying destination changes.                                                                | [Native ACP fixture](../../../crates/grida-agent/tests/process/approvals/confinement.rs) retargets an alias during review. On arm64 macOS and Linux, the scoped write succeeds and direct or aliased protected reads and writes are refused. The [permission fixture](../../../crates/grida-agent/tests/permissions.rs) checks replacement of the approved root.                                                                                                                               |
@@ -155,19 +154,16 @@ settled while browsing. The [controller case](../../../editor/lib/agent-chat/nat
 holds an earlier read across settlement. The [Main case](../../../desktop/src/main/native-agent-process.test.ts)
 exercises overlapping replay requests and delayed chunks.
 
-An unsigned macOS ARM64 Desktop preview build exercised
-the rendered workbench, packaged preload, Main, and the native child together.
-With a saved OpenRouter GPT-5.6 Terra profile, two files named `same.png`
-reached the synthetic provider with their respective original bytes. A
-simulated loss of PNG capability kept the text and attachment in the mounted
-composer and left the current question visible. After capability recovery, a
-lost acceptance reply was retried with the same queued input ID. Answering the
-original question released that follow-up for exactly one inference.
-
-Relaunching the same preview profile on Vercel removed PNG availability and
-sent no work. Relaunching on the original OpenRouter profile reopened an existing
-pending question and accepted its answer once. This verifies the supported
-one-PNG path with synthetic upstream responses. Live provider execution and
+A macOS ARM64 Desktop preview build exercised the rendered workbench, packaged
+preload, Main, and the native child together with a saved OpenRouter profile
+and synthetic upstream responses. Two files named `same.png` reached the
+provider with their respective original bytes. A simulated loss of PNG
+capability kept the text and attachment in the mounted composer and left the
+current question visible. After capability recovery, a lost acceptance reply
+was retried with the same queued input ID, and answering the original question
+released that follow-up for exactly one inference. Relaunching on a profile
+without PNG support sent no work; relaunching on the original profile reopened
+the pending question and accepted its answer once. Live provider execution and
 the legacy pending-approval scenario retain separate evidence requirements.
 
 ### Implementation-plan requirements
@@ -239,11 +235,9 @@ can still inspect partial results and produce a factual account. Storage or
 integrity failure instead suspends trustworthy continuation and leaves the
 recorded state for recovery.
 
-Codex's captured step context and Zed's round-by-round preparation support this
-boundary between product choices and mechanical execution. Zed also releases
-the completed model request's permit before awaiting tool work that may need
-the same capacity. [Codex step context](https://github.com/openai/codex/blob/main/codex-rs/core/src/session/turn.rs),
-[Zed turn loop](https://github.com/zed-industries/zed/blob/main/crates/agent/src/thread.rs).
+Per-step preparation keeps product choices separate from mechanical execution.
+Releasing the completed model request's capacity before awaiting tool work that
+may need the same capacity keeps a step from waiting on its own permit.
 
 ### Counterexamples
 
@@ -254,7 +248,7 @@ the same capacity. [Codex step context](https://github.com/openai/codex/blob/mai
   account. Requested stop closes new effects while allowing receipt recording
   and settlement.
 - Exposing journal snapshots as the master's public view binds policy to storage
-  layout. `MasterView` supplies the semantic data the consumer actually uses.
+  layout. The turn's semantic view supplies the data the consumer actually uses.
 - Treating a missing aggregate step result as a missing execution repeats work.
   Runtime rebuilds the aggregate from committed model items and tool outcomes.
 
@@ -303,12 +297,10 @@ last explicit checkpoint determines its next decision.
 same change identity and verifies the stored terminal record. The queued turn
 cannot be started by guessing whether the previous one completed.
 
-Codex's authoritative history under acquired writer ownership is relevant to
-these cases. The inspected Zed native persistence path saves thread snapshots
-asynchronously, which establishes a different boundary from the proposed
-pre-effect journal. The stronger durability rules remain requirements of this
-design. [Codex thread store](https://github.com/openai/codex/blob/main/codex-rs/thread-store/src/store.rs),
-[Zed thread persistence](https://github.com/zed-industries/zed/blob/main/crates/agent/src/agent.rs).
+Persistence that saves conversation snapshots asynchronously cannot establish
+these boundaries, because an effect could begin before its intent is durable.
+Authoritative history under acquired writer ownership and the pre-effect
+journal are requirements of this design.
 
 ### Controls during the durable run
 
@@ -324,12 +316,11 @@ design. [Codex thread store](https://github.com/openai/codex/blob/main/codex-rs/
 ## Headless executable walkthrough
 
 The [native host](./rust-core.md#native-executable-and-headless-host)
-is part of the first durable delivery. The same binary serves Desktop and
-headless protocol clients, and its bounded run entrypoint uses the same master.
+serves Desktop and headless protocol clients from the same binary, and its bounded run entrypoint uses the same master.
 Passing imported-handler tests is supporting evidence. The executable path
 must also be exercised in its actual process.
 
-The first process path uses JSON-RPC over stdio under a supervising parent.
+The supervised process path uses JSON-RPC over stdio under a supervising parent.
 Independent-client cases use the explicitly selected authenticated loopback
 WebSocket service. Both bind the same dispatcher and session contracts. Closing
 the only stdio supervisor initiates bounded host shutdown. Disconnecting one
@@ -357,7 +348,7 @@ so they cannot attach to unrelated personal sessions.
 
 The agent-facing `/canvas.svg` can be rebound when the active editor or slide
 changes. Its live binding mutates editor state, while the host separately owns
-disk persistence. The proposed tool host captures the selected endpoint and its
+disk persistence. The tool host captures the selected endpoint and its
 binding generation so a focus change cannot silently redirect an admitted call.
 The document tool owns the meaning of its arguments, edits, persistence, and any
 content-version checks. [Active editor binding](../../../editor/scaffolds/desktop/file/active-editor-agent-fs.ts),
@@ -479,15 +470,9 @@ bindings, a primary default, and a revision while Files supplies scoped access.
 [Workspace registry](../../grida-daemon/src/workspaces.ts),
 [Directory reference scopes](../src/session/directory-scopes.ts).
 
-Codex's attachment store can select inline bytes or file references, and its
-clipboard path can create a temporary image file. Its public Project model and
-Desktop documentation support multiple local folders with primary-directory
-behavior. The documentation assigns default cwd, Git operations, and automatic
-instruction discovery to the primary folder. A sandbox still governs access.
-[Attachment store](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/attachment-store/src/lib.rs),
-[Clipboard image materialization](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/tui/src/clipboard_paste.rs),
-[Project storage](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/state/src/model/project.rs),
-[Desktop Projects](https://learn.chatgpt.com/docs/projects#use-local-projects-for-folders-and-codebases).
+In a multi-directory workspace, the primary directory supplies the default
+working directory and instruction discovery, while confinement still governs
+access to every directory.
 
 The pressure cases are loss of staged bytes after acceptance, cleanup racing
 Pause, identical relative paths in two roots, primary-directory changes during
@@ -519,25 +504,15 @@ driver reconstructs its continuation from history, operation outcomes, and any
 additional checkpoint. It does not deserialize a language stack or keep a model
 request open during human think time.
 
-Codex's inspected source has both an awaited input tool and an immediate-return
-asynchronous question tool. Its Desktop documentation separately describes
-steering and queueing. This supports the two interaction styles without
-establishing every detail of the Desktop client's reply routing.
-[Awaited question tool](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/core/src/tools/handlers/request_user_input.rs),
-[Asynchronous question tool](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/core/src/tools/handlers/request_user_input_async.rs),
-[Desktop steering and queueing](https://learn.chatgpt.com/docs/prompting#steering-and-queuing).
+Both interaction styles are needed: an awaited question blocks the dependent
+work, while an immediate-return question lets independent work continue.
+Steering and queueing are separate input routes.
 
-The proposed product supports slash commands, explicit skill mentions, and
-branching through its composer and control layer. Current official documentation
-describes these Desktop affordances. It also documents backend history reversion
-at a selected turn, which establishes a broader technical operation than a
-latest-message-only edit control. The reason for any narrower Desktop UI editing
-limit remains unverified.
-[Desktop commands](https://learn.chatgpt.com/docs/reference/slash-commands#available-slash-commands),
-[Skill selection](https://learn.chatgpt.com/docs/build-skills#how-chatgpt-and-codex-use-skills),
-[History reversion](https://learn.chatgpt.com/docs/app-server#revert-thread-history).
+The product supports slash commands, explicit skill mentions, branching, and
+earlier-message revision through its composer and control layer, all over the
+same history controls.
 
-## Subagent control study
+## Subagent controls
 
 Named children are addressable, reusable conversations. Their controls separate
 informational delivery, follow-up work, observation and interruption, so that
@@ -577,40 +552,21 @@ parent-funded reviewer. Named work can reuse a child from a later settled
 parent turn and retains separate usage and results. A parent Resume preserves
 the reviewer's independent Pause after reopening. [Built child lifecycle cases](../../../crates/grida-agent/tests/process/subagents.rs)
 
-## Side conversation study
+## Side conversations
 
-The Desktop command reference describes `/side` as a temporary conversation
-that leaves the main chat working. The goal guide recommends it for a status
-recap or explanation. Those are user-facing behavior claims. The shared Rust
-implementation provides additional evidence about context and role awareness.
-[Desktop commands](https://learn.chatgpt.com/docs/reference/slash-commands#available-slash-commands),
-[Goal guidance](https://learn.chatgpt.com/docs/long-running-work#steer-a-running-goal).
+A side conversation is temporary and leaves the main chat working; it suits a
+status recap or explanation. It freezes a source-history position and
+reconstructs model context from the installed summary and the later suffix, so
+opening it runs no new summarization. Policy identifies it to the model and
+marks inherited history as reference material. New requests after that
+boundary are its active work.
 
-The traced fork freezes a source-history position and reconstructs model context
-using existing compaction and the later suffix. Opening the side conversation
-does not itself run new summarization. Separate policy fragments identify it
-to the model and mark inherited history as reference material. New requests
-after that boundary are its active work.
-[Frozen fork](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/thread-store/src/local/paginated_fork.rs),
-[Model context](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/thread-store/src/local/model_context.rs),
-[Side-conversation policy](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/context-fragments/src/side_conversation.rs).
+Its policy favors non-mutating exploration. These instructions establish the
+model's role; actual grants and executors establish its enforced authority.
+Returning to the parent is navigation and does not merge the side conversation
+into parent context.
 
-The policy favors non-mutating exploration, permits an explicitly requested
-mutation within current permissions, and disallows subagent interaction.
-Temporary policy also restricts scheduled updates and retained worktrees.
-These instructions establish the model's role. Actual grants and executors
-establish its enforced authority.
-
-The Rust client distinguishes Temporary and Attached storage, and tests cover
-reopening saved side conversations. Returning to the parent is navigation and
-does not merge the side conversation into parent context. These client paths
-do not establish which storage choice every Desktop surface currently uses.
-[Client construction](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/tui/src/app_server_session.rs),
-[Side-chat lifecycle](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/tui/src/app/side.rs),
-[Policy request tests](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/tui/src/app/tests/side_chat_policy_tests.rs).
-
-The proposed components therefore treat this as derived conversation
-initialization. The master selects the seed, role, grants, lifetime, owner, and
+The components therefore treat this as derived conversation initialization. The master selects the seed, role, grants, lifetime, owner, and
 output routing using existing Context, Runtime, and Sessions contracts.
 
 | Pressure case                                               | Required result                                                                      |
@@ -624,18 +580,13 @@ output routing using existing Context, Runtime, and Sessions contracts.
 
 ## Persistent goal harness
 
-Codex's goal implementation is composed as an extension with lifecycle hooks,
-tools, persisted thread state, accounting, and continuation prompts. It submits
-ordinary next turns when its policy decides more work is needed. The public
-explanation describes the same separation between a durable objective and
-the execution turns that pursue it.
-[Codex goal extension](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/ext/goal/src/extension.rs),
-[Goal tools](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/ext/goal/src/spec.rs),
-[Official goal design](https://developers.openai.com/cookbook/examples/codex/using_goals_in_codex#how-goals-are-designed-in-codex).
+A persistent goal separates a durable objective from the execution turns that
+pursue it. The harness submits ordinary next turns when its policy decides more
+work is needed.
 
 The relevant missing seam was cross-turn driver state. A turn checkpoint covers
 continuation within that turn. An objective, its lifecycle, and its continuation
-eligibility can outlive many completed turns. The proposed optional session
+eligibility can outlive many completed turns. The optional session
 driver-state envelope supplies that persistence, with conditional revision
 checks and atomic publication alongside existing controls and turn outcomes.
 The master owns the goal schema, tools, prompts, completion criteria, and
@@ -650,13 +601,9 @@ anti-spin policy. The components enforce the generic storage and admission rules
 | Completion races with a changed objective                            | Commit against the expected state revision or reject the stale completion. The final account and goal-state change agree.      |
 | A branch copies goal context                                         | Preserve provenance while requiring explicit continuation activation for the new branch.                                       |
 
-Codex restores goal state on thread resume and coordinates continuation with
-goal mutations. Its accounting and empty-turn handling are useful policy
-examples. Exact thresholds belong to the master, and its budget accounting does
-not by itself prove a pre-dispatch monetary ceiling for every external action.
-[Goal runtime](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/ext/goal/src/runtime.rs),
-[Goal accounting](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/ext/goal/src/accounting.rs),
-[Goal storage](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/state/src/runtime/goals.rs).
+Goal state is restored on resume and coordinated with goal mutations. Exact
+thresholds belong to the master, and budget accounting alone does not prove a
+pre-dispatch monetary ceiling for every external action.
 
 This addition creates no goal-specific neutral crate or runtime mode. It reuses
 session state, ordinary turn drivers, controls, operation accounting, child
@@ -665,16 +612,14 @@ results, and wake-up delivery.
 ## Permission profiles and automatic review
 
 Approval eligibility, reviewer routing, and enforced access are separate
-contracts. In the inspected Codex source, the manual and automatic-review
-presets select the same workspace profile while changing the reviewer. Its
-official documentation also describes automatic review as a separate reviewer
-for eligible approval requests. [Codex permission selection](https://github.com/openai/codex/blob/main/codex-rs/tui/src/chatwidget/permissions_menu.rs),
-[Official automatic-review documentation](https://learn.chatgpt.com/docs/sandboxing/auto-review).
+contracts. Manual and automatic review can select the same workspace profile
+while changing only the reviewer, so automatic review is a separate decision
+route for eligible approval requests.
 
-Grida already has a host-owned executor with immutable scope, independently
-validated roots, and OS sandbox creation. Its supervised approval flow preserves
-the exact request and consuming run. These provide existing execution contracts
-to retain, while an automatic reviewer adds a separate decision route.
+The earlier host had an executor with immutable scope, independently validated
+roots, and OS sandbox creation, and its supervised approval flow preserved the
+exact request and consuming run. These are the execution contracts the native
+host retains, while an automatic reviewer adds a separate decision route.
 [Host executor scope](../../grida-daemon/src/shell/runner.ts),
 [Historical native command host](https://github.com/gridaco/grida/blob/219f40bcd1579d07b0742f63671875c4939bc0d5/desktop/src/main/agent-command-host.ts),
 [Approval consumption](../src/session/store.ts).
@@ -697,11 +642,10 @@ adapter. Product labels and reviewer policy remain in the master.
 ## Feature coverage recheck
 
 The [feature catalog](../../../docs/agent/features.md) separates current behavior
-from proposed guarantees. This review maps its feature families to the
+from intended guarantees and records each feature's availability and evidence.
+This review maps its feature families to the
 [master](../../../docs/wg/ai/agent/master.md) and
-[components](../../../docs/wg/ai/agent/components.md). It establishes a design
-path for every committed feature. Runtime behavior and Rust ergonomics still
-require implementation evidence.
+[components](../../../docs/wg/ai/agent/components.md).
 
 | Catalog features                                                                    | Master or host decision                                                                          | Reusable contract                                                                                                                      |
 | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
@@ -758,17 +702,10 @@ contracts even when the happy path is one model request.
 | Compaction finishes after input or lineage changes       | Validate its covered basis and preserve later input. Reject an incompatible candidate without replacing the live view.            |
 | Compaction fails or still leaves input too large         | Retain previous context and stop after bounded recovery with a clear explanation.                                                 |
 
-Zed counts the provider representation of a full request and classifies retry
-failures separately from the wait that reports progress and handles cancellation.
-Codex retains failure/partial-output evidence and validates prepared compaction
-prefixes before installation. These are concrete reference mechanisms for the
-corresponding contracts, while retry counts and compaction strategy remain
-product decisions.
-[Zed request counting](https://github.com/zed-industries/zed/blob/62682ebde9e70b8a77a95863a2b16e9d59bf65eb/crates/language_models/src/provider/open_ai.rs),
-[Zed failure facts](https://github.com/zed-industries/zed/blob/62682ebde9e70b8a77a95863a2b16e9d59bf65eb/crates/language_model_core/src/language_model_core.rs),
-[Zed retry wait](https://github.com/zed-industries/zed/blob/62682ebde9e70b8a77a95863a2b16e9d59bf65eb/crates/agent/src/thread.rs),
-[Codex retry decisions](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/core/src/session/turn.rs),
-[Codex compaction installation](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/core/src/compact_remote_v2_installation.rs).
+Counting the provider representation of the complete request, and classifying
+a retryable failure separately from the wait that reports progress and handles
+cancellation, are the mechanisms these contracts need. Retry counts and
+compaction strategy remain product decisions.
 
 ### Lifecycle hooks
 
@@ -811,7 +748,7 @@ built-in agent session.
 
 ### ACP client boundary
 
-The [client protocol proposal](./rust-client-protocol.md) maps standard ACP
+The [client protocol binding](./rust-client-protocol.md) maps standard ACP
 exchanges to the same internal contracts used by headless execution. The
 following cases constrain that adapter before compatibility can be claimed.
 
@@ -832,47 +769,44 @@ authority, interaction, recovery, and presentation obligations.
 ### Command confinement
 
 The native adapter confines raw executions. The host's authority, routing,
-credential custody, and process supervision remain separately owned. Outer host containment is a separate
-deployment profile, retained by the current Grida host. Platform support requires
-direct enforcement evidence.
+credential custody, and process supervision remain separately owned. Outer host
+containment is a separate deployment profile. Platform support requires direct
+enforcement evidence.
 
-The [native sandbox proposal](./rust-sandbox.md) selects one crate
-with Seatbelt on macOS and bubblewrap plus a trusted seccomp helper on Linux.
-The initial raw-command profile denies networking. Native Windows raw execution
-is deferred behind capability checks.
+The [native sandbox binding](./rust-sandbox.md) uses one crate with Seatbelt on
+macOS and bubblewrap plus a trusted seccomp helper on Linux. The raw-command
+profile denies networking. Native Windows raw execution is deferred behind
+capability checks.
 
-| Pressure case                                               | Required result                                                                                                                        |
-| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Two concurrent children have different filesystem grants    | Each execution retains its own scope, including after either grant changes.                                                            |
-| A command requests networking in the initial implementation | Admission reports an unsupported profile before executing the target.                                                                  |
-| A child daemonizes outside its original process group       | Cancellation reports whether the descendant terminated, remains confined, or is unresolved. Conflicting work cannot assume revocation. |
-| A process exits before temporary-resource cleanup finishes  | The outcome preserves cleanup state before releasing ownership that depends on it.                                                     |
-| Host proxy or trust configuration changes                   | The host routing adapter handles the change within authorized destinations. Confinement does not silently widen.                       |
-| A platform cannot enforce the requested profile             | That execution remains unavailable through the existing admission contract.                                                            |
+| Pressure case                                              | Required result                                                                                                                        |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Two concurrent children have different filesystem grants   | Each execution retains its own scope, including after either grant changes.                                                            |
+| A command requests networking                              | Admission reports an unsupported profile before executing the target.                                                                  |
+| A child daemonizes outside its original process group      | Cancellation reports whether the descendant terminated, remains confined, or is unresolved. Conflicting work cannot assume revocation. |
+| A process exits before temporary-resource cleanup finishes | The outcome preserves cleanup state before releasing ownership that depends on it.                                                     |
+| Host proxy or trust configuration changes                  | The host routing adapter handles the change within authorized destinations. Confinement does not silently widen.                       |
+| A platform cannot enforce the requested profile            | That execution remains unavailable through the existing admission contract.                                                            |
 
-The current host already separates an immutable shell scope from the executor,
-validates command roots independently, and waits for worker cleanup on
-cancellation. It also documents a macOS process-group revocation limitation.
-These supply concrete acceptance cases for the replacement.
+The earlier host separated an immutable shell scope from the executor,
+validated command roots independently, and waited for worker cleanup on
+cancellation. It also documented a macOS process-group revocation limitation.
+These supplied the acceptance cases the native adapter retains.
 [Shell executor](../../grida-daemon/src/shell/runner.ts),
 [Historical command confinement](https://github.com/gridaco/grida/blob/219f40bcd1579d07b0742f63671875c4939bc0d5/desktop/src/main/agent-command-host.ts),
 [Cancellation acknowledgment](../../../desktop/src/agent-sidecar-network.ts),
 [Current host authority and limitations](../../../desktop/docs/agent-authority.md).
 
-## Inherited choices review
+## Design decisions
 
-The 2026-11-09 review covers the active component, master, native-host, storage,
-workspace, and sandbox proposals. The TS implementation supplies evidence of
-user-visible behavior and past failures. Its framework, process topology, and
-defaults do not determine the rebuild. Codex `6107b9886c` and Zed `62682ebde9`
-provide independent comparisons, with implementation evidence still required
-for the selected native design.
+The earlier TypeScript implementation supplies evidence of user-visible
+behavior and past failures. Its framework, process topology, and defaults do
+not determine the native design.
 
-| Inherited or premature choice                                                    | Revised design and reason                                                                                                                                                                     |
+| Earlier choice                                                                   | Decision and reason                                                                                                                                                                           |
 | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | HTTP plus a separate event stream from the TS daemon                             | Use ACP with stdio first and an explicit shared-service binding. Negotiate additional durable controls while keeping core contracts protocol-independent.                                     |
 | TS socketless sidecar, main-owned provider broker, and compulsory outer envelope | Let the trusted native host own approved connections and launchers. Declare host hardening separately from mandatory raw-execution confinement.                                               |
-| One SQLite worker and one process for the entire database as fixed architecture  | Retain SQLite as the first adapter candidate. Require per-session ownership and atomic publication, while worker/connection/process topology awaits the executable proof.                     |
+| One SQLite worker and one process for the entire database as fixed architecture  | Use SQLite as the persistent adapter. Require per-session ownership and atomic publication; worker, connection, and process topology are adapter choices.                                     |
 | Queued work inherits whatever settings happen to exist at selection              | Capture requested model, effort, regime, approval policy, and resolved defaults at acceptance. Explicit queued edits can change them. Current authority and limits still constrain execution. |
 | A fork must start from already bounded model context                             | Seed from selected retained history, then assemble model context separately. A compact side-chat seed remains a master choice.                                                                |
 | Workspace hydration determines which files exist                                 | Use demand-driven file access and bounded listings. Index coverage is a discovery aid and cannot replace actual resource checks.                                                              |
@@ -881,97 +815,39 @@ for the selected native design.
 | Public segmented-effect machinery before advanced consumers exist                | Begin with complete-input tools. Streaming mutation and paid-job recovery must establish the shared stage API before promotion. Their durable-effect obligations still apply.                 |
 | Bundle one bubblewrap build as a core requirement                                | Require a trusted compatible non-setuid executable and feature probes. System selection and bundled fallback are packaging choices.                                                           |
 
-Codex preserves explicit per-input settings, semantic reasoning and phase, and
-per-thread live-writer ownership. Its tool futures can be queued while response
-items are still arriving. These mechanisms support the revised boundaries,
-without prescribing our queue-default policy or storage implementation.
-[Input settings](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/protocol/src/turn_input.rs),
-[response items](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/protocol/src/models.rs),
-[writer ownership](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/thread-store/src/local/live_writer.rs),
-[streamed dispatch](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/core/src/session/turn.rs).
-
-Zed preserves thinking and compaction content, distinguishes tools that accept
-partial input, and performs database work through its own connection and
-background-executor arrangement. Codex's system-or-bundled bubblewrap selection
-and the two projects' scoped launchers support keeping deployment selection
-outside the execution invariant.
-[Zed content](https://github.com/zed-industries/zed/blob/62682ebde9e70b8a77a95863a2b16e9d59bf65eb/crates/language_model_core/src/request.rs),
-[Zed tool execution](https://github.com/zed-industries/zed/blob/62682ebde9e70b8a77a95863a2b16e9d59bf65eb/crates/agent/src/thread.rs),
-[Zed database](https://github.com/zed-industries/zed/blob/62682ebde9e70b8a77a95863a2b16e9d59bf65eb/crates/agent/src/db.rs),
-[Codex launcher selection](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/linux-sandbox/src/launcher.rs).
-
-The review keeps durable acceptance, pre-effect barriers, explicit uncertain
+The design keeps durable acceptance, pre-effect barriers, explicit uncertain
 outcomes, scoped authority, recoverable working files, and final-account policy.
-These answer the catalog's product promises and known failures. Reference
-implementations with different persistence guarantees do not remove those
-requirements. Current deployed TS security rules retain their existing scope.
+These answer the catalog's product promises and known failures. A persistence
+design with weaker guarantees does not remove those requirements.
 
-The whole-design recheck retains the existing component and crate count. It
-makes finite command execution explicit as the first adapter profile. Codex's
-reusable command sessions and Zed's awaited terminal illustrate different
-lifetimes, so the initial sandbox handle alone cannot promise interactive or
-background process management.
-[Codex command sessions](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/core/src/unified_exec/command_sessions.rs),
-[Zed terminal](https://github.com/zed-industries/zed/blob/62682ebde9e70b8a77a95863a2b16e9d59bf65eb/crates/agent/src/tools/terminal_tool.rs).
+Command execution is finite: interactive and long-lived command sessions have
+different lifetimes, so the sandbox handle alone does not promise interactive
+or background process management. Host environment projection and private
+state creation belong to the execution and storage adapters. Bounded ingress
+and slow-consumer handling remain protocol responsibilities.
 
-Host environment projection and private state creation receive concrete
-acceptance cases. These belong to the existing execution/storage adapters.
-Bounded ingress and slow-consumer handling remain protocol responsibilities.
-[Codex environment](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/core/src/exec_env.rs),
-[Zed private validation channel](https://github.com/zed-industries/zed/blob/62682ebde9e70b8a77a95863a2b16e9d59bf65eb/crates/sandbox/src/linux_bubblewrap.rs).
+### Rejected alternatives
 
-## Simplification decisions
+| Alternative                                         | Decision                                                                                                                      |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Checkpoint every new decision                       | Derive simple master state from committed work, checkpoint additional state explicitly                                        |
+| Every tool author manually journals nested effects  | Runtime wraps ordinary invocations, while concrete advanced consumers establish any shared stage API                          |
+| Master reads the journal snapshot                   | Give the master a semantic view and keep replay schemas adapter-facing                                                        |
+| Another state machine for interactive tools         | Reuse Runtime's typed wait operation through a narrow scoped adapter                                                          |
+| A special reporting subsystem                       | Use ordinary inference when needed and a factual fallback from recorded results                                               |
+| Generalized media inference                         | Adapt typed generation clients as Tools                                                                                       |
+| Additional surface or todo core components          | Keep domain tools and presentation projections in product composition                                                         |
+| A separate command-line agent loop                  | One native host composes the master for service, unattended, and Desktop clients                                              |
+| A queue-specific settings framework                 | Keep settings in input/driver state and capture their selected revisions                                                      |
+| Runtime-owned hook and reviewer workflows           | The master and host supply hook dispatch and authorization policy through the admission gate and ordinary recorded operations |
+| Implicit parent funding for every child             | The master selects funding relationships, and admission enforces the supplied allocations                                     |
+| Fixed tool envelopes and file-spooling policy       | Tool adapters own domain results, the host owns retained output, and the master selects model presentation                    |
+| A pricing or preview core service                   | Use normalized usage evidence and artifact references, with host-owned interpretation                                         |
+| A mandatory core summarizer                         | Keep structured settlement mandatory and consumer-authored summary policy in the master                                       |
+| Partial-input admission in the tool contract        | Use complete validated arguments. Keep staged mutation behind its separately reviewed consumer contract.                      |
+| A background compaction subsystem                   | Use foreground candidate generation and atomic installation. Add speculative preparation only for measured benefit.           |
+| Shared-service networking before core controls work | Controls are proven over stdio; the loopback listener has its own independent-client tests                                    |
+| One crate for every logical component               | Shared Core, Runtime, and Sessions packages, with lower components as modules                                                 |
 
-| Earlier candidate                                    | Revised decision                                                                                                      |
-| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Checkpoint every new decision                        | Derive simple master state from committed work, checkpoint additional state explicitly                                |
-| Every tool author manually journals nested effects   | Runtime wraps ordinary invocations, while concrete advanced consumers establish any shared stage API                  |
-| Master reads the journal snapshot                    | Give the master a semantic view and keep replay schemas adapter-facing                                                |
-| Another state machine for interactive tools          | Reuse Runtime's typed wait operation through a narrow scoped adapter                                                  |
-| A special reporting subsystem                        | Use ordinary inference when needed and a factual fallback from recorded results                                       |
-| Generalized media inference                          | Adapt typed generation clients as Tools                                                                               |
-| Additional surface or todo core components           | Keep domain tools and presentation projections in product composition                                                 |
-| A separate command-line agent loop                   | One native host composes the master for service, unattended, and Desktop clients                                      |
-| A queue-specific settings framework                  | Keep settings in input/driver state and capture their selected revisions                                              |
-| Runtime-owned hook and reviewer workflows            | The host supplies dispatch and authorization policy through the async admission gate and ordinary recorded operations |
-| Implicit parent funding for every child              | The master selects funding relationships, and admission enforces the supplied allocations                             |
-| Fixed tool envelopes and file-spooling policy        | Tool adapters own domain results, the host owns retained output, and the master selects model presentation            |
-| A pricing or preview core service                    | Use normalized usage evidence and artifact references, with host-owned interpretation                                 |
-| A mandatory core summarizer                          | Keep structured settlement mandatory and consumer-authored summary policy in the master                               |
-| Partial-input admission in the initial tool contract | Use complete validated arguments. Keep staged mutation behind its separately reviewed consumer contract.              |
-| A background compaction subsystem in the first slice | Use foreground candidate generation and atomic installation. Add speculative preparation only for measured benefit.   |
-| Shared-service networking before core controls work  | Prove controls over stdio first. Activate the listener and independent-client tests with their actual consumer.       |
-| One crate for every logical component                | Reserve shared Core, Runtime, and Sessions boundaries, keeping lower components as modules                            |
-
-## Packaging reassessment
-
-The independent-use cases establish small public contracts, while the known
-growth paths establish three credible package boundaries. Shared Core serves
-direct model/tool callers, Runtime serves live turns, and Sessions coordinates
-durable work through native or external drivers. The lower Messages, History,
-Context, Tools, and Turn contracts can stay as modules within the shared Core.
-
-Reserve those names, ownership rules, dependency budgets, consumers, and
-activation points now. Create each package when its first substantive
-implementation arrives. The full durable vertical slice can activate all three
-from the start. A smaller embedded prototype can use one physical crate while
-honoring the same seams.
-
-SQLite stays in a selected adapter crate because it introduces a concrete native
-dependency. Provider implementations can share a package while their transport
-and release requirements align. The branded master remains a separate consumer.
-
-This approach preserves the known destination without requiring a package for
-every pure component. It also prevents the shared Core from accumulating
-dependencies on its future Runtime and Sessions consumers. The proposal records
-the [reserved crate map](./rust-core.md#reserved-crate-map),
-[dependency budgets](./rust-core.md#dependency-budgets-and-graphs), and
-[activation rules](./rust-core.md#activating-later-boundaries).
-
-## Lock recommendation
-
-The responsibilities and failure semantics survive these walkthroughs. The
-concrete guarantees recommended for commitment are listed in the proposal's
-[lock table](./rust-core.md#what-to-lock-after-the-pressure-test).
-The first implementation still needs to demonstrate Rust ergonomics, actual
-crash recovery, resource bounds, and the performance of the supported paths.
+The semantic commitments these walkthroughs support are listed in the core
+binding's [committed boundaries](./rust-core.md#committed-boundaries).
