@@ -247,7 +247,7 @@ describe("AgentSidecarChannel.parse", () => {
     for (const type of ["command.request", "command.output", "command.end"])
       expect(() =>
         AgentSidecarChannel.parse({ v: 1, type, requestId: "cmd" })
-      ).toThrow();
+      ).toThrow(`unknown frame type: ${type}`);
   });
 });
 
