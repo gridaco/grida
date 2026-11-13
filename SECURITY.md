@@ -722,6 +722,24 @@ canonical identities. Protected contents, directory listings, extended
 attributes and other descendant metadata remain denied. Actual native tests
 exercise fresh managed-workspace creation alongside protected-root rejection.
 
+- **Network (retained service, native confinement).** On macOS and Linux the
+  retained file/media sidecar runs under native Seatbelt or bubblewrap/seccomp
+  confinement with no direct network: its profile has an empty domain
+  allowlist and denylist, and local binding is off. Construction refuses any
+  other network posture (`retained_service_direct_network_forbidden`), and on
+  Linux the syscall filter also denies new sockets. The daemon remains
+  reachable because Electron main owns the exact-`127.0.0.1` loopback listener
+  and transfers only accepted connected sockets, and provider HTTP for media
+  and subscription work flows through main's provider transport over inherited
+  channels. The retained process therefore has no network owner of its own.
+  Windows retained services run without kernel confinement and receive no
+  model command executor.
+
+**Historical TypeScript execution (srt).** The four bullets below describe the
+retired TypeScript agent tenant and its srt outer policy. They remain as
+source-only regression evidence and do not describe distributed Desktop
+execution.
+
 - **Network (allow-only, enumerated).** `srt` denies all outbound except a
   host-set domain allowlist and **forbids `*` / broad patterns by design** —
   its structural sandbox is also its network sandbox, so there is no "open
@@ -775,10 +793,10 @@ workbench's Terminal pane (`bridge.terminal.*`) is a real, **unsandboxed**
 login PTY — arbitrary code execution by design, accepted under the same
 trust model as VSCode's integrated terminal: the human runs commands as
 themselves, on their own machine, with their own privileges (no
-escalation). It is deliberately NOT wrapped in `srt` and deliberately NOT
-part of the agent's tool surface — the agent's `run_command` stays
-confined behind the sandbox gates above, and no code path hands the agent
-a handle to a human terminal. What makes the surface acceptable is that
+escalation). It is deliberately NOT wrapped in an agent sandbox and
+deliberately NOT part of the agent's tool surface — the agent's command tool
+stays confined by the native command sandbox, and no code path hands the
+agent a handle to a human terminal. What makes the surface acceptable is that
 only the legitimate desktop renderer can reach it: the four terminal IPC
 channels are registered through the same sender-frame `guarded()` wrapper
 as every other native capability (editor origin + `/desktop/*` path), the
