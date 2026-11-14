@@ -66,10 +66,12 @@ connection. Deleting data does not reset a connection.
 To ask about the conversation without adding to it, type **`/side`** in an
 idle chat that already has a finished turn. Choosing it adds a removable
 **Side** badge and sends nothing. Type the question and send: it goes to a
-temporary, read-only side chat that opens above the composer, and this chat
-does not change. The side chat sees this chat's saved text but no project
-files or tools, takes up to six questions, and is discarded when you choose
-**Close side chat** or leave the chat. Choose **Add to parent draft** to quote
+temporary, read-only side chat that opens as a **Side chat** tab beside your
+open files (in a file window, under the chat), and this chat does not change.
+Ask further questions in the tab. The side chat sees this chat's saved text
+but no project files or tools, takes up to six questions, and is discarded
+when you close its tab, choose **Close side chat**, or leave the chat; a
+closed side chat cannot be reopened. Choose **Add to parent draft** to quote
 an answer in your next message. **Side** cannot be combined with a goal or an
 attachment; with **Plan** on, the side question still leaves the plan
 unchanged. ACP clients can open side chats too.

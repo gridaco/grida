@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import type { WorkspaceFsEntry } from "@grida/desktop-bridge";
 import { WorkspaceArtifact } from "@/lib/desktop/workspace-artifact";
 import { EditorGroup } from "./editor-group";
+import { WorkbenchTab } from "./workbench-tab";
+
+const file = WorkbenchTab.file;
 import { WorkspaceSurfaceHost } from "./workspace-surface-host";
 
 function createHost(entries: WorkspaceFsEntry[]) {
@@ -27,8 +30,8 @@ describe("WorkspaceSurfaceHost.open", () => {
     await host.open("/assets/hero.svg");
     expect(readdir).toHaveBeenCalledWith("assets");
     expect(group.getSnapshot()).toEqual({
-      tabs: ["assets/hero.svg"],
-      active: "assets/hero.svg",
+      tabs: [file("assets/hero.svg")],
+      active: file("assets/hero.svg"),
     });
   });
 
@@ -37,13 +40,13 @@ describe("WorkspaceSurfaceHost.open", () => {
       { name: "a.svg", rel_path: "a.svg", kind: "file" },
       { name: "b.svg", rel_path: "b.svg", kind: "file" },
     ]);
-    group.open("a.svg");
-    group.open("b.svg");
+    group.open(file("a.svg"));
+    group.open(file("b.svg"));
 
     await host.open("/a.svg");
     expect(group.getSnapshot()).toEqual({
-      tabs: ["a.svg", "b.svg"],
-      active: "a.svg",
+      tabs: [file("a.svg"), file("b.svg")],
+      active: file("a.svg"),
     });
   });
 
@@ -60,7 +63,7 @@ describe("WorkspaceSurfaceHost.open", () => {
 
     await host.open("/Launch.canvas");
     await host.open("/assets");
-    expect(group.getSnapshot().tabs).toEqual(["Launch.canvas"]);
+    expect(group.getSnapshot().tabs).toEqual([file("Launch.canvas")]);
   });
 
   it("rejects invalid, missing, and non-file paths without opening a tab", async () => {
@@ -80,18 +83,18 @@ describe("WorkspaceSurfaceHost.open", () => {
     const readdir = vi.fn<WorkspaceArtifact.Readdir>(() => entries);
     const group = new EditorGroup();
     const host = new WorkspaceSurfaceHost(readdir, group);
-    group.open("before.svg");
+    group.open(file("before.svg"));
 
     const opening = host.open("/agent.svg");
-    group.open("user.svg");
+    group.open(file("user.svg"));
     resolveEntries([
       { name: "agent.svg", rel_path: "agent.svg", kind: "file" },
     ]);
     await opening;
 
     expect(group.getSnapshot()).toEqual({
-      tabs: ["before.svg", "user.svg"],
-      active: "user.svg",
+      tabs: [file("before.svg"), file("user.svg")],
+      active: file("user.svg"),
     });
   });
 
@@ -118,15 +121,15 @@ describe("WorkspaceSurfaceHost.open", () => {
 describe("WorkspaceSurfaceHost.listOpen", () => {
   it("returns canonical paths and reports file activity", () => {
     const { host, group } = createHost([]);
-    group.open("a.svg");
-    group.open("b.svg");
+    group.open(file("a.svg"));
+    group.open(file("b.svg"));
 
     expect(host.listOpen()).toEqual({
       active: "/b.svg",
       open: ["/a.svg", "/b.svg"],
     });
 
-    group.activate("a.svg");
+    group.activate(file("a.svg"));
     expect(host.listOpen()).toEqual({
       active: "/a.svg",
       open: ["/a.svg", "/b.svg"],
@@ -137,18 +140,18 @@ describe("WorkspaceSurfaceHost.listOpen", () => {
     const { host, group } = createHost([]);
     const observe = vi.fn<() => void>();
     const unsubscribe = host.subscribeToEditorSurfaces(observe);
-    group.open("a.svg");
-    group.open("b.canvas");
+    group.open(file("a.svg"));
+    group.open(file("b.canvas"));
     expect(host.readEditorSurfaces()).toEqual({
       active: "/b.canvas",
       open: ["/a.svg", "/b.canvas"],
       truncated: false,
     });
-    group.activate("a.svg");
+    group.activate(file("a.svg"));
     expect(observe).toHaveBeenCalledTimes(3);
     expect(host.readEditorSurfaces().active).toBe("/a.svg");
     unsubscribe();
-    group.activate("b.canvas");
+    group.activate(file("b.canvas"));
     expect(observe).toHaveBeenCalledTimes(3);
   });
 
@@ -161,8 +164,8 @@ describe("WorkspaceSurfaceHost.listOpen", () => {
     publish.mockResolvedValue(false);
     const release = host.publishEditorSurfaces(publish);
     try {
-      group.open("a.svg");
-      group.open("b.canvas");
+      group.open(file("a.svg"));
+      group.open(file("b.canvas"));
       expect(publish).toHaveBeenCalledExactlyOnceWith({
         active: null,
         open: [],
@@ -175,7 +178,7 @@ describe("WorkspaceSurfaceHost.listOpen", () => {
         open: ["/a.svg", "/b.canvas"],
         truncated: false,
       });
-      group.activate("a.svg");
+      group.activate(file("a.svg"));
       expect(publish).toHaveBeenCalledTimes(2);
     } finally {
       release();
@@ -199,8 +202,8 @@ describe("WorkspaceSurfaceHost.restoreRelative", () => {
     });
 
     expect(group.getSnapshot()).toEqual({
-      tabs: ["a.svg", "b.svg", "c.svg"],
-      active: "b.svg",
+      tabs: [file("a.svg"), file("b.svg"), file("c.svg")],
+      active: file("b.svg"),
     });
     expect(listener).toHaveBeenCalledTimes(1);
   });
@@ -217,8 +220,8 @@ describe("WorkspaceSurfaceHost.restoreRelative", () => {
     });
 
     expect(group.getSnapshot()).toEqual({
-      tabs: ["a.svg", "c.svg"],
-      active: "c.svg",
+      tabs: [file("a.svg"), file("c.svg")],
+      active: file("c.svg"),
     });
   });
 
@@ -235,7 +238,7 @@ describe("WorkspaceSurfaceHost.restoreRelative", () => {
       open: ["remembered.svg"],
       active: "remembered.svg",
     });
-    group.open("user.svg");
+    group.open(file("user.svg"));
     resolveEntries([
       {
         name: "remembered.svg",
@@ -246,8 +249,8 @@ describe("WorkspaceSurfaceHost.restoreRelative", () => {
     await restoring;
 
     expect(group.getSnapshot()).toEqual({
-      tabs: ["user.svg"],
-      active: "user.svg",
+      tabs: [file("user.svg")],
+      active: file("user.svg"),
     });
   });
 });
@@ -255,9 +258,9 @@ describe("WorkspaceSurfaceHost.restoreRelative", () => {
 describe("WorkspaceSurfaceHost.rememberedTabs", () => {
   it("keeps ordered real tabs and the active real artifact", () => {
     const { host, group } = createHost([]);
-    group.open("a.svg");
-    group.open("b.svg");
-    group.activate("a.svg");
+    group.open(file("a.svg"));
+    group.open(file("b.svg"));
+    group.activate(file("a.svg"));
 
     expect(host.rememberedTabs()).toEqual({
       open: ["a.svg", "b.svg"],
@@ -267,9 +270,9 @@ describe("WorkspaceSurfaceHost.rememberedTabs", () => {
 
   it("falls back to the last open tab after the active one closes", () => {
     const { host, group } = createHost([]);
-    group.open("a.svg");
-    group.open("b.svg");
-    group.close("b.svg");
+    group.open(file("a.svg"));
+    group.open(file("b.svg"));
+    group.close(file("b.svg"));
 
     expect(host.rememberedTabs()).toEqual({
       open: ["a.svg"],
@@ -279,9 +282,20 @@ describe("WorkspaceSurfaceHost.rememberedTabs", () => {
 
   it("persists an empty group when no tabs remain", () => {
     const { host, group } = createHost([]);
-    group.open("remembered.svg");
-    group.close("remembered.svg");
+    group.open(file("remembered.svg"));
+    group.close(file("remembered.svg"));
 
     expect(host.rememberedTabs()).toEqual({ open: [], active: null });
+  });
+});
+
+describe("WorkspaceSurfaceHost — panel tabs", () => {
+  it("lists and remembers file tabs only", () => {
+    const { host, group } = createHost([]);
+    group.open(file("a.svg"));
+    group.open(WorkbenchTab.panel("side-chat/1"));
+
+    expect(host.listOpen()).toEqual({ active: null, open: ["/a.svg"] });
+    expect(host.rememberedTabs()).toEqual({ open: ["a.svg"], active: "a.svg" });
   });
 });

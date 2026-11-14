@@ -1550,8 +1550,8 @@ export class NativeChatController {
   }
 
   /**
-   * Ask the draft in the side chat, opening its panel when needed. The text
-   * never reaches this chat; a failed ask keeps the draft and the badge.
+   * Ask the draft in the side chat, opening one when needed. The text never
+   * reaches this chat; a failed ask keeps the draft and the badge.
    */
   private async askSide(scope: Scope, text: string): Promise<void> {
     if (!text.trim()) throw new Error("native_chat_not_ready");

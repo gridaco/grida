@@ -60,7 +60,7 @@ import { ContextMeter } from "../shared/context-meter";
 import { computeContextUsage } from "@/lib/agent-chat/context-usage";
 import { cn } from "@app/ui/lib/utils";
 import styles from "./agent-pane.module.css";
-import { NativeSideChatPanel } from "./native-side-chat-panel";
+import { SideChatPlacement } from "./side-chat-placement";
 import { NativeTurnArtifacts } from "./native-turn-summary";
 import { NativeAttachmentCard } from "./native-attachment-card";
 import { NativeEarlierMessages } from "./native-earlier-messages";
@@ -131,6 +131,7 @@ export function NativeAgentPaneGate({
   workspaceId,
   initialSession,
   editorSurfaces,
+  sideChatPlacement,
   firstMessage,
 }: {
   bridge: DesktopNativeChat;
@@ -138,6 +139,8 @@ export function NativeAgentPaneGate({
   workspaceId?: string;
   initialSession: string | null;
   editorSurfaces?: NativeChatEditorSurfaces;
+  /** Where this chat's side chat is shown. */
+  sideChatPlacement: SideChatPlacement;
   /** Sent once as a new chat's first turn when the chat is ready. */
   firstMessage?: NativeFirstMessage;
 }) {
@@ -224,6 +227,7 @@ export function NativeAgentPaneGate({
       workspaceId={workspaceId}
       initialSession={initialSession}
       editorSurfaces={editorSurfaces}
+      sideChatPlacement={sideChatPlacement}
       firstMessage={firstMessage}
     />
   );
@@ -252,6 +256,7 @@ export function NativeAgentPane({
   workspaceId,
   initialSession,
   editorSurfaces,
+  sideChatPlacement,
   firstMessage,
 }: {
   bridge: DesktopNativeChat;
@@ -264,6 +269,8 @@ export function NativeAgentPane({
   workspaceId?: string;
   initialSession: string | null;
   editorSurfaces?: NativeChatEditorSurfaces;
+  /** Where this chat's side chat is shown; see `side-chat-placement.ts`. */
+  sideChatPlacement: SideChatPlacement;
   /** Sent once as a new chat's first turn; see {@link NativeAgentPaneGate}. */
   firstMessage?: NativeFirstMessage;
 }) {
@@ -313,7 +320,17 @@ export function NativeAgentPane({
     scope: number;
     selectionId: string;
   } | null>(null);
-  const side = state.sideChat;
+  // The side chat shows wherever the host places it; answers quote into this
+  // chat's composer.
+  useEffect(
+    () =>
+      SideChatPlacement.connect(
+        controller,
+        sideChatPlacement,
+        (text) => draft.current?.appendText(text, MAX_DRAFT_BYTES) ?? false
+      ),
+    [controller, sideChatPlacement]
+  );
   useEffect(() => {
     const profile =
       workspaceId && initialSession
@@ -557,21 +574,6 @@ export function NativeAgentPane({
           Opening edit…
         </div>
       ) : null}
-      {side && (
-        <NativeSideChatPanel
-          controller={side}
-          close={() => void controller.closeSideChat()}
-          draftUnavailable={state.steering || state.acting}
-          addToDraft={(turnId) =>
-            controller.stageSideAnswer(
-              side,
-              turnId,
-              (text) =>
-                draft.current?.appendText(text, MAX_DRAFT_BYTES) ?? false
-            )
-          }
-        />
-      )}
       {error && (
         <div
           role="alert"

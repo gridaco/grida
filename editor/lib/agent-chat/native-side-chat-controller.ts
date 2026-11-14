@@ -24,9 +24,13 @@ const QUESTION_LIMIT = 16 * 1024;
 const QUOTE_LIMIT = 16 * 1024;
 const utf8 = new TextEncoder();
 
-/** A temporary renderer view bound to one admitted parent attachment. */
+/**
+ * One temporary side chat bound to an admitted parent attachment: its
+ * lifecycle, exchanges and draft. Where it is shown is decided elsewhere.
+ */
 export class NativeSideChatController {
-  private readonly openId = crypto.randomUUID();
+  /** Stable for this side chat's life; a later side chat has a new id. */
+  readonly id = crypto.randomUUID();
   private readonly listeners = new Set<() => void>();
   private opening?: Promise<void>;
   private closing?: Promise<void>;
@@ -67,7 +71,7 @@ export class NativeSideChatController {
     if (this.closing || this.view.phase === "ready") return Promise.resolve();
     this.update({ phase: "opening", error: null });
     this.opening = this.bridge
-      .openSideChat(this.parent, this.openId)
+      .openSideChat(this.parent, this.id)
       .then((context) => {
         if (!this.closing) this.update({ phase: "ready", context });
       })
@@ -122,7 +126,7 @@ export class NativeSideChatController {
     try {
       const answer = await this.bridge.askSideChat(
         this.parent,
-        this.openId,
+        this.id,
         pending.requestId,
         pending.text
       );
@@ -151,7 +155,7 @@ export class NativeSideChatController {
   close(): Promise<void> {
     if (this.closing) return this.closing;
     this.closing = Promise.resolve().then(() =>
-      this.bridge.closeSideChat(this.parent, this.openId)
+      this.bridge.closeSideChat(this.parent, this.id)
     );
     this.update({
       phase: "closing",

@@ -2,6 +2,9 @@ import { createSvgEditor } from "@grida/svg-editor";
 import type { NativeEditorSvgText } from "@grida/desktop-bridge";
 import { expect, it } from "vitest";
 import { EditorGroup } from "./editor-group";
+import { WorkbenchTab } from "./workbench-tab";
+
+const file = WorkbenchTab.file;
 import { WorkspaceSvgText } from "./workspace-svg-text";
 
 const source =
@@ -12,7 +15,7 @@ function fixture() {
   const group = new EditorGroup();
   const owner = new WorkspaceSvgText(group.getSnapshot);
   const close = owner.register("poster.svg", editor);
-  group.open("poster.svg");
+  group.open(file("poster.svg"));
   const select = (name: string) =>
     editor.commands.select(
       [...editor.tree().nodes.values()].find((node) => node.name === name)!.id
@@ -65,8 +68,8 @@ it("retires selection and tab changes even after returning to the same SVG", () 
       call(target, { kind: "replace", revision: target, text: "Wrong" })
     ).toEqual({ kind: "unavailable" });
     const next = owner.capture()!;
-    group.open("other.svg");
-    group.activate("poster.svg");
+    group.open(file("other.svg"));
+    group.activate(file("poster.svg"));
     expect(call(next, { kind: "read" })).toEqual({ kind: "unavailable" });
     select("mixed");
     expect(owner.capture()).toBeUndefined();

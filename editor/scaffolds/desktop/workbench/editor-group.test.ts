@@ -201,7 +201,7 @@ describe("EditorGroup — reopen-closed history", () => {
   });
 
   it("bounds the history to the configured limit", () => {
-    const g = new EditorGroup(2);
+    const g = new EditorGroup({ historyLimit: 2 });
     for (const t of ["a", "b", "c"]) {
       g.open(t);
       g.close(t);
@@ -213,5 +213,29 @@ describe("EditorGroup — reopen-closed history", () => {
     expect(snap(g).active).toBe("b");
     g.reopenClosed(); // "a" is gone
     expect(snap(g).tabs).toEqual(["c", "b"]);
+  });
+});
+
+describe("EditorGroup — reopenable policy", () => {
+  it("never records a tab the policy rejects", () => {
+    const g = new EditorGroup({ reopenable: (id) => id !== "panel" });
+    g.open("a");
+    g.open("panel");
+    g.close("a");
+    g.close("panel");
+    g.reopenClosed();
+    expect(snap(g)).toEqual({ tabs: ["a"], active: "a" });
+    g.reopenClosed();
+    expect(snap(g)).toEqual({ tabs: ["a"], active: "a" });
+  });
+
+  it("applies the neighbor rule to a closed non-reopenable tab", () => {
+    const g = new EditorGroup({ reopenable: (id) => id !== "panel" });
+    g.open("a");
+    g.open("panel");
+    g.open("b");
+    g.activate("panel");
+    g.close("panel");
+    expect(snap(g)).toEqual({ tabs: ["a", "b"], active: "a" });
   });
 });

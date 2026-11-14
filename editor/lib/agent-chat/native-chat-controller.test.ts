@@ -2275,6 +2275,24 @@ it("hides Side without committed history or while the chat is busy", async () =>
   unsupported.controller.disconnect();
 });
 
+it("closes the open side chat by its id and clears it from the view", async () => {
+  const { bridge, controller } = sideFixture(true);
+  const close = vi.fn<NonNullable<DesktopNativeChat["closeSideChat"]>>(
+    async () => {}
+  );
+  bridge.closeSideChat = close;
+  await controller.select("chat-a");
+  controller.openSideChat();
+  const side = controller.read().sideChat!;
+  await side.open();
+  await controller.closeSideChat();
+  expect(close).toHaveBeenCalledExactlyOnceWith("chat-a", side.id);
+  expect(controller.read().sideChat).toBeNull();
+  controller.openSideChat();
+  expect(controller.read().sideChat?.id).not.toBe(side.id);
+  controller.disconnect();
+});
+
 it("keeps side retries exact, parent input independent, and late answers out of the next chat", async () => {
   const { bridge, controller } = fixture();
   const context = {

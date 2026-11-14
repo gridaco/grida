@@ -1,8 +1,10 @@
 /**
- * Workspace editor region: a persistent title bar over the focused document.
+ * Workspace editor region: a persistent title bar over the focused tab.
  *
  * Open, active, and close state lives in `workspace-workbench.tsx`; this
- * component owns only transient per-tab dirty state for the title bar.
+ * component owns only transient per-file dirty state for the title bar. Tabs
+ * are keyed through `WorkbenchTab`: a file tab shows its viewer and file
+ * menu; a panel tab shows the content its owner placed in `WorkbenchPanels`.
  */
 "use client";
 
@@ -12,6 +14,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { PanelRightIcon, XIcon } from "lucide-react";
 import { Toggle } from "@app/ui/components/toggle";
@@ -27,6 +30,8 @@ import type { WorkspaceCanvasCreation } from "./workspace-canvas-creation";
 import { useWorkspaceChanges } from "./workspace-changes";
 import { WorkspaceFileIcon } from "./workspace-file-icon";
 import { WorkspaceTabThumbnail } from "./workspace-tab-thumbnail";
+import { WorkbenchTab } from "./workbench-tab";
+import type { WorkbenchPanel, WorkbenchPanels } from "./workbench-panels";
 import type { WorkspaceSvgText } from "./workspace-svg-text";
 import { FileContextMenu } from "./workbench-file-context-menu";
 import {
@@ -39,10 +44,13 @@ import {
 export type EditorPaneProps = {
   workspace: Workspace;
   svgText?: WorkspaceSvgText;
+  /** Content of the open panel tabs. */
+  panels: WorkbenchPanels;
+  /** Tab keys (`WorkbenchTab`) in strip order. */
   openTabs: readonly string[];
-  activeRelPath: string | null;
-  onSelectTab: (relPath: string) => void;
-  onCloseTab: (relPath: string) => void;
+  activeTab: string | null;
+  onSelectTab: (tab: string) => void;
+  onCloseTab: (tab: string) => void;
   onReopenClosedTab: () => void;
   /** Show the workspace-local faux Start tab while the real group is empty. */
   showStart: boolean;
@@ -61,8 +69,9 @@ export type EditorPaneProps = {
 export function EditorPane({
   workspace,
   svgText,
+  panels,
   openTabs,
-  activeRelPath,
+  activeTab,
   onSelectTab,
   onCloseTab,
   onReopenClosedTab,
@@ -90,31 +99,38 @@ export function EditorPane({
   }, []);
 
   const handleClose = useCallback(
-    (relPath: string) => {
-      if (dirtyPaths.has(relPath)) {
+    (tab: string) => {
+      const relPath = WorkbenchTab.relPath(tab);
+      if (relPath !== null && dirtyPaths.has(relPath)) {
         const name = relPath.split("/").pop() ?? relPath;
         const ok = window.confirm(
           `"${name}" has unsaved changes. Close anyway?`
         );
         if (!ok) return;
       }
-      setDirtyPaths((prev) => {
-        if (!prev.has(relPath)) return prev;
-        const next = new Set(prev);
-        next.delete(relPath);
-        return next;
-      });
-      onCloseTab(relPath);
+      if (relPath !== null)
+        setDirtyPaths((prev) => {
+          if (!prev.has(relPath)) return prev;
+          const next = new Set(prev);
+          next.delete(relPath);
+          return next;
+        });
+      onCloseTab(tab);
     },
     [dirtyPaths, onCloseTab]
+  );
+  const shownPanels = useSyncExternalStore(
+    panels.subscribe,
+    panels.getSnapshot,
+    panels.getSnapshot
   );
 
   const dispatchWorkspaceCommand = useCallback(
     (command: WorkspaceWorkbenchCommand) => {
       switch (command) {
         case "workspace.tabs.close-active": {
-          if (activeRelPath) {
-            handleClose(activeRelPath);
+          if (activeTab) {
+            handleClose(activeTab);
             return;
           }
           void getDesktopBridge()?.window.close();
@@ -126,8 +142,8 @@ export function EditorPane({
         }
         case "workspace.tabs.select-next":
         case "workspace.tabs.select-previous": {
-          if (!activeRelPath || openTabs.length < 2) return;
-          const idx = openTabs.indexOf(activeRelPath);
+          if (!activeTab || openTabs.length < 2) return;
+          const idx = openTabs.indexOf(activeTab);
           if (idx < 0) return;
           const delta = command === "workspace.tabs.select-next" ? 1 : -1;
           const nextIdx = (idx + delta + openTabs.length) % openTabs.length;
@@ -139,7 +155,7 @@ export function EditorPane({
         }
       }
     },
-    [activeRelPath, openTabs, onSelectTab, handleClose, onReopenClosedTab]
+    [activeTab, openTabs, onSelectTab, handleClose, onReopenClosedTab]
   );
 
   useEffect(() => {
@@ -175,7 +191,8 @@ export function EditorPane({
       <EditorTitleBar
         workspace={workspace}
         tabs={openTabs}
-        activeRelPath={activeRelPath}
+        panels={shownPanels}
+        activeTab={activeTab}
         dirtyPaths={dirtyPaths}
         onSelect={onSelectTab}
         onClose={handleClose}
@@ -201,17 +218,26 @@ export function EditorPane({
                   onCreateCanvas={onCreateCanvas}
                 />
               ) : (
-                openTabs.map((relPath) => (
-                  <EditorPaneTab
-                    key={`${workspace.id}:${relPath}`}
-                    workspace={workspace}
-                    svgText={svgText}
-                    relPath={relPath}
-                    active={relPath === activeRelPath}
-                    onDirtyChange={onTabDirtyChange}
-                    onSaved={onSaved}
-                  />
-                ))
+                openTabs.map((tab) => {
+                  const target = WorkbenchTab.parse(tab);
+                  return target.kind === "file" ? (
+                    <EditorPaneTab
+                      key={`${workspace.id}:${tab}`}
+                      workspace={workspace}
+                      svgText={svgText}
+                      relPath={target.relPath}
+                      active={tab === activeTab}
+                      onDirtyChange={onTabDirtyChange}
+                      onSaved={onSaved}
+                    />
+                  ) : (
+                    <PanelTabContent
+                      key={tab}
+                      panel={shownPanels.get(target.id)}
+                      active={tab === activeTab}
+                    />
+                  );
+                })
               )}
             </div>
           </div>
@@ -224,7 +250,8 @@ export function EditorPane({
 function EditorTitleBar({
   workspace,
   tabs,
-  activeRelPath,
+  panels,
+  activeTab,
   dirtyPaths,
   onSelect,
   onClose,
@@ -235,10 +262,11 @@ function EditorTitleBar({
 }: {
   workspace: Workspace;
   tabs: readonly string[];
-  activeRelPath: string | null;
+  panels: ReadonlyMap<string, WorkbenchPanel>;
+  activeTab: string | null;
   dirtyPaths: Set<string>;
-  onSelect: (relPath: string) => void;
-  onClose: (relPath: string) => void;
+  onSelect: (tab: string) => void;
+  onClose: (tab: string) => void;
   showStart: boolean;
   treeVisible: boolean;
   onToggleTree: () => void;
@@ -251,7 +279,10 @@ function EditorTitleBar({
   const [previewRevision, setPreviewRevision] = useState(0);
 
   useEffect(() => {
-    previewController.reconcile(tabs);
+    // Hover previews are file thumbnails; panels have none.
+    previewController.reconcile(
+      tabs.flatMap((tab) => WorkbenchTab.relPath(tab) ?? [])
+    );
   }, [previewController, tabs]);
 
   useEffect(() => {
@@ -323,19 +354,40 @@ function EditorTitleBar({
         }
       >
         {showStart && <StartTabItem />}
-        {tabs.map((relPath) => (
-          <TabItem
-            key={relPath}
-            workspace={workspace}
-            relPath={relPath}
-            active={relPath === activeRelPath}
-            dirty={dirtyPaths.has(relPath)}
-            onSelect={() => onSelect(relPath)}
-            onClose={() => onClose(relPath)}
-            onTrashed={onFileTrashed ? () => onFileTrashed(relPath) : undefined}
-            previewController={previewController}
-          />
-        ))}
+        {tabs.map((tab) => {
+          const target = WorkbenchTab.parse(tab);
+          return target.kind === "file" ? (
+            <TabItem
+              key={tab}
+              workspace={workspace}
+              tabKey={tab}
+              relPath={target.relPath}
+              active={tab === activeTab}
+              dirty={dirtyPaths.has(target.relPath)}
+              onSelect={() => onSelect(tab)}
+              onClose={() => onClose(tab)}
+              onTrashed={
+                onFileTrashed ? () => onFileTrashed(target.relPath) : undefined
+              }
+              previewController={previewController}
+            />
+          ) : (
+            <PanelTabItem
+              key={tab}
+              tabKey={tab}
+              panel={panels.get(target.id)}
+              active={tab === activeTab}
+              onSelect={() => {
+                previewController.dismiss();
+                onSelect(tab);
+              }}
+              onClose={() => {
+                previewController.dismiss();
+                onClose(tab);
+              }}
+            />
+          );
+        })}
         {/* The parent title bar owns dragging. The stationary exclusions below
             cover the occupied tab run (including inter-tab gaps); this genuinely
             unused trailing space remains draggable. */}
@@ -358,10 +410,10 @@ function EditorTitleBar({
             style={{ display: "none" }}
           />
         )}
-        {tabs.map((relPath) => (
+        {tabs.map((tab) => (
           <div
-            key={relPath}
-            data-tab-native-drag-region-exclusion={relPath}
+            key={tab}
+            data-tab-native-drag-region-exclusion={tab}
             className="desktop-no-drag absolute"
             style={{ display: "none" }}
           />
@@ -431,6 +483,7 @@ export function WorkspaceExplorerToggleButton({
 
 function TabItem({
   workspace,
+  tabKey,
   relPath,
   active,
   dirty,
@@ -440,6 +493,7 @@ function TabItem({
   previewController,
 }: {
   workspace: Workspace;
+  tabKey: string;
   relPath: string;
   active: boolean;
   dirty: boolean;
@@ -465,7 +519,7 @@ function TabItem({
       role="tab"
       tabIndex={0}
       aria-selected={active}
-      data-tab-native-drag-region-target={relPath}
+      data-tab-native-drag-region-target={tabKey}
       onPointerEnter={(event) =>
         previewController.pointerEnter(
           { relPath, anchor: event.currentTarget },
@@ -542,5 +596,96 @@ function TabItem({
     >
       {tab}
     </FileContextMenu>
+  );
+}
+
+/** A panel's content, kept mounted while another tab is in front. */
+function PanelTabContent({
+  panel,
+  active,
+}: {
+  panel: WorkbenchPanel | undefined;
+  active: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "absolute inset-0",
+        !active && "invisible pointer-events-none"
+      )}
+      aria-hidden={!active}
+    >
+      {panel?.content}
+    </div>
+  );
+}
+
+/** A panel's strip tab: no file menu, preview or dirty state. */
+function PanelTabItem({
+  tabKey,
+  panel,
+  active,
+  onSelect,
+  onClose,
+}: {
+  tabKey: string;
+  panel: WorkbenchPanel | undefined;
+  active: boolean;
+  onSelect: () => void;
+  onClose: () => void;
+}) {
+  const tabRef = useRef<HTMLDivElement | null>(null);
+  const title = panel?.title ?? "";
+
+  useEffect(() => {
+    if (!active) return;
+    tabRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [active]);
+
+  return (
+    <div
+      ref={tabRef}
+      role="tab"
+      tabIndex={0}
+      aria-selected={active}
+      data-tab-native-drag-region-target={tabKey}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      onMouseDown={(e) => {
+        if (e.button === 1) {
+          e.preventDefault();
+          onClose();
+        }
+      }}
+      className={cn(
+        "group flex h-7 shrink-0 cursor-pointer select-none items-center gap-1.5 rounded-md px-2 text-xs outline-none transition-colors [&_svg:not([class*='size-'])]:size-3.5",
+        active
+          ? "bg-muted text-foreground shadow-xs"
+          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+        "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+      )}
+    >
+      {panel?.icon}
+      <span className="max-w-[180px] truncate">{title}</span>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+        className={cn(
+          "ml-1 grid size-4 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground",
+          active ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+        )}
+        aria-label={`Close ${title}`}
+      >
+        <XIcon className="size-3" />
+      </button>
+    </div>
   );
 }

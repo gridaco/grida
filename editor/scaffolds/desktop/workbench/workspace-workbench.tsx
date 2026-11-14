@@ -23,6 +23,10 @@
  * an mkdir/cp/git-mv from the agent pane). Pure prop drilling — no
  * context, no store — because nothing else needs to subscribe.
  *
+ * Tabs are files or panels (`workbench-tab.ts`). The agent pane's side chat
+ * opens as a panel tab through `SideChatTabPlacement`, handed down to the
+ * chat like the surface host.
+ *
  * The host (`page.tsx`) is responsible for resolving the workspace
  * from the `?id=` query param; this component renders against an
  * already-resolved `Workspace` so it never needs to deal with the
@@ -74,6 +78,9 @@ import { AgentPane } from "./agent-pane";
 import { TerminalPane } from "./terminal-pane";
 import { WorkspaceChangesProvider } from "./workspace-changes";
 import { EditorGroup } from "./editor-group";
+import { WorkbenchTab } from "./workbench-tab";
+import { WorkbenchPanels } from "./workbench-panels";
+import { SideChatTabPlacement } from "./side-chat-tab-placement";
 import { WorkspaceSurfaceHost } from "./workspace-surface-host";
 import { WorkspaceCanvasCreation } from "./workspace-canvas-creation";
 import styles from "./workspace-workbench.module.css";
@@ -151,7 +158,15 @@ export function WorkspaceWorkbench({
   // always one of `tabs`. (Per the `code-react` doctrine: load-bearing UX logic
   // lives where it's testable, not smeared across effects + refs + nested
   // setState updaters.)
-  const group = useMemo(() => new EditorGroup(), []);
+  const group = useMemo(
+    () => new EditorGroup({ reopenable: WorkbenchTab.reopenable }),
+    []
+  );
+  const panels = useMemo(() => new WorkbenchPanels(group), [group]);
+  const sideChatPlacement = useMemo(
+    () => new SideChatTabPlacement(panels),
+    [panels]
+  );
   const surfaceHost = useMemo(
     () =>
       new WorkspaceSurfaceHost(
@@ -160,11 +175,14 @@ export function WorkspaceWorkbench({
       ),
     [group, workspace.id]
   );
-  const { tabs: openTabs, active: activeRelPath } = useSyncExternalStore(
+  const { tabs: openTabs, active: activeTab } = useSyncExternalStore(
     group.subscribe,
     group.getSnapshot,
     group.getSnapshot
   );
+  // File rules (reveal, copy path, trash, tree selection) follow the active
+  // tab only when it is a file.
+  const activeRelPath = WorkbenchTab.relPath(activeTab);
   const [restoreSettled, setRestoreSettled] = useState(false);
 
   useEffect(() => {
@@ -270,11 +288,7 @@ export function WorkspaceWorkbench({
       // A trashed file closes its own tab; a trashed folder closes its whole
       // subtree. The group focuses the nearest surviving tab and (being a trash,
       // not a close) never records them for reopen.
-      group.closeMatching((tab) =>
-        isDirectory
-          ? tab === relPath || tab.startsWith(`${relPath}/`)
-          : tab === relPath
-      );
+      group.closeMatching(WorkbenchTab.trashed(relPath, isDirectory));
       bumpTreeRefresh();
     },
     [group, bumpTreeRefresh]
@@ -380,7 +394,7 @@ export function WorkspaceWorkbench({
   ]);
 
   const openFile = useCallback(
-    (relPath: string) => group.open(relPath),
+    (relPath: string) => group.open(WorkbenchTab.file(relPath)),
     [group]
   );
   const createCanvas = useCallback(
@@ -390,18 +404,15 @@ export function WorkspaceWorkbench({
         editor
       );
       bumpTreeRefresh();
-      group.open(relPath);
+      group.open(WorkbenchTab.file(relPath));
     },
     [workspace.id, group, bumpTreeRefresh]
   );
   const activateTab = useCallback(
-    (relPath: string) => group.activate(relPath),
+    (tab: string) => group.activate(tab),
     [group]
   );
-  const closeTab = useCallback(
-    (relPath: string) => group.close(relPath),
-    [group]
-  );
+  const closeTab = useCallback((tab: string) => group.close(tab), [group]);
   const reopenClosedTab = useCallback(() => group.reopenClosed(), [group]);
 
   return (
@@ -433,7 +444,11 @@ export function WorkspaceWorkbench({
                 </div>
               </TitleBar>
               <div className="min-h-0 flex-1">
-                <AgentPane workspace={workspace} surfaceHost={surfaceHost} />
+                <AgentPane
+                  workspace={workspace}
+                  surfaceHost={surfaceHost}
+                  sideChatPlacement={sideChatPlacement}
+                />
               </div>
             </div>
           </ResizablePanel>
@@ -468,8 +483,9 @@ export function WorkspaceWorkbench({
                       <EditorPane
                         workspace={workspace}
                         svgText={surfaceHost.svgText}
+                        panels={panels}
                         openTabs={openTabs}
-                        activeRelPath={activeRelPath}
+                        activeTab={activeTab}
                         onSelectTab={activateTab}
                         onCloseTab={closeTab}
                         onReopenClosedTab={reopenClosedTab}

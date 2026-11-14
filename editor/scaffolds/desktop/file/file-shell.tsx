@@ -30,6 +30,10 @@ import { TitleBar } from "../chrome/title-bar";
 import { DesktopCanvasBundleShell } from "../canvas/canvas-bundle-shell";
 import { WorkspaceChangesProvider } from "../workbench/workspace-changes";
 import { NativeAgentPaneGate } from "../workbench/native-agent-pane";
+import {
+  SideChatInlinePlacement,
+  SideChatInlineRegion,
+} from "../workbench/side-chat-inline-placement";
 import { DocumentSurfaceHost } from "./document-surface-host";
 import { SingleFileSvgSurface, type FileMeta } from "./single-file-svg-surface";
 
@@ -73,6 +77,9 @@ export function DesktopFileShell({
   }, [bridge, mode, basePath]);
 
   const [fileSurface] = useState(() => new DocumentSurfaceHost());
+  // The file window has no tabbed editor region; its side chat shows inline
+  // under the chat.
+  const [sideChat] = useState(() => new SideChatInlinePlacement());
   const setActiveEditor = useCallback(
     (editor: SvgEditor | null) => fileSurface.setEditor(editor),
     [fileSurface]
@@ -127,18 +134,25 @@ export function DesktopFileShell({
         >
           <aside className="flex h-full w-full flex-col">
             {nativeChat && fileChatAvailable ? (
-              <NativeAgentPaneGate
-                bridge={nativeChat}
-                selectionKey={
-                  mode === "deck" && !basePath ? workspaceId : undefined
-                }
-                initialSession={null}
-                editorSurfaces={
-                  mode === "doc" || nativeChat.deckSvgText
-                    ? fileSurface
-                    : undefined
-                }
-              />
+              <>
+                <NativeAgentPaneGate
+                  bridge={nativeChat}
+                  selectionKey={
+                    mode === "deck" && !basePath ? workspaceId : undefined
+                  }
+                  initialSession={null}
+                  editorSurfaces={
+                    mode === "doc" || nativeChat.deckSvgText
+                      ? fileSurface
+                      : undefined
+                  }
+                  sideChatPlacement={sideChat}
+                />
+                <SideChatInlineRegion
+                  placement={sideChat}
+                  className="max-h-[40%] shrink-0 border-t"
+                />
+              </>
             ) : (
               <p
                 role="status"

@@ -5,6 +5,7 @@ import {
 import { WorkspaceArtifact } from "@/lib/desktop/workspace-artifact";
 import type { WorkspaceViewState } from "@/lib/desktop/workspace-view-state";
 import type { EditorGroup } from "./editor-group";
+import { WorkbenchTab } from "./workbench-tab";
 import { WorkspaceSvgText } from "./workspace-svg-text";
 
 /**
@@ -14,7 +15,8 @@ import { WorkspaceSvgText } from "./workspace-svg-text";
  * directory truth before handing a relative id to the editor group. The
  * agent owns the tool result; this renderer adapter only applies the
  * presentation request as an auxiliary side effect. Tab mutation stays in
- * `EditorGroup`.
+ * `EditorGroup`. The host deals in file tabs only: panels are neither listed
+ * to the agent nor remembered for a later restore.
  */
 export class WorkspaceSurfaceHost {
   readonly svgText: WorkspaceSvgText;
@@ -43,7 +45,7 @@ export class WorkspaceSurfaceHost {
       requireCurrent() &&
       this.group.getSnapshot() === expectedSnapshot
     )
-      this.group.open(target);
+      this.group.open(WorkbenchTab.file(target));
   }
 
   /**
@@ -58,16 +60,16 @@ export class WorkspaceSurfaceHost {
     );
     if (this.group.getSnapshot() !== expectedSnapshot) return;
 
-    const tabs = restored.filter((path): path is string => path !== null);
+    const paths = restored.filter((path): path is string => path !== null);
     const requestedActive =
       state.active === null
         ? null
         : WorkspaceArtifact.normalizeRelativePath(state.active);
     this.group.restore({
-      tabs,
+      tabs: paths.map(WorkbenchTab.file),
       active:
-        requestedActive !== null && tabs.includes(requestedActive)
-          ? requestedActive
+        requestedActive !== null && paths.includes(requestedActive)
+          ? WorkbenchTab.file(requestedActive)
           : null,
     });
   }
@@ -84,15 +86,20 @@ export class WorkspaceSurfaceHost {
     }
   }
 
-  /** Agent paths of the open tabs, and the active one. */
+  /** Agent paths of the open file tabs, and the active one. */
   listOpen(): { active: string | null; open: string[] } {
     const { tabs, active } = this.group.getSnapshot();
-    const open = tabs.flatMap((id) => {
-      const path = WorkspaceArtifact.toAgentPath(id);
+    const open = tabs.flatMap((key) => {
+      const relPath = WorkbenchTab.relPath(key);
+      const path =
+        relPath === null ? null : WorkspaceArtifact.toAgentPath(relPath);
       return path === null ? [] : [path];
     });
+    const activeRelPath = WorkbenchTab.relPath(active);
     const activePath =
-      active === null ? null : WorkspaceArtifact.toAgentPath(active);
+      activeRelPath === null
+        ? null
+        : WorkspaceArtifact.toAgentPath(activeRelPath);
     return { active: activePath, open };
   }
 
@@ -137,17 +144,23 @@ export class WorkspaceSurfaceHost {
   /**
    * Pick the ordered tabs safe to persist for a later workspace restore.
    *
-   * Only an active path that is still open is persisted; otherwise fall back
-   * to the last open tab, or clear the path when none remain.
+   * Only file tabs are persisted. Only an active path that is still open is
+   * persisted; otherwise fall back to the last open file, or clear the path
+   * when none remain.
    */
   rememberedTabs(): WorkspaceViewState.Tabs {
     const { tabs, active } = this.group.getSnapshot();
-    const open = tabs.flatMap((id) => {
-      const path = WorkspaceArtifact.normalizeRelativePath(id);
+    const open = tabs.flatMap((key) => {
+      const relPath = WorkbenchTab.relPath(key);
+      const path =
+        relPath === null
+          ? null
+          : WorkspaceArtifact.normalizeRelativePath(relPath);
       return path === null ? [] : [path];
     });
-    if (active !== null) {
-      const normalized = WorkspaceArtifact.normalizeRelativePath(active);
+    const activeRelPath = WorkbenchTab.relPath(active);
+    if (activeRelPath !== null) {
+      const normalized = WorkspaceArtifact.normalizeRelativePath(activeRelPath);
       if (normalized !== null && open.includes(normalized)) {
         return { open, active: normalized };
       }

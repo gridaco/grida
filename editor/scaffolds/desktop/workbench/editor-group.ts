@@ -14,6 +14,10 @@
  * Invariant: `active === null` means no tabs are open; otherwise `active` is
  * always one of `tabs`. Every mutation preserves it.
  *
+ * Tab ids are opaque here. The workbench keys them through `WorkbenchTab` and
+ * supplies the `reopenable` policy: a closed tab the policy rejects (a panel
+ * whose owner ended it) is never recorded for reopen-closed.
+ *
  * Framework-agnostic (no React, no Electron): unit-tested directly.
  */
 
@@ -37,8 +41,24 @@ export class EditorGroup {
   private snapshot: EditorGroupState = { tabs: [], active: null };
   private readonly listeners = new Set<() => void>();
 
-  /** @param historyLimit Max reopen-closed depth. */
-  constructor(private readonly historyLimit: number = DEFAULT_HISTORY_LIMIT) {}
+  private readonly historyLimit: number;
+  private readonly reopenable: (id: string) => boolean;
+
+  /**
+   * @param options.historyLimit Max reopen-closed depth.
+   * @param options.reopenable Whether a closed tab may be reopened; every tab
+   *   is by default.
+   */
+  constructor({
+    historyLimit = DEFAULT_HISTORY_LIMIT,
+    reopenable = () => true,
+  }: {
+    historyLimit?: number;
+    reopenable?: (id: string) => boolean;
+  } = {}) {
+    this.historyLimit = historyLimit;
+    this.reopenable = reopenable;
+  }
 
   // ── snapshots ──────────────────────────────────────────────────────
   subscribe = (listener: () => void): (() => void) => {
@@ -100,8 +120,8 @@ export class EditorGroup {
 
   /**
    * Close `id`. If it was active, focus the left neighbor (else the right, else
-   * null) — VSCode's rule. Records the tab for reopen-closed. No-op if `id`
-   * isn't open.
+   * null) — VSCode's rule. Records the tab for reopen-closed when the
+   * `reopenable` policy allows it. No-op if `id` isn't open.
    */
   close(id: string): void {
     const idx = this._tabs.indexOf(id);
@@ -111,7 +131,7 @@ export class EditorGroup {
     if (this._active === id) {
       this._active = prev[idx - 1] ?? prev[idx + 1] ?? null;
     }
-    this.pushClosed(id);
+    if (this.reopenable(id)) this.pushClosed(id);
     this.commit();
   }
 

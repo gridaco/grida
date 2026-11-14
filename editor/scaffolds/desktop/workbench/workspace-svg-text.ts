@@ -3,15 +3,17 @@ import type { NativeEditorSvgText } from "@grida/desktop-bridge";
 import { WorkspaceArtifact } from "@/lib/desktop/workspace-artifact";
 import { SelectedSvgText } from "../shared/selected-svg-text";
 import type { EditorGroupState } from "./editor-group";
+import { WorkbenchTab } from "./workbench-tab";
 
 /** Bind selected-text operations to the active SVG in a workspace tab group. */
 export class WorkspaceSvgText {
   private readonly editors = new Map<string, SvgEditor>();
   private readonly selection = new SelectedSvgText(() => {
     const basis = this.view();
-    if (!basis.active) return;
-    const editor = this.editors.get(basis.active);
-    const path = WorkspaceArtifact.toAgentPath(basis.active);
+    const relPath = WorkbenchTab.relPath(basis.active);
+    if (relPath === null) return;
+    const editor = this.editors.get(relPath);
+    const path = WorkspaceArtifact.toAgentPath(relPath);
     if (editor && path) return { basis, editor, path };
   });
 

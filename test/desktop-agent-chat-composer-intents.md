@@ -7,7 +7,7 @@ tags: [agent-chat, composer, plan, goal, side, keyboard, focus]
 status: untested
 severity: high
 date: 2026-11-11
-updated: 2026-11-13
+updated: 2026-11-15
 automatable: true
 covered_by:
   - editor/kits/composer/composer-command-selection.browser.ts
@@ -41,8 +41,9 @@ A connection must finish starting before its commands become available.
    4a. In an idle chat with at least one finished turn, type `/side` and choose
    it. A **Side** badge appears, `/goal` is no longer offered, and nothing
    opens or sends. Type `What did we decide?` and send. The side chat opens
-   above the composer with the question and its answer; the main conversation
-   gains no message and no turn starts. The badge clears after the answer.
+   as a focused **Side chat** tab in the workbench with the question and its
+   answer (see TC-DESKTOP-AGENT-CHAT-023); the main conversation gains no
+   message and no turn starts. The badge clears after the answer.
    In a new chat with no finished turn, or while a turn runs, `/side` is not
    offered.
 5. Choose Ultra in the model popover. Planning and permission choices remain

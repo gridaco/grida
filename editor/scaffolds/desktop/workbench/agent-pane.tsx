@@ -15,6 +15,7 @@ import { useSearchParams } from "next/navigation";
 import { cn } from "@app/ui/lib/utils";
 import { useDesktopBridge, type Workspace } from "@/lib/desktop/bridge";
 import type { WorkspaceSurfaceHost } from "./workspace-surface-host";
+import type { SideChatPlacement } from "./side-chat-placement";
 import { welcome_message } from "@/lib/desktop/welcome-message";
 import {
   NativeAgentPaneGate,
@@ -26,12 +27,15 @@ export type AgentPaneProps = {
   workspace: Workspace;
   /** Host-owned artifact presentation for this workbench's editor group. */
   surfaceHost: WorkspaceSurfaceHost;
+  /** Where the chat's side chat is shown in this workbench. */
+  sideChatPlacement: SideChatPlacement;
   className?: string;
 };
 
 export function AgentPane({
   workspace,
   surfaceHost,
+  sideChatPlacement,
   className,
 }: AgentPaneProps) {
   const bridge = useDesktopBridge();
@@ -68,6 +72,7 @@ export function AgentPane({
           workspaceId={workspace.id}
           initialSession={initialSession}
           editorSurfaces={surfaceHost}
+          sideChatPlacement={sideChatPlacement}
           firstMessage={firstMessage}
         />
       )}
