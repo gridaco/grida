@@ -18,9 +18,6 @@ pub(super) fn capabilities() -> Value {
         "co.grida/session/delete-preview",
         "co.grida/session/organize",
         "co.grida/session/updates",
-        "co.grida/side-chat/open",
-        "co.grida/side-chat/ask",
-        "co.grida/side-chat/close",
         "co.grida/subagent/create",
         "co.grida/subagent/assign",
         "co.grida/subagent/inspect",
@@ -367,36 +364,21 @@ async fn private_delete_revokes_attachment_and_retains_fork_and_exact_restart_re
 }
 
 #[tokio::test]
-async fn private_delete_refuses_side_chats_children_retained_inputs_and_live_work() {
+async fn private_delete_refuses_children_retained_inputs_and_live_work() {
     let temp = TempDir::new().unwrap();
     let state = temp.path().join("state");
     let workspace = TempDir::new().unwrap();
     let cwd = workspace.path();
     let mut endpoint = Endpoint::start(vec![
-        Reply::Finished("Side source"),
+        Reply::Finished("Parent source"),
         Reply::Hold("Still working"),
     ])
     .await;
     let mut client = start(&state, &endpoint.url).await;
     let parent = created(&mut client, cwd).await;
-    prompt(&mut client, &parent, "Use this side context").await;
+    prompt(&mut client, &parent, "Use this context").await;
     endpoint.request().await;
     let params = deletion(&mut client, &parent, cwd).await;
-    let side = client
-        .request(
-            "_co.grida/side-chat/open",
-            json!({"sessionId":parent,"requestId":"open-side"}),
-        )
-        .await;
-    let side = side["result"]["sideChatId"].as_str().unwrap();
-    refused(
-        &client.request(DELETE, params.clone()).await,
-        "session_deletion_has_side_chat",
-    );
-    let closed = client
-        .request("_co.grida/side-chat/close", json!({"sideChatId":side}))
-        .await;
-    assert!(closed.get("result").is_some(), "{closed}");
     let child = client
         .request(
             "_co.grida/subagent/create",

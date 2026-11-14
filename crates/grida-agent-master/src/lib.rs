@@ -14,7 +14,7 @@ pub mod presentation;
 pub mod questions;
 pub mod retained_file;
 mod retry;
-pub mod side_context;
+pub mod side_chat;
 pub mod subagents;
 pub mod usage;
 pub mod wakeups;

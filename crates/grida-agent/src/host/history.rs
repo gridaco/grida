@@ -129,6 +129,8 @@ impl Host {
         session: SessionId,
         request: ChangeId,
     ) -> Result<SessionId> {
+        self.refuse_in_side_chat(&session, side_chats::Refusal::Fork)
+            .await?;
         let history = self
             .store
             .retained_history_with(session.clone(), HistorySelection::Current, project)
@@ -146,18 +148,45 @@ impl Host {
         .await
     }
 
+    /// The committed context a turn starts from. A side chat's boundary
+    /// follows its inherited history and precedes its own turns.
     pub(super) async fn provider_history(
         &self,
         session: SessionId,
         before_turn: Option<TurnId>,
+        side: bool,
     ) -> Result<PriorContext> {
         let retained = self
             .store
-            .context_history_with(session, before_turn, model_context)
+            .context_history_with(session.clone(), before_turn, model_context)
             .await?;
+        // The boundary follows the records copied from another chat. A
+        // revision can fold the side chat's own earlier records into its seed;
+        // those keep their origin and stay after the boundary.
+        let inherited = match &retained.seed {
+            Some(seed) if side => {
+                // A side chat summarizes only its inherited history, so an
+                // installed summary is entirely background.
+                if grida_agent_master::compaction::replacement_coverage(&seed.provenance)?.is_some()
+                {
+                    seed.records.len()
+                } else {
+                    decode_seed(Some(seed.clone()))?.map_or(0, |seed| {
+                        seed.provenance()
+                            .entries
+                            .iter()
+                            .filter(|entry| {
+                                entry.message.is_some() && entry.origin.session != session
+                            })
+                            .count()
+                    })
+                }
+            }
+            _ => 0,
+        };
         let (mut messages, omissions, _) = context_material(retained)?;
-        if let Some(context) = &self.side_context {
-            messages.insert(0, context.background.clone());
+        if side {
+            messages.insert(inherited, grida_agent_master::side_chat::boundary()?);
         }
         Ok(PriorContext {
             messages,
@@ -389,6 +418,8 @@ impl Host {
             if host.work.lock().await.closed {
                 return Err(problem(ErrorKind::Unavailable, "host_shutting_down"));
             }
+            host.refuse_in_side_chat(&source, side_chats::Refusal::Fork)
+                .await?;
             let fingerprint = Fingerprint::of(&(&source, &derivation.request))?;
             let destination = SessionId::new(format!(
                 "fork/{}",
@@ -409,6 +440,7 @@ impl Host {
                         execution: execution.configuration,
                         owner: execution.owner,
                         subagent: None,
+                        side: None,
                     };
                     encode(SESSION_SCHEMA, SESSION_VERSION, &configuration)?
                 }
@@ -568,12 +600,12 @@ pub(super) fn context_material(
     ))
 }
 
-fn decode_seed(seed: Option<HistorySeed>) -> Result<Option<ConversationSeed>> {
+pub(super) fn decode_seed(seed: Option<HistorySeed>) -> Result<Option<ConversationSeed>> {
     seed.map(|seed| ConversationSeed::from_parts(seed.records, &seed.provenance))
         .transpose()
 }
 
-fn lower_seed(
+pub(super) fn lower_seed(
     session: SessionId,
     cut: ConversationCut,
     history: RetainedHistory,
@@ -649,7 +681,7 @@ fn revision_target_unavailable() -> Error {
     )
 }
 
-fn latest_anchor(history: &RetainedHistory) -> Option<ConversationAnchor> {
+pub(super) fn latest_anchor(history: &RetainedHistory) -> Option<ConversationAnchor> {
     history
         .records
         .iter()

@@ -224,6 +224,12 @@ and passes that scope and basis in `DeleteDependents`. The deletion fails with
 dependent must be idle and pass the owner's checks, and all are retired in the
 same transaction.
 
+`discard` removes a temporary session without those conditions: its turns may
+be unsettled and its queue nonempty. The caller names the session's
+owner-defined scope, which must still match, and no live writer in this process
+may hold one of its turns (`session_discard_requires_idle`). The identity is
+retired the same way, with an optional cleanup identity.
+
 Removal of owner storage outside the database is two-phase.
 `delete_idle_with_cleanup` and `delete_idle_with_dependents` retain an
 optional 32-byte cleanup identity with the retirement. After a restart,

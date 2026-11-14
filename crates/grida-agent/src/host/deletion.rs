@@ -91,7 +91,7 @@ impl Host {
             // Wait out a settled turn's worker before admission, which that
             // worker's next queued input may need. Idleness is checked below.
             drop(host.settled_work(&request.session).await);
-            let _admission = host.configuration_admission.lock().await;
+            let admission = host.configuration_admission.lock().await;
             if let Some(receipt) = host.store.deletion_receipt(request.clone()).await? {
                 return host.finish_deletion(receipt).await;
             }
@@ -152,10 +152,18 @@ impl Host {
                 }
                 Err(error) => Err(error),
             };
-            let mut work = host.work.lock().await;
-            for id in &family {
-                work.retiring.remove(id);
-                host.processes.release(id);
+            {
+                let mut work = host.work.lock().await;
+                for id in &family {
+                    work.retiring.remove(id);
+                    host.processes.release(id);
+                }
+            }
+            drop(admission);
+            if result.is_ok() {
+                // Side chats are temporary views of the parent and go with it.
+                // A side worker waiting for admission can now see the fence.
+                host.discard_side_chats_of(&family[0]).await;
             }
             result
         })
@@ -237,7 +245,11 @@ impl Host {
         Ok(receipt)
     }
 
-    async fn cleanup_retired(&self, session: SessionId, identity: [u8; 32]) -> Result<()> {
+    pub(super) async fn cleanup_retired(
+        &self,
+        session: SessionId,
+        identity: [u8; 32],
+    ) -> Result<()> {
         let state_dir = self
             .state_dir
             .clone()
@@ -284,6 +296,9 @@ impl Host {
 
 fn require_saved_workspace(configuration: &Envelope, cwd: &Path) -> Result<()> {
     let configuration = decode_session_configuration(configuration)?;
+    if configuration.side.is_some() {
+        return Err(side_chats::Refusal::Catalog.error());
+    }
     if configuration.subagent.is_some() || configuration.cwd != cwd {
         return Err(problem(ErrorKind::InvalidInput, "session_missing"));
     }

@@ -75,7 +75,7 @@ impl Host {
     pub(super) fn capture_host_tools(&self, allowed: bool) -> Result<Option<Capture>> {
         self.host_tools
             .as_ref()
-            .filter(|_| allowed && self.side_context.is_none())
+            .filter(|_| allowed)
             .map(|owner| {
                 owner.ensure_open()?;
                 Ok(owner.capture.clone())

@@ -20,7 +20,7 @@ pub(super) struct Fixture {
     _base: TempDir,
     pub(super) state: PathBuf,
     pub(super) primary: PathBuf,
-    extra: PathBuf,
+    pub(super) extra: PathBuf,
     pub(super) profile: PathBuf,
 }
 
@@ -233,6 +233,11 @@ impl Stdio {
         let output = finish_child(child).await;
         drop(stdout);
         output
+    }
+
+    /// End the host without letting it shut down, as a crash would.
+    pub(super) async fn kill(mut self) {
+        self.child.kill().await.unwrap();
     }
 
     pub(super) async fn close(self) {

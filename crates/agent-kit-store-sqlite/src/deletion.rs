@@ -171,6 +171,44 @@ impl SqliteStore {
         .await
     }
 
+    /// Remove a temporary session its owner discards, whatever state its
+    /// turns and queue are in. The session must still belong to `scope`, and
+    /// no live writer in this process may hold one of its turns. The identity
+    /// is retired like a deleted session's, with an optional cleanup identity
+    /// for owner data outside SQLite.
+    pub async fn discard(
+        &self,
+        session: SessionId,
+        scope: Fingerprint,
+        cleanup: Option<[u8; 32]>,
+    ) -> Result<()> {
+        execute(Arc::clone(&self.inner), move |inner, connection| {
+            let transaction = connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(database_error)?;
+            let scoped: bool = transaction
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM sessions WHERE id=?1 AND scope=?2)",
+                    params![session.as_str(), scope.bytes().as_slice()],
+                    |row| row.get(0),
+                )
+                .map_err(database_error)?;
+            if !scoped {
+                return Err(error(ErrorKind::InvalidInput, "session_missing"));
+            }
+            if has_live_session_owner(inner, &session)? {
+                return Err(error(ErrorKind::Conflict, "session_discard_requires_idle"));
+            }
+            let fingerprint = Fingerprint::of(&("discard-session-v1", &session, scope))?;
+            delete_rows(&transaction, &session, scope, fingerprint, cleanup)?;
+            commit(inner, transaction)?;
+            owners(inner).retain(|(owner, _), _| owner != &session);
+            inner.changed.notify_waiters();
+            Ok(())
+        })
+        .await
+    }
+
     /// Enumerate a bounded page of retired identities awaiting their owner's cleanup.
     pub async fn pending_retirement_cleanup(
         &self,

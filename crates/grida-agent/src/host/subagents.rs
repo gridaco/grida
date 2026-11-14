@@ -80,7 +80,6 @@ impl Host {
     pub(crate) fn subagents_available(&self) -> bool {
         self.subagents_enabled
             && self.operating_regime.is_act()
-            && self.side_context.is_none()
             && self
                 .execution
                 .as_ref()
@@ -124,6 +123,9 @@ impl Host {
             let view = host.store.inspect(parent.clone()).await?;
             host.check_execution(&view)?;
             let mut configuration = session_configuration(&view)?;
+            if configuration.side.is_some() {
+                return Err(side_chats::Refusal::Subagents.error());
+            }
             if configuration.subagent.is_some() {
                 return Err(problem(
                     ErrorKind::Unsupported,
@@ -821,6 +823,7 @@ mod tests {
                     execution: Fingerprint::of(&"execution").unwrap(),
                     owner: Fingerprint::of(&"owner").unwrap(),
                     subagent: Some(profile),
+                    side: None,
                 },
             )
             .unwrap()

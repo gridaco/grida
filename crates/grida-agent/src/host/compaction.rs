@@ -92,6 +92,10 @@ enum CompactionTrigger {
         verified_pressure: bool,
         has_unprojected_suffix: bool,
     },
+    /// A side chat's inherited history, summarized before its first turn so
+    /// the summary stays background ahead of the side-chat boundary. A side
+    /// chat's own turns are never summarized.
+    Inherited,
 }
 
 impl Host {
@@ -110,6 +114,8 @@ impl Host {
                 request,
                 recover,
             } = request;
+            host.refuse_in_side_chat(&session, side_chats::Refusal::Compaction)
+                .await?;
             let fingerprint = Fingerprint::of(&(&session, &request))?;
             let turn = TurnId::new(format!(
                 "compact/{:x}",
@@ -328,8 +334,10 @@ impl Host {
         let Some(head) = view.queued.first().map(|entry| &entry.input) else {
             return Ok(None);
         };
-        if self.side_context.is_some()
-            || session_configuration(view)?.subagent.is_some()
+        let configuration = session_configuration(view)?;
+        let side = configuration.side.is_some();
+        if self.inference_only
+            || configuration.subagent.is_some()
             || !is_stored_input(&head.payload)
             || view.latest.as_ref().is_some_and(|latest| {
                 latest
@@ -370,6 +378,7 @@ impl Host {
             &view.session,
             head,
             None,
+            side,
             InputAuthority::RequireCaptured,
         )?;
         let prefix = self
@@ -380,6 +389,31 @@ impl Host {
         let context = prefix.history;
         if context.session_revision != view.revision {
             return Ok(None);
+        }
+        if side {
+            // Only the inherited history can be summarized, and only while
+            // the side chat has no turn of its own to fold into the summary.
+            if has_unprojected_suffix || !context.records.is_empty() || view.latest.is_some() {
+                return Ok(None);
+            }
+            let Some(plan) = compaction_plan_for(
+                execution,
+                &input.config,
+                input.limit,
+                context,
+                CompactionTrigger::Inherited,
+            )?
+            else {
+                return Ok(None);
+            };
+            return Ok(Some((
+                turn,
+                AutomaticCompaction {
+                    head: head.id.clone(),
+                    expected_revision: view.revision,
+                    plan,
+                },
+            )));
         }
         let verified_pressure = has_unprojected_suffix
             || self
@@ -810,6 +844,9 @@ fn compaction_plan_for(
             _ => turns.push((entry.turn, vec![message])),
         }
     }
+    if matches!(trigger, CompactionTrigger::Inherited) && !turns.is_empty() {
+        return Ok(None);
+    }
     let prefix_end = if let CompactionTrigger::Automatic {
         has_unprojected_suffix,
         ..
@@ -841,9 +878,14 @@ fn compaction_plan_for(
     else {
         return Ok(None);
     };
-    if let CompactionTrigger::Automatic {
-        verified_pressure, ..
-    } = trigger
+    let automatic_pressure = match trigger {
+        CompactionTrigger::Manual => None,
+        CompactionTrigger::Automatic {
+            verified_pressure, ..
+        } => Some(verified_pressure),
+        CompactionTrigger::Inherited => Some(false),
+    };
+    if let Some(verified_pressure) = automatic_pressure
         && ((!verified_pressure && coverage.input_bytes < AUTOMATIC_SOURCE_BYTES)
             || coverage.omissions.media != 0
             || coverage.omissions.tool_results_with_media != 0)

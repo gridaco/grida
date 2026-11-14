@@ -278,6 +278,9 @@ struct SnapshotResponse {
     latest: Option<TurnSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     retry_not_before_ms: Option<u64>,
+    /// Present on a temporary side chat.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    side: Option<crate::host::side_chats::SideSnapshot>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -502,7 +505,10 @@ pub(super) fn handlers(
                         .inspect_with_retry(request.session_id)
                         .await
                         .map_err(host_error)?;
+                    let side =
+                        crate::host::side_chats::side_snapshot(&snapshot).map_err(host_error)?;
                     Ok(SnapshotResponse {
+                        side,
                         session_id: snapshot.session,
                         session_revision: snapshot.revision,
                         queued_inputs: snapshot.queued.len(),

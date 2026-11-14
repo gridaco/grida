@@ -63,9 +63,9 @@ after reconnecting without reattaching. The retired identity is unavailable
 for future attachment or execution.
 
 Deletion requires idle, resolved work and an empty queue. A concurrent
-transcript replay or catalog read can require a retry. An open side chat, a
-pending wake-up, an unfinished Goal, or unresolved execution evidence blocks
-deletion. To include owned named subagents, negotiate
+transcript replay or catalog read can require a retry. A pending wake-up, an
+unfinished Goal, or unresolved execution evidence blocks deletion. Deletion
+discards the chat's side chats and removes them from the connection. To include owned named subagents, negotiate
 `co.grida/session/delete-preview` version 1 and call
 `_co.grida/session/delete-preview` with the attached `sessionId` and `cwd`.
 The response contains `sessionId`, `ownedChildren`, and `ownedChildrenBasis`,
@@ -386,24 +386,46 @@ exit code `6` when it suspends for an answer.
 
 ### Temporary side chats
 
-Private stdio clients negotiate all three version-1 keys under
-`co.grida/side-chat/`. Side chat IDs belong to the current connection.
+Private stdio clients negotiate both version-1 keys under
+`co.grida/side-chat/`. A side chat is an ordinary session forked from its
+parent; its ID belongs to the connection that opened it.
 
-| Method suffix | Parameters and result                                                                                                                                                 |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `open`        | `sessionId`, `requestId`. Capture an attached parent's current context and return `sideChatId`, `parentSessionId`, `sourceContext`, policy, and omission information. |
-| `ask`         | `sideChatId`, `requestId`, `text`. Run one side turn and return `turnId`, `status`, `account`, and `textTruncated`.                                                   |
-| `close`       | `sideChatId`. Stop active side work, verify worker shutdown, and discard the temporary conversation.                                                                  |
+| Method suffix | Parameters and result                                                                                                                                                                                               |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `open`        | `sessionId` of an attached parent. Fork its committed conversation into a temporary session attached here and return `sideChatId`, `parentSessionId`, `sourceContext`, `compacted`, `omissions`, `temporary: true`. |
+| `close`       | `sideChatId` opened on this connection. Cancel its running turn, stop its processes, remove its data and detach it. Returns `{}`.                                                                                   |
 
-An open retry returns the original capture while the side chat is open.
-An ask retry with identical text returns its recorded terminal account.
-One question can run per side chat at a time. Each question accepts at most
-16 KiB of text. The response caps answer text at 64 KiB. The connection can
-open up to four chats at once, with six turns per chat and 32 open requests
-over the connection's lifetime. Disconnect closes the temporary chats.
-The host uses the existing selected model with no tool inventory. Source
-context uses the installed summary and committed suffix when available.
-Parent controls and history are independent of side execution.
+Every session method works on `sideChatId`: `session/prompt`, `session/cancel`,
+`_co.grida/session/submit`, queue edits, steer, stop, pause and resume,
+questions, approvals, snapshot, history, transcript window, turn summaries and
+processes. Live `session/update` notifications are delivered as for any
+attached chat. Tools and permission rules are the parent's.
+
+Each side turn's instructions end with the side-chat policy, and its model
+context places a boundary message after the inherited history and before the
+side chat's own turns. The snapshot carries
+`side: { parentSessionId, temporary: true, unavailable }`, where `unavailable`
+lists `fork`, `side_chat`, `compaction`, `goals`, `subagents`, `delegation`,
+`wakeups` and `catalog`. The host refuses each with
+`side_chat_fork_unavailable`, `side_chat_nested_unavailable`,
+`side_chat_compaction_unavailable`, `side_chat_goals_unavailable`,
+`side_chat_subagents_unavailable`, `side_chat_delegation_unavailable` (effort
+above Standard), `side_chat_wakeups_unavailable` (`allowWakeups`) or
+`side_chat_catalog_unavailable` (catalog entry, organize, delete and its
+preview). `compaction` means manual compaction. Automatic compaction can
+summarize a side chat's inherited history before its first turn, covering
+nothing of its own; the boundary then follows the summary. Once the side chat
+has a turn, automatic compaction no longer selects it.
+
+Side chats live in a catalog scope outside every workspace, so listings,
+archive listings and deletion previews never include them, and they are never
+titled. Loading one from a connection that did not open it returns
+`side_chat_unavailable`, as does closing an unknown or closed ID. A close whose
+cleanup cannot be confirmed returns `side_chat_discard_pending`, leaves the
+side chat fenced and open, and can be retried. A connection holds at most four
+open side chats (`side_chat_scope_limit`). Disconnect shuts the host down and
+then discards every side chat; a host also discards any left by a crash before
+it serves.
 
 ### One-shot task wake-ups
 

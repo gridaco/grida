@@ -149,8 +149,8 @@ async fn serve_stdio(
             }
         },
         result = signal => {
-            let sides = side_chats.close_all().await;
-            host.shutdown().await.and(sides)?;
+            side_chats.close_scope().await;
+            host.shutdown_discarding_side_chats().await?;
             result?;
             return Ok(130);
         }

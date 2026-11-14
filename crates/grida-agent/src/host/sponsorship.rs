@@ -394,7 +394,6 @@ impl Host {
     pub(crate) fn sponsorship_available(&self) -> bool {
         self.sponsorship_enabled
             && self.subagents_enabled
-            && self.side_context.is_none()
             && self.execution.as_ref().is_some_and(|execution| {
                 execution.config.max_output_tokens.is_some()
                     && execution
@@ -903,7 +902,7 @@ impl Host {
                 configuration,
                 &request.claim,
                 &request.input,
-                self.provider_history(request.claim.session.clone(), None)
+                self.provider_history(request.claim.session.clone(), None, false)
                     .await?
                     .messages,
             ),
@@ -925,6 +924,7 @@ impl Host {
             &session,
             input,
             Some(&profile),
+            false,
             InputAuthority::RequireCaptured,
         )?;
         if let Some(capture) = &prepared.permission_capture {

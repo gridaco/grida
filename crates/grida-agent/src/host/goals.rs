@@ -152,7 +152,6 @@ impl Host {
 
     pub(crate) fn supports_goal_spending(&self) -> bool {
         cfg!(any(target_os = "macos", target_os = "linux"))
-            && self.side_context.is_none()
             && self.state_dir.is_some()
             && self.supervised_gateway().is_some()
     }
@@ -164,6 +163,8 @@ impl Host {
         allow_wakeups: bool,
         max_cost_mills: Option<String>,
     ) -> Result<DurableSubmission> {
+        self.refuse_in_side_chat(&request.session, side_chats::Refusal::Goals)
+            .await?;
         let effort = request.effort.unwrap_or(EffortPreset::Standard);
         if goal.named_child.is_some() && effort != EffortPreset::Ultra {
             return Err(problem(

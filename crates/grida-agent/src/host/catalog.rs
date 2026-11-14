@@ -34,6 +34,8 @@ impl Host {
     }
 
     pub(crate) async fn catalog_entry(&self, id: SessionId) -> Result<CatalogEntry> {
+        self.refuse_in_side_chat(&id, side_chats::Refusal::Catalog)
+            .await?;
         self.store.catalog_entry(id).await
     }
 
@@ -51,6 +53,8 @@ impl Host {
         {
             return Err(problem(ErrorKind::InvalidInput, "invalid_session_title"));
         }
+        self.refuse_in_side_chat(&id, side_chats::Refusal::Catalog)
+            .await?;
         self.store
             .replace_catalog_entry(CatalogEntry {
                 session: id,
@@ -75,9 +79,12 @@ pub(super) fn configuration_scope(configuration: &Envelope) -> Option<Fingerprin
     if !config.cwd.is_absolute() {
         return None;
     }
-    match config.subagent {
-        Some(child) => child_scope(child.parent()).ok(),
-        None => workspace_scope(&config.cwd).ok(),
+    // Side chats share one scope outside every workspace, so no saved-chat
+    // listing can reach them.
+    match (config.subagent, config.side) {
+        (Some(child), _) => child_scope(child.parent()).ok(),
+        (None, Some(_)) => super::side_chats::scope().ok(),
+        (None, None) => workspace_scope(&config.cwd).ok(),
     }
 }
 

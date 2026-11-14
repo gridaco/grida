@@ -38,6 +38,11 @@ impl ListenOptions {
 }
 
 pub async fn serve_websocket(host: Arc<Host>, options: ListenOptions) -> Result<()> {
+    // Side chats are private to stdio connections; discard any a previous
+    // process left behind.
+    if host.sweep_side_chats().await.is_err() {
+        eprintln!("grida-agent: side chat cleanup is pending");
+    }
     let listener = TcpListener::bind(options.address)
         .await
         .map_err(|_| Error::new(ErrorKind::Unavailable, "acp_listener_unavailable"))?;

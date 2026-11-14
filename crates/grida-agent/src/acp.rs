@@ -71,6 +71,11 @@ async fn serve(
     provider: Option<crate::SupervisedProvider>,
     side_chats: Arc<crate::host::side_chats::SideChats>,
 ) -> std::result::Result<(), ServeError> {
+    // Side chats a previous process left behind are discarded before any
+    // client can reach them.
+    if host.sweep_side_chats().await.is_err() {
+        eprintln!("grida-agent: side chat cleanup is pending");
+    }
     let recovering = host.clone();
     let cleanup = tokio::spawn(async move { recovering.recover_retired_chat_data().await });
     let delivery = Arc::new(Delivery::new());
@@ -87,7 +92,7 @@ async fn serve(
         if let Some(provider) = &provider {
             provider.detach();
         }
-        let _ = side_chats.close_all().await;
+        side_chats.close_scope().await;
         result
     };
     let result = tokio::try_join!(
@@ -108,10 +113,9 @@ async fn serve(
     if let Some(provider) = &provider {
         provider.detach();
     }
-    let sides = side_chats.close_all().await;
-    host.shutdown()
+    side_chats.close_scope().await;
+    host.shutdown_discarding_side_chats()
         .await
-        .and(sides)
         .map_err(ServeError::Shutdown)?;
     let _ = cleanup.await;
     result.map(|_| ()).map_err(ServeError::Protocol)
@@ -440,6 +444,12 @@ async fn serve_connection(
                         .map(serde_json::from_value::<projection::ReplayRequest>)
                         .transpose()
                         .map_err(|_| Error::invalid_params().data("invalid_transcript_window"))?;
+                    // A side chat is reachable only on the connection that opened it.
+                    if !load_sessions.lock().unwrap().attached.contains(&id)
+                        && load_host.side_parent(&id).await.map_err(host_error)?.is_some()
+                    {
+                        return Err(unavailable("side_chat_unavailable"));
+                    }
                     if mode.is_some() {
                         if !load_sessions.lock().unwrap().negotiated.contains(projection::TRANSCRIPT_WINDOW) {
                             return Err(unavailable("transcript_window_capability_required"));

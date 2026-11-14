@@ -404,3 +404,67 @@ async fn a_queued_dependent_rolls_back_the_entire_reviewed_retirement() {
     assert!(store.inspect(first).await.is_ok());
     assert_eq!(store.inspect(second).await.unwrap().queued.len(), 1);
 }
+
+#[tokio::test]
+async fn discard_removes_an_unsettled_temporary_session_once_its_writer_is_gone() {
+    let directory = private_directory();
+    let store =
+        SqliteStore::open_cataloged(directory.path().join("sessions.sqlite"), project).unwrap();
+    store.create(create(session(), "temporary")).await.unwrap();
+    let scope = project(&payload("temporary")).unwrap();
+    store
+        .submit(session(), submission("running", "accepted input"))
+        .await
+        .unwrap();
+    let owner = claim(&store, "claim", vec![change("running")]).await;
+    store
+        .submit(session(), submission("queued", "waiting input"))
+        .await
+        .unwrap();
+    assert_eq!(
+        store
+            .discard(session(), scope, None)
+            .await
+            .unwrap_err()
+            .code,
+        "session_discard_requires_idle"
+    );
+    let workspace = project(&payload("workspace")).unwrap();
+    assert_eq!(
+        store
+            .discard(session(), workspace, None)
+            .await
+            .unwrap_err()
+            .code,
+        "session_missing"
+    );
+    drop(owner);
+    store
+        .discard(session(), scope, Some([7; 32]))
+        .await
+        .unwrap();
+    assert_eq!(
+        store.inspect(session()).await.unwrap_err().code,
+        "session_missing"
+    );
+    assert_eq!(
+        store
+            .create(create(session(), "temporary"))
+            .await
+            .unwrap_err()
+            .code,
+        "session_identity_retired"
+    );
+    assert_eq!(
+        store.pending_retirement_cleanup(None).await.unwrap(),
+        vec![(session(), [7; 32])]
+    );
+    assert_eq!(
+        store
+            .discard(session(), scope, None)
+            .await
+            .unwrap_err()
+            .code,
+        "session_missing"
+    );
+}

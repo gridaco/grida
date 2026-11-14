@@ -111,10 +111,9 @@ pub(super) fn handlers(
                     let host = host.clone();
                     // The fence follows the admitted mutation even if its requester
                     // cancels before the durable disposition reaches the connection.
+                    let parent = request.session.clone();
+                    let attached = sessions.clone();
                     tokio::spawn(async move {
-                        if sides.has_open_parent(&request.session).await {
-                            return Err(unavailable("session_deletion_has_side_chat"));
-                        }
                         let result = host.delete_saved_chat(request).await;
                         if result.is_ok()
                             || result
@@ -122,6 +121,14 @@ pub(super) fn handlers(
                                 .is_err_and(|error| error.kind == ErrorKind::Uncertain)
                         {
                             fence.revoke();
+                        }
+                        if result.is_ok() {
+                            // The host discarded the parent's side chats with it.
+                            let closed = sides.forget_parent(&parent).await;
+                            let mut state = attached.lock().unwrap();
+                            for id in closed {
+                                state.attached.remove(&id);
+                            }
                         }
                         result.map(Deleted::from).map_err(host_error)
                     })

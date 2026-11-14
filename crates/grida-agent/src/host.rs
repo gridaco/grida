@@ -178,7 +178,8 @@ pub struct Host {
     effort: EffortPreset,
     operating_regime: OperatingRegime,
     require_completion_text: bool,
-    side_context: Option<Arc<grida_agent_master::side_context::SideContext>>,
+    /// A temporary host that only makes tool-free model requests (see `titles`).
+    inference_only: bool,
     #[cfg(unix)]
     guidance_root: Option<Arc<skills::HeadlessGuidance>>,
     configuration_admission: Arc<Mutex<()>>,
@@ -619,6 +620,9 @@ struct SessionConfiguration {
     owner: Fingerprint,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     subagent: Option<grida_agent_master::subagents::Profile>,
+    /// Present on a temporary side chat (see `side_chats`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    side: Option<side_chats::SideSession>,
 }
 
 /// The selected model and explicit output allowance for the scoped GG host.
@@ -794,7 +798,7 @@ impl Host {
             effort: EffortPreset::Standard,
             operating_regime: OperatingRegime::default(),
             require_completion_text: false,
-            side_context: None,
+            inference_only: false,
             #[cfg(unix)]
             guidance_root: None,
             configuration_admission: Arc::default(),
@@ -840,7 +844,6 @@ impl Host {
 
     pub(crate) fn supports_editor_tools(&self) -> bool {
         self.operating_regime.is_act()
-            && self.side_context.is_none()
             && self
                 .host_tools
                 .as_ref()
@@ -857,6 +860,7 @@ impl Host {
             execution: execution.configuration,
             owner: execution.owner,
             subagent: None,
+            side: None,
         };
         let session = SessionId::new(uuid())?;
         self.store
@@ -1508,7 +1512,13 @@ impl Host {
             return Ok(None);
         }
         self.check_execution(&view)?;
-        let SessionConfiguration { cwd, subagent, .. } = session_configuration(&view)?;
+        let SessionConfiguration {
+            cwd,
+            subagent,
+            side,
+            ..
+        } = session_configuration(&view)?;
+        let side = side.is_some();
         let (claim_request, input, acceptance, history) = match launch {
             Launch::Prompt {
                 id, parts, policy, ..
@@ -1517,7 +1527,7 @@ impl Host {
                 if !view.queued.is_empty() {
                     return Err(problem(ErrorKind::Conflict, "session_queue_waiting"));
                 }
-                let history = self.provider_history(session.clone(), None).await?;
+                let history = self.provider_history(session.clone(), None, side).await?;
                 let title = self.title_candidate(&view, &parts);
                 let input = self.capture_input(&view, id, parts, policy).await?;
                 let acceptance = self.store.submit(session.clone(), input.clone()).await?;
@@ -1556,7 +1566,7 @@ impl Host {
                         next
                     }
                 };
-                let history = self.provider_history(session.clone(), None).await?;
+                let history = self.provider_history(session.clone(), None, side).await?;
                 let mut selected = Vec::new();
                 if subagent.is_some() {
                     selected.extend(
@@ -1590,7 +1600,7 @@ impl Host {
                     _ => unreachable!("resume launch selected"),
                 };
                 let history = self
-                    .provider_history(session.clone(), Some(turn.clone()))
+                    .provider_history(session.clone(), Some(turn.clone()), side)
                     .await?;
                 let inputs = self
                     .store
@@ -1606,7 +1616,7 @@ impl Host {
             }
             Launch::RecoverStopped(request) => {
                 let history = self
-                    .provider_history(session.clone(), Some(turn.clone()))
+                    .provider_history(session.clone(), Some(turn.clone()), side)
                     .await?;
                 (WorkerClaim::Recover(request), None, None, history)
             }
@@ -1625,6 +1635,7 @@ impl Host {
                     session,
                     input,
                     subagent.as_ref(),
+                    side,
                     InputAuthority::RequireCaptured,
                 )
             })
@@ -1736,6 +1747,7 @@ impl Host {
                     session,
                     input,
                     subagent.as_ref(),
+                    side,
                     InputAuthority::CancellationOnly,
                 )
                 .map_err(|_| problem(ErrorKind::Uncertain, "retained_input_unavailable"))?
@@ -1941,10 +1953,9 @@ impl Host {
             .transpose()?;
         let base_runtime = spending_runtime.as_ref().unwrap_or(&execution.runtime);
         let runtime = self
-            .side_context
-            .as_ref()
-            .map(|_| {
-                let authority = Arc::new(side_chats::InferenceOnly::new(execution));
+            .inference_only
+            .then(|| {
+                let authority = Arc::new(titles::ToolFree::new(execution));
                 base_runtime.with_authorization(authority.clone(), authority)
             })
             .or_else(|| {
@@ -1997,11 +2008,8 @@ impl Host {
             delegation.insert(operations.clone(), &mut inventory, &mut authority.tools)?;
         }
         let selected = authority.tools.keys().cloned().collect::<Vec<_>>();
-        if self.side_context.is_some() && !selected.is_empty() {
-            return Err(problem(
-                ErrorKind::InvalidState,
-                "side_chat_tools_unavailable",
-            ));
+        if self.inference_only && !selected.is_empty() {
+            return Err(problem(ErrorKind::InvalidState, "title_tools_unavailable"));
         }
         let tools = inventory.snapshot(&selected)?;
         if !closing && let Some(delegation) = &delegation {
@@ -2174,7 +2182,7 @@ impl Host {
         let image_owner = self
             .desktop_image_generation
             .as_ref()
-            .filter(|_| operating_regime.is_act() && !allow_wakeups && self.side_context.is_none());
+            .filter(|_| operating_regime.is_act() && !allow_wakeups);
         Ok(SubmissionPolicy {
             questions: request.questions,
             allow_wakeups,
@@ -2225,13 +2233,19 @@ impl Host {
         let execution = self.execution()?;
         let configuration = self.with_configuration(Configuration::snapshot).await?;
         let child_work = subagent.is_some();
-        if allow_library_selection
-            && (!execution.tool_result_images || child_work || self.side_context.is_some())
-        {
+        if allow_library_selection && (!execution.tool_result_images || child_work) {
             return Err(problem(
                 ErrorKind::Unsupported,
                 "library_selection_unavailable",
             ));
+        }
+        if session_configuration(session)?.side.is_some() {
+            if allow_wakeups {
+                return Err(side_chats::Refusal::Wakeups.error());
+            }
+            if effort.is_some() {
+                return Err(side_chats::Refusal::Delegation.error());
+            }
         }
         if child_work != session_configuration(session)?.subagent.is_some() {
             return Err(problem(
@@ -2260,16 +2274,6 @@ impl Host {
                 .as_ref()
                 .is_some_and(image_generation::DesktopImageGeneration::references);
         let guidance = if child_work {
-            None
-        } else if self.side_context.is_some() {
-            if questions
-                || allow_wakeups
-                || parts
-                    .iter()
-                    .any(|part| !matches!(part, PromptPart::Text { .. }))
-            {
-                return Err(problem(ErrorKind::Unsupported, "side_chat_text_only"));
-            }
             None
         } else {
             skills::capture_guidance(self.guidance_scope(session)?, &parts).await?
@@ -2382,19 +2386,12 @@ impl Host {
         session: &SessionId,
         input: &Submission,
         subagent_profile: Option<&grida_agent_master::subagents::Profile>,
+        side: bool,
         authority: InputAuthority,
     ) -> Result<PreparedInput> {
         let mut config = execution.config.clone();
         let lifecycle_hooks;
         let spending;
-        if self.side_context.is_some() {
-            if !config.instructions.is_empty() {
-                config.instructions.push_str("\n\n");
-            }
-            config
-                .instructions
-                .push_str(grida_agent_master::side_context::INSTRUCTIONS);
-        }
         let cancellation_only = matches!(authority, InputAuthority::CancellationOnly);
         let mut host_tools = Vec::new();
         let mut image_generation = None;
@@ -2434,9 +2431,7 @@ impl Host {
                         PromptPart::RetainedFile { work } => Some(work.clone()),
                         _ => None,
                     });
-                    if retained_file.is_some()
-                        && (subagent_profile.is_some() || self.side_context.is_some())
-                    {
+                    if retained_file.is_some() && subagent_profile.is_some() {
                         return Err(problem(
                             ErrorKind::InvalidState,
                             "retained_file_scope_mismatch",
@@ -2444,6 +2439,15 @@ impl Host {
                     }
                 }
                 effort = stored.effort.clone();
+                if !cancellation_only
+                    && side
+                    && (stored.allow_wakeups
+                        || effort.is_some()
+                        || stored.goal.is_some()
+                        || stored.subagent.is_some())
+                {
+                    return Err(problem(ErrorKind::InvalidState, "invalid_side_chat_input"));
+                }
                 if !cancellation_only && effort.is_some() && !self.sponsorship_available() {
                     return Err(problem(ErrorKind::Unsupported, "delegation_unavailable"));
                 }
@@ -2549,7 +2553,6 @@ impl Host {
                     if !stored.operating_regime.is_act()
                         || stored.goal.is_some()
                         || subagent
-                        || self.side_context.is_some()
                         || host_tools.iter().any(|tools| tools.has_local_surface())
                     {
                         return Err(problem(
@@ -2574,7 +2577,6 @@ impl Host {
                         || stored.allow_wakeups
                         || stored.goal.is_some()
                         || subagent
-                        || self.side_context.is_some()
                         || (stored.allow_image_reference && !stored.allow_library_selection)
                     {
                         return Err(problem(
@@ -2732,6 +2734,9 @@ impl Host {
         }
         if config.max_steps == 0 || config.max_output_tokens == Some(0) {
             return Err(problem(ErrorKind::InvalidInput, "invalid_master_limits"));
+        }
+        if side {
+            grida_agent_master::side_chat::apply(&mut config.instructions);
         }
         let completion_authorized = completion_checks.is_some() && !cancellation_only;
         if completion_authorized
@@ -3916,6 +3921,12 @@ fn decode_session_configuration(config: &Envelope) -> Result<SessionConfiguratio
         .map_err(|_| problem(ErrorKind::InvalidState, "invalid_session_configuration"))?;
     if let Some(subagent) = &configuration.subagent {
         subagent.validate()?;
+    }
+    if configuration.subagent.is_some() && configuration.side.is_some() {
+        return Err(problem(
+            ErrorKind::InvalidState,
+            "invalid_session_configuration",
+        ));
     }
     Ok(configuration)
 }

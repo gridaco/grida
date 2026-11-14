@@ -7,9 +7,7 @@
 
 use super::*;
 use agent_kit_core::messages::OutcomeStatus;
-use grida_agent_master::conversation_seed::SeedOmissions;
 use grida_agent_master::read_account;
-use grida_agent_master::side_context::SideContext;
 
 const TITLE_INSTRUCTIONS: &str = include_str!("../prompts/title.md");
 /// The request text a title reads, so a long first request stays cheap.
@@ -20,7 +18,7 @@ const TITLE_TIMEOUT: Duration = Duration::from_secs(60);
 impl Host {
     /// Title untitled chats. A client opts in at launch: the title costs one
     /// model request, which a one-shot run or a scripted provider does not
-    /// expect. Temporary hosts (side chat, titler) never title.
+    /// expect. The temporary titler and side chats are never titled.
     pub fn with_chat_titles(mut self) -> Self {
         self.chat_titles = true;
         self
@@ -34,12 +32,13 @@ impl Host {
         parts: &[PromptPart],
     ) -> Option<(SessionId, String)> {
         if !self.chat_titles
-            || self.side_context.is_some()
+            || self.inference_only
             || view.current.is_some()
             || view.latest.is_some()
             || !view.queued.is_empty()
-            || session_configuration(view)
-                .is_ok_and(|configuration| configuration.subagent.is_some())
+            || session_configuration(view).is_ok_and(|configuration| {
+                configuration.subagent.is_some() || configuration.side.is_some()
+            })
         {
             return None;
         }
@@ -131,11 +130,6 @@ impl Host {
     /// A private, in-memory, tool-free host for one title request.
     fn temporary_titler(&self) -> Result<Self> {
         self.execution()?;
-        let context = Arc::new(SideContext::capture(
-            Vec::new(),
-            Fingerprint::of(&"chat-title")?,
-            SeedOmissions::default(),
-        )?);
         let store = Arc::new(SqliteStore::open_in_memory()?);
         Ok(Self {
             spending: Arc::new(spending::Store::detached(store.clone())),
@@ -155,7 +149,7 @@ impl Host {
             effort: EffortPreset::Standard,
             operating_regime: OperatingRegime::Act,
             require_completion_text: false,
-            side_context: Some(context),
+            inference_only: true,
             #[cfg(unix)]
             guidance_root: None,
             configuration_admission: Arc::default(),
@@ -167,6 +161,36 @@ impl Host {
             live_updates: broadcast::channel(UPDATE_CAPACITY).0,
             processes: Arc::default(),
         })
+    }
+}
+
+/// The titler's authority: inference under the host's execution, and no tool.
+pub(super) struct ToolFree {
+    authority: Arc<ExecutionAuthority>,
+    selection: GrantSelection,
+}
+
+impl ToolFree {
+    pub(super) fn new(execution: &Execution) -> Self {
+        Self {
+            authority: execution.authorization.clone(),
+            selection: execution.authority.inference.clone(),
+        }
+    }
+}
+
+impl AuthorityValidator for ToolFree {
+    fn validate(&self, request: AuthorityRequest) -> BoxFuture<'_, Result<()>> {
+        if request.selection == self.selection {
+            return self.authority.validate(request);
+        }
+        Box::pin(async { Err(problem(ErrorKind::Unsupported, "title_tools_unavailable")) })
+    }
+}
+
+impl ToolGate for ToolFree {
+    fn decide(&self, _: ToolAdmission, _: AdmissionContext) -> BoxFuture<'_, Result<ToolDecision>> {
+        Box::pin(async { Err(problem(ErrorKind::Unsupported, "title_tools_unavailable")) })
     }
 }
 
