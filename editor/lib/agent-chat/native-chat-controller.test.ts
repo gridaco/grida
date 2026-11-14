@@ -4206,7 +4206,7 @@ it("drops an unsent goal intent on chat switch and refuses unavailable goal entr
   bridge.startGoal = undefined;
   const ordinary = vi.spyOn(bridge, "submit");
   await expect(controller.submit("/goal Inspect the file")).rejects.toThrow(
-    /cannot start/
+    "Goals are unavailable in this chat."
   );
   expect(ordinary).not.toHaveBeenCalled();
   controller.disconnect();
@@ -4583,5 +4583,217 @@ describe("background processes", () => {
     );
     await controller.select("chat-b");
     expect(stop).not.toHaveBeenCalled();
+  });
+});
+
+describe("slash commands", () => {
+  const ALL = ["plan", "goal", "side", "stop", "compact", "fork"];
+
+  function commands() {
+    const f = fixture();
+    let queued = 0;
+    let paused = false;
+    let pendingGoalId: string | undefined;
+    const observe = f.bridge.observe.bind(f.bridge);
+    f.bridge.observe = async (id) => {
+      const observation = await observe(id);
+      return {
+        ...observation,
+        snapshot: {
+          ...observation.snapshot,
+          queuedInputs: queued,
+          admissionPaused: paused,
+          ...(pendingGoalId && { pendingGoalId }),
+        },
+      };
+    };
+    const submitInRegime = vi.fn<
+      NonNullable<DesktopNativeChat["submitInRegime"]>
+    >(async (_action, sessionId, inputId) => ({
+      sessionId,
+      inputId,
+      disposition: "queued",
+      inputPosition: 2,
+      turnId: null,
+    }));
+    const startGoal = vi.fn<NonNullable<DesktopNativeChat["startGoal"]>>(
+      async (sessionId, inputId) => {
+        pendingGoalId = inputId;
+        return {
+          sessionId,
+          inputId,
+          disposition: "queued",
+          inputPosition: 2,
+          turnId: null,
+        };
+      }
+    );
+    const steer = vi.fn<NonNullable<DesktopNativeChat["steer"]>>();
+    const runCommand = vi.fn<NonNullable<DesktopNativeChat["runCommand"]>>();
+    const stop = vi.fn<
+      NonNullable<DesktopNativeChat["stopBackgroundProcesses"]>
+    >(async () => []);
+    f.bridge.submitInRegime = submitInRegime;
+    f.bridge.enqueue = vi.fn<NonNullable<DesktopNativeChat["enqueue"]>>();
+    f.bridge.steer = steer;
+    f.bridge.goal = async () => ({ observationId: null, goal: null });
+    f.bridge.startGoal = startGoal;
+    f.bridge.openSideChat =
+      vi.fn<NonNullable<DesktopNativeChat["openSideChat"]>>();
+    f.bridge.closeSideChat =
+      vi.fn<NonNullable<DesktopNativeChat["closeSideChat"]>>();
+    f.bridge.commands = async () => ["compact", "fork"];
+    f.bridge.runCommand = runCommand;
+    f.bridge.acceptsBackgroundProcesses = async () => true;
+    f.bridge.backgroundProcesses = async () => [];
+    f.bridge.stopBackgroundProcesses = stop;
+    return {
+      ...f,
+      submitInRegime,
+      startGoal,
+      steer,
+      runCommand,
+      stop,
+      busy(state: { queued?: number; paused?: boolean }) {
+        f.running.add("chat-a");
+        queued = state.queued ?? 0;
+        paused = state.paused ?? false;
+      },
+    };
+  }
+
+  async function open(controller: NativeChatController) {
+    await controller.select("chat-a");
+    await vi.waitFor(() => {
+      expect(controller.read().commands).toEqual(["compact", "fork"]);
+      expect(controller.read().backgroundProcesses).not.toBeNull();
+      expect(controller.read().goalReady).toBe(true);
+    });
+  }
+
+  it("lists the same commands whether the chat is idle or the agent is working", async () => {
+    const idle = commands();
+    await open(idle.controller);
+    expect(idle.controller.composerCommands).toEqual(ALL);
+    idle.controller.disconnect();
+
+    for (const state of [{}, { queued: 2 }, { queued: 1, paused: true }]) {
+      const busy = commands();
+      busy.busy(state);
+      await open(busy.controller);
+      expect(busy.controller.composerCommands).toEqual(ALL);
+      busy.controller.toggleSteering();
+      expect(busy.controller.read().steering).toBe(true);
+      expect(busy.controller.composerCommands).toEqual(ALL);
+      // An in-flight send does not hide commands either.
+      const held = Promise.withResolvers<void>();
+      busy.submitInRegime.mockImplementationOnce(async (_a, id, inputId) => {
+        await held.promise;
+        return {
+          sessionId: id,
+          inputId,
+          disposition: "queued",
+          inputPosition: 3,
+          turnId: null,
+        };
+      });
+      busy.controller.toggleSteering();
+      const sending = busy.controller.submit("Next");
+      await vi.waitFor(() => expect(busy.controller.read().acting).toBe(true));
+      expect(busy.controller.composerCommands).toEqual(ALL);
+      held.resolve();
+      await sending;
+      busy.controller.disconnect();
+    }
+  });
+
+  it("queues the next message in Plan during a turn and turns steering off", async () => {
+    const { controller, busy, submitInRegime, steer } = commands();
+    busy({});
+    await open(controller);
+    controller.toggleSteering();
+    await controller.runComposerCommand("plan");
+    expect(controller.read()).toMatchObject({
+      steering: false,
+      operatingRegime: "plan",
+      commandNotice: expect.stringContaining("waits in the queue"),
+    });
+    await controller.submit("Investigate the export");
+    expect(submitInRegime).toHaveBeenCalledExactlyOnceWith(
+      "enqueue",
+      "chat-a",
+      expect.any(String),
+      "Investigate the export",
+      "plan"
+    );
+    expect(steer).not.toHaveBeenCalled();
+    controller.disconnect();
+  });
+
+  it("sends a goal started during a turn to the host, which queues it", async () => {
+    const { controller, busy, startGoal, steer } = commands();
+    busy({ queued: 1 });
+    await open(controller);
+    expect(controller.canStartGoal).toBe(true);
+    controller.toggleSteering();
+    await controller.runComposerCommand("goal");
+    expect(controller.read()).toMatchObject({
+      goalIntent: true,
+      steering: false,
+    });
+    expect(controller.canSubmit).toBe(true);
+    await controller.submit("Prepare the export");
+    expect(startGoal).toHaveBeenCalledExactlyOnceWith(
+      "chat-a",
+      expect.any(String),
+      expect.objectContaining({ objective: "Prepare the export" })
+    );
+    expect(steer).not.toHaveBeenCalled();
+    expect(controller.read().goalIntent).toBe(false);
+    // The queued start is this chat's goal; another waits for it.
+    await vi.waitFor(() =>
+      expect(controller.read().observation?.snapshot.pendingGoalId).toBe(
+        startGoal.mock.calls[0][1]
+      )
+    );
+    expect(controller.composerCommands).toEqual(ALL);
+    await controller.runComposerCommand("goal");
+    expect(controller.read()).toMatchObject({
+      goalIntent: false,
+      error: "A goal is already waiting to start in this chat.",
+    });
+    controller.disconnect();
+  });
+
+  it("says /fork and /compact are unavailable while the agent works", async () => {
+    const { bridge, controller, busy, runCommand } = commands();
+    const submit = vi.spyOn(bridge, "submit");
+    busy({});
+    await open(controller);
+    await controller.runComposerCommand("fork");
+    expect(controller.read().error).toBe(
+      "/fork is unavailable while the agent is working."
+    );
+    // Typed alone, the command behaves as chosen from the menu.
+    await controller.submit("/compact");
+    expect(controller.read().error).toBe(
+      "/compact is unavailable while the agent is working."
+    );
+    expect(runCommand).not.toHaveBeenCalled();
+    expect(submit).not.toHaveBeenCalled();
+    controller.disconnect();
+  });
+
+  it("reports /stop with no background process running", async () => {
+    const { controller, stop } = commands();
+    await open(controller);
+    await controller.runComposerCommand("stop");
+    await controller.submit("/stop");
+    expect(stop).not.toHaveBeenCalled();
+    expect(controller.read()).toMatchObject({
+      error: null,
+      commandNotice: "No background processes are running.",
+    });
+    controller.disconnect();
   });
 });

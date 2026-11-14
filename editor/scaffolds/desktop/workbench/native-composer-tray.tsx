@@ -431,13 +431,17 @@ function GoalStrip({
   const goalRevision = view.goal?.goalRevision;
   const editing = draft && goal?.goalId === draft.goalId ? draft : null;
 
-  if (!goal)
+  if (!goal) {
+    // A goal started while the agent works waits for its place in the queue.
+    const snapshot = view.observation?.snapshot;
+    const waiting = !!snapshot?.current || !!snapshot?.admissionPaused;
     return (
       <div className="flex items-center gap-2 py-2 pr-1.5 pl-3" role="status">
         <GoalIcon className="text-muted-foreground size-4 shrink-0" />
-        <span>Starting goal</span>
+        <span>{waiting ? "Goal waits in the queue" : "Starting goal"}</span>
       </div>
     );
+  }
 
   if (editing)
     return (

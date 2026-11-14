@@ -295,6 +295,21 @@ type SideChatScope = {
 };
 
 const SIDE_CHAT_UNAVAILABLE = "Side chats are unavailable in this chat.";
+const GOALS_UNAVAILABLE = "Goals are unavailable in this chat.";
+/** Plan applies to the next message, which waits for the running turn. */
+const PLAN_QUEUES_STEERING =
+  "Plan applies to your next message, so it waits in the queue instead of steering the running turn.";
+
+/**
+ * A slash command the composer lists: an intent for the next message, a side
+ * chat, stopping background processes, or a host chat command.
+ */
+export type NativeChatComposerCommand =
+  | "plan"
+  | "goal"
+  | "side"
+  | "stop"
+  | NativeChatCommand;
 
 const EMPTY: NativeChatView = Object.freeze({
   scope: 0,
@@ -1048,14 +1063,15 @@ export class NativeChatController {
       (!this.scope.selectedAttachment ||
         this.acceptsAttachment(this.scope.selectedAttachment.kind) ||
         this.scope.pending?.attachment === this.scope.selectedAttachment) &&
-      (this.view.steering
-        ? this.canSteer &&
-          this.scope.steeringTarget ===
-            this.view.observation?.snapshot.current?.turnId
-        : (this.view.goalIntent && !!this.scope.pendingGoalStart) ||
-          !this.needsQueue ||
-          !!this.bridge.enqueue ||
-          !!this.scope.pending?.allowLibrarySelection)
+      // A goal start needs no queue support here: the host queues it.
+      (this.view.goalIntent ||
+        (this.view.steering
+          ? this.canSteer &&
+            this.scope.steeringTarget ===
+              this.view.observation?.snapshot.current?.turnId
+          : !this.needsQueue ||
+            !!this.bridge.enqueue ||
+            !!this.scope.pending?.allowLibrarySelection))
     );
   }
 
@@ -1595,12 +1611,16 @@ export class NativeChatController {
    * to a fixed session, whose connection offers side chats.
    */
   get canOpenSideChat(): boolean {
+    return this.offersSideChat && !this.view.profileBusy;
+  }
+
+  /** Whether this attached chat's connection can ever open a side chat. */
+  private get offersSideChat(): boolean {
     return (
       !this.fixed &&
       !!this.scope?.attachment &&
       !!this.bridge.openSideChat &&
       !!this.bridge.closeSideChat &&
-      !this.view.profileBusy &&
       this.offers("side_chat")
     );
   }
@@ -1694,27 +1714,45 @@ export class NativeChatController {
     );
   }
 
-  get canStartGoal(): boolean {
-    const scope = this.scope;
-    const snapshot = scope?.observation?.snapshot;
-    const goal = this.view.goal?.goal;
+  /** Whether this chat's connection can ever start a goal. */
+  get offersGoals(): boolean {
     return (
-      !!scope &&
+      !!this.scope &&
       !!this.bridge.goal &&
       !!this.bridge.startGoal &&
-      this.offers("goals") &&
+      this.offers("goals")
+    );
+  }
+
+  /**
+   * Why a goal cannot start in this chat now, or `null`. A chat holds one
+   * goal at a time, active or waiting to start. The current turn and queue
+   * never matter: a goal started while the agent works waits in the queue.
+   */
+  get goalStartRefusal(): string | null {
+    const scope = this.scope;
+    if (!scope || !this.offersGoals) return GOALS_UNAVAILABLE;
+    if (scope.pendingGoalStart) return null;
+    if (scope.awaitingGoalId || scope.observation?.snapshot.pendingGoalId)
+      return "A goal is already waiting to start in this chat.";
+    const goal = this.view.goal?.goal;
+    if (
+      goal &&
+      (goal.reservation ||
+        (goal.state.status !== "complete" && goal.state.status !== "cleared"))
+    )
+      return "This chat already has a goal. Clear it before starting another.";
+    return null;
+  }
+
+  get canStartGoal(): boolean {
+    const scope = this.scope;
+    return (
+      !!scope &&
       !this.view.loading &&
       !this.view.acting &&
-      !scope.awaitingGoalId &&
       (!scope.attachment || this.view.goalReady) &&
-      (!!scope.pendingGoalStart ||
-        (!snapshot?.current &&
-          !snapshot?.queuedInputs &&
-          !snapshot?.admissionPaused &&
-          (!goal ||
-            (!goal.reservation &&
-              (goal.state.status === "complete" ||
-                goal.state.status === "cleared")))))
+      this.goalStartRefusal === null
     );
   }
 
@@ -2044,30 +2082,65 @@ export class NativeChatController {
     }
   }
 
+  /**
+   * Choose the regime of the next message. Plan is per message: while a turn
+   * runs it applies to the next message, which waits in the queue. A
+   * steering message joins the running turn under that turn's regime, so
+   * choosing Plan turns steering off and says so.
+   */
   selectOperatingRegime(operatingRegime: NativeChatOperatingRegime): void {
-    if (
-      this.bridge.submitInRegime &&
-      !this.view.acting &&
-      !this.view.steering
-    ) {
-      this.update({ operatingRegime });
-      this.saveDraftModes();
-    }
+    if (!this.bridge.submitInRegime || this.view.acting) return;
+    const queues = operatingRegime === "plan" && this.view.steering;
+    if (queues) this.leaveSteering();
+    this.update({
+      operatingRegime,
+      ...(queues && {
+        error: null,
+        commandNotice: PLAN_QUEUES_STEERING,
+        commandFork: null,
+      }),
+    });
+    this.saveDraftModes();
   }
 
+  /**
+   * Turn goal entry on or off. Goal entry is refused only for a chat that
+   * cannot start a goal now, with the reason; a goal started while a turn
+   * runs waits in the queue. A goal is never sent as steering.
+   */
   selectGoalIntent(enabled: boolean): void {
     if (this.view.acting) return;
-    if (!enabled && this.scope?.pendingGoalStart) return;
-    if (enabled && this.view.attachmentDraft) {
+    if (!enabled) {
+      if (this.scope?.pendingGoalStart) return;
+      this.update({ goalIntent: false, error: null });
+      this.saveDraftModes();
+      return;
+    }
+    if (this.view.attachmentDraft) {
       this.update({
         error: "Send or remove the attachment before starting a goal.",
       });
       return;
     }
-    if (!enabled || this.canStartGoal) {
-      this.update({ goalIntent: enabled, error: null });
-      this.saveDraftModes();
+    const refusal = this.goalStartRefusal;
+    if (refusal || !this.canStartGoal) {
+      this.update({
+        error: refusal ?? "This chat is still loading. Try again in a moment.",
+      });
+      return;
     }
+    if (this.view.steering) this.leaveSteering();
+    this.update({ goalIntent: true, error: null });
+    this.saveDraftModes();
+  }
+
+  private leaveSteering(): void {
+    const scope = this.scope;
+    if (scope) {
+      scope.steeringTarget = undefined;
+      scope.pendingSteering = undefined;
+    }
+    this.update({ steering: false });
   }
 
   selectEffort(effort: NativeChatEffort): void {
@@ -2088,17 +2161,13 @@ export class NativeChatController {
     const intent = /^\/(plan|goal)(?:\s+|$)/.exec(text.trim());
     if (intent) {
       if (intent[1] === "plan") {
-        if (!this.bridge.submitInRegime || this.view.steering)
+        if (!this.bridge.submitInRegime)
           throw new Error("Planning is unavailable in this chat.");
         this.selectOperatingRegime("plan");
       } else {
-        if (!this.view.goalIntent && !this.canStartGoal)
-          throw new Error(
-            "A goal cannot start while this chat has unfinished work."
-          );
-        this.selectGoalIntent(true);
+        if (!this.view.goalIntent) this.selectGoalIntent(true);
         if (!this.view.goalIntent)
-          throw new Error(this.view.error ?? "Goal entry is unavailable.");
+          throw new Error(this.view.error ?? GOALS_UNAVAILABLE);
       }
       text = text.trim().slice(intent[0].length).trim();
       if (!text) return;
@@ -2319,6 +2388,51 @@ export class NativeChatController {
     );
   }
 
+  /**
+   * The slash commands the composer lists. The list comes from what this chat
+   * can ever do (its connection, host capabilities and side-chat policy),
+   * never from a running turn, the queue, steering or an in-flight action: a
+   * command chosen when it cannot run says why instead of disappearing. A
+   * chat that is not open yet lists none; side chats, background processes
+   * and host chat commands also need the chat attached, since their
+   * capabilities are read from it.
+   */
+  get composerCommands(): readonly NativeChatComposerCommand[] {
+    if (!this.scope) return [];
+    return [
+      ...(this.bridge.submitInRegime ? (["plan"] as const) : []),
+      ...(this.offersGoals ? (["goal"] as const) : []),
+      ...(this.offersSideChat ? (["side"] as const) : []),
+      ...(this.view.backgroundProcesses ? (["stop"] as const) : []),
+      ...this.commandChoices,
+    ];
+  }
+
+  /**
+   * Run a listed slash command, chosen from the menu or typed alone. A
+   * command refused for what the chat is doing now (fork or compaction while
+   * the agent works, a goal while one is set, `/stop` with nothing running)
+   * reports why and resolves.
+   */
+  async runComposerCommand(command: NativeChatComposerCommand): Promise<void> {
+    switch (command) {
+      case "plan":
+        if (!this.bridge.submitInRegime)
+          this.update({ error: "Planning is unavailable in this chat." });
+        else this.selectOperatingRegime("plan");
+        return;
+      case "goal":
+        this.selectGoalIntent(true);
+        return;
+      case "side":
+        return this.openSideChat();
+      case "stop":
+        return this.stopBackgroundProcesses();
+      default:
+        return this.runCommand(command);
+    }
+  }
+
   async runCommand(command: NativeChatCommand): Promise<void> {
     const scope = this.scope;
     const attachment = scope?.attachment;
@@ -2348,19 +2462,25 @@ export class NativeChatController {
       });
       throw new Error("native_chat_command_pending");
     }
+    // Fork and compaction start from settled history, so they wait for the
+    // agent; the command stays listed and says so. A retained request is
+    // retried as is, to confirm its outcome.
     const snapshot = scope.observation?.snapshot;
+    if (!retained && snapshot?.current) {
+      this.update({
+        error: `/${command} is unavailable while the agent is working.`,
+      });
+      return;
+    }
     if (
       !retained &&
       command === "compact" &&
-      (!snapshot ||
-        snapshot.current ||
-        snapshot.admissionPaused ||
-        snapshot.queuedInputs)
+      (!snapshot || snapshot.admissionPaused || snapshot.queuedInputs)
     ) {
       this.update({
         error: "Compaction needs an idle chat with an open, empty queue.",
       });
-      throw new Error("native_chat_compaction_requires_idle");
+      return;
     }
     const pending = (scope.pendingCommand ??= {
       command,
@@ -3624,6 +3744,14 @@ export class NativeChatController {
       const error = "Background processes are unavailable in this chat.";
       this.update({ error });
       throw new Error(error);
+    }
+    if (processes.read().running === 0) {
+      this.update({
+        error: null,
+        commandNotice: "No background processes are running.",
+        commandFork: null,
+      });
+      return;
     }
     if (!(await processes.stop())) {
       const error =

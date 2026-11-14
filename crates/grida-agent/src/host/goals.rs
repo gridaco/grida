@@ -113,7 +113,9 @@ pub(super) struct GoalResumeWake {
 }
 
 impl Host {
-    /// Accept an explicit user goal. Its first reservation is made at claim.
+    /// Accept an explicit user goal as a queued input. Its first reservation
+    /// is made when the input is admitted, in queue order; a busy chat keeps
+    /// it waiting behind the current turn and earlier queued inputs.
     pub async fn start_goal(
         &self,
         request: PromptRequest,
@@ -242,7 +244,7 @@ impl Host {
         if self.work.lock().await.closed {
             return Err(problem(ErrorKind::Unavailable, "host_shutting_down"));
         }
-        let view = self.store.inspect(request.session.clone()).await?;
+        let mut view = self.store.inspect(request.session.clone()).await?;
         self.check_execution(&view)?;
         if self
             .permissions
@@ -267,7 +269,11 @@ impl Host {
             self.require_goal_named_child(&request.session, child)
                 .await?;
         }
-        self.check_ready_capacity(&request.session).await?;
+        // A start behind a running turn or other queued work waits in the
+        // queue, like any queued input; only an idle chat admits it now.
+        if view.current.is_none() && !view.admission_paused {
+            self.check_ready_capacity(&request.session).await?;
+        }
         let mut request = request;
         request.effort = Some(effort);
         let mut policy = self.submission_policy(&request, allow_wakeups)?;
@@ -302,10 +308,27 @@ impl Host {
         stored.allow_reviewer_primary_read = false;
         stored.goal = Some(GoalInput::Start(goal));
         input.payload = encode_stored_prompt(&stored)?;
-        let accepted = self
-            .store
-            .submit_at_revision(request.session, input, view.revision)
-            .await?;
+        // The start is accepted against the revision its preconditions were
+        // checked at. A running turn can settle meanwhile; recheck and retry.
+        let mut attempts = 0;
+        let accepted = loop {
+            match self
+                .store
+                .submit_at_revision(request.session.clone(), input.clone(), view.revision)
+                .await
+            {
+                Ok(accepted) => break accepted,
+                Err(error)
+                    if error.code == "stale_session_revision" && attempts < GOAL_START_ATTEMPTS =>
+                {
+                    attempts += 1;
+                    view = self.store.inspect(request.session.clone()).await?;
+                    self.check_execution(&view)?;
+                    require_goal_start(&view)?;
+                }
+                Err(error) => return Err(error),
+            }
+        };
         if let Some(selection) = &spending {
             self.spending.publish_initial(selection).map_err(|_| {
                 problem(
@@ -873,12 +896,28 @@ pub(super) fn claim_update(
     })
 }
 
+/// How often an accepted start rechecks a revision a settling turn changed.
+const GOAL_START_ATTEMPTS: u32 = 3;
+
+/// A goal start needs no idle chat: behind a running turn, other queued work
+/// or a paused queue it waits as a queued input and starts when admitted.
+/// A chat holds at most one goal, active or waiting to start.
 fn require_goal_start(view: &SessionView) -> Result<()> {
-    require_idle(view)?;
-    if !view.queued.is_empty() {
-        return Err(problem(ErrorKind::Conflict, "session_queue_waiting"));
+    require_no_active_goal(view)?;
+    for queued in &view.queued {
+        if queued_goal_start(&queued.input)? {
+            return Err(problem(ErrorKind::Conflict, "session_goal_queued"));
+        }
     }
-    require_no_active_goal(view)
+    Ok(())
+}
+
+fn queued_goal_start(input: &Submission) -> Result<bool> {
+    if !is_stored_input(&input.payload) {
+        return Ok(false);
+    }
+    let stored: StoredPrompt = decode_input(input)?;
+    Ok(matches!(stored.goal, Some(GoalInput::Start(_))))
 }
 
 fn require_no_active_goal(view: &SessionView) -> Result<()> {

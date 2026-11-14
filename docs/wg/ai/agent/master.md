@@ -193,7 +193,11 @@ A goal is product-owned objective state and a continuation policy spanning work
 turns. The master exposes tools to create, inspect, revise, and report progress
 against it. The product defines completion evidence, blocked-work policy,
 continuation limits, and which controls require an explicit user request.
-Starting a goal is an explicit action.
+Starting a goal is an explicit action. The start is an ordinary queued request
+that carries the goal: accepted while other work runs or waits, it creates the
+goal only when admitted in queue order, so the goal's first reservation and
+limits apply to the work it actually starts. A session holds one goal,
+active or waiting to start; a second start is refused rather than queued.
 
 The goal record carries its identity, revision, objective, progress, status, and
 applicable resource allowance. Session driver state retains that record across

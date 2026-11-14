@@ -187,6 +187,11 @@ retains the surrounding draft and starts no model work. The removable badges
 capture product instructions; permission grants and effort stay separate.
 An unconfirmed Goal start retries the same input and allowance even if work
 has already begun; a changed objective cannot replace that outstanding request.
+The slash menu lists commands from the chat's capabilities only; a running
+turn, queued input, steering or an in-flight action never hides one. `/plan`
+during a turn applies to the next, queued message and turns steering off;
+`/goal` sends the goal start, which the host queues; `/fork` and `/compact`
+report that the agent is working; `/stop` reports when nothing runs.
 [Controller regressions](../../../editor/lib/agent-chat/native-chat-controller.test.ts),
 [real-editor selection tests](../../../editor/kits/composer/composer-command-selection.browser.ts),
 and the [Desktop interaction case](../../../test/desktop-agent-chat-composer-intents.md)
@@ -569,6 +574,8 @@ anti-spin policy. The components enforce the generic storage and admission rules
 | An earlier child reports usage after a later goal turn is prepared   | Retain the reservation and account the usage once. New work uses the remaining cumulative allowance.                           |
 | Completion races with a changed objective                            | Commit against the expected state revision or reject the stale completion. The final account and goal-state change agree.      |
 | A branch copies goal context                                         | Preserve provenance while requiring explicit continuation activation for the new branch.                                       |
+| A goal starts while a turn runs or input waits                       | Queue the start; the goal begins at admission, in queue order. A second start is refused while one is set or queued.           |
+| A queued goal start is reordered, withdrawn, paused or restarted     | It follows the queue contract; the goal begins only when the start is admitted, and a withdrawn start begins no goal.          |
 
 Goal state is restored on resume and coordinated with goal mutations. Exact
 thresholds belong to the master, and budget accounting alone does not prove a

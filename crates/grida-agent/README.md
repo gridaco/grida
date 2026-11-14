@@ -797,9 +797,12 @@ work through private ACP. The fixtures use synthetic loopback provider
 responses and disposable files.
 
 Persistent goals are available through negotiated ACP and the embedded Host.
-The initial work and explicitly authorized automatic follow-ups use the same
-owned scheduler. A claim and its reservation commit together. Only reserved
-turns receive the goal tools. See the
+Goal Start is a queued input: started while a turn runs or input waits, the
+goal begins when the queue admits it, in order. A session holds one goal,
+active or waiting to start. The initial work and explicitly authorized
+automatic follow-ups use the same owned scheduler. A claim and its
+reservation commit together. Only reserved turns receive the goal tools. See
+the
 [agent client guide](../../docs/agent/clients.md#work-toward-a-persistent-goal).
 
 With `serve --stdio --subagents` and a compatible provider, a private ACP

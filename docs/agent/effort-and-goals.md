@@ -47,10 +47,14 @@ message needs a model that supports Ultra.
 
 ## Keep an objective across turns
 
-1. In an idle chat with nothing queued, type `/goal` and select it, or choose
-   **+ → Goal**. A **Goal** badge appears in the composer without starting
-   work; hover it and choose × to remove it.
-2. Describe the objective in your own words and send. The message is marked
+1. Type `/goal` and select it, or choose **+ → Goal**. A **Goal** badge
+   appears in the composer without starting work; hover it and choose × to
+   remove it. A chat holds one goal at a time; clear or finish the current
+   one first.
+2. Describe the objective in your own words and send. If the agent is still
+   working or messages are waiting, the goal waits in the queue as
+   **Goal: …** and starts when its turn comes; until then you can reorder or
+   remove it like a queued message. The message is marked
    **Sent as goal** in the chat. The agent works from that objective and
    continues on its own within eight work turns and 64 inference steps.
    Choose **Ultra** before sending to let one independent review share the

@@ -9,15 +9,23 @@ format: md
 
 ## Use a chat command
 
-Type `/` in a Desktop workspace chat to see the commands you can use now.
-Select one; `/fork` and `/compact` are sent on their own.
+Type `/` in a Desktop workspace chat to see the commands the chat offers. The
+list stays the same while the agent works; a command that has to wait says so
+when you choose it. Select one; `/fork` and `/compact` are sent on their own.
 
 - **`/plan`** adds a **Plan** badge so the next message investigates and
   proposes without changing anything. It starts no work and keeps your draft.
+  While the agent works, that message waits in the queue; choosing `/plan`
+  while steering turns steering off, because a Plan message cannot join the
+  running turn.
   [Decide what the agent may do](./effort-and-goals.md#decide-what-the-agent-may-do)
 - **`/goal`** adds a **Goal** badge; send the objective to start a persistent
-  goal. It needs an idle chat with nothing queued.
+  goal. Sent while the agent works, the goal waits in the queue and starts
+  when its turn comes. A chat holds one goal at a time.
   [Keep an objective across turns](./effort-and-goals.md#keep-an-objective-across-turns)
+- **`/side`** opens a side chat about this one without changing it.
+- **`/stop`** stops the chat's background processes; the current turn keeps
+  running. With none running, it says so.
 - **`/fork`** starts a separate chat from the latest saved message. Your
   current chat stays selected until you choose **Open fork**. If Desktop
   cannot confirm the result, send the command again from the same chat.
@@ -25,6 +33,9 @@ Select one; `/fork` and `/compact` are sent on their own.
   context. **Compacting…** shows while it runs; use the composer's main
   button to pause it. The full transcript stays in the chat, and an uncertain
   result leaves the previous model context in use.
+
+`/fork` and `/compact` wait for the agent: chosen while it works, they say
+they are unavailable until it finishes.
 
 ## Give the agent project instructions and skills
 

@@ -86,9 +86,14 @@ must be restored before continuing.
 ## Use commands and select skills
 
 The person can open the available command menu with `/` and select an action
-such as `/fork` or `/compact`. The product explains each
-command's effect and shows when it is unavailable. Commands that change settings
-or conversation state use the same controls as the corresponding buttons.
+such as `/fork` or `/compact`. The menu lists what the conversation can do,
+not what it can do this instant: it stays the same while the agent works, a
+request waits or input is in flight, so the person never has to guess why a
+command vanished. A command that must wait for the agent says so when chosen.
+A command that sets up the next request, such as planning or a goal, applies
+to that request, which waits in the queue while work is running. The product
+explains each command's effect. Commands that change settings or conversation
+state use the same controls as the corresponding buttons.
 
 A person can explicitly select an available skill by name through the composer's
 skill picker. Each surface identifies its commands and reference kinds so that
@@ -106,7 +111,10 @@ working within the granted permissions and resource limits. A turn's final
 summary can report progress while the goal remains active.
 
 Starting a goal is one explicit act: the person states the objective in their
-own words and sends it. The product derives the success conditions and default
+own words and sends it. Sent while the agent works or other requests wait, the
+goal start waits its turn in the queue like any request, visible as a goal, and
+the goal begins when that turn comes. A conversation holds one goal at a time,
+active or waiting to start. The product derives the success conditions and default
 limits from that statement; the person does not fill out a configuration form
 before work can begin. The message that started the goal stays recognizable as
 a goal in the transcript, including after reopening the chat.

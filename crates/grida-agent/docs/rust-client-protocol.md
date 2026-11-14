@@ -700,13 +700,22 @@ original authority and selected settings and carries no new user message.
 | `control`                             | `sessionId`, `requestId`, `expectedSessionRevision`, `expectedStateRevision`, `basis` and `change`. Actions are `pause`, `resume`, `clear` and `revise` with a replacement `objective`. Returns the original session and state revisions and any affected turn's journal position.                                                                                                       |
 | `recover`                             | `sessionId`. Reconsiders eligible work after a host restart. An interrupted dispatch remains bound to its original turn.                                                                                                                                                                                                                                                                 |
 
-Start requires idle work and an empty queue. Automatic follow-ups wait behind
-queued user prompts. Their acceptance, exact claim, and resource reservation
-commit together. Repeating the same start or control preserves its receipt.
+Start accepts the request as a queued input, also while a turn runs, other
+input is queued or admission is paused. The goal begins when that input is
+admitted in queue order: its first reservation, allowance and spending
+ceiling apply then, and an idle chat with an open queue admits it at once.
+Until then `inspect` reports no goal. A session holds one goal at a time:
+Start returns `session_goal_exists` while a goal is active, blocked or holds a
+reservation, and `session_goal_queued` while another goal start waits in the
+queue. Effort, named-child, wake-up, hook and spending rules are checked when
+Start is accepted. Automatic follow-ups wait behind queued user prompts. Their
+acceptance, exact claim, and resource reservation commit together. Repeating
+the same start or control preserves its receipt.
 Before the first claim, queue and input inspection return the captured goal
-under `settings.goalStart`. Use the exact queue withdrawal to remove it.
-Replacing a queued goal with a generic prompt returns
-`queued_goal_requires_withdrawal`.
+under `settings.goalStart`. A queued start is reordered, withdrawn and kept
+across a restart like any queued input, and waits for `resume-queue` when
+admission is paused. Use the exact queue withdrawal to remove it. Replacing a
+queued goal with a generic prompt returns `queued_goal_requires_withdrawal`.
 Pause and Resume can reacquire the same suspended turn. Revising or clearing
 an active goal cancels its reserved turn without discarding its uncertainty.
 Clear an active or blocked goal before replacing an earlier message in the

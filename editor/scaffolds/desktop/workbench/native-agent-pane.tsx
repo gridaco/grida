@@ -44,6 +44,7 @@ import {
 } from "@/kits/agent-chat";
 import {
   NativeChatController,
+  type NativeChatComposerCommand,
   type NativeChatEditorSurfaces,
   type NativeChatView,
 } from "@/lib/agent-chat/native-chat-controller";
@@ -99,9 +100,16 @@ import { NativeChatHeader, NativeModelPicker } from "./native-chat-controls";
 
 const NO_COMMANDS: ComposerCatalog["commands"] = [];
 const COMMAND_DESCRIPTIONS = {
+  plan: "Plan before making changes",
+  goal: "Work toward a goal with automatic continuation",
+  side: "Open a side chat; this chat is unchanged",
+  stop: "Stop all background processes",
   compact: "Summarize earlier context while keeping the transcript",
   fork: "Create a separate chat from the latest committed message",
-};
+} satisfies Record<NativeChatComposerCommand, string>;
+/** Commands that take effect when chosen, before anything is sent. */
+const IMMEDIATE_COMMANDS: ReadonlySet<string> =
+  new Set<NativeChatComposerCommand>(["plan", "goal", "side", "stop"]);
 const MAX_DRAFT_BYTES = 512 * 1024;
 const APPROVAL_ACTION = {
   read_file: "Read file",
@@ -867,85 +875,22 @@ function NativeChatPane({
           autofocus={autofocus}
           catalog={catalog}
           className="@container"
-          commandActions={[
-            ...(bridge.submitInRegime &&
-            state.scope > 0 &&
-            !state.loading &&
-            !state.profileBusy &&
-            !state.steering &&
-            !state.acting
-              ? [
-                  {
-                    id: "plan",
-                    title: "plan",
-                    description: "Plan before making changes",
-                    standalone: true as const,
-                    run: () => controller.selectOperatingRegime("plan"),
-                  },
-                ]
-              : []),
-            ...(controller.canStartGoal
-              ? [
-                  {
-                    id: "goal",
-                    title: "goal",
-                    description:
-                      "Work toward a goal with automatic continuation",
-                    standalone: true as const,
-                    run: () => controller.selectGoalIntent(true),
-                  },
-                ]
-              : []),
-            ...(controller.canOpenSideChat
-              ? [
-                  {
-                    id: "side",
-                    title: "side",
-                    description: "Open a side chat; this chat is unchanged",
-                    standalone: true as const,
-                    run: () => controller.openSideChat(),
-                  },
-                ]
-              : []),
-            ...(state.backgroundProcesses
-              ? [
-                  {
-                    id: "stop",
-                    title: "stop",
-                    description: "Stop all background processes",
-                    standalone: true as const,
-                    run: () => controller.stopBackgroundProcesses(),
-                  },
-                ]
-              : []),
-            ...controller.commandChoices.map(
-              (command): ComposerCommandAction => ({
-                id: command,
-                title: command,
-                description: COMMAND_DESCRIPTIONS[command],
-                standalone: true,
-                run: () => controller.runCommand(command),
-              })
-            ),
-          ]}
+          commandActions={controller.composerCommands.map(
+            (command): ComposerCommandAction => ({
+              id: command,
+              title: command,
+              description: COMMAND_DESCRIPTIONS[command],
+              standalone: true,
+              run: () => controller.runComposerCommand(command),
+            })
+          )}
           onCommandSelect={(command) => {
-            if (command.id === "plan") {
-              controller.selectOperatingRegime("plan");
-              return true;
-            }
-            if (command.id === "goal") {
-              controller.selectGoalIntent(true);
-              return true;
-            }
-            if (command.id === "side") {
-              void controller.openSideChat().catch(() => {});
-              return true;
-            }
-            if (command.id === "stop" && state.backgroundProcesses) {
-              void controller.stopBackgroundProcesses().catch(() => {});
-              return true;
-            }
-            return false;
+            const chosen = controller.composerCommands.find(
+              (listed) => listed === command.id
+            );
+            if (!chosen || !IMMEDIATE_COMMANDS.has(chosen)) return false;
+            void controller.runComposerCommand(chosen).catch(() => {});
+            return true;
           }}
           attachments={
             state.attachmentDraft &&
@@ -1078,7 +1023,7 @@ function NativeChatPane({
                   )}
                   {bridge.submitInRegime && (
                     <DropdownMenuItem
-                      disabled={state.acting || state.steering}
+                      disabled={state.acting}
                       onSelect={() =>
                         controller.selectOperatingRegime(
                           state.operatingRegime === "plan" ? "act" : "plan"

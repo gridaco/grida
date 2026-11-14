@@ -772,8 +772,10 @@ In Desktop, start a goal with `/goal` or **+ → Goal**.
 
 Clients can set separate success criteria, allowances, manual continuation,
 named reviewers, a spending limit and a check-in through the goal protocol.
-Start a goal in an idle chat with an empty queue. Supply an objective and its
-success criteria. Separate allowances for work turns and inference steps are
+Supply an objective and its success criteria. A goal started while the agent
+works, or while messages wait, joins the queue and begins when its turn comes;
+until then the queue shows it as a goal. A chat holds one goal at a time, so
+a second start is refused while a goal is set or waiting to start. Separate allowances for work turns and inference steps are
 optional; without them the goal gets eight work turns and 64 inference steps.
 Opt in to automatic continuation when you start the goal. The next reserved
 turn follows any prompts already in the queue. The agent waits if it needs

@@ -656,7 +656,7 @@ pub(super) async fn wait_for_snapshot(
     .unwrap()
 }
 
-fn queue_ids(snapshot: &Value) -> Vec<&str> {
+pub(super) fn queue_ids(snapshot: &Value) -> Vec<&str> {
     snapshot["queue"]
         .as_array()
         .unwrap()

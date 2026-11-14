@@ -1,5 +1,5 @@
 use super::lifecycle::{
-    prompt_request, queue_basis, session_snapshot, task_basis, terminate_shared_server,
+    prompt_request, queue_basis, queue_ids, session_snapshot, task_basis, terminate_shared_server,
     wait_for_snapshot,
 };
 use super::*;
@@ -1485,5 +1485,320 @@ async fn explicit_goal_resume_keeps_the_same_turn_and_replays_controls() {
     assert!(!cleared.paused);
     assert_eq!(cleared.reservation.unwrap().uncertain_steps, Some(2));
     host.shutdown().await.unwrap();
+    endpoint.done().await;
+}
+
+fn queued_goal_start(session: &str, input: &str) -> Value {
+    json!({
+        "sessionId":session,"inputId":input,
+        "prompt":[{"type":"text","text":"Prepare the export"}],
+        "goal":{
+            "objective":{"description":"Prepare the export","criteria":["The exported file opens"]},
+            "allowance":{"work_turns":1,"inference_steps":2},"automatic":false
+        }
+    })
+}
+
+fn last_content(request: &Value) -> &Value {
+    &request["messages"].as_array().unwrap().last().unwrap()["content"]
+}
+
+/// A goal started while the chat is busy waits in the queue as a goal start
+/// and starts its goal only when admitted, in queue order.
+#[tokio::test]
+async fn a_goal_started_while_the_chat_is_busy_starts_in_queue_order() {
+    let (release_first, first_held) = tokio::sync::oneshot::channel();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Release("First answer", first_held),
+        Reply::Finished("Earlier queued answer"),
+        Reply::Finished("Goal work"),
+        Reply::Finished("Later queued answer"),
+    ])
+    .await;
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let workspace = TempDir::new().unwrap();
+    let (child, url) = shared_server(&state, &endpoint.url).await;
+    let mut client = goal_client(&url, true, false).await;
+    let new = ws_rpc(
+        &mut client,
+        2,
+        "session/new",
+        json!({"cwd":workspace.path(),"mcpServers":[]}),
+    )
+    .await;
+    let session = new["result"]["sessionId"].as_str().unwrap();
+    let selector = json!({"sessionId":session});
+    let started = ws_rpc(
+        &mut client,
+        3,
+        "_co.grida/session/submit",
+        prompt_request(session, "first", "First"),
+    )
+    .await;
+    assert_eq!(started["result"]["disposition"], "claimed", "{started}");
+    assert_eq!(last_content(&endpoint.request().await), "First");
+    let earlier = ws_rpc(
+        &mut client,
+        4,
+        "_co.grida/session/enqueue",
+        prompt_request(session, "earlier", "Earlier"),
+    )
+    .await;
+    assert_eq!(earlier["result"]["disposition"], "queued", "{earlier}");
+
+    let start = queued_goal_start(session, "busy-goal");
+    let accepted = ws_rpc(&mut client, 5, "_co.grida/goal/start", start.clone()).await;
+    assert_eq!(accepted["result"]["disposition"], "queued", "{accepted}");
+    let retry = ws_rpc(&mut client, 6, "_co.grida/goal/start", start).await;
+    assert_eq!(retry["result"], accepted["result"]);
+    let second = ws_rpc(
+        &mut client,
+        7,
+        "_co.grida/goal/start",
+        queued_goal_start(session, "second-goal"),
+    )
+    .await;
+    assert_eq!(second["error"]["data"], "session_goal_queued", "{second}");
+    let later = ws_rpc(
+        &mut client,
+        8,
+        "_co.grida/session/enqueue",
+        prompt_request(session, "later", "Later"),
+    )
+    .await;
+    assert_eq!(later["result"]["disposition"], "queued", "{later}");
+    let snapshot = session_snapshot(&mut client, session).await;
+    assert_eq!(queue_ids(&snapshot), ["earlier", "busy-goal", "later"]);
+    assert_eq!(
+        snapshot["queue"][1]["settings"]["goalStart"]["objective"]["description"],
+        "Prepare the export"
+    );
+    assert!(snapshot["queue"][0]["settings"]["goalStart"].is_null());
+    let waiting = ws_rpc(&mut client, 9, "_co.grida/goal/inspect", selector.clone()).await;
+    assert!(waiting["result"]["goal"].is_null(), "{waiting}");
+
+    release_first.send(()).unwrap();
+    assert_eq!(last_content(&endpoint.request().await), "Earlier");
+    let goal_request = endpoint.request().await;
+    assert!(goal_request.to_string().contains("Prepare the export"));
+    assert!(!goal_request.to_string().contains("Later"));
+    assert_eq!(last_content(&endpoint.request().await), "Later");
+    let settled = wait_for_snapshot(&mut client, session, |snapshot| {
+        snapshot["current"].is_null() && queue_ids(snapshot).is_empty()
+    })
+    .await;
+    assert_eq!(settled["latest"]["status"], "succeeded");
+    let started = ws_rpc(&mut client, 10, "_co.grida/goal/inspect", selector).await;
+    let goal = &started["result"]["goal"];
+    assert_eq!(goal["basis"]["goal"], "busy-goal", "{started}");
+    assert_eq!(goal["spent"]["work_turns"], 1);
+    let refused = ws_rpc(
+        &mut client,
+        11,
+        "_co.grida/goal/start",
+        queued_goal_start(session, "third-goal"),
+    )
+    .await;
+    assert_eq!(refused["error"]["data"], "session_goal_exists", "{refused}");
+    drop(client);
+    terminate_shared_server(child).await;
+    endpoint.done().await;
+}
+
+/// A queued goal start is edited, paused and retained like other queued
+/// inputs: it can be reordered or withdrawn, it is accepted while the queue
+/// is paused, and it survives a host restart until the queue resumes.
+#[tokio::test]
+async fn a_queued_goal_start_follows_the_queue_contract_across_restart() {
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Hold("Working."),
+        Reply::Finished("Goal work"),
+        Reply::Finished("Queued answer"),
+    ])
+    .await;
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let workspace = TempDir::new().unwrap();
+    let (child, url) = shared_server(&state, &endpoint.url).await;
+    let mut client = goal_client(&url, true, false).await;
+    let new = ws_rpc(
+        &mut client,
+        2,
+        "session/new",
+        json!({"cwd":workspace.path(),"mcpServers":[]}),
+    )
+    .await;
+    let session = new["result"]["sessionId"].as_str().unwrap();
+    let started = ws_rpc(
+        &mut client,
+        3,
+        "_co.grida/session/submit",
+        prompt_request(session, "first", "First"),
+    )
+    .await;
+    assert_eq!(started["result"]["disposition"], "claimed", "{started}");
+    endpoint.request().await;
+    let queued = ws_rpc(
+        &mut client,
+        4,
+        "_co.grida/session/enqueue",
+        prompt_request(session, "message", "Queued message"),
+    )
+    .await;
+    assert_eq!(queued["result"]["disposition"], "queued", "{queued}");
+    let withdrawn_start = queued_goal_start(session, "withdrawn-goal");
+    let accepted = ws_rpc(
+        &mut client,
+        5,
+        "_co.grida/goal/start",
+        withdrawn_start.clone(),
+    )
+    .await;
+    assert_eq!(accepted["result"]["disposition"], "queued", "{accepted}");
+
+    let snapshot = session_snapshot(&mut client, session).await;
+    let reordered = ws_rpc(
+        &mut client,
+        6,
+        "_co.grida/session/reorder",
+        json!({
+            "queue":queue_basis(&snapshot, session, "goal-first"),
+            "inputIds":["withdrawn-goal","message"]
+        }),
+    )
+    .await;
+    assert_eq!(
+        reordered["result"]["requestId"], "goal-first",
+        "{reordered}"
+    );
+    let snapshot = session_snapshot(&mut client, session).await;
+    assert_eq!(queue_ids(&snapshot), ["withdrawn-goal", "message"]);
+    let replaced = ws_rpc(
+        &mut client,
+        7,
+        "_co.grida/session/replace",
+        json!({
+            "queue":queue_basis(&snapshot, session, "replace-goal"),
+            "inputId":"withdrawn-goal","replacementInputId":"replacement",
+            "prompt":[{"type":"text","text":"Something else"}],
+        }),
+    )
+    .await;
+    assert_eq!(
+        replaced["error"]["data"], "queued_goal_requires_withdrawal",
+        "{replaced}"
+    );
+    let withdrawn = ws_rpc(
+        &mut client,
+        8,
+        "_co.grida/session/withdraw",
+        json!({"queue":queue_basis(&snapshot, session, "withdraw-goal"),"inputId":"withdrawn-goal"}),
+    )
+    .await;
+    assert_eq!(
+        withdrawn["result"]["requestId"], "withdraw-goal",
+        "{withdrawn}"
+    );
+    let replayed = ws_rpc(&mut client, 9, "_co.grida/goal/start", withdrawn_start).await;
+    assert_eq!(replayed["result"]["disposition"], "withdrawn", "{replayed}");
+
+    let snapshot = session_snapshot(&mut client, session).await;
+    assert_eq!(queue_ids(&snapshot), ["message"]);
+    let stopped = ws_rpc(
+        &mut client,
+        10,
+        "_co.grida/session/stop",
+        task_basis(&snapshot, session, "stop-first"),
+    )
+    .await;
+    assert_eq!(stopped["result"]["requestId"], "stop-first", "{stopped}");
+    let paused = wait_for_snapshot(&mut client, session, |snapshot| {
+        snapshot["current"].is_null()
+    })
+    .await;
+    assert_eq!(paused["admissionPaused"], true);
+    let accepted = ws_rpc(
+        &mut client,
+        11,
+        "_co.grida/goal/start",
+        queued_goal_start(session, "paused-goal"),
+    )
+    .await;
+    assert_eq!(accepted["result"]["disposition"], "queued", "{accepted}");
+    let refused = ws_rpc(
+        &mut client,
+        12,
+        "_co.grida/goal/start",
+        queued_goal_start(session, "another-goal"),
+    )
+    .await;
+    assert_eq!(refused["error"]["data"], "session_goal_queued", "{refused}");
+    let snapshot = session_snapshot(&mut client, session).await;
+    assert_eq!(queue_ids(&snapshot), ["message", "paused-goal"]);
+    let reordered = ws_rpc(
+        &mut client,
+        13,
+        "_co.grida/session/reorder",
+        json!({
+            "queue":queue_basis(&snapshot, session, "paused-goal-first"),
+            "inputIds":["paused-goal","message"]
+        }),
+    )
+    .await;
+    assert_eq!(
+        reordered["result"]["requestId"], "paused-goal-first",
+        "{reordered}"
+    );
+    drop(client);
+    terminate_shared_server(child).await;
+
+    let (child, url) = shared_server(&state, &endpoint.url).await;
+    let mut client = goal_client(&url, true, false).await;
+    let load = ws_rpc(
+        &mut client,
+        2,
+        "session/load",
+        json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]}),
+    )
+    .await;
+    assert!(load.get("result").is_some(), "{load}");
+    let reopened = session_snapshot(&mut client, session).await;
+    assert_eq!(queue_ids(&reopened), ["paused-goal", "message"]);
+    assert_eq!(reopened["admissionPaused"], true);
+    assert_eq!(
+        reopened["queue"][0]["settings"]["goalStart"]["allowance"],
+        json!({"work_turns":1,"inference_steps":2})
+    );
+    let selector = json!({"sessionId":session});
+    let waiting = ws_rpc(&mut client, 3, "_co.grida/goal/inspect", selector.clone()).await;
+    assert!(waiting["result"]["goal"].is_null(), "{waiting}");
+    let resumed = ws_rpc(
+        &mut client,
+        4,
+        "_co.grida/session/resume-queue",
+        queue_basis(&reopened, session, "resume-goal"),
+    )
+    .await;
+    assert_eq!(resumed["result"]["requestId"], "resume-goal", "{resumed}");
+    assert!(
+        endpoint
+            .request()
+            .await
+            .to_string()
+            .contains("Prepare the export")
+    );
+    assert_eq!(last_content(&endpoint.request().await), "Queued message");
+    wait_for_snapshot(&mut client, session, |snapshot| {
+        snapshot["current"].is_null() && queue_ids(snapshot).is_empty()
+    })
+    .await;
+    let started = ws_rpc(&mut client, 5, "_co.grida/goal/inspect", selector).await;
+    assert_eq!(
+        started["result"]["goal"]["basis"]["goal"], "paused-goal",
+        "{started}"
+    );
+    drop(client);
+    terminate_shared_server(child).await;
     endpoint.done().await;
 }

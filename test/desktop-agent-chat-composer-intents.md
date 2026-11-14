@@ -27,6 +27,9 @@ starting; cancelling customization keeps the unsent intent.
 The compact sidebar keeps history and chat actions in its header, with model
 selection beside Send. Narrow layouts retain Send and accessible icon controls.
 A connection must finish starting before its commands become available.
+After that, the `/` menu lists the same commands whether the chat is idle or
+the agent is working: a command that has to wait says so when chosen instead
+of disappearing.
 
 ## Steps
 
@@ -81,7 +84,27 @@ A connection must finish starting before its commands become available.
    A queue left waiting with nothing paused (for example after a restart)
    shows **Queued messages are waiting** instead. Starting a goal in a new chat
    shows only the goal's **Starting goal** row, never a paused queue.
-10. The ring beside the model picker shows context use once the model's window
+10. Commands during a running turn. Start a turn that takes a while, then type
+    `/` with the turn still running. The menu lists the same commands as in an
+    idle chat (`/plan`, `/goal`, `/side`, and `/stop`, `/compact`, `/fork`
+    where offered); queueing a message or turning steering on does not change
+    the list.
+    10a. Choose `/plan`, type `Investigate the export` and send. The message
+    queues above the composer as **Plan · Investigate the export**; it runs in
+    Plan after the current turn. With steering on, choosing `/plan` turns
+    steering off and a status line says the Plan message waits in the queue.
+    10b. Choose `/goal`, type an objective and send. The objective appears in
+    the queue as **Goal: …** and the strip reads **Goal waits in the queue**.
+    Choosing `/goal` again says a goal is already waiting. Remove the queued
+    goal with its trash button: no goal starts. Send a goal again during the
+    turn and leave it: when the running turn and any earlier queued messages
+    finish, the goal starts and the strip reads **Pursuing goal**.
+    10c. Choose `/fork`, then `/compact`, while the turn runs. Each shows that
+    it is unavailable while the agent is working, and nothing starts. Typing
+    `/compact` and sending it behaves the same.
+    10d. In a chat with no background process running, choose `/stop`. A status
+    line says no background processes are running; the turn keeps going.
+11. The ring beside the model picker shows context use once the model's window
     is known; hover for the percentage, click for the breakdown. Scrolling the
     chat fades content at the top and bottom edges. No **Execution details**
     panel appears under turns.
