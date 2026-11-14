@@ -94,7 +94,7 @@ describe("@grida/daemon public API", () => {
   });
 
   describe("server subpath", () => {
-    it("exposes DaemonServer and the tenant seam (#927)", () => {
+    it("exposes DaemonServer and the tenant seam", () => {
       const httpAccess: DaemonHttpAccess = {
         allowed_origins: ["https://client.example"],
         allowed_referer_paths: ["/client"],

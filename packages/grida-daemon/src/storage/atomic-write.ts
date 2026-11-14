@@ -28,7 +28,7 @@ export type AtomicWriteOptions = {
    */
   ensure_dir?: boolean;
   /**
-   * Last-chance precondition (issue #805 optimistic concurrency): invoked
+   * Last-chance precondition for optimistic concurrency: invoked
    * AFTER the tmp file is staged and immediately BEFORE the atomic rename.
    * Throw to abort the publish — the staged tmp file is cleaned up and the
    * error propagates. Running it here (rather than as a caller-side preflight)

@@ -76,7 +76,7 @@ function parseRange(
 }
 
 /**
- * Extension → media MIME for the streamed file route (#924). MIME ownership
+ * Extension → media MIME for the streamed file route. MIME ownership
  * lives server-side here — the route sets `Content-Type` on the response —
  * rather than on a client-built `data:` URL (the base64 fallback still infers
  * its own). Unknown extensions fall back to `application/octet-stream`; the
