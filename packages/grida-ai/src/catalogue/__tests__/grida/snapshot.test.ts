@@ -397,7 +397,7 @@ describe("models.snapshot.view", () => {
     expect(resolved?.contextWindow).toBe(100_000);
   });
 
-  it("still resolves registered custom models below the catalogue (#806)", () => {
+  it("still resolves registered custom models below the catalogue", () => {
     const view = snapshot.view(
       snapshot.parse(wire(snapshotOf([spec("acme/only")])))!
     );

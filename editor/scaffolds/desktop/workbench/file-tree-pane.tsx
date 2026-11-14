@@ -165,7 +165,7 @@ function FileTreePaneInner({
     [reload]
   );
 
-  // External file changes (issue #805): surgically reload the parent dir
+  // External file changes: surgically reload the parent dir
   // of each changed path. Events arrive already coalesced by the host;
   // we dedupe by parent so one `git checkout` touching many files reloads
   // each affected (and currently-expanded) folder once. `reload` no-ops

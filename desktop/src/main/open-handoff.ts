@@ -25,7 +25,7 @@
  */
 
 import path from "node:path";
-// GRIDA-SEC-005 / #955 — shared, electron-free scheme set (both `grida` and
+// GRIDA-SEC-005 — shared, electron-free scheme set (both `grida` and
 // `grida-dev`; see `../deep-link`). Classify both so this Windows/Linux argv path
 // stays env-agnostic, mirroring the protocol router; `routeDeepLink` re-validates.
 import { DEEP_LINK_SCHEMES } from "../deep-link";

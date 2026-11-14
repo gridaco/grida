@@ -116,7 +116,7 @@ type Tile = {
 };
 
 /**
- * Desktop video generation playground (#908) — the video sibling of the image
+ * Desktop video generation playground — the video sibling of the image
  * playground. A hairline gallery (visible even empty), a minimal header, and a
  * floating prompt composer. Each submit prepends a shimmering cell that fills in
  * with a playable clip when the video resolves. Generation runs in the agent

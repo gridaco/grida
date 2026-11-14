@@ -1,5 +1,5 @@
 /**
- * GRIDA-SEC-005 / #955 — the deep-link URL schemes Grida owns, in one place.
+ * GRIDA-SEC-005 — the deep-link URL schemes Grida owns, in one place.
  *
  * `grida` is production; `grida-dev` is local dev/insiders (a dev build registers
  * its own scheme so it never fights an installed production Grida over a single OS

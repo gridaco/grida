@@ -1,6 +1,6 @@
 /**
  * The browser-engine system harness (WG spec docs/wg/ai/agent/daemon.md
- * §conformance, issue #798).
+ * §conformance).
  *
  * Node tests can forge any header, so they cannot prove what a browser
  * may actually do against the daemon perimeter. This config runs

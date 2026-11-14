@@ -15,7 +15,7 @@ import {
 import { MediaModelPickerTrigger } from "../shared/media-model-picker-trigger";
 
 /**
- * Provider-hidden video-model picker (#908). Lists only the curated
+ * Provider-hidden video-model picker. Lists only the curated
  * (`listed: true`) video models by friendly label — never by provider. The
  * agent host resolves the provider per request from the user's connected key.
  */

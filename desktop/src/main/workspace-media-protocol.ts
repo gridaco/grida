@@ -1,5 +1,5 @@
 /**
- * GRIDA-SEC-004 — `grida-workspace://` privileged media protocol (#924).
+ * GRIDA-SEC-004 — `grida-workspace://` privileged media protocol.
  *
  * The desktop workspace media viewer renders `<img>` / `<video src>` pointing
  * at `grida-workspace://workspace/<workspaceId>/<relPath>` instead of inlining

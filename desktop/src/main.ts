@@ -102,7 +102,7 @@ app.commandLine.appendSwitch("js-flags", "--expose-gc");
 // #endregion chrome flags
 
 app.setName(RUNTIME_APP_NAME);
-// GRIDA-SEC-005 / #955 — register this build's channel-specific deep-link scheme
+// GRIDA-SEC-005 — register this build's channel-specific deep-link scheme
 // (`grida-dev` for local builds, `grida` for production) so dev and an installed
 // production Grida don't fight over one scheme. On macOS the reliable, declarative
 // registration is the dev bundle's CFBundleURLTypes (dev: prepare-dev-electron-
@@ -121,8 +121,8 @@ if (process.defaultApp && process.argv.length >= 2) {
   app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME);
 }
 
-// GRIDA-SEC-004 — register the `grida-workspace://` privileged media scheme
-// (#924). `registerSchemesAsPrivileged` MUST run before `app.whenReady()`; the
+// GRIDA-SEC-004 — register the `grida-workspace://` privileged media scheme.
+// `registerSchemesAsPrivileged` MUST run before `app.whenReady()`; the
 // matching `protocol.handle` is installed in the `ready` handler once the
 // sidecar is up. See `main/workspace-media-protocol.ts`.
 registerWorkspaceMediaScheme();
@@ -963,7 +963,7 @@ app.on("ready", async () => {
         `[grida] services sidecar ready on 127.0.0.1:${servicesSidecarInfo.port}`
       );
       // Now that the sidecar is up, serve `grida-workspace://` media requests
-      // by proxying to its streamed `/workspaces/file` route (#924).
+      // by proxying to its streamed `/workspaces/file` route.
       handleWorkspaceMediaProtocol(workspaceCatalog);
       markAuthenticatedEntryReady();
       return true;

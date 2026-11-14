@@ -66,7 +66,7 @@ export namespace protocol_router {
       console.warn("[grida] malformed deep link ignored");
       return { kind: "ignored" };
     }
-    // GRIDA-SEC-005 / #955 — accept every scheme Grida owns (`grida:` prod,
+    // GRIDA-SEC-005 — accept every scheme Grida owns (`grida:` prod,
     // `grida-dev:` local); the OS delivers only the scheme registered by this
     // build, while identical parsing keeps the boundary env-agnostic.
     if (!DEEP_LINK_SCHEMES.some((scheme) => parsed.protocol === `${scheme}:`)) {

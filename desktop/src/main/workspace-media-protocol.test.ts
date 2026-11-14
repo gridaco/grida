@@ -65,7 +65,7 @@ import {
 // decode contract — especially that the workspaceId survives verbatim, which is
 // WHY both ids live in the path (a host-carried id would be lowercased by
 // Chromium's standard-URL canonicalization and stop matching the registry).
-describe("parseWorkspaceMediaUrl (#924)", () => {
+describe("parseWorkspaceMediaUrl", () => {
   it("parses workspaceId from the first path segment and joins the rest as relPath", () => {
     expect(
       parseWorkspaceMediaUrl("grida-workspace://workspace/ws123/dir/pic.png")

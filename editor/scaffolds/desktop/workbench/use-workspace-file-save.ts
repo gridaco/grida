@@ -1,6 +1,6 @@
 /**
  * mtime-safe save for an `@grida/svg-editor` document backed by a workspace
- * file (issue #805). Extracted from `editor-pane-svg-editor.tsx` so the
+ * file. Extracted from `editor-pane-svg-editor.tsx` so the
  * subtle conflict / echo-suppression logic lives once and is shared by both
  * the workbench SVG pane and the desktop slides surface — two editors over the
  * same `{workspaceId, relPath}` contract that must not drift.
@@ -74,7 +74,7 @@ export function useWorkspaceFileSave({
   );
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  // The conflict-detection token (issue #805): the mtime we last observed on
+  // The conflict-detection token: the mtime we last observed on
   // disk for this file — seeded at load, advanced on every successful write /
   // reload. A ref (not state) so `onSave` stays referentially stable and the
   // Cmd+S listener doesn't re-bind on each save.
@@ -174,7 +174,7 @@ export function useWorkspaceFileSave({
       setSaveError(null);
       try {
         const r = await workspacesNs.readFile(workspaceId, relPath);
-        // Echo suppression (issue #805): our own save produces a watcher
+        // Echo suppression: our own save produces a watcher
         // `changed` event for this same file, which lands here once the buffer
         // is clean again. A dependency-only refresh deliberately bypasses this:
         // the source file is unchanged, but its host projection is not.
@@ -222,7 +222,7 @@ export function useWorkspaceFileSave({
     void commitWrite(conflict.content, conflict.snapshot, {});
   }, [conflict, commitWrite]);
 
-  // React to external changes to THIS file (issue #805). When the buffer is
+  // React to external changes to THIS file. When the buffer is
   // clean we take the new bytes seamlessly; when it's dirty we keep the user's
   // edits and let the save-time guard surface the conflict (the stale mtime
   // makes the next Cmd+S reject) — VSCode's non-dirty-reload / dirty-defer

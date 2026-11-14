@@ -7,7 +7,7 @@
  *
  *   - Markdown (.md, .markdown) → Streamdown default rendering.
  *   - Image (.png/.jpg/.gif/.webp/…) / Video (.mp4/.webm/.mov/…) → on desktop,
- *     streamed straight from the `grida-workspace://` privileged scheme (#924):
+ *     streamed straight from the `grida-workspace://` privileged scheme:
  *     size-independent, Range-capable (video seeking), no base64. On hosts
  *     without that scheme we fall back to the capped
  *     base64 reader (`readFileBytes` → `<img/video data:…>`).
@@ -113,7 +113,7 @@ function LoadingState({ relPath }: { relPath: string }) {
 }
 
 /** Shown under the error message only on the capped readers (markdown/text and
- * the base64 media fallback). The streamed media path (#924) has no cap, so it
+ * the base64 media fallback). The streamed media path has no cap, so it
  * passes no hint. */
 const SIDECAR_CAP_HINT =
   "The viewer reads text files up to 1 MiB and buffered media up to 8 MiB.";
@@ -193,7 +193,7 @@ function inferMime(relPath: string): string {
 }
 
 /**
- * Image/video viewers (#924). On desktop the host exposes a streamable
+ * Image/video viewers. On desktop the host exposes a streamable
  * `media_url` (`grida-workspace://`, proxied to the sidecar's Range-capable
  * `/workspaces/file` route) — the `<img>/<video>` points at it directly, so the
  * viewer is size-independent (no 1 MiB base64 cap) and video seeking works. On

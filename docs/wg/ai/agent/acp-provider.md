@@ -228,8 +228,6 @@ If the data clears, keep "forever" reversible until the bet is proven:
   [MCP and Connectors](./mcp.md), [Local Daemon](./daemon.md),
   [Components / sessions](./components.md#sessions), [Master / input during work and stopping](./master.md#input-during-work-and-stopping),
   [index](./index.md).
-- **Discussion:** the open provider-class decision is discussed in
-  [gridaco/grida#813](https://github.com/gridaco/grida/issues/813).
 - **External (auth/ToS facts):** the [Agent Client
   Protocol](https://agentclientprotocol.com/); OpenAI endorses Codex on a
   ChatGPT subscription; Claude works _de facto_ via the community

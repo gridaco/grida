@@ -1,5 +1,5 @@
 /**
- * Shared save-state chrome for editable workspace panes (issue #805).
+ * Shared save-state chrome for editable workspace panes.
  *
  * The dirty badge, save-error toast, and save-conflict resolver are
  * editor-agnostic — the SVG editor and the CodeMirror text/markdown editor

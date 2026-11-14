@@ -275,7 +275,7 @@ export namespace servicesSidecarClient {
    * Low-level authenticated fetch against the sidecar from the main process —
    * same Basic-Auth + forged Origin/Referer as every call above, returning the
    * raw `Response` so the caller can stream the body straight through. Used by
-   * the `grida-workspace://` media protocol handler (#924) to proxy the
+   * the `grida-workspace://` media protocol handler to proxy the
    * streamed `GET /workspaces/file` route (forwarding the renderer's Range
    * header) WITHOUT the renderer ever holding the credential. Throws
    * {@link ServicesSidecarNotReadyError} before the sidecar is up.

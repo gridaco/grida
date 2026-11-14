@@ -1,5 +1,5 @@
 /**
- * Workspace file-change watcher host (issue #805).
+ * Workspace file-change watcher host.
  *
  * Owns the OS-level recursive watch behind `bridge.workspaces.
  * subscribe_changes`. When a workspace file changes on disk outside the
@@ -232,7 +232,7 @@ type WatchState = {
 const watches = new Map<string, WatchState>();
 
 /**
- * In-flight `startWatch` promise per root (issue #805). Serializes startup so
+ * In-flight `startWatch` promise per root. Serializes startup so
  * concurrent subscribers to the same root share ONE OS watch attempt: the
  * first subscriber starts it, later subscribers (and any sub/unsub churn that
  * lands while the OS `subscribe()` is in flight) await the same promise rather
