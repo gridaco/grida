@@ -102,6 +102,8 @@ async fn headless_selected_skills_apply_without_granting_tool_capabilities() {
     assert!(messages.contains("live render of what you wrote"));
     assert!(!messages.contains("also_in_load"));
     assert!(!messages.contains("Build a Grida slides deck"));
+    // Without workspace tools the turn lists no skills to read on its own.
+    assert!(!messages.contains("## Skills"));
     assert!(request.get("tools").is_none());
     endpoint.done().await;
 }
@@ -193,6 +195,109 @@ async fn selected_project_skill_supporting_files_use_existing_read_authority() {
         endpoint.request().await;
     }
     endpoint.done().await;
+}
+
+fn offered(request: &Value, name: &str) -> bool {
+    request["tools"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .any(|tool| tool["function"]["name"] == name)
+}
+
+#[tokio::test]
+async fn listed_skills_are_read_by_the_model_without_a_selection() {
+    let fixture = super::approvals::Fixture::new(false);
+    let mut profile: Value =
+        serde_json::from_slice(&std::fs::read(&fixture.profile).unwrap()).unwrap();
+    profile["directories"][0]["write"] = json!("allow");
+    std::fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
+    let directory = fixture.primary.join(".agents/skills/deck-notes");
+    std::fs::create_dir_all(&directory).unwrap();
+    std::fs::write(
+        directory.join("SKILL.md"),
+        "---\nname: deck-notes\ndescription: Add speaker notes to a deck.\n---\nWORKSPACE NOTES WORKFLOW\n",
+    )
+    .unwrap();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Choose(Box::new(|request| {
+            let messages = request["messages"].to_string();
+            assert!(messages.contains("## Skills"), "{messages}");
+            assert!(messages.contains("- slides: Build a Grida slides deck"));
+            assert!(messages.contains("(bundled; read with `read_skill`)"));
+            assert!(messages.contains(
+                "- deck-notes: Add speaker notes to a deck. (workspace; read `.agents/skills/deck-notes/SKILL.md`)"
+            ));
+            // Only names and descriptions are listed, never a skill's text.
+            assert!(!messages.contains("Today this is Grida's only slide format"));
+            assert!(!messages.contains("WORKSPACE NOTES WORKFLOW"));
+            assert!(offered(request, "read_skill"));
+            Reply::Tool("read_skill", r#"{"name":"slides"}"#)
+        })),
+        Reply::Choose(Box::new(|request| {
+            let messages = request["messages"].to_string();
+            assert!(messages.contains("Today this is Grida's only slide format"));
+            Reply::Tool("read_skill", r#"{"name":"deck-notes"}"#)
+        })),
+        Reply::Choose(Box::new(|request| {
+            let messages = request["messages"].to_string();
+            // A workspace skill is not served by the bundled reader.
+            assert!(messages.contains("skill_not_listed"), "{messages}");
+            Reply::Tool(
+                "read_file",
+                r#"{"path":".agents/skills/deck-notes/SKILL.md"}"#,
+            )
+        })),
+        Reply::Choose(Box::new(|request| {
+            assert!(
+                request["messages"]
+                    .to_string()
+                    .contains("WORKSPACE NOTES WORKFLOW")
+            );
+            // Follow the slides skill: one SVG slide, then the manifest.
+            Reply::Tool(
+                "write_file",
+                r##"{"path":"Tides.canvas/001.svg","content":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1920 1080\" width=\"1920\" height=\"1080\"><title>Cover</title><rect width=\"1920\" height=\"1080\" fill=\"#0b1220\"/></svg>"}"##,
+            )
+        })),
+        Reply::Tool(
+            "write_file",
+            r#"{"path":"Tides.canvas/.canvas.json","content":"{\"editor\":\"slides\",\"files\":[\"*.svg\"],\"documents\":[{\"src\":\"001.svg\",\"id\":\"cover\"}]}"}"#,
+        ),
+        Reply::Finished("Followed the slides and notes skills."),
+    ])
+    .await;
+    let output = timeout(
+        WAIT,
+        fixture
+            .process(&endpoint.url, "run")
+            .arg("--cwd")
+            .arg(&fixture.primary)
+            .args(["--prompt", "Make a three-slide deck about tides."])
+            .output(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    for _ in 0..6 {
+        endpoint.request().await;
+    }
+    endpoint.done().await;
+    let deck = fixture.primary.join("Tides.canvas");
+    let manifest: Value =
+        serde_json::from_slice(&std::fs::read(deck.join(".canvas.json")).unwrap()).unwrap();
+    assert_eq!(manifest["editor"], "slides");
+    assert_eq!(manifest["documents"][0]["src"], "001.svg");
+    assert!(
+        std::fs::read_to_string(deck.join("001.svg"))
+            .unwrap()
+            .contains("<title>Cover</title>")
+    );
 }
 
 #[tokio::test]

@@ -19,8 +19,9 @@ covered_by:
 
 ## Behavior
 
-Every file is a valid attachment. A PNG of up to 256 KiB and any other file of
-up to 256 KiB keep their direct paths. Any other file, of any type or size,
+Every file is a valid attachment. A PNG of up to 256 KiB, when the chat's
+model takes images, and any other file of up to 256 KiB keep their direct
+paths. A PNG the model cannot take goes by reference. Any other file, of any type or size,
 is attached by reference: the agent receives its name, type, size and
 location, never its bytes, and the reference grants nothing. A file inside the
 project is named by its project path and the file tools can read it; a file
@@ -42,11 +43,15 @@ side chat tab.
    - Expected: the agent reads it with its file tools by its project path.
 4. Drop a JPEG photo.
    - Expected: it attaches by reference instead of asking for a PNG.
-5. Try to attach a file from the Desktop app's data folder (for example under
+5. Choose a model that does not take images and drop a small PNG.
+   - Expected: it attaches by reference. Pasting a PNG with no location on
+     disk shows "<model> can't take images here. Choose a model that supports
+     images to attach a PNG."
+6. Try to attach a file from the Desktop app's data folder (for example under
    `~/Library/Application Support/` for Grida) and send.
    - Expected: the send is refused with "This file is in Grida's private data
      and can't be attached." and the draft stays.
-6. Open a side chat tab and repeat step 2 there.
+7. Open a side chat tab and repeat step 2 there.
    - Expected: the same card and result.
 
 ## Notes

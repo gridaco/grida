@@ -468,15 +468,21 @@ fn lower_message(message: &Message, tools_supported: bool, output: &mut Vec<Valu
             // Plain compatible endpoints have no portable reasoning-input field.
             Content::Reasoning(_) if message.role == Role::Assistant => {}
             Content::ToolCall(call) if message.role == Role::Assistant && tools_supported => {
-                let ToolArguments::Json(arguments) = &call.arguments else {
-                    return Err(Error::new(
-                        ErrorKind::Unsupported,
-                        "unsupported_tool_format",
-                    ));
+                let arguments = match &call.arguments {
+                    ToolArguments::Json(arguments) => {
+                        serde_json::to_string(arguments).map_err(|_| {
+                            Error::new(ErrorKind::InvalidInput, "tool_argument_encoding_failed")
+                        })?
+                    }
+                    // The model's own text goes back with its failed result.
+                    ToolArguments::Malformed(text) => text.clone(),
+                    ToolArguments::Text(_) => {
+                        return Err(Error::new(
+                            ErrorKind::Unsupported,
+                            "unsupported_tool_format",
+                        ));
+                    }
                 };
-                let arguments = serde_json::to_string(arguments).map_err(|_| {
-                    Error::new(ErrorKind::InvalidInput, "tool_argument_encoding_failed")
-                })?;
                 calls.push(json!({ "id": short_identity("call", &call.id)?, "type": "function", "function": {
                     "name": function_name(&call.tool)?, "arguments": arguments
                 }}));

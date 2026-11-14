@@ -59,7 +59,7 @@ keeps image edits in private scratch.
 
 ```sh
 target/debug/grida-agent run --state-dir "$GRIDA_AGENT_STATE" \
-  --provider responses --endpoint "$GRIDA_AGENT_ENDPOINT" --model gpt-5.4 \
+  --provider responses --endpoint "$GRIDA_AGENT_ENDPOINT" --model gpt-6.1-sol \
   --credential-env OPENAI_API_KEY --input-png "$GRIDA_SELECTED_PNG" \
   --prompt 'Crop the image to the requested area.'
 ```
@@ -563,6 +563,13 @@ supplies a readable primary root. Project guidance comes from that root's
 `AGENTS.md`. The accepted input retains the exact versions it used. Later inputs
 resolve the current files, and stale explicit references require reselection.
 
+An input with workspace file tools (a `--permission-profile` whose primary root
+matches the working directory) also captures the skill catalog's names,
+descriptions and sources and lists them in the instructions. The model reads a
+listed bundled skill with `read_skill` and a listed project skill with its file
+tools at the listed workspace-relative path, then follows it. Subagent and
+funded Goal work list no skills.
+
 ## Filesystem services
 
 The private `workspace-file` process reads one span from a registered
@@ -616,8 +623,13 @@ at admission. Executors own quotas for their separate working areas and outputs.
 These private-storage helpers currently support macOS and Linux. The native
 host's tool composition supplies their grants and lifecycle.
 
-Private stdio ACP can submit a single validated PNG as part of an input when
-using the Responses `gpt-5.4` profile. The host keeps the original under the
+Private stdio ACP can submit a single validated PNG as part of an input on a
+Responses connection whose exact OpenAI model id is listed in
+`data/responses-png-models.json`: models whose published model and binding
+facts declare PNG input and tool calls, generated from the released Models
+package. The same connections, and listed OpenRouter PNG models on the saved
+OpenRouter route, offer `view_image`, because they can carry images in tool
+results. The host keeps the original under the
 private state directory and stores its immutable reference with the accepted
 input. Queued input and provider context can use the original after restart.
 An unsupported profile or unavailable original produces an error for the

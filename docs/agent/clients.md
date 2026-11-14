@@ -49,8 +49,10 @@ default. Use `--provider responses`, `--provider anthropic`, or
 HTTPS endpoints and loopback HTTP endpoints. When a credential is required,
 set it in an environment variable and select that variable with `--credential-env`.
 
-On macOS and Linux, private stdio ACP with `--provider responses --model gpt-5.4`
-also accepts one inline PNG up to 256 KiB per input. Supply the PNG bytes in
+On macOS and Linux, private stdio ACP with `--provider responses` and an
+OpenAI model whose published facts declare PNG input and tool calls (for
+example `--model gpt-6.1-sol`) also accepts one inline PNG up to 256 KiB per
+input. Other model names stay text-only. Supply the PNG bytes in
 the image content block. Accepted inputs keep the original in the private
 agent state directory so queued work can use it after a restart. The selected
 provider receives it when the conversation uses it. Chat history identifies
@@ -612,8 +614,10 @@ Reopening preserves the same file or identifies which copy is unavailable.
 
 ## View a workspace PNG headlessly
 
-On macOS and Linux, use a source-built host with the Responses `gpt-5.4`
-profile and a trusted workspace permission profile. Ask the agent to view
+On macOS and Linux, use a source-built host with a connection that can
+return images in tool results and a trusted workspace permission profile:
+`--provider responses` with an OpenAI model that takes PNG input, or a saved
+OpenRouter key with a listed OpenRouter model that takes PNG input. Ask the agent to view
 a PNG of up to 256 KiB by its relative path. Include the directory ID if
 the file is outside the primary folder. A folder configured to ask still
 requires approval for that exact read.
@@ -705,6 +709,10 @@ Repeat the flag to select more than one. Bundled skills include `dotcanvas`,
 `slides`, and `svg`. On Unix, a local run can also use skills in its selected
 project. An ACP host must explicitly allow reads from the primary project
 directory. Project skills override bundled skills with the same name.
+
+With a permission profile, the agent also sees each available skill's name
+and description and reads one when the request calls for it, without a
+selection.
 
 An accepted prompt keeps the skill and project instruction versions it used.
 Changes on disk apply to later prompts. If a saved skill selection has changed,

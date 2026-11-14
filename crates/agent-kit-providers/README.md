@@ -65,11 +65,16 @@ Message and call identities are scoped to the supplied inference attempt.
 Usage observations share that attempt identity. Missing usage stays absent.
 Cache-related counters retain their provider-specific meanings.
 
-Every adapter validates each emitted tool call's arguments as JSON before
-emitting the call. An unparseable call fails the attempt as an interrupted
-protocol error (`invalid_tool_arguments`) instead of reaching the model as a
-correctable error, so the turn ends without automatic correction. Returning a
-malformed call to the model is deliberately deferred.
+Every adapter parses each completed tool call's arguments before emitting the
+call. Arguments that are not one JSON object do not fail the attempt: the call
+is emitted with `ToolArguments::Malformed` carrying the text as received. The
+runtime gives such a call a failed `tool_arguments_malformed` result without
+admitting it to any tool, so the model can send the call again in a later step
+of the same turn; the turn's step limit bounds repeated failures. On replay,
+Chat Completions and Responses return the text the model wrote; Messages and
+Gemini, whose wire formats require an object, return an empty object beside the
+failed result. Incomplete calls (no terminal event) still interrupt the
+attempt.
 
 - `OpenAiCompatible` validates the configured output-token field and usage
   option. Completion requires a finish reason and `[DONE]`. It emits calls

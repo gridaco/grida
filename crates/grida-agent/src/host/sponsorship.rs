@@ -814,6 +814,7 @@ impl Host {
         captured.editor_presentation = false;
         captured.editor_svg_target = None;
         captured.guidance = None;
+        captured.skills = None;
         let mut assignment = Assignment::new(source.binding.turn.clone());
         if let Some(target) = target {
             assignment.named_sponsorship = Some(NamedSponsorship {
@@ -978,9 +979,10 @@ impl Host {
             let owner = permissions::ToolAuthority::bind(
                 execution.authorization.clone(),
                 Some(permissions.clone()),
-                permissions::AttachmentTools {
+                permissions::MaterialTools {
                     image: None,
                     file: None,
+                    skills: None,
                 },
                 None,
                 permissions::HookTools {

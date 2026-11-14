@@ -3352,6 +3352,71 @@ it("attaches any file: a large file goes by reference without reading its bytes"
   }
 });
 
+it("attaches a PNG by reference when the model cannot take images", async () => {
+  const { bridge, controller, sendReference, dropped } = referenceFixture();
+  bridge.acceptsPng = async () => false;
+  try {
+    await controller.select("chat-a");
+    const scope = controller.read().scope;
+    const png = dropped("poster.png", "image/png", 2048);
+    await controller.pickTransferredAttachment(scope, [
+      { kind: "file", file: png.file },
+    ]);
+    expect(controller.read()).toMatchObject({
+      attachmentNotice: null,
+      attachmentDraft: { kind: "reference", name: "poster.png" },
+    });
+    await controller.submit("Use this poster.");
+    expect(sendReference).toHaveBeenCalledExactlyOnceWith("chat-a", {
+      action: "submit",
+      inputId: expect.any(String),
+      text: "Use this poster.",
+      file: png.file,
+      mimeType: "image/png",
+      operatingRegime: "act",
+    });
+    expect(png.read).not.toHaveBeenCalled();
+  } finally {
+    vi.restoreAllMocks();
+    controller.disconnect();
+  }
+});
+
+it("names the model when a PNG has no way into the chat", async () => {
+  const { bridge, controller } = fixture();
+  const id = "d".repeat(64);
+  bridge.acceptsPng = async () => false;
+  bridge.profiles = async () => ({
+    active: id,
+    choices: [{ id, connection: "Local", model: "Text Fixture" }],
+    saved: [],
+  });
+  try {
+    controller.connect("chat-a");
+    await vi.waitFor(() => expect(controller.read().profiles?.active).toBe(id));
+    await vi.waitFor(() => expect(controller.read().loading).toBe(false));
+    const scope = controller.read().scope;
+    await controller.pickTransferredAttachment(scope, [
+      {
+        kind: "file",
+        file: {
+          name: "poster.png",
+          type: "image/png",
+          size: 8,
+          arrayBuffer: async () => new Uint8Array(8).buffer,
+        },
+      },
+    ]);
+    expect(controller.read()).toMatchObject({
+      attachmentDraft: null,
+      attachmentNotice:
+        "Text Fixture can't take images here. Choose a model that supports images to attach a PNG.",
+    });
+  } finally {
+    controller.disconnect();
+  }
+});
+
 it("shows a dropped .mov as a video card with its poster frame and duration", async () => {
   const { bridge, controller, sendReference, dropped } = referenceFixture();
   try {

@@ -44,12 +44,24 @@ project folder. Desktop workspace chats and source-built hosts follow it
 automatically. A message keeps the instructions it started with, and edits
 apply to later messages.
 
-Desktop does not offer a skill picker. From a source-built host, add
-`--skill svg` to `grida-agent run`, and repeat the flag for more skills. The
-bundled skills are `dotcanvas`, `slides` and `svg`. A project skill in
-`.agents/skills/<name>/SKILL.md` (or `.claude/skills/<name>/SKILL.md`)
-replaces a bundled skill with the same name. A selected project skill tells
-the agent where its folder is; reading supporting files there still needs the
+You don't have to pick a skill. In a chat that can use project files, such
+as a Desktop workspace chat, the agent sees each available skill's name and
+description. When you name a skill or ask for work a skill describes, for
+example "make a short deck about tides", the agent reads that skill's full
+instructions and follows them. It says which skill it is using. The bundled
+skills are `dotcanvas`, `slides` and `svg`. The agent reads a bundled skill
+from Grida itself and a project skill as a project file, under the chat's
+existing access. A skill adds guidance, never access.
+
+A project skill in `.agents/skills/<name>/SKILL.md` (or
+`.claude/skills/<name>/SKILL.md`) replaces a bundled skill with the same name.
+The list is saved with each message, so later skill edits apply to later
+messages.
+
+To choose a skill yourself from a source-built host, add `--skill svg` to
+`grida-agent run`, and repeat the flag for more skills. A selected skill's
+instructions go to the agent directly. A selected project skill tells the
+agent where its folder is; reading supporting files there still needs the
 chat's existing access. ACP clients can list and select skills through the
 skill catalog; if a saved selection has changed, refresh the catalog and
 select it again. [Use durable client operations](./clients.md#use-durable-client-operations)
@@ -71,8 +83,9 @@ Current limits:
 
 - The agent cannot render the SVG or HTML it writes to an image to check how
   it looks, so review visual results in the editor yourself.
-- If the model sends a tool request Grida cannot read, the turn ends; send a
-  follow-up message to continue.
+- If the model sends a tool request whose details Grida cannot read, the
+  agent is told the request could not be read and can send it again in the
+  same turn. Repeated failures end the turn at its step limit.
 
 ## Use tools from a local MCP server
 

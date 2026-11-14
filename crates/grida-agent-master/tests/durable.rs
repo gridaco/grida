@@ -126,6 +126,10 @@ enum Script {
     Tools,
     /// One reply that makes this many tool calls, then an answer.
     ParallelTools(usize),
+    /// Calls whose arguments are not a JSON object, then (when bounded)
+    /// a well-formed call and an answer.
+    MalformedThenAnswer,
+    Malformed,
     EffortReview,
     GoalReport {
         call: &'static str,
@@ -243,6 +247,19 @@ impl Provider for ScriptProvider {
         } else {
             vec![Content::Text("Finished".into())]
         };
+        if matches!(self.script, Script::Malformed)
+            || matches!(self.script, Script::MalformedThenAnswer) && index < 2
+        {
+            content = vec![Content::ToolCall(ToolCall {
+                id: ToolCallId::new(format!("call-{index}"))?,
+                tool: tool_id(),
+                arguments: if index == 0 || matches!(self.script, Script::Malformed) {
+                    ToolArguments::Malformed("{\"value\":".into())
+                } else {
+                    ToolArguments::Json(serde_json::json!({ "value": "echoed" }))
+                },
+            })];
+        }
         if let Script::ParallelTools(count) = self.script
             && index == 0
         {
@@ -1632,6 +1649,65 @@ async fn step_limit_bounds_repeated_tool_calls_and_records_a_failed_account() {
     assert_eq!(account.stop_reason, Some(StopReason::StepLimit));
     assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 2);
     assert_eq!(fixture.tool.calls.load(Ordering::SeqCst), 2);
+    store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
+}
+
+#[tokio::test]
+async fn a_malformed_call_is_corrected_within_the_turn() {
+    let fixture = Fixture::new(Script::MalformedThenAnswer);
+    let store = fixture.store();
+    let claim = fixture.claim(&store).await;
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    let MasterOutcome::Settled(receipt) = fixture
+        .master(4, "Use tools")
+        .run(opened.turn, input())
+        .await
+        .unwrap()
+    else {
+        panic!("expected settlement")
+    };
+    assert_eq!(receipt.outcome.status, OutcomeStatus::Succeeded);
+    let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
+    assert_eq!(account.steps, 3);
+    assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 3);
+    // The malformed call never reached the tool; the corrected one did.
+    assert_eq!(fixture.tool.calls.load(Ordering::SeqCst), 1);
+    let failed = fixture.provider.requests.lock().unwrap()[1]
+        .messages
+        .iter()
+        .flat_map(|message| &message.content)
+        .find_map(|part| match part {
+            Content::ToolResult(result) if result.call.as_str() == "call-0" => Some(result.clone()),
+            _ => None,
+        })
+        .expect("the next request carries the failed result");
+    assert_eq!(failed.status, OutcomeStatus::Failed);
+    assert!(matches!(
+        failed.content.as_slice(),
+        [ResultContent::Text(text)] if text.starts_with(agent_kit_runtime::MALFORMED_ARGUMENTS)
+    ));
+    store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
+}
+
+#[tokio::test]
+async fn repeated_malformed_calls_end_at_the_step_limit() {
+    let fixture = Fixture::new(Script::Malformed);
+    let store = fixture.store();
+    let claim = fixture.claim(&store).await;
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    let MasterOutcome::Settled(receipt) = fixture
+        .master(2, "Use tools")
+        .run(opened.turn, input())
+        .await
+        .unwrap()
+    else {
+        panic!("expected bounded settlement")
+    };
+    assert_eq!(receipt.outcome.status, OutcomeStatus::Failed);
+    let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
+    assert_eq!(account.stop_reason, Some(StopReason::StepLimit));
+    assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 2);
+    assert_eq!(fixture.tool.calls.load(Ordering::SeqCst), 0);
     store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
 }
 

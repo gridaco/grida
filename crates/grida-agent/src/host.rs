@@ -2,6 +2,7 @@
 
 mod approval_review;
 mod before_tool;
+mod bundled_skills;
 mod catalog;
 pub(crate) mod compaction;
 mod completion_checks;
@@ -206,7 +207,8 @@ struct Execution {
     questions: Arc<questions::QuestionAccess>,
     accepts_selected_png: bool,
     image_tools: Option<Arc<retained_inputs::RetainedInputs>>,
-    workspace_vision: bool,
+    /// The connection returns images in tool results, so `view_image` and
+    /// Library selection can show the model what they found.
     tool_result_images: bool,
     retained_inputs: Option<Arc<retained_inputs::RetainedInputs>>,
 }
@@ -429,6 +431,9 @@ struct StoredPrompt {
     editor_svg_target: Option<BindingId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     guidance: Option<crate::skills::CapturedGuidance>,
+    /// Skills the model may read and follow without an explicit selection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    skills: Option<crate::skills::SkillListing>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     goal: Option<goals::GoalInput>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -584,6 +589,7 @@ struct PreparedInput {
     host_tools: Vec<Arc<host_tools::HostTools>>,
     image_generation: Option<image_generation::Prepared>,
     guidance: Option<Message>,
+    skills: Option<crate::skills::SkillListing>,
     goal: Option<goals::GoalInput>,
     completion_checks: Option<CompletionChecks>,
     completion_authorized: bool,
@@ -1803,6 +1809,13 @@ impl Host {
                 retained_file::TurnFile::bind(storage, claim.lease.binding(), work)
             })
             .transpose()?;
+        let skill_reader = prepared
+            .skills
+            .as_ref()
+            .filter(|_| !cancellation_only && !prepared.subagent && !self.inference_only)
+            .map(|listing| bundled_skills::TurnSkills::bind(listing, claim.lease.binding()))
+            .transpose()?
+            .flatten();
         let wakeups = prepared
             .allow_wakeups
             .then(|| wakeups::WakeupAccess::bind(self.clone(), claim.lease.binding()))
@@ -1812,7 +1825,7 @@ impl Host {
         let capture_image = execution
             .image_tools
             .as_ref()
-            .filter(|_| execution.workspace_vision && !prepared.subagent)
+            .filter(|_| execution.tool_result_images && !prepared.subagent)
             .map(|images| {
                 images.workspace_image_capture(claim.lease.binding().session.clone(), cwd.clone())
             });
@@ -1908,9 +1921,10 @@ impl Host {
         let tool_authority = permissions::ToolAuthority::bind(
             execution.authorization.clone(),
             permission_scope.clone(),
-            permissions::AttachmentTools {
+            permissions::MaterialTools {
                 image: image.clone(),
                 file: file.clone(),
+                skills: skill_reader.clone(),
             },
             wakeups.clone(),
             permissions::HookTools {
@@ -1988,6 +2002,9 @@ impl Host {
         }
         if let Some(file) = &file {
             file.insert(&mut inventory, &mut authority.tools)?;
+        }
+        if let Some(skills) = &skill_reader {
+            skills.insert(&mut inventory, &mut authority.tools)?;
         }
         if prepared.questions {
             execution
@@ -2290,6 +2307,17 @@ impl Host {
         } else {
             skills::capture_guidance(self.guidance_scope(session)?, &parts).await?
         };
+        // A turn with workspace tools lists the skills it may read and follow
+        // on its own. Funded Goal work keeps its reviewed tool scope.
+        let skills = if child_work
+            || self.inference_only
+            || spending.is_some()
+            || permission_capture.is_none()
+        {
+            None
+        } else {
+            Some(skills::capture_listing(self.guidance_scope(session)?).await?)
+        };
         let parts = if parts
             .iter()
             .any(|part| matches!(part, PromptPart::Image { .. } | PromptPart::File { .. }))
@@ -2381,6 +2409,7 @@ impl Host {
                 editor_presentation,
                 editor_svg_target,
                 guidance,
+                skills,
                 goal: None,
                 subagent,
                 completion_checks: if child_work {
@@ -2410,6 +2439,7 @@ impl Host {
         let subagent;
         let effort;
         let mut retained_file = None;
+        let skills;
         let (
             messages,
             operating_regime,
@@ -2508,6 +2538,7 @@ impl Host {
                         || stored.editor_presentation
                         || stored.editor_svg_target.is_some()
                         || stored.guidance.is_some()
+                        || stored.skills.is_some()
                         || stored.goal.is_some()
                         || stored.effort.is_some()
                         || stored.completion_checks.is_some()
@@ -2671,6 +2702,13 @@ impl Host {
                     config.instructions.push_str("\n\n");
                     config.instructions.push_str(crate::skills::GUIDANCE_POLICY);
                 }
+                // The listing stays in the instructions a retained decision
+                // was made under; only an admitted turn binds its reader.
+                skills = stored.skills.clone();
+                if let Some(listing) = &skills {
+                    config.instructions.push_str("\n\n");
+                    config.instructions.push_str(&listing.instructions());
+                }
                 if stored.goal.is_some() {
                     config.instructions.push_str("\n\n");
                     config
@@ -2776,6 +2814,7 @@ impl Host {
             host_tools,
             image_generation,
             guidance,
+            skills,
             goal,
             completion_checks,
             completion_authorized,
@@ -3288,9 +3327,8 @@ impl Execution {
         }
         let compatible_png = transport.accepts_compatible_png(&options.model);
         let gemini_flash = transport.is_reviewed_gemini_flash();
-        let image_profile = if options.protocol == ProviderProtocol::Responses
-            && options.model.as_str() == "gpt-5.4"
-        {
+        let responses_png = transport.accepts_responses_png(&options.model);
+        let image_profile = if responses_png {
             Some("responses-image-tools-v1")
         } else if compatible_png {
             Some("openrouter-png-tools-v1")
@@ -3306,7 +3344,9 @@ impl Execution {
         } else {
             None
         };
-        let workspace_vision = images.is_some() && options.protocol == ProviderProtocol::Responses;
+        // Tool results carry images on Responses and on compatible routes
+        // that resolve retained PNG tool results.
+        let tool_result_images = images.is_some() && (responses_png || compatible_png);
         let compatible_tool_images = compatible_png && images.is_some();
         let image_resolver = images.as_ref().map(|images| {
             let images = images.clone();
@@ -3401,8 +3441,7 @@ impl Execution {
         )?;
         execution.accepts_selected_png = images.is_some();
         execution.image_tools = images;
-        execution.workspace_vision = workspace_vision;
-        execution.tool_result_images = workspace_vision || compatible_tool_images;
+        execution.tool_result_images = tool_result_images;
         Ok(execution)
     }
 
@@ -3569,7 +3608,6 @@ impl Execution {
             questions,
             accepts_selected_png: false,
             image_tools: None,
-            workspace_vision: false,
             tool_result_images: false,
             retained_inputs: None,
         })

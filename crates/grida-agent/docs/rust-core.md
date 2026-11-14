@@ -320,11 +320,11 @@ recovery contract requires one.
 An unavailable tool fails before execution and produces a bounded, correlated
 error result when the call has a valid identity. The model can correct a
 subsequent call within the same task limits. The rejected call and its failure
-remain recorded. Malformed model arguments are intended to follow the same
-path. That correction is deferred: provider adapters currently reject a call
-whose arguments are not valid JSON as a stream protocol error, so the turn ends
-with an uncertain result and the conversation remains available for a new
-message. Protocol corruption that prevents safe correlation,
+remain recorded. Malformed model arguments follow the same path: provider
+adapters emit a call whose arguments are not one JSON object as
+`ToolArguments::Malformed`, and the runtime returns a failed
+`tool_arguments_malformed` result for it without admitting any tool, so the
+model can retry within the turn's step limit. Protocol corruption that prevents safe correlation,
 storage failure, and host invariant violations remain execution failures.
 Permission denial retains its distinct meaning and cannot be disguised as an
 argument error to encourage circumvention.

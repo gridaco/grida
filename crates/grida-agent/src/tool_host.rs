@@ -319,7 +319,7 @@ impl Tool for CapabilityGrant {
 fn json_arguments(arguments: &ToolArguments) -> Result<&Value> {
     match arguments {
         ToolArguments::Json(value) => Ok(value),
-        ToolArguments::Text(_) => Err(Error::new(
+        ToolArguments::Text(_) | ToolArguments::Malformed(_) => Err(Error::new(
             ErrorKind::InvalidInput,
             "host_capability_requires_json",
         )),

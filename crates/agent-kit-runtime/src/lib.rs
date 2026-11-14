@@ -21,6 +21,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 pub use execution::{OpenedTurn, Runtime, Turn, TurnObserver, TurnOperations};
+pub use step::MALFORMED_ARGUMENTS;
 
 /// A logical operation name supplied by the master and retained across restart.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]

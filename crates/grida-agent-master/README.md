@@ -75,11 +75,11 @@ accounted.
 Completion accounts expose typed output-limit, refusal, and step-limit reasons
 for client adapters. Provider failure classifications remain available in the
 account, with context exhaustion separate from output-limit exhaustion.
-An inference the provider did not confirm, such as a protocol failure from a
-tool call whose arguments are not valid JSON, ends the turn with an uncertain
-account; the conversation stays available for a new message. Returning a
-malformed call to the model for correction is deliberately deferred, while a
-call to an unavailable tool already receives a correctable error result.
+An inference the provider did not confirm, such as a stream that ends before
+its terminal event, ends the turn with an uncertain account; the conversation
+stays available for a new message. A tool call whose arguments are not one
+JSON object, like a call to an unavailable tool, receives a correctable failed
+result and the turn continues; repeated failures end at the step limit.
 Every account counts tool operations by their recorded final disposition.
 Recovered and stopped turns retain successful partial work without counting a
 replay twice.

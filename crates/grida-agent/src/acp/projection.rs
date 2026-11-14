@@ -445,7 +445,9 @@ const MAX_INPUT_ITEMS: usize = 64;
 fn tool_input(arguments: &ToolArguments) -> Value {
     match arguments {
         ToolArguments::Json(value) => bounded(value),
-        ToolArguments::Text(text) => json!(shorten(text, MAX_INPUT_TEXT).0),
+        ToolArguments::Text(text) | ToolArguments::Malformed(text) => {
+            json!(shorten(text, MAX_INPUT_TEXT).0)
+        }
     }
 }
 

@@ -319,12 +319,14 @@ impl Response {
             .cloned()
             .ok_or("unoffered_tool_call")?;
         let arguments = call.args.unwrap_or_else(|| json!({}));
-        if !arguments.is_object() {
-            return Err("invalid_tool_arguments");
-        }
         if arguments.to_string().len() > self.limits.max_tool_argument_bytes {
             return Err("tool_argument_limit");
         }
+        let arguments = if arguments.is_object() {
+            ToolArguments::Json(arguments)
+        } else {
+            ToolArguments::Malformed(arguments.to_string())
+        };
         let id = short_identity(
             "call",
             &(&self.control.attempt, self.replay.parts.len(), &call.id),
@@ -341,7 +343,7 @@ impl Response {
         self.content.push(Content::ToolCall(ToolCall {
             id,
             tool,
-            arguments: ToolArguments::Json(arguments),
+            arguments,
         }));
         Ok(())
     }

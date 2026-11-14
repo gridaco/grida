@@ -8,7 +8,7 @@ use agent_kit_core::inference::{
 };
 use agent_kit_core::messages::{
     Content, MediaRef, Message, MessagePhase, OutcomeStatus, ResultContent, Retention, Role,
-    ToolCall, ToolResult,
+    ToolArguments, ToolCall, ToolResult,
 };
 use agent_kit_core::{ArtifactId, BindingId, ModelId, PrincipalId, ProviderId, ScopeId};
 use agent_kit_providers::{
@@ -628,6 +628,63 @@ async fn tool_calls_require_verified_terminal_and_use_attempt_scoped_identity() 
         assert!(outcome.messages.is_empty());
         assert_eq!(outcome.failure.unwrap().code, code);
     }
+}
+
+#[tokio::test]
+async fn malformed_arguments_complete_and_replay_as_the_model_wrote_them() {
+    let transport = FixtureTransport::new([
+        Ok(response(
+            [call(0, "fc_1", r#"{"value":"#), completed(None)]
+                .into_iter()
+                .map(frame),
+            true,
+        )),
+        Ok(response(
+            [answer("msg_1", "Retried."), completed(None)]
+                .into_iter()
+                .map(frame),
+            true,
+        )),
+    ]);
+    let provider = adapter(transport.clone(), ResponsesEndpoint::Api, "lineage", "live");
+    let mut request = tool_request();
+    let outcome = run(&provider, request.clone(), "malformed").await;
+    assert_eq!(outcome.status, InferenceStatus::Completed);
+    assert!(outcome.failure.is_none());
+    let malformed = first_call(&outcome).clone();
+    assert_eq!(
+        malformed.arguments,
+        ToolArguments::Malformed(r#"{"value":"#.into())
+    );
+    request.messages.extend(outcome.messages);
+    request.messages.push(message(
+        "result",
+        Role::Tool,
+        vec![Content::ToolResult(ToolResult {
+            call: malformed.id,
+            status: OutcomeStatus::Failed,
+            content: vec![ResultContent::Text("tool_arguments_malformed".into())],
+            structured: None,
+            truncated: false,
+        })],
+    ));
+    let retried = run(&provider, request, "retried").await;
+    assert_eq!(retried.status, InferenceStatus::Completed);
+    let input = body(&transport, 1)["input"].clone();
+    let replayed = input
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["type"] == "function_call")
+        .unwrap();
+    assert_eq!(replayed["arguments"], r#"{"value":"#);
+    assert!(
+        input
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item["type"] == "function_call_output" && item["call_id"] == "call_remote")
+    );
 }
 
 #[tokio::test]

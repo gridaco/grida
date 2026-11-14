@@ -2868,6 +2868,69 @@ async fn a_call_to_an_unoffered_tool_returns_a_correctable_result() {
     )));
 }
 
+#[tokio::test]
+async fn a_malformed_call_returns_a_correctable_result_without_admission() {
+    let mut malformed = call("malformed", "counter");
+    malformed.arguments = ToolArguments::Malformed("{\"value\":".into());
+    let provider = Arc::new(ScriptedProvider {
+        starts: AtomicUsize::new(0),
+        attempts: Mutex::new(vec![]),
+        receiver: Mutex::new(None),
+        events: vec![ProviderEvent::Finished(inference_outcome(vec![
+            Content::ToolCall(call("valid", "counter")),
+            Content::ToolCall(malformed),
+        ]))],
+    });
+    let tool = CounterTool::new(None);
+    let runtime = runtime(
+        provider.clone(),
+        &tool,
+        Arc::new(Allow),
+        Authority::allowed(),
+    );
+    let mut turn = runtime
+        .open(EphemeralJournal::create(binding()).unwrap().lease)
+        .await
+        .unwrap()
+        .turn;
+    let outcome = turn
+        .step(StepPlan {
+            key: OperationKey::new("malformed-call").unwrap(),
+            request: request(&provider, &inventory(&tool)),
+            inference_grants: grants(),
+            tool_grants: tool_grants(),
+            tools: inventory(&tool),
+        })
+        .await
+        .unwrap();
+    let results: BTreeMap<_, _> = outcome
+        .tools
+        .iter()
+        .map(|tool| (tool.call.id.as_str().to_owned(), tool.outcome.clone()))
+        .collect();
+    let InvokeOutcome::Complete(failed) = &results["malformed"] else {
+        panic!("a malformed call settles in its step");
+    };
+    assert_eq!(failed.status, OutcomeStatus::Failed);
+    let [agent_kit_core::messages::ResultContent::Text(text)] = failed.content.as_slice() else {
+        panic!("the result explains the failure");
+    };
+    assert!(text.starts_with(agent_kit_runtime::MALFORMED_ARGUMENTS));
+    assert!(text.contains("could not be parsed"));
+    assert_eq!(results["valid"], InvokeOutcome::Complete(success()));
+    // Only the well-formed call reached the tool and the journal.
+    assert_eq!(tool.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(turn.view().state.operations().len(), 2);
+    assert!(outcome.history.iter().any(|record| matches!(
+        record,
+        HistoryRecord::Message(message) if message.content.iter().any(|content| matches!(
+            content,
+            Content::ToolResult(result) if result.call.as_str() == "malformed"
+                && result.status == OutcomeStatus::Failed
+        ))
+    )));
+}
+
 struct CancellableTool {
     definition: ToolDefinition,
     started: AtomicUsize,

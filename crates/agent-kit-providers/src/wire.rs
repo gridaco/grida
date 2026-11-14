@@ -9,7 +9,7 @@ use agent_kit_core::inference::{
     InferenceUpdate, InputFormat, InputMeasurement, MeasurementKind, Modality, ModelCapabilities,
     ProviderEvent, RequestControl, ToolOffer, UsageObservation,
 };
-use agent_kit_core::messages::{MediaRef, ResultContent, ToolResult};
+use agent_kit_core::messages::{MediaRef, ResultContent, ToolArguments, ToolResult};
 use agent_kit_core::{
     AttemptId, Envelope, Error, ErrorKind, Fingerprint, Result, SchemaId, ToolId,
 };
@@ -469,6 +469,34 @@ pub(crate) fn lower_tool_offers<'a>(
         offers.push((wire_name, offer, schema));
     }
     Ok((names, offers))
+}
+
+/// Read a function call's argument text. Text that is not one JSON object
+/// stays with the call as written, so the model receives a failed result it
+/// can correct from instead of the response failing.
+pub(crate) fn json_arguments(text: &str) -> ToolArguments {
+    match serde_json::from_str::<Value>(text) {
+        Ok(value) if value.is_object() => ToolArguments::Json(value),
+        _ => ToolArguments::Malformed(text.into()),
+    }
+}
+
+/// The object a wire format that requires structured arguments receives for
+/// a malformed call. Its failed result carries the explanation.
+pub(crate) fn replayed_object(arguments: &ToolArguments) -> Result<&Value> {
+    static EMPTY: std::sync::LazyLock<Value> = std::sync::LazyLock::new(|| json!({}));
+    match arguments {
+        ToolArguments::Json(value) if value.is_object() => Ok(value),
+        ToolArguments::Json(_) => Err(Error::new(
+            ErrorKind::InvalidInput,
+            "invalid_tool_arguments",
+        )),
+        ToolArguments::Malformed(_) => Ok(&EMPTY),
+        ToolArguments::Text(_) => Err(Error::new(
+            ErrorKind::Unsupported,
+            "unsupported_tool_format",
+        )),
+    }
 }
 
 pub(crate) fn function_name(tool: &ToolId) -> Result<String> {

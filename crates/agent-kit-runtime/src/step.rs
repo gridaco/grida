@@ -1,7 +1,9 @@
 use crate::execution::fingerprint_name;
 use crate::*;
 use agent_kit_core::history::HistoryRecord;
-use agent_kit_core::messages::{Content, Message, Provenance, ProvenanceKind, Role, ToolResult};
+use agent_kit_core::messages::{
+    Content, Message, Provenance, ProvenanceKind, ResultContent, Role, ToolArguments, ToolResult,
+};
 use agent_kit_core::turn::{OperationInput, OperationOutcome};
 use agent_kit_core::{MessageId, ToolCallId};
 use futures_util::stream::{FuturesUnordered, StreamExt};
@@ -241,6 +243,12 @@ impl StepCalls<'_> {
                     let outcome = ToolOutcome::failed("tool_unavailable");
                     return (call, Ok(InvokeOutcome::Complete(outcome)));
                 }
+                if recorded.is_none() && matches!(call.arguments, ToolArguments::Malformed(_)) {
+                    // Arguments no tool can accept never reach admission.
+                    // The model reads why and can send the call again in a
+                    // later step, which the turn's step guard bounds.
+                    return (call, Ok(InvokeOutcome::Complete(malformed_arguments())));
+                }
                 match (recorded, selected_grants) {
                     (Some(recorded), _) if recorded.outcome().is_some() => {
                         Some(recorded.record.grants.clone())
@@ -295,6 +303,20 @@ impl StepCalls<'_> {
         }));
         Ok(())
     }
+}
+
+/// The code that opens the failed result of a call whose arguments are not
+/// a JSON object.
+pub const MALFORMED_ARGUMENTS: &str = "tool_arguments_malformed";
+
+fn malformed_arguments() -> ToolOutcome {
+    let mut outcome = ToolOutcome::failed(MALFORMED_ARGUMENTS);
+    outcome.content = vec![ResultContent::Text(format!(
+        "{MALFORMED_ARGUMENTS}: The arguments of this tool call could not be parsed as a JSON \
+         object, so the tool did not run. Call the tool again with arguments that are one valid \
+         JSON object matching its input schema."
+    ))];
+    outcome
 }
 
 fn candidate_history(

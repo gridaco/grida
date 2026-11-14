@@ -468,7 +468,7 @@ http://localhost:*`. The nonce is generated in the proxy, exposed
    is route compatibility, not a censorship-circumvention tunnel: no route is
    created when Chromium and the operating system have none.
 
-**Endpoint providers (local LLMs, #806).** The
+**Endpoint providers (local LLMs).** The
 [media composition](packages/grida-ai-host/src/media-server.ts) serves
 `/providers/endpoints/*` — CRUD over user-configured OpenAI-compatible
 endpoints (Ollama preset, self-hosted gateways), persisted at
@@ -571,7 +571,9 @@ created beneath it. Version-control and agent metadata names are refused as
 the first component. Content goes to an exclusive temporary file in the same
 folder and is renamed into place; an edit also confirms the file is unchanged
 since it was read. Desktop grants the Default preset's write rule only for the
-selected project folder; additional folders stay read-on-request. Desktop
+selected project folder and registers no additional folders, so its file
+tools stay inside the project, apart from the settings file below, and no
+folder can be granted on request. Desktop
 supplies programs its captured login-shell environment, minus app variables.
 Preparation refusals share one tool response regardless of path existence.
 
@@ -1697,6 +1699,16 @@ Today:
   argument or workspace authority. The provider receives display metadata and
   may request a bounded text excerpt through the tool. [Process fixtures](crates/grida-agent/tests/process/retained_files.rs)
   verify isolation, restart and refusal after loss of either copy.
+- Bundled skills are compiled into the native host, so no file exists for the
+  agent's file tools to read and none is extracted or granted. The
+  [bundled skill reader](crates/grida-agent/src/host/bundled_skills.rs)
+  returns that fixed text only for a bundled name in the turn's captured skill
+  listing, takes no path, reads no filesystem and has no effects. [Tool
+  authority](crates/grida-agent/src/host/permissions.rs) checks its turn-bound
+  grant independently from workspace permissions, and project skills in the
+  same listing are read with the ordinary file tools under the existing
+  grants. [Process fixtures](crates/grida-agent/tests/process/skills.rs)
+  cover the read and the refusal of an unlisted name.
 - The native [artifact read](crates/grida-agent/src/acp/extensions/summaries.rs) requires negotiated private stdio and an exact attached session. It returns a bounded PNG only when the settled turn's successful crop receipt matches the existing private scratch bytes. The read uses pinned descriptors, creates no files, and exposes no path, digest, or unrelated tool output. [Process tests](crates/grida-agent/tests/process/images.rs) cover reopen, a replaced or missing copy, and refusal across sessions and shared connections.
 - The Desktop [artifact IPC](desktop/src/main/native-chat-ipc.ts) admits only an artifact listed for the same attachment's latest observed finished turn. Main rechecks the frame, chat, and observation after the read. The [PNG response validator](desktop/src/main/native-agent-artifacts.ts) validates the bounded byte response against the selected descriptor and returns only bytes. The [Desktop fixture](desktop/src/main/native-agent-images.test.ts) verifies restart recovery and missing-file refusal through the built native child.
 - The [retained file exporter](desktop/src/main/retained-file-export.ts) publishes a new file exclusively from bounded retained bytes. A window-owned chooser supplies the destination to Main. The chat caller supplies only its attachment, observation and artifact identities, and the Tools caller supplies only its media item ID. Main rechecks the initiating scope before publication. Existing destination files and the retained result remain available after a failed copy.
@@ -1910,8 +1922,8 @@ paths, and params are public, so the design must not rely on obscurity.
    webview never loads a provider page, and the `…://auth/callback`
    redirect is allowlisted in Supabase
    ([supabase/config.toml](supabase/config.toml) locally; the hosted
-   project's dashboard in production). The scheme is **per-environment**
-   (#955): production returns to `grida://`, while local dev/insiders
+   project's dashboard in production). The scheme is **per-environment**:
+   production returns to `grida://`, while local dev/insiders
    builds register and return to `grida-dev://` — so a machine running
    BOTH a dev build and the installed production Grida never has the two
    fight over one OS handler. The target is chosen from the build channel
@@ -2415,7 +2427,9 @@ context.
    text and provenance. A newly captured project skill also carries a labeled
    workspace-relative directory derived from its validated name and layer. It
    grants no tool access and follows no companion paths; later supporting-file
-   reads use the ordinary workspace authority.
+   reads use the ordinary workspace authority. A turn with workspace file tools
+   also captures the catalog's names, descriptions and sources with its input;
+   the model reads a listed project skill through those same file tools.
 
 **Files bound by this id.**
 

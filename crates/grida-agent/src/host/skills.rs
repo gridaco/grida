@@ -53,6 +53,14 @@ impl Host {
     }
 }
 
+pub(super) async fn capture_listing(
+    root: Option<ProjectRoot>,
+) -> Result<crate::skills::SkillListing> {
+    tokio::task::spawn_blocking(move || crate::skills::SkillListing::capture(root.as_ref()))
+        .await
+        .map_err(|_| problem(ErrorKind::Unavailable, "skill_discovery_interrupted"))?
+}
+
 pub(super) async fn capture_guidance(
     root: Option<ProjectRoot>,
     parts: &[PromptPart],

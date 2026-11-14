@@ -1132,9 +1132,10 @@ export class NativeChatController {
 
   /**
    * The way a person's file enters this chat, or null for an image that must
-   * be a PNG. A PNG and a small file keep the direct path; a video, another
-   * image or a larger file goes by reference when this chat takes references
-   * and Desktop can name the file on disk.
+   * be a PNG. A small PNG goes to a model that takes images and a small file
+   * keeps the direct path; a video, another image, a larger file or a PNG the
+   * model cannot take goes by reference when this chat takes references and
+   * Desktop can name the file on disk.
    * (see test/desktop-agent-chat-file-reference.md)
    */
   private intake(
@@ -1144,7 +1145,7 @@ export class NativeChatController {
     const png =
       file.type === "image/png" || (!file.type && /\.png$/i.test(file.name));
     const direct = file.size <= MAX_ATTACHMENT_BYTES;
-    if (png && direct) return "png";
+    if (png && direct && this.view.imageInput) return "png";
     const image = isSupportedImageType(file.type);
     if (
       direct &&
@@ -1212,7 +1213,7 @@ export class NativeChatController {
           : this.view.loading || this.acceptsAttachment(kind)
             ? "Wait until the chat is ready to attach a file."
             : kind === "png"
-              ? "This connection cannot use a PNG attachment."
+              ? `${this.activeModelName() ?? "This model"} can't take images here. Choose a model that supports images to attach a PNG.`
               : "This chat cannot inspect a file attachment.",
       });
       return;
@@ -1428,6 +1429,19 @@ export class NativeChatController {
       file: file === true,
       reference: reference === true,
     };
+  }
+
+  /** The name the model picker shows for the chat's model, when known. */
+  private activeModelName(): string | null {
+    const profiles = this.view.profiles;
+    const active = profiles?.active;
+    if (!active) return null;
+    return (
+      (
+        profiles.choices.find((choice) => choice.id === active) ??
+        profiles.saved.find((choice) => choice.id === active)
+      )?.model ?? null
+    );
   }
 
   /** The running connection confirms Ultra, or the chosen model offers it. */

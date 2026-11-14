@@ -195,6 +195,32 @@ if (bundle) {
       windows: Object.fromEntries([...responseWindows].sort()),
     })
   );
+  // Exact OpenAI bindings whose model and binding facts both declare PNG
+  // input and tool calls. The host offers images only on the canonical
+  // Responses route for these ids; any other model stays text-only.
+  const responsesPng = new Set();
+  for (const model of Object.values(publicModels["text.catalog"])) {
+    const binding = model.providers?.openai;
+    if (
+      model.reference_provider !== "openai" ||
+      binding?.provider !== "openai" ||
+      !binding.id ||
+      model.tool_call !== true ||
+      !model.image_input_mimes?.includes("image/png") ||
+      binding.capabilities?.image_input !== true ||
+      binding.capabilities?.tools !== true
+    )
+      continue;
+    if (responsesPng.has(binding.id))
+      throw Error(`Duplicate OpenAI PNG binding: ${binding.id}`);
+    responsesPng.add(binding.id);
+  }
+  if (responsesPng.size === 0)
+    throw Error("No OpenAI Responses model takes PNG input");
+  write(
+    path.join(root, "crates/grida-agent/data/responses-png-models.json"),
+    json({ models_release: release, models: [...responsesPng].sort() })
+  );
   // Listed models whose OpenRouter binding takes PNG input and tool calls.
   // The transport is the same for each: the canonical OpenRouter route with a
   // saved key, and exact PNG bytes resolved only for an admitted request.

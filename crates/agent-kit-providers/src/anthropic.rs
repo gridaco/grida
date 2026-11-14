@@ -1,14 +1,15 @@
 mod stream;
 
 use crate::wire::{
-    EncodedRequest, function_name, lower_tool_offers, short_identity, text_profile, tool_result,
+    EncodedRequest, function_name, lower_tool_offers, replayed_object, short_identity,
+    text_profile, tool_result,
 };
 use crate::{StreamLimits, StreamingTransport, TransportOperation, TransportRequest};
 use agent_kit_core::inference::{
     InferenceControl, InferenceRequest, InferenceRun, ModelCapabilities, PreparedRequest, Provider,
     ProviderBinding,
 };
-use agent_kit_core::messages::{Content, OutcomeStatus, Role, ToolArguments};
+use agent_kit_core::messages::{Content, OutcomeStatus, Role};
 use agent_kit_core::{Error, ErrorKind, MessageId, ModelId, Result};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
@@ -88,18 +89,7 @@ impl Anthropic {
                     // Plain Messages has no portable reasoning-input field.
                     (Role::Assistant, Content::Reasoning(_)) => {}
                     (Role::Assistant, Content::ToolCall(call)) if tools_supported => {
-                        let ToolArguments::Json(input) = &call.arguments else {
-                            return Err(Error::new(
-                                ErrorKind::Unsupported,
-                                "unsupported_tool_format",
-                            ));
-                        };
-                        if !input.is_object() {
-                            return Err(Error::new(
-                                ErrorKind::InvalidInput,
-                                "invalid_tool_arguments",
-                            ));
-                        }
+                        let input = replayed_object(&call.arguments)?;
                         pending.insert(&call.id);
                         blocks.push(json!({
                             "type": "tool_use", "id": short_identity("call", &call.id)?,

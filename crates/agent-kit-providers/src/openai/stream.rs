@@ -1,8 +1,8 @@
 use crate::StreamLimits;
-use crate::wire::short_identity;
 use crate::wire::{
     Incoming, RateRejectionEvidence, Usage as UsageLedger, WireError, WireStream, classify_error,
 };
+use crate::wire::{json_arguments, short_identity};
 use crate::{StreamingTransport, TerminalReceiptDecoder, TransportRequest};
 use agent_kit_core::inference::usage::{
     CACHED_INPUT_TOKENS, INPUT_TOKENS, OUTPUT_TOKENS, REASONING_OUTPUT_TOKENS,
@@ -11,9 +11,7 @@ use agent_kit_core::inference::{
     FailureKind, InferenceControl, InferenceFailure, InferenceOutcome, InferenceStatus,
     InferenceUpdate, ProviderEvent,
 };
-use agent_kit_core::messages::{
-    Content, Message, Provenance, ProvenanceKind, Role, ToolArguments, ToolCall,
-};
+use agent_kit_core::messages::{Content, Message, Provenance, ProvenanceKind, Role, ToolCall};
 use agent_kit_core::{Envelope, MessageId, ToolCallId, ToolId};
 use futures_core::stream::BoxStream;
 use futures_util::stream;
@@ -407,12 +405,11 @@ impl ResponseStream {
             let id = short_identity("call", &(&self.control.attempt, index, source_id))
                 .map_err(|_| "tool_call_identity_failed")?;
             let id = ToolCallId::new(id).map_err(|_| "tool_call_identity_failed")?;
-            let arguments =
-                serde_json::from_str(&parts.arguments).map_err(|_| "invalid_tool_arguments")?;
+            let arguments = json_arguments(&parts.arguments);
             calls.push(ToolCall {
                 id,
                 tool,
-                arguments: ToolArguments::Json(arguments),
+                arguments,
             });
         }
         for call in &calls {

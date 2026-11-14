@@ -85,6 +85,11 @@ pub struct ToolCall {
 pub enum ToolArguments {
     Json(serde_json::Value),
     Text(String),
+    /// The provider's text for a call to a JSON tool that is not a JSON
+    /// object. No tool accepts it: the call receives a failed result the
+    /// model can correct from, and the text is returned to the provider as
+    /// the model wrote it where its wire format allows.
+    Malformed(String),
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

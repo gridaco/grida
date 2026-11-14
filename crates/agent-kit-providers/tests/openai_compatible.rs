@@ -793,31 +793,81 @@ async fn request_lowering_preserves_tool_result_correlation_and_uses_wire_names(
 }
 
 #[tokio::test]
-async fn incomplete_or_malformed_tool_arguments_never_become_invocations() {
-    for (script, code) in [
-        (
-            function_response(["{\"value\":", "invalid"]),
-            "invalid_tool_arguments",
-        ),
-        (
-            function_response(["{\"value\":", "\"incomplete\"}"])[..2].to_vec(),
-            "missing_terminal_event",
-        ),
-    ] {
+async fn incomplete_tool_arguments_never_become_invocations() {
+    let script = function_response(["{\"value\":", "\"incomplete\"}"])[..2].to_vec();
+    let transport = FixtureTransport::new([Ok(response(script, false))]);
+    let provider = adapter(transport);
+    let mut run = provider
+        .start(
+            provider.prepare(tool_request()).unwrap(),
+            control("invalid"),
+        )
+        .unwrap();
+    assert!(run.next().await.is_none());
+    let result = run.finish().await;
+    assert_eq!(result.status, InferenceStatus::Interrupted);
+    assert_eq!(result.failure.unwrap().code, "missing_terminal_event");
+    assert!(result.messages.is_empty());
+}
+
+#[tokio::test]
+async fn malformed_tool_arguments_complete_as_a_correctable_call() {
+    for text in ["{\"value\":invalid", "[1]"] {
+        let script = function_response([text, ""]);
         let transport = FixtureTransport::new([Ok(response(script, false))]);
         let provider = adapter(transport);
         let mut run = provider
             .start(
                 provider.prepare(tool_request()).unwrap(),
-                control("invalid"),
+                control("malformed"),
             )
             .unwrap();
+        let Some(InferenceUpdate::ToolCall(call)) = run.next().await else {
+            panic!("a malformed call is still emitted");
+        };
+        assert_eq!(call.arguments, ToolArguments::Malformed(text.into()));
         assert!(run.next().await.is_none());
         let result = run.finish().await;
-        assert_eq!(result.status, InferenceStatus::Interrupted);
-        assert_eq!(result.failure.unwrap().code, code);
-        assert!(result.messages.is_empty());
+        assert_eq!(result.status, InferenceStatus::Completed);
+        assert!(result.failure.is_none());
+        assert_eq!(result.messages[0].content, vec![Content::ToolCall(call)]);
     }
+}
+
+#[tokio::test]
+async fn a_malformed_call_replays_the_text_the_model_wrote() {
+    let transport = FixtureTransport::new([Ok(response(text_response("done"), false))]);
+    let provider = adapter(transport.clone());
+    let mut request = request();
+    request.tools = vec![offer("filesystem/read")];
+    let call_id = agent_kit_core::ToolCallId::new("old-call").unwrap();
+    request.messages.push(message(
+        "assistant",
+        Role::Assistant,
+        vec![Content::ToolCall(agent_kit_core::messages::ToolCall {
+            id: call_id.clone(),
+            tool: ToolId::new("filesystem/read").unwrap(),
+            arguments: ToolArguments::Malformed("{\"value\":".into()),
+        })],
+    ));
+    request.messages.push(message(
+        "result",
+        Role::Tool,
+        vec![Content::ToolResult(ToolResult {
+            call: call_id,
+            status: OutcomeStatus::Failed,
+            content: vec![ResultContent::Text("tool_arguments_malformed".into())],
+            structured: None,
+            truncated: false,
+        })],
+    ));
+    execute(&provider, request, "continued").await;
+    let body: Value =
+        serde_json::from_slice(&transport.requests.lock().unwrap()[0].0.body).unwrap();
+    assert_eq!(
+        body["messages"][1]["tool_calls"][0]["function"]["arguments"],
+        "{\"value\":"
+    );
 }
 
 #[tokio::test]

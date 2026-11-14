@@ -1,6 +1,7 @@
 use super::{ItemStatus, ReplayScope, Summary, WireContent, WireItem};
 use crate::wire::{
-    Incoming, RateRejectionEvidence, Usage, WireError, WireStream, classify_error, short_identity,
+    Incoming, RateRejectionEvidence, Usage, WireError, WireStream, classify_error, json_arguments,
+    short_identity,
 };
 use crate::{StreamLimits, StreamingTransport, TransportRequest};
 use agent_kit_core::inference::usage::{
@@ -10,9 +11,7 @@ use agent_kit_core::inference::{
     FailureKind, InferenceControl, InferenceFailure, InferenceOutcome, InferenceStatus,
     InferenceUpdate, ProviderEvent,
 };
-use agent_kit_core::messages::{
-    Content, Message, Provenance, ProvenanceKind, Role, ToolArguments, ToolCall,
-};
+use agent_kit_core::messages::{Content, Message, Provenance, ProvenanceKind, Role, ToolCall};
 use agent_kit_core::{AttemptId, MessageId, ToolCallId, ToolId};
 use futures_core::stream::BoxStream;
 use futures_util::stream;
@@ -540,18 +539,14 @@ impl Response {
                     if arguments.len() > self.limits.max_tool_argument_bytes {
                         return Err("tool_argument_limit");
                     }
-                    let arguments: Value =
-                        serde_json::from_str(arguments).map_err(|_| "invalid_tool_arguments")?;
-                    if !arguments.is_object() {
-                        return Err("invalid_tool_arguments");
-                    }
+                    let arguments = json_arguments(arguments);
                     let id = short_identity("call", &(&self.attempt, call_id))
                         .and_then(ToolCallId::new)
                         .map_err(|_| "tool_call_identity_failed")?;
                     vec![Content::ToolCall(ToolCall {
                         id,
                         tool,
-                        arguments: ToolArguments::Json(arguments),
+                        arguments,
                     })]
                 }
             };

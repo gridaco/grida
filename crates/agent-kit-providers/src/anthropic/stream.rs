@@ -1,4 +1,4 @@
-use crate::wire::{Incoming, Usage, WireStream, classify_error, short_identity};
+use crate::wire::{Incoming, Usage, WireStream, classify_error, json_arguments, short_identity};
 use crate::{StreamLimits, StreamingTransport, TransportRequest};
 use agent_kit_core::inference::usage::{
     CACHE_CREATION_INPUT_TOKENS, CACHED_INPUT_TOKENS, OUTPUT_TOKENS, UNCACHED_INPUT_TOKENS,
@@ -233,10 +233,8 @@ impl Response {
                         if id.is_empty() || id.len() > 256 || !self.call_ids.insert(id.clone()) {
                             return Err("invalid_tool_call_identity");
                         }
-                        if !input.is_object()
-                            || input.to_string().len() > self.limits.max_tool_argument_bytes
-                        {
-                            return Err("invalid_tool_arguments");
+                        if input.to_string().len() > self.limits.max_tool_argument_bytes {
+                            return Err("tool_argument_limit");
                         }
                         let tool = self
                             .names
@@ -290,24 +288,23 @@ impl Response {
                         fragments,
                     } => {
                         let arguments = if fragments.is_empty() {
-                            initial
+                            match initial {
+                                initial if initial.is_object() => ToolArguments::Json(initial),
+                                initial => ToolArguments::Malformed(initial.to_string()),
+                            }
                         } else {
                             if !initial.as_object().is_some_and(|object| object.is_empty()) {
                                 return Err("ambiguous_tool_arguments");
                             }
-                            serde_json::from_str(&fragments)
-                                .map_err(|_| "invalid_tool_arguments")?
+                            json_arguments(&fragments)
                         };
-                        if !arguments.is_object() {
-                            return Err("invalid_tool_arguments");
-                        }
                         let id = short_identity("call", &(&self.control.attempt, index, id))
                             .and_then(ToolCallId::new)
                             .map_err(|_| "tool_call_identity_failed")?;
                         let call = ToolCall {
                             id,
                             tool,
-                            arguments: ToolArguments::Json(arguments),
+                            arguments,
                         };
                         self.updates
                             .push_back(ProviderEvent::Update(InferenceUpdate::ToolCall(

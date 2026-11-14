@@ -6,7 +6,7 @@ use super::*;
 use agent_kit_core::{ChangeId, SessionId};
 use base64::{Engine, engine::general_purpose::STANDARD};
 
-const IMAGE_MODEL: &str = "gpt-5.4";
+const IMAGE_MODEL: &str = "gpt-6.1-sol";
 const GATEWAY_PNG_MODEL: &str = "openai/gpt-5.6-sol";
 const GATEWAY_ENDPOINT: &str = "https://grida.co/api/v1/ai";
 const ARTIFACTS: &str = "co.grida/session/artifacts";
@@ -911,6 +911,78 @@ fn encode_png(width: u32, height: u32, pixels: &[u8]) -> Vec<u8> {
 
 /// Library selections return images to the model, so a connection that cannot
 /// read images in tool results does not offer them.
+#[tokio::test]
+async fn responses_image_input_follows_declared_openai_bindings() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = TempDir::new().unwrap();
+    let base = root.path().canonicalize().unwrap();
+    std::fs::set_permissions(&base, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let project = base.join("project");
+    std::fs::create_dir(&project).unwrap();
+    let profile = base.join("permissions.json");
+    std::fs::write(
+        &profile,
+        serde_json::to_vec(&json!({
+            "version": 1, "workspace": "project", "revision": "selected", "primary": "primary",
+            "directories": [
+                {"id":"primary","name":"Project","path":project,"generation":"first","read":"allow"}
+            ]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    std::fs::set_permissions(&profile, std::fs::Permissions::from_mode(0o600)).unwrap();
+    for (model, images) in [
+        ("gpt-6-sol", true),
+        ("gpt-6.1-terra", true),
+        ("gpt-5.4", false),
+        ("openai/gpt-6.1-sol", false),
+    ] {
+        let mut endpoint = Endpoint::start_protocol(
+            ProviderProtocol::Responses,
+            vec![Reply::Finished("Done.")],
+            Some(TEST_CREDENTIAL),
+        )
+        .await;
+        let mut client = StdioClient::from_child(
+            server(&base.join(model.replace('/', "-")), &endpoint.url, model)
+                .arg("--permission-profile")
+                .arg(&profile)
+                .arg("--stdio")
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .unwrap(),
+        );
+        let ready = client.request("initialize", extension_initialize()).await;
+        assert_eq!(
+            ready["result"]["agentCapabilities"]["promptCapabilities"]["image"], images,
+            "{model}: {ready}"
+        );
+        let created = client
+            .request("session/new", json!({"cwd":project,"mcpServers":[]}))
+            .await;
+        let session = created["result"]["sessionId"].as_str().unwrap();
+        client
+            .request(
+                "_co.grida/session/submit",
+                super::lifecycle::prompt_request(session, "look", "Look around."),
+            )
+            .await;
+        let offered = endpoint.request().await;
+        let view_image = offered["tools"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .any(|tool| tool["name"] == "view_image");
+        assert_eq!(view_image, images, "{model}: {offered}");
+        settled(&mut client, session).await;
+        client.close().await;
+        endpoint.done().await;
+    }
+}
+
 #[tokio::test]
 async fn a_connection_without_image_input_offers_no_library_selection() {
     const LIST: &str = "co.grida/session/library-selections";

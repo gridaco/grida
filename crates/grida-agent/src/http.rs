@@ -272,6 +272,13 @@ impl HttpTransport {
             && openrouter_png_model(model)
     }
 
+    /// A Responses connection to an exact OpenAI model id whose bundled model
+    /// and binding facts declare PNG input and tool calls. Any other id,
+    /// including a provider-prefixed one, stays text-only.
+    pub(crate) fn accepts_responses_png(&self, model: &ModelId) -> bool {
+        self.protocol == ProviderProtocol::Responses && responses_png_model(model)
+    }
+
     pub(crate) fn is_reviewed_gemini_flash(&self) -> bool {
         self.protocol == ProviderProtocol::Gemini
             && matches!(self.dispatch, Dispatch::Direct(_))
@@ -357,6 +364,21 @@ fn responses_context_window(target: &Url, model: &ModelId) -> Option<NonZeroU64>
             .expect("generated model context facts")
     });
     facts.windows.get(model.as_str()).copied()
+}
+
+fn responses_png_model(model: &ModelId) -> bool {
+    #[derive(serde::Deserialize)]
+    struct Facts {
+        models: Vec<ModelId>,
+    }
+    static FACTS: OnceLock<Facts> = OnceLock::new();
+    FACTS
+        .get_or_init(|| {
+            serde_json::from_str(include_str!("../data/responses-png-models.json"))
+                .expect("generated OpenAI PNG binding facts")
+        })
+        .models
+        .contains(model)
 }
 
 fn openrouter_png_model(model: &ModelId) -> bool {
@@ -814,6 +836,21 @@ mod tests {
         }
         let unregistered = ModelId::new("openai/gpt-6.1-sol").unwrap();
         assert!(responses_context_window(&canonical, &unregistered).is_none());
+    }
+
+    #[test]
+    fn responses_png_follows_exact_declared_openai_bindings() {
+        for model in ["gpt-6-sol", "gpt-6.1-sol", "gpt-6.1-terra", "gpt-5.5"] {
+            assert!(responses_png_model(&ModelId::new(model).unwrap()));
+        }
+        for model in [
+            "gpt-5.4",
+            "openai/gpt-6.1-sol",
+            "GPT-6.1-SOL",
+            "unknown-model",
+        ] {
+            assert!(!responses_png_model(&ModelId::new(model).unwrap()));
+        }
     }
 
     #[cfg(any(target_os = "macos", target_os = "linux"))]

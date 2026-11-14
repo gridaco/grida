@@ -219,6 +219,60 @@ async fn anthropic_commits_complete_tool_blocks_and_preserves_result_identity() 
 }
 
 #[tokio::test]
+async fn anthropic_malformed_tool_input_completes_and_replays_as_an_empty_object() {
+    let mut events = claude_tool();
+    events[6] = json!({"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"\"hello\""}});
+    let transport = FixtureTransport::new([
+        Ok(response(events.into_iter().map(frame), true)),
+        Ok(response(
+            [
+                claude_start(),
+                json!({"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":2}}),
+                json!({"type":"message_stop"}),
+            ]
+            .into_iter()
+            .map(frame),
+            true,
+        )),
+    ]);
+    let adapter = anthropic(transport.clone());
+    let mut request = tool_request();
+    let outcome = adapter
+        .start(
+            adapter.prepare(request.clone()).unwrap(),
+            control("malformed"),
+        )
+        .unwrap()
+        .finish()
+        .await;
+    assert_eq!(outcome.status, InferenceStatus::Completed);
+    assert!(outcome.failure.is_none());
+    let calls = recorded_calls(&outcome.messages[0]);
+    assert_eq!(
+        calls[0].arguments,
+        ToolArguments::Malformed("{\"value\":\"hello\"".into())
+    );
+    request.messages.extend(outcome.messages);
+    request
+        .messages
+        .push(tool_result(&calls[0], "result", "tool_arguments_malformed"));
+    adapter
+        .start(adapter.prepare(request).unwrap(), control("retried"))
+        .unwrap()
+        .finish()
+        .await;
+    let body = sent(&transport, 1, TransportOperation::AnthropicMessages);
+    let replayed = body["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|message| message["content"].as_array().cloned().unwrap_or_default())
+        .find(|block| block["type"] == "tool_use")
+        .unwrap();
+    assert_eq!(replayed["input"], json!({}));
+}
+
+#[tokio::test]
 async fn anthropic_eof_and_in_stream_error_keep_only_known_evidence() {
     let incomplete = claude_tool().into_iter().take(7).map(frame);
     let overloaded = [
@@ -682,6 +736,36 @@ async fn gemini_never_admits_unsigned_or_incompletely_framed_tool_calls() {
                 .all(|part| { !matches!(part, Content::ToolCall(_) | Content::ProviderState(_)) })
         );
     }
+}
+
+#[tokio::test]
+async fn gemini_non_object_arguments_complete_as_a_correctable_call() {
+    let mut parts = gemini_parts();
+    parts[1]["functionCall"]["args"] = json!(["first"]);
+    let transport = FixtureTransport::new([Ok(response(
+        [frame(gemini_candidate(parts, Some("STOP")))],
+        false,
+    ))]);
+    let adapter = gemini(transport, binding("gemini"));
+    let outcome = adapter
+        .start(
+            adapter.prepare(tool_request()).unwrap(),
+            control("malformed"),
+        )
+        .unwrap()
+        .finish()
+        .await;
+    assert_eq!(outcome.status, InferenceStatus::Completed);
+    assert!(outcome.failure.is_none());
+    let calls: Vec<_> = outcome.messages.iter().flat_map(recorded_calls).collect();
+    assert_eq!(
+        calls[0].arguments,
+        ToolArguments::Malformed("[\"first\"]".into())
+    );
+    assert_eq!(
+        calls[1].arguments,
+        ToolArguments::Json(json!({"value":"second"}))
+    );
 }
 
 #[tokio::test]

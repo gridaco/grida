@@ -30,16 +30,19 @@ pub struct Approvals {
 pub(super) struct ToolAuthority {
     base: Arc<ExecutionAuthority>,
     permissions: Option<Arc<TurnPermissions>>,
-    attachments: AttachmentTools,
+    material: MaterialTools,
     wakeups: Option<Arc<wakeups::WakeupAccess>>,
     hooks: HookTools,
     host_tools: Vec<Arc<host_tools::TurnTools>>,
     delegation: Option<Arc<sponsorship::DelegationAccess>>,
 }
 
-pub(super) struct AttachmentTools {
+/// Tools that read material the host holds for this turn, each under its own
+/// turn-bound grant rather than workspace permissions.
+pub(super) struct MaterialTools {
     pub(super) image: Option<Arc<image_tools::TurnImage>>,
     pub(super) file: Option<Arc<retained_file::TurnFile>>,
+    pub(super) skills: Option<Arc<bundled_skills::TurnSkills>>,
 }
 
 pub(super) struct HookTools {
@@ -52,15 +55,16 @@ impl ToolAuthority {
     pub(super) fn bind(
         base: Arc<ExecutionAuthority>,
         permissions: Option<Arc<TurnPermissions>>,
-        attachments: AttachmentTools,
+        material: MaterialTools,
         wakeups: Option<Arc<wakeups::WakeupAccess>>,
         hooks: HookTools,
         host_tools: Vec<Arc<host_tools::TurnTools>>,
         delegation: Option<Arc<sponsorship::DelegationAccess>>,
     ) -> Option<Arc<Self>> {
         if permissions.is_none()
-            && attachments.image.is_none()
-            && attachments.file.is_none()
+            && material.image.is_none()
+            && material.file.is_none()
+            && material.skills.is_none()
             && wakeups.is_none()
             && hooks.completion.is_none()
             && hooks.before_tool.is_none()
@@ -73,7 +77,7 @@ impl ToolAuthority {
         Some(Arc::new(Self {
             base,
             permissions,
-            attachments,
+            material,
             wakeups,
             hooks,
             host_tools,
@@ -125,7 +129,7 @@ impl AuthorityValidator for ToolAuthority {
             return Box::pin(async { Ok(()) });
         }
         if let Some(image) = self
-            .attachments
+            .material
             .image
             .as_ref()
             .filter(|image| image.handles(&request.selection))
@@ -133,10 +137,15 @@ impl AuthorityValidator for ToolAuthority {
             return image.validate(request);
         }
         if self
-            .attachments
+            .material
             .file
             .as_ref()
             .is_some_and(|file| file.handles(&request.selection))
+            || self
+                .material
+                .skills
+                .as_ref()
+                .is_some_and(|skills| skills.handles(&request.selection))
         {
             return Box::pin(async { Ok(()) });
         }
@@ -200,7 +209,7 @@ impl ToolAuthority {
             return wakeups.decide(admission, context);
         }
         if let Some(image) = self
-            .attachments
+            .material
             .image
             .as_ref()
             .filter(|image| image.handles(&admission.grants))
@@ -208,12 +217,20 @@ impl ToolAuthority {
             return image.decide(admission, context);
         }
         if let Some(file) = self
-            .attachments
+            .material
             .file
             .as_ref()
             .filter(|file| file.handles(&admission.grants))
         {
             return file.decide(admission, context);
+        }
+        if let Some(skills) = self
+            .material
+            .skills
+            .as_ref()
+            .filter(|skills| skills.handles(&admission.grants))
+        {
+            return skills.decide(admission, context);
         }
         if let Some(permissions) = self
             .permissions

@@ -901,7 +901,7 @@ export namespace models {
 
     // ── models.text.registry ──────────────────────────────────────────
     //
-    // The open-registry seam (issue #806): spec resolution over the
+    // The open-registry seam: spec resolution over the
     // static catalogue PLUS caller-supplied user-registered models (local
     // Ollama models, self-hosted OpenAI-compatible gateways). Pure data —
     // the caller owns where the custom list comes from (agent-host config,
