@@ -150,7 +150,7 @@ export function DesktopFileShell({
                 />
                 <SideChatInlineRegion
                   placement={sideChat}
-                  className="max-h-[40%] shrink-0 border-t"
+                  className="h-[40%] shrink-0 border-t"
                 />
               </>
             ) : (

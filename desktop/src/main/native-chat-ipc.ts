@@ -40,8 +40,7 @@ import type {
   NativeChatReadiness,
   NativeChatRevisionReceipt,
   NativeChatRevisionTarget,
-  NativeChatSideAnswer,
-  NativeChatSideContext,
+  NativeChatSideAttachment,
   NativeChatSnapshot,
   NativeChatTurnSummary,
   NativeChatUpdate,
@@ -91,7 +90,6 @@ export type ActiveNativeChat = Readonly<{
     | "create"
     | "load"
     | "openSideChat"
-    | "askSideChat"
     | "closeSideChat"
     | "submit"
     | "enqueue"
@@ -171,8 +169,10 @@ type Attachment = {
   deletion?: ReviewedDeletion;
   editorSurfaces?: NativeEditorSurfaceLease;
   deckEditorSurface?: NativeEditorSurfaceSnapshot;
-  side?: SideAttachment;
-  closingSide?: Promise<void>;
+  /** The side chat this chat opened in the same frame. */
+  side?: SideLink;
+  /** Set on a side chat's own attachment. */
+  sideOf?: Readonly<{ parent: Attachment; side: NativeSideChat }>;
 };
 
 type ReviewedDeletion = {
@@ -182,12 +182,9 @@ type ReviewedDeletion = {
   expectedOwnedChildren?: string;
 };
 
-type SideAttachment = {
-  openId: string;
-  nativeRequestId: string;
-  opening?: Promise<NativeSideChat>;
-  chat?: NativeSideChat;
-  unconfirmed: boolean;
+type SideLink = {
+  opening?: Promise<Attachment>;
+  attachment?: Attachment;
 };
 
 type Subscription = { attachment: Attachment; stop(): void };
@@ -1284,92 +1281,90 @@ export class NativeChatIpc {
     }
   }
 
+  /**
+   * Open the side chat of an attached chat in the same frame, or return the
+   * one it already has. The side chat becomes an ordinary attachment of that
+   * frame: every chat method takes it, and no other frame can name it.
+   */
   async openSideChat(
     event: IpcMainInvokeEvent,
-    attachmentId: string,
-    openId: string
-  ): Promise<NativeChatSideContext> {
-    const { owner, attachment } = this.requireAttachment(event, attachmentId);
-    if (
-      !token(openId) ||
-      attachment.closingSide ||
-      (attachment.side && attachment.side.openId !== openId)
-    )
-      throw new Error("native_chat_side_open_unavailable");
-    const side = (attachment.side ??= {
-      openId,
-      nativeRequestId: `side/${attachment.id}/${openId}`,
-      unconfirmed: false,
-    });
-    const chat =
-      side.chat ??
-      (await (side.opening ??= owner.active.chat
-        .openSideChat(attachment.session, side.nativeRequestId)
-        .then((opened) => {
-          side.chat = opened;
-          side.unconfirmed = false;
-          return opened;
-        })
-        .catch((error: unknown) => {
-          side.opening = undefined;
-          side.unconfirmed ||=
-            error instanceof Error &&
-            error.message === "native_agent_request_timeout";
-          throw error;
-        })));
-    this.revalidate(owner, attachment);
-    if (attachment.side !== side)
-      throw new Error("native_chat_side_unavailable");
-    return chat.context;
-  }
-
-  async askSideChat(
-    event: IpcMainInvokeEvent,
-    attachmentId: string,
-    openId: string,
-    requestId: string,
-    text: string
-  ): Promise<NativeChatSideAnswer> {
-    const { owner, attachment } = this.requireAttachment(event, attachmentId);
-    const side = attachment.side;
-    if (!side?.chat || side.openId !== openId || !token(requestId))
-      throw new Error("native_chat_side_unavailable");
-    const answer = await owner.active.chat.askSideChat(
-      attachment.session,
-      side.chat,
-      requestId,
-      text
+    attachmentId: string
+  ): Promise<NativeChatSideAttachment> {
+    const { owner, attachment: parent } = this.requireAttachment(
+      event,
+      attachmentId
     );
-    this.revalidate(owner, attachment);
-    if (attachment.side !== side)
-      throw new Error("native_chat_side_unavailable");
-    return answer;
+    if (parent.sideOf) throw new Error("native_chat_side_nested_unavailable");
+    const existing = parent.side;
+    if (existing) {
+      const side = existing.attachment ?? (await existing.opening);
+      this.revalidate(owner, parent);
+      if (!side || parent.side !== existing || !side.sideOf)
+        throw new Error("native_chat_side_unavailable");
+      return sideAttachment(side);
+    }
+    if (owner.pending + owner.attachments.size >= MAX_ATTACHMENTS)
+      throw new Error("native_chat_attachment_limit");
+    const link: SideLink = {};
+    parent.side = link;
+    owner.pending += 1;
+    const chat = owner.active.chat;
+    link.opening = (async () => {
+      const opened = await chat.openSideChat(parent.session);
+      try {
+        this.revalidate(owner, parent);
+        if (parent.side !== link)
+          throw new Error("native_chat_side_unavailable");
+      } catch (error) {
+        await chat.closeSideChat(opened.session).catch(() => {});
+        throw error;
+      }
+      const side: Attachment = {
+        ...emptyAttachment(opened.session),
+        sideOf: { parent, side: opened.side },
+      };
+      link.attachment = side;
+      owner.attachments.set(side.id, side);
+      this.recordShown(owner, opened.session);
+      return side;
+    })()
+      .catch((error: unknown) => {
+        if (parent.side === link) parent.side = undefined;
+        throw error;
+      })
+      .finally(() => {
+        owner.pending -= 1;
+        link.opening = undefined;
+      });
+    return sideAttachment(await link.opening);
   }
 
+  /** Discard a side chat by its own attachment. */
   async closeSideChat(
     event: IpcMainInvokeEvent,
-    attachmentId: string,
-    openId: string
+    sideAttachmentId: string
   ): Promise<void> {
-    const { owner, attachment } = this.requireAttachment(event, attachmentId);
-    if (
-      !token(openId) ||
-      (attachment.side && attachment.side.openId !== openId)
-    )
+    const { owner, attachment } = this.requireAttachment(
+      event,
+      sideAttachmentId
+    );
+    const parent = attachment.sideOf?.parent;
+    if (!parent || parent.side?.attachment !== attachment)
       throw new Error("native_chat_side_unavailable");
-    await this.releaseSide(owner, attachment);
-    this.revalidate(owner, attachment);
+    await this.releaseSide(owner, parent);
+    this.revalidate(owner);
   }
 
   detach(event: IpcMainInvokeEvent, attachmentId: string): void {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
-    owner.attachments.delete(attachment.id);
-    attachment.editorSurfaces?.close();
-    void this.releaseSide(owner, attachment).catch(() => {});
-    for (const [id, subscription] of owner.subscriptions) {
-      if (subscription.attachment === attachment)
-        this.unsubscribeOwned(owner, id);
+    // A side chat lives only through its attachment; detaching discards it.
+    const parent = attachment.sideOf?.parent;
+    if (parent?.side?.attachment === attachment) {
+      void this.releaseSide(owner, parent).catch(() => {});
+      return;
     }
+    this.dropAttachment(owner, attachment);
+    void this.releaseSide(owner, attachment).catch(() => {});
   }
 
   publishEditorSurfaces(
@@ -2390,15 +2385,7 @@ export class NativeChatIpc {
       const existing = [...owner.attachments.values()].find(
         (entry) => entry.session === session
       );
-      const attachment = existing ?? {
-        id: randomUUID(),
-        session,
-        observations: new Map(),
-        approvals: new Map(),
-        questions: new Map(),
-        librarySelections: new Map(),
-        goals: new Map(),
-      };
+      const attachment = existing ?? emptyAttachment(session);
       owner.attachments.set(attachment.id, attachment);
       this.recordShown(owner, session);
       return { attachmentId: attachment.id, sessionId: session.id };
@@ -2436,11 +2423,12 @@ export class NativeChatIpc {
         stopWatching();
         for (const id of owner.subscriptions.keys())
           this.unsubscribeOwned(owner, id);
-        for (const attachment of owner.attachments.values()) {
+        const attachments = [...owner.attachments.values()];
+        owner.attachments.clear();
+        for (const attachment of attachments) {
           attachment.editorSurfaces?.close();
           void this.releaseSide(owner, attachment).catch(() => {});
         }
-        owner.attachments.clear();
       },
     };
     this.owners.set(sender, owner);
@@ -2520,7 +2508,13 @@ export class NativeChatIpc {
     for (const owner of this.owners.values()) {
       if (!sameActive(active, owner.active)) continue;
       for (const attachment of owner.attachments.values()) {
-        if (attachment.session !== session) continue;
+        // The host discards a deleted chat's side chats with it.
+        if (
+          attachment.session !== session &&
+          attachment.sideOf?.parent.session !== session
+        )
+          continue;
+        attachment.side = undefined;
         owner.attachments.delete(attachment.id);
         attachment.editorSurfaces?.close();
         owner.retired.add(attachment.id);
@@ -2591,26 +2585,32 @@ export class NativeChatIpc {
     }
   }
 
-  private releaseSide(owner: Owner, attachment: Attachment): Promise<void> {
-    if (attachment.closingSide) return attachment.closingSide;
-    const side = attachment.side;
-    if (!side) return Promise.resolve();
-    attachment.side = undefined;
-    const chat = owner.active.chat;
-    const closing = (async () => {
-      let opened = side.chat ?? (await side.opening?.catch(() => undefined));
-      if (!opened && side.unconfirmed)
-        opened = await chat.openSideChat(
-          attachment.session,
-          side.nativeRequestId
-        );
-      if (opened) await chat.closeSideChat(opened);
-    })().finally(() => {
-      if (attachment.closingSide === closing)
-        attachment.closingSide = undefined;
-    });
-    attachment.closingSide = closing;
-    return closing;
+  /**
+   * Discard `parent`'s side chat: its attachment and subscriptions go first,
+   * so nothing more is delivered for it, then the child discards the
+   * session. A side chat still opening is discarded when it opens.
+   */
+  private async releaseSide(owner: Owner, parent: Attachment): Promise<void> {
+    const link = parent.side;
+    if (!link) return;
+    parent.side = undefined;
+    const side = link.attachment;
+    if (!side) {
+      await link.opening?.catch(() => {});
+      return;
+    }
+    this.dropAttachment(owner, side);
+    await owner.active.chat.closeSideChat(side.session);
+  }
+
+  private dropAttachment(owner: Owner, attachment: Attachment): void {
+    if (owner.attachments.get(attachment.id) === attachment)
+      owner.attachments.delete(attachment.id);
+    attachment.editorSurfaces?.close();
+    for (const [id, subscription] of owner.subscriptions) {
+      if (subscription.attachment === attachment)
+        this.unsubscribeOwned(owner, id);
+    }
   }
 
   private scope(
@@ -2935,4 +2935,28 @@ function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
+}
+
+function emptyAttachment(session: NativeChatSession): Attachment {
+  return {
+    id: randomUUID(),
+    session,
+    observations: new Map(),
+    approvals: new Map(),
+    questions: new Map(),
+    librarySelections: new Map(),
+    goals: new Map(),
+  };
+}
+
+function sideAttachment(attachment: Attachment): NativeChatSideAttachment {
+  const side = attachment.sideOf?.side;
+  if (!side) throw new Error("native_chat_side_unavailable");
+  return {
+    attachmentId: attachment.id,
+    sessionId: attachment.session.id,
+    parentSessionId: side.parent,
+    compacted: side.compacted,
+    omitted: side.omitted,
+  };
 }

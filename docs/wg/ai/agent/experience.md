@@ -269,23 +269,40 @@ for help. They do not run indefinitely.
 ## Ask in a side chat
 
 A side chat lets the person ask a focused question using context from the main
-conversation while its work continues. It starts a separate conversation from
-an identifiable context snapshot, including any earlier compaction already
-represented there. The side chat's later discussion stays separate.
+conversation while its work continues. It is an ordinary conversation forked
+from the main conversation's committed history, with the same model, settings,
+tools and permission rules. Everything a conversation can do — streaming,
+queueing, stopping, questions and approvals, transcript reading — works the
+same way. The main conversation does not change, and the side chat's later
+discussion stays separate.
 
-The agent is explicitly told that it is answering a side question. Inherited
-history supplies background, and the person's new messages supply the current
-request. It does not continue the main task merely because that task appears
-in the inherited context.
+A side chat differs from an ordinary fork only by policy:
 
-The normal purpose is questions and lightweight exploration. An explicitly
-requested action still follows the side chat's available tools and permissions.
-The product shows its retention and closing behavior. A temporary conversation
-can have lasting external effects, which retain their actual outcome records.
+| Concern           | Side-chat rule                                                                                                                                   |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Role              | The agent is told it is answering in a side chat, not continuing the main task.                                                                  |
+| Inherited history | A boundary follows the copied history. Requests, plans, tool calls and approvals before it are background; only messages after it are active.    |
+| Effects           | Questions and non-mutating exploration by default. A change happens only when the person asks for it after the boundary, and stays minimal.      |
+| Authority         | The main conversation's permissions, unchanged. The policy steers behavior; it never widens or narrows what a tool may do.                       |
+| Unavailable       | Delegation and subagents, goals, scheduled continuation, forking, nested side chats, manual compaction, and catalog changes such as renaming.    |
+| Retention         | Temporary. Never listed or titled, and discarded with its data and processes when closed, when its parent is removed, or when its client leaves. |
+
+The policy and boundary are present before the first side turn and on every
+turn after it; they are recomputed rather than stored in the conversation.
+When the copied history is too large, automatic compaction may replace it with
+a summary before the first side turn. The summary remains background and sits
+before the boundary. The side chat's own turns are never summarized, so the
+boundary cannot be folded into a summary, and manual compaction is refused; a
+side chat is meant to be short.
+
+The client learns the unavailable operations from the side chat's state, so it
+can hide those controls instead of discovering them by refusal. A refusal names
+the operation. A temporary conversation can still have lasting external
+effects, which keep their actual outcome records.
 
 Opening or closing the side chat preserves the main task's independent controls.
 Returning to the main chat changes the view. Bringing back an answer or using it
-to steer the main task is an explicit action. A side chat can use a snapshot for
+to steer the main task is an explicit action. A side chat can use its copy for
 background and request a fresh observation when it needs current task status.
 
 ## Work with subagents

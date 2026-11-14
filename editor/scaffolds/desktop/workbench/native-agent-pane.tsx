@@ -6,6 +6,8 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type ReactNode,
+  type RefObject,
 } from "react";
 import type {
   DesktopNativeChat,
@@ -25,7 +27,6 @@ import {
   PlusIcon,
   GoalIcon,
   ListChecksIcon,
-  MessageSquareTextIcon,
   ImageIcon,
   XIcon,
 } from "lucide-react";
@@ -44,6 +45,7 @@ import {
 import {
   NativeChatController,
   type NativeChatEditorSurfaces,
+  type NativeChatView,
 } from "@/lib/agent-chat/native-chat-controller";
 import { subscribeToNativeNotificationFocus } from "@/lib/desktop/agent-focus-session";
 import type { ComposerCatalog, ComposerController } from "@/kits/composer";
@@ -60,7 +62,10 @@ import { ContextMeter } from "../shared/context-meter";
 import { computeContextUsage } from "@/lib/agent-chat/context-usage";
 import { cn } from "@app/ui/lib/utils";
 import styles from "./agent-pane.module.css";
-import { SideChatPlacement } from "./side-chat-placement";
+import {
+  SideChatPlacement,
+  type SideChatPresentation,
+} from "./side-chat-placement";
 import { NativeTurnArtifacts } from "./native-turn-summary";
 import { NativeAttachmentCard } from "./native-attachment-card";
 import { NativeEarlierMessages } from "./native-earlier-messages";
@@ -285,45 +290,16 @@ export function NativeAgentPane({
     created.keepDrafts(COMPOSER_DRAFTS, workspaceId ?? "standalone");
     return created;
   }, [bridge, selectionKey, editorSurfaces, workspaceId]);
-  // Workspace file links in replies open in the workbench, which validates
-  // the path against the workspace before opening a tab.
-  const openWorkspaceLink = useMemo(() => {
-    const open = editorSurfaces?.open;
-    return open
-      ? (path: string) => {
-          const target = workspace_links.workspacePath(path);
-          if (target)
-            void open.call(editorSurfaces, target, () => true).catch(() => {});
-        }
-      : null;
-  }, [editorSurfaces]);
-  const state = useSyncExternalStore(
-    controller.subscribe,
-    controller.read,
-    controller.read
-  );
-  // One preview per staged draft; a new draft object means a new attachment.
-  const attachmentPreview = useMemo(
-    () => (state.attachmentDraft ? controller.attachmentPreview() : null),
-    [controller, state.attachmentDraft]
-  );
-  const mentions = useWorkspaceFileMentions(workspaceId);
-  const catalog = useMemo(
-    () => ({ commands: NO_COMMANDS, mentions }),
-    [mentions]
-  );
-  const draft = useRef<Pick<ComposerController, "appendText">>(null);
-  const pngPicker = useRef<HTMLInputElement>(null);
-  const filePicker = useRef<HTMLInputElement>(null);
-  const [libraryScope, setLibraryScope] = useState<number | null>(null);
-  const [libraryRequest, setLibraryRequest] = useState<{
-    scope: number;
-    selectionId: string;
-  } | null>(null);
+  const draft = useRef<NativeChatComposer>(null);
   // The side chat shows wherever the host places it.
   useEffect(
-    () => SideChatPlacement.connect(controller, sideChatPlacement),
-    [controller, sideChatPlacement]
+    () =>
+      SideChatPlacement.connect(controller, sideChatPlacement, {
+        bridge,
+        workspaceId,
+        editorSurfaces,
+      }),
+    [controller, sideChatPlacement, bridge, workspaceId, editorSurfaces]
   );
   useEffect(() => {
     const profile =
@@ -363,6 +339,136 @@ export function NativeAgentPane({
     connectionRequired,
     starting,
   ]);
+  return (
+    <NativeChatPane
+      controller={controller}
+      bridge={bridge}
+      workspaceId={workspaceId}
+      editorSurfaces={editorSurfaces}
+      connectionRequired={connectionRequired}
+      connectionNote={connectionNote}
+      draftRef={draft}
+      header={(state) => (
+        <NativeChatHeader controller={controller} state={state} />
+      )}
+    />
+  );
+}
+
+/** The composer handle a chat pane lends its owner. */
+type NativeChatComposer = Pick<ComposerController, "appendText" | "focus">;
+
+/**
+ * A side chat, as a placement presents it: the ordinary chat pane bound to
+ * the side session, under a header that closes it. It fills the container it
+ * is placed in; see `side-chat-placement.ts`.
+ */
+export function NativeSideChatPane({
+  presentation,
+}: {
+  presentation: SideChatPresentation;
+}) {
+  const { chat, focus, host, close } = presentation;
+  const draft = useRef<NativeChatComposer>(null);
+  // Each request to show the side chat puts the caret in its composer.
+  useEffect(() => {
+    draft.current?.focus();
+  }, [focus]);
+  return (
+    <NativeChatPane
+      controller={chat}
+      bridge={host.bridge}
+      workspaceId={host.workspaceId}
+      editorSurfaces={host.editorSurfaces}
+      draftRef={draft}
+      autofocus
+      testId="native-side-chat"
+      header={() => (
+        <header className="flex h-10 shrink-0 items-center gap-2 px-3 text-xs font-medium">
+          <span className="min-w-0 flex-1 truncate text-muted-foreground">
+            Side chat
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Close side chat"
+            title="Close side chat"
+            onClick={close}
+          >
+            <XIcon className="size-3.5" />
+          </Button>
+        </header>
+      )}
+    />
+  );
+}
+
+/**
+ * One chat's conversation, prompts and composer, for whatever chat
+ * `controller` is bound to. A chat bound to a fixed session (a side chat)
+ * offers only what it can do: no other model, and only the commands and
+ * modes its snapshot does not refuse. Choosing among chats belongs to
+ * `header`.
+ */
+function NativeChatPane({
+  controller,
+  bridge,
+  workspaceId,
+  editorSurfaces,
+  connectionRequired = false,
+  connectionNote,
+  draftRef: draft,
+  header,
+  autofocus,
+  testId = "workspace-native-chat",
+}: {
+  controller: NativeChatController;
+  bridge: DesktopNativeChat;
+  workspaceId?: string;
+  editorSurfaces?: NativeChatEditorSurfaces;
+  /** No connection can run yet; the composer's model picker starts the chat. */
+  connectionRequired?: boolean;
+  connectionNote?: string;
+  draftRef: RefObject<NativeChatComposer | null>;
+  header: (state: NativeChatView) => ReactNode;
+  autofocus?: boolean;
+  testId?: string;
+}) {
+  // Workspace file links in replies open in the workbench, which validates
+  // the path against the workspace before opening a tab.
+  const openWorkspaceLink = useMemo(() => {
+    const open = editorSurfaces?.open;
+    return open
+      ? (path: string) => {
+          const target = workspace_links.workspacePath(path);
+          if (target)
+            void open.call(editorSurfaces, target, () => true).catch(() => {});
+        }
+      : null;
+  }, [editorSurfaces]);
+  const state = useSyncExternalStore(
+    controller.subscribe,
+    controller.read,
+    controller.read
+  );
+  // One preview per staged draft; a new draft object means a new attachment.
+  const attachmentPreview = useMemo(
+    () => (state.attachmentDraft ? controller.attachmentPreview() : null),
+    [controller, state.attachmentDraft]
+  );
+  const mentions = useWorkspaceFileMentions(workspaceId);
+  const catalog = useMemo(
+    () => ({ commands: NO_COMMANDS, mentions }),
+    [mentions]
+  );
+  const pngPicker = useRef<HTMLInputElement>(null);
+  const filePicker = useRef<HTMLInputElement>(null);
+  const [libraryScope, setLibraryScope] = useState<number | null>(null);
+  const [libraryRequest, setLibraryRequest] = useState<{
+    scope: number;
+    selectionId: string;
+  } | null>(null);
   const snapshot = state.observation?.snapshot;
   const editHistory = controller.canReviseHistory && !state.revisionDraft;
   const turn = snapshot?.current;
@@ -474,11 +580,8 @@ export function NativeAgentPane({
   };
 
   return (
-    <div
-      data-testid="workspace-native-chat"
-      className="flex min-h-0 flex-1 flex-col"
-    >
-      <NativeChatHeader controller={controller} state={state} />
+    <div data-testid={testId} className="flex min-h-0 flex-1 flex-col">
+      {header(state)}
       {(state.profileError || state.catalogEntryError) && (
         <p role="alert" className="px-3 py-1 text-xs text-destructive">
           {state.profileError ?? state.catalogEntryError}
@@ -760,10 +863,8 @@ export function NativeAgentPane({
         />
         <AgentComposerInput
           key={state.scope}
-          draft={{
-            key: controller.draftKey() ?? "",
-            store: COMPOSER_DRAFTS,
-          }}
+          draft={controller.composerDraft()}
+          autofocus={autofocus}
           catalog={catalog}
           className="@container"
           commandActions={[
@@ -783,7 +884,7 @@ export function NativeAgentPane({
                   },
                 ]
               : []),
-            ...(controller.canStartGoal && !state.sideIntent
+            ...(controller.canStartGoal
               ? [
                   {
                     id: "goal",
@@ -795,15 +896,14 @@ export function NativeAgentPane({
                   },
                 ]
               : []),
-            ...(controller.canAskSide && !state.sideIntent
+            ...(controller.canOpenSideChat
               ? [
                   {
                     id: "side",
                     title: "side",
-                    description:
-                      "Ask a quick question on the side; this chat is unchanged",
+                    description: "Open a side chat; this chat is unchanged",
                     standalone: true as const,
-                    run: () => controller.selectSideIntent(true),
+                    run: () => controller.openSideChat(),
                   },
                 ]
               : []),
@@ -818,7 +918,7 @@ export function NativeAgentPane({
                   },
                 ]
               : []),
-            ...state.commands.map(
+            ...controller.commandChoices.map(
               (command): ComposerCommandAction => ({
                 id: command,
                 title: command,
@@ -838,7 +938,7 @@ export function NativeAgentPane({
               return true;
             }
             if (command.id === "side") {
-              controller.selectSideIntent(true);
+              void controller.openSideChat().catch(() => {});
               return true;
             }
             if (command.id === "stop" && state.backgroundProcesses) {
@@ -960,7 +1060,7 @@ export function NativeAgentPane({
                       Library
                     </DropdownMenuItem>
                   )}
-                  {bridge.startGoal && (
+                  {bridge.startGoal && controller.offers("goals") && (
                     <DropdownMenuItem
                       disabled={
                         state.acting ||
@@ -1051,14 +1151,6 @@ export function NativeAgentPane({
                   onRemove={() => controller.selectGoalIntent(false)}
                 />
               )}
-              {state.sideIntent && (
-                <IntentChip
-                  icon={<MessageSquareTextIcon />}
-                  label="Side"
-                  disabled={state.acting}
-                  onRemove={() => controller.selectSideIntent(false)}
-                />
-              )}
             </>
           }
           toolbarEnd={
@@ -1069,13 +1161,14 @@ export function NativeAgentPane({
                 defaultUnavailable={connectionRequired}
                 busy={state.profileBusy || state.acting}
                 onSelect={
-                  bridge.selectProfile
+                  bridge.selectProfile && !controller.fixedSession
                     ? (selection) => void controller.selectProfile(selection)
                     : undefined
                 }
                 onRefresh={() => void controller.readProfiles()}
                 effort={state.effort}
                 ultraAvailable={state.effortAvailable}
+                ultraOffered={controller.offers("delegation")}
                 goal={state.goalIntent}
                 onEffort={(effort) => controller.selectEffort(effort)}
               />

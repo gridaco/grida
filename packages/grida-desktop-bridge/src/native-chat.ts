@@ -151,18 +151,35 @@ export type NativeChatCatalogChange = Pick<
   "revision" | "title" | "archived"
 >;
 
-export type NativeChatSideContext = Readonly<{
-  sourceRevision: number;
-  compacted: boolean;
-  truncated: boolean;
-  omitted: boolean;
-}>;
+/**
+ * A temporary side chat: an ordinary chat forked from its parent's committed
+ * conversation and attached to the frame that opened it. Every chat method
+ * takes its `attachmentId`; closing it discards the side chat.
+ */
+export type NativeChatSideAttachment = NativeChatAttachment &
+  Readonly<{
+    parentSessionId: string;
+    /** The parent's model context had been compacted. */
+    compacted: boolean;
+    /** The copy leaves out parent material it cannot carry. */
+    omitted: boolean;
+  }>;
 
-export type NativeChatSideAnswer = Readonly<{
-  turnId: string;
-  status: "succeeded" | "failed" | "cancelled" | "uncertain";
-  text: string;
-  textTruncated: boolean;
+/** What a side chat refuses; its snapshot lists each one. */
+export type NativeChatSideRefusal =
+  | "fork"
+  | "side_chat"
+  | "compaction"
+  | "goals"
+  | "subagents"
+  | "delegation"
+  | "wakeups"
+  | "catalog";
+
+export type NativeChatSideSnapshot = Readonly<{
+  parentSessionId: string;
+  temporary: true;
+  unavailable: readonly NativeChatSideRefusal[];
 }>;
 
 export type NativeChatReadiness =
@@ -205,6 +222,8 @@ export type NativeChatSnapshot = Readonly<{
   idleQueueResumeAvailable?: true;
   current: NativeChatTurn | null;
   latest: NativeChatTurn | null;
+  /** Present for a side chat. */
+  side?: NativeChatSideSnapshot;
 }>;
 
 export type NativeChatObservation = Readonly<{
@@ -762,17 +781,13 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     input: NativeChatRevisionInput
   ): Promise<NativeChatRevisionReceipt>;
   load(sessionId: string): Promise<NativeChatAttachment>;
-  openSideChat?(
-    attachmentId: string,
-    openId: string
-  ): Promise<NativeChatSideContext>;
-  askSideChat?(
-    attachmentId: string,
-    openId: string,
-    requestId: string,
-    text: string
-  ): Promise<NativeChatSideAnswer>;
-  closeSideChat?(attachmentId: string, openId: string): Promise<void>;
+  /**
+   * Open the side chat of an attached chat, or return the one already open
+   * for it. The side chat is attached to this frame only.
+   */
+  openSideChat?(attachmentId: string): Promise<NativeChatSideAttachment>;
+  /** Discard a side chat by its own attachment. */
+  closeSideChat?(sideAttachmentId: string): Promise<void>;
   detach(attachmentId: string): Promise<void>;
   publishEditorSurfaces?(
     attachmentId: string,

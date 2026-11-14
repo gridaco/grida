@@ -57,6 +57,8 @@ export type ComposerController = {
   /** Restore a saved document into an empty editor. False when not applied. */
   restoreDocument: (doc: unknown) => boolean;
   appendText: (text: string, maxBytes: number) => boolean;
+  /** Put the caret at the end of the draft. False before the editor exists. */
+  focus: () => boolean;
   insertFileReference: (reference: ComposerFileReference) => boolean;
   setTriggerIndex: (index: number) => void;
   moveTriggerIndex: (delta: number) => void;
@@ -157,6 +159,9 @@ export function useComposer() {
       },
       appendText(text, maxBytes) {
         return !!editor && ComposerTiptap.appendText(editor, text, maxBytes);
+      },
+      focus() {
+        return !!editor && editor.commands.focus("end");
       },
       insertFileReference(reference) {
         if (!editor) return false;

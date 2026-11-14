@@ -476,24 +476,11 @@ function setup(
     async load(id) {
       return load(id);
     },
-    async openSideChat(parent, requestId) {
+    async openSideChat(parent) {
+      const id = `side/${parent.id}/${sessions.size}`;
       return {
-        id: requestId,
-        parent: parent.id,
-        context: {
-          sourceRevision: 1,
-          compacted: false,
-          truncated: false,
-          omitted: false,
-        },
-      };
-    },
-    async askSideChat() {
-      return {
-        turnId: "side-turn",
-        status: "succeeded",
-        text: "Side reply",
-        textTruncated: false,
+        session: load(id),
+        side: { id, parent: parent.id, compacted: false, omitted: false },
       };
     },
     async closeSideChat() {},
@@ -1581,64 +1568,83 @@ describe("native chat IPC", () => {
     expect(read).toHaveBeenCalledTimes(2);
   });
 
-  it("scopes temporary side chats to each parent attachment and endpoint generation", async () => {
-    const { ipc, first, second, chat, scopes } = setup();
+  it("lends a side chat only to the frame attachment that opened it", async () => {
+    const { ipc, first, second, chat } = setup();
     const one = await ipc.create(first.event);
     const two = await ipc.load(second.event, one.sessionId);
-    const openId = randomUUID();
-    const requestId = randomUUID();
     const open = vi.spyOn(chat, "openSideChat");
-    const ask = vi.spyOn(chat, "askSideChat");
     const close = vi.spyOn(chat, "closeSideChat");
-    const context = await ipc.openSideChat(
-      first.event,
-      one.attachmentId,
-      openId
-    );
+    const observe = vi.spyOn(chat, "observe");
+    const side = await ipc.openSideChat(first.event, one.attachmentId);
+    expect(side).toEqual({
+      attachmentId: expect.any(String),
+      sessionId: expect.stringMatching(/^side\//),
+      parentSessionId: one.sessionId,
+      compacted: false,
+      omitted: false,
+    });
+    // A second open returns the side chat the parent already has.
     await expect(
-      ipc.openSideChat(first.event, one.attachmentId, openId)
-    ).resolves.toEqual(context);
-    expect(open).toHaveBeenCalledTimes(1);
-    await expect(
-      ipc.askSideChat(
-        second.event,
-        two.attachmentId,
-        openId,
-        requestId,
-        "Copied"
-      )
-    ).rejects.toThrow("native_chat_side_unavailable");
-    await ipc.openSideChat(second.event, two.attachmentId, openId);
-    expect(open.mock.calls[0][1]).not.toBe(open.mock.calls[1][1]);
-    await ipc.askSideChat(
-      first.event,
-      one.attachmentId,
-      openId,
-      requestId,
-      "Original"
-    );
-    expect(ask).toHaveBeenCalledExactlyOnceWith(
-      { id: one.sessionId },
-      expect.objectContaining({ parent: one.sessionId }),
-      requestId,
-      "Original"
-    );
+      ipc.openSideChat(first.event, one.attachmentId)
+    ).resolves.toEqual(side);
+    expect(open).toHaveBeenCalledExactlyOnceWith({ id: one.sessionId });
 
-    scopes.set(first.sender, { workspaceId: WORKSPACE, chat: { ...chat } });
-    await expect(
-      ipc.askSideChat(
-        first.event,
-        one.attachmentId,
-        openId,
-        requestId,
-        "Original"
-      )
-    ).rejects.toThrow("native_chat_scope_changed");
-    expect(close).toHaveBeenCalledExactlyOnceWith(
-      expect.objectContaining({ id: open.mock.calls[0][1] })
+    // The opening frame uses it like any attached chat.
+    await ipc.observe(first.event, side.attachmentId);
+    expect(observe).toHaveBeenLastCalledWith({ id: side.sessionId });
+
+    // Another frame showing the same parent cannot name it.
+    await expect(ipc.observe(second.event, side.attachmentId)).rejects.toThrow(
+      "native_chat_attachment_unavailable"
     );
+    await expect(
+      ipc.closeSideChat(second.event, side.attachmentId)
+    ).rejects.toThrow("native_chat_attachment_unavailable");
+    const other = await ipc.openSideChat(second.event, two.attachmentId);
+    expect(other.sessionId).not.toBe(side.sessionId);
+
+    // A side chat opens no side chat, and close takes the side attachment.
+    await expect(
+      ipc.openSideChat(first.event, side.attachmentId)
+    ).rejects.toThrow("native_chat_side_nested_unavailable");
+    await expect(
+      ipc.closeSideChat(first.event, one.attachmentId)
+    ).rejects.toThrow("native_chat_side_unavailable");
+
+    await ipc.closeSideChat(first.event, side.attachmentId);
+    expect(close).toHaveBeenCalledExactlyOnceWith({ id: side.sessionId });
+    await expect(ipc.observe(first.event, side.attachmentId)).rejects.toThrow(
+      "native_chat_attachment_unavailable"
+    );
+    await ipc.observe(first.event, one.attachmentId);
+
+    // Detaching a parent discards its side chat.
     ipc.detach(second.event, two.attachmentId);
-    await vi.waitFor(() => expect(close).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() =>
+      expect(close).toHaveBeenLastCalledWith({ id: other.sessionId })
+    );
+  });
+
+  it("discards a frame's side chats when its scope changes or it detaches one", async () => {
+    const { ipc, first, chat, scopes } = setup();
+    const parent = await ipc.create(first.event);
+    const close = vi.spyOn(chat, "closeSideChat");
+    const side = await ipc.openSideChat(first.event, parent.attachmentId);
+    ipc.detach(first.event, side.attachmentId);
+    await vi.waitFor(() =>
+      expect(close).toHaveBeenCalledExactlyOnceWith({ id: side.sessionId })
+    );
+    await ipc.observe(first.event, parent.attachmentId);
+
+    const next = await ipc.openSideChat(first.event, parent.attachmentId);
+    expect(next.sessionId).not.toBe(side.sessionId);
+    scopes.set(first.sender, { workspaceId: WORKSPACE, chat: { ...chat } });
+    await expect(ipc.observe(first.event, next.attachmentId)).rejects.toThrow(
+      "native_chat_scope_changed"
+    );
+    await vi.waitFor(() =>
+      expect(close).toHaveBeenLastCalledWith({ id: next.sessionId })
+    );
   });
 
   it("retires a side chat that opens after navigation", async () => {
@@ -1650,41 +1656,45 @@ describe("native chat IPC", () => {
       >();
     vi.spyOn(chat, "openSideChat").mockReturnValueOnce(opened.promise);
     const close = vi.spyOn(chat, "closeSideChat");
-    const opening = ipc.openSideChat(
-      first.event,
-      parent.attachmentId,
-      randomUUID()
-    );
+    const opening = ipc.openSideChat(first.event, parent.attachmentId);
     first.contents.emit("did-start-navigation", { isMainFrame: true });
-    const side = {
-      id: "late-side",
-      parent: parent.sessionId,
-      context: {
-        sourceRevision: 1,
+    const session = { id: "side/late" };
+    opened.resolve({
+      session,
+      side: {
+        id: session.id,
+        parent: parent.sessionId,
         compacted: false,
-        truncated: false,
         omitted: false,
       },
-    };
-    opened.resolve(side);
+    });
     await expect(opening).rejects.toThrow("native_chat_attachment_unavailable");
-    expect(close).toHaveBeenCalledExactlyOnceWith(side);
+    expect(close).toHaveBeenCalledExactlyOnceWith(session);
   });
 
-  it("recovers an unconfirmed open only to close the exact temporary chat", async () => {
-    const { ipc, first, chat } = setup();
+  it("drops the side chats of a deleted chat with it", async () => {
+    const { ipc, first, chat } = setup(async () => true);
+    Object.defineProperty(chat, "acceptsSavedChatDeletion", { value: true });
+    chat.deleteSavedChat = async () => {};
     const parent = await ipc.create(first.event);
-    const openId = randomUUID();
-    const open = vi
-      .spyOn(chat, "openSideChat")
-      .mockRejectedValueOnce(new Error("native_agent_request_timeout"));
-    const close = vi.spyOn(chat, "closeSideChat");
+    const side = await ipc.openSideChat(first.event, parent.attachmentId);
+    const observed = await ipc.observe(first.event, parent.attachmentId);
+    vi.spyOn(chat, "observe").mockResolvedValueOnce({
+      ...observed.snapshot,
+      current: null,
+    });
+    const idle = await ipc.observe(first.event, parent.attachmentId);
     await expect(
-      ipc.openSideChat(first.event, parent.attachmentId, openId)
-    ).rejects.toThrow("native_agent_request_timeout");
-    await ipc.closeSideChat(first.event, parent.attachmentId, openId);
-    expect(open.mock.calls[1]).toEqual(open.mock.calls[0]);
-    expect(close).toHaveBeenCalledTimes(1);
+      ipc.deleteSavedChat(
+        first.event,
+        parent.attachmentId,
+        idle.observationId,
+        0
+      )
+    ).resolves.toBe(true);
+    await expect(ipc.observe(first.event, side.attachmentId)).rejects.toThrow(
+      "native_chat_session_deleted"
+    );
   });
 
   it("issues goal controls only for the attached frame's inspected basis", async () => {
@@ -2566,10 +2576,8 @@ describe("background processes", () => {
     const one = await ipc.create(first.event);
     ipc.detach(first.event, one.attachmentId);
     const two = await ipc.create(first.event);
-    const openId = randomUUID();
-    await ipc.openSideChat(first.event, two.attachmentId, openId);
-    await ipc.closeSideChat(first.event, two.attachmentId, openId);
-    // Switching chats and closing a side chat keep processes running.
+    const side = await ipc.openSideChat(first.event, two.attachmentId);
+    // Switching chats keeps processes running.
     expect(stop).not.toHaveBeenCalled();
     // Another window still shows the second chat.
     await ipc.load(second.event, two.sessionId);
@@ -2577,6 +2585,8 @@ describe("background processes", () => {
     await vi.waitFor(() => expect(stop).toHaveBeenCalled());
     const stopped = stop.mock.calls.map(([session]) => session.id);
     expect(stopped).toContain(one.sessionId);
+    // A side chat is shown only by the window that opened it.
+    expect(stopped).toContain(side.sessionId);
     expect(stopped).not.toContain(two.sessionId);
     // A closing window stops all of each chat's processes.
     expect(stop.mock.calls.every((call) => call.length === 1)).toBe(true);

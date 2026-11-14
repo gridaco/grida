@@ -63,17 +63,36 @@ connection. Deleting data does not reset a connection.
 
 ## Ask a side question
 
-To ask about the conversation without adding to it, type **`/side`** in an
-idle chat that already has a finished turn. Choosing it adds a removable
-**Side** badge and sends nothing. Type the question and send: it goes to a
-temporary, read-only side chat that opens as a **Side chat** tab beside your
-open files (in a file window, under the chat), and this chat does not change.
-Ask further questions in the tab. The side chat sees this chat's saved text
-but no project files or tools, takes up to six questions, and is discarded
-when you close its tab, choose **Close side chat**, or leave the chat; a
-closed side chat cannot be reopened. **Side** cannot be combined with a goal or an
-attachment; with **Plan** on, the side question still leaves the plan
-unchanged. ACP clients can open side chats too.
+To ask about the conversation without adding to it, type **`/side`** in a
+chat and send it, or choose **side** from the **`/`** menu. A temporary side
+chat opens right away as a **Side chat** tab beside your open files (in a file
+window, under the chat) with its message box ready, and this chat does not
+change. Send **`/side`** followed by a question to open the side chat and ask
+it in one step. While a side chat is open, **`/side`** brings it forward, and
+a question sent with it goes to that side chat.
+
+A side chat starts from a copy of this chat's saved conversation and continues
+as its own chat with the same model and effort. It looks and works like any
+chat: replies stream in, and you can queue, steer, pause or stop it, answer
+its questions and approvals, use **Plan**, and see its background processes.
+Ask as many follow-up questions as you like in the tab. It treats the copied
+conversation as
+background: it answers your questions and can look through the project with
+the same tools and permissions as this chat, and it asks for approval in the
+same places. It does not pick up this chat's unfinished work, and it avoids
+changing files or settings unless you ask it to after opening it. When the
+copied conversation is long, the side chat summarizes it automatically before
+your first question and keeps treating the summary as background. Goals,
+scheduled follow-ups, subagents, **Ultra** effort, **`/fork`**, **`/compact`**,
+another **`/side`**, choosing another model, renaming and archiving are not
+available in a side chat, and its message box does not offer them.
+
+A side chat never appears in your chat list. It is discarded with its
+conversation, attachments and background processes when you close its tab,
+choose **Close side chat**, switch to another chat, delete this chat, close the
+window, or quit; a closed side chat cannot be reopened. Opening it leaves this
+chat's **Plan** and draft settings as they were. ACP clients can open side
+chats too.
 [Ask in a temporary side chat](./clients.md#ask-in-a-temporary-side-chat)
 
 ## Continue a long conversation

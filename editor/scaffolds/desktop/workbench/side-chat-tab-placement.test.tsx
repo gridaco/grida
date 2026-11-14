@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { EditorGroup } from "./editor-group";
 import { SideChatPlacement } from "./side-chat-placement";
-import { FakeSideChatParent } from "./side-chat-placement.fixtures";
+import { FakeSideChatParent, idleBridge } from "./side-chat-placement.fixtures";
 import { SideChatTabPlacement } from "./side-chat-tab-placement";
 import { WorkbenchPanels } from "./workbench-panels";
 import { WorkbenchTab } from "./workbench-tab";
@@ -15,7 +15,8 @@ function fixture() {
   const parent = new FakeSideChatParent();
   const stop = SideChatPlacement.connect(
     parent,
-    new SideChatTabPlacement(panels)
+    new SideChatTabPlacement(panels),
+    { bridge: idleBridge }
   );
   const tabOf = (id: string) =>
     WorkbenchTab.panel(SideChatTabPlacement.panel(id));
@@ -23,7 +24,7 @@ function fixture() {
 }
 
 describe("SideChatTabPlacement", () => {
-  it("opens a side chat as the focused Side chat tab showing its view", () => {
+  it("opens a side chat as the focused Side chat tab showing the chat pane", () => {
     const { group, panels, parent, tabOf } = fixture();
     group.open(file("a.svg"));
     const side = parent.open();
@@ -35,9 +36,14 @@ describe("SideChatTabPlacement", () => {
       .getSnapshot()
       .get(SideChatTabPlacement.panel(side.id))!;
     expect(panel.title).toBe("Side chat");
-    expect(renderToStaticMarkup(<>{panel.content}</>)).toContain(
-      'data-testid="native-side-chat"'
-    );
+    const html = renderToStaticMarkup(<>{panel.content}</>);
+    expect(html).toContain('data-testid="native-side-chat"');
+    expect(html).toContain('aria-label="Close side chat"');
+    // The same transcript and composer as any chat, without choosing chats.
+    expect(html).toContain('aria-label="Add to message"');
+    expect(html).not.toContain('aria-label="Open chat list"');
+    expect(html).not.toContain('aria-label="New chat"');
+    expect(html).not.toContain('aria-label="Chat options"');
   });
 
   it("ends the side chat when its tab closes, and never reopens it", async () => {
@@ -51,7 +57,7 @@ describe("SideChatTabPlacement", () => {
       active: file("a.svg"),
     });
     // Parent updates while the side chat is still closing keep the tab shut.
-    parent.set({});
+    parent.show();
     expect(group.getSnapshot().tabs).toEqual([file("a.svg")]);
     await vi.waitFor(() => expect(parent.read().sideChat).toBeNull());
     group.reopenClosed();
@@ -84,16 +90,15 @@ describe("SideChatTabPlacement", () => {
     expect(parent.close).not.toHaveBeenCalled();
   });
 
-  it("brings its tab forward when a question is asked from elsewhere", async () => {
+  it("brings its tab forward when asked to show the open side chat", () => {
     const { group, parent, tabOf } = fixture();
     const side = parent.open();
-    await side.open();
     group.open(file("a.svg"));
-    side.setDraft("Why?");
-    const asking = side.ask();
-    expect(group.getSnapshot().active).toBe(tabOf(side.id));
-    await asking;
-    group.activate(file("a.svg"));
     expect(group.getSnapshot().active).toBe(file("a.svg"));
+    parent.show();
+    expect(group.getSnapshot()).toEqual({
+      tabs: [tabOf(side.id), file("a.svg")],
+      active: tabOf(side.id),
+    });
   });
 });

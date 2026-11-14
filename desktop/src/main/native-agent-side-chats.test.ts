@@ -30,20 +30,15 @@ async function provider() {
     request.on("end", () => {
       requests.push(JSON.parse(body));
       const index = requests.length;
-      if (request.url !== "/v1/chat/completions" || index > 4) {
+      if (request.url !== "/v1/chat/completions" || index > 2) {
         response.writeHead(400).end();
         return;
       }
-      const text = [
-        "Parent partial.",
-        "The separate answer.",
-        "Side work held.",
-        "Parent finished independently.",
-      ][index - 1];
+      const text = ["Parent partial.", "The separate answer."][index - 1];
       response.writeHead(200, { "content-type": "text/event-stream" });
       response.write(chunk(index, { role: "assistant", content: text }));
       if (index === 1) parent = response;
-      if (index === 2 || index === 4)
+      if (index === 2)
         response.end(chunk(index, {}, "stop") + "data: [DONE]\n\n");
     });
   });
@@ -66,7 +61,7 @@ async function provider() {
 }
 
 it.runIf(Boolean(packaged))(
-  "keeps temporary side questions separate while the parent continues through the same private child",
+  "runs a side chat as an ordinary attached chat while the parent continues through the same private child",
   async () => {
     const root = fs.mkdtempSync(
       path.join(fs.realpathSync(os.tmpdir()), "grida-side-chat-")
@@ -85,6 +80,16 @@ it.runIf(Boolean(packaged))(
       sender,
       senderFrame: frame,
     } as unknown as IpcMainInvokeEvent;
+    const otherFrame = { url: frame.url };
+    const otherSender = Object.assign(new EventEmitter(), {
+      mainFrame: otherFrame,
+      isDestroyed: () => false,
+      isLoadingMainFrame: () => false,
+    }) as unknown as WebContents;
+    const other = {
+      sender: otherSender,
+      senderFrame: otherFrame,
+    } as unknown as IpcMainInvokeEvent;
     let chat: NativeAgentChat | undefined;
     try {
       chat = await NativeAgentChat.start({
@@ -97,9 +102,9 @@ it.runIf(Boolean(packaged))(
       });
       const active = { workspaceId: "workspace", chat };
       const ipc = new NativeChatIpc(origin, (candidate) =>
-        candidate === sender ? active : null
+        candidate === sender || candidate === otherSender ? active : null
       );
-      const { attachmentId } = await ipc.create(event);
+      const { attachmentId, sessionId } = await ipc.create(event);
       const parent = await ipc.submit(
         event,
         attachmentId,
@@ -107,107 +112,66 @@ it.runIf(Boolean(packaged))(
         "Continue the parent task."
       );
       await vi.waitFor(() => expect(endpoint.requests).toHaveLength(1));
-      const openId = randomUUID();
-      const opened = await ipc.openSideChat(event, attachmentId, openId);
-      expect(opened).toEqual({
-        sourceRevision: expect.any(Number),
+      const side = await ipc.openSideChat(event, attachmentId);
+      expect(side).toEqual({
+        attachmentId: expect.any(String),
+        sessionId: expect.stringMatching(/^side\//),
+        parentSessionId: sessionId,
         compacted: false,
-        truncated: false,
-        omitted: false,
+        omitted: expect.any(Boolean),
       });
-      await expect(
-        ipc.openSideChat(event, attachmentId, openId)
-      ).resolves.toEqual(opened);
-      expect(endpoint.requests).toHaveLength(1);
+      await expect(ipc.openSideChat(event, attachmentId)).resolves.toEqual(
+        side
+      );
+      // Another frame of the same child cannot load or name the side chat.
+      await expect(ipc.load(other, side.sessionId)).rejects.toThrow(
+        "native_chat_side_unavailable"
+      );
+      await expect(ipc.observe(other, side.attachmentId)).rejects.toThrow(
+        "native_chat_attachment_unavailable"
+      );
 
-      const requestId = randomUUID();
-      const first = await ipc.askSideChat(
+      const observed = await ipc.observe(event, side.attachmentId);
+      expect(observed.snapshot.side).toEqual({
+        parentSessionId: sessionId,
+        temporary: true,
+        unavailable: expect.arrayContaining(["side_chat", "catalog"]),
+      });
+      const asked = await ipc.submit(
         event,
-        attachmentId,
-        openId,
-        requestId,
+        side.attachmentId,
+        randomUUID(),
         "Explain one decision."
       );
-      expect(first).toEqual({
-        turnId: expect.any(String),
-        status: "succeeded",
-        text: "The separate answer.",
-        textTruncated: false,
+      await vi.waitFor(() => expect(endpoint.requests).toHaveLength(2));
+      await vi.waitFor(async () => {
+        const settled = await ipc.observe(event, side.attachmentId);
+        expect(settled.snapshot.latest?.turnId).toBe(asked.turnId);
+        expect(settled.snapshot.latest?.status).toBe("succeeded");
       });
-      expect(endpoint.requests[1].tools).toBeUndefined();
-      expect(JSON.stringify(endpoint.requests[1].messages)).toContain(
-        "Continue the parent task."
-      );
-      expect(JSON.stringify(endpoint.requests[1].messages)).not.toContain(
-        "Parent partial."
-      );
-      await expect(
-        ipc.askSideChat(
-          event,
-          attachmentId,
-          openId,
-          requestId,
-          "Explain one decision."
-        )
-      ).resolves.toEqual(first);
-      await expect(
-        ipc.askSideChat(event, attachmentId, openId, requestId, "Changed.")
-      ).rejects.toThrow("submission_input_changed");
-      expect(endpoint.requests).toHaveLength(2);
+      expect(
+        JSON.stringify(await ipc.transcript(event, side.attachmentId))
+      ).toContain("The separate answer.");
 
-      const held = ipc.askSideChat(
-        event,
-        attachmentId,
-        openId,
-        randomUUID(),
-        "Follow up on that."
-      );
-      const retired = held.catch((error: unknown) => error);
-      await vi.waitFor(() => expect(endpoint.requests).toHaveLength(3));
-      expect(JSON.stringify(endpoint.requests[2].messages)).toContain(
-        "The separate answer."
-      );
       const current = await ipc.observe(event, attachmentId);
       expect(current.snapshot.current?.turnId).toBe(parent.turnId);
-      await ipc.steer(event, attachmentId, {
-        observationId: current.observationId,
-        requestId: "parent-correction",
-        text: "Adjust the parent task.",
-      });
+      await ipc.closeSideChat(event, side.attachmentId);
+      await expect(ipc.observe(event, side.attachmentId)).rejects.toThrow(
+        "native_chat_attachment_unavailable"
+      );
       endpoint.releaseParent();
-      await vi.waitFor(() => expect(endpoint.requests).toHaveLength(4));
-      expect(JSON.stringify(endpoint.requests[3].messages)).toContain(
-        "Adjust the parent task."
-      );
-      expect(JSON.stringify(endpoint.requests[3].messages)).not.toContain(
-        "The separate answer."
-      );
-      await ipc.closeSideChat(event, attachmentId, openId);
-      const failure = await retired;
-      expect(failure).toBeInstanceOf(Error);
-      expect((failure as Error).message).toMatch(
-        /side_chat_turn_unsettled|native_chat_side_unavailable/
-      );
-      await expect(
-        ipc.askSideChat(
-          event,
-          attachmentId,
-          openId,
-          randomUUID(),
-          "After close."
-        )
-      ).rejects.toThrow("native_chat_side_unavailable");
       await vi.waitFor(async () => {
         const settled = await ipc.observe(event, attachmentId);
         expect(settled.snapshot.current).toBeNull();
         expect(settled.snapshot.latest?.turnId).toBe(parent.turnId);
-        expect(settled.snapshot.latest?.status).toBe("succeeded");
       });
-      const transcript = await ipc.transcript(event, attachmentId);
-      expect(JSON.stringify(transcript)).toContain(
-        "Parent finished independently."
+      const transcript = JSON.stringify(
+        await ipc.transcript(event, attachmentId)
       );
-      expect(JSON.stringify(transcript)).not.toContain("The separate answer.");
+      expect(transcript).toContain("Parent partial.");
+      expect(transcript).not.toContain("The separate answer.");
+      const listed = await ipc.list(event);
+      expect(listed.sessionIds).not.toContain(side.sessionId);
     } finally {
       try {
         await chat?.close();

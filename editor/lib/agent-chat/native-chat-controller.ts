@@ -38,6 +38,8 @@ import type {
   NativeChatQueuePage,
   NativeChatSteer,
   NativeChatReadiness,
+  NativeChatSideAttachment,
+  NativeChatSideRefusal,
   NativeChatTextUpdate,
   NativeChatTranscriptPage,
   NativeChatTurnRecord,
@@ -48,9 +50,8 @@ import type {
   NativeSubagentClient,
 } from "@grida/desktop-bridge";
 import { GoalSpending } from "./goal-spending";
-import type { ComposerDrafts } from "./composer-drafts";
+import { ComposerDrafts } from "./composer-drafts";
 import { isSupportedImageType } from "./image-attachment";
-import { NativeSideChatController } from "./native-side-chat-controller";
 import { NativeSubagentController } from "./native-subagent-controller";
 import { NativeBackgroundProcessController } from "./native-background-process-controller";
 
@@ -104,6 +105,17 @@ const TERMINAL_OUTCOME: Record<NativeChatTurnSummary["status"], string> = {
   uncertain: "The turn ended with unverified work.",
 };
 
+/**
+ * The side chat a chat opened: an ordinary chat bound to the side session.
+ * `focus` counts the requests to show it, so a placement can bring it forward.
+ */
+export type NativeChatSideChat = Readonly<{
+  /** Stable for one side chat; a later side chat has a new id. */
+  id: string;
+  chat: NativeChatController;
+  focus: number;
+}>;
+
 export type NativeChatView = Readonly<{
   scope: number;
   selected: string | null;
@@ -141,7 +153,7 @@ export type NativeChatView = Readonly<{
   titleArrived: string | null;
   readingEarlier: boolean;
   earlierError: string | null;
-  sideChat: NativeSideChatController | null;
+  sideChat: NativeChatSideChat | null;
   subagents: NativeSubagentController | null;
   /** Present once the attached chat confirms it lists background processes. */
   backgroundProcesses: NativeBackgroundProcessController | null;
@@ -191,8 +203,6 @@ export type NativeChatView = Readonly<{
   goal: NativeChatGoalObservation | null;
   goalReady: boolean;
   goalIntent: boolean;
-  /** The next send asks the temporary read-only side chat, not this chat. */
-  sideIntent: boolean;
   loading: boolean;
   acting: boolean;
   repairing: boolean;
@@ -212,7 +222,7 @@ type Scope = {
   stopEditorSurfaceOpen?: () => void;
   stopEditorSvgText?: () => void;
   editorPresentationRevision?: number;
-  sideChat?: NativeSideChatController;
+  side?: SideChatScope;
   subagents?: NativeSubagentController;
   backgroundProcesses?: NativeBackgroundProcessController;
   selectedAttachment?: SelectedAttachment;
@@ -276,6 +286,15 @@ type Scope = {
   };
   awaitingTurn?: string;
 };
+
+type SideChatScope = {
+  id: string;
+  chat: NativeChatController;
+  /** The side session's attachment, once requested. */
+  opened?: Promise<NativeChatSideAttachment>;
+};
+
+const SIDE_CHAT_UNAVAILABLE = "Side chats are unavailable in this chat.";
 
 const EMPTY: NativeChatView = Object.freeze({
   scope: 0,
@@ -341,7 +360,6 @@ const EMPTY: NativeChatView = Object.freeze({
   goal: null,
   goalReady: false,
   goalIntent: false,
-  sideIntent: false,
   loading: false,
   acting: false,
   repairing: false,
@@ -395,8 +413,44 @@ export class NativeChatController {
     private readonly memory?: Pick<Storage, "getItem" | "setItem">,
     private readonly memoryKey?: string,
     private readonly editorSurfaces?: NativeChatEditorSurfaces,
-    private readonly libraryPicker = false
-  ) {}
+    private readonly libraryPicker = false,
+    /** Bind this chat to one session it does not choose. */
+    private readonly fixed?: NativeChatController.FixedSession
+  ) {
+    if (fixed)
+      this.view = {
+        ...this.view,
+        effort: fixed.effort,
+        profiles: fixed.profiles,
+      };
+  }
+
+  /** While a fixed chat opens its session; see {@link opened}. */
+  private binding?: Promise<void>;
+
+  /**
+   * This chat is bound to one session it did not choose, such as a side chat.
+   * It never lists, switches, creates or organizes chats, and keeps the model
+   * connection of the chat that opened it.
+   */
+  get fixedSession(): boolean {
+    return !!this.fixed;
+  }
+
+  /**
+   * Whether this chat offers `feature`. A side chat refuses what its snapshot
+   * lists, and a fixed chat offers none of them before its first snapshot.
+   */
+  offers(feature: NativeChatSideRefusal): boolean {
+    const snapshot = this.view.observation?.snapshot;
+    if (this.fixed && !snapshot) return false;
+    return !snapshot?.side?.unavailable.includes(feature);
+  }
+
+  /** Settles once a fixed chat has opened its session, or failed to. */
+  opened(): Promise<void> {
+    return this.binding ?? Promise.resolve();
+  }
 
   private drafts?: { store: ComposerDrafts; workspace: string };
 
@@ -406,6 +460,12 @@ export class NativeChatController {
    */
   keepDrafts(store: ComposerDrafts, workspace: string): void {
     this.drafts = { store, workspace };
+  }
+
+  /** Where the composer keeps the selected chat's unsent draft. */
+  composerDraft(): { key: string; store: ComposerDrafts } | undefined {
+    const key = this.draftKey();
+    return key && this.drafts ? { key, store: this.drafts.store } : undefined;
   }
 
   /** The draft key the composer uses for the selected chat. */
@@ -533,6 +593,10 @@ export class NativeChatController {
   };
 
   connect(initial: string | null, profileId?: string | null): void {
+    if (this.fixed) {
+      this.binding ??= this.bind(null);
+      return;
+    }
     const saved = this.beginConnection();
     if (profileId !== null && profileId !== undefined) {
       if (initial) void this.focusChat(initial, profileId);
@@ -887,7 +951,16 @@ export class NativeChatController {
     }
   }
 
+  /** Open a saved chat, or a new one for `null`. A fixed chat stays put. */
   async select(
+    sessionId: string | null,
+    options: { reattach?: boolean } = {}
+  ): Promise<void> {
+    if (this.fixed) return;
+    return this.bind(sessionId, options);
+  }
+
+  private async bind(
     sessionId: string | null,
     { reattach = false }: { reattach?: boolean } = {}
   ): Promise<void> {
@@ -923,12 +996,13 @@ export class NativeChatController {
       ...pickSessionIndependent(this.view),
       scope: scope.id,
       selected: sessionId,
+      ...(this.fixed && { effort: this.fixed.effort }),
       messages: retained?.messages ?? [],
       turnRecords: retained?.turnRecords ?? [],
-      loading: sessionId !== null,
+      loading: sessionId !== null || !!this.fixed,
     });
     void this.readEffortCapability(scope);
-    if (sessionId === null) {
+    if (sessionId === null && !this.fixed) {
       void this.readInputCapabilities(scope).then(() =>
         this.restoreDraft(scope)
       );
@@ -943,7 +1017,14 @@ export class NativeChatController {
       if (this.owns(scope)) {
         if (deletedAttachment(error)) this.forgetDeletedChat(scope);
         else
-          this.update({ error: describe(error, "Couldn't open this chat.") });
+          this.update({
+            error: describe(
+              error,
+              this.fixed
+                ? "Couldn't open the side chat."
+                : "Couldn't open this chat."
+            ),
+          });
       }
     } finally {
       if (this.owns(scope)) {
@@ -986,8 +1067,7 @@ export class NativeChatController {
       !this.view.profileBusy &&
       !this.view.acting &&
       !this.view.steering &&
-      !this.view.goalIntent &&
-      !this.view.sideIntent
+      !this.view.goalIntent
     );
   }
 
@@ -1192,6 +1272,7 @@ export class NativeChatController {
   private ultraOffered(): boolean {
     const profiles = this.view.profiles;
     const active = profiles?.active;
+    if (!this.offers("delegation")) return false;
     return (
       this.view.effortAvailable ||
       (!!active &&
@@ -1223,6 +1304,7 @@ export class NativeChatController {
 
   get hasHooks(): boolean {
     return (
+      !this.fixed &&
       !!this.bridge.inspectHooks &&
       !!this.bridge.importHook &&
       !!this.bridge.removeHook
@@ -1295,6 +1377,7 @@ export class NativeChatController {
 
   get canOrganizeChats(): boolean {
     return (
+      this.offers("catalog") &&
       !!this.bridge.listArchived &&
       !!this.bridge.catalogEntry &&
       !!this.bridge.organize
@@ -1507,70 +1590,96 @@ export class NativeChatController {
     return { attachment, observation, artifact, requireCurrent };
   }
 
+  /**
+   * Whether this chat can open a side chat: an attached chat, not itself bound
+   * to a fixed session, whose connection offers side chats.
+   */
   get canOpenSideChat(): boolean {
     return (
+      !this.fixed &&
       !!this.scope?.attachment &&
-      !this.scope.sideChat &&
-      NativeSideChatController.supported(this.bridge)
+      !!this.bridge.openSideChat &&
+      !!this.bridge.closeSideChat &&
+      !this.view.profileBusy &&
+      this.offers("side_chat")
     );
   }
 
-  openSideChat(): void {
+  /**
+   * Show this chat's side chat, opening one when none is open, and send
+   * `text` there as its next message. This chat itself is unchanged. A side
+   * chat starts from this chat's committed conversation, model and effort;
+   * it is discarded when it closes or this chat is switched or released.
+   */
+  async openSideChat(text?: string): Promise<void> {
     const scope = this.scope;
-    if (
-      !scope?.attachment ||
-      scope.sideChat ||
-      !NativeSideChatController.supported(this.bridge)
-    )
-      return;
-    const side = new NativeSideChatController(
-      this.bridge,
-      scope.attachment.attachmentId
-    );
-    scope.sideChat = side;
-    this.update({ sideChat: side });
-    void side.open();
+    const parent = scope?.attachment;
+    const open = this.bridge.openSideChat;
+    if (!scope || !parent || !open || !this.canOpenSideChat) {
+      if (scope && !scope.side) this.update({ error: SIDE_CHAT_UNAVAILABLE });
+      throw new Error(SIDE_CHAT_UNAVAILABLE);
+    }
+    let side = scope.side;
+    if (!side) {
+      const opening: SideChatScope = {
+        id: crypto.randomUUID(),
+        chat: new NativeChatController(
+          this.bridge,
+          undefined,
+          undefined,
+          undefined,
+          this.libraryPicker,
+          {
+            open: () =>
+              (opening.opened ??= open
+                .call(this.bridge, parent.attachmentId)
+                .catch((error: unknown) => {
+                  opening.opened = undefined;
+                  throw error;
+                })),
+            effort: this.view.effort === "ultra" ? "xhigh" : this.view.effort,
+            profiles: this.view.profiles,
+          }
+        ),
+      };
+      // A side chat's draft ends with it.
+      opening.chat.keepDrafts(new ComposerDrafts(null, null), "side");
+      opening.chat.connect(null);
+      side = scope.side = opening;
+    }
+    this.update({
+      sideChat: {
+        id: side.id,
+        chat: side.chat,
+        focus: (this.view.sideChat?.focus ?? 0) + 1,
+      },
+      error: null,
+    });
+    if (!text?.trim()) return;
+    await side.chat.opened();
+    if (!this.owns(scope) || scope.side !== side) return;
+    await side.chat.submit(text);
   }
 
   async closeSideChat(): Promise<void> {
     const scope = this.scope;
-    const side = scope?.sideChat;
+    const side = scope?.side;
     if (!scope || !side) return;
+    scope.side = undefined;
+    this.update({ sideChat: null });
     try {
-      await side.close();
+      await this.releaseSide(side);
     } catch {
       if (this.owns(scope))
         this.update({ error: "Couldn't confirm that the side chat closed." });
-    } finally {
-      if (this.owns(scope) && scope.sideChat === side) {
-        scope.sideChat = undefined;
-        this.update({ sideChat: null });
-      }
     }
   }
 
-  /**
-   * Ask the draft in the side chat, opening one when needed. The text never
-   * reaches this chat; a failed ask keeps the draft and the badge.
-   */
-  private async askSide(scope: Scope, text: string): Promise<void> {
-    if (!text.trim()) throw new Error("native_chat_not_ready");
-    if (!scope.sideChat) {
-      if (!this.canAskSide)
-        throw new Error("A side question needs an idle chat with history.");
-      this.openSideChat();
-    }
-    const side = scope.sideChat;
-    if (!side) throw new Error("Couldn't open the side chat.");
-    await side.open();
-    if (side.read().phase !== "ready")
-      throw new Error(side.read().error ?? "Couldn't open the side chat.");
-    const asked = side.read().exchanges.length;
-    side.setDraft(text);
-    await side.ask();
-    if (side.read().exchanges.length === asked)
-      throw new Error(side.read().error ?? "Couldn't ask the side chat.");
-    if (this.owns(scope)) this.update({ sideIntent: false });
+  /** End a side chat: its view goes first, then its session is discarded. */
+  private async releaseSide(side: SideChatScope): Promise<void> {
+    side.chat.disconnect();
+    const attachment = await side.opened?.catch(() => null);
+    if (attachment) await this.bridge.closeSideChat?.(attachment.attachmentId);
   }
 
   get canSteer(): boolean {
@@ -1593,6 +1702,7 @@ export class NativeChatController {
       !!scope &&
       !!this.bridge.goal &&
       !!this.bridge.startGoal &&
+      this.offers("goals") &&
       !this.view.loading &&
       !this.view.acting &&
       !scope.awaitingGoalId &&
@@ -1954,39 +2064,10 @@ export class NativeChatController {
       });
       return;
     }
-    if (!enabled || (this.canStartGoal && !this.view.sideIntent)) {
+    if (!enabled || this.canStartGoal) {
       this.update({ goalIntent: enabled, error: null });
       this.saveDraftModes();
     }
-  }
-
-  /**
-   * Whether a side question can be asked: an idle chat with committed
-   * history whose connection offers side chats. A side chat is read-only and
-   * text-only, so it excludes a goal and an attachment.
-   */
-  get canAskSide(): boolean {
-    const snapshot = this.scope?.observation?.snapshot;
-    return (
-      !!this.scope?.attachment &&
-      NativeSideChatController.supported(this.bridge) &&
-      !this.view.loading &&
-      !this.view.profileBusy &&
-      !this.view.acting &&
-      !this.view.steering &&
-      !this.view.goalIntent &&
-      !this.view.attachmentDraft &&
-      !!snapshot?.latest &&
-      !snapshot.current &&
-      !snapshot.queuedInputs
-    );
-  }
-
-  /** Composer-only: selecting it adds a badge and starts nothing. */
-  selectSideIntent(enabled: boolean): void {
-    if (this.view.acting) return;
-    if (!enabled || this.canAskSide)
-      this.update({ sideIntent: enabled, error: null });
   }
 
   selectEffort(effort: NativeChatEffort): void {
@@ -2002,13 +2083,11 @@ export class NativeChatController {
     const scope = this.scope;
     if (!scope || scope.id !== scopeId || this.view.profileBusy)
       throw new Error("native_chat_not_ready");
-    const intent = /^\/(plan|goal|side)(?:\s+|$)/.exec(text.trim());
+    const side = /^\/side(?:\s+|$)/.exec(text.trim());
+    if (side) return this.openSideChat(text.trim().slice(side[0].length));
+    const intent = /^\/(plan|goal)(?:\s+|$)/.exec(text.trim());
     if (intent) {
-      if (intent[1] === "side") {
-        if (!this.view.sideIntent && !this.canAskSide)
-          throw new Error("A side question needs an idle chat with history.");
-        this.selectSideIntent(true);
-      } else if (intent[1] === "plan") {
+      if (intent[1] === "plan") {
         if (!this.bridge.submitInRegime || this.view.steering)
           throw new Error("Planning is unavailable in this chat.");
         this.selectOperatingRegime("plan");
@@ -2024,7 +2103,6 @@ export class NativeChatController {
       text = text.trim().slice(intent[0].length).trim();
       if (!text) return;
     }
-    if (this.view.sideIntent) return this.askSide(scope, text);
     const literal = text.trim();
     if (literal === "/compact" || literal === "/fork")
       return this.runCommand(literal === "/compact" ? "compact" : "fork");
@@ -2061,7 +2139,8 @@ export class NativeChatController {
     // Ultra also needs its extended harness.
     const effort =
       this.view.effort === "medium" ||
-      (this.view.effort === "ultra" && !this.view.effortAvailable)
+      (this.view.effort === "ultra" &&
+        (!this.view.effortAvailable || !this.offers("delegation")))
         ? undefined
         : this.view.effort;
     // A queued request keeps the editor binding a sent one has.
@@ -2233,6 +2312,13 @@ export class NativeChatController {
     }
   }
 
+  /** The chat commands this chat offers; a side chat refuses some. */
+  get commandChoices(): readonly NativeChatCommand[] {
+    return this.view.commands.filter((command) =>
+      this.offers(command === "fork" ? "fork" : "compaction")
+    );
+  }
+
   async runCommand(command: NativeChatCommand): Promise<void> {
     const scope = this.scope;
     const attachment = scope?.attachment;
@@ -2240,7 +2326,7 @@ export class NativeChatController {
       !scope ||
       !attachment ||
       !this.bridge.runCommand ||
-      !this.view.commands.includes(command)
+      !this.commandChoices.includes(command)
     ) {
       this.update({
         error: "This command is unavailable for the selected chat.",
@@ -2953,7 +3039,8 @@ export class NativeChatController {
 
   async repair(): Promise<void> {
     const scope = this.scope;
-    if (!scope || (!scope.attachment && !scope.requested)) return;
+    if (!scope || (!scope.attachment && !scope.requested && !this.fixed))
+      return;
     scope.replay = true;
     void this.readEffortCapability(scope);
     if (scope.summaryRequest?.failed) scope.summaryRequest = undefined;
@@ -3364,9 +3451,11 @@ export class NativeChatController {
     if (scope.opening) return scope.opening;
     const opening = this.attachments.then(async () => {
       if (!this.owns(scope)) return;
-      const attachment = scope.requested
-        ? await this.bridge.load(scope.requested)
-        : await this.bridge.create();
+      const attachment = this.fixed
+        ? await this.fixed.open()
+        : scope.requested
+          ? await this.bridge.load(scope.requested)
+          : await this.bridge.create();
       scope.attachment = attachment;
       if (!this.owns(scope)) return;
       if (this.editorSurfaces && this.bridge.publishEditorSurfaces) {
@@ -3427,10 +3516,12 @@ export class NativeChatController {
     scope.stopEditorSurfaceOpen?.();
     scope.stopEditorSvgText?.();
     scope.stopEditorSurfaceUpdates?.();
-    void scope.sideChat?.close().catch(() => {});
+    if (scope.side) void this.releaseSide(scope.side).catch(() => {});
     scope.subagents?.dispose();
     // Switching chats leaves background processes running.
     scope.backgroundProcesses?.dispose();
+    // A fixed session belongs to the chat that opened it, which ends it.
+    if (this.fixed) return;
     this.attachments = this.attachments.then(async () => {
       // Detach removes the subscription. It does not stop accepted work.
       if (scope.attachment)
@@ -3682,6 +3773,7 @@ export class NativeChatController {
         scope.observation = next;
         if (
           next.snapshot.subagentsAvailable &&
+          !next.snapshot.side?.unavailable.includes("subagents") &&
           supportsSubagents(this.bridge)
         ) {
           scope.subagents ??= new NativeSubagentController(
@@ -4243,6 +4335,11 @@ export class NativeChatController {
   }
 
   private forgetDeletedChat(scope: Scope): void {
+    if (this.fixed) {
+      // Deleting the chat that opened it discarded this one.
+      if (this.owns(scope)) this.update({ error: "This side chat has ended." });
+      return;
+    }
     const session = scope.attachment?.sessionId ?? scope.requested;
     if (!session) return;
     const selected = this.owns(scope);
@@ -4403,8 +4500,6 @@ function deletedAttachment(error: unknown): boolean {
 function deletionError(reason: string): string {
   if (reason.includes("deletion_unverified"))
     return "Couldn't confirm deletion. Try Delete chat again to check the same request.";
-  if (reason.includes("has_side_chat"))
-    return "Close the side chat before deleting this chat.";
   if (reason.includes("has_subagents"))
     return "This connection can't delete a chat with named subagents.";
   if (reason.includes("deletion_dependencies_changed"))
@@ -4604,4 +4699,20 @@ function goalObjectiveProblem(
   )
     return "Enter 1–16 success criteria, each at most 1 KiB.";
   return null;
+}
+
+export namespace NativeChatController {
+  /**
+   * A session a chat is bound to without choosing it. Its owner opens the
+   * session and ends it; the chat only shows and drives it. A side chat is
+   * one: its owner is the chat that opened it.
+   */
+  export type FixedSession = Readonly<{
+    /** Attach the session. Called again after a failed attempt. */
+    open(): Promise<NativeChatAttachment>;
+    /** The effort the chat starts with. */
+    effort: NativeChatEffort;
+    /** The model connections shown; the chat cannot choose another. */
+    profiles: NativeChatProfileCatalog | null;
+  }>;
 }

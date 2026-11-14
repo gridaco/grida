@@ -33,8 +33,8 @@ provider.
 ## Chat title
 
 **Opt-in.** A client enables titles at launch, because a title costs one model
-request that one-shot runs and scripted providers do not expect. Temporary
-hosts — side chats and the titler itself — never title.
+request that one-shot runs and scripted providers do not expect. The
+temporary titler never titles, and temporary side chats are never titled.
 
 **Trigger.** When a chat's first text request is accepted, the title runs in
 the background alongside the first turn. Subagent chats and chats that already

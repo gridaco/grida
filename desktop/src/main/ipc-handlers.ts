@@ -466,20 +466,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         control
       )
   );
-  guarded(
-    IPC_CHANNELS.NATIVE_CHAT_OPEN_SIDE,
-    (event, id: string, openId: string) =>
-      nativeChat.openSideChat(event, id, openId)
+  guarded(IPC_CHANNELS.NATIVE_CHAT_OPEN_SIDE, (event, id: string) =>
+    nativeChat.openSideChat(event, id)
   );
-  guarded(
-    IPC_CHANNELS.NATIVE_CHAT_ASK_SIDE,
-    (event, id: string, openId: string, requestId: string, text: string) =>
-      nativeChat.askSideChat(event, id, openId, requestId, text)
-  );
-  guarded(
-    IPC_CHANNELS.NATIVE_CHAT_CLOSE_SIDE,
-    (event, id: string, openId: string) =>
-      nativeChat.closeSideChat(event, id, openId)
+  guarded(IPC_CHANNELS.NATIVE_CHAT_CLOSE_SIDE, (event, id: string) =>
+    nativeChat.closeSideChat(event, id)
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_DETACH, (event, id: string) =>
     nativeChat.detach(event, id)

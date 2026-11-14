@@ -299,6 +299,7 @@ export function NativeModelPicker({
   effort,
   onEffort,
   ultraAvailable = false,
+  ultraOffered = true,
   defaultUnavailable,
   goal = false,
 }: {
@@ -314,6 +315,11 @@ export function NativeModelPicker({
   onEffort?: (effort: NativeChatEffort) => void;
   /** The connection offers the extended Ultra harness. */
   ultraAvailable?: boolean;
+  /**
+   * False when this chat cannot use Ultra on any connection, such as a side
+   * chat; effort then stops at Extra high.
+   */
+  ultraOffered?: boolean;
   /** The default connection cannot run; ask for an explicit choice. */
   defaultUnavailable?: boolean;
   /** The next send starts a goal, whose turns keep the model's reasoning. */
@@ -322,7 +328,9 @@ export function NativeModelPicker({
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"effort" | "models">("effort");
   const stop = effortStop(effort);
-  const stops = EFFORT_STOPS;
+  const stops: readonly EffortStop[] = ultraOffered
+    ? EFFORT_STOPS
+    : EFFORT_STOPS.filter((value) => value !== "ultra");
   const selected =
     profiles?.saved.find((p) => p.id === profiles.active) ??
     profiles?.choices.find((p) => p.id === profiles.active);
@@ -348,7 +356,7 @@ export function NativeModelPicker({
   ];
   // Ultra is a property of the chosen model's connection, known before any
   // chat starts. The running connection can also confirm it.
-  const ultra = ultraAvailable || selected?.ultra === true;
+  const ultra = ultraOffered && (ultraAvailable || selected?.ultra === true);
   const choose = (selection: NativeChatProfileSelection) => {
     onSelect?.(selection);
     setView("effort");
@@ -410,8 +418,8 @@ export function NativeModelPicker({
                     <ChevronRightIcon className="size-3 shrink-0" />
                   </button>
                 ) : (
-                  <span className="max-w-full text-center text-xs text-muted-foreground">
-                    This chat uses the default model
+                  <span className="max-w-full truncate text-center text-xs text-muted-foreground">
+                    {selected ? label : "This chat uses the default model"}
                   </span>
                 )}
               </div>
@@ -463,7 +471,7 @@ export function NativeModelPicker({
                 {ultra && " Ultra still extends the work."}
               </p>
             )}
-            {!ultra && (
+            {!ultra && ultraOffered && (
               <p className="text-[11px] text-muted-foreground">
                 {selected
                   ? "Ultra needs a Grida, OpenRouter or Vercel AI Gateway model."

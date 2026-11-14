@@ -77,7 +77,6 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_CREATE: "grida:native-chat:create",
   NATIVE_CHAT_LOAD: "grida:native-chat:load",
   NATIVE_CHAT_OPEN_SIDE: "grida:native-chat:open-side",
-  NATIVE_CHAT_ASK_SIDE: "grida:native-chat:ask-side",
   NATIVE_CHAT_CLOSE_SIDE: "grida:native-chat:close-side",
   NATIVE_CHAT_DETACH: "grida:native-chat:detach",
   NATIVE_CHAT_PUBLISH_EDITOR_SURFACES:

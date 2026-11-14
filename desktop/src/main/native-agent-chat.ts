@@ -38,7 +38,8 @@ import type {
   NativeChatQueueChange,
   NativeChatQueuePage,
   NativeChatQueueReceipt,
-  NativeChatSideAnswer,
+  NativeChatSideRefusal,
+  NativeChatSideSnapshot,
   NativeChatSnapshot,
   NativeChatSteer,
   NativeChatStreamUpdate,
@@ -101,7 +102,6 @@ const CAPABILITIES = {
   "co.grida/goal/inspect": 1,
   "co.grida/goal/control": 1,
   "co.grida/side-chat/open": 1,
-  "co.grida/side-chat/ask": 1,
   "co.grida/side-chat/close": 1,
 } as const;
 const TURN_DISPOSITIONS = [
@@ -633,7 +633,14 @@ export class NativeAgentChat {
       expectedCatalogRevision: revision(catalogRevision),
       ...(expectedOwnedChildren && { expectedOwnedChildren }),
     });
+    // The host discards the deleted chat's side chats with it.
+    for (const side of this.sideChats.forgetParent(sessionId))
+      this.forget(side);
     if (!this.ownsSession(session)) return;
+    this.forget(sessionId);
+  }
+
+  private forget(sessionId: string): void {
     this.attached.delete(sessionId);
     this.loading.delete(sessionId);
     this.transcripts.delete(sessionId);
@@ -684,6 +691,8 @@ export class NativeAgentChat {
   async load(sessionId: string): Promise<NativeChatSession> {
     this.requireOpen();
     const id = identity(sessionId);
+    // GRIDA-SEC-004: a side chat is lent only to the attachment that opened it.
+    if (this.sideChats.has(id)) throw new Error("native_chat_side_unavailable");
     const existing = this.attached.get(id);
     if (existing) return existing;
     const loading = this.loading.get(id);
@@ -719,39 +728,30 @@ export class NativeAgentChat {
     return requested;
   }
 
+  /**
+   * Open a side chat of `parent` on this connection. The side chat is an
+   * ordinary session of this connection; Main lends it only to the attachment
+   * that opened it.
+   */
   async openSideChat(
-    parent: NativeChatSession,
-    requestId: string
-  ): Promise<NativeSideChat> {
-    const side = await this.sideChats.open(
-      this.requireAttached(parent),
-      requestId
-    );
+    parent: NativeChatSession
+  ): Promise<{ session: NativeChatSession; side: NativeSideChat }> {
+    const side = await this.sideChats.open(this.requireAttached(parent));
     try {
       this.requireAttached(parent);
     } catch (error) {
-      await this.sideChats.close(side).catch(() => {});
+      await this.sideChats.close(side.id).catch(() => {});
       throw error;
     }
-    return side;
+    return { session: this.attach(side.id), side };
   }
 
-  askSideChat(
-    parent: NativeChatSession,
-    side: NativeSideChat,
-    requestId: string,
-    text: string
-  ): Promise<NativeChatSideAnswer> {
-    return this.sideChats.ask(
-      this.requireAttached(parent),
-      side,
-      requestId,
-      text
-    );
-  }
-
-  closeSideChat(side: NativeSideChat): Promise<void> {
-    return this.sideChats.close(side);
+  /** Discard a side chat this connection opened. */
+  async closeSideChat(session: NativeChatSession): Promise<void> {
+    if (!this.sideChats.has(session.id) || !this.ownsSession(session))
+      throw new Error("native_chat_side_unavailable");
+    await this.sideChats.close(session.id);
+    this.forget(session.id);
   }
 
   registerEditorSurfaces(
@@ -1022,6 +1022,9 @@ export class NativeAgentChat {
         queuedInputs > 0 && { idleQueueResumeAvailable: true as const }),
       current,
       latest: result.latest === null ? null : turn(result.latest),
+      ...(result.side !== undefined && {
+        side: sideSnapshot(result.side, this.sideChats.has(sessionId)),
+      }),
     });
     observed.set(snapshot, {
       scope: this.scope,
@@ -1936,6 +1939,9 @@ export class NativeAgentChat {
       content.text !== ""
     )
       return;
+    // A side chat is shown only in the frame that opened it; it never
+    // raises a notification that would open it elsewhere.
+    if (this.sideChats.has(session.id)) return;
     const record = object(value);
     if (Object.keys(record).length !== 3) return;
     const turnId = identity(record.turnId);
@@ -2478,6 +2484,43 @@ function identity(value: unknown): string {
   if (typeof value !== "string" || !IDENTITY.test(value))
     throw invalidResponse();
   return value;
+}
+
+const SIDE_REFUSALS: ReadonlySet<string> = new Set<NativeChatSideRefusal>([
+  "fork",
+  "side_chat",
+  "compaction",
+  "goals",
+  "subagents",
+  "delegation",
+  "wakeups",
+  "catalog",
+]);
+
+/**
+ * A side chat's snapshot presentation. Refusals this Desktop does not know
+ * are dropped; they name controls it does not offer.
+ */
+function sideSnapshot(value: unknown, opened: boolean): NativeChatSideSnapshot {
+  const side = object(value);
+  const unavailable = side.unavailable;
+  if (
+    !opened ||
+    side.temporary !== true ||
+    !Array.isArray(unavailable) ||
+    unavailable.length > 32 ||
+    unavailable.some((entry) => typeof entry !== "string")
+  )
+    throw invalidResponse();
+  return Object.freeze({
+    parentSessionId: identity(side.parentSessionId),
+    temporary: true,
+    unavailable: Object.freeze(
+      (unavailable as string[]).filter(
+        (entry): entry is NativeChatSideRefusal => SIDE_REFUSALS.has(entry)
+      )
+    ),
+  });
 }
 
 function object(value: unknown): Record<string, unknown> {

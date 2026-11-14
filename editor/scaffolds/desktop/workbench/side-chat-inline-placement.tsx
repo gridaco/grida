@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { cn } from "@app/ui/lib/utils";
-import { NativeSideChatView } from "./native-side-chat-view";
+import { NativeSideChatPane } from "./native-agent-pane";
 import type {
   SideChatPlacement,
   SideChatPresentation,
@@ -11,8 +11,8 @@ import type {
 /**
  * Presents a side chat inline, for a host without a tabbed editor region (the
  * file window). The host renders {@link SideChatInlineRegion} where the side
- * chat belongs; the region is empty while no side chat is open, and
- * the side chat's own close action ends it.
+ * chat belongs; the region is empty while no side chat is open, and the side
+ * chat's own close action ends it.
  */
 export class SideChatInlinePlacement implements SideChatPlacement {
   private current: SideChatPresentation | null = null;
@@ -56,7 +56,7 @@ export function SideChatInlineRegion({
   if (!presentation) return null;
   return (
     <div className={cn("flex min-h-0 flex-col overflow-hidden", className)}>
-      <NativeSideChatView key={presentation.id} {...presentation} />
+      <NativeSideChatPane key={presentation.id} presentation={presentation} />
     </div>
   );
 }

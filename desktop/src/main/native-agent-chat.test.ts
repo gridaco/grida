@@ -1290,3 +1290,97 @@ it.runIf(Boolean(packaged))(
   },
   20000
 );
+
+it("lends a side chat only through the attachment that opened it", async () => {
+  const test = fixture();
+  const request =
+    vi.fn<
+      (method: string, input?: Record<string, unknown>) => Promise<unknown>
+    >();
+  const start = vi.spyOn(NativeAgentProcess, "start").mockResolvedValueOnce({
+    request,
+    close: async () => {},
+  } as unknown as NativeAgentProcess);
+  const sideId = "side/0123456789abcdef0123456789abcdef";
+  let client: NativeAgentChat | undefined;
+  try {
+    client = await NativeAgentChat.start({
+      resourcesPath: test.root,
+      stateDirectory: test.stateDirectory,
+      cwd: test.cwd,
+      endpoint: "http://127.0.0.1:1/v1",
+      provider: "openai-compatible",
+      model: "fixture",
+    });
+    request.mockResolvedValueOnce({ sessionId: "parent" });
+    const parent = await client.create();
+    request.mockResolvedValueOnce({
+      sideChatId: sideId,
+      parentSessionId: "parent",
+      sourceContext: { view: 3, tail: null, fingerprint: "f" },
+      compacted: true,
+      omissions: { reasoning: 2, media: 0 },
+      temporary: true,
+    });
+    const { session, side } = await client.openSideChat(parent);
+    expect(request.mock.calls.at(-1)).toEqual([
+      "_co.grida/side-chat/open",
+      { sessionId: "parent" },
+    ]);
+    expect(side).toEqual({
+      id: sideId,
+      parent: "parent",
+      compacted: true,
+      omitted: true,
+    });
+    expect(client.ownsSession(session)).toBe(true);
+
+    request.mockResolvedValueOnce({
+      sessionId: sideId,
+      sessionRevision: 1,
+      queuedInputs: 0,
+      queue: [],
+      admissionPaused: false,
+      current: null,
+      latest: null,
+      side: {
+        parentSessionId: "parent",
+        temporary: true,
+        unavailable: ["fork", "catalog", "a_future_refusal"],
+      },
+    });
+    const snapshot = await client.observe(session);
+    expect(snapshot.side).toEqual({
+      parentSessionId: "parent",
+      temporary: true,
+      unavailable: ["fork", "catalog"],
+    });
+
+    // No other attachment can load the side chat by its id.
+    const calls = request.mock.calls.length;
+    await expect(client.load(sideId)).rejects.toThrow(
+      "native_chat_side_unavailable"
+    );
+    expect(request.mock.calls).toHaveLength(calls);
+
+    // Unconfirmed cleanup is retried for the same side chat.
+    request.mockRejectedValueOnce(new Error("side_chat_discard_pending"));
+    request.mockResolvedValueOnce({});
+    await client.closeSideChat(session);
+    expect(request.mock.calls.slice(-2)).toEqual([
+      ["_co.grida/side-chat/close", { sideChatId: sideId }],
+      ["_co.grida/side-chat/close", { sideChatId: sideId }],
+    ]);
+    expect(client.ownsSession(session)).toBe(false);
+    await expect(client.closeSideChat(session)).rejects.toThrow(
+      "native_chat_side_unavailable"
+    );
+    await expect(client.closeSideChat(parent)).rejects.toThrow(
+      "native_chat_side_unavailable"
+    );
+  } finally {
+    await client?.close();
+    start.mockRestore();
+    test.close();
+  }
+});

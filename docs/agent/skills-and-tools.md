@@ -69,6 +69,6 @@ On macOS and Linux, a source-built host can let the agent use an explicit list
 of tools from one trusted MCP server on your computer. A Desktop build started
 from source or an Insiders build can do the same for one workspace through
 launch options. Only messages sent without the **Plan** badge can call those
-tools; goals and side chats have none. If a tool call loses its reply, check
+tools; goals have none, and a side chat has the same tools as its chat. If a tool call loses its reply, check
 the server for its effect before sending work that would repeat it.
 [Use tools from a local MCP server](./clients.md#use-tools-from-a-local-mcp-server)

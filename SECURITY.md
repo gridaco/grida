@@ -1123,9 +1123,16 @@ build-cleanup directory and retain the same fixed-path and binary validation.
   The [queue process fixture](desktop/src/main/native-agent-queue.test.ts)
   verifies exact retries, stale revisions, and the queue held after Stop.
 - The [Desktop side-chat adapter](desktop/src/main/native-agent-side-chats.ts)
-  exposes bounded answer text and context metadata. Main binds each open
-  identity to one parent attachment and private child connection. Closing,
-  detaching, or navigating retires that side chat independently of parent work.
+  opens a side chat for an attached parent on the private child connection and
+  records which session is a side chat of which parent. A side session is an
+  ordinary attachment only of the frame that opened it: the
+  [native chat owner](desktop/src/main/native-chat-ipc.ts) adds it to that
+  frame's attachments, so every chat method, delivery and process control
+  takes it under the same exact-frame checks, and another frame cannot name
+  it. Loading a side session by its ID is refused, notifications never name
+  one, and a side chat opens no side chat. Closing it, detaching it or its
+  parent, deleting the parent, navigating, or a scope change removes the
+  attachment and its subscriptions before the child discards the session.
 - The [Desktop background process adapter](desktop/src/main/native-agent-background-processes.ts)
   lists and stops a chat's kept processes only when the native child
   advertises the capability. Main names the frame's attached chat and checks
@@ -1446,16 +1453,36 @@ Today:
   launch, refusal of a matching user-owned program, launch changes,
   interruption, and exact retained attempts.
 - [Private side-chat controls](crates/grida-agent/src/acp/extensions/side_chats.rs)
-  require negotiation and an attached parent. The [side-chat owner](crates/grida-agent/src/host/side_chats.rs)
-  keeps a separate in-memory journal, uses only the selected inference authority,
-  and denies tool dispatch. The [context projection](crates/grida-agent-master/src/side_context.rs)
-  excludes source system instructions, tool payloads, and provider continuation state.
-  [Process tests](crates/grida-agent/tests/process/side_chats.rs) verify private
-  scope and concurrent parent work through side-chat closure.
+  are offered only on private stdio, require negotiation and an attached
+  parent, and attach the side chat only to the opening connection; another
+  connection cannot load it. The [side-chat owner](crates/grida-agent/src/host/side_chats.rs)
+  forks the parent's committed history through the ordinary
+  [fork lowering](crates/grida-agent-master/src/conversation_seed.rs), which
+  excludes source system instructions, tool payloads, reasoning and provider
+  continuation state. A side chat is an ordinary session under the parent's
+  execution, workspace and captured permission profile, so it gains no
+  authority the parent lacks; approval `ask` rules still ask. Its writes and
+  commands are not structurally blocked: the
+  [side-chat policy](crates/grida-agent-master/src/side_chat.rs) and history
+  boundary steer the model away from mutation unless the person asks, and
+  only the permission profile bounds what a tool may do. The host refuses
+  delegation, subagents, goals, wake-ups, forks, nested side chats,
+  manual compaction and catalog changes for a side session where each is
+  admitted; automatic compaction may summarize only the inherited history,
+  before the first side turn, and the boundary follows that summary. The host
+  rejects a retained side input that carries any refused option. Side sessions
+  live in a catalog scope outside every workspace. Close, parent deletion,
+  connection shutdown and the sweep a host runs before serving cancel their
+  work, stop their processes and [discard](crates/agent-kit-store-sqlite/src/deletion.rs)
+  their records, spending authority and retained attachments; unconfirmed
+  cleanup leaves the session fenced for the next sweep.
+  [Process tests](crates/grida-agent/tests/process/side_chats.rs) verify
+  private scope, parent permissions and approvals, refusals, catalog absence
+  and every discard path.
 - The [chat title owner](crates/grida-agent/src/host/titles.rs) titles an
-  untitled chat from its first request through the same side-context host: a
-  separate in-memory journal, only the selected inference authority, tools
-  denied, and an empty background. It writes the title only while the chat is
+  untitled chat from its first request through a temporary host: a separate
+  in-memory journal, only the selected inference authority, and tools denied.
+  It writes the title only while the chat is
   still untitled at the same catalogue revision. A client opts in at launch.
   The [process test](crates/grida-agent/tests/process/catalog.rs) verifies a
   tool-free title request and that a rename is never replaced.

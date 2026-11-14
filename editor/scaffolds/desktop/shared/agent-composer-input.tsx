@@ -89,7 +89,7 @@ export type AgentComposerInputProps = {
    * in the newly selected session.
    */
   submissionScope?: string | number;
-  draftRef?: Ref<Pick<ComposerController, "appendText">>;
+  draftRef?: Ref<Pick<ComposerController, "appendText" | "focus">>;
   onStop: () => void;
   /**
    * What the single primary button does while the draft is empty, such as
@@ -202,9 +202,11 @@ function AgentComposerInner({
     if (!draftKey || !draftStore || binding.held !== draftKey) return;
     draftStore.write(draftKey, readDocument());
   }, [binding, composer.snapshot, draftKey, draftStore, readDocument]);
-  useImperativeHandle(draftRef, () => ({ appendText: composer.appendText }), [
-    composer.appendText,
-  ]);
+  useImperativeHandle(
+    draftRef,
+    () => ({ appendText: composer.appendText, focus: composer.focus }),
+    [composer.appendText, composer.focus]
+  );
 
   const actionById = useMemo(() => {
     const map = new Map<string, ComposerCommandAction>();

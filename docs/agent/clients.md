@@ -285,9 +285,9 @@ On macOS and Linux, private stdio clients can negotiate
 `co.grida/session/delete` version 1 to permanently remove an eligible saved
 chat. Attach the chat and read both its execution and catalog revisions before
 asking for confirmation. The host requires idle work and refuses chats with
-pending inputs, unresolved execution, an open side chat, an unfinished Goal,
-or named subagents. Deletion also removes the chat's private attachments
-and unpublished working copies. Authored files, saved exports, and independent
+pending inputs, unresolved execution, an unfinished Goal, or named
+subagents. Deletion also discards the chat's open side chats and removes its
+private attachments and unpublished working copies. Authored files, saved exports, and independent
 forks stay available. Retry a lost deletion reply with the original request
 ID, workspace, and revisions, even if the chat has disappeared from the list.
 
@@ -444,7 +444,8 @@ An attached workbench in the selected workspace can use its live editor tools
 and the allowlisted MCP tools in the same Act turn. The peer receives the
 arguments supplied to its own calls.
 
-Plan messages, goals and side chats have no MCP tools. Saved work keeps its
+Plan messages and goals have no MCP tools. A side chat in Act has the same
+tools as its parent. Saved work keeps its
 original tool connection; restart the host after a lost connection to connect
 again. If that connection closes, the turn can still be stopped. A lost reply
 after a tool call leaves an uncertain result. Reconcile it before sending new work that would
@@ -500,21 +501,60 @@ See the [native host request fields](https://github.com/gridaco/grida/blob/main/
 ## Ask in a temporary side chat
 
 Side chats are available to private stdio ACP clients; in Desktop, `/side`
-opens one. [Ask a side question](./history.md#ask-a-side-question) A private stdio client can open a read-only side chat from an attached parent.
-It captures committed background, including an installed summary when present.
-The parent can keep working. The selected model treats that snapshot as quoted
-reference and answers the side chat's new questions. The open response identifies
-the source context and reports omitted material.
+opens one. [Ask a side question](./history.md#ask-a-side-question)
 
-Side chats accept up to six text questions and use the host's selected model.
-They have no workspace tools or scheduled work. Close ends that side chat and discards its conversation.
-A disconnect also discards it. The parent keeps its own history and controls.
-Bringing an answer into the parent is up to the client.
+Negotiate version 1 of `co.grida/side-chat/open` and `co.grida/side-chat/close`.
+Open takes the `sessionId` of a parent attached on this connection. The host
+forks the parent's committed conversation, the same way a fork does, into a new
+temporary session under the parent's model and settings; the parent can keep
+working and is not changed. The response returns `sideChatId`,
+`parentSessionId`, the parent history basis it copied (`sourceContext`),
+whether the parent's model context had been compacted (`compacted`), the
+material the portable copy leaves out (`omissions`) and `temporary: true`.
+The copy is the parent's complete committed transcript.
 
-Negotiate version 1 for `co.grida/side-chat/open`, `ask`, and `close` separately.
-Open supplies the parent session and a request ID. Ask supplies the returned side
-chat ID, a request ID, and text, and returns a completion account. Close supplies
-the side chat ID. These IDs work only on the connection that opened the chat.
+The side chat ID is an ordinary session ID, already attached on this
+connection. Submit, prompt, queue, steer, stop, pause and resume it; answer its
+questions and approvals; read its snapshot, transcript window and history; and
+list or stop its processes, all with the normal session methods. Live updates
+arrive as for any attached chat. Its tools and permission rules are the
+parent's, so an approval `ask` rule still asks.
+
+Every side turn runs under a side-chat policy, and a boundary message
+separates the copied conversation from the side chat's own messages. The
+model treats the copy as background, does not continue the parent's work, and
+avoids changes unless the person asks for one after the boundary. These limits
+steer the model; they do not narrow the parent's permissions. When the copied
+conversation is large, automatic compaction summarizes it before the side
+chat's first turn; the summary stays before the boundary. A side chat's own
+turns are never summarized, and manual compaction is refused.
+
+A side chat's snapshot includes `side`: its `parentSessionId`,
+`temporary: true` and an `unavailable` list. Each listed operation is refused
+with its code:
+
+| `unavailable` | Refused operation                                                 | Code                               |
+| ------------- | ----------------------------------------------------------------- | ---------------------------------- |
+| `fork`        | `co.grida/session/fork` and `/fork`                               | `side_chat_fork_unavailable`       |
+| `side_chat`   | opening a side chat from the side chat                            | `side_chat_nested_unavailable`     |
+| `compaction`  | manual `co.grida/session/compact` and `/compact`                  | `side_chat_compaction_unavailable` |
+| `goals`       | `co.grida/goal/start`                                             | `side_chat_goals_unavailable`      |
+| `subagents`   | `co.grida/subagent/create`                                        | `side_chat_subagents_unavailable`  |
+| `delegation`  | submitting with an effort above Standard                          | `side_chat_delegation_unavailable` |
+| `wakeups`     | submitting with `allowWakeups`                                    | `side_chat_wakeups_unavailable`    |
+| `catalog`     | catalog entry, organize (rename, archive), delete and its preview | `side_chat_catalog_unavailable`    |
+
+A side chat never appears in `session/list`, the archive list or saved-chat
+counts, and is never titled. Another connection cannot load it
+(`side_chat_unavailable`). Close takes `sideChatId`, cancels any running turn,
+stops its processes and removes its data; a closed or unknown ID returns
+`side_chat_unavailable`. If cleanup cannot be confirmed the close fails with
+`side_chat_discard_pending` and can be retried. Deleting the parent also
+discards its side chats, which are then no longer attached. Closing the
+connection discards every side chat, and a host discards any side chat a
+crash left behind before it serves. One connection can hold four side chats
+open (`side_chat_scope_limit`). Bringing an answer into the parent is up to
+the client.
 
 ## Set the context input limit
 

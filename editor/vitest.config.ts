@@ -34,6 +34,10 @@ loadEnvFile(path.join(dir, ".env.local"));
 
 export default defineConfig({
   root: ".",
+  // Tests render components that import stylesheets but never assert on
+  // them. Skip the app's Tailwind PostCSS pipeline, which Vite cannot load
+  // in its Next.js string-plugin form.
+  css: { postcss: { plugins: [] } },
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./", import.meta.url)),

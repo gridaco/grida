@@ -1,5 +1,5 @@
 import { MessageSquareTextIcon } from "lucide-react";
-import { NativeSideChatView } from "./native-side-chat-view";
+import { NativeSideChatPane } from "./native-agent-pane";
 import type {
   SideChatPlacement,
   SideChatPresentation,
@@ -9,14 +9,14 @@ import type { WorkbenchPanels } from "./workbench-panels";
 /**
  * Presents a side chat as a tab in the workbench's editor group.
  *
- * A side chat that opens becomes a focused **Side chat** tab; a question asked
- * while another tab is in front brings it forward again. Closing the tab ends
- * the side chat through its parent; a side chat that ends elsewhere closes its
- * tab. A closed side chat tab is not reopenable, because the side chat itself
- * has ended. See test/desktop-agent-chat-side-chat-tab.md.
+ * A side chat that opens becomes a focused **Side chat** tab; asking to show
+ * it again (`/side` while it is open) brings the tab forward. Closing the tab
+ * ends the side chat through its parent; a side chat that ends elsewhere
+ * closes its tab. A closed side chat tab is not reopenable, because the side
+ * chat itself has ended. See test/desktop-agent-chat-side-chat-tab.md.
  */
 export class SideChatTabPlacement implements SideChatPlacement {
-  private shown?: Readonly<{ id: string; stopReveal: () => void }>;
+  private shown?: string;
   /** A side chat whose tab was closed while it is still ending. */
   private dismissed?: string;
 
@@ -28,43 +28,35 @@ export class SideChatTabPlacement implements SideChatPlacement {
   ) {}
 
   present(presentation: SideChatPresentation): void {
-    const { id, side } = presentation;
+    const { id } = presentation;
     if (id === this.dismissed) return;
-    if (this.shown?.id !== id) {
+    const known = this.shown === id;
+    if (!known) {
       this.withdraw();
-      let asking = side.read().asking;
-      const stopReveal = side.subscribe(() => {
-        const now = side.read().asking;
-        if (now && !asking) this.panels.reveal(SideChatTabPlacement.panel(id));
-        asking = now;
-      });
-      this.shown = { id, stopReveal };
+      this.shown = id;
     }
+    const panel = SideChatTabPlacement.panel(id);
     this.panels.show(
-      SideChatTabPlacement.panel(id),
+      panel,
       {
         title: "Side chat",
         icon: <MessageSquareTextIcon />,
-        content: <NativeSideChatView {...presentation} />,
+        content: <NativeSideChatPane presentation={presentation} />,
       },
       () => {
-        this.release();
+        this.shown = undefined;
         this.dismissed = id;
         presentation.close();
       }
     );
+    if (known) this.panels.reveal(panel);
   }
 
   withdraw(): void {
     const shown = this.shown;
-    this.release();
-    this.dismissed = undefined;
-    if (shown) this.panels.withdraw(SideChatTabPlacement.panel(shown.id));
-  }
-
-  private release(): void {
-    this.shown?.stopReveal();
     this.shown = undefined;
+    this.dismissed = undefined;
+    if (shown) this.panels.withdraw(SideChatTabPlacement.panel(shown));
   }
 
   /** The panel id of a side chat's tab. */

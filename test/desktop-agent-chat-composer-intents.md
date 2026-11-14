@@ -16,10 +16,11 @@ covered_by:
 
 ## Behavior
 
-Plan, Goal and Side are composer intents. Explicit slash-menu selection adds a
+Plan and Goal are composer intents. Explicit slash-menu selection adds a
 removable badge without sending a message, starting inference, or replacing
-the rest of the draft. Side is offered only in an idle chat with a finished
-turn and excludes Goal and attachments. Keyboard and pointer selection have the same result.
+the rest of the draft. Keyboard and pointer selection have the same result.
+`/side` is not an intent: choosing it, or sending it, opens the side chat at
+once and adds no badge.
 Permissions and effort remain independent. Goal limits are visible before
 starting; cancelling customization keeps the unsent intent.
 
@@ -38,14 +39,14 @@ A connection must finish starting before its commands become available.
    the slash trigger disappears, and no turn starts.
 4. Hover the Goal badge: its icon turns into ×. Click it. Goal disappears and
    no message or model request has been created. There is no goal form.
-   4a. In an idle chat with at least one finished turn, type `/side` and choose
-   it. A **Side** badge appears, `/goal` is no longer offered, and nothing
-   opens or sends. Type `What did we decide?` and send. The side chat opens
-   as a focused **Side chat** tab in the workbench with the question and its
-   answer (see TC-DESKTOP-AGENT-CHAT-023); the main conversation gains no
-   message and no turn starts. The badge clears after the answer.
-   In a new chat with no finished turn, or while a turn runs, `/side` is not
-   offered.
+   4a. In an open chat, type `/side` and choose it. No badge appears: a
+   **Side chat** tab opens at once in the workbench with the caret in its
+   message box (see TC-DESKTOP-AGENT-CHAT-023), and the `/side` text leaves
+   this composer. The main conversation gains no message and no turn starts.
+   Back in the chat pane, send `/side What did we decide?`. The side chat tab
+   comes forward and sends the question there; this composer is cleared and
+   its **Plan** setting is unchanged. In a new chat that has not been sent
+   yet, `/side` is not offered.
 5. Choose Ultra in the model popover. Planning and permission choices remain
    separate. Open chat history and rename a saved chat through Chat options.
 6. Narrow the window. Send, the model picker, the attachment menu, and chat

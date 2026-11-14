@@ -111,6 +111,15 @@ function clearNativeChatDelivery(): void {
   nativeSvgTextHandlers.clear();
 }
 
+/** Stop delivering anything for an attachment this frame is giving up. */
+function forgetNativeChatAttachment(attachmentId: string): void {
+  nativeEditorHandlers.delete(attachmentId);
+  nativeSvgTextHandlers.delete(attachmentId);
+  for (const [id, subscriber] of nativeChatHandlers) {
+    if (subscriber.attachmentId === attachmentId) nativeChatHandlers.delete(id);
+  }
+}
+
 function selectedDocumentRoute(): boolean {
   const params = new URLSearchParams(location.search);
   return (
@@ -527,33 +536,17 @@ const bridge: DesktopBridge = {
     create: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_CREATE),
     load: (sessionId) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_LOAD, sessionId),
-    openSideChat: (attachmentId, openId) =>
-      ipcRenderer.invoke(
-        IPC_CHANNELS.NATIVE_CHAT_OPEN_SIDE,
-        attachmentId,
-        openId
-      ),
-    askSideChat: (attachmentId, openId, requestId, text) =>
-      ipcRenderer.invoke(
-        IPC_CHANNELS.NATIVE_CHAT_ASK_SIDE,
-        attachmentId,
-        openId,
-        requestId,
-        text
-      ),
-    closeSideChat: (attachmentId, openId) =>
-      ipcRenderer.invoke(
+    openSideChat: (attachmentId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_OPEN_SIDE, attachmentId),
+    closeSideChat: async (sideAttachmentId) => {
+      forgetNativeChatAttachment(sideAttachmentId);
+      await ipcRenderer.invoke(
         IPC_CHANNELS.NATIVE_CHAT_CLOSE_SIDE,
-        attachmentId,
-        openId
-      ),
+        sideAttachmentId
+      );
+    },
     detach: async (attachmentId) => {
-      nativeEditorHandlers.delete(attachmentId);
-      nativeSvgTextHandlers.delete(attachmentId);
-      for (const [id, subscriber] of nativeChatHandlers) {
-        if (subscriber.attachmentId === attachmentId)
-          nativeChatHandlers.delete(id);
-      }
+      forgetNativeChatAttachment(attachmentId);
       await ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_DETACH, attachmentId);
     },
     publishEditorSurfaces: (attachmentId, snapshot, revision) =>

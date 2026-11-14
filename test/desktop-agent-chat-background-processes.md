@@ -7,7 +7,7 @@ tags: [agent-chat, background-processes, exec-command, stop, composer]
 status: untested
 severity: high
 date: 2026-11-14
-updated: 2026-11-14
+updated: 2026-11-15
 automatable: false
 covered_by:
   - desktop/src/main/native-agent-background-processes.test.ts
@@ -34,7 +34,8 @@ Stop control is a separate action. The "stop" command appears only when the
 chat offers background processes.
 
 Switching to another chat in the same window, or closing a side chat, leaves
-processes running. Reloading the window, navigating within it, or a renderer
+this chat's processes running. A side chat shows its own processes in its own
+composer the same way; they end when the side chat closes. Reloading the window, navigating within it, or a renderer
 crash also leaves them running: the window re-attaches the chat and reads its
 current list again, so a development server survives a reload. Closing the
 window that showed the chat stops its processes, unless another open window
