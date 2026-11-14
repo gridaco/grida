@@ -12,8 +12,18 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt, DuplexStream, WriteHalf}
 use tokio::process::{Child, Command};
 use tokio::task::JoinHandle;
 
-const DRAIN_GRACE: Duration = Duration::from_millis(500);
-const REAP_GRACE: Duration = Duration::from_secs(2);
+pub(super) const DRAIN_GRACE: Duration = Duration::from_millis(500);
+pub(super) const REAP_GRACE: Duration = Duration::from_secs(2);
+/// How often a finite launch checks whether its launcher exited.
+pub(super) const EXIT_POLL: Duration = Duration::from_millis(10);
+
+/// What supervises a launch once it started.
+pub(super) enum Supervision {
+    /// Bounded capture, optionally streaming stdio to a trusted embedder.
+    Finite(Option<DuplexStream>),
+    /// A long-running session with retained output.
+    Session(super::session::Io),
+}
 
 pub(crate) struct Running {
     stop: CancellationToken,
@@ -76,7 +86,7 @@ impl Placeholders {
     }
 
     /// `ended` states that no process of the launch can still observe them.
-    fn release(self, ended: bool) {
+    pub(super) fn release(self, ended: bool) {
         #[cfg(target_os = "linux")]
         for placeholder in self.0 {
             placeholder.release(ended);
@@ -89,12 +99,12 @@ impl Placeholders {
 pub(super) fn spawn(
     mut prepared: Prepared,
     cancellation: CancellationToken,
-    stream: Option<DuplexStream>,
+    supervision: Supervision,
 ) -> Result<Running> {
     let runtime = tokio::runtime::Handle::try_current()
         .map_err(|_| refused(ErrorKind::InvalidState, "sandbox_async_runtime_required"))?;
     let held = Placeholders::hold(&mut prepared)?;
-    match launch(prepared, cancellation, stream, runtime, held) {
+    match launch(prepared, cancellation, supervision, runtime, held) {
         Ok(running) => Ok(running),
         Err((error, held)) => {
             // Nothing started unless the launcher's start is uncertain.
@@ -107,7 +117,7 @@ pub(super) fn spawn(
 fn launch(
     mut prepared: Prepared,
     cancellation: CancellationToken,
-    stream: Option<DuplexStream>,
+    supervision: Supervision,
     runtime: tokio::runtime::Handle,
     held: Placeholders,
 ) -> std::result::Result<Running, (Error, Placeholders)> {
@@ -148,15 +158,26 @@ fn launch(
     };
     prepared.placeholders = held;
     let stop = CancellationToken::new();
-    let task = tokio::spawn(supervise(
-        child,
-        status_read,
-        prepared,
-        payload,
-        cancellation,
-        stop.clone(),
-        stream,
-    ));
+    let task = match supervision {
+        Supervision::Finite(stream) => tokio::spawn(supervise(
+            child,
+            status_read,
+            prepared,
+            payload,
+            cancellation,
+            stop.clone(),
+            stream,
+        )),
+        Supervision::Session(io) => tokio::spawn(super::session::supervise(
+            child,
+            status_read,
+            prepared,
+            payload,
+            cancellation,
+            stop.clone(),
+            io,
+        )),
+    };
     Ok(Running { stop, task })
 }
 
@@ -603,7 +624,7 @@ async fn supervise(
         // Darwin can reject a group signal once only zombies remain.
         _ = read_terminal_prefix(&mut status, &mut status_bytes, probe),
             if prepared.support.backend == Backend::Seatbelt => None,
-        result = wait_without_reaping(pid) => {
+        result = wait_without_reaping(pid, EXIT_POLL) => {
             observation = Some(result);
             None
         },
@@ -699,7 +720,7 @@ async fn read_terminal_prefix(
     Ok(())
 }
 
-fn parse_status(bytes: &[u8], probe: bool) -> Completion {
+pub(super) fn parse_status(bytes: &[u8], probe: bool) -> Completion {
     if bytes == [wire::STATUS_SETUP_FAILED] {
         return Completion::SetupFailed;
     }
@@ -719,7 +740,7 @@ fn parse_status(bytes: &[u8], probe: bool) -> Completion {
     }
 }
 
-async fn wait_without_reaping(pid: i32) -> io::Result<()> {
+pub(super) async fn wait_without_reaping(pid: i32, poll: Duration) -> io::Result<()> {
     // Keep the root PID reserved until we signal its private process group.
     // Reaping first would allow PID/PGID reuse to target an unrelated process.
     loop {
@@ -729,7 +750,7 @@ async fn wait_without_reaping(pid: i32) -> io::Result<()> {
             Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
             Err(error) => return Err(error),
         }
-        tokio::time::sleep(Duration::from_millis(10)).await;
+        tokio::time::sleep(poll).await;
     }
 }
 
@@ -752,7 +773,7 @@ fn observed_exit(pid: i32) -> io::Result<bool> {
 }
 
 #[allow(unsafe_code)]
-fn signal_process_group(pid: i32) -> io::Result<()> {
+pub(super) fn signal_process_group(pid: i32) -> io::Result<()> {
     if unsafe { libc::kill(-pid, libc::SIGKILL) } == 0 {
         return Ok(());
     }

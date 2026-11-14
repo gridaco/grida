@@ -1,7 +1,7 @@
 # agent-kit-sandbox
 
-Run a bounded process under a host-issued native filesystem scope with raw
-networking denied. The caller validates current authority and chooses the
+Run a bounded process, or a long-running process session, under a
+host-issued native filesystem scope with raw networking denied. The caller validates current authority and chooses the
 approved executable, working directory, runtime files, environment, and limits.
 The crate owns preparation, launch, cancellation, and native evidence.
 
@@ -30,8 +30,11 @@ The crate owns preparation, launch, cancellation, and native evidence.
 
 Ordinary payloads inherit only stdin, stdout, and stderr. The helper reports
 whether a command started and how it exited on a separate close-on-exec
-descriptor. Launcher exit alone cannot establish payload completion. Stopping
-an operation bounds cleanup attempts and preserves uncertain effects.
+descriptor. The owner's end of that descriptor is also its control channel.
+When it closes, for example because the owner process ended, the helper ends
+everything it launched. Launcher exit alone cannot establish payload
+completion. Stopping an operation bounds cleanup attempts and preserves
+uncertain effects.
 
 Trusted embedders on macOS and Linux can open bidirectional stdio with
 `PreparedProcess::spawn_streaming`. This requires a reviewed system executable
@@ -43,13 +46,62 @@ it through shutdown. The existing output budget covers streamed stdout and
 captured stderr together, and the separate stdin budget stops excess input.
 The running handle still owns cancellation, cleanup, and native evidence.
 
+## Sessions
+
+`PreparedProcess::spawn_session` starts the same prepared command as a
+long-running session. The process specification's timeout and output budget
+do not apply. The session ends when its command ends, the scope's
+`valid_until` passes, the cancellation token fires, or a stop is requested.
+Fixed stdin must be empty.
+
+- Pipe sessions close the payload's stdin at once and merge stdout and stderr
+  into one output in arrival order. Launcher diagnostics join that output.
+- Terminal sessions allocate one pseudo-terminal inside the sandbox through
+  the trusted helper, sized 80 columns by 24 rows. The payload leads a new
+  session with the terminal as stdin, stdout, stderr, and controlling
+  terminal. `RunningSession::write` types into it, at most 64 KiB at a time
+  and 256 KiB undelivered. Output keeps the terminal's line endings and
+  control sequences.
+
+Output is retained until read: the first half of `retained_output_bytes`
+and a rolling last half. Readers drain it into the buffer whether or not the
+owner reads, so the payload never waits on the owner. `RunningSession::read`
+returns soon after output appears, once the session ended and everything was
+read, or at its deadline. It consumes what it returns, and reports bytes
+dropped from the buffer or elided to fit the requested size as one counted
+span with its position.
+
+`RunningSession::interrupt` delivers Ctrl-C through the helper. A terminal
+session receives the interrupt character, which its line discipline turns
+into `SIGINT` for the foreground process group unless the payload reads it as
+input. A pipe session's payload process group receives `SIGINT`; on macOS
+that is the launcher's group, whose helper ignores it, and on Linux the
+payload's own group inside the PID namespace. Supervision, the status
+channel, and the evidence continue.
+
+`RunningSession::request_stop`, cancellation, the scope deadline, and
+dropping the handle stop a session. The owner asks the helper to end the
+payload and its own group, waits briefly for the report, and then applies the
+same termination as a finite launch. `RunningSession::finish` returns the
+same evidence as a finite launch with empty stdout and stderr. A session
+whose owner process disappears without stopping it ends too: the helper sees
+its control channel close and ends everything it launched.
+
+On macOS a terminal payload leads a session outside the launcher's process
+group, so the owner's group signal does not reach it. The helper signals the
+payload's group while the payload is still unreaped and confirms it in its
+report. Without that confirmation the evidence is `Unverified`. A descendant
+that moves to another process group or session, such as a job-control shell's
+background job, can outlive the stop. Linux sessions keep the PID namespace
+guarantee in both modes.
+
 ## Profiles
 
 - macOS generates a deny-by-default Seatbelt profile for the supplied paths.
   The command and descendants inherit its confinement. Cancellation signals an
   owned process group. After normal payload exit, the helper reports the exit
   and stays alive for the owner's group signal and reap. Closing the status
-  channel releases that wait. A descendant that creates another session can
+  channel ends the helper and everything left in its group. A descendant that creates another session can
   outlive the group, so this backend refuses a required all-descendant guarantee.
 - Linux uses bubblewrap user, mount, PID, IPC, UTS, and network namespaces.
   The trusted helper verifies mounted identities, disables inspection of
@@ -98,5 +150,6 @@ AGENT_KIT_TEST_BWRAP=/usr/bin/bwrap cargo test -p agent-kit-sandbox --locked --t
 
 The fixtures exercise explicit input and environment, permitted files, denied
 filesystem and IPC access, descriptor inheritance, temporary isolation,
-bounded output, and cancellation. Their native enforcement evidence belongs to
+bounded output, cancellation, and sessions: retained output, terminal input,
+interrupts, stops with background descendants, and the owner process ending. Their native enforcement evidence belongs to
 the OS, kernel, and bubblewrap configuration on which they execute.

@@ -1,4 +1,5 @@
-//! Finite commands under a host-issued, denied-network native scope.
+//! Finite commands and long-running sessions under a host-issued,
+//! denied-network native scope.
 //!
 //! GRIDA-SEC-004 — native confinement for host-approved processes.
 //!
@@ -8,6 +9,16 @@
 //! [`ProcessEvidence`] that never claims more than the backend established.
 //! Other targets compile, and every operation returns `Unsupported`
 //! `native_sandbox_unavailable`.
+//!
+//! [`PreparedProcess::spawn`] runs a finite command with bounded output.
+//! [`PreparedProcess::spawn_session`] runs the same preparation as a
+//! [`RunningSession`] with no wall-clock limit of its own: retained output
+//! the owner polls, terminal input, interrupts and stop. The trusted helper
+//! inside the sandbox ends everything it launched when the owner's end of
+//! its private channel closes, so a session does not outlive an owner process
+//! that disappears. On macOS a terminal session's payload leads its own
+//! session; its cleanup rests on the helper's confirmation, and descendants
+//! that change process group or session can outlive a stop.
 
 use agent_kit_core::authority::GrantSelection;
 use agent_kit_core::{BindingId, CancellationToken, Error, ErrorKind, Fingerprint, Result};
@@ -207,6 +218,34 @@ pub enum Descendants {
     Unverified,
 }
 
+/// How [`PreparedProcess::spawn_session`] connects the payload.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SessionOptions {
+    /// Allocate a pseudo-terminal inside the sandbox. The payload leads its
+    /// own session with the terminal as stdin, stdout, stderr and
+    /// controlling terminal, and [`RunningSession::write`] types into it.
+    /// Without one, stdin is closed and stdout and stderr share one pipe.
+    pub terminal: bool,
+    /// Unread output retained between reads, 1 KiB to 8 MiB: the first half
+    /// and a rolling last half. Bytes dropped between them are counted.
+    pub retained_output_bytes: usize,
+}
+
+/// Output consumed by one [`RunningSession::read`].
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct SessionRead {
+    /// At most the requested number of bytes. Terminal output carries the
+    /// terminal's own line endings and control sequences.
+    pub output: Vec<u8>,
+    /// Bytes left out of `output`: dropped from the retained output since
+    /// the previous read, plus any elided to fit the requested size.
+    pub omitted_bytes: u64,
+    /// Where in `output` the omitted bytes were, when any were.
+    pub omitted_at: Option<usize>,
+    /// The process ended and every retained byte has been read.
+    pub ended: bool,
+}
+
 /// Bounded output and native evidence of one launch.
 pub struct ProcessEvidence {
     pub support: Support,
@@ -214,8 +253,9 @@ pub struct ProcessEvidence {
     /// Set when the sandbox stopped the process or a limit was reached.
     pub stopped: Option<StopReason>,
     /// Captured stdout. Empty for a streamed launch, whose stdout went to the
-    /// stream.
+    /// stream, and for a session, whose output went to its reads.
     pub stdout: Vec<u8>,
+    /// Captured stderr. Empty for a session.
     pub stderr: Vec<u8>,
     /// Output was cut at the budget, or a reader failed or did not drain in
     /// time.
@@ -259,6 +299,17 @@ pub struct PreparedProcess {
 pub struct RunningProcess {
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     native: native::Running,
+}
+
+/// A long-running process session under supervision.
+///
+/// The handle can be shared, for example through an `Arc`. Supervision
+/// continues after it is dropped, but dropping it requests a stop.
+pub struct RunningSession {
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    native: native::Session,
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    _unavailable: (),
 }
 
 impl Sandbox {
@@ -388,6 +439,113 @@ impl PreparedProcess {
     ) -> Result<(RunningProcess, tokio::io::DuplexStream)> {
         let (native, stream) = self.native.spawn_streaming(executable, cancellation)?;
         Ok((RunningProcess { native }, stream))
+    }
+
+    /// Start a long-running session after the caller's admission barrier.
+    ///
+    /// The process specification's timeout and output budget do not apply:
+    /// the session runs until it ends, the scope's `valid_until` passes, the
+    /// cancellation token fires, or a stop is requested. Its fixed stdin must
+    /// be empty. Requires a Tokio runtime context, like [`Self::spawn`].
+    pub fn spawn_session(
+        self,
+        options: SessionOptions,
+        cancellation: CancellationToken,
+    ) -> Result<RunningSession> {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        {
+            Ok(RunningSession {
+                native: self.native.spawn_session(options, cancellation)?,
+            })
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        {
+            let _ = (options, cancellation);
+            Err(unavailable())
+        }
+    }
+}
+
+impl RunningSession {
+    /// Consume unread output. Returns once output is available and a short
+    /// settling delay has passed, once the process ended and all output was
+    /// read, or at `until`, whichever comes first. A read after the end
+    /// returns at once with `ended` set.
+    pub async fn read(&self, until: Instant, max_bytes: usize) -> SessionRead {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        {
+            self.native.read(until, max_bytes).await
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        {
+            let _ = (until, max_bytes);
+            SessionRead {
+                ended: true,
+                ..SessionRead::default()
+            }
+        }
+    }
+
+    /// Type bytes into a terminal session, at most 64 KiB at a time and
+    /// 256 KiB not yet delivered (`LimitExceeded`
+    /// `sandbox_session_input_limit`). A pipe session's stdin is closed:
+    /// `InvalidState` `sandbox_session_stdin_closed`.
+    pub fn write(&self, bytes: &[u8]) -> Result<()> {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        {
+            self.native.write(bytes)
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        {
+            let _ = bytes;
+            Err(unavailable())
+        }
+    }
+
+    /// Deliver Ctrl-C. A terminal session receives the interrupt character,
+    /// which signals its foreground process group unless the payload reads
+    /// it as input. A pipe session's payload process group receives
+    /// `SIGINT`. The supervision and its evidence continue either way.
+    pub fn interrupt(&self) -> Result<()> {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        {
+            self.native.interrupt()
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        {
+            Err(unavailable())
+        }
+    }
+
+    /// Ask the supervisor to stop the session. Repeated requests are harmless.
+    pub fn request_stop(&self) {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        self.native.request_stop();
+    }
+
+    /// The process ended and supervision finished.
+    pub fn has_ended(&self) -> bool {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        {
+            self.native.has_ended()
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        {
+            true
+        }
+    }
+
+    /// Wait for supervision to end, as [`RunningProcess::finish`]. The
+    /// evidence carries no output; it went to [`RunningSession::read`].
+    pub async fn finish(self) -> Result<ProcessEvidence> {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        {
+            self.native.finish().await
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        {
+            Err(unavailable())
+        }
     }
 }
 

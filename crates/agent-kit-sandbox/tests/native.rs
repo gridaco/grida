@@ -1,5 +1,7 @@
 #![cfg(any(target_os = "macos", target_os = "linux"))]
 
+// GRIDA-SEC-004: native confinement, process sessions and owner-loss cleanup.
+
 use agent_kit_core::authority::{AuthorityBinding, GrantSelection};
 use agent_kit_core::{BindingId, CancellationToken, GrantId, PrincipalId, ScopeId};
 use agent_kit_sandbox::*;
@@ -879,4 +881,486 @@ async fn a_new_session_cannot_outlive_the_linux_pid_namespace() {
     fs::write(fixture.workspace.join("after-stop"), b"continue").unwrap();
     tokio::time::sleep(Duration::from_millis(250)).await;
     assert!(!fixture.workspace.join("survived").exists());
+}
+
+impl Fixture {
+    /// A shell without the macOS `/bin/sh` selector, whose lookup the
+    /// sandbox denies with a diagnostic on stderr. A session merges stderr
+    /// into its output, so the fixtures avoid that noise.
+    fn session_command(&self, script: &str) -> ProcessSpec {
+        ProcessSpec {
+            executable: PathBuf::from("/bin/bash"),
+            ..self.command(script)
+        }
+    }
+}
+
+fn session_options(terminal: bool) -> SessionOptions {
+    SessionOptions {
+        terminal,
+        retained_output_bytes: 64 * 1024,
+    }
+}
+
+/// Read until `done` holds for everything read so far or the session ends.
+async fn read_until(
+    session: &RunningSession,
+    within: Duration,
+    done: impl Fn(&[u8]) -> bool,
+) -> (Vec<u8>, bool) {
+    let until = Instant::now() + within;
+    let mut output = Vec::new();
+    loop {
+        let read = session.read(until, 64 * 1024).await;
+        output.extend_from_slice(&read.output);
+        if read.ended || done(&output) || Instant::now() >= until {
+            return (output, read.ended);
+        }
+    }
+}
+
+fn contains(haystack: &[u8], needle: &str) -> bool {
+    haystack
+        .windows(needle.len())
+        .any(|window| window == needle.as_bytes())
+}
+
+async fn wait_for_file(path: &Path, within: Duration) -> bool {
+    tokio::time::timeout(within, async {
+        while !path.exists() {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .is_ok()
+}
+
+#[test]
+fn a_session_handle_can_be_shared_across_tasks() {
+    fn shared<T: Send + Sync + 'static>() {}
+    fn sendable<T: Send>(_: &T) {}
+    shared::<RunningSession>();
+    shared::<std::sync::Arc<RunningSession>>();
+    // A read can run on any runtime worker.
+    let _ = |session: &RunningSession| {
+        let read = session.read(Instant::now(), 1);
+        sendable(&read);
+    };
+}
+
+#[cfg(target_os = "macos")]
+const SESSION_DESCENDANTS: Descendants = Descendants::ProcessGroupSignalled;
+#[cfg(target_os = "linux")]
+const SESSION_DESCENDANTS: Descendants = Descendants::NamespaceEnded;
+
+#[tokio::test]
+#[ignore = "requires native Seatbelt or bubblewrap and working namespaces"]
+async fn pipe_session_reads_output_as_it_arrives() {
+    let fixture = Fixture::new();
+    let sandbox = fixture.sandbox();
+    let mut spec = fixture.session_command(
+        r#"
+        if IFS= read -r line; then exit 31; fi
+        printf first
+        /bin/sleep 1.5
+        printf second >&2
+        "#,
+    );
+    // A session is not bound by the finite timeout.
+    spec.timeout = Duration::from_secs(1);
+    let session = sandbox
+        .prepare(spec, fixture.scope())
+        .unwrap()
+        .spawn_session(session_options(false), CancellationToken::new())
+        .unwrap();
+    let started = Instant::now();
+    let first = session.read(started + Duration::from_secs(10), 4096).await;
+    assert_eq!(first.output, b"first", "{first:?}");
+    assert!(!first.ended && first.omitted_bytes == 0 && first.omitted_at.is_none());
+    assert!(started.elapsed() < Duration::from_millis(1400));
+    let quiet = session
+        .read(Instant::now() + Duration::from_millis(200), 4096)
+        .await;
+    assert_eq!(quiet, SessionRead::default());
+    let error = session.write(b"input").err().unwrap();
+    assert_eq!(error.code, "sandbox_session_stdin_closed");
+    let (rest, ended) = read_until(&session, Duration::from_secs(10), |_| false).await;
+    assert_eq!(rest, b"second");
+    assert!(ended && session.has_ended());
+    let after = session
+        .read(Instant::now() + Duration::from_secs(5), 4096)
+        .await;
+    assert!(after.ended && after.output.is_empty());
+    let evidence = session.finish().await.unwrap();
+    assert_eq!(evidence.completion, Completion::Exited(0), "{evidence:?}");
+    assert_eq!(evidence.stopped, None);
+    assert!(evidence.stdout.is_empty() && evidence.stderr.is_empty());
+    assert!(!evidence.output_truncated);
+    assert_eq!(evidence.descendants, SESSION_DESCENDANTS);
+    assert!(evidence.temporary_removed);
+}
+
+#[tokio::test]
+#[ignore = "requires native Seatbelt or bubblewrap and working namespaces"]
+async fn pipe_session_interrupt_signals_the_payload_and_keeps_supervision() {
+    let fixture = Fixture::new();
+    let sandbox = fixture.sandbox();
+    let trapped = sandbox
+        .prepare(
+            fixture.session_command(
+                r#"
+                trap 'printf interrupted; exit 7' INT
+                printf ready
+                while :; do /bin/sleep 0.05; done
+                "#,
+            ),
+            fixture.scope(),
+        )
+        .unwrap()
+        .spawn_session(session_options(false), CancellationToken::new())
+        .unwrap();
+    let (output, _) = read_until(&trapped, Duration::from_secs(10), |output| {
+        contains(output, "ready")
+    })
+    .await;
+    assert_eq!(output, b"ready");
+    trapped.interrupt().unwrap();
+    let (output, ended) = read_until(&trapped, Duration::from_secs(10), |_| false).await;
+    assert!(ended, "{output:?}");
+    assert_eq!(output, b"interrupted");
+    assert!(trapped.interrupt().is_err());
+    let evidence = trapped.finish().await.unwrap();
+    assert_eq!(evidence.completion, Completion::Exited(7), "{evidence:?}");
+    assert_eq!(evidence.stopped, None);
+    assert_eq!(evidence.descendants, SESSION_DESCENDANTS);
+
+    let plain = sandbox
+        .prepare(
+            fixture.session_command("printf ready; exec /bin/sleep 100"),
+            fixture.scope(),
+        )
+        .unwrap()
+        .spawn_session(session_options(false), CancellationToken::new())
+        .unwrap();
+    read_until(&plain, Duration::from_secs(10), |output| {
+        contains(output, "ready")
+    })
+    .await;
+    plain.interrupt().unwrap();
+    let (_, ended) = read_until(&plain, Duration::from_secs(10), |_| false).await;
+    assert!(ended);
+    let evidence = plain.finish().await.unwrap();
+    assert_eq!(
+        evidence.completion,
+        Completion::Signaled(libc::SIGINT),
+        "{evidence:?}"
+    );
+    assert_eq!(evidence.stopped, None);
+    assert_eq!(evidence.descendants, SESSION_DESCENDANTS);
+}
+
+#[tokio::test]
+#[ignore = "requires native Seatbelt or bubblewrap and working namespaces"]
+async fn terminal_session_runs_on_a_pseudo_terminal() {
+    let fixture = Fixture::new();
+    let sandbox = fixture.sandbox();
+    let session = sandbox
+        .prepare(
+            fixture.session_command(
+                r#"
+                if test -t 0 && test -t 1 && test -t 2; then printf 'tty:yes\n'; fi
+                printf 'size:%s\n' "$(/bin/stty size)"
+                IFS= read -r line
+                printf 'got:%s\n' "$line"
+                "#,
+            ),
+            fixture.scope(),
+        )
+        .unwrap()
+        .spawn_session(session_options(true), CancellationToken::new())
+        .unwrap();
+    let (output, _) = read_until(&session, Duration::from_secs(10), |output| {
+        contains(output, "size:")
+    })
+    .await;
+    assert!(contains(&output, "tty:yes\r\n"), "{output:?}");
+    session.write(b"hello\n").unwrap();
+    let (rest, ended) = read_until(&session, Duration::from_secs(10), |_| false).await;
+    let output = [output, rest].concat();
+    assert!(ended, "{}", String::from_utf8_lossy(&output));
+    assert!(contains(&output, "size:24 80"), "{output:?}");
+    // The terminal echoes the typed line before the payload consumes it.
+    assert!(contains(&output, "hello\r\n"), "{output:?}");
+    assert!(contains(&output, "got:hello\r\n"), "{output:?}");
+    let error = session.write(&vec![0; 64 * 1024 + 1]).err().unwrap();
+    assert_eq!(error.code, "sandbox_session_input_limit");
+    let evidence = session.finish().await.unwrap();
+    assert_eq!(evidence.completion, Completion::Exited(0), "{evidence:?}");
+    assert_eq!(evidence.descendants, SESSION_DESCENDANTS);
+    assert!(evidence.temporary_removed);
+}
+
+#[tokio::test]
+#[ignore = "requires native Seatbelt or bubblewrap and working namespaces"]
+async fn terminal_session_interrupt_types_the_interrupt_character() {
+    let fixture = Fixture::new();
+    let sandbox = fixture.sandbox();
+    let session = sandbox
+        .prepare(
+            fixture.session_command("printf 'ready\\n'; exec /bin/sleep 100"),
+            fixture.scope(),
+        )
+        .unwrap()
+        .spawn_session(session_options(true), CancellationToken::new())
+        .unwrap();
+    read_until(&session, Duration::from_secs(10), |output| {
+        contains(output, "ready")
+    })
+    .await;
+    let interrupted = Instant::now();
+    session.interrupt().unwrap();
+    let (_, ended) = read_until(&session, Duration::from_secs(10), |_| false).await;
+    assert!(ended);
+    assert!(interrupted.elapsed() < Duration::from_secs(5));
+    let evidence = session.finish().await.unwrap();
+    assert_eq!(
+        evidence.completion,
+        Completion::Signaled(libc::SIGINT),
+        "{evidence:?}"
+    );
+    assert_eq!(evidence.stopped, None);
+    assert_eq!(evidence.descendants, SESSION_DESCENDANTS);
+}
+
+#[tokio::test]
+#[ignore = "requires native Seatbelt or bubblewrap and working namespaces"]
+async fn stopping_a_session_ends_its_background_descendants() {
+    for terminal in [false, true] {
+        let fixture = Fixture::new();
+        let sandbox = fixture.sandbox();
+        let session = sandbox
+            .prepare(
+                fixture.session_command(
+                    r#"
+                    (
+                        while :; do
+                            if [ -f after-stop ]; then printf escaped > survived; exit; fi
+                            /bin/sleep 0.05
+                        done
+                    ) &
+                    printf ready > started
+                    wait
+                    "#,
+                ),
+                fixture.scope(),
+            )
+            .unwrap()
+            .spawn_session(session_options(terminal), CancellationToken::new())
+            .unwrap();
+        assert!(wait_for_file(&fixture.workspace.join("started"), Duration::from_secs(10)).await);
+        session.request_stop();
+        session.request_stop();
+        let (_, ended) = read_until(&session, Duration::from_secs(10), |_| false).await;
+        assert!(ended);
+        let evidence = session.finish().await.unwrap();
+        assert_eq!(
+            evidence.stopped,
+            Some(StopReason::Requested),
+            "{evidence:?}"
+        );
+        assert_eq!(
+            evidence.completion,
+            Completion::Signaled(libc::SIGKILL),
+            "terminal={terminal} {evidence:?}"
+        );
+        assert_eq!(
+            evidence.descendants, SESSION_DESCENDANTS,
+            "terminal={terminal}"
+        );
+        assert!(evidence.temporary_removed);
+        fs::write(fixture.workspace.join("after-stop"), b"continue").unwrap();
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        assert!(
+            !fixture.workspace.join("survived").exists(),
+            "terminal={terminal}"
+        );
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires native Seatbelt or bubblewrap and working namespaces"]
+async fn a_session_ends_at_the_scope_deadline_or_when_its_handle_is_dropped() {
+    let fixture = Fixture::new();
+    let sandbox = fixture.sandbox();
+    let mut scope = fixture.scope();
+    scope.valid_until = Instant::now() + Duration::from_secs(2);
+    let session = sandbox
+        .prepare(fixture.session_command("exec /bin/sleep 100"), scope)
+        .unwrap()
+        .spawn_session(session_options(true), CancellationToken::new())
+        .unwrap();
+    let evidence = session.finish().await.unwrap();
+    assert_eq!(evidence.stopped, Some(StopReason::Deadline), "{evidence:?}");
+    assert_eq!(evidence.descendants, SESSION_DESCENDANTS);
+
+    let session = sandbox
+        .prepare(
+            fixture.session_command("while :; do printf alive > heartbeat; /bin/sleep 0.05; done"),
+            fixture.scope(),
+        )
+        .unwrap()
+        .spawn_session(session_options(false), CancellationToken::new())
+        .unwrap();
+    let heartbeat = fixture.workspace.join("heartbeat");
+    assert!(wait_for_file(&heartbeat, Duration::from_secs(10)).await);
+    drop(session);
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    fs::remove_file(&heartbeat).unwrap();
+    assert!(!wait_for_file(&heartbeat, Duration::from_millis(500)).await);
+}
+
+#[tokio::test]
+#[ignore = "requires native Seatbelt or bubblewrap and working namespaces"]
+async fn retained_session_output_counts_what_it_drops() {
+    let fixture = Fixture::new();
+    let sandbox = fixture.sandbox();
+    let options = SessionOptions {
+        terminal: false,
+        retained_output_bytes: 1023,
+    };
+    let error = sandbox
+        .prepare(fixture.session_command("exit 0"), fixture.scope())
+        .unwrap()
+        .spawn_session(options, CancellationToken::new())
+        .err()
+        .unwrap();
+    assert_eq!(error.code, "sandbox_session_limit");
+    let mut fixed = fixture.session_command("exit 0");
+    fixed.stdin = b"fixed".to_vec();
+    let error = sandbox
+        .prepare(fixed, fixture.scope())
+        .unwrap()
+        .spawn_session(session_options(false), CancellationToken::new())
+        .err()
+        .unwrap();
+    assert_eq!(error.code, "sandbox_fixed_stdin_present");
+
+    let session = sandbox
+        .prepare(
+            fixture.session_command(
+                "i=0; while [ $i -lt 2000 ]; do printf '0123456789abcdef'; i=$((i + 1)); done",
+            ),
+            fixture.scope(),
+        )
+        .unwrap()
+        .spawn_session(
+            SessionOptions {
+                terminal: false,
+                retained_output_bytes: 1024,
+            },
+            CancellationToken::new(),
+        )
+        .unwrap();
+    // Nobody reads while the payload writes; it is never blocked.
+    tokio::time::timeout(Duration::from_secs(20), async {
+        while !session.has_ended() {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .unwrap();
+    let read = session.read(Instant::now(), 256).await;
+    assert!(read.ended);
+    assert_eq!(read.output.len(), 256);
+    assert_eq!(read.omitted_bytes, 32_000 - 256);
+    assert_eq!(read.omitted_at, Some(128));
+    assert!(read.output.starts_with(b"0123456789abcdef"));
+    assert!(read.output.ends_with(b"0123456789abcdef"));
+    let evidence = session.finish().await.unwrap();
+    assert_eq!(evidence.completion, Completion::Exited(0), "{evidence:?}");
+    assert!(!evidence.output_truncated);
+}
+
+/// Started as its own process by the owner-loss fixture, which kills it.
+#[tokio::test]
+#[ignore = "requires native Seatbelt or bubblewrap and working namespaces"]
+async fn session_owner_process() {
+    let Some(report) = std::env::var_os("AGENT_KIT_TEST_SESSION_OWNER") else {
+        return;
+    };
+    let fixture = Fixture::new();
+    let sandbox = fixture.sandbox();
+    let mut scope = fixture.scope();
+    scope.valid_until = Instant::now() + Duration::from_secs(60);
+    let mut sessions = Vec::new();
+    for (terminal, name) in [(false, "pipe"), (true, "terminal")] {
+        sessions.push(
+            sandbox
+                .prepare(
+                    fixture.session_command(&format!(
+                        "( while :; do printf alive > {name}-child; /bin/sleep 0.05; done ) & \
+                         while :; do printf alive > {name}; /bin/sleep 0.05; done"
+                    )),
+                    scope.clone(),
+                )
+                .unwrap()
+                .spawn_session(session_options(terminal), CancellationToken::new())
+                .unwrap(),
+        );
+    }
+    fs::write(report, fixture.workspace.to_string_lossy().as_bytes()).unwrap();
+    // The fixture kills this process before the sessions would end.
+    tokio::time::sleep(Duration::from_secs(60)).await;
+    drop(sessions);
+}
+
+#[tokio::test]
+#[ignore = "requires native Seatbelt or bubblewrap and working namespaces"]
+async fn a_session_ends_when_its_owner_process_disappears() {
+    let directory = tempfile::tempdir().unwrap();
+    let report = directory.path().join("workspace");
+    let mut owner = std::process::Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "session_owner_process",
+            "--include-ignored",
+            "--nocapture",
+        ])
+        .env("AGENT_KIT_TEST_SESSION_OWNER", &report)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    let ready = tokio::time::timeout(Duration::from_secs(20), async {
+        loop {
+            if let Ok(workspace) = fs::read_to_string(&report) {
+                let workspace = PathBuf::from(workspace);
+                if ["pipe", "terminal", "pipe-child", "terminal-child"]
+                    .iter()
+                    .all(|name| workspace.join(name).exists())
+                {
+                    break workspace;
+                }
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await;
+    let Ok(workspace) = ready else {
+        let _ = owner.kill();
+        let _ = owner.wait();
+        panic!("the owner process did not start its sessions");
+    };
+    // The owner ends without any chance to stop its sessions.
+    owner.kill().unwrap();
+    owner.wait().unwrap();
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    for name in ["pipe", "terminal", "pipe-child", "terminal-child"] {
+        fs::remove_file(workspace.join(name)).unwrap();
+    }
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    for name in ["pipe", "terminal", "pipe-child", "terminal-child"] {
+        assert!(!workspace.join(name).exists(), "{name} outlived its owner");
+    }
+    let _ = fs::remove_dir_all(workspace.parent().unwrap());
 }

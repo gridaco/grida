@@ -45,6 +45,17 @@ jobs:
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - name: Test
         run: cargo test --workspace --all-features --locked
+      - name: Native sandbox
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            sudo apt-get update && sudo apt-get install -y bubblewrap
+            # Ubuntu restricts unprivileged user namespaces by default.
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+            export AGENT_KIT_TEST_BWRAP=/usr/bin/bwrap
+          fi
+          cargo test -p agent-kit-sandbox --locked --test native -- --include-ignored --test-threads=1
       - name: Build
         run: cargo build --workspace --locked
   conformance:

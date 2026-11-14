@@ -14,6 +14,7 @@ use tempfile::TempDir;
 mod placeholder;
 mod process;
 mod reviewed;
+mod session;
 
 const MAX_PATHS: usize = 128;
 const MAX_INPUT: usize = 1024 * 1024;
@@ -410,6 +411,7 @@ impl Installation {
                 arguments: spec.arguments,
                 cwd: cwd.path().to_owned(),
                 environment: spec.environment,
+                mode: wire::Mode::Finite,
             };
             (
                 task,
@@ -616,6 +618,7 @@ fn support(termination: Termination) -> Result<Support> {
 }
 
 pub(super) use process::Running;
+pub(super) use session::Session;
 
 impl Prepared {
     pub(super) fn verify_executable(&self, executable: &TrustedExecutable) -> Result<()> {
@@ -639,6 +642,7 @@ impl Prepared {
             arguments,
             cwd,
             environment,
+            ..
         } = &self.launch.task
         else {
             return Err(refused(
@@ -726,7 +730,37 @@ impl Prepared {
 
     pub(super) fn spawn(self, cancellation: CancellationToken) -> Result<Running> {
         self.validate_spawn(&cancellation)?;
-        process::spawn(self, cancellation, None)
+        process::spawn(self, cancellation, process::Supervision::Finite(None))
+    }
+
+    pub(super) fn spawn_session(
+        mut self,
+        options: SessionOptions,
+        cancellation: CancellationToken,
+    ) -> Result<session::Session> {
+        if !(session::MIN_RETAINED..=session::MAX_RETAINED).contains(&options.retained_output_bytes)
+        {
+            return Err(refused(ErrorKind::LimitExceeded, "sandbox_session_limit"));
+        }
+        if !self.stdin.is_empty() {
+            return Err(refused(
+                ErrorKind::InvalidInput,
+                "sandbox_fixed_stdin_present",
+            ));
+        }
+        let Task::Command { mode, .. } = &mut self.launch.task else {
+            return Err(refused(
+                ErrorKind::InvalidState,
+                "sandbox_capture_process_required",
+            ));
+        };
+        *mode = if options.terminal {
+            wire::Mode::Terminal
+        } else {
+            wire::Mode::Pipe
+        };
+        self.validate_spawn(&cancellation)?;
+        session::spawn(self, options, cancellation)
     }
 
     pub(super) fn spawn_streaming(
@@ -743,7 +777,11 @@ impl Prepared {
         self.validate_spawn(&cancellation)?;
         self.verify_executable(executable)?;
         let (client, supervisor) = tokio::io::duplex(16 * 1024);
-        let running = process::spawn(self, cancellation, Some(supervisor))?;
+        let running = process::spawn(
+            self,
+            cancellation,
+            process::Supervision::Finite(Some(supervisor)),
+        )?;
         Ok((running, client))
     }
 
@@ -772,6 +810,11 @@ impl Prepared {
     /// for a missing protected path, so those are counted at their largest.
     fn measure_setup_frame(&mut self) -> Result<()> {
         let roots = self.launch.roots.len();
+        // A session launch names the longest mode.
+        let mode = match &mut self.launch.task {
+            Task::Command { mode, .. } => Some(std::mem::replace(mode, wire::Mode::Terminal)),
+            Task::Probe => None,
+        };
         #[cfg(target_os = "linux")]
         {
             let missing = self.placeholder_candidates()?;
@@ -785,6 +828,9 @@ impl Prepared {
         }
         let frame = serde_json::to_vec(&self.launch).map(|frame| frame.len());
         self.launch.roots.truncate(roots);
+        if let (Task::Command { mode, .. }, Some(original)) = (&mut self.launch.task, mode) {
+            *mode = original;
+        }
         let frame =
             frame.map_err(|_| refused(ErrorKind::InvalidInput, "sandbox_setup_encoding"))?;
         if frame > wire::MAX_FRAME_BYTES {
