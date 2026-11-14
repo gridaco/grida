@@ -64,6 +64,24 @@ export function AgentPane({
           bridge={bridge.nativeExternalAgent}
         />
       )}
+      {bridge && !chat && (
+        // An installed Desktop older than the native agent has no chat
+        // bridge; say so instead of leaving the pane empty.
+        <p
+          data-testid="workspace-agent-update-required"
+          className="m-3 text-sm text-muted-foreground"
+        >
+          Update Grida Desktop to use the agent.{" "}
+          <a
+            href="https://grida.co/downloads"
+            target="_blank"
+            rel="noreferrer"
+            className="underline"
+          >
+            Download the latest version
+          </a>
+        </p>
+      )}
       {chat && ready && (
         <NativeAgentPaneGate
           key={workspace.id}
