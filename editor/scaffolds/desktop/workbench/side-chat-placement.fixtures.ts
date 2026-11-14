@@ -6,13 +6,9 @@ import type { SideChatPlacement } from "./side-chat-placement";
 export class FakeSideChatParent implements SideChatPlacement.Parent {
   private view: ReturnType<SideChatPlacement.Parent["read"]> = {
     sideChat: null,
-    steering: false,
-    acting: false,
   };
   private readonly listeners = new Set<() => void>();
   readonly close = vi.fn<() => void>();
-  readonly stage =
-    vi.fn<(side: NativeSideChatController, turnId: string) => void>();
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -53,13 +49,5 @@ export class FakeSideChatParent implements SideChatPlacement.Parent {
     this.close();
     await this.view.sideChat?.close();
     this.set({ sideChat: null });
-  }
-
-  stageSideAnswer(
-    side: NativeSideChatController,
-    turnId: string,
-    _append: (text: string) => boolean
-  ): void {
-    this.stage(side, turnId);
   }
 }

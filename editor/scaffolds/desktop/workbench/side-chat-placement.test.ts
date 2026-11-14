@@ -19,16 +19,12 @@ describe("SideChatPlacement.connect", () => {
   it("presents an opened side chat and withdraws it when it ends", async () => {
     const parent = new FakeSideChatParent();
     const { placement, presented, withdrawn } = recorder();
-    const stop = SideChatPlacement.connect(parent, placement, () => true);
+    const stop = SideChatPlacement.connect(parent, placement);
     expect(presented).toHaveLength(0);
 
     const side = parent.open();
     expect(presented).toHaveLength(1);
-    expect(presented[0]).toMatchObject({
-      id: side.id,
-      side,
-      draftUnavailable: false,
-    });
+    expect(presented[0]).toMatchObject({ id: side.id, side });
 
     presented[0].close();
     await vi.waitFor(() => expect(withdrawn).toHaveBeenCalledTimes(1));
@@ -37,24 +33,21 @@ describe("SideChatPlacement.connect", () => {
     expect(withdrawn).toHaveBeenCalledTimes(1);
   });
 
-  it("presents again only when the side chat or its draft availability changes", () => {
+  it("presents an open side chat once until it changes", () => {
     const parent = new FakeSideChatParent();
     const { placement, presented } = recorder();
-    SideChatPlacement.connect(parent, placement, () => true);
+    SideChatPlacement.connect(parent, placement);
     parent.open();
     parent.set({});
     expect(presented).toHaveLength(1);
-    parent.set({ acting: true });
-    expect(presented).toHaveLength(2);
-    expect(presented[1].draftUnavailable).toBe(true);
-    parent.set({ acting: false, steering: true });
+    parent.open();
     expect(presented).toHaveLength(2);
   });
 
   it("withdraws when the parent switches chats and on disconnect", () => {
     const parent = new FakeSideChatParent();
     const { placement, withdrawn } = recorder();
-    const stop = SideChatPlacement.connect(parent, placement, () => true);
+    const stop = SideChatPlacement.connect(parent, placement);
     parent.open();
     parent.set({ sideChat: null });
     expect(withdrawn).toHaveBeenCalledTimes(1);
@@ -68,7 +61,7 @@ describe("SideChatPlacement.connect", () => {
   it("routes a late close only to the side chat it was presented for", () => {
     const parent = new FakeSideChatParent();
     const { placement, presented } = recorder();
-    SideChatPlacement.connect(parent, placement, () => true);
+    SideChatPlacement.connect(parent, placement);
     parent.open();
     const stale = presented[0];
     parent.set({ sideChat: null });
@@ -76,14 +69,5 @@ describe("SideChatPlacement.connect", () => {
     stale.close();
     expect(parent.close).not.toHaveBeenCalled();
     expect(parent.read().sideChat).toBe(current);
-  });
-
-  it("stages an answer through the parent for the presented side chat", () => {
-    const parent = new FakeSideChatParent();
-    const { placement, presented } = recorder();
-    SideChatPlacement.connect(parent, placement, () => true);
-    const side = parent.open();
-    presented[0].addToDraft("answer-1");
-    expect(parent.stage).toHaveBeenCalledExactlyOnceWith(side, "answer-1");
   });
 });

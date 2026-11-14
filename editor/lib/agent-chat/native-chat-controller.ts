@@ -1573,24 +1573,6 @@ export class NativeChatController {
     if (this.owns(scope)) this.update({ sideIntent: false });
   }
 
-  stageSideAnswer(
-    side: NativeSideChatController,
-    turnId: string,
-    append: (text: string) => boolean
-  ): void {
-    const scope = this.scope;
-    if (
-      !scope?.attachment ||
-      scope.sideChat !== side ||
-      this.view.steering ||
-      this.view.acting
-    )
-      return;
-    const quote = side.quote(turnId);
-    if (quote && !append(quote))
-      this.update({ error: "Couldn't add the side answer to this draft." });
-  }
-
   get canSteer(): boolean {
     const turn = this.view.observation?.snapshot.current;
     return (

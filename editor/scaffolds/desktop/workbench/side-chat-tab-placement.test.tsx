@@ -15,8 +15,7 @@ function fixture() {
   const parent = new FakeSideChatParent();
   const stop = SideChatPlacement.connect(
     parent,
-    new SideChatTabPlacement(panels),
-    () => true
+    new SideChatTabPlacement(panels)
   );
   const tabOf = (id: string) =>
     WorkbenchTab.panel(SideChatTabPlacement.panel(id));
@@ -52,7 +51,7 @@ describe("SideChatTabPlacement", () => {
       active: file("a.svg"),
     });
     // Parent updates while the side chat is still closing keep the tab shut.
-    parent.set({ acting: true });
+    parent.set({});
     expect(group.getSnapshot().tabs).toEqual([file("a.svg")]);
     await vi.waitFor(() => expect(parent.read().sideChat).toBeNull());
     group.reopenClosed();

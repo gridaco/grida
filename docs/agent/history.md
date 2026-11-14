@@ -71,8 +71,7 @@ open files (in a file window, under the chat), and this chat does not change.
 Ask further questions in the tab. The side chat sees this chat's saved text
 but no project files or tools, takes up to six questions, and is discarded
 when you close its tab, choose **Close side chat**, or leave the chat; a
-closed side chat cannot be reopened. Choose **Add to parent draft** to quote
-an answer in your next message. **Side** cannot be combined with a goal or an
+closed side chat cannot be reopened. **Side** cannot be combined with a goal or an
 attachment; with **Plan** on, the side question still leaves the plan
 unchanged. ACP clients can open side chats too.
 [Ask in a temporary side chat](./clients.md#ask-in-a-temporary-side-chat)

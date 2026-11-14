@@ -320,15 +320,9 @@ export function NativeAgentPane({
     scope: number;
     selectionId: string;
   } | null>(null);
-  // The side chat shows wherever the host places it; answers quote into this
-  // chat's composer.
+  // The side chat shows wherever the host places it.
   useEffect(
-    () =>
-      SideChatPlacement.connect(
-        controller,
-        sideChatPlacement,
-        (text) => draft.current?.appendText(text, MAX_DRAFT_BYTES) ?? false
-      ),
+    () => SideChatPlacement.connect(controller, sideChatPlacement),
     [controller, sideChatPlacement]
   );
   useEffect(() => {

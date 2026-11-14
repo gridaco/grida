@@ -21,13 +21,9 @@ const OUTCOME = {
 export function NativeSideChatView({
   side,
   close,
-  addToDraft,
-  draftUnavailable,
 }: {
   side: NativeSideChatController;
   close: () => void;
-  addToDraft: (turnId: string) => void;
-  draftUnavailable: boolean;
 }) {
   const view = useSyncExternalStore(side.subscribe, side.read, side.read);
   return (
@@ -94,17 +90,6 @@ export function NativeSideChatView({
                   <p className="text-muted-foreground">
                     The answer was shortened.
                   </p>
-                )}
-                {answer.status === "succeeded" && answer.text.trim() && (
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant="ghost"
-                    disabled={draftUnavailable}
-                    onClick={() => addToDraft(answer.turnId)}
-                  >
-                    Add to parent draft
-                  </Button>
                 )}
               </li>
             ))}

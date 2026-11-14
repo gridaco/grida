@@ -21,7 +21,6 @@ type View = Readonly<{
 }>;
 
 const QUESTION_LIMIT = 16 * 1024;
-const QUOTE_LIMIT = 16 * 1024;
 const utf8 = new TextEncoder();
 
 /**
@@ -91,21 +90,6 @@ export class NativeSideChatController {
   setDraft(draft: string): void {
     if (this.view.phase === "ready" && !this.view.asking)
       this.update({ draft });
-  }
-
-  quote(turnId: string): string | null {
-    if (this.view.phase !== "ready") return null;
-    const answer = this.view.exchanges.find(
-      ({ answer }) => answer.turnId === turnId
-    )?.answer;
-    if (answer?.status !== "succeeded" || !answer.text.trim()) return null;
-    const quoted = answer.text.replace(/\r\n?/g, "\n").replace(/^/gm, "> ");
-    const bytes = new Uint8Array(QUOTE_LIMIT);
-    const { read, written } = utf8.encodeInto(quoted, bytes);
-    const excerpt = answer.textTruncated || read < quoted.length;
-    return `Side chat answer${excerpt ? " (excerpt)" : ""}\n${new TextDecoder().decode(
-      bytes.subarray(0, written)
-    )}`;
   }
 
   async ask(): Promise<void> {
