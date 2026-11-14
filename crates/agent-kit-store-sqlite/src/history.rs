@@ -206,14 +206,18 @@ impl HistoryReplay {
 
 impl SqliteStore {
     /// Read a bounded window of the current view from newest to oldest.
-    /// Both callbacks run under the store lock. `measure` returns the size of
-    /// the public record, or zero when the consumer does not display it.
+    /// Every callback runs under the store lock and must be pure. `measure`
+    /// returns the size of the public record, or zero when the consumer does
+    /// not display it. `seed_start` returns the index of the first seed record
+    /// the replay shows; the seed records before it are context the replay
+    /// never shows.
     pub async fn history_replay_window(
         &self,
         session: SessionId,
         cursor: Option<ReplayCursor>,
         project: fn(&TurnState) -> Vec<HistoryRecord>,
         measure: fn(&HistoryRecord) -> usize,
+        seed_start: impl Fn(&HistorySeed) -> Result<usize> + Send + 'static,
     ) -> Result<ReplayWindow> {
         execute(Arc::clone(&self.inner), move |_, connection| {
             load_session(connection, &session)?;
@@ -315,7 +319,11 @@ impl SqliteStore {
                 Some(ReplayBoundary::Seed { before }) => Some(before),
                 _ => None,
             };
-            let seed = view.seed.map_or_else(Vec::new, |seed| seed.records);
+            let seed = view
+                .seed
+                .map(|seed| replayed_seed(seed, &seed_start))
+                .transpose()?
+                .unwrap_or_default();
             let older = window
                 .collect(None, seed, before, measure)?
                 .map(|before| ReplayBoundary::Seed { before });
@@ -326,11 +334,13 @@ impl SqliteStore {
 
     /// Capture the current view for observation without taking a turn lease.
     /// The projection must be pure and keep settled history stable through
-    /// operation reconciliation.
+    /// operation reconciliation. `seed_start` is as for
+    /// [`Self::history_replay_window`].
     pub async fn open_history_replay(
         &self,
         session: SessionId,
         project: fn(&TurnState) -> Vec<HistoryRecord>,
+        seed_start: impl Fn(&HistorySeed) -> Result<usize> + Send + 'static,
     ) -> Result<HistoryReplay> {
         let replay_owner = Arc::clone(&self.inner);
         execute(Arc::clone(&self.inner), move |inner, connection| {
@@ -369,7 +379,10 @@ impl SqliteStore {
                 session,
                 after: view.after,
                 end,
-                prefix: view.seed.map(|seed| seed.records),
+                prefix: view
+                    .seed
+                    .map(|seed| replayed_seed(seed, &seed_start))
+                    .transpose()?,
                 active,
                 project,
             })
@@ -577,6 +590,18 @@ impl ReverseWindow {
             older: older.map(|boundary| ReplayCursor { view, boundary }),
         }
     }
+}
+
+/// The seed records a replay shows: those from `seed_start` on.
+fn replayed_seed(
+    mut seed: HistorySeed,
+    seed_start: &impl Fn(&HistorySeed) -> Result<usize>,
+) -> Result<Vec<HistoryRecord>> {
+    let start = seed_start(&seed)?;
+    if start > seed.records.len() {
+        return Err(error(ErrorKind::InvalidState, "stored_data_invalid"));
+    }
+    Ok(seed.records.split_off(start))
 }
 
 fn replay_changed() -> Error {

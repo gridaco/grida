@@ -4,12 +4,13 @@ import {
   type SideChatPresentation,
 } from "./side-chat-placement";
 import { FakeSideChatParent, idleBridge } from "./side-chat-placement.fixtures";
+import { SideChatInlinePlacement } from "./side-chat-inline-placement";
 
 const host = { bridge: idleBridge };
 
 function recorder() {
   const presented: SideChatPresentation[] = [];
-  const withdrawn = vi.fn<() => void>();
+  const withdrawn = vi.fn<(id: string) => void>();
   const placement: SideChatPlacement = {
     present: (presentation) => void presented.push(presentation),
     withdraw: withdrawn,
@@ -34,39 +35,59 @@ describe("SideChatPlacement.connect", () => {
     });
 
     presented[0].close();
-    await vi.waitFor(() => expect(withdrawn).toHaveBeenCalledTimes(1));
-    expect(parent.close).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() =>
+      expect(withdrawn).toHaveBeenCalledExactlyOnceWith(side.id)
+    );
+    expect(parent.close).toHaveBeenCalledExactlyOnceWith(side.id);
     stop();
     expect(withdrawn).toHaveBeenCalledTimes(1);
   });
 
-  it("presents the same side chat again only when asked to show it", () => {
+  it("presents each side chat beside the others and closes only the one asked", async () => {
+    const parent = new FakeSideChatParent();
+    const { placement, presented, withdrawn } = recorder();
+    SideChatPlacement.connect(parent, placement, host);
+    const first = parent.open();
+    const second = parent.open();
+    expect(presented.map(({ id }) => id)).toEqual([first.id, second.id]);
+    expect(withdrawn).not.toHaveBeenCalled();
+
+    presented[0].close();
+    await vi.waitFor(() =>
+      expect(withdrawn).toHaveBeenCalledExactlyOnceWith(first.id)
+    );
+    expect(parent.read().sideChats.map(({ id }) => id)).toEqual([second.id]);
+    expect(presented).toHaveLength(2);
+  });
+
+  it("presents a side chat again only when asked to show it", () => {
     const parent = new FakeSideChatParent();
     const { placement, presented } = recorder();
     SideChatPlacement.connect(parent, placement, host);
-    const side = parent.open();
-    parent.set({ sideChat: side });
-    expect(presented).toHaveLength(1);
-    parent.show();
+    const first = parent.open();
+    const second = parent.open();
+    parent.set({ sideChats: parent.read().sideChats });
     expect(presented).toHaveLength(2);
-    expect(presented[1]).toMatchObject({ id: side.id, focus: 2 });
-    parent.open();
+    parent.show(first.id);
     expect(presented).toHaveLength(3);
-    expect(presented[2].id).not.toBe(side.id);
+    expect(presented[2]).toMatchObject({ id: first.id, focus: 2 });
+    parent.show(second.id);
+    expect(presented[3]).toMatchObject({ id: second.id, focus: 2 });
   });
 
-  it("withdraws when the parent switches chats and on disconnect", () => {
+  it("withdraws every side chat when the parent switches chats and on disconnect", () => {
     const parent = new FakeSideChatParent();
     const { placement, withdrawn } = recorder();
     const stop = SideChatPlacement.connect(parent, placement, host);
-    parent.open();
-    parent.set({ sideChat: null });
-    expect(withdrawn).toHaveBeenCalledTimes(1);
-    parent.open();
+    const first = parent.open();
+    const second = parent.open();
+    parent.switchChat();
+    expect(withdrawn.mock.calls).toEqual([[first.id], [second.id]]);
+    const third = parent.open();
     stop();
-    expect(withdrawn).toHaveBeenCalledTimes(2);
-    parent.set({ sideChat: null });
-    expect(withdrawn).toHaveBeenCalledTimes(2);
+    expect(withdrawn).toHaveBeenLastCalledWith(third.id);
+    parent.switchChat();
+    expect(withdrawn).toHaveBeenCalledTimes(3);
   });
 
   it("routes a late close only to the side chat it was presented for", () => {
@@ -75,10 +96,28 @@ describe("SideChatPlacement.connect", () => {
     SideChatPlacement.connect(parent, placement, host);
     parent.open();
     const stale = presented[0];
-    parent.set({ sideChat: null });
+    parent.switchChat();
     const current = parent.open();
     stale.close();
     expect(parent.close).not.toHaveBeenCalled();
-    expect(parent.read().sideChat).toBe(current);
+    expect(parent.read().sideChats).toEqual([current]);
+  });
+});
+
+describe("SideChatInlinePlacement", () => {
+  it("shows the side chat opened or shown last and the one before when it closes", async () => {
+    const parent = new FakeSideChatParent();
+    const inline = new SideChatInlinePlacement();
+    SideChatPlacement.connect(parent, inline, host);
+    expect(inline.read()).toBeNull();
+    const first = parent.open();
+    const second = parent.open();
+    expect(inline.read()?.id).toBe(second.id);
+    parent.show(first.id);
+    expect(inline.read()).toMatchObject({ id: first.id, focus: 2 });
+    await parent.closeSideChat(first.id);
+    expect(inline.read()?.id).toBe(second.id);
+    parent.switchChat();
+    expect(inline.read()).toBeNull();
   });
 });

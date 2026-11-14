@@ -252,10 +252,13 @@ once settled,
 reported context tokens, whether the window holds the turn's newest record,
 and the account of a settled turn that added no records), and an opaque
 `ReplayCursor` for the next older window, or none at the start of the view.
-Inherited seed records come last and belong to no turn of this session.
+Inherited seed records come last and belong to no turn of this session. A
+pure `seed_start` callback names the first seed record the replay shows; the
+seed records before it stay context only, and the oldest window ends at it.
 
 The cursor is bound to the view and to the turn and position at which it cut.
 If history is revised, or the cut turn's journal position changes, the next
 read fails with `history_replay_window_changed`; restart from the latest
 window. `open_history_replay` instead captures the current view once and
-yields its seed, settled turns in pages, and the projected active turn last.
+yields its seed from `seed_start`, settled turns in pages, and the projected
+active turn last.

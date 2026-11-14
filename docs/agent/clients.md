@@ -502,11 +502,12 @@ See the [native host request fields](https://github.com/gridaco/grida/blob/main/
 
 Side chats are available to private stdio ACP clients; in Desktop, `/side`
 opens one. [Ask a side question](./history.md#ask-a-side-question)
+A chat can have several side chats open at once.
 
 Negotiate version 1 of `co.grida/side-chat/open` and `co.grida/side-chat/close`.
-Open takes the `sessionId` of a parent attached on this connection. The host
-forks the parent's committed conversation, the same way a fork does, into a new
-temporary session under the parent's model and settings; the parent can keep
+Open takes the `sessionId` of a parent attached on this connection. Each open
+forks the parent's committed conversation, the same way a fork does, into a
+new temporary session under the parent's model and settings; the parent can keep
 working and is not changed. The response returns `sideChatId`,
 `parentSessionId`, the parent history basis it copied (`sourceContext`),
 whether the parent's model context had been compacted (`compacted`), the
@@ -529,9 +530,15 @@ conversation is large, automatic compaction summarizes it before the side
 chat's first turn; the summary stays before the boundary. A side chat's own
 turns are never summarized, and manual compaction is refused.
 
+The copied conversation is model context only. A new side chat starts empty:
+its replay, transcript window and history page show nothing, and
+`latestAnchor` is `null`. They then show only the side chat's own messages,
+and only those can be edited with a revision. The summary of a compacted copy
+does not appear in the side chat's transcript either.
+
 A side chat's snapshot includes `side`: its `parentSessionId`,
-`temporary: true` and an `unavailable` list. Each listed operation is refused
-with its code:
+`temporary: true`, an `unavailable` list and, once the host titles it from its
+first message, its `title`. Each listed operation is refused with its code:
 
 | `unavailable` | Refused operation                                                 | Code                               |
 | ------------- | ----------------------------------------------------------------- | ---------------------------------- |
@@ -545,16 +552,20 @@ with its code:
 | `catalog`     | catalog entry, organize (rename, archive), delete and its preview | `side_chat_catalog_unavailable`    |
 
 A side chat never appears in `session/list`, the archive list or saved-chat
-counts, and is never titled. Another connection cannot load it
+counts. When the host is launched with chat titles, it titles a side chat from
+its first message the same way it titles a chat; read the title from the
+snapshot, because the catalog entry stays refused and a side chat cannot be
+renamed. The title ends with the side chat. Another connection cannot load it
 (`side_chat_unavailable`). Close takes `sideChatId`, cancels any running turn,
 stops its processes and removes its data; a closed or unknown ID returns
 `side_chat_unavailable`. If cleanup cannot be confirmed the close fails with
 `side_chat_discard_pending` and can be retried. Deleting the parent also
-discards its side chats, which are then no longer attached. Closing the
+discards all of its side chats, which are then no longer attached. Closing the
 connection discards every side chat, and a host discards any side chat a
-crash left behind before it serves. One connection can hold four side chats
-open (`side_chat_scope_limit`). Bringing an answer into the parent is up to
-the client.
+crash left behind before it serves. A parent can have eight side chats open
+(`side_chat_parent_limit`) and one connection thirty-two across its parents
+(`side_chat_scope_limit`); closing one makes room. Bringing an answer into the
+parent is up to the client.
 
 ## Set the context input limit
 

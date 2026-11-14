@@ -9,13 +9,15 @@ import type {
 } from "./side-chat-placement";
 
 /**
- * Presents a side chat inline, for a host without a tabbed editor region (the
- * file window). The host renders {@link SideChatInlineRegion} where the side
- * chat belongs; the region is empty while no side chat is open, and the side
- * chat's own close action ends it.
+ * Presents side chats inline, for a host without a tabbed editor region (the
+ * file window). The host renders {@link SideChatInlineRegion} where side chats
+ * belong. The region shows one side chat at a time: the one opened or asked
+ * to show most recently. The others stay open beneath it, and closing the
+ * shown one shows the one before it. The region is empty while none is open.
  */
 export class SideChatInlinePlacement implements SideChatPlacement {
-  private current: SideChatPresentation | null = null;
+  /** Open side chats, the shown one last. */
+  private stack: readonly SideChatPresentation[] = [];
   private readonly listeners = new Set<() => void>();
 
   readonly subscribe = (listener: () => void): (() => void) => {
@@ -23,19 +25,23 @@ export class SideChatInlinePlacement implements SideChatPlacement {
     return () => this.listeners.delete(listener);
   };
 
-  readonly read = (): SideChatPresentation | null => this.current;
+  /** The side chat shown, or `null` while none is open. */
+  readonly read = (): SideChatPresentation | null => this.stack.at(-1) ?? null;
 
   present(presentation: SideChatPresentation): void {
-    this.set(presentation);
+    this.set([
+      ...this.stack.filter(({ id }) => id !== presentation.id),
+      presentation,
+    ]);
   }
 
-  withdraw(): void {
-    this.set(null);
+  withdraw(id: string): void {
+    if (this.stack.some((presentation) => presentation.id === id))
+      this.set(this.stack.filter((presentation) => presentation.id !== id));
   }
 
-  private set(current: SideChatPresentation | null): void {
-    if (this.current === current) return;
-    this.current = current;
+  private set(stack: readonly SideChatPresentation[]): void {
+    this.stack = stack;
     for (const listener of this.listeners) listener();
   }
 }

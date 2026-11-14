@@ -16,6 +16,12 @@
 //! first side question. The host recomputes both on every side turn from the
 //! side session's configuration, so neither can drift or be dropped.
 //!
+//! The boundary is also where the side chat's transcript begins. The
+//! inherited history stays model context only: [`inherited_records`] counts
+//! the seed records that precede the boundary, and every user-facing view of
+//! the side chat (its transcript, history and revision targets) starts after
+//! them.
+//!
 //! Automatic compaction can replace the inherited history with a summary
 //! before the first side turn. The summary is still background: it precedes
 //! the boundary, and the side chat's own turns follow it. Those turns are never
@@ -27,8 +33,9 @@
 //! manual compaction) are enforced by the host where each operation is
 //! admitted.
 
+use crate::conversation_seed::SeedProvenance;
 use agent_kit_core::messages::{Content, Message, Provenance, ProvenanceKind, Role};
-use agent_kit_core::{Fingerprint, MessageId, Result};
+use agent_kit_core::{Fingerprint, MessageId, Result, SessionId};
 
 /// Provenance source of the inherited-history boundary message.
 pub const BOUNDARY_SOURCE: &str = "side_chat_boundary";
@@ -88,6 +95,22 @@ pub fn boundary() -> Result<Message> {
     })
 }
 
+/// How many leading records of side session `session`'s retained seed were
+/// inherited from its parent: the background the model reads before the
+/// boundary. The side chat's transcript begins after them.
+///
+/// A revision of a side message folds the side chat's own earlier records into
+/// the seed after the inherited ones. Those keep the side session as their
+/// origin, so they stay after the boundary and in the transcript.
+pub fn inherited_records(session: &SessionId, provenance: &SeedProvenance) -> usize {
+    provenance
+        .entries
+        .iter()
+        .filter(|entry| entry.message.is_some())
+        .take_while(|entry| &entry.origin.session != session)
+        .count()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -120,6 +143,92 @@ mod tests {
         let mut empty = String::new();
         apply(&mut empty);
         assert_eq!(empty, POLICY);
+    }
+
+    #[test]
+    fn the_transcript_begins_after_the_inherited_records() {
+        use crate::conversation_seed::{
+            ConversationAnchor, ConversationCut, ConversationSeed, ConversationSource,
+        };
+        use agent_kit_core::TurnId;
+        use agent_kit_core::history::HistoryRecord;
+        use agent_kit_core::turn::JournalPosition;
+
+        let parent = SessionId::new("parent").unwrap();
+        let side = SessionId::new("side/one").unwrap();
+        let source = |session: &SessionId| ConversationSource {
+            session: session.clone(),
+            view: 0,
+            tail: None,
+            fingerprint: Fingerprint::of(session).unwrap(),
+        };
+        let local = |turn: &str, messages: [(&str, Role); 2]| {
+            messages.map(|(id, role)| {
+                (
+                    TurnId::new(turn).unwrap(),
+                    JournalPosition(1),
+                    HistoryRecord::Message(Message {
+                        id: MessageId::new(id).unwrap(),
+                        role,
+                        phase: None,
+                        content: vec![Content::Text(format!("{id} text"))],
+                        provenance: Provenance {
+                            source: "test".into(),
+                            kind: ProvenanceKind::Supplied,
+                            fingerprint: None,
+                        },
+                    }),
+                )
+            })
+        };
+        // Opening the side chat copies the parent's two messages.
+        let opened = ConversationSeed::lower(
+            source(&parent),
+            ConversationCut::Through(ConversationAnchor::Turn {
+                turn: TurnId::new("parent-turn").unwrap(),
+                message: MessageId::new("parent-answer").unwrap(),
+            }),
+            None,
+            local(
+                "parent-turn",
+                [
+                    ("parent-question", Role::User),
+                    ("parent-answer", Role::Assistant),
+                ],
+            ),
+        )
+        .unwrap();
+        assert_eq!(opened.records().len(), 2);
+        assert_eq!(inherited_records(&side, opened.provenance()), 2);
+
+        // Editing the side chat's second question folds its first side turn
+        // into the seed after the inherited records.
+        let revised = ConversationSeed::lower(
+            source(&side),
+            ConversationCut::BeforeEditableUser(ConversationAnchor::Turn {
+                turn: TurnId::new("side-second").unwrap(),
+                message: MessageId::new("side-second-question").unwrap(),
+            }),
+            Some(opened),
+            local(
+                "side-first",
+                [
+                    ("side-first-question", Role::User),
+                    ("side-first-answer", Role::Assistant),
+                ],
+            )
+            .into_iter()
+            .chain(local(
+                "side-second",
+                [
+                    ("side-second-question", Role::User),
+                    ("side-second-answer", Role::Assistant),
+                ],
+            )),
+        )
+        .unwrap();
+        assert_eq!(revised.records().len(), 4);
+        assert_eq!(inherited_records(&side, revised.provenance()), 2);
     }
 
     #[test]

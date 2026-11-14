@@ -23,9 +23,9 @@
  * an mkdir/cp/git-mv from the agent pane). Pure prop drilling — no
  * context, no store — because nothing else needs to subscribe.
  *
- * Tabs are files or panels (`workbench-tab.ts`). The agent pane's side chat
- * opens as a panel tab through `SideChatTabPlacement`, handed down to the
- * chat like the surface host.
+ * Tabs are files or panels (`workbench-tab.ts`). Each of the agent pane's
+ * side chats opens as its own panel tab through `SideChatTabPlacement`,
+ * handed down to the chat like the surface host.
  *
  * The host (`page.tsx`) is responsible for resolving the workspace
  * from the `?id=` query param; this component renders against an

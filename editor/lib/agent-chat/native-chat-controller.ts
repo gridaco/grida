@@ -71,6 +71,8 @@ const MAX_LIVE_ACTIVITY = 64;
 const EMPTY_TURNS: readonly NativeChatTurnRecord[] = [];
 /** The title of a chat the host has not titled yet. */
 export const NEW_CHAT_TITLE = "New chat";
+/** The title of a side chat the host has not titled yet. */
+export const SIDE_CHAT_TITLE = "Side chat";
 /** A message chosen before the chat opened could not be sent. */
 const MESSAGE_NOT_SENT =
   "Your message from Welcome wasn't sent. It is in the composer; send it when the chat is ready.";
@@ -106,11 +108,12 @@ const TERMINAL_OUTCOME: Record<NativeChatTurnSummary["status"], string> = {
 };
 
 /**
- * The side chat a chat opened: an ordinary chat bound to the side session.
- * `focus` counts the requests to show it, so a placement can bring it forward.
+ * One of the side chats a chat opened: an ordinary chat bound to its side
+ * session. `focus` counts the requests to show it, so a placement can bring
+ * it forward.
  */
 export type NativeChatSideChat = Readonly<{
-  /** Stable for one side chat; a later side chat has a new id. */
+  /** Stable for one side chat; every side chat has its own id. */
   id: string;
   chat: NativeChatController;
   focus: number;
@@ -153,7 +156,8 @@ export type NativeChatView = Readonly<{
   titleArrived: string | null;
   readingEarlier: boolean;
   earlierError: string | null;
-  sideChat: NativeChatSideChat | null;
+  /** The open side chats of this chat, in the order they opened. */
+  sideChats: readonly NativeChatSideChat[];
   subagents: NativeSubagentController | null;
   /** Present once the attached chat confirms it lists background processes. */
   backgroundProcesses: NativeBackgroundProcessController | null;
@@ -222,7 +226,8 @@ type Scope = {
   stopEditorSurfaceOpen?: () => void;
   stopEditorSvgText?: () => void;
   editorPresentationRevision?: number;
-  side?: SideChatScope;
+  /** Open side chats, in the order they opened. */
+  sides: SideChatScope[];
   subagents?: NativeSubagentController;
   backgroundProcesses?: NativeBackgroundProcessController;
   selectedAttachment?: SelectedAttachment;
@@ -288,10 +293,13 @@ type Scope = {
 };
 
 type SideChatScope = {
-  id: string;
   chat: NativeChatController;
-  /** The side session's attachment, once requested. */
-  opened?: Promise<NativeChatSideAttachment>;
+  /** The side session's attachment. */
+  opened: Promise<NativeChatSideAttachment>;
+  /** What placements see; replaced each time the side chat is asked to show. */
+  shown: NativeChatSideChat;
+  /** Grows each time it opens, shows or sends; the largest is the latest used. */
+  used: number;
 };
 
 const SIDE_CHAT_UNAVAILABLE = "Side chats are unavailable in this chat.";
@@ -339,7 +347,7 @@ const EMPTY: NativeChatView = Object.freeze({
   titleArrived: null,
   readingEarlier: false,
   earlierError: null,
-  sideChat: null,
+  sideChats: [],
   subagents: null,
   backgroundProcesses: null,
   imageInput: false,
@@ -995,6 +1003,7 @@ export class NativeChatController {
     const scope: Scope = {
       id: ++this.generation,
       requested: sessionId,
+      sides: [],
       durable: [],
       earlierPages: [],
       live: new Map(),
@@ -1626,67 +1635,90 @@ export class NativeChatController {
   }
 
   /**
-   * Show this chat's side chat, opening one when none is open, and send
-   * `text` there as its next message. This chat itself is unchanged. A side
-   * chat starts from this chat's committed conversation, model and effort;
-   * it is discarded when it closes or this chat is switched or released.
+   * Open a new side chat of this chat and show it; with `text`, send that as
+   * its first message. This chat itself is unchanged. A side chat starts from
+   * this chat's committed conversation, model and effort, and shows only its
+   * own messages. It is discarded when it closes or this chat is switched or
+   * released. A refused open reports why here and ends that side chat.
    */
   async openSideChat(text?: string): Promise<void> {
     const scope = this.scope;
     const parent = scope?.attachment;
     const open = this.bridge.openSideChat;
     if (!scope || !parent || !open || !this.canOpenSideChat) {
-      if (scope && !scope.side) this.update({ error: SIDE_CHAT_UNAVAILABLE });
+      if (scope) this.update({ error: SIDE_CHAT_UNAVAILABLE });
       throw new Error(SIDE_CHAT_UNAVAILABLE);
     }
-    let side = scope.side;
-    if (!side) {
-      const opening: SideChatScope = {
-        id: crypto.randomUUID(),
-        chat: new NativeChatController(
-          this.bridge,
-          undefined,
-          undefined,
-          undefined,
-          this.libraryPicker,
-          {
-            open: () =>
-              (opening.opened ??= open
-                .call(this.bridge, parent.attachmentId)
-                .catch((error: unknown) => {
-                  opening.opened = undefined;
-                  throw error;
-                })),
-            effort: this.view.effort === "ultra" ? "xhigh" : this.view.effort,
-            profiles: this.view.profiles,
-          }
-        ),
-      };
-      // A side chat's draft ends with it.
-      opening.chat.keepDrafts(new ComposerDrafts(null, null), "side");
-      opening.chat.connect(null);
-      side = scope.side = opening;
-    }
-    this.update({
-      sideChat: {
-        id: side.id,
-        chat: side.chat,
-        focus: (this.view.sideChat?.focus ?? 0) + 1,
-      },
-      error: null,
-    });
+    const opened = open.call(this.bridge, parent.attachmentId);
+    const id = crypto.randomUUID();
+    const chat = new NativeChatController(
+      this.bridge,
+      undefined,
+      undefined,
+      undefined,
+      this.libraryPicker,
+      {
+        open: () => opened,
+        effort: this.view.effort === "ultra" ? "xhigh" : this.view.effort,
+        profiles: this.view.profiles,
+        sent: () => this.useSide(scope, side),
+      }
+    );
+    const side: SideChatScope = {
+      chat,
+      opened,
+      shown: Object.freeze({ id, chat, focus: 1 }),
+      used: ++this.sideUse,
+    };
+    // A side chat's draft ends with it.
+    chat.keepDrafts(new ComposerDrafts(null, null), "side");
+    scope.sides.push(side);
+    const ready = opened.then(
+      () => true,
+      (error: unknown) => {
+        if (!this.removeSide(scope, side)) return false;
+        chat.disconnect();
+        if (this.owns(scope))
+          this.update({
+            error: describeSideRefusal(error),
+          });
+        return false;
+      }
+    );
+    chat.connect(null);
+    this.publishSides(scope, { error: null });
     if (!text?.trim()) return;
-    await side.chat.opened();
-    if (!this.owns(scope) || scope.side !== side) return;
-    await side.chat.submit(text);
+    if (!(await ready)) return;
+    await chat.opened();
+    if (!this.owns(scope) || !scope.sides.includes(side)) return;
+    await chat.submit(text);
   }
 
-  async closeSideChat(): Promise<void> {
+  /**
+   * Show the side chat of this chat used most recently, or open a new one
+   * when none is open.
+   */
+  async showSideChat(): Promise<void> {
     const scope = this.scope;
-    const side = scope?.side;
+    const latest = scope?.sides.reduce<SideChatScope | undefined>(
+      (found, side) => (found && found.used > side.used ? found : side),
+      undefined
+    );
+    if (!scope || !latest) return this.openSideChat();
+    latest.shown = Object.freeze({
+      ...latest.shown,
+      focus: latest.shown.focus + 1,
+    });
+    this.useSide(scope, latest);
+    this.publishSides(scope, { error: null });
+  }
+
+  /** End side chat `id` of this chat; its siblings stay open. */
+  async closeSideChat(id: string): Promise<void> {
+    const scope = this.scope;
+    const side = scope?.sides.find((candidate) => candidate.shown.id === id);
     if (!scope || !side) return;
-    scope.side = undefined;
-    this.update({ sideChat: null });
+    this.removeSide(scope, side);
     try {
       await this.releaseSide(side);
     } catch {
@@ -1695,11 +1727,45 @@ export class NativeChatController {
     }
   }
 
+  private sideUse = 0;
+
+  private useSide(scope: Scope, side: SideChatScope): void {
+    if (scope.sides.includes(side)) side.used = ++this.sideUse;
+  }
+
+  /** Take `side` out of `scope`; false when it was already gone. */
+  private removeSide(scope: Scope, side: SideChatScope): boolean {
+    const index = scope.sides.indexOf(side);
+    if (index < 0) return false;
+    scope.sides.splice(index, 1);
+    this.publishSides(scope);
+    return true;
+  }
+
+  private publishSides(
+    scope: Scope,
+    change: Partial<NativeChatView> = {}
+  ): void {
+    if (!this.owns(scope)) return;
+    this.update({
+      ...change,
+      sideChats: scope.sides.map((side) => side.shown),
+    });
+  }
+
   /** End a side chat: its view goes first, then its session is discarded. */
   private async releaseSide(side: SideChatScope): Promise<void> {
     side.chat.disconnect();
-    const attachment = await side.opened?.catch(() => null);
+    const attachment = await side.opened.catch(() => null);
     if (attachment) await this.bridge.closeSideChat?.(attachment.attachmentId);
+  }
+
+  /**
+   * The title a side chat shows: the one the host generated from its first
+   * message, or the side chat label until it arrives.
+   */
+  sideChatTitle(): string {
+    return this.view.observation?.snapshot.side?.title ?? SIDE_CHAT_TITLE;
   }
 
   get canSteer(): boolean {
@@ -2157,7 +2223,11 @@ export class NativeChatController {
     if (!scope || scope.id !== scopeId || this.view.profileBusy)
       throw new Error("native_chat_not_ready");
     const side = /^\/side(?:\s+|$)/.exec(text.trim());
-    if (side) return this.openSideChat(text.trim().slice(side[0].length));
+    if (side) {
+      const message = text.trim().slice(side[0].length);
+      return message ? this.openSideChat(message) : this.showSideChat();
+    }
+    this.fixed?.sent?.();
     const intent = /^\/(plan|goal)(?:\s+|$)/.exec(text.trim());
     if (intent) {
       if (intent[1] === "plan") {
@@ -2425,7 +2495,7 @@ export class NativeChatController {
         this.selectGoalIntent(true);
         return;
       case "side":
-        return this.openSideChat();
+        return this.showSideChat();
       case "stop":
         return this.stopBackgroundProcesses();
       default:
@@ -3636,7 +3706,8 @@ export class NativeChatController {
     scope.stopEditorSurfaceOpen?.();
     scope.stopEditorSvgText?.();
     scope.stopEditorSurfaceUpdates?.();
-    if (scope.side) void this.releaseSide(scope.side).catch(() => {});
+    for (const side of scope.sides.splice(0))
+      void this.releaseSide(side).catch(() => {});
     scope.subagents?.dispose();
     // Switching chats leaves background processes running.
     scope.backgroundProcesses?.dispose();
@@ -3777,9 +3848,22 @@ export class NativeChatController {
   /**
    * An untitled chat is titled by the host from its first request, in the
    * background. Pick the title up as turns progress, and once more shortly
-   * after, without surfacing errors from this background read.
+   * after, without surfacing errors from this background read. A side chat
+   * reads its title from its snapshot.
    */
   private refreshUntitled(scope: Scope): void {
+    const side = scope.observation?.snapshot.side;
+    if (side) {
+      // A side chat's title arrives through its snapshot; look once more
+      // shortly after, as the title can follow the turn that asked for it.
+      if (side.title !== undefined) return;
+      clearTimeout(scope.titleCheck);
+      scope.titleCheck = setTimeout(
+        () => void this.refresh(scope),
+        TITLE_RECHECK_MS
+      );
+      return;
+    }
     const read = this.bridge.catalogEntry;
     const attachment = scope.attachment;
     if (
@@ -4713,6 +4797,18 @@ function applyText(
   };
 }
 
+/** Why a side chat could not open, for the chat that asked for it. */
+function describeSideRefusal(error: unknown): string {
+  const message = error instanceof Error ? error.message : "";
+  if (message.includes("side_chat_parent_limit"))
+    return "This chat already has 8 side chats open. Close one to open another.";
+  if (message.includes("side_chat_scope_limit"))
+    return "Too many side chats are open. Close one to open another.";
+  if (message.includes("native_chat_attachment_limit"))
+    return "This window has too many chats open. Close a side chat to open another.";
+  return "Couldn't open a side chat.";
+}
+
 function describe(error: unknown, fallback: string): string {
   if (!(error instanceof Error)) return fallback;
   if (error.message.includes("session_execution_configuration_changed"))
@@ -4836,11 +4932,13 @@ export namespace NativeChatController {
    * one: its owner is the chat that opened it.
    */
   export type FixedSession = Readonly<{
-    /** Attach the session. Called again after a failed attempt. */
+    /** Attach the session. Every call returns the same attachment. */
     open(): Promise<NativeChatAttachment>;
     /** The effort the chat starts with. */
     effort: NativeChatEffort;
     /** The model connections shown; the chat cannot choose another. */
     profiles: NativeChatProfileCatalog | null;
+    /** The person sends a message from this chat. */
+    sent?(): void;
   }>;
 }

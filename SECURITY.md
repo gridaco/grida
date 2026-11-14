@@ -1123,16 +1123,20 @@ build-cleanup directory and retain the same fixed-path and binary validation.
   The [queue process fixture](desktop/src/main/native-agent-queue.test.ts)
   verifies exact retries, stale revisions, and the queue held after Stop.
 - The [Desktop side-chat adapter](desktop/src/main/native-agent-side-chats.ts)
-  opens a side chat for an attached parent on the private child connection and
-  records which session is a side chat of which parent. A side session is an
-  ordinary attachment only of the frame that opened it: the
+  opens side chats for an attached parent on the private child connection and
+  records which session is a side chat of which parent. Each side session is
+  an ordinary attachment only of the frame that opened it: the
   [native chat owner](desktop/src/main/native-chat-ipc.ts) adds it to that
-  frame's attachments, so every chat method, delivery and process control
-  takes it under the same exact-frame checks, and another frame cannot name
-  it. Loading a side session by its ID is refused, notifications never name
-  one, and a side chat opens no side chat. Closing it, detaching it or its
-  parent, deleting the parent, navigating, or a scope change removes the
-  attachment and its subscriptions before the child discards the session.
+  frame's attachments, within the frame's attachment bound, so every chat
+  method, delivery and process control takes it under the same exact-frame
+  checks, and another frame cannot name it. Loading a side session by its ID
+  is refused, notifications never name one, and a side chat opens no side
+  chat. Closing or detaching one removes only that side chat; detaching its
+  parent, deleting the parent, navigating, or a scope change removes every
+  side chat of that parent. Each removal drops the attachment and its
+  subscriptions before the child discards the session. A side chat's
+  generated title reaches the frame only inside that side chat's own
+  snapshot, validated like a catalog title.
 - The [Desktop background process adapter](desktop/src/main/native-agent-background-processes.ts)
   lists and stops a chat's kept processes only when the native child
   advertises the capability. Main names the frame's attached chat and checks
@@ -1470,20 +1474,29 @@ Today:
   manual compaction and catalog changes for a side session where each is
   admitted; automatic compaction may summarize only the inherited history,
   before the first side turn, and the boundary follows that summary. The host
-  rejects a retained side input that carries any refused option. Side sessions
-  live in a catalog scope outside every workspace. Close, parent deletion,
+  rejects a retained side input that carries any refused option. The inherited
+  history is model context only: replay, transcript windows, history pages and
+  revision targets of a side session begin after it, and leave out the summary
+  of a compacted copy, so a side chat never re-presents the parent's
+  conversation. A parent holds at most eight open side chats and a connection
+  thirty-two. Side sessions live in a catalog scope outside every workspace,
+  and a side chat's generated title stays on that session's own record,
+  readable only through its snapshot on the opening connection. Close, parent deletion,
   connection shutdown and the sweep a host runs before serving cancel their
   work, stop their processes and [discard](crates/agent-kit-store-sqlite/src/deletion.rs)
   their records, spending authority and retained attachments; unconfirmed
   cleanup leaves the session fenced for the next sweep.
   [Process tests](crates/grida-agent/tests/process/side_chats.rs) verify
-  private scope, parent permissions and approvals, refusals, catalog absence
-  and every discard path.
+  private scope, parent permissions and approvals, refusals, the transcript
+  beginning at the boundary, the per-parent and per-connection bounds, a
+  title kept out of the catalog, and every discard path.
 - The [chat title owner](crates/grida-agent/src/host/titles.rs) titles an
   untitled chat from its first request through a temporary host: a separate
   in-memory journal, only the selected inference authority, and tools denied.
   It writes the title only while the chat is
-  still untitled at the same catalogue revision. A client opts in at launch.
+  still untitled at the same catalogue revision, as the chat's own record
+  rather than a person's catalog action, so it also titles a side chat that
+  refuses those actions. A client opts in at launch.
   The [process test](crates/grida-agent/tests/process/catalog.rs) verifies a
   tool-free title request and that a rename is never replaced.
 - [Desktop media startup proof](desktop/src/sidecar/media-startup.test.ts), [build fixture](desktop/src/sidecar/testing/media-startup-build.mjs), and [runtime guard](desktop/src/sidecar/testing/media-startup-guard.cjs) — actual Vite sidecar output, private framed provider/control traffic and main-transferred loopback sockets, with synthetic BYOK/GG responses and owned temporary state. Import/network tripwires and absent chat/scratch files test startup isolation; they are not an OS-sandbox, installed-app or provider integration certification.

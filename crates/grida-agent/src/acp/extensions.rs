@@ -505,8 +505,10 @@ pub(super) fn handlers(
                         .inspect_with_retry(request.session_id)
                         .await
                         .map_err(host_error)?;
-                    let side =
-                        crate::host::side_chats::side_snapshot(&snapshot).map_err(host_error)?;
+                    let side = snapshot_host
+                        .side_snapshot(&snapshot)
+                        .await
+                        .map_err(host_error)?;
                     Ok(SnapshotResponse {
                         side,
                         session_id: snapshot.session,

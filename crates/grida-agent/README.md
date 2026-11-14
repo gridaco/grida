@@ -429,15 +429,18 @@ Exact retries return the persisted receipt. Chats with pending work or
 dependent retained state remain available until those dependencies are resolved.
 
 Private stdio clients can negotiate the side-chat open and close operations.
-Open forks an attached parent's committed conversation into a temporary
-session attached to the same connection; every ordinary session method then
-works on it, under the parent's tools and permission rules. Each side turn
-runs under the side-chat policy and history boundary, and the side chat
-refuses delegation, goals, wake-ups, forking, nested side chats, manual
-compaction and catalog changes. Automatic compaction can summarize the
-inherited history before the first side turn. Close, parent deletion, disconnect and the next host
-start after a crash discard it with its data and processes. The parent task
-keeps its original controls.
+Each open forks an attached parent's committed conversation into a new
+temporary session attached to the same connection; every ordinary session
+method then works on it, under the parent's tools and permission rules. Each
+side turn runs under the side-chat policy and history boundary. The inherited
+conversation is model context only: the side chat's transcript and history
+start empty and show its own turns. The side chat refuses delegation, goals,
+wake-ups, forking, nested side chats, manual compaction and catalog changes,
+and is titled from its first message when titles are on. Automatic compaction
+can summarize the inherited history before the first side turn. A parent can
+have eight side chats open and a connection thirty-two. Close, parent
+deletion, disconnect and the next host start after a crash discard it with its
+data and processes. The parent task keeps its original controls.
 
 Clients can negotiate both `co.grida/session/questions` and
 `co.grida/session/answer-question` at version `1`. Prompts accepted through the

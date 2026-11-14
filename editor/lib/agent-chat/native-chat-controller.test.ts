@@ -2160,9 +2160,12 @@ const SIDE_REFUSALS = [
 function sideFixture() {
   const f = fixture();
   let opened = 0;
+  /** Side chats the host has titled, by attachment. */
+  const titles = new Map<string, string>();
   const observe = f.bridge.observe.bind(f.bridge);
   f.bridge.observe = async (id) => {
     const observation = await observe(id);
+    const title = titles.get(id);
     return id.startsWith("side-")
       ? {
           ...observation,
@@ -2172,6 +2175,7 @@ function sideFixture() {
               parentSessionId: "chat-a",
               temporary: true as const,
               unavailable: SIDE_REFUSALS,
+              ...(title && { title }),
             },
           },
         }
@@ -2196,10 +2200,10 @@ function sideFixture() {
   f.bridge.closeSideChat = close;
   f.bridge.commands = async () => ["compact", "fork"];
   f.bridge.runCommand = vi.fn<NonNullable<DesktopNativeChat["runCommand"]>>();
-  return { ...f, open, close };
+  return { ...f, open, close, titles };
 }
 
-it("opens a side chat at once on /side and leaves this chat unchanged", async () => {
+it("opens a side chat at once on /side, and /side alone shows it again", async () => {
   const { bridge, controller, open } = sideFixture();
   const submit = vi.spyOn(bridge, "submit");
   await controller.select("chat-a");
@@ -2209,7 +2213,8 @@ it("opens a side chat at once on /side and leaves this chat unchanged", async ()
   expect(controller.canOpenSideChat).toBe(true);
   const scope = controller.read().scope;
   await controller.submit("/side");
-  const side = controller.read().sideChat!;
+  const [side] = controller.read().sideChats;
+  expect(controller.read().sideChats).toHaveLength(1);
   expect(side.focus).toBe(1);
   expect(open).toHaveBeenCalledExactlyOnceWith("chat-a");
   expect(submit).not.toHaveBeenCalled();
@@ -2224,34 +2229,44 @@ it("opens a side chat at once on /side and leaves this chat unchanged", async ()
     expect(side.chat.read().commands).toEqual(["compact", "fork"])
   );
 
-  // A second /side shows the same side chat again.
+  // /side alone, typed or chosen, shows the open side chat again.
   await controller.submit("/side");
-  expect(controller.read().sideChat).toMatchObject({ id: side.id, focus: 2 });
+  expect(controller.read().sideChats).toEqual([
+    expect.objectContaining({ id: side.id, focus: 2 }),
+  ]);
+  await controller.runComposerCommand("side");
+  expect(controller.read().sideChats).toEqual([
+    expect.objectContaining({ id: side.id, focus: 3 }),
+  ]);
   expect(open).toHaveBeenCalledTimes(1);
   controller.disconnect();
 });
 
-it("sends /side with a question as the side chat's first message", async () => {
+it("opens a new side chat for each /side with a question", async () => {
   const { bridge, controller, open } = sideFixture();
   const submit = vi.spyOn(bridge, "submit");
   await controller.select("chat-a");
   await controller.submit("/side What did we decide?");
-  expect(open).toHaveBeenCalledExactlyOnceWith("chat-a");
-  expect(submit).toHaveBeenCalledExactlyOnceWith(
-    "side-1",
-    expect.any(String),
-    "What did we decide?"
-  );
-  // With a side chat open, the next question goes to the same one.
   await controller.submit("/side And why?");
-  expect(open).toHaveBeenCalledTimes(1);
-  expect(submit).toHaveBeenLastCalledWith(
-    "side-1",
-    expect.any(String),
-    "And why?"
-  );
-  expect(submit.mock.calls.every(([id]) => id === "side-1")).toBe(true);
+  expect(open).toHaveBeenCalledTimes(2);
+  expect(submit.mock.calls.map(([id, , text]) => [id, text])).toEqual([
+    ["side-1", "What did we decide?"],
+    ["side-2", "And why?"],
+  ]);
+  const [first, second] = controller.read().sideChats;
+  expect(controller.read().sideChats).toHaveLength(2);
+  expect(first.id).not.toBe(second.id);
+  expect(first.chat).not.toBe(second.chat);
   expect(controller.read().messages).toEqual([]);
+
+  // /side alone shows the side chat used last: the newest, until the person
+  // sends from an earlier one.
+  await controller.submit("/side");
+  expect(controller.read().sideChats.map(({ focus }) => focus)).toEqual([1, 2]);
+  await first.chat.submit("One more thing.");
+  await controller.submit("/side");
+  expect(controller.read().sideChats.map(({ focus }) => focus)).toEqual([2, 2]);
+  expect(open).toHaveBeenCalledTimes(2);
   controller.disconnect();
 });
 
@@ -2274,7 +2289,7 @@ it("offers in a side chat only what its snapshot does not refuse", async () => {
   controller.selectEffort("ultra");
   expect(controller.read().effort).toBe("ultra");
   await controller.openSideChat();
-  const side = controller.read().sideChat!.chat;
+  const side = controller.read().sideChats[0].chat;
 
   // Before its first snapshot a side chat offers nothing it could refuse.
   expect(side.offers("goals")).toBe(false);
@@ -2321,26 +2336,29 @@ it("offers in a side chat only what its snapshot does not refuse", async () => {
   controller.disconnect();
 });
 
-it("discards the side chat when it closes or this chat switches, never by detaching", async () => {
+it("closes one side chat at a time and discards all when this chat switches, never by detaching", async () => {
   const { bridge, controller, close } = sideFixture();
   const detach = vi.spyOn(bridge, "detach");
   await controller.select("chat-a");
   await controller.openSideChat();
-  const first = controller.read().sideChat!;
-  await first.chat.opened();
-  await controller.closeSideChat();
+  await controller.openSideChat();
+  const [first, second] = controller.read().sideChats;
+  await Promise.all([first.chat.opened(), second.chat.opened()]);
+  await controller.closeSideChat(first.id);
   expect(close).toHaveBeenCalledExactlyOnceWith("side-1");
-  expect(controller.read().sideChat).toBeNull();
+  expect(controller.read().sideChats).toEqual([second]);
   expect(detach).not.toHaveBeenCalledWith("side-1");
 
   await controller.openSideChat();
-  const second = controller.read().sideChat!;
-  expect(second.id).not.toBe(first.id);
-  await second.chat.opened();
+  const third = controller.read().sideChats[1];
+  await third.chat.opened();
   await controller.select("chat-b");
-  expect(controller.read().sideChat).toBeNull();
-  await vi.waitFor(() => expect(close).toHaveBeenLastCalledWith("side-2"));
+  expect(controller.read().sideChats).toEqual([]);
+  await vi.waitFor(() => expect(close).toHaveBeenCalledTimes(3));
+  expect(close).toHaveBeenCalledWith("side-2");
+  expect(close).toHaveBeenCalledWith("side-3");
   expect(detach).not.toHaveBeenCalledWith("side-2");
+  expect(detach).not.toHaveBeenCalledWith("side-3");
   controller.disconnect();
 });
 
@@ -2348,28 +2366,55 @@ it("reports a side chat that did not close", async () => {
   const { controller, close } = sideFixture();
   await controller.select("chat-a");
   await controller.openSideChat();
-  await controller.read().sideChat!.chat.opened();
+  const [side] = controller.read().sideChats;
+  await side.chat.opened();
   close.mockRejectedValueOnce(new Error("side_chat_discard_pending"));
-  await controller.closeSideChat();
-  expect(controller.read().sideChat).toBeNull();
+  await controller.closeSideChat(side.id);
+  expect(controller.read().sideChats).toEqual([]);
   expect(controller.read().error).toBe(
     "Couldn't confirm that the side chat closed."
   );
   controller.disconnect();
 });
 
-it("retries opening a side chat that failed to open", async () => {
-  const { controller, open } = sideFixture();
-  open.mockRejectedValueOnce(new Error("side_chat_scope_limit"));
+it("reports a refused side chat in this chat and ends it", async () => {
+  const { bridge, controller, open } = sideFixture();
+  const submit = vi.spyOn(bridge, "submit");
   await controller.select("chat-a");
   await controller.openSideChat();
-  const side = controller.read().sideChat!.chat;
-  await side.opened();
-  expect(side.read().error).toBe("Couldn't open the side chat.");
-  expect(side.read().selected).toBeNull();
-  await side.repair();
-  expect(side.read().selected).toBe("side/side-1");
-  expect(open).toHaveBeenCalledTimes(2);
+  const [kept] = controller.read().sideChats;
+  open.mockRejectedValueOnce(new Error("side_chat_parent_limit"));
+  await controller.submit("/side One too many?");
+  expect(controller.read().sideChats).toEqual([kept]);
+  expect(controller.read().error).toBe(
+    "This chat already has 8 side chats open. Close one to open another."
+  );
+  expect(submit).not.toHaveBeenCalled();
+  open.mockRejectedValueOnce(new Error("side_chat_scope_limit"));
+  await controller.openSideChat();
+  await vi.waitFor(() =>
+    expect(controller.read().error).toBe(
+      "Too many side chats are open. Close one to open another."
+    )
+  );
+  expect(controller.read().sideChats).toEqual([kept]);
+  controller.disconnect();
+});
+
+it("titles a side chat once its snapshot carries the generated title", async () => {
+  const { controller, titles } = sideFixture();
+  await controller.select("chat-a");
+  await controller.submit("/side Which banner sizes?");
+  const [side] = controller.read().sideChats;
+  expect(side.chat.sideChatTitle()).toBe("Side chat");
+  titles.set("side-1", "Banner sizes");
+  await side.chat.submit("And for mobile?");
+  await vi.waitFor(() =>
+    expect(side.chat.sideChatTitle()).toBe("Banner sizes")
+  );
+  // A side chat's title never names or renames a saved chat.
+  expect(side.chat.canOrganizeChats).toBe(false);
+  expect(controller.chatTitle("chat-a")).toBe("New chat");
   controller.disconnect();
 });
 

@@ -106,6 +106,11 @@ pub struct SeedOmissions {
 }
 
 impl SeedProvenance {
+    /// Interpret the product provenance retained beside a seed's records.
+    pub fn decode(envelope: &Envelope) -> Result<Self> {
+        decode(SCHEMA, envelope)
+    }
+
     pub fn omissions(&self) -> SeedOmissions {
         let mut counts = SeedOmissions::default();
         for omission in self.entries.iter().flat_map(|entry| &entry.omissions) {
@@ -234,7 +239,7 @@ impl ConversationSeed {
 
     /// Interpret the product provenance retained beside portable history records.
     pub fn from_parts(records: Vec<HistoryRecord>, provenance: &Envelope) -> Result<Self> {
-        let provenance: SeedProvenance = decode(SCHEMA, provenance)?;
+        let provenance = SeedProvenance::decode(provenance)?;
         let mut visible = provenance
             .entries
             .iter()

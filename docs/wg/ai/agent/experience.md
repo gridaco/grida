@@ -286,14 +286,17 @@ discussion stays separate.
 
 A side chat differs from an ordinary fork only by policy:
 
-| Concern           | Side-chat rule                                                                                                                                   |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Role              | The agent is told it is answering in a side chat, not continuing the main task.                                                                  |
-| Inherited history | A boundary follows the copied history. Requests, plans, tool calls and approvals before it are background; only messages after it are active.    |
-| Effects           | Questions and non-mutating exploration by default. A change happens only when the person asks for it after the boundary, and stays minimal.      |
-| Authority         | The main conversation's permissions, unchanged. The policy steers behavior; it never widens or narrows what a tool may do.                       |
-| Unavailable       | Delegation and subagents, goals, scheduled continuation, forking, nested side chats, manual compaction, and catalog changes such as renaming.    |
-| Retention         | Temporary. Never listed or titled, and discarded with its data and processes when closed, when its parent is removed, or when its client leaves. |
+| Concern           | Side-chat rule                                                                                                                                |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Role              | The agent is told it is answering in a side chat, not continuing the main task.                                                               |
+| Inherited history | A boundary follows the copied history. Requests, plans, tool calls and approvals before it are background; only messages after it are active. |
+| Transcript        | Begins at the boundary. The copied history, and any summary of it, is model context only; the person sees, pages and edits only side turns.   |
+| Effects           | Questions and non-mutating exploration by default. A change happens only when the person asks for it after the boundary, and stays minimal.   |
+| Authority         | The main conversation's permissions, unchanged. The policy steers behavior; it never widens or narrows what a tool may do.                    |
+| Unavailable       | Delegation and subagents, goals, scheduled continuation, forking, nested side chats, manual compaction, and catalog changes such as renaming. |
+| Title             | Generated from the first side message like any conversation's, presentation only: never listed, not renamable, and ended with the side chat.  |
+| Multiplicity      | A conversation can hold several side chats, each independent, within a small bound per conversation and per client.                           |
+| Retention         | Temporary. Never listed, and discarded with its data and processes when closed, when its parent is removed, or when its client leaves.        |
 
 The policy and boundary are present before the first side turn and on every
 turn after it; they are recomputed rather than stored in the conversation.
@@ -308,7 +311,18 @@ can hide those controls instead of discovering them by refusal. A refusal names
 the operation. A temporary conversation can still have lasting external
 effects, which keep their actual outcome records.
 
-Opening or closing the side chat preserves the main task's independent controls.
+A side chat starts empty on screen because its value is the focused question,
+not a second copy of a conversation the person already sees. Showing the
+copied history would invite edits and references to messages the side chat
+cannot change, and would bury its own short exchange.
+
+Asking with a question opens a new side chat, so unrelated side questions
+never share a context. Asking without one returns to the side chat used last,
+or opens one. Closing one side chat leaves the others; leaving or removing the
+main conversation ends all of them. Opening beyond the bound is refused with
+a reason the main conversation shows.
+
+Opening or closing a side chat preserves the main task's independent controls.
 Returning to the main chat changes the view. Bringing back an answer or using it
 to steer the main task is an explicit action. A side chat can use its copy for
 background and request a fresh observation when it needs current task status.

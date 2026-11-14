@@ -1356,6 +1356,29 @@ it("lends a side chat only through the attachment that opened it", async () => {
       unavailable: ["fork", "catalog"],
     });
 
+    // A generated title arrives through the side chat's snapshot.
+    const titled = (title: unknown) => ({
+      sessionId: sideId,
+      sessionRevision: 2,
+      queuedInputs: 0,
+      queue: [],
+      admissionPaused: false,
+      current: null,
+      latest: null,
+      side: {
+        parentSessionId: "parent",
+        temporary: true,
+        unavailable: [],
+        title,
+      },
+    });
+    request.mockResolvedValueOnce(titled("Banner sizes"));
+    expect((await client.observe(session)).side?.title).toBe("Banner sizes");
+    request.mockResolvedValueOnce(titled("Bad\u0007title"));
+    await expect(client.observe(session)).rejects.toThrow(
+      "native_chat_invalid_protocol_value"
+    );
+
     // No other attachment can load the side chat by its id.
     const calls = request.mock.calls.length;
     await expect(client.load(sideId)).rejects.toThrow(

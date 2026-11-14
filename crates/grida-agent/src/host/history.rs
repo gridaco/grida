@@ -9,9 +9,10 @@ use agent_kit_store_sqlite::history::{
 };
 use grida_agent_master::conversation_seed::{
     ConversationAnchor, ConversationCut, ConversationSeed, ConversationSource, SeedEntry,
-    SeedOmissions, is_editable_user,
+    SeedOmissions, SeedProvenance, is_editable_user,
 };
 use grida_agent_master::history::{model_context, project};
+use grida_agent_master::side_chat::inherited_records;
 use std::borrow::Cow;
 
 const HISTORY_PAGE: usize = 128;
@@ -92,9 +93,47 @@ impl Host {
         before: Option<ReplayCursor>,
         measure: fn(&HistoryRecord) -> usize,
     ) -> Result<ReplayWindow> {
-        self.store
-            .history_replay_window(session, before, project, measure)
-            .await
+        let side = self.side_parent(&session).await?.is_some();
+        let start = seed_start(side.then(|| session.clone()));
+        let mut window = self
+            .store
+            .history_replay_window(session, before, project, measure, start)
+            .await?;
+        if side {
+            // A side chat compacts only its inherited history, so its
+            // summary is background like that history and has no place in
+            // the side chat's transcript.
+            window.turns.retain(|turn| {
+                !turn.silent_account.as_ref().is_some_and(|account| {
+                    grida_agent_master::compaction::CompactionAccount::from_envelope(account)
+                        .is_ok()
+                })
+            });
+        }
+        Ok(window)
+    }
+
+    /// Where `session`'s transcript begins within its seed. A side chat's
+    /// transcript begins at its boundary, after the history it inherited;
+    /// any other session shows its whole seed.
+    pub(super) async fn transcript_seed_start(
+        &self,
+        session: &SessionId,
+    ) -> Result<impl Fn(&HistorySeed) -> Result<usize> + Send + 'static> {
+        let side = self.side_parent(session).await?.map(|_| session.clone());
+        Ok(seed_start(side))
+    }
+
+    /// How many leading records of `session`'s seed precede its transcript.
+    async fn hidden_seed_records(
+        &self,
+        session: &SessionId,
+        seed: Option<&HistorySeed>,
+    ) -> Result<usize> {
+        match seed {
+            Some(seed) => (self.transcript_seed_start(session).await?)(seed),
+            None => Ok(0),
+        }
     }
 
     /// The turns among `turns` whose accepted input started a goal. A client
@@ -135,7 +174,7 @@ impl Host {
             .store
             .retained_history_with(session.clone(), HistorySelection::Current, project)
             .await?;
-        let anchor = latest_anchor(&history)
+        let anchor = latest_anchor(&history, 0)
             .ok_or_else(|| problem(ErrorKind::InvalidInput, "history_anchor_missing"))?;
         self.fork_session(
             session,
@@ -171,15 +210,7 @@ impl Host {
                 {
                     seed.records.len()
                 } else {
-                    decode_seed(Some(seed.clone()))?.map_or(0, |seed| {
-                        seed.provenance()
-                            .entries
-                            .iter()
-                            .filter(|entry| {
-                                entry.message.is_some() && entry.origin.session != session
-                            })
-                            .count()
-                    })
+                    inherited_records(&session, &SeedProvenance::decode(&seed.provenance)?)
                 }
             }
             _ => 0,
@@ -203,7 +234,7 @@ impl Host {
         let retained = self
             .store
             .retained_history_with(
-                query.session,
+                query.session.clone(),
                 query
                     .view
                     .map_or(HistorySelection::Current, HistorySelection::View),
@@ -217,7 +248,10 @@ impl Host {
         {
             return Err(problem(ErrorKind::Conflict, "history_basis_changed"));
         }
-        let latest_anchor = latest_anchor(&retained);
+        let hidden = self
+            .hidden_seed_records(&query.session, retained.seed.as_ref())
+            .await?;
+        let latest_anchor = latest_anchor(&retained, hidden);
         let inherited = decode_seed(retained.seed)?;
         let lineage = inherited.as_ref().map(|seed| {
             let provenance = seed.provenance();
@@ -233,6 +267,7 @@ impl Host {
                 .iter()
                 .filter(|entry| entry.message.is_some())
                 .zip(seed.records())
+                .skip(hidden)
                 .filter_map(|(entry, HistoryRecord::Message(message))| {
                     history_message(
                         message,
@@ -288,6 +323,9 @@ impl Host {
         if expected_revision != retained.session_revision {
             return Err(problem(ErrorKind::Conflict, "stale_session_revision"));
         }
+        let hidden = self
+            .hidden_seed_records(&session, retained.seed.as_ref())
+            .await?;
         let inherited = decode_seed(retained.seed)?;
         let inherited_messages = inherited.iter().flat_map(|seed| {
             seed.provenance()
@@ -295,6 +333,7 @@ impl Host {
                 .iter()
                 .filter(|entry| entry.message.is_some())
                 .zip(seed.records())
+                .skip(hidden)
                 .map(|(entry, HistoryRecord::Message(message))| {
                     (message, RevisionOrigin::Inherited(entry))
                 })
@@ -558,6 +597,16 @@ impl Host {
     }
 }
 
+/// Where a transcript begins within a seed: after the inherited records of
+/// `side`, a side session, or at the start for any other session.
+fn seed_start(side: Option<SessionId>) -> impl Fn(&HistorySeed) -> Result<usize> + Send + 'static {
+    move |seed: &HistorySeed| match &side {
+        Some(session) => SeedProvenance::decode(&seed.provenance)
+            .map(|provenance| inherited_records(session, &provenance)),
+        None => Ok(0),
+    }
+}
+
 pub(super) fn context_material(
     retained: RetainedHistory,
 ) -> Result<(Vec<Message>, SeedOmissions, bool)> {
@@ -681,7 +730,12 @@ fn revision_target_unavailable() -> Error {
     )
 }
 
-pub(super) fn latest_anchor(history: &RetainedHistory) -> Option<ConversationAnchor> {
+/// The newest visible message of `history`, among its own turns or the seed
+/// records after the first `hidden`.
+pub(super) fn latest_anchor(
+    history: &RetainedHistory,
+    hidden: usize,
+) -> Option<ConversationAnchor> {
     history
         .records
         .iter()
@@ -699,6 +753,7 @@ pub(super) fn latest_anchor(history: &RetainedHistory) -> Option<ConversationAnc
                 .as_ref()?
                 .records
                 .iter()
+                .skip(hidden)
                 .rev()
                 .find_map(|record| {
                     let HistoryRecord::Message(message) = record;

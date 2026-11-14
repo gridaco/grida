@@ -388,7 +388,8 @@ exit code `6` when it suspends for an answer.
 
 Private stdio clients negotiate both version-1 keys under
 `co.grida/side-chat/`. A side chat is an ordinary session forked from its
-parent; its ID belongs to the connection that opened it.
+parent; its ID belongs to the connection that opened it. A parent can have
+several side chats open at once; each `open` forks a new one.
 
 | Method suffix | Parameters and result                                                                                                                                                                                               |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -403,10 +404,17 @@ attached chat. Tools and permission rules are the parent's.
 
 Each side turn's instructions end with the side-chat policy, and its model
 context places a boundary message after the inherited history and before the
-side chat's own turns. The snapshot carries
-`side: { parentSessionId, temporary: true, unavailable }`, where `unavailable`
-lists `fork`, `side_chat`, `compaction`, `goals`, `subagents`, `delegation`,
-`wakeups` and `catalog`. The host refuses each with
+side chat's own turns. The inherited history is model context only. The side
+chat's transcript begins at the boundary: a new side chat's `session/load`
+replay, transcript window and `_co.grida/session/history` page are empty
+(`latestAnchor` is `null`), and they then show the side chat's own turns. A
+history page's `seed` still names the parent the side chat was forked from.
+Revision targets are the side chat's own messages; revising one keeps the
+earlier side turns in the transcript, now as inherited anchors with
+`editable: true`, and the parent's history stays hidden. The snapshot carries
+`side: { parentSessionId, temporary: true, unavailable, title? }`, where
+`unavailable` lists `fork`, `side_chat`, `compaction`, `goals`, `subagents`,
+`delegation`, `wakeups` and `catalog`. The host refuses each with
 `side_chat_fork_unavailable`, `side_chat_nested_unavailable`,
 `side_chat_compaction_unavailable`, `side_chat_goals_unavailable`,
 `side_chat_subagents_unavailable`, `side_chat_delegation_unavailable` (effort
@@ -414,18 +422,27 @@ above Standard), `side_chat_wakeups_unavailable` (`allowWakeups`) or
 `side_chat_catalog_unavailable` (catalog entry, organize, delete and its
 preview). `compaction` means manual compaction. Automatic compaction can
 summarize a side chat's inherited history before its first turn, covering
-nothing of its own; the boundary then follows the summary. Once the side chat
-has a turn, automatic compaction no longer selects it.
+nothing of its own; the boundary then follows the summary. That summary is
+background too, so the side chat's transcript window leaves out the turn that
+wrote it. Once the side chat has a turn, automatic compaction no longer
+selects it.
+
+A host launched with chat titles titles a side chat from its first message,
+as it titles a chat. `title` appears in the side chat's snapshot once written;
+a client reads it there, since the catalog entry stays refused. The title is
+kept only on the side chat's own record and is discarded with it.
 
 Side chats live in a catalog scope outside every workspace, so listings,
-archive listings and deletion previews never include them, and they are never
-titled. Loading one from a connection that did not open it returns
-`side_chat_unavailable`, as does closing an unknown or closed ID. A close whose
-cleanup cannot be confirmed returns `side_chat_discard_pending`, leaves the
-side chat fenced and open, and can be retried. A connection holds at most four
-open side chats (`side_chat_scope_limit`). Disconnect shuts the host down and
-then discards every side chat; a host also discards any left by a crash before
-it serves.
+archive listings and deletion previews never include them. Loading one from a
+connection that did not open it returns `side_chat_unavailable`, as does
+closing an unknown or closed ID. A close whose cleanup cannot be confirmed
+returns `side_chat_discard_pending`, leaves the side chat fenced and open, and
+can be retried. A parent can have at most eight side chats open
+(`side_chat_parent_limit`), and a connection at most thirty-two across its
+parents (`side_chat_scope_limit`). Closing one makes room again. Deleting a
+parent discards all of its side chats. Disconnect shuts the host down and then
+discards every side chat; a host also discards any left by a crash before it
+serves.
 
 ### One-shot task wake-ups
 

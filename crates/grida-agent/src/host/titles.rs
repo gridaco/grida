@@ -4,9 +4,14 @@
 //! temporary, tool-free conversation writes it while the first turn runs, and
 //! it is saved only if the chat is still untitled at the same catalogue
 //! revision, so a person's rename always wins.
+//!
+//! A side chat is titled the same way. Its title stays on the side session's
+//! own record, outside every workspace listing, and is discarded with it; a
+//! client reads it from the side chat's snapshot. A person cannot rename it.
 
 use super::*;
 use agent_kit_core::messages::OutcomeStatus;
+use agent_kit_store_sqlite::catalog::CatalogEntry;
 use grida_agent_master::read_account;
 
 const TITLE_INSTRUCTIONS: &str = include_str!("../prompts/title.md");
@@ -18,7 +23,7 @@ const TITLE_TIMEOUT: Duration = Duration::from_secs(60);
 impl Host {
     /// Title untitled chats. A client opts in at launch: the title costs one
     /// model request, which a one-shot run or a scripted provider does not
-    /// expect. The temporary titler and side chats are never titled.
+    /// expect. The temporary titler and subagents are never titled.
     pub fn with_chat_titles(mut self) -> Self {
         self.chat_titles = true;
         self
@@ -36,9 +41,8 @@ impl Host {
             || view.current.is_some()
             || view.latest.is_some()
             || !view.queued.is_empty()
-            || session_configuration(view).is_ok_and(|configuration| {
-                configuration.subagent.is_some() || configuration.side.is_some()
-            })
+            || session_configuration(view)
+                .is_ok_and(|configuration| configuration.subagent.is_some())
         {
             return None;
         }
@@ -65,29 +69,37 @@ impl Host {
         });
     }
 
+    /// Write the generated title as the chat's own label. This is the
+    /// store's record of the chat, not a person's catalog action, so it also
+    /// titles a side chat that refuses those actions.
     async fn write_title(&self, session: SessionId, text: String) -> Result<()> {
-        if self.catalog_entry(session.clone()).await?.label.is_some() {
+        if self
+            .store
+            .catalog_entry(session.clone())
+            .await?
+            .label
+            .is_some()
+        {
             return Ok(());
         }
         let cwd = session_configuration(&self.store.inspect(session.clone()).await?)?.cwd;
         let Some(title) = self.generate_title(cwd, &text).await? else {
             return Ok(());
         };
-        let current = self.catalog_entry(session.clone()).await?;
+        let current = self.store.catalog_entry(session.clone()).await?;
         // A host that shut down while the title was generated no longer
         // writes to the chat.
         if current.label.is_some() || self.work.lock().await.closed {
             return Ok(());
         }
         // The revision check refuses the write if the person renamed meanwhile.
-        self.organize_session(
-            session,
-            current.revision,
-            Some(title),
-            catalog::is_archived(&current),
-        )
-        .await
-        .map(|_| ())
+        self.store
+            .replace_catalog_entry(CatalogEntry {
+                label: Some(title),
+                ..current
+            })
+            .await
+            .map(|_| ())
     }
 
     async fn generate_title(&self, cwd: PathBuf, text: &str) -> Result<Option<String>> {

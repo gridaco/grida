@@ -1367,7 +1367,11 @@ async fn oversized_history_is_refused_without_returning_a_partial_projection() {
             .is_empty()
     );
     let mut replay = store
-        .open_history_replay(session(), |state| state.history().records().to_vec())
+        .open_history_replay(
+            session(),
+            |state| state.history().records().to_vec(),
+            |_| Ok(0),
+        )
         .await
         .unwrap();
     assert_eq!(replay.next().await.unwrap(), Some(records));
@@ -1467,7 +1471,10 @@ async fn bounded_context_prefix_keeps_whole_turns_and_checks_the_full_source() {
         compacted.history.into_records(),
         [vec![summary], suffix.clone(), vec![later.clone()]].concat()
     );
-    let mut replay = store.open_history_replay(session(), project).await.unwrap();
+    let mut replay = store
+        .open_history_replay(session(), project, |_| Ok(0))
+        .await
+        .unwrap();
     let mut visible = Vec::new();
     while let Some(records) = replay.next().await.unwrap() {
         visible.extend(records);
@@ -1575,7 +1582,11 @@ async fn paged_transcript_replay_freezes_the_active_tail_without_a_lease() {
     expected.push(current);
 
     let mut replay = store
-        .open_history_replay(session(), |state| state.history().records().to_vec())
+        .open_history_replay(
+            session(),
+            |state| state.history().records().to_vec(),
+            |_| Ok(0),
+        )
         .await
         .unwrap();
     let mut restored = replay.next().await.unwrap().unwrap();
@@ -1625,7 +1636,7 @@ async fn earlier_replay_windows_keep_the_exact_boundary_as_new_turns_arrive() {
     let project = |state: &agent_kit_core::turn::TurnState| state.history().records().to_vec();
     let measure = |_: &HistoryRecord| 13;
     let latest = store
-        .history_replay_window(session(), None, project, measure)
+        .history_replay_window(session(), None, project, measure, |_| Ok(0))
         .await
         .unwrap();
     assert_eq!(plain(&latest.records), expected[38..]);
@@ -1650,7 +1661,7 @@ async fn earlier_replay_windows_keep_the_exact_boundary_as_new_turns_arrive() {
     .await;
     while let Some(cursor) = older {
         let page = store
-            .history_replay_window(session(), Some(cursor), project, measure)
+            .history_replay_window(session(), Some(cursor), project, measure, |_| Ok(0))
             .await
             .unwrap();
         assert_eq!(page.view, latest.view);
@@ -1683,7 +1694,7 @@ async fn an_earlier_window_cannot_mix_changed_records_within_an_active_turn() {
     let project = |state: &agent_kit_core::turn::TurnState| state.history().records().to_vec();
     let measure = |_: &HistoryRecord| 4;
     let latest = store
-        .history_replay_window(session(), None, project, measure)
+        .history_replay_window(session(), None, project, measure, |_| Ok(0))
         .await
         .unwrap();
     assert_eq!(plain(&latest.records), records[4..]);
@@ -1693,7 +1704,7 @@ async fn an_earlier_window_cannot_mix_changed_records_within_an_active_turn() {
     assert!(latest.turns[0].started_ms > 0);
     assert_eq!(latest.turns[0].settled_ms, None);
     let older = store
-        .history_replay_window(session(), latest.older.clone(), project, measure)
+        .history_replay_window(session(), latest.older.clone(), project, measure, |_| Ok(0))
         .await
         .unwrap();
     assert_eq!(plain(&older.records), records[..4]);
@@ -1708,7 +1719,7 @@ async fn an_earlier_window_cannot_mix_changed_records_within_an_active_turn() {
     .await;
     assert_error(
         store
-            .history_replay_window(session(), latest.older, project, measure)
+            .history_replay_window(session(), latest.older, project, measure, |_| Ok(0))
             .await,
         ErrorKind::Conflict,
         "history_replay_window_changed",
@@ -1978,6 +1989,87 @@ fn copy_seed(history: RetainedHistory) -> Result<HistorySeed> {
         records: history.into_records(),
         provenance: payload("fixture lineage"),
     })
+}
+
+/// A replay can start partway into a session's seed: the earlier seed
+/// records stay context only. Windows page down to the start and stop there.
+#[tokio::test]
+async fn a_replay_shows_the_seed_from_its_start() {
+    let (_directory, store) = store().await;
+    let seed: Vec<_> = (0..140)
+        .map(|i| history_message(&format!("seed-{i}"), "seeded text"))
+        .collect();
+    let copied = seed.clone();
+    let destination = SessionId::new("seeded").unwrap();
+    finish_history_turn(&store, session(), "source-turn", Vec::new()).await;
+    store
+        .create_seeded(
+            SeededSession {
+                create: CreateSession {
+                    id: destination.clone(),
+                    request: change("seeded"),
+                    configuration: payload("settings"),
+                },
+                source: session(),
+                expected_history: current_history(&store, session()).await.basis,
+                intent: Fingerprint::of(&"seeded").unwrap(),
+            },
+            |_| Vec::new(),
+            move |_| {
+                Ok(HistorySeed {
+                    records: copied,
+                    provenance: payload("fixture lineage"),
+                })
+            },
+        )
+        .await
+        .unwrap();
+    let own = history_message("own", "after the seed start");
+    finish_history_turn(&store, destination.clone(), "own-turn", vec![own.clone()]).await;
+    let project = |state: &agent_kit_core::turn::TurnState| state.history().records().to_vec();
+    let measure = |_: &HistoryRecord| 1;
+    let start = |seed: &HistorySeed| Ok(seed.records.len() - 5);
+
+    let latest = store
+        .history_replay_window(destination.clone(), None, project, measure, start)
+        .await
+        .unwrap();
+    let mut expected = seed[135..].to_vec();
+    expected.push(own.clone());
+    assert_eq!(plain(&latest.records), expected);
+    assert!(latest.older.is_none());
+
+    // A window that stops inside the shown seed pages down to its start.
+    let wide = |seed: &HistorySeed| Ok(seed.records.len() - 130);
+    let latest = store
+        .history_replay_window(destination.clone(), None, project, measure, wide)
+        .await
+        .unwrap();
+    assert_eq!(latest.records.len(), 128);
+    let older = store
+        .history_replay_window(destination.clone(), latest.older, project, measure, wide)
+        .await
+        .unwrap();
+    assert_eq!(plain(&older.records), seed[10..13]);
+    assert!(older.older.is_none());
+
+    let mut replay = store
+        .open_history_replay(destination.clone(), project, start)
+        .await
+        .unwrap();
+    assert_eq!(replay.next().await.unwrap(), Some(seed[135..].to_vec()));
+    assert_eq!(replay.next().await.unwrap(), Some(vec![own]));
+    assert_eq!(replay.next().await.unwrap(), None);
+
+    assert_error(
+        store
+            .history_replay_window(destination, None, project, measure, |seed| {
+                Ok(seed.records.len() + 1)
+            })
+            .await,
+        ErrorKind::InvalidState,
+        "stored_data_invalid",
+    );
 }
 
 #[tokio::test]

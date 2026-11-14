@@ -2512,6 +2512,8 @@ function sideSnapshot(value: unknown, opened: boolean): NativeChatSideSnapshot {
     unavailable.some((entry) => typeof entry !== "string")
   )
     throw invalidResponse();
+  const title =
+    side.title === undefined ? null : catalogTitle(side.title as unknown);
   return Object.freeze({
     parentSessionId: identity(side.parentSessionId),
     temporary: true,
@@ -2520,6 +2522,7 @@ function sideSnapshot(value: unknown, opened: boolean): NativeChatSideSnapshot {
         (entry): entry is NativeChatSideRefusal => SIDE_REFUSALS.has(entry)
       )
     ),
+    ...(title !== null && { title }),
   });
 }
 

@@ -19,8 +19,9 @@ covered_by:
 Plan and Goal are composer intents. Explicit slash-menu selection adds a
 removable badge without sending a message, starting inference, or replacing
 the rest of the draft. Keyboard and pointer selection have the same result.
-`/side` is not an intent: choosing it, or sending it, opens the side chat at
-once and adds no badge.
+`/side` is not an intent: choosing it, or sending it, shows a side chat at
+once and adds no badge. `/side` alone shows the side chat used last or opens
+one; `/side` with a question opens a new side chat for it.
 Permissions and effort remain independent. Goal limits are visible before
 starting; cancelling customization keeps the unsent intent.
 
@@ -46,9 +47,10 @@ of disappearing.
    **Side chat** tab opens at once in the workbench with the caret in its
    message box (see TC-DESKTOP-AGENT-CHAT-023), and the `/side` text leaves
    this composer. The main conversation gains no message and no turn starts.
-   Back in the chat pane, send `/side What did we decide?`. The side chat tab
-   comes forward and sends the question there; this composer is cleared and
-   its **Plan** setting is unchanged. In a new chat that has not been sent
+   Back in the chat pane, send `/side What did we decide?`. A second side
+   chat tab opens and sends the question there; this composer is cleared and
+   its **Plan** setting is unchanged. Choose `/side` again: the second tab
+   comes forward and no third opens. In a new chat that has not been sent
    yet, `/side` is not offered.
 5. Choose Ultra in the model popover. Planning and permission choices remain
    separate. Open chat history and rename a saved chat through Chat options.

@@ -77,8 +77,8 @@ export function DesktopFileShell({
   }, [bridge, mode, basePath]);
 
   const [fileSurface] = useState(() => new DocumentSurfaceHost());
-  // The file window has no tabbed editor region; its side chat shows inline
-  // under the chat.
+  // The file window has no tabbed editor region; its side chats show inline
+  // under the chat, the latest one at a time.
   const [sideChat] = useState(() => new SideChatInlinePlacement());
   const setActiveEditor = useCallback(
     (editor: SvgEditor | null) => fileSurface.setEditor(editor),

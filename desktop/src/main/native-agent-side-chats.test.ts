@@ -120,9 +120,12 @@ it.runIf(Boolean(packaged))(
         compacted: false,
         omitted: expect.any(Boolean),
       });
-      await expect(ipc.openSideChat(event, attachmentId)).resolves.toEqual(
-        side
-      );
+      // Each open is another side chat of the same parent.
+      const sibling = await ipc.openSideChat(event, attachmentId);
+      expect(sibling.parentSessionId).toBe(sessionId);
+      expect(sibling.sessionId).not.toBe(side.sessionId);
+      // A side chat shows none of the conversation it inherited.
+      expect(await ipc.transcript(event, side.attachmentId)).toEqual([]);
       // Another frame of the same child cannot load or name the side chat.
       await expect(ipc.load(other, side.sessionId)).rejects.toThrow(
         "native_chat_side_unavailable"
@@ -149,9 +152,12 @@ it.runIf(Boolean(packaged))(
         expect(settled.snapshot.latest?.turnId).toBe(asked.turnId);
         expect(settled.snapshot.latest?.status).toBe("succeeded");
       });
-      expect(
-        JSON.stringify(await ipc.transcript(event, side.attachmentId))
-      ).toContain("The separate answer.");
+      const shown = JSON.stringify(
+        await ipc.transcript(event, side.attachmentId)
+      );
+      expect(shown).toContain("Explain one decision.");
+      expect(shown).toContain("The separate answer.");
+      expect(shown).not.toContain("Continue the parent task.");
 
       const current = await ipc.observe(event, attachmentId);
       expect(current.snapshot.current?.turnId).toBe(parent.turnId);
@@ -159,6 +165,9 @@ it.runIf(Boolean(packaged))(
       await expect(ipc.observe(event, side.attachmentId)).rejects.toThrow(
         "native_chat_attachment_unavailable"
       );
+      // Its sibling stays open until it is closed too.
+      await ipc.observe(event, sibling.attachmentId);
+      await ipc.closeSideChat(event, sibling.attachmentId);
       endpoint.releaseParent();
       await vi.waitFor(async () => {
         const settled = await ipc.observe(event, attachmentId);

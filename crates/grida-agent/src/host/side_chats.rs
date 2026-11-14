@@ -7,18 +7,23 @@
 //! - every side turn runs under [`grida_agent_master::side_chat`]'s policy and
 //!   sees its history boundary between the inherited history (or the summary
 //!   that replaced it) and its own turns;
+//! - the inherited history is model context only: the session's transcript,
+//!   history and revision targets begin at the boundary;
 //! - operations listed in [`Refusal`] are refused where the host admits them;
 //! - the session lives outside every workspace catalog and is discarded with
 //!   its data when closed, when its parent is deleted, when its connection
-//!   closes, or by the sweep a host runs before serving.
+//!   closes, or by the sweep a host runs before serving. Its generated title
+//!   lives and ends with it, and reaches clients through its snapshot.
 
 use super::*;
 use agent_kit_store_sqlite::history::{HistoryBasis, HistorySelection, SeededSession};
 use grida_agent_master::conversation_seed::{ConversationCut, SeedOmissions};
 use grida_agent_master::history::project;
 
-/// Side chats one connection may hold open at once.
-const MAX_OPEN_CHATS: usize = 4;
+/// Side chats one parent chat may have open at once.
+const MAX_OPEN_PER_PARENT: usize = 8;
+/// Side chats one connection may hold open at once, across its parents.
+const MAX_OPEN_PER_CONNECTION: usize = 32;
 /// How long discarding a side chat waits for its running turn to stop.
 const DISCARD_WAIT: Duration = Duration::from_secs(8);
 /// Attempts to capture a parent whose committed history keeps moving.
@@ -112,18 +117,26 @@ pub(crate) struct SideSnapshot {
     parent_session_id: SessionId,
     temporary: bool,
     unavailable: [Refusal; 8],
-}
-
-/// The side-chat presentation of a session, when it is one.
-pub(crate) fn side_snapshot(view: &SessionView) -> Result<Option<SideSnapshot>> {
-    Ok(session_configuration(view)?.side.map(|side| SideSnapshot {
-        parent_session_id: side.parent,
-        temporary: true,
-        unavailable: Refusal::ALL,
-    }))
+    /// The title generated from the side chat's first message, once written.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    title: Option<String>,
 }
 
 impl Host {
+    /// The side-chat presentation of a session, when it is one.
+    pub(crate) async fn side_snapshot(&self, view: &SessionView) -> Result<Option<SideSnapshot>> {
+        let Some(side) = session_configuration(view)?.side else {
+            return Ok(None);
+        };
+        let title = self.store.catalog_entry(view.session.clone()).await?.label;
+        Ok(Some(SideSnapshot {
+            parent_session_id: side.parent,
+            temporary: true,
+            unavailable: Refusal::ALL,
+            title,
+        }))
+    }
+
     /// The parent of a side session, or `None` for any other session.
     pub(crate) async fn side_parent(&self, session: &SessionId) -> Result<Option<SessionId>> {
         let view = self.store.inspect(session.clone()).await?;
@@ -185,7 +198,7 @@ impl Host {
                     .retained_history_with(parent.clone(), HistorySelection::Current, project)
                     .await?;
                 let basis = history.basis.clone();
-                let Some(anchor) = history::latest_anchor(&history) else {
+                let Some(anchor) = history::latest_anchor(&history, 0) else {
                     host.store.create(create.clone()).await?;
                     break basis;
                 };
@@ -399,7 +412,16 @@ impl SideChats {
         if state.closed {
             return Err(problem(ErrorKind::Unavailable, "side_chat_scope_closed"));
         }
-        if state.open.len() >= MAX_OPEN_CHATS {
+        if state
+            .open
+            .values()
+            .filter(|owner| **owner == parent)
+            .count()
+            >= MAX_OPEN_PER_PARENT
+        {
+            return Err(problem(ErrorKind::LimitExceeded, "side_chat_parent_limit"));
+        }
+        if state.open.len() >= MAX_OPEN_PER_CONNECTION {
             return Err(problem(ErrorKind::LimitExceeded, "side_chat_scope_limit"));
         }
         let view = host.open_side_chat(parent).await?;

@@ -7,18 +7,22 @@ import type {
 import type { WorkbenchPanels } from "./workbench-panels";
 
 /**
- * Presents a side chat as a tab in the workbench's editor group.
+ * Presents each side chat as its own tab in the workbench's editor group.
  *
- * A side chat that opens becomes a focused **Side chat** tab; asking to show
- * it again (`/side` while it is open) brings the tab forward. Closing the tab
- * ends the side chat through its parent; a side chat that ends elsewhere
- * closes its tab. A closed side chat tab is not reopenable, because the side
- * chat itself has ended. See test/desktop-agent-chat-side-chat-tab.md.
+ * A side chat that opens becomes a focused tab titled **Side chat** until the
+ * host titles it, then by that title; asking to show it again (`/side` alone
+ * when it is the side chat used last) brings its tab forward. Closing a tab
+ * ends that side chat only, through its parent; a side chat that ends
+ * elsewhere closes its tab. A closed side chat tab is not reopenable, because
+ * the side chat itself has ended. See test/desktop-agent-chat-side-chat-tab.md.
  */
 export class SideChatTabPlacement implements SideChatPlacement {
-  private shown?: string;
-  /** A side chat whose tab was closed while it is still ending. */
-  private dismissed?: string;
+  private readonly shown = new Map<
+    string,
+    { presentation: SideChatPresentation; title: string; stop: () => void }
+  >();
+  /** Side chats whose tab was closed while they are still ending. */
+  private readonly dismissed = new Set<string>();
 
   constructor(
     private readonly panels: Pick<
@@ -28,35 +32,57 @@ export class SideChatTabPlacement implements SideChatPlacement {
   ) {}
 
   present(presentation: SideChatPresentation): void {
+    const { id, chat } = presentation;
+    if (this.dismissed.has(id)) return;
+    const known = this.shown.get(id);
+    known?.stop();
+    const entry = {
+      presentation,
+      title: chat.sideChatTitle(),
+      // The tab follows the side chat's title as it arrives.
+      stop: chat.subscribe(() => {
+        if (this.shown.get(id) !== entry) return;
+        const title = chat.sideChatTitle();
+        if (title === entry.title) return;
+        entry.title = title;
+        this.show(entry);
+      }),
+    };
+    this.shown.set(id, entry);
+    this.show(entry);
+    if (known) this.panels.reveal(SideChatTabPlacement.panel(id));
+  }
+
+  withdraw(id: string): void {
+    this.dismissed.delete(id);
+    const entry = this.shown.get(id);
+    if (!entry) return;
+    entry.stop();
+    this.shown.delete(id);
+    this.panels.withdraw(SideChatTabPlacement.panel(id));
+  }
+
+  private show(entry: {
+    presentation: SideChatPresentation;
+    title: string;
+    stop: () => void;
+  }): void {
+    const { presentation, title } = entry;
     const { id } = presentation;
-    if (id === this.dismissed) return;
-    const known = this.shown === id;
-    if (!known) {
-      this.withdraw();
-      this.shown = id;
-    }
-    const panel = SideChatTabPlacement.panel(id);
     this.panels.show(
-      panel,
+      SideChatTabPlacement.panel(id),
       {
-        title: "Side chat",
+        title,
         icon: <MessageSquareTextIcon />,
         content: <NativeSideChatPane presentation={presentation} />,
       },
       () => {
-        this.shown = undefined;
-        this.dismissed = id;
+        entry.stop();
+        this.shown.delete(id);
+        this.dismissed.add(id);
         presentation.close();
       }
     );
-    if (known) this.panels.reveal(panel);
-  }
-
-  withdraw(): void {
-    const shown = this.shown;
-    this.shown = undefined;
-    this.dismissed = undefined;
-    if (shown) this.panels.withdraw(SideChatTabPlacement.panel(shown));
   }
 
   /** The panel id of a side chat's tab. */

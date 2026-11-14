@@ -107,7 +107,7 @@ const NO_COMMANDS: ComposerCatalog["commands"] = [];
 const COMMAND_DESCRIPTIONS = {
   plan: "Plan before making changes",
   goal: "Work toward a goal with automatic continuation",
-  side: "Open a side chat; this chat is unchanged",
+  side: "Show your latest side chat or open one; this chat is unchanged",
   stop: "Stop all background processes",
   compact: "Summarize earlier context while keeping the transcript",
   fork: "Create a separate chat from the latest committed message",
@@ -157,7 +157,7 @@ export function NativeAgentPaneGate({
   workspaceId?: string;
   initialSession: string | null;
   editorSurfaces?: NativeChatEditorSurfaces;
-  /** Where this chat's side chat is shown. */
+  /** Where this chat's side chats are shown. */
   sideChatPlacement: SideChatPlacement;
   /** Sent once as a new chat's first turn when the chat is ready. */
   firstMessage?: NativeFirstMessage;
@@ -287,7 +287,7 @@ export function NativeAgentPane({
   workspaceId?: string;
   initialSession: string | null;
   editorSurfaces?: NativeChatEditorSurfaces;
-  /** Where this chat's side chat is shown; see `side-chat-placement.ts`. */
+  /** Where this chat's side chats are shown; see `side-chat-placement.ts`. */
   sideChatPlacement: SideChatPlacement;
   /** Sent once as a new chat's first turn; see {@link NativeAgentPaneGate}. */
   firstMessage?: NativeFirstMessage;
@@ -304,7 +304,7 @@ export function NativeAgentPane({
     return created;
   }, [bridge, selectionKey, editorSurfaces, workspaceId]);
   const draft = useRef<NativeChatComposer>(null);
-  // The side chat shows wherever the host places it.
+  // Side chats show wherever the host places them.
   useEffect(
     () =>
       SideChatPlacement.connect(controller, sideChatPlacement, {
@@ -373,8 +373,8 @@ type NativeChatComposer = Pick<ComposerController, "appendText" | "focus">;
 
 /**
  * A side chat, as a placement presents it: the ordinary chat pane bound to
- * the side session, under a header that closes it. It fills the container it
- * is placed in; see `side-chat-placement.ts`.
+ * the side session, under a header with its title that closes it. It fills
+ * the container it is placed in; see `side-chat-placement.ts`.
  */
 export function NativeSideChatPane({
   presentation,
@@ -399,7 +399,7 @@ export function NativeSideChatPane({
       header={() => (
         <header className="flex h-10 shrink-0 items-center gap-2 px-3 text-xs font-medium">
           <span className="min-w-0 flex-1 truncate text-muted-foreground">
-            Side chat
+            {chat.sideChatTitle()}
           </span>
           <Button
             type="button"

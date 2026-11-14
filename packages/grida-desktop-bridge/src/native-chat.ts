@@ -180,6 +180,11 @@ export type NativeChatSideSnapshot = Readonly<{
   parentSessionId: string;
   temporary: true;
   unavailable: readonly NativeChatSideRefusal[];
+  /**
+   * The title generated from the side chat's first message, once written.
+   * It lives and ends with the side chat and is never listed.
+   */
+  title?: string;
 }>;
 
 export type NativeChatReadiness =
@@ -782,8 +787,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   ): Promise<NativeChatRevisionReceipt>;
   load(sessionId: string): Promise<NativeChatAttachment>;
   /**
-   * Open the side chat of an attached chat, or return the one already open
-   * for it. The side chat is attached to this frame only.
+   * Open a new side chat of an attached chat. A chat can have several side
+   * chats open; each is attached to this frame only.
    */
   openSideChat?(attachmentId: string): Promise<NativeChatSideAttachment>;
   /** Discard a side chat by its own attachment. */

@@ -895,8 +895,9 @@ impl Host {
         cwd: PathBuf,
     ) -> Result<agent_kit_store_sqlite::history::HistoryReplay> {
         self.validate_session_workspace(id.clone(), cwd).await?;
+        let start = self.transcript_seed_start(&id).await?;
         self.store
-            .open_history_replay(id, grida_agent_master::history::project)
+            .open_history_replay(id, grida_agent_master::history::project, start)
             .await
     }
 
