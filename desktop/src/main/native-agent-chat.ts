@@ -51,6 +51,7 @@ import type {
   NativeSubagentCreate,
 } from "@grida/desktop-bridge";
 import { NativeAgentArtifacts } from "./native-agent-artifacts";
+import { NativeFileReference } from "./native-file-reference";
 import { NativeAgentBackgroundProcesses } from "./native-agent-background-processes";
 import { NativeAgentHooks, type NativeHookReview } from "./native-agent-hooks";
 import type { NativeHookInspection } from "@grida/desktop-bridge";
@@ -302,6 +303,15 @@ export class NativeAgentChat {
     return this.connected && this.process.acceptsFile;
   }
 
+  /** Files by reference need the workspace's protected stores to refuse. */
+  get acceptsFileReference(): boolean {
+    return (
+      this.connected &&
+      this.process.acceptsFileReference &&
+      this.referenceDenials !== undefined
+    );
+  }
+
   get acceptsEffort(): boolean {
     return this.connected && this.process.acceptsEffort;
   }
@@ -331,7 +341,8 @@ export class NativeAgentChat {
     private readonly cwd: string,
     private readonly scope: string,
     private readonly onLifecycle?: NativeAgentChatLaunch["onLifecycle"],
-    private readonly hookRegistry?: NativeAgentHooks
+    private readonly hookRegistry?: NativeAgentHooks,
+    private readonly referenceDenials?: readonly string[]
   ) {}
 
   private readonly lifecycleSeen = new Set<string>();
@@ -361,7 +372,11 @@ export class NativeAgentChat {
       cwd,
       JSON.stringify([launch.stateDirectory, cwd]),
       onLifecycle,
-      launch.hooks
+      launch.hooks,
+      launch.workspace && [
+        ...launch.workspace.protectedPaths,
+        launch.stateDirectory,
+      ]
     );
     return client;
   }
@@ -894,6 +909,59 @@ export class NativeAgentChat {
     );
   }
 
+  /**
+   * GRIDA-SEC-004: send a file the person attached by reference. `path` comes
+   * from the preload's resolution of their File; it is resolved again here,
+   * only its metadata is read, and Grida's protected stores are refused.
+   */
+  async submitFileReference(
+    session: NativeChatSession,
+    value: unknown
+  ): Promise<NativeChatAcceptance> {
+    this.requireAttached(session);
+    const denials = this.referenceDenials;
+    if (!this.acceptsFileReference || !denials)
+      throw new Error("native_chat_file_reference_unavailable");
+    const input = object(value);
+    const known = new Set([
+      "action",
+      "inputId",
+      "text",
+      "path",
+      "mimeType",
+      "preview",
+      "operatingRegime",
+      "effort",
+    ]);
+    if (
+      Object.keys(input).some((key) => !known.has(key)) ||
+      typeof input.text !== "string"
+    )
+      throw invalidResponse();
+    const effort =
+      input.effort === undefined
+        ? undefined
+        : choice(input.effort, EFFORT_CHOICES);
+    const action = choice(input.action, ["submit", "enqueue"] as const);
+    const inputId = identity(input.inputId);
+    const operatingRegime = choice(input.operatingRegime, [
+      "act",
+      "plan",
+    ] as const);
+    const preview = NativeFileReference.preview(input.preview);
+    const resolved = await NativeFileReference.resolve(input.path, {
+      cwd: this.cwd,
+      protectedPaths: denials,
+    });
+    return this.send(action, session, inputId, input.text, operatingRegime, {
+      reference: NativeFileReference.link(resolved, {
+        mimeType: NativeFileReference.mediaType(input.mimeType),
+        preview,
+      }),
+      effort,
+    });
+  }
+
   private async send(
     mode: "submit" | "enqueue",
     session: NativeChatSession,
@@ -903,6 +971,7 @@ export class NativeAgentChat {
     options: {
       image?: ReturnType<typeof pngPrompt>;
       file?: ReturnType<typeof selectedFile>;
+      reference?: ReturnType<typeof NativeFileReference.link>;
       allowLibrarySelection?: true;
       editorSurfaces?: NativeEditorSurfaceSelection;
       effort?: NativeChatEffort;
@@ -910,20 +979,34 @@ export class NativeAgentChat {
   ): Promise<NativeChatAcceptance> {
     const sessionId = this.requireAttached(session);
     identity(inputId);
-    const { image, file, allowLibrarySelection, editorSurfaces, effort } =
-      options;
+    const {
+      image,
+      file,
+      reference,
+      allowLibrarySelection,
+      editorSurfaces,
+      effort,
+    } = options;
     if (effort === "ultra" && !this.acceptsEffort)
       throw new Error("native_chat_effort_unavailable");
     return acceptance(
       await this.process.request(`_co.grida/session/${mode}`, {
         sessionId,
         inputId,
-        prompt: [...textPrompt(text), ...(image ? [image] : [])],
+        prompt: [
+          ...textPrompt(text),
+          ...(image ? [image] : []),
+          ...(reference ? [reference] : []),
+        ],
         ...(file && { selectedFile: file }),
         ...(operatingRegime && { operatingRegime }),
         ...hostEffort(effort),
         ...(allowLibrarySelection && { allowLibrarySelection }),
-        ...(operatingRegime === "act" && !image && !file && editorSurfaces),
+        ...(operatingRegime === "act" &&
+          !image &&
+          !file &&
+          !reference &&
+          editorSurfaces),
       }),
       sessionId,
       inputId
@@ -2121,7 +2204,10 @@ function captureAttachment(
   const previous = capture.messages.get(messageId);
   if (previous && previous.role !== "user") throw invalidResponse();
   const recorded = previous?.attachments ?? [];
+  // A reference's poster frame counts toward the transcript like text.
+  capture.bytes += entry.preview?.poster?.length ?? 0;
   if (
+    capture.bytes > MAX_TRANSCRIPT_BYTES ||
     recorded.length >= MAX_MESSAGE_ATTACHMENTS ||
     (!previous && capture.messages.size >= MAX_TRANSCRIPT_MESSAGES)
   ) {
@@ -2143,7 +2229,7 @@ function captureAttachment(
 function attachment(
   content: Record<string, unknown>
 ): NativeChatMessageAttachment {
-  const { name, mimeType, size } = content;
+  const { name, mimeType, size, _meta } = content;
   if (
     typeof name !== "string" ||
     !name ||
@@ -2154,10 +2240,14 @@ function attachment(
         !/^[a-z0-9.+-]+\/[a-z0-9.+-]+$/.test(mimeType)))
   )
     throw invalidResponse();
+  // A reference's preview is shown again after reopening; a malformed one is
+  // dropped rather than failing the transcript.
+  const preview = NativeFileReference.replayedPreview(_meta);
   return Object.freeze({
     name,
     ...(typeof mimeType === "string" && { mimeType }),
     ...(size !== undefined && size !== null && { size: revision(size) }),
+    ...(preview && { preview }),
   });
 }
 

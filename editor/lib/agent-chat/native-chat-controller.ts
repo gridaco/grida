@@ -52,6 +52,7 @@ import type {
 import { GoalSpending } from "./goal-spending";
 import { ComposerDrafts } from "./composer-drafts";
 import { isSupportedImageType } from "./image-attachment";
+import { video_attachment } from "./video-attachment";
 import { NativeSubagentController } from "./native-subagent-controller";
 import { NativeBackgroundProcessController } from "./native-background-process-controller";
 
@@ -81,23 +82,39 @@ const TITLE_RECHECK_MS = 6_000;
 const MAX_LIVE_BYTES = 1024 * 1024;
 const MAX_ATTACHMENT_BYTES = 256 * 1024;
 
-type AttachmentKind = "png" | "file";
+/**
+ * How a person's file enters a message. A PNG and a small file go directly:
+ * the model sees the PNG, and the host keeps a private copy of the file for
+ * inspection. Any other file goes by reference: the agent receives its path
+ * and facts and works with it through its own tools and permissions.
+ */
+type AttachmentKind = "png" | "file" | "reference";
 type BrowserAttachment = Pick<File, "name" | "size" | "arrayBuffer">;
 type TransferredAttachment =
   | { kind: "file"; file: BrowserAttachment & Pick<File, "type"> }
   | { kind: "directory" };
 type AttachmentSource =
   | { kind: "file"; file: BrowserAttachment }
+  | { kind: "reference"; file: File }
   | {
       kind: "library";
       name: string;
       readPng: (maxBytes: number) => Promise<ArrayBuffer>;
     };
-type SelectedAttachment = Readonly<{
-  kind: AttachmentKind;
-  name: string;
-  bytes: ArrayBuffer;
-}>;
+type SelectedAttachment =
+  | Readonly<{
+      kind: "png" | "file";
+      name: string;
+      bytes: ArrayBuffer;
+    }>
+  | Readonly<{
+      kind: "reference";
+      name: string;
+      /** The person's File; Desktop resolves its path when it is sent. */
+      file: File;
+      mimeType?: string;
+      preview?: video_attachment.Preview;
+    }>;
 const utf8 = new TextEncoder();
 
 const TERMINAL_OUTCOME: Record<NativeChatTurnSummary["status"], string> = {
@@ -163,12 +180,17 @@ export type NativeChatView = Readonly<{
   backgroundProcesses: NativeBackgroundProcessController | null;
   imageInput: boolean;
   fileInput: boolean;
+  /** The chat takes files by reference. */
+  fileReferenceInput: boolean;
   attachmentReading: boolean;
   attachmentNotice: string | null;
   attachmentDraft: Readonly<{
     kind: AttachmentKind;
     name: string;
     size: number;
+    mimeType?: string;
+    /** A video's poster frame, duration and dimensions. */
+    preview?: video_attachment.Preview;
     error?: string;
   }> | null;
   hooksOpen: boolean;
@@ -352,6 +374,7 @@ const EMPTY: NativeChatView = Object.freeze({
   backgroundProcesses: null,
   imageInput: false,
   fileInput: false,
+  fileReferenceInput: false,
   attachmentReading: false,
   attachmentNotice: null,
   attachmentDraft: null,
@@ -538,10 +561,13 @@ export class NativeChatController {
       });
       return;
     }
-    await this.readAttachment(scope.id, attachment.kind, {
-      kind: "file",
-      file: new File([attachment.bytes], attachment.name),
-    });
+    await this.readAttachment(
+      scope.id,
+      attachment.kind,
+      attachment.kind === "reference"
+        ? { kind: "reference", file: attachment.file }
+        : { kind: "file", file: new File([attachment.bytes], attachment.name) }
+    );
   }
 
   /** The model last chosen in a workspace, as the pane's memory keeps it. */
@@ -1097,7 +1123,45 @@ export class NativeChatController {
   }
 
   private acceptsAttachment(kind: AttachmentKind): boolean {
-    return kind === "png" ? this.view.imageInput : this.view.fileInput;
+    return kind === "png"
+      ? this.view.imageInput
+      : kind === "file"
+        ? this.view.fileInput
+        : this.view.fileReferenceInput;
+  }
+
+  /**
+   * The way a person's file enters this chat, or null for an image that must
+   * be a PNG. A PNG and a small file keep the direct path; a video, another
+   * image or a larger file goes by reference when this chat takes references
+   * and Desktop can name the file on disk.
+   * (see test/desktop-agent-chat-file-reference.md)
+   */
+  private intake(
+    file: Pick<File, "name" | "size" | "type">,
+    picked: boolean
+  ): AttachmentKind | null {
+    const png =
+      file.type === "image/png" || (!file.type && /\.png$/i.test(file.name));
+    const direct = file.size <= MAX_ATTACHMENT_BYTES;
+    if (png && direct) return "png";
+    const image = isSupportedImageType(file.type);
+    if (
+      direct &&
+      !png &&
+      !image &&
+      !video_attachment.isVideo(file) &&
+      this.view.fileInput
+    )
+      return "file";
+    if (
+      this.view.fileReferenceInput &&
+      file instanceof File &&
+      this.bridge.canReferenceFile?.(file) === true
+    )
+      return "reference";
+    if (png) return "png";
+    return image && !picked ? null : "file";
   }
 
   async pickTransferredAttachment(
@@ -1114,16 +1178,33 @@ export class NativeChatController {
       this.update({ attachmentNotice: "Choose a file instead of a folder." });
       return;
     }
-    const { file } = resource;
-    const png =
-      file.type === "image/png" || (!file.type && /\.png$/i.test(file.name));
-    if (!png && isSupportedImageType(file.type)) {
+    await this.attachFile(scopeId, resource.file, false);
+  }
+
+  /**
+   * A file chosen with the file picker. It takes the same path as a drop,
+   * except that an image other than a PNG is still accepted as a file.
+   */
+  pickFile(
+    scopeId: number,
+    file: BrowserAttachment & Pick<File, "type">
+  ): Promise<void> {
+    if (this.scope?.id !== scopeId) return Promise.resolve();
+    return this.attachFile(scopeId, file, true);
+  }
+
+  private async attachFile(
+    scopeId: number,
+    file: BrowserAttachment & Pick<File, "type">,
+    picked: boolean
+  ): Promise<void> {
+    const kind = this.intake(file, picked);
+    if (!kind) {
       this.update({
         attachmentNotice: "Use a PNG to send an image to this chat.",
       });
       return;
     }
-    const kind = png ? "png" : "file";
     if (!this.canAttach(kind)) {
       this.update({
         attachmentNotice: this.view.goalIntent
@@ -1136,12 +1217,17 @@ export class NativeChatController {
       });
       return;
     }
-    await this.pickAttachment(scopeId, kind, file);
+    if (kind === "reference")
+      await this.readAttachment(scopeId, kind, {
+        kind: "reference",
+        file: file as File,
+      });
+    else await this.pickAttachment(scopeId, kind, file);
   }
 
   pickAttachment(
     scopeId: number,
-    kind: AttachmentKind,
+    kind: "png" | "file",
     file: BrowserAttachment
   ): Promise<void> {
     return this.readAttachment(scopeId, kind, { kind: "file", file });
@@ -1169,7 +1255,7 @@ export class NativeChatController {
     const read = {};
     scope.attachmentRead = read;
     const name = (
-      source.kind === "file" ? source.file.name : source.name
+      source.kind === "library" ? source.name : source.file.name
     ).slice(0, 256);
     this.update({
       attachmentReading: true,
@@ -1178,6 +1264,43 @@ export class NativeChatController {
     });
     const ownsRead = () => this.owns(scope) && scope.attachmentRead === read;
     try {
+      if (source.kind === "reference") {
+        // By reference: nothing is read here but a video's preview.
+        const { file } = source;
+        const mimeType = video_attachment.mediaType(file);
+        const original = scope.selectedAttachment ?? scope.pending?.attachment;
+        const preview =
+          original?.kind === "reference" && original.file === file
+            ? original.preview
+            : video_attachment.isVideo(file)
+              ? ((await video_attachment.probe(file)) ?? undefined)
+              : undefined;
+        if (!ownsRead()) return;
+        if (original?.kind === "reference" && original.file === file)
+          scope.selectedAttachment = original;
+        else {
+          scope.selectedAttachment = Object.freeze({
+            kind: "reference" as const,
+            name,
+            file,
+            ...(mimeType && { mimeType }),
+            ...(preview && { preview }),
+          });
+          if (scope.pending?.attachment) scope.pending = undefined;
+        }
+        this.update({
+          attachmentDraft: {
+            kind,
+            name,
+            size: file.size,
+            ...(mimeType && { mimeType }),
+            ...(preview && { preview }),
+          },
+        });
+        this.saveDraftAttachment(scope.selectedAttachment);
+        return;
+      }
+      if (kind === "reference") throw new Error("invalid_file_attachment");
       let bytes: ArrayBuffer;
       if (source.kind === "file") {
         const { file } = source;
@@ -1200,7 +1323,10 @@ export class NativeChatController {
       }
       if (!ownsRead()) return;
       const original = scope.selectedAttachment ?? scope.pending?.attachment;
-      const previous = original && new Uint8Array(original.bytes);
+      const previous =
+        original && original.kind !== "reference"
+          ? new Uint8Array(original.bytes)
+          : undefined;
       if (
         original?.kind !== kind ||
         (kind === "file" && original.name !== name) ||
@@ -1269,11 +1395,11 @@ export class NativeChatController {
 
   private async readInputCapabilities(
     scope: Scope
-  ): Promise<{ png: boolean; file: boolean } | null> {
+  ): Promise<Record<AttachmentKind, boolean> | null> {
     const attachment = scope.attachment;
     const read = {};
     scope.attachmentCapabilityRead = read;
-    const [png, file, library] = await Promise.all([
+    const [png, file, library, reference] = await Promise.all([
       this.bridge.submitImage && this.bridge.acceptsPng?.().catch(() => false),
       this.bridge.submitFile && this.bridge.acceptsFile?.().catch(() => false),
       this.libraryPicker &&
@@ -1281,6 +1407,9 @@ export class NativeChatController {
         this.bridge.librarySelections &&
         this.bridge.answerLibrarySelection &&
         this.bridge.acceptsLibrarySelection?.().catch(() => false),
+      this.bridge.submitFileReference &&
+        this.bridge.canReferenceFile &&
+        this.bridge.acceptsFileReference?.().catch(() => false),
     ]);
     if (
       !this.owns(scope) ||
@@ -1289,8 +1418,16 @@ export class NativeChatController {
     )
       return null;
     scope.librarySelectionAvailable = library === true;
-    this.update({ imageInput: png === true, fileInput: file === true });
-    return { png: png === true, file: file === true };
+    this.update({
+      imageInput: png === true,
+      fileInput: file === true,
+      fileReferenceInput: reference === true,
+    });
+    return {
+      png: png === true,
+      file: file === true,
+      reference: reference === true,
+    };
   }
 
   /** The running connection confirms Ultra, or the chosen model offers it. */
@@ -2328,7 +2465,9 @@ export class NativeChatController {
             throw new Error(
               pending.attachment.kind === "png"
                 ? "image_input_unavailable"
-                : "file_attachment_unavailable"
+                : pending.attachment.kind === "file"
+                  ? "file_attachment_unavailable"
+                  : "native_chat_file_reference_unavailable"
             );
         }
         this.attachment(scope);
@@ -2344,6 +2483,23 @@ export class NativeChatController {
             operatingRegime: pending.operatingRegime,
             ...(pending.effort && { effort: pending.effort }),
           });
+        } else if (pending.attachment?.kind === "reference") {
+          if (!this.bridge.submitFileReference || !pending.operatingRegime)
+            throw new Error("native_chat_file_reference_unavailable");
+          const { file, mimeType, preview } = pending.attachment;
+          accepted = await this.bridge.submitFileReference(
+            attachment.attachmentId,
+            {
+              action: pending.mode,
+              inputId: pending.inputId,
+              text: pending.text,
+              file,
+              ...(mimeType && { mimeType }),
+              ...(preview && { preview }),
+              operatingRegime: pending.operatingRegime,
+              ...(pending.effort && { effort: pending.effort }),
+            }
+          );
         } else if (pending.attachment) {
           if (!this.bridge.submitFile || !pending.operatingRegime)
             throw new Error("file_attachment_unavailable");
@@ -2432,7 +2588,7 @@ export class NativeChatController {
           selectedAttachment &&
           this.acceptsAttachment(selectedAttachment.kind) &&
           error instanceof Error &&
-          /image_input_unavailable|file_attachment_unavailable/.test(
+          /image_input_unavailable|file_attachment_unavailable|file_reference_unavailable/.test(
             error.message
           )
         )
@@ -4835,6 +4991,10 @@ function describe(error: unknown, fallback: string): string {
     return "Choose a file with a supported name that can be read.";
   if (error.message.includes("file_attachment_unavailable"))
     return "This chat cannot inspect attached files.";
+  if (error.message.includes("file_reference_protected"))
+    return "This file is in Grida's private data and can't be attached.";
+  if (error.message.includes("file_reference_unavailable"))
+    return "Couldn't find this file on disk. Attach it again from its folder.";
   if (error.message.includes("native_agent_frame_limit"))
     return "This message exceeds the connection limit. Shorten it and try again.";
   return fallback;

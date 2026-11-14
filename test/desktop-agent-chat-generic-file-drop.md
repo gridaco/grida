@@ -7,7 +7,7 @@ tags: [agent-chat, composer, file, drag-drop, scratch]
 status: verified
 severity: high
 date: 2026-07-30
-updated: 2026-11-13
+updated: 2026-11-15
 automatable: false
 covered_by:
   - editor/lib/agent-chat/native-chat-controller.test.ts
@@ -40,8 +40,10 @@ from session scratch without receiving the source operating-system path.
 ## Notes
 
 - `NativeChatController.pickTransferredAttachment` sends a PNG as image input
-  and any other file, including SVG, through the generic file route; other
-  supported raster types are refused with a notice to use PNG.
+  and any other file of up to 256 KiB, including SVG, through the generic file
+  route. Larger files, videos and other raster types go by reference when the
+  chat takes references (see `desktop-agent-chat-file-reference.md`);
+  otherwise other raster types are refused with a notice to use PNG.
 - File classification is covered by `native-chat-controller.test.ts` and
   retained-file staging by the process tests; the Finder gesture and rendered
   chip remain manual.

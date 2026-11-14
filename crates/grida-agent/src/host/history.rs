@@ -694,7 +694,9 @@ fn history_message(
         Content::Media(media) if is_retained_image(media) => {
             Some(Cow::Borrowed(RETAINED_IMAGE_LABEL))
         }
-        Content::Media(media) => grida_agent_master::retained_file::display(media).map(Cow::Owned),
+        Content::Media(media) => grida_agent_master::retained_file::display(media)
+            .or_else(|| attachment_label(media))
+            .map(Cow::Owned),
         _ => None,
     });
     let first = text.next()?;
@@ -720,7 +722,14 @@ fn visible_message(message: &Message) -> bool {
             matches!(part, Content::Text(text) if !text.is_empty())
                 || matches!(part, Content::Media(media) if is_retained_image(media))
                 || matches!(part, Content::Media(media) if grida_agent_master::retained_file::display(media).is_some())
+                || matches!(part, Content::Media(media) if grida_agent_master::file_reference::reference(media).is_some())
         })
+}
+
+/// A file attached by reference, named in a history preview without its path.
+fn attachment_label(media: &agent_kit_core::messages::MediaRef) -> Option<String> {
+    grida_agent_master::file_reference::reference(media)
+        .map(|reference| format!("\n\nAttached file {}.", reference.name))
 }
 
 fn revision_target_unavailable() -> Error {

@@ -18,6 +18,7 @@ import {
   type ImageReferenceReview,
 } from "./native-image-generation";
 import { NativeImagePlacement } from "./native-image-placement";
+import { NativeFileReference } from "./native-file-reference";
 import { NativeProviderSelection } from "./native-provider-selection";
 import {
   NativeEditorSurfaceEndpoints,
@@ -153,6 +154,7 @@ export class NativeAgentProcess {
   private imageWorkspaceReferenceEnabled = false;
   private librarySelection = false;
   private fileInput = false;
+  private fileReference = false;
   private agentEffort = false;
   private historyRevision = false;
   private transcriptWindow = false;
@@ -254,6 +256,10 @@ export class NativeAgentProcess {
 
   get acceptsFile(): boolean {
     return this.connected && this.fileInput;
+  }
+
+  get acceptsFileReference(): boolean {
+    return this.connected && this.fileReference;
   }
 
   get acceptsEffort(): boolean {
@@ -610,6 +616,7 @@ export class NativeAgentProcess {
                 }),
                 ...(options.workspace && LIBRARY_SELECTION_CAPABILITIES),
                 "co.grida/session/selected-file": 1,
+                [NativeFileReference.capability]: 1,
                 [TRANSCRIPT_WINDOW]: 1,
                 ...(requestDeletion && {
                   [NativeAgentDeletion.capability]: 1,
@@ -664,6 +671,8 @@ export class NativeAgentProcess {
         );
       processOwner.fileInput =
         advertised?.["co.grida/session/selected-file"] === 1;
+      processOwner.fileReference =
+        advertised?.[NativeFileReference.capability] === 1;
       processOwner.agentEffort =
         options.subagents === true && advertised?.[SESSION_EFFORT] === 1;
       processOwner.historyRevision = Object.keys(

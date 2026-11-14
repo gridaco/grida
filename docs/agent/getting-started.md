@@ -72,11 +72,21 @@ below the turn's answer, where you can preview and save it.
 
 ## Attach a file
 
-Choose **+ → Files**, or drop or paste one file up to 256 KiB into the
-composer, and ask the agent to inspect it. The agent can check the file's
-size and digest and read a short text excerpt; the chat keeps a private copy.
-Dropping a folder or several files shows a message and keeps your draft. To
-work on a project file instead, mention it with `@`.
+Choose **+ → Files**, or drop or paste one file into the composer, and ask
+the agent to inspect it. A file of up to 256 KiB goes with the message: the
+agent can check its size and digest and read a short text excerpt, and the
+chat keeps a private copy. Dropping a folder or several files shows a message
+and keeps your draft. To work on a project file instead, mention it with `@`.
+
+Any other file, of any type or size, is attached by reference: the agent
+receives its name, type, size and location, not its contents, and works with
+it through its tools under the same permissions as any other file, for
+example running a command to inspect a video outside the project. Grida does
+not copy the file, so the agent sees it as it is when it reads it; moving or
+deleting it makes it unavailable. A video (such as MP4, MOV or WebM) shows a
+frame, its duration and its size on the attachment card, and the sent message
+keeps that card after you reopen the chat. Files in Grida's own data can't be
+attached.
 
 ## Edit selected text in an SVG or slide
 

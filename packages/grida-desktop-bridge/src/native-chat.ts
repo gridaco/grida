@@ -108,6 +108,34 @@ export type NativeChatFileInput = Readonly<{
   effort?: NativeChatEffort;
 }>;
 
+/**
+ * What the composer showed for an attachment: a small poster frame (a JPEG or
+ * PNG data URL) and, for a video, its duration and dimensions. Kept with the
+ * message so the transcript shows the same card after reopening.
+ */
+export type NativeChatAttachmentPreview = Readonly<{
+  poster?: string;
+  durationMs?: number;
+  width?: number;
+  height?: number;
+}>;
+
+/**
+ * A file attached by reference: the agent receives its path and facts, never
+ * its bytes. `file` must be the File the person dropped, pasted or picked; the
+ * Desktop preload resolves its path, which never reaches the renderer.
+ */
+export type NativeChatFileReferenceInput = Readonly<{
+  action: "submit" | "enqueue";
+  inputId: string;
+  text: string;
+  file: File;
+  mimeType?: string;
+  preview?: NativeChatAttachmentPreview;
+  operatingRegime: NativeChatOperatingRegime;
+  effort?: NativeChatEffort;
+}>;
+
 export type NativeChatPage = Readonly<{
   sessionIds: readonly string[];
   titles?: readonly Readonly<{ sessionId: string; title: string }>[];
@@ -430,6 +458,8 @@ export type NativeChatMessageAttachment = Readonly<{
   mimeType?: string;
   /** Bytes, when the host recorded the size. */
   size?: number;
+  /** A file attached by reference, with the preview the composer showed. */
+  preview?: NativeChatAttachmentPreview;
 }>;
 
 /** Recorded outcome and wall-clock interval of a turn in a transcript page. */
@@ -856,6 +886,14 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   submitFile?(
     attachmentId: string,
     input: NativeChatFileInput
+  ): Promise<NativeChatAcceptance>;
+  /** Whether this chat takes files by reference. */
+  acceptsFileReference?(): Promise<boolean>;
+  /** Whether this File names a file on disk that can be attached by reference. */
+  canReferenceFile?(file: File): boolean;
+  submitFileReference?(
+    attachmentId: string,
+    input: NativeChatFileReferenceInput
   ): Promise<NativeChatAcceptance>;
   inputReceipt(
     attachmentId: string,

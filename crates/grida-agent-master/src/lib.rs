@@ -6,6 +6,7 @@ pub mod compaction;
 pub mod configuration;
 pub mod conversation_seed;
 pub mod effort;
+pub mod file_reference;
 pub mod goals;
 pub mod history;
 pub mod hooks;
@@ -1192,7 +1193,8 @@ impl Master {
         );
         for content in messages.iter_mut().flat_map(|message| &mut message.content) {
             if let Content::Media(media) = content
-                && let Some(display) = retained_file::display(media)
+                && let Some(display) =
+                    retained_file::display(media).or_else(|| file_reference::display(media))
             {
                 *content = Content::Text(display);
             }

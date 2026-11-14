@@ -102,6 +102,9 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_ACCEPTS_FILE: "grida:native-chat:accepts-file",
   NATIVE_CHAT_SUBMIT_IMAGE: "grida:native-chat:submit-image",
   NATIVE_CHAT_SUBMIT_FILE: "grida:native-chat:submit-file",
+  NATIVE_CHAT_ACCEPTS_FILE_REFERENCE:
+    "grida:native-chat:accepts-file-reference",
+  NATIVE_CHAT_SUBMIT_FILE_REFERENCE: "grida:native-chat:submit-file-reference",
   NATIVE_CHAT_HOOKS: "grida:native-chat:hooks",
   NATIVE_CHAT_IMPORT_HOOK: "grida:native-chat:import-hook",
   NATIVE_CHAT_REMOVE_HOOK: "grida:native-chat:remove-hook",

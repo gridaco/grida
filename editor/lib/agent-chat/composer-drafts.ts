@@ -10,19 +10,41 @@
  * and other inline chips survive), the Plan and Goal intents, and an attached
  * file with its bytes. Drafts are keyed by chat. Storage is best effort per
  * device: when it is unavailable, drafts still live in memory for this session.
+ * A file attached by reference has no bytes here; it is the person's File,
+ * which only lives in memory, so it stays with the draft until Desktop
+ * restarts.
  */
 export type ComposerDraftModes = Readonly<{ plan?: true; goal?: true }>;
 
-export type ComposerDraftAttachment = Readonly<{
-  kind: "png" | "file";
-  name: string;
-  bytes: ArrayBuffer;
-}>;
+export type ComposerDraftAttachment =
+  | Readonly<{
+      kind: "png" | "file";
+      name: string;
+      bytes: ArrayBuffer;
+    }>
+  | Readonly<{
+      kind: "reference";
+      name: string;
+      file: File;
+      mimeType?: string;
+      preview?: Readonly<{
+        poster?: string;
+        durationMs: number;
+        width: number;
+        height: number;
+      }>;
+    }>;
+
+/** An attachment that storage can keep: one with its bytes. */
+export type StoredDraftAttachment = Extract<
+  ComposerDraftAttachment,
+  { bytes: ArrayBuffer }
+>;
 
 /** Where attachment bytes are kept; too large for synchronous storage. */
 export interface ComposerDraftBlobs {
-  get(key: string): Promise<ComposerDraftAttachment | null>;
-  put(key: string, value: ComposerDraftAttachment): Promise<void>;
+  get(key: string): Promise<StoredDraftAttachment | null>;
+  put(key: string, value: StoredDraftAttachment): Promise<void>;
   delete(key: string): Promise<void>;
 }
 
@@ -99,7 +121,9 @@ export class ComposerDrafts {
   ): Promise<void> {
     this.attachments.set(key, attachment);
     try {
-      if (attachment) await this.blobs?.put(key, attachment);
+      // A reference cannot outlive the File it names; storage drops it.
+      if (attachment && attachment.kind !== "reference")
+        await this.blobs?.put(key, attachment);
       else await this.blobs?.delete(key);
     } catch {
       // Memory still holds the attachment for this session.
@@ -259,9 +283,9 @@ class IndexedDbBlobs implements ComposerDraftBlobs {
     });
   }
 
-  async get(key: string): Promise<ComposerDraftAttachment | null> {
+  async get(key: string): Promise<StoredDraftAttachment | null> {
     const value = (await this.run("readonly", (store) => store.get(key))) as
-      | ComposerDraftAttachment
+      | StoredDraftAttachment
       | undefined;
     return value &&
       (value.kind === "png" || value.kind === "file") &&
@@ -271,7 +295,7 @@ class IndexedDbBlobs implements ComposerDraftBlobs {
       : null;
   }
 
-  async put(key: string, value: ComposerDraftAttachment): Promise<void> {
+  async put(key: string, value: StoredDraftAttachment): Promise<void> {
     await this.run("readwrite", (store) => store.put(value, key));
   }
 

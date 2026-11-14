@@ -460,6 +460,10 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
       send({method:'session/update',params:{sessionId:'chat',_meta:meta({}),
         update:{sessionUpdate:'user_message_chunk',messageId:'ask',content:{type:'resource_link',
           name:'image.png',uri:'urn:grida:retained-attachment:image-1',mimeType:'image/png',size:179}}}});
+      send({method:'session/update',params:{sessionId:'chat',_meta:meta({}),
+        update:{sessionUpdate:'user_message_chunk',messageId:'ask',content:{type:'resource_link',
+          name:'clip.mov',uri:'file:///Users/someone/clip.mov',mimeType:'video/quicktime',size:9,
+          _meta:{'co.grida/file-reference':{preview:{poster:'data:image/jpeg;base64,/9j/4AAQ',durationMs:12500,width:1920,height:1080}}}}}}});
       send({method:'session/update',params:{sessionId:'chat',_meta:meta({phase:'progress'}),
         update:{sessionUpdate:'agent_message_chunk',messageId:'work',content:{type:'text',text:'Reading.'}}}});
       send({method:'session/update',params:{sessionId:'chat',
@@ -521,8 +525,20 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
               text: "Check it",
               turnId: "turn-1",
               // The attachment is named for display; its host URI is not kept.
+              // A file reference keeps the preview the composer showed.
               attachments: [
                 { name: "image.png", mimeType: "image/png", size: 179 },
+                {
+                  name: "clip.mov",
+                  mimeType: "video/quicktime",
+                  size: 9,
+                  preview: {
+                    poster: "data:image/jpeg;base64,/9j/4AAQ",
+                    durationMs: 12_500,
+                    width: 1920,
+                    height: 1080,
+                  },
+                },
               ],
             },
             {

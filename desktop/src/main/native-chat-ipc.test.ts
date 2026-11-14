@@ -510,6 +510,10 @@ function setup(
     async submitFile(session) {
       return this.submit(session, "file-input", "Inspect file.");
     },
+    acceptsFileReference: false,
+    async submitFileReference(session) {
+      return this.submit(session, "reference-input", "Inspect file.");
+    },
     async inputReceipt(session, inputId) {
       return this.submit(session, inputId, "Fixture");
     },

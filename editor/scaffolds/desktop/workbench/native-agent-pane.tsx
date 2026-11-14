@@ -815,19 +815,19 @@ function NativeChatPane({
             }}
           />
         )}
-        {state.fileInput && (
+        {(state.fileInput || state.fileReferenceInput) && (
           <input
             key={`file-${state.scope}`}
             ref={filePicker}
             type="file"
-            aria-label="Select file to inspect"
+            aria-label="Select file to attach"
             className="hidden"
             onChange={(event) => {
               const input = event.currentTarget;
               const file = input.files?.[0];
               input.value = "";
-              if (file)
-                void controller.pickAttachment(state.scope, "file", file);
+              // Small files go directly, others by reference.
+              if (file) void controller.pickFile(state.scope, file);
             }}
           />
         )}
@@ -840,7 +840,9 @@ function NativeChatPane({
           (state.attachmentDraft.error ||
             !(state.attachmentDraft.kind === "png"
               ? state.imageInput
-              : state.fileInput)) && (
+              : state.attachmentDraft.kind === "file"
+                ? state.fileInput
+                : state.fileReferenceInput)) && (
             <p
               role="status"
               className="text-muted-foreground px-1 pb-1 text-xs"
@@ -915,6 +917,8 @@ function NativeChatPane({
                 size={state.attachmentDraft.size}
                 png={state.attachmentDraft.kind === "png"}
                 preview={attachmentPreview}
+                mimeType={state.attachmentDraft.mimeType}
+                video={state.attachmentDraft.preview}
                 onRemove={() => controller.removeAttachment(state.scope)}
               />
             )
@@ -987,10 +991,14 @@ function NativeChatPane({
                   <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
                     Add
                   </DropdownMenuLabel>
-                  {state.fileInput && (
+                  {(state.fileInput || state.fileReferenceInput) && (
                     <DropdownMenuItem
                       disabled={
-                        state.goalIntent || !controller.canAttach("file")
+                        state.goalIntent ||
+                        !(
+                          controller.canAttach("file") ||
+                          controller.canAttach("reference")
+                        )
                       }
                       onSelect={() => filePicker.current?.click()}
                     >

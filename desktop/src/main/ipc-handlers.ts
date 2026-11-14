@@ -575,6 +575,16 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     (event, id: string, input: unknown) =>
       nativeChat.submitFile(event, id, input)
   );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_FILE_REFERENCE, (event) =>
+    nativeChat.acceptsFileReference(event)
+  );
+  // GRIDA-SEC-004: the input's path comes from the preload, which resolves it
+  // from the person's File; Main resolves and refuses it independently.
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_SUBMIT_FILE_REFERENCE,
+    (event, id: string, input: unknown) =>
+      nativeChat.submitFileReference(event, id, input)
+  );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_INPUT_RECEIPT,
     (event, id: string, input: string) =>

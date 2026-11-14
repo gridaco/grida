@@ -33,6 +33,9 @@ mod deletion;
 #[cfg(unix)]
 #[path = "process/effort.rs"]
 mod effort;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[path = "process/file_references.rs"]
+mod file_references;
 #[cfg(unix)]
 #[path = "process/goals.rs"]
 mod goals;

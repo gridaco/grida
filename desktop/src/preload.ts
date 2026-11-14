@@ -18,6 +18,7 @@
 
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { MediaTransport } from "@grida/ai-host/media-transport";
+import { FileReferenceRequest } from "./bridge/file-reference-request";
 import {
   NativeEditorSurfaces,
   NativeEditorSvgText,
@@ -693,6 +694,22 @@ const bridge: DesktopBridge = {
         IPC_CHANNELS.NATIVE_CHAT_SUBMIT_FILE,
         attachmentId,
         input
+      ),
+    acceptsFileReference: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_FILE_REFERENCE),
+    // GRIDA-SEC-004 — the path is resolved here from the person's File and
+    // never returned to the page; Main validates it again.
+    canReferenceFile: (file) =>
+      FileReferenceRequest.available(file, (each) =>
+        webUtils.getPathForFile(each)
+      ),
+    submitFileReference: async (attachmentId, input) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_SUBMIT_FILE_REFERENCE,
+        attachmentId,
+        FileReferenceRequest.from(input, (each) =>
+          webUtils.getPathForFile(each)
+        )
       ),
     turnSummary: (
       attachmentId,

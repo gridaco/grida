@@ -330,9 +330,20 @@ pub(super) fn visible_record_bytes(record: &HistoryRecord) -> usize {
             _ => false,
         })
         .count();
-    let attachments = attachment_links(message).count();
+    // A reference's poster frame travels with its link, so it counts too.
+    let attachments = attachment_links(message)
+        .map(|link| {
+            ACTIVITY_RECORD_BYTES
+                + link
+                    .meta
+                    .as_ref()
+                    .and_then(|meta| serde_json::to_string(meta).ok())
+                    .map_or(0, |meta| meta.len())
+        })
+        .sum::<usize>();
     visible_parts(message).map(|part| part.len()).sum::<usize>()
-        + (activity + attachments) * ACTIVITY_RECORD_BYTES
+        + activity * ACTIVITY_RECORD_BYTES
+        + attachments
 }
 
 /// Recorded outcome and wall-clock interval for a replayed turn.
@@ -523,8 +534,42 @@ fn attachment_links(message: &Message) -> impl Iterator<Item = ResourceLink> + '
                     .size(size),
             );
         }
+        if let Some(reference) = grida_agent_master::file_reference::reference(media) {
+            return Some(file_reference_link(&reference));
+        }
         grida_agent_master::retained_file::name(media).map(|name| ResourceLink::new(name, uri))
     })
+}
+
+/// `_meta` key of a file reference link: the workspace path and the preview a
+/// client showed for it.
+pub(crate) const FILE_REFERENCE_META: &str = "co.grida/file-reference";
+
+/// A file a person attached by reference, as the link they sent. The link
+/// names a local file; reading it still needs the agent's own permissions.
+pub(crate) fn file_reference_link(
+    reference: &grida_agent_master::file_reference::FileReference,
+) -> ResourceLink {
+    let uri = reqwest::Url::from_file_path(&reference.path)
+        .map_or_else(|()| format!("file://{}", reference.path), String::from);
+    let mut details = serde_json::Map::new();
+    if let Some(path) = &reference.workspace_path {
+        details.insert("workspacePath".into(), json!(path));
+    }
+    if let Some(preview) = &reference.preview {
+        details.insert("preview".into(), json!(preview));
+    }
+    let link = ResourceLink::new(reference.name.clone(), uri)
+        .mime_type(reference.mime_type.clone())
+        .size(reference.size.and_then(|size| i64::try_from(size).ok()));
+    if details.is_empty() {
+        link
+    } else {
+        link.meta(serde_json::Map::from_iter([(
+            FILE_REFERENCE_META.into(),
+            Value::Object(details),
+        )]))
+    }
 }
 
 #[cfg(test)]

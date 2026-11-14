@@ -197,18 +197,36 @@ export function ChatMessageView({
                     part.type === chat_vocabulary.CONTEXT_PARTS.files;
                   const d = part.data ?? {};
                   // Name the chip by the file(s) sent with the message.
-                  const fileNames = (
-                    Array.isArray(d.files) ? d.files : []
-                  ).flatMap((f) =>
-                    f && typeof (f as { name?: unknown }).name === "string"
-                      ? [(f as { name: string }).name]
-                      : []
+                  const files = (Array.isArray(d.files) ? d.files : []).flatMap(
+                    (f) =>
+                      f && typeof (f as { name?: unknown }).name === "string"
+                        ? [
+                            f as {
+                              name: string;
+                              poster?: unknown;
+                              caption?: unknown;
+                            },
+                          ]
+                        : []
                   );
                   const label = isFiles
-                    ? fileNames.length === 1
-                      ? fileNames[0]
-                      : `${fileNames.length} files`
+                    ? files.length === 1
+                      ? files[0].name
+                      : `${files.length} files`
                     : chat_vocabulary.CONTEXT_MARKERS[part.type];
+                  // A single file with a still (a video's poster frame) shows
+                  // it in place of the clip icon, with its caption.
+                  const single =
+                    isFiles && files.length === 1 ? files[0] : undefined;
+                  const poster =
+                    typeof single?.poster === "string" &&
+                    single.poster.startsWith("data:image/")
+                      ? single.poster
+                      : undefined;
+                  const caption =
+                    typeof single?.caption === "string"
+                      ? single.caption
+                      : undefined;
                   return (
                     // Index key: a sent user message's parts are immutable and
                     // never reorder (same reasoning as the images below).
@@ -216,8 +234,20 @@ export function ChatMessageView({
                       key={index}
                       className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs shadow-sm"
                     >
-                      <PaperclipIcon className="size-3.5 text-muted-foreground" />
+                      {poster ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={poster}
+                          alt=""
+                          className="size-8 shrink-0 rounded object-cover"
+                        />
+                      ) : (
+                        <PaperclipIcon className="size-3.5 text-muted-foreground" />
+                      )}
                       <span className="font-medium">{label}</span>
+                      {caption && (
+                        <span className="text-muted-foreground">{caption}</span>
+                      )}
                     </span>
                   );
                 })}

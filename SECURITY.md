@@ -876,6 +876,28 @@ build-cleanup directory and retain the same fixed-path and binary validation.
   and refuses to resubmit a retained Ultra message on an incompatible
   connection. The renderer sees only whether review findings were collected
   in a summary for its exact observed turn.
+- **Chat attachments by reference.** A file attached to a native chat message
+  that is not sent directly (any file other than a PNG or a file of up to
+  256 KiB, such as a video) goes by reference: the agent receives its path,
+  name, type and size, never its bytes, and the reference grants nothing. The
+  renderer passes only the person's dropped, pasted or picked `File`; the
+  [preload request owner](desktop/src/bridge/file-reference-request.ts)
+  resolves its path with `webUtils.getPathForFile` and refuses a page-built
+  File or a page-supplied path, so the path never crosses into the renderer.
+  [Main](desktop/src/main/native-file-reference.ts) resolves it again to a
+  canonical regular file, reads only its metadata, and refuses Grida's
+  protected stores (the chat state directory, the Desktop profile and
+  `~/.grida`), also through a link, before sending one ACP `resource_link`.
+  The [host](crates/grida-agent/src/host/file_references.rs) records the
+  reference only for a client that negotiated `co.grida/session/file-reference`,
+  checks that a workspace path names the same file inside the chat's working
+  directory, and never opens it. The agent reaches the file only through its
+  existing permissions: file tools inside the project, sandboxed commands
+  elsewhere except protected paths. Nothing is copied, so no new readable
+  location exists. [Process tests](crates/grida-agent/tests/process/file_references.rs)
+  show a workspace reference read by the file tools and an outside reference
+  refused by them; [Main tests](desktop/src/main/native-file-reference.test.ts)
+  cover protected and non-file paths.
 - [Desktop workspace ownership](desktop/src/main/native-workspace-agents.ts)
   shares one startup across requests for the same registered workspace and
   canonical root. It bounds concurrent engine ownership and withdraws lookup

@@ -37,7 +37,14 @@ function getAttachmentTypeLabel(attachment: ComposerAttachment): string {
   const extension = attachment.name.includes(".")
     ? attachment.name.split(".").pop()
     : undefined;
-  return (mimeSubtype || extension || "file").toUpperCase();
+  // A video's subtype names its container ("quicktime"); its extension reads better.
+  const type = (
+    (attachment.mime?.startsWith("video/") && extension) ||
+    mimeSubtype ||
+    extension ||
+    "file"
+  ).toUpperCase();
+  return attachment.caption ? `${type} · ${attachment.caption}` : type;
 }
 
 export function ComposerTriggerMenu({
@@ -223,6 +230,26 @@ export function ComposerAttachmentCard({
             fill
             sizes="32px"
             src={attachment.url}
+            unoptimized
+          />
+        }
+        label={getAttachmentTypeLabel(attachment)}
+        name={attachment.name}
+        onRemove={onRemove}
+      />
+    );
+  }
+
+  if (attachment.poster) {
+    return (
+      <AttachmentCardShell
+        icon={
+          <Image
+            alt=""
+            className="object-cover"
+            fill
+            sizes="32px"
+            src={attachment.poster}
             unoptimized
           />
         }

@@ -1,16 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   ComposerDrafts,
-  type ComposerDraftAttachment,
+  type StoredDraftAttachment,
   type ComposerDraftBlobs,
 } from "./composer-drafts";
 
 class MemoryBlobs implements ComposerDraftBlobs {
-  readonly items = new Map<string, ComposerDraftAttachment>();
+  readonly items = new Map<string, StoredDraftAttachment>();
   async get(key: string) {
     return this.items.get(key) ?? null;
   }
-  async put(key: string, value: ComposerDraftAttachment) {
+  async put(key: string, value: StoredDraftAttachment) {
     this.items.set(key, value);
   }
   async delete(key: string) {

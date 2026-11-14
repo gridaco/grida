@@ -97,6 +97,8 @@ export type ActiveNativeChat = Readonly<{
     | "submitImage"
     | "acceptsFile"
     | "submitFile"
+    | "acceptsFileReference"
+    | "submitFileReference"
     | "inputReceipt"
     | "observe"
     | "turnSummary"
@@ -1613,6 +1615,10 @@ export class NativeChatIpc {
     return this.owner(event).active.chat.acceptsFile;
   }
 
+  acceptsFileReference(event: IpcMainInvokeEvent): boolean {
+    return this.owner(event).active.chat.acceptsFileReference;
+  }
+
   async inspectHooks(
     event: IpcMainInvokeEvent,
     attachmentId?: string
@@ -1726,6 +1732,20 @@ export class NativeChatIpc {
   ) {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const result = await owner.active.chat.submitFile(
+      attachment.session,
+      input
+    );
+    this.revalidate(owner, attachment);
+    return result;
+  }
+
+  async submitFileReference(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    input: unknown
+  ) {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const result = await owner.active.chat.submitFileReference(
       attachment.session,
       input
     );

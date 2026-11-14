@@ -20,10 +20,9 @@ import type {
   NativeEditorSurfaceSnapshot,
 } from "@grida/desktop-bridge";
 import { NEW_CHAT_TITLE, NativeChatController } from "./native-chat-controller";
-import {
-  ComposerDrafts,
-  type ComposerDraftAttachment,
-} from "./composer-drafts";
+import { native_message_parts } from "./native-message-parts";
+import { video_attachment } from "./video-attachment";
+import { ComposerDrafts, type StoredDraftAttachment } from "./composer-drafts";
 
 function fixture() {
   const updates = new Map<string, (update: NativeChatUpdate) => void>();
@@ -2884,7 +2883,7 @@ it("keeps Plan and an attachment with each chat's draft across reattachment", as
   bridge.submitImage = vi.fn<NonNullable<DesktopNativeChat["submitImage"]>>();
   bridge.submitInRegime =
     vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>();
-  const blobs = new Map<string, ComposerDraftAttachment>();
+  const blobs = new Map<string, StoredDraftAttachment>();
   const drafts = new ComposerDrafts(null, {
     get: async (key) => blobs.get(key) ?? null,
     put: async (key, value) => void blobs.set(key, value),
@@ -2929,7 +2928,7 @@ it("keeps a new chat's draft with the chat its refused first send created", asyn
   bridge.submitImage = vi.fn<NonNullable<DesktopNativeChat["submitImage"]>>();
   bridge.submitInRegime =
     vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>();
-  const blobs = new Map<string, ComposerDraftAttachment>();
+  const blobs = new Map<string, StoredDraftAttachment>();
   const drafts = new ComposerDrafts(null, {
     get: async (key) => blobs.get(key) ?? null,
     put: async (key, value) => void blobs.set(key, value),
@@ -3236,6 +3235,255 @@ it("keeps one selected file when a transfer is rejected and replaces it with a P
   expect(sendFile).not.toHaveBeenCalled();
   expect(controller.read().attachmentDraft).toBeNull();
   controller.disconnect();
+});
+
+/** A media element that decodes a 12.5 s 1920×1080 clip on request. */
+class StubVideo extends EventTarget implements video_attachment.Element {
+  muted = false;
+  preload = "";
+  playsInline = false;
+  duration = Number.NaN;
+  videoWidth = 0;
+  videoHeight = 0;
+  private time = 0;
+  private source = "";
+  get src() {
+    return this.source;
+  }
+  set src(value: string) {
+    this.source = value;
+    queueMicrotask(() => {
+      this.duration = 12.5;
+      this.videoWidth = 1920;
+      this.videoHeight = 1080;
+      this.dispatchEvent(new Event("loadedmetadata"));
+    });
+  }
+  get currentTime() {
+    return this.time;
+  }
+  set currentTime(value: number) {
+    this.time = value;
+    queueMicrotask(() => this.dispatchEvent(new Event("seeked")));
+  }
+  removeAttribute() {}
+  load() {}
+}
+
+const POSTER = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ==";
+
+function referenceFixture() {
+  const context = fixture();
+  const { bridge } = context;
+  const onDisk = new WeakSet<File>();
+  bridge.acceptsPng = async () => true;
+  bridge.acceptsFile = async () => true;
+  bridge.submitImage = vi.fn<NonNullable<DesktopNativeChat["submitImage"]>>(
+    (sessionId, input) => bridge.submit(sessionId, input.inputId, input.text)
+  );
+  bridge.submitFile = vi.fn<NonNullable<DesktopNativeChat["submitFile"]>>(
+    (sessionId, input) => bridge.submit(sessionId, input.inputId, input.text)
+  );
+  bridge.acceptsFileReference = async () => true;
+  bridge.canReferenceFile = (file) => onDisk.has(file);
+  const sendReference = vi.fn<
+    NonNullable<DesktopNativeChat["submitFileReference"]>
+  >((sessionId, input) => bridge.submit(sessionId, input.inputId, input.text));
+  bridge.submitFileReference = sendReference;
+  const dropped = (name: string, type: string, size: number) => {
+    const file = new File([new Uint8Array(Math.min(size, 16))], name, {
+      type,
+    });
+    Object.defineProperty(file, "size", { value: size });
+    const read = vi.spyOn(file, "arrayBuffer");
+    onDisk.add(file);
+    return { file, read };
+  };
+  // The real thumbnail module, reading a stubbed media element.
+  const probe = vi.spyOn(video_attachment, "probe").mockImplementation((file) =>
+    original(file, {
+      video: () => new StubVideo(),
+      canvas: (width, height) => ({
+        width,
+        height,
+        draw: () => {},
+        toDataURL: () => POSTER,
+      }),
+      createObjectURL: () => "blob:clip",
+      revokeObjectURL: () => {},
+    })
+  );
+  return { ...context, sendReference, dropped, probe };
+}
+const original = video_attachment.probe;
+
+it("attaches any file: a large file goes by reference without reading its bytes", async () => {
+  const { controller, sendReference, dropped, probe } = referenceFixture();
+  try {
+    await controller.select("chat-a");
+    const scope = controller.read().scope;
+    expect(controller.canAttach("reference")).toBe(true);
+    const archive = dropped("dataset.zip", "application/zip", 3 * 1024 ** 3);
+    await controller.pickTransferredAttachment(scope, [
+      { kind: "file", file: archive.file },
+    ]);
+    expect(controller.read().attachmentDraft).toEqual({
+      kind: "reference",
+      name: "dataset.zip",
+      size: 3 * 1024 ** 3,
+      mimeType: "application/zip",
+    });
+    expect(controller.read().attachmentNotice).toBeNull();
+    expect(probe).not.toHaveBeenCalled();
+    await controller.submit("Unpack and summarize this.");
+    expect(sendReference).toHaveBeenCalledExactlyOnceWith("chat-a", {
+      action: "submit",
+      inputId: expect.any(String),
+      text: "Unpack and summarize this.",
+      file: archive.file,
+      mimeType: "application/zip",
+      operatingRegime: "act",
+    });
+    expect(archive.read).not.toHaveBeenCalled();
+    expect(controller.read().attachmentDraft).toBeNull();
+  } finally {
+    vi.restoreAllMocks();
+    controller.disconnect();
+  }
+});
+
+it("shows a dropped .mov as a video card with its poster frame and duration", async () => {
+  const { bridge, controller, sendReference, dropped } = referenceFixture();
+  try {
+    await controller.select("chat-a");
+    const scope = controller.read().scope;
+    // A small clip still goes by reference: models here do not watch video.
+    const clip = dropped("clip.mov", "", 180 * 1024);
+    await controller.pickTransferredAttachment(scope, [
+      { kind: "file", file: clip.file },
+    ]);
+    const preview = {
+      poster: POSTER,
+      durationMs: 12_500,
+      width: 1920,
+      height: 1080,
+    };
+    expect(controller.read().attachmentDraft).toEqual({
+      kind: "reference",
+      name: "clip.mov",
+      size: 180 * 1024,
+      mimeType: "video/quicktime",
+      preview,
+    });
+    expect(controller.attachmentPreview()).toBeNull();
+    await controller.submit("Cut the first two seconds.");
+    expect(sendReference.mock.calls[0]?.[1]).toMatchObject({
+      file: clip.file,
+      mimeType: "video/quicktime",
+      preview,
+    });
+    expect(bridge.submitFile).not.toHaveBeenCalled();
+    expect(clip.read).not.toHaveBeenCalled();
+  } finally {
+    vi.restoreAllMocks();
+    controller.disconnect();
+  }
+});
+
+it("keeps the video card when the chat is reopened", async () => {
+  const { controller, transcripts } = referenceFixture();
+  try {
+    const preview = {
+      poster: POSTER,
+      durationMs: 12_500,
+      width: 1920,
+      height: 1080,
+    };
+    transcripts.set("chat-a", [
+      {
+        messageId: "cut",
+        role: "user",
+        text: "Cut the first two seconds.",
+        attachments: [
+          { name: "clip.mov", mimeType: "video/quicktime", size: 9, preview },
+        ],
+      },
+    ]);
+    await controller.select("chat-a");
+    const [message] = controller.read().messages;
+    expect(native_message_parts.of(message)[0]).toEqual({
+      type: "data-user_file_attachments",
+      data: {
+        files: [
+          { name: "clip.mov", poster: POSTER, caption: "0:13 · 1920×1080" },
+        ],
+      },
+    });
+  } finally {
+    vi.restoreAllMocks();
+    controller.disconnect();
+  }
+});
+
+it("keeps PNG and small files on their direct paths when references are available", async () => {
+  const { bridge, controller, sendReference, dropped } = referenceFixture();
+  try {
+    await controller.select("chat-a");
+    const scope = controller.read().scope;
+    const png = dropped("sketch.png", "image/png", 8);
+    await controller.pickTransferredAttachment(scope, [
+      { kind: "file", file: png.file },
+    ]);
+    expect(controller.read().attachmentDraft).toMatchObject({ kind: "png" });
+    await controller.submit("Describe it.");
+    expect(bridge.submitImage).toHaveBeenCalledTimes(1);
+    const notes = dropped("notes.txt", "text/plain", 12);
+    await controller.pickTransferredAttachment(scope, [
+      { kind: "file", file: notes.file },
+    ]);
+    expect(controller.read().attachmentDraft).toMatchObject({ kind: "file" });
+    await controller.submit("Summarize it.");
+    expect(bridge.submitFile).toHaveBeenCalledTimes(1);
+    // A non-PNG image and a large PNG now go by reference instead of being refused.
+    for (const [name, type, size] of [
+      ["photo.jpg", "image/jpeg", 12],
+      ["screenshot.png", "image/png", 4 * 1024 * 1024],
+    ] as const) {
+      const image = dropped(name, type, size);
+      await controller.pickTransferredAttachment(scope, [
+        { kind: "file", file: image.file },
+      ]);
+      expect(controller.read().attachmentDraft).toMatchObject({
+        kind: "reference",
+        name,
+      });
+    }
+    expect(sendReference).not.toHaveBeenCalled();
+  } finally {
+    vi.restoreAllMocks();
+    controller.disconnect();
+  }
+});
+
+it("keeps today's limits for a file Desktop cannot name on disk", async () => {
+  const { bridge, controller } = referenceFixture();
+  try {
+    bridge.canReferenceFile = () => false;
+    await controller.select("chat-a");
+    const scope = controller.read().scope;
+    const pasted = new File([new Uint8Array(16)], "Pasted.bin");
+    Object.defineProperty(pasted, "size", { value: 300 * 1024 });
+    await controller.pickTransferredAttachment(scope, [
+      { kind: "file", file: pasted },
+    ]);
+    expect(controller.read().attachmentDraft).toMatchObject({
+      kind: "file",
+      error: "Choose a file of at most 256 KiB.",
+    });
+  } finally {
+    vi.restoreAllMocks();
+    controller.disconnect();
+  }
 });
 
 it("preserves an existing attachment on Library failure and submits only captured PNG bytes", async () => {

@@ -43,6 +43,9 @@ use std::sync::{Arc, Mutex};
 
 const SUBMIT: &str = "co.grida/session/submit";
 const FILE_INTAKE: &str = "co.grida/session/selected-file";
+/// A prompt `resource_link` with a `file:` URI names a local file by
+/// reference: the host records its path and facts and never reads it.
+const FILE_REFERENCE: &str = "co.grida/session/file-reference";
 const SNAPSHOT: &str = "co.grida/session/snapshot";
 const STOP: &str = "co.grida/session/stop";
 const OPERATING_REGIME: &str = "co.grida/session/operating-regime";
@@ -138,6 +141,7 @@ fn capability_keys(
         .chain((reviewer && goal_effort).then_some(goals::FUNDED_REVIEW))
         .chain((reviewer && goal_effort && subagents).then_some(goals::NAMED_CHILD))
         .chain((reviewer && files).then_some(FILE_INTAKE))
+        .chain(reviewer.then_some(FILE_REFERENCE))
         .chain(reviewer.then_some(super::projection::TRANSCRIPT_WINDOW))
 }
 
@@ -192,7 +196,14 @@ fn identified_prompt(
     if has_embedded && incompatible {
         return Err(Error::invalid_params().data("selected_file_options_unsupported"));
     }
+    let references = file_references(&prompt, sessions, incompatible)?;
     let mut parts = prompt_parts(prompt, image_intake, embedded_context)?;
+    // `prompt_parts` maps each block to one part, in order.
+    for (part, reference) in parts.iter_mut().zip(references) {
+        if let Some(reference) = reference {
+            *part = crate::host::PromptPart::FileReference { reference };
+        }
+    }
     if let Some(file) = file {
         require(sessions, FILE_INTAKE, None)?;
         if incompatible {
@@ -209,6 +220,81 @@ fn identified_prompt(
         });
     }
     Ok(parts)
+}
+
+/// The file references among a prompt's blocks, aligned with the blocks. Only a
+/// client that negotiated file references sends them; for any other client a
+/// `file:` link stays ordinary context text.
+fn file_references(
+    prompt: &[ContentBlock],
+    sessions: &Mutex<ConnectionSessions>,
+    incompatible: bool,
+) -> Result<Vec<Option<grida_agent_master::file_reference::FileReference>>> {
+    let linked = |block: &ContentBlock| matches!(block, ContentBlock::ResourceLink(link) if link.uri.starts_with("file:"));
+    if !prompt.iter().any(linked) || require(sessions, FILE_REFERENCE, None).is_err() {
+        return Ok(vec![None; prompt.len()]);
+    }
+    if incompatible {
+        return Err(Error::invalid_params().data("file_reference_options_unsupported"));
+    }
+    if !prompt
+        .iter()
+        .any(|block| matches!(block, ContentBlock::Text(text) if !text.text.trim().is_empty()))
+    {
+        return Err(Error::invalid_params().data("file_reference_requires_text"));
+    }
+    prompt
+        .iter()
+        .map(|block| match block {
+            ContentBlock::ResourceLink(link) if linked(block) => file_reference(link).map(Some),
+            _ => Ok(None),
+        })
+        .collect()
+}
+
+fn file_reference(
+    link: &agent_client_protocol::v1::schema::ResourceLink,
+) -> Result<grida_agent_master::file_reference::FileReference> {
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase", deny_unknown_fields)]
+    struct Details {
+        workspace_path: Option<String>,
+        preview: Option<grida_agent_master::file_reference::Preview>,
+    }
+    let invalid = |code: &'static str| Error::invalid_params().data(code);
+    let path = reqwest::Url::parse(&link.uri)
+        .ok()
+        .filter(|uri| uri.scheme() == "file" && uri.host_str().is_none_or(str::is_empty))
+        .and_then(|uri| uri.to_file_path().ok())
+        .and_then(|path| path.to_str().map(str::to_owned))
+        .ok_or_else(|| invalid("file_reference_path_invalid"))?;
+    let details = match link
+        .meta
+        .as_ref()
+        .and_then(|meta| meta.get(super::projection::FILE_REFERENCE_META))
+    {
+        Some(value) => serde_json::from_value::<Details>(value.clone())
+            .map_err(|_| invalid("file_reference_details_invalid"))?,
+        None => Details {
+            workspace_path: None,
+            preview: None,
+        },
+    };
+    let reference = grida_agent_master::file_reference::FileReference {
+        name: link.name.clone(),
+        path,
+        workspace_path: details.workspace_path,
+        mime_type: link.mime_type.clone(),
+        size: match link.size {
+            Some(size) => {
+                Some(u64::try_from(size).map_err(|_| invalid("file_reference_size_invalid"))?)
+            }
+            None => None,
+        },
+        preview: details.preview,
+    };
+    reference.validate().map_err(invalid)?;
+    Ok(reference)
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]

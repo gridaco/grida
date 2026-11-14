@@ -355,6 +355,20 @@ working copy. The prepared request contains a display marker. The bound
 `inspect_retained_file` tool returns its size, digest, and a bounded text
 excerpt on request. Reopening an input returns a marker and its receipt.
 
+Private stdio clients may also negotiate `co.grida/session/file-reference`
+version 1. Identified Submit and Enqueue then record a prompt `resource_link`
+whose `uri` is a local `file:` URL as a file reference, alongside nonempty
+text and at most one per message. The link carries `name`, optional
+`mimeType` and `size`, and optional `_meta["co.grida/file-reference"]` with
+`workspacePath` (the path relative to the chat's working directory, which
+must name the same file) and `preview` (`poster` as a JPEG or PNG data URL of
+at most 48 KiB, `durationMs`, `width`, `height`). The model reads the name,
+path, type, size and media facts as text, never the poster or the bytes. The
+host never opens the file, and the reference grants no access: the agent
+reaches it only through tools its permissions already allow. Replay and input
+inspection return the same link. Without the capability, a `file:` link stays
+ordinary context text.
+
 An admitted turn can offer `crop_retained_image` when its captured context
 contains a retained PNG owned by the chat. The tool uses the most recent such
 image and takes a rectangle in original pixel coordinates. It writes a private

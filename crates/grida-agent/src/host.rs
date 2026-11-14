@@ -6,6 +6,7 @@ mod catalog;
 pub(crate) mod compaction;
 mod completion_checks;
 pub(crate) mod deletion;
+mod file_references;
 mod goals;
 mod history;
 mod host_tools;
@@ -335,6 +336,10 @@ pub enum PromptPart {
     },
     RetainedFile {
         work: crate::scratch::WorkingCopyReceipt,
+    },
+    /// A local file named by path. The host records it and never opens it.
+    FileReference {
+        reference: grida_agent_master::file_reference::FileReference,
     },
 }
 
@@ -2231,6 +2236,12 @@ impl Host {
             return Err(problem(ErrorKind::Unsupported, "plan_wakeups_unavailable"));
         }
         validate_prompt_parts(&parts)?;
+        let cwd = session_configuration(session)?.cwd;
+        for part in &parts {
+            if let PromptPart::FileReference { reference } = part {
+                file_references::check_workspace_path(reference, &cwd)?;
+            }
+        }
         let execution = self.execution()?;
         let configuration = self.with_configuration(Configuration::snapshot).await?;
         let child_work = subagent.is_some();
@@ -3806,10 +3817,17 @@ fn decode_input<T: serde::de::DeserializeOwned>(input: &Submission) -> Result<T>
 pub(crate) fn validate_prompt_parts(parts: &[PromptPart]) -> Result<()> {
     let mut uploads = 0;
     let mut files = 0;
+    let mut references = 0;
     for part in parts {
         match part {
             PromptPart::Image { .. } => uploads += 1,
             PromptPart::File { .. } => files += 1,
+            PromptPart::FileReference { reference } => {
+                reference
+                    .validate()
+                    .map_err(|code| problem(ErrorKind::InvalidInput, code))?;
+                references += 1;
+            }
             PromptPart::RetainedImage { .. } => {
                 return Err(problem(
                     ErrorKind::InvalidInput,
@@ -3827,6 +3845,12 @@ pub(crate) fn validate_prompt_parts(parts: &[PromptPart]) -> Result<()> {
     }
     if uploads > 1 {
         return Err(problem(ErrorKind::LimitExceeded, "image_count_limit"));
+    }
+    if references > file_references::MAX_REFERENCES {
+        return Err(problem(
+            ErrorKind::LimitExceeded,
+            "file_reference_count_limit",
+        ));
     }
     if files > 1 || files > 0 && uploads > 0 {
         return Err(problem(
@@ -3883,6 +3907,9 @@ fn prompt_input(id: &ChangeId, parts: &[PromptPart]) -> Result<Vec<Message>> {
                 }
                 PromptPart::RetainedFile { work } => {
                     Content::Media(retained_file::media(work.asset())?)
+                }
+                PromptPart::FileReference { reference } => {
+                    Content::Media(file_references::media(reference)?)
                 }
             })
         })

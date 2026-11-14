@@ -441,5 +441,8 @@ fn prompt_block(part: PromptPart) -> ContentBlock {
                 .into()
         }
         PromptPart::File { .. } => "Attached file.".into(),
+        PromptPart::FileReference { reference } => {
+            ContentBlock::ResourceLink(crate::acp::projection::file_reference_link(&reference))
+        }
     }
 }

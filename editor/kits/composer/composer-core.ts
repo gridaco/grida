@@ -23,6 +23,11 @@ export type ComposerFileAttachment = {
   size?: number;
   path?: string;
   url?: string;
+  /** A still that stands for a file that is not an image, such as a video's
+   *  poster frame (an image URL). */
+  poster?: string;
+  /** Facts shown after the type, such as a video's duration and size. */
+  caption?: string;
   payload?: Record<string, unknown>;
 };
 
