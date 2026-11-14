@@ -38,6 +38,10 @@ struct Enqueue {
     effort: Option<crate::EffortPreset>,
     #[serde(default)]
     reasoning: Option<agent_kit_core::inference::ReasoningEffort>,
+    editor_endpoint_id: Option<BindingId>,
+    #[serde(default)]
+    editor_presentation: bool,
+    editor_svg_target_id: Option<BindingId>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -185,27 +189,43 @@ pub(super) fn handlers(
             async move |request: Enqueue, responder, _| {
                 let result = async {
                     require(&enqueue.1, ENQUEUE, Some(&request.session_id))?;
+                    editor_binding(
+                        &enqueue.1,
+                        request.editor_endpoint_id.as_ref(),
+                        request.editor_presentation,
+                        request.editor_svg_target_id.as_ref(),
+                        false,
+                    )?;
+                    let parts = identified_prompt(
+                        request.prompt,
+                        image_intake,
+                        embedded_context,
+                        request.selected_file,
+                        &enqueue.1,
+                        request.editor_endpoint_id.is_some(),
+                    )?;
                     let accepted = enqueue
                         .0
-                        .enqueue(PromptRequest {
-                            id: request.input_id,
-                            session: request.session_id,
-                            parts: identified_prompt(
-                                request.prompt,
-                                image_intake,
-                                embedded_context,
-                                request.selected_file,
-                                &enqueue.1,
-                                false,
-                            )?,
-                            questions: questions::available(&enqueue.1),
-                            operating_regime: operating_regime(
-                                &enqueue.1,
-                                request.operating_regime,
-                            )?,
-                            effort: effort(&enqueue.1, request.effort)?,
-                            reasoning: request.reasoning,
-                        })
+                        .enqueue_with_context(
+                            PromptRequest {
+                                id: request.input_id,
+                                session: request.session_id,
+                                parts,
+                                questions: questions::available(&enqueue.1),
+                                operating_regime: operating_regime(
+                                    &enqueue.1,
+                                    request.operating_regime,
+                                )?,
+                                effort: effort(&enqueue.1, request.effort)?,
+                                reasoning: request.reasoning,
+                            },
+                            SubmissionContext {
+                                editor_endpoint: request.editor_endpoint_id,
+                                editor_presentation: request.editor_presentation,
+                                editor_svg_target: request.editor_svg_target_id,
+                                ..SubmissionContext::default()
+                            },
+                        )
                         .await
                         .map_err(host_error)?;
                     Ok(SubmitResponse::from(accepted))

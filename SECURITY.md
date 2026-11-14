@@ -519,11 +519,24 @@ load `https://grida.co` while dev loads `http://localhost:3000`;
 `shell.openExternal` after validation; `will-attach-webview` rejects;
 every main-process IPC handler validates `event.senderFrame.url`.
 
-**Native finite-command adapter.** A host can construct the adapter for one
-authorized execution scope after probing the installed native sandbox. A tool
-call supplies the program, arguments, working directory, environment values,
-and optional UTF-8 stdin. Filesystem grants, network denial, private temporary
-storage, and the termination guarantee come from the host and native sandbox.
+**Native command adapter.** A host can construct the adapter for one
+authorized execution scope after probing the installed native sandbox. A model
+command runs as `<shell> -c <cmd>` in the user's named POSIX shell: the
+captured environment's `SHELL` only when it is an absolute path to an
+executable `sh`, `bash`, `zsh` or `dash`, otherwise `/bin/sh`. The call
+supplies the command line, an optional working directory and a terminal
+choice; it supplies no environment values or stdin. A command still running
+when its wait ends is kept by its chat in the host's process store. Turn end,
+cancellation, pause and approval waits leave it running; it ends when the
+model or a person stops it, its directory grant is revoked, it is evicted for
+a newer process (64 per chat), its chat is deleted, or the host shuts down.
+Kept processes run under a 24-hour scope. Input written to a terminal process
+after launch is covered by the launch approval and is not separately
+reviewed, so a policy that must see every command should refuse interactive
+terminals. Cleanup that cannot be verified is reported at host shutdown
+rather than holding the queue. Filesystem grants, network denial, private
+temporary storage, and the termination guarantee come from the host and
+native sandbox.
 A host profile can let programs read and execute anywhere except its protected
 paths (disk read) and start from the host's environment minus Grida's own
 `GRIDA_*` variables and the provider credential variable the host was launched
@@ -607,6 +620,27 @@ canonical identities. Protected contents, directory listings, extended
 attributes and other descendant metadata remain denied. Actual native tests
 exercise fresh managed-workspace creation alongside protected-root rejection.
 
+- **Process sessions (native confinement).** A
+  [native process session](crates/agent-kit-sandbox/src/native/session.rs)
+  runs a prepared command under the same scope without the finite wall-clock
+  limit; the scope deadline, cancellation, a stop request and dropping its
+  handle still end it. The [trusted helper](crates/agent-kit-sandbox/src/helper.rs)
+  uses the owner's end of its private status channel as a control channel for
+  interrupt and stop. End of stream or any unknown byte ends everything the
+  helper launched: on macOS the payload (a terminal payload's own group) and
+  then the launcher group; on Linux the helper's exit as the PID namespace's
+  first process. A session or finite command therefore does not outlive an
+  owner that disappears. Interrupts reach the payload only through the helper.
+  A terminal session allocates its pseudo-terminal inside the sandbox through
+  the existing Seatbelt pseudo-terminal allowance or bubblewrap's private
+  `/dev`; sessions add no profile or syscall-filter rule. On macOS a terminal
+  payload leads a session outside the launcher group. The helper signals it
+  only while it is unreaped and confirms that in its report; otherwise the
+  cleanup evidence is unverified. On macOS, descendants that change process
+  group or session can outlive a stop; Linux keeps the PID-namespace
+  guarantee. [Native sandbox tests](crates/agent-kit-sandbox/tests/native.rs)
+  cover retained output, terminal input, interrupts, stop with background
+  descendants, the scope deadline, handle drop and owner loss.
 - **Network (retained service, native confinement).** On macOS and Linux the
   retained file/media sidecar runs under native Seatbelt or bubblewrap/seccomp
   confinement with no direct network: its profile has an empty domain
@@ -1092,6 +1126,12 @@ build-cleanup directory and retain the same fixed-path and binary validation.
   exposes bounded answer text and context metadata. Main binds each open
   identity to one parent attachment and private child connection. Closing,
   detaching, or navigating retires that side chat independently of parent work.
+- The [Desktop background process adapter](desktop/src/main/native-agent-background-processes.ts)
+  lists and stops a chat's kept processes only when the native child
+  advertises the capability. Main names the frame's attached chat and checks
+  each reply against that exact session. Listings, process IDs and command
+  text are bounded, and a stop reply cannot name a process it did not request.
+  Listing grants no input, output or execution authority.
 - [Native capability host](crates/grida-agent/src/tool_host.rs) and
   [its fixtures](crates/grida-agent/tests/tool_host.rs) bind a tool lease to
   a single capability and endpoint lifetime. The dispatcher checks the
@@ -1396,8 +1436,9 @@ Today:
   The private check retains the same sandbox and cleanup owner. A trusted
   `beforeTool` profile can also require the private [pre-tool check](crates/grida-agent/src/host/before_tool.rs)
   for an Act command after permission and before the target attempt. It receives
-  the bounded validated command arguments, including explicit environment and
-  stdin values, and cannot grant the target authority.
+  the bounded validated command arguments: the command line, working directory,
+  terminal choice and access. Later process input is not checked. The check
+  cannot grant the target authority.
   An unconfirmed check blocks later admissions in the same turn after it is observed; effects
   already admitted can finish. This profile supports Standard Act Goals;
   Plan and Ultra Goals remain unavailable.
@@ -1524,7 +1565,8 @@ Today:
 - `desktop/src/services-sidecar-channel.ts`, `provider-network-policy.ts`, and `services-sidecar-network.ts` — strict private stdio framing, destination/header policy and the sidecar's explicit provider/provider-asset transport client. The channel carries no host command lane: `command.*` frames are unknown types, and malformed or unknown frames fail the channel.
 - `desktop/src/main/services-sidecar-socket-host.ts` — owns the exact loopback listener, pauses accepted sockets, rejects non-loopback peers, and transfers the bounded connected capability over per-spawn Node IPC.
 - `desktop/src/main/provider-network-host.ts` and `provider-network-authority.ts` — main-owned Chromium network execution, bounded response streaming, redirect/route reauthorization and per-spawn built-in/custom grant state. Main executes no command for the sidecar; native model commands run in the Rust host.
-- The native command adapter retains the authorized scope, owns cleanup across runtime cancellation, and reconciles the original attempt. [Adapter](crates/grida-agent/src/command.rs) and [tests](crates/grida-agent/tests/commands.rs).
+- The [finite command supervisor](crates/grida-agent/src/command.rs) runs reviewed hook and completion checks. It retains the authorized scope, owns cleanup across runtime cancellation, and reconciles the original attempt.
+- Model commands run through the [chat process store](crates/grida-agent/src/processes.rs) and its [command tools](crates/grida-agent/src/processes/tools.rs). Each launch uses the approved scope and captured environment; later input reaches only that chat's own processes. Stop, revocation, eviction, deletion and shutdown end them, and unverified cleanup is reported at shutdown. The [native session](crates/agent-kit-sandbox/src/native/session.rs) and [trusted helper](crates/agent-kit-sandbox/src/helper.rs) end a session at its scope deadline, on stop or handle drop, and when its owner disappears. The [private process controls](crates/grida-agent/src/acp/extensions/processes.rs) list and stop processes only for an attached chat on a negotiated private connection. [Command tests](crates/grida-agent/tests/commands.rs), [process tests](crates/grida-agent/tests/process/processes.rs) and [native sandbox tests](crates/agent-kit-sandbox/tests/native.rs) cover this boundary.
 - The [confined ACP turn driver](crates/grida-agent/src/acp/external.rs) is
   selected only by a trusted embedding. It requires a reviewed executable and
   revalidates the exact prompt grant before dispatch. The sandbox's bounded
@@ -1564,7 +1606,7 @@ Today:
   to the selected authenticated workspace frame and its exact observed run.
   Navigation withdraws the observation and closes pending admission.
 - The native [permission owner](crates/grida-agent/src/permissions.rs) resolves an explicit host profile, binds a durable decision to one action and its captured scope, and fences revocation at command spawn. [Sandbox preparation](crates/agent-kit-sandbox/src/native.rs) checks the exact opened directory and captures executable and scope identity. [Native permission tests](crates/grida-agent/tests/permissions.rs) cover decline, restart, identity changes and revocation.
-- The native [approval extension](crates/grida-agent/src/acp/extensions/approvals.rs) requires the private supervising stdio client for answers. Attached shared clients can read pending approvals. The [host](crates/grida-agent/src/host/permissions.rs) checks the retained action and revisions and holds the execution slot while command cleanup is pending. Unverified cleanup stops automatic queue advancement. [Process tests](crates/grida-agent/tests/process/approvals.rs) cover private review, restart, exact retries, cancellation, and confined command dispatch.
+- The native [approval extension](crates/grida-agent/src/acp/extensions/approvals.rs) requires the private supervising stdio client for answers. Attached shared clients can read pending approvals. The [host](crates/grida-agent/src/host/permissions.rs) checks the retained action and revisions and holds the execution slot while a reviewed hook check's command cleanup is pending; unverified hook cleanup stops automatic queue advancement. Model command processes belong to their chat and do not hold the slot; deletion and host shutdown clean them up. [Process tests](crates/grida-agent/tests/process/approvals.rs) cover private review, restart, exact retries, cancellation, and confined command dispatch.
 - Trusted launch configuration can select [automatic review](crates/grida-agent/src/host/approval_review.rs) for one exact file read already governed by `ask`. The [review policy](crates/grida-agent-master/src/approval_review.rs) bounds the evidence and gives the selected provider no tools, absolute root, or file content. Only a valid retained result on the same action, scope, control, and history basis can answer the ordinary pending approval. Manual decisions and current file grants still govern. The host filters reviewer output before the public stream. [Built tests](crates/grida-agent/tests/process/approvals/reviewer.rs) cover exact scope, manual precedence, restart, and interruption.
 - The [native ACP confinement fixtures](crates/grida-agent/tests/process/approvals/confinement.rs) retarget a folder alias into a protected root during approval and verify both direct and aliased reads and writes are refused under Seatbelt or bubblewrap. The Linux cases probe socket denial inside the command namespace and verify detached work stops, retaining explicit uncertainty when native cleanup cannot be confirmed.
 - Each [shared ACP listener](crates/grida-agent/src/acp/websocket.rs) has one bearer and one trusted Host. Deploy independent authorities as separate processes with separate private state, listener tokens, provider grants and workspace profiles. The [built deployment fixtures](crates/grida-agent/tests/process/approvals/deployments.rs) exercise cross-token and cross-session refusal, duplicate state ownership, separate provider routing, and concurrent native command scopes. Whole-host containment depends on the deployment's own filesystem and network isolation.

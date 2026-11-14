@@ -211,6 +211,58 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_queued_request_keeps_its_editor_binding() {
+        let root = tempfile::tempdir().unwrap();
+        let host = fixture_host(&root.path().join("state"), "fixture");
+        let session = host
+            .new_session(root.path().canonicalize().unwrap())
+            .await
+            .unwrap();
+        let endpoint = BindingId::new("6f9619ff-8b86-4011-b42d-00c04fc964ff").unwrap();
+        let bound = || SubmissionContext {
+            editor_endpoint: Some(endpoint.clone()),
+            editor_presentation: true,
+            ..SubmissionContext::default()
+        };
+        // Rules a submitted request follows apply before anything is queued.
+        let mut plan = fixture_prompt(&session, "plan");
+        plan.operating_regime = Some(OperatingRegime::Plan);
+        assert_eq!(
+            host.enqueue_with_context(plan, bound())
+                .await
+                .unwrap_err()
+                .code,
+            "editor_surface_requires_workspace_act_text"
+        );
+        let target = SubmissionContext {
+            editor_svg_target: Some(endpoint.clone()),
+            ..SubmissionContext::default()
+        };
+        assert_eq!(
+            host.enqueue_with_context(fixture_prompt(&session, "target"), target)
+                .await
+                .unwrap_err()
+                .code,
+            "svg_text_requires_attached_act"
+        );
+        let accepted = host
+            .enqueue_with_context(fixture_prompt(&session, "queued"), bound())
+            .await
+            .unwrap();
+        let view = host
+            .store
+            .input(session.clone(), accepted.input)
+            .await
+            .unwrap()
+            .unwrap();
+        let stored: StoredPrompt = decode_input(&view.input).unwrap();
+        assert_eq!(stored.editor_endpoint.as_ref(), Some(&endpoint));
+        assert!(stored.editor_presentation);
+        assert!(stored.editor_svg_target.is_none());
+        let _ = host.shutdown().await;
+    }
+
+    #[tokio::test]
     async fn compaction_waits_for_a_settled_turn_worker_to_release_the_session() {
         let root = tempfile::tempdir().unwrap();
         let host = fixture_host(&root.path().join("state"), "fixture");
@@ -503,17 +555,28 @@ impl Host {
     }
 
     pub async fn enqueue(&self, request: PromptRequest) -> Result<DurableSubmission> {
-        self.owned_control(move |host| async move { host.enqueue_owned(request).await })
+        self.enqueue_with_context(request, SubmissionContext::default())
             .await
     }
 
-    async fn enqueue_owned(&self, request: PromptRequest) -> Result<DurableSubmission> {
+    /// Queue a request that keeps its editor binding until it runs.
+    pub(crate) async fn enqueue_with_context(
+        &self,
+        request: PromptRequest,
+        context: SubmissionContext,
+    ) -> Result<DurableSubmission> {
+        self.owned_control(move |host| async move { host.enqueue_owned(request, context).await })
+            .await
+    }
+
+    async fn enqueue_owned(
+        &self,
+        request: PromptRequest,
+        context: SubmissionContext,
+    ) -> Result<DurableSubmission> {
         validate_prompt_parts(&request.parts)?;
         let admission = self.configuration_admission.lock().await;
-        if let Some(accepted) = self
-            .existing_submission(&request, &SubmissionContext::default())
-            .await?
-        {
+        if let Some(accepted) = self.existing_submission(&request, &context).await? {
             return Ok(accepted);
         }
         if self.work.lock().await.closed {
@@ -524,7 +587,8 @@ impl Host {
         if view.current.is_none() && !view.admission_paused {
             self.check_ready_capacity(&request.session).await?;
         }
-        let policy = self.submission_policy(&request, false)?;
+        let mut policy = self.submission_policy(&request, context.allow_wakeups)?;
+        self.bind_editor(&mut policy, &request, &context)?;
         let title = self.title_candidate(&view, &request.parts);
         let input = self
             .capture_input(&view, request.id, request.parts, policy)

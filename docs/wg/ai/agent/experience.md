@@ -650,11 +650,14 @@ Already accepted external operations retain their known receipts and status.
 The agent explains when recovering them needs renewed access or another explicit
 decision.
 
-Command execution initially runs finite programs such as Git, test runners,
-and scripts, with bounded output, a deadline, and cancellation. The product
-identifies its supported environment and network scope. Interactive input,
-reusable terminal sessions, and persistent development servers require an
-explicit additional capability before the agent promises them.
+Command execution runs programs such as Git, test runners, and scripts, with
+bounded output and cancellation. A program still running after a short wait,
+such as a development server, a watcher, or an interactive tool, stays with
+the conversation as a process the person can see and stop. The agent reads its
+output, types into it, and interrupts it in later turns. Ending or stopping a
+turn does not stop it; stopping it, deleting the conversation, and quitting
+the application do. The product identifies its supported environment and
+network scope.
 An environment can support structured file or model operations while raw command
 execution is unavailable. Approving an action still requires an environment
 capable of enforcing its requested permissions.

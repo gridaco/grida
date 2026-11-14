@@ -743,19 +743,23 @@ macOS and bubblewrap plus a trusted seccomp helper on Linux. The raw-command
 profile denies networking. Native Windows raw execution is deferred behind
 capability checks.
 
-| Pressure case                                              | Required result                                                                                                                        |
-| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Two concurrent children have different filesystem grants   | Each execution retains its own scope, including after either grant changes.                                                            |
-| A command requests networking                              | Admission reports an unsupported profile before executing the target.                                                                  |
-| A child daemonizes outside its original process group      | Cancellation reports whether the descendant terminated, remains confined, or is unresolved. Conflicting work cannot assume revocation. |
-| A process exits before temporary-resource cleanup finishes | The outcome preserves cleanup state before releasing ownership that depends on it.                                                     |
-| Host proxy or trust configuration changes                  | The host routing adapter handles the change within authorized destinations. Confinement does not silently widen.                       |
-| A platform cannot enforce the requested profile            | That execution remains unavailable through the existing admission contract.                                                            |
+| Pressure case                                              | Required result                                                                                                                                           |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Two concurrent children have different filesystem grants   | Each execution retains its own scope, including after either grant changes.                                                                               |
+| A command requests networking                              | Admission reports an unsupported profile before executing the target.                                                                                     |
+| A child daemonizes outside its original process group      | Cancellation reports whether the descendant terminated, remains confined, or is unresolved. Conflicting work cannot assume revocation.                    |
+| A process exits before temporary-resource cleanup finishes | The outcome preserves cleanup state before releasing ownership that depends on it.                                                                        |
+| Host proxy or trust configuration changes                  | The host routing adapter handles the change within authorized destinations. Confinement does not silently widen.                                          |
+| A platform cannot enforce the requested profile            | That execution remains unavailable through the existing admission contract.                                                                               |
+| A command is still running when its turn ends or stops     | The chat keeps it as a numbered process that later turns can read and stop. Only explicit stops, eviction, revocation, deletion and host shutdown end it. |
+| A chat starts more processes than it may keep              | Eviction stops a least recently used process outside the most recent and in-use ones, records its cleanup, or refuses the new command.                    |
+| The chat is deleted or the host shuts down                 | Its processes stop first. Unconfirmed cleanup is reported, not assumed.                                                                                   |
 
 The native adapter separates an immutable command scope from the executor,
 validates command roots independently, and waits for worker cleanup on
 cancellation. macOS process-group revocation has a documented limitation.
 [Command tests](../tests/commands.rs),
+[process control tests](../tests/process/processes.rs),
 [Host authority and limitations](../../../desktop/docs/agent-authority.md).
 
 ## Design decisions
@@ -782,11 +786,13 @@ outcomes, scoped authority, recoverable working files, and final-account policy.
 These answer the catalog's product promises and known failures. A persistence
 design with weaker guarantees does not remove those requirements.
 
-Command execution is finite: interactive and long-lived command sessions have
-different lifetimes, so the sandbox handle alone does not promise interactive
-or background process management. Host environment projection and private
-state creation belong to the execution and storage adapters. Bounded ingress
-and slow-consumer handling remain protocol responsibilities.
+A model command can outlive its call and turn: the host keeps a still-running
+command as a chat-owned process, while the sandbox handle supplies only
+supervision, output retention, input and stop. Process lifetime, numbering,
+eviction, listing and stop paths belong to the host's process store. Reviewed
+checks remain finite. Host environment projection and private state creation
+belong to the execution and storage adapters. Bounded ingress and
+slow-consumer handling remain protocol responsibilities.
 
 ### Rejected alternatives
 

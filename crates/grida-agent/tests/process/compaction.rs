@@ -101,7 +101,7 @@ fn offers_tool(request: &Value, name: &str) -> bool {
 
 fn assert_plan_request(request: &Value) {
     assert!(request["messages"].to_string().contains("Plan is active"));
-    for denied in ["write_file", "edit_file", "run_command"] {
+    for denied in ["write_file", "edit_file", "exec_command", "write_stdin"] {
         assert!(!offers_tool(request, denied), "{request}");
     }
 }
@@ -203,7 +203,8 @@ async fn identified_submit_compacts_in_regime(
     );
     let synchronous_request = endpoint.request().await;
     if profile.is_some() {
-        assert!(offers_tool(&synchronous_request, "run_command"));
+        assert!(offers_tool(&synchronous_request, "exec_command"));
+        assert!(offers_tool(&synchronous_request, "write_stdin"));
     }
     assert_eq!(
         synchronous_request["messages"]

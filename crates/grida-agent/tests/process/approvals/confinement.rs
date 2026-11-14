@@ -38,24 +38,25 @@ async fn approve_scoped_command() {
     profile["protectedPaths"] = json!([protected]);
     fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
 
-    let args = json!({
-        "directory":"extra","access":"read_write","program":"/bin/bash","cwd":fixture.extra,
-        "args":["-c",r#"
-            if (: < "$1") 2>/dev/null; then exit 41; fi
-            if (: < attached/input) 2>/dev/null; then exit 42; fi
-            if (printf denied > "$2") 2>/dev/null; then exit 43; fi
-            if (printf denied > attached/forbidden-write) 2>/dev/null; then exit 44; fi
-            if [ "$#" -gt 2 ]; then
-                test -S "$3" || exit 45
-                "./$4" --exact "$5" --include-ignored --nocapture --test-threads=1 || exit 46
-            fi
-            printf selected >> effect
-        "#,"scope-fixture",secret,forbidden],
-    });
     #[cfg(target_os = "linux")]
-    let (args, _listeners) = socket_probe::bind(args, &fixture.extra);
+    let (probe, _listeners) = socket_probe::bind(&fixture.extra);
+    #[cfg(not(target_os = "linux"))]
+    let probe = String::new();
+    let script = format!(
+        r#"
+            if (: < '{secret}') 2>/dev/null; then exit 41; fi
+            if (: < attached/input) 2>/dev/null; then exit 42; fi
+            if (printf denied > '{forbidden}') 2>/dev/null; then exit 43; fi
+            if (printf denied > attached/forbidden-write) 2>/dev/null; then exit 44; fi
+            {probe}
+            printf selected >> effect
+        "#,
+        secret = secret.display(),
+        forbidden = forbidden.display(),
+    );
+    let args = json!({"directory":"extra","access":"read_write","cmd":script});
     let mut endpoint = Endpoint::start(vec![
-        Reply::Tool("run_command", Box::leak(args.to_string().into_boxed_str())),
+        Reply::Tool("exec_command", Box::leak(args.to_string().into_boxed_str())),
         Reply::Finished("Command complete."),
     ])
     .await;
@@ -82,6 +83,12 @@ async fn approve_scoped_command() {
         .unwrap();
     let outcome: Value = serde_json::from_str(tool["content"].as_str().unwrap()).unwrap();
     assert_eq!(outcome["status"], "succeeded", "{outcome}");
+    assert!(
+        outcome["content"]
+            .to_string()
+            .contains("Process exited with code 0"),
+        "{outcome}"
+    );
     #[cfg(target_os = "linux")]
     {
         socket_probe::assert_denied(&outcome);
@@ -112,17 +119,17 @@ async fn approve_scoped_command() {
 #[cfg(target_os = "linux")]
 #[tokio::test]
 #[ignore = "requires a reviewed native helper and working Linux bubblewrap"]
-async fn stopping_an_approved_command_stops_its_detached_work() {
+async fn host_shutdown_stops_a_kept_command_and_its_detached_work() {
     let fixture = Fixture::new(true);
     let args = json!({
-        "directory":"extra","access":"read_write","program":"/bin/bash","cwd":fixture.extra,
-        "args":["-c",r#"
+        "directory":"extra","access":"read_write","cmd":r#"
             /usr/bin/setsid /bin/bash -c 'while :; do printf tick >> heartbeat; /usr/bin/sleep 0.04; done' &
             wait
-        "#],
+        "#,
+        "yield_time_ms":30000,
     });
     let mut endpoint = Endpoint::start(vec![Reply::Tool(
-        "run_command",
+        "exec_command",
         Box::leak(args.to_string().into_boxed_str()),
     )])
     .await;
@@ -168,6 +175,16 @@ async fn stopping_an_approved_command_stops_its_detached_work() {
     .unwrap();
     assert_eq!(terminal["latest"]["status"], "cancelled", "{terminal}");
     assert_eq!(terminal["admissionPaused"], true, "{terminal}");
+    // Stopping the turn leaves the command with the chat; host shutdown
+    // stops it and everything it started.
+    let running = fs::metadata(&heartbeat).unwrap().len();
+    timeout(WAIT, async {
+        while fs::metadata(&heartbeat).unwrap().len() == running {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .unwrap();
 
     let Stdio {
         child,
@@ -181,7 +198,14 @@ async fn stopping_an_approved_command_stops_its_detached_work() {
     let diagnostic = String::from_utf8_lossy(&output.stderr);
     if !output.status.success() {
         assert_eq!(output.status.code(), Some(5), "{diagnostic}");
-        assert_eq!(diagnostic.trim(), "grida-agent: host_turn_unverified");
+        assert!(
+            [
+                "grida-agent: host_turn_unverified",
+                "grida-agent: process_cleanup_unverified"
+            ]
+            .contains(&diagnostic.trim()),
+            "{diagnostic}"
+        );
     }
     let length = fs::metadata(&heartbeat).unwrap().len();
     tokio::time::sleep(Duration::from_millis(250)).await;
@@ -217,21 +241,23 @@ mod socket_probe {
     }
 
     // Reuse the same test binary inside the command's namespace. Its parent
-    // keeps both listeners open and requires the probe marker in the tool result.
-    pub(super) fn bind(mut args: Value, workspace: &Path) -> (Value, (UnixListener, TcpListener)) {
+    // keeps both listeners open and requires the probe marker in the tool
+    // result. Returns the script lines that run the probe.
+    pub(super) fn bind(workspace: &Path) -> (String, (UnixListener, TcpListener)) {
         let probe = workspace.join(EXECUTABLE);
         fs::copy(std::env::current_exe().unwrap(), &probe).unwrap();
         fs::set_permissions(&probe, fs::Permissions::from_mode(0o700)).unwrap();
         let socket = workspace.join("listener.sock");
         let unix = UnixListener::bind(&socket).unwrap();
         let tcp = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
-        args["env"] = json!({(SOCKET):socket,(PORT):tcp.local_addr().unwrap().port().to_string()});
-        args["args"].as_array_mut().unwrap().extend([
-            json!(socket),
-            json!(EXECUTABLE),
-            json!(TEST),
-        ]);
-        (args, (unix, tcp))
+        let port = tcp.local_addr().unwrap().port();
+        let socket = socket.display();
+        let script = format!(
+            "test -S '{socket}' || exit 45\n\
+             {SOCKET}='{socket}' {PORT}='{port}' './{EXECUTABLE}' --exact '{TEST}' \
+             --include-ignored --nocapture --test-threads=1 || exit 46"
+        );
+        (script, (unix, tcp))
     }
 
     pub(super) fn verify_denials() {
@@ -271,24 +297,24 @@ async fn read_only_command_permits_selected_bytes_and_private_temporary_work() {
 
     let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
     let port = listener.local_addr().unwrap().port().to_string();
-    let arguments = json!({
-        "directory": "extra", "access": "read", "program": "/bin/bash", "cwd": fixture.extra,
-        "env": {"GRIDA_VISIBLE_FIXTURE": "explicit input"},
-        "args": ["-c", r#"
+    // The default shell is /bin/sh; bash provides /dev/tcp for the probe.
+    let script = format!(
+        r#"exec /bin/bash -c '
             test "$(/bin/cat input.txt)" = "selected text" || exit 71
-            test "$GRIDA_VISIBLE_FIXTURE" = "explicit input" || exit 72
-            test -z "${GRIDA_TEST_HOST_ONLY_CREDENTIAL+x}" || exit 73
-            if (: < "$1") 2>/dev/null; then exit 74; fi
+            test -z "${{GRIDA_TEST_HOST_ONLY_CREDENTIAL+x}}" || exit 73
+            if (: < "{secret}") 2>/dev/null; then exit 74; fi
             if (printf denied > ungranted-output.txt) 2>/dev/null; then exit 75; fi
-            if (: > "/dev/tcp/127.0.0.1/$2") 2>/dev/null; then exit 76; fi
+            if (: > "/dev/tcp/127.0.0.1/{port}") 2>/dev/null; then exit 76; fi
             printf private > "$TMPDIR/output" || exit 77
             test "$(/bin/cat "$TMPDIR/output")" = private || exit 78
             printf read-only-profile-verified
-        "#, "read-only-fixture", secret, port],
-    });
+        '"#,
+        secret = secret.display(),
+    );
+    let arguments = json!({"directory": "extra", "access": "read", "cmd": script});
     let mut endpoint = Endpoint::start(vec![
         Reply::Tool(
-            "run_command",
+            "exec_command",
             Box::leak(arguments.to_string().into_boxed_str()),
         ),
         Reply::Finished("Read-only operation complete."),

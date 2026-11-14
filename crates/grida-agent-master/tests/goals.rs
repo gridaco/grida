@@ -658,7 +658,7 @@ fn a_report_that_describes_its_evidence_instead_of_citing_a_call_is_named() {
     );
     let described = ToolArguments::Json(json!({
         "report":{"kind":"completion","summary":"All 10 tests pass.","evidence":[
-            {"criterion":1,"call":"functions.run_command: npm test, exit 0; 10 tests passed"}
+            {"criterion":1,"call":"functions.exec_command: npm test, exit 0; 10 tests passed"}
         ]}
     }));
     assert_eq!(

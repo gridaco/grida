@@ -11,6 +11,8 @@ mod history;
 mod hooks;
 pub(super) mod library;
 mod lifecycle;
+mod processes;
+pub(super) use processes::PROCESSES;
 mod questions;
 mod routes;
 mod side_chats;
@@ -130,6 +132,7 @@ fn capability_keys(
         .chain(goals::CAPABILITIES)
         .chain(side_chats::capabilities(reviewer))
         .chain(wakeups::capabilities(reviewer))
+        .chain(processes::capabilities(reviewer))
         .chain(subagents::capabilities(reviewer && subagents))
         .chain((reviewer && effort).then_some(EFFORT))
         .chain((reviewer && goal_effort).then_some(goals::FUNDED_REVIEW))
@@ -429,6 +432,7 @@ pub(super) fn handlers(
         ))
         .extend(subagents::handlers(host.clone(), sessions.clone()))
         .extend(wakeups::handlers(host.clone(), sessions.clone()))
+        .extend(processes::handlers(host.clone(), sessions.clone()))
         .extend(side_chats::handlers(
             host.clone(),
             sessions.clone(),
@@ -444,35 +448,13 @@ pub(super) fn handlers(
                     if request.allow_library_selection && !library::available(&submit_sessions) {
                         return Err(unavailable("library_selection_capability_required"));
                     }
-                    if let Some(endpoint) = &request.editor_endpoint_id {
-                        require(&submit_sessions, crate::editor_surfaces::CAPABILITY, None)?;
-                        if uuid::Uuid::parse_str(endpoint.as_str()).is_err() {
-                            return Err(Error::invalid_params());
-                        }
-                    }
-                    if request.editor_presentation {
-                        require(
-                            &submit_sessions,
-                            crate::editor_surfaces::OPEN_CAPABILITY,
-                            None,
-                        )?;
-                        if request.editor_endpoint_id.is_none() {
-                            return Err(Error::invalid_params());
-                        }
-                    }
-                    if let Some(target) = &request.editor_svg_target_id {
-                        require(
-                            &submit_sessions,
-                            crate::editor_surfaces::SVG_TEXT_CAPABILITY,
-                            None,
-                        )?;
-                        if request.editor_endpoint_id.is_none()
-                            || request.allow_wakeups
-                            || uuid::Uuid::parse_str(target.as_str()).is_err()
-                        {
-                            return Err(Error::invalid_params());
-                        }
-                    }
+                    editor_binding(
+                        &submit_sessions,
+                        request.editor_endpoint_id.as_ref(),
+                        request.editor_presentation,
+                        request.editor_svg_target_id.as_ref(),
+                        request.allow_wakeups,
+                    )?;
                     let parts = identified_prompt(
                         request.prompt,
                         image_intake,
@@ -598,6 +580,36 @@ pub(super) fn handlers(
             },
             on_receive_request!(),
         )
+}
+
+/// The editor surface a submitted or queued request names, with the
+/// capabilities each part needs.
+fn editor_binding(
+    sessions: &Mutex<ConnectionSessions>,
+    endpoint: Option<&BindingId>,
+    presentation: bool,
+    svg_target: Option<&BindingId>,
+    allow_wakeups: bool,
+) -> Result<()> {
+    if let Some(endpoint) = endpoint {
+        require(sessions, crate::editor_surfaces::CAPABILITY, None)?;
+        if uuid::Uuid::parse_str(endpoint.as_str()).is_err() {
+            return Err(Error::invalid_params());
+        }
+    }
+    if presentation {
+        require(sessions, crate::editor_surfaces::OPEN_CAPABILITY, None)?;
+        if endpoint.is_none() {
+            return Err(Error::invalid_params());
+        }
+    }
+    if let Some(target) = svg_target {
+        require(sessions, crate::editor_surfaces::SVG_TEXT_CAPABILITY, None)?;
+        if endpoint.is_none() || allow_wakeups || uuid::Uuid::parse_str(target.as_str()).is_err() {
+            return Err(Error::invalid_params());
+        }
+    }
+    Ok(())
 }
 
 fn require(

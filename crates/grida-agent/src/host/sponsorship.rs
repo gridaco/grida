@@ -956,7 +956,7 @@ impl Host {
         // authority; delegation does not bypass required lifecycle policy.
         let hook_command = permission_scope
             .as_ref()
-            .map(|permissions| permissions.hook_command_tool())
+            .map(|permissions| permissions.hook_supervisor())
             .transpose()?
             .flatten();
         let hooks = lifecycle_hooks::LifecycleAccess::bind(

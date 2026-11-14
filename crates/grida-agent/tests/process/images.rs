@@ -599,11 +599,10 @@ async fn embedded_run_edits_an_explicit_png_without_a_project_and_reopens_its_re
             .iter()
             .any(|tool| tool["name"] == "crop_retained_image")
     );
-    assert!(
-        tools
-            .iter()
-            .all(|tool| !matches!(tool["name"].as_str(), Some("read_file" | "run_command")))
-    );
+    assert!(tools.iter().all(|tool| !matches!(
+        tool["name"].as_str(),
+        Some("read_file" | "exec_command" | "write_stdin")
+    )));
     assert_eq!(
         last_tool_result(endpoint.request().await)["status"],
         "succeeded"

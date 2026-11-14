@@ -17,6 +17,7 @@ pub mod mcp;
 pub mod mcp_client;
 pub mod permissions;
 pub mod process;
+pub mod processes;
 pub mod scratch;
 pub mod skills;
 mod supervised_provider;

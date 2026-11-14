@@ -1,14 +1,13 @@
-//! Scoped finite commands and host-owned process cleanup.
+//! Reviewed finite commands and host-owned process cleanup.
+//!
+//! The model's commands run as chat-owned sessions; see [`crate::processes`].
+//! This supervisor runs the host's own reviewed checks (hooks) under the same
+//! native sandbox and cleanup barrier.
 
-use agent_kit_core::inference::InputFormat;
-use agent_kit_core::messages::{OutcomeStatus, ResultContent, ToolArguments};
-use agent_kit_core::tools::{
-    Invocation, InvocationContext, InvocationRecovery, RecoveryKind, Tool, ToolDefinition,
-    ToolOutcome,
-};
+use agent_kit_core::messages::{OutcomeStatus, ResultContent};
+use agent_kit_core::tools::{Invocation, InvocationContext, ToolOutcome};
 use agent_kit_core::{
-    AttemptId, BindingId, BoxFuture, CancellationToken, Envelope, Error, ErrorKind, Fingerprint,
-    OperationId, Result, SchemaId, ToolId,
+    AttemptId, CancellationToken, Envelope, Error, ErrorKind, OperationId, Result, SchemaId,
 };
 use agent_kit_sandbox::{
     Backend, Completion, Descendants, ExecutionScope, PreparedProcess, ProcessEvidence,
@@ -17,17 +16,16 @@ use agent_kit_sandbox::{
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::BTreeMap;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Component, Path};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::sync::{Notify, oneshot};
 
-const MAX_INPUT_BYTES: usize = 64 * 1024;
-const MAX_OUTPUT_BYTES: usize = 64 * 1024;
-const MAX_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const MAX_ACTIVE: usize = 4;
 const MAX_RETAINED: usize = 16;
 
+/// Fixed command constraints chosen by the host. `timeout` bounds reviewed
+/// checks; input and output bound each model command call.
 #[derive(Clone, Copy, Debug)]
 pub struct CommandLimits {
     pub timeout: Duration,
@@ -55,18 +53,14 @@ impl CommandQuiescence {
     }
 }
 
-/// A host-owned finite command supervisor.
+/// A host-owned finite command supervisor for reviewed checks.
 ///
 /// Keep this handle and its Tokio runtime alive through `stop_and_wait` before
-/// releasing resources that depend on native cleanup. The runtime can settle an invocation as uncertain
-/// before the supervisor finishes. Recovery reads bounded same-process evidence.
-/// The runtime's durable journal owns dispatch deduplication across restarts.
+/// releasing resources that depend on native cleanup. The runtime can settle an
+/// invocation as uncertain before the supervisor finishes.
 // GRIDA-SEC-004: finite command authority and cleanup stay with the host.
-pub struct CommandTool {
+pub struct CommandSupervisor {
     sandbox: Arc<Sandbox>,
-    scope: CommandScope,
-    timeout: Duration,
-    definition: ToolDefinition,
     activity: Arc<Activity>,
 }
 
@@ -77,22 +71,8 @@ pub enum CommandAccess {
     ReadWrite,
 }
 
-type ResolveCommand = dyn Fn(&Invocation) -> Result<AuthorizedCommand> + Send + Sync;
 pub(crate) type SpawnCommand =
     dyn Fn(PreparedProcess, CancellationToken) -> Result<RunningProcess> + Send + Sync;
-
-enum CommandScope {
-    Fixed(Box<ExecutionScope>),
-    Authorized(Arc<ResolveCommand>),
-}
-
-pub(crate) struct AuthorizedCommand {
-    pub scope: ExecutionScope,
-    pub expected: Fingerprint,
-    pub spawn: Arc<SpawnCommand>,
-    /// The environment the approved process was captured with.
-    pub environment: Arc<BTreeMap<String, String>>,
-}
 
 pub(crate) struct ReviewedCommand {
     pub spec: ProcessSpec,
@@ -101,81 +81,13 @@ pub(crate) struct ReviewedCommand {
     pub spawn: Arc<SpawnCommand>,
 }
 
-enum ProcessAdmission {
-    Fixed,
-    Captured(Fingerprint, Arc<SpawnCommand>),
-    Reviewed(TrustedExecutable, Arc<SpawnCommand>),
-}
-
-impl CommandTool {
-    /// Create an adapter for a host-authorized scope. The host must probe
-    /// native support for that scope before offering the tool.
-    pub fn new(
-        sandbox: Arc<Sandbox>,
-        scope: ExecutionScope,
-        limits: CommandLimits,
-    ) -> Result<Self> {
-        Self::with_scope(sandbox, CommandScope::Fixed(Box::new(scope)), limits)
-    }
-
-    pub(crate) fn authorized(
-        sandbox: Arc<Sandbox>,
-        limits: CommandLimits,
-        resolve: Arc<ResolveCommand>,
-    ) -> Result<Self> {
-        Self::with_scope(sandbox, CommandScope::Authorized(resolve), limits)
-    }
-
-    fn with_scope(
-        sandbox: Arc<Sandbox>,
-        scope: CommandScope,
-        limits: CommandLimits,
-    ) -> Result<Self> {
-        if limits.timeout.is_zero()
-            || limits.timeout > MAX_TIMEOUT
-            || !(1..=MAX_INPUT_BYTES).contains(&limits.max_input_bytes)
-            || !(1..=MAX_OUTPUT_BYTES).contains(&limits.max_output_bytes)
-        {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                "invalid_command_limits",
-            ));
-        }
-        let scoped = matches!(scope, CommandScope::Authorized(_));
-        let mut schema = json!({
-            "type": "object",
-            "properties": {
-                "program": {"type": "string"},
-                "args": {"type": "array", "items": {"type": "string"}},
-                "cwd": {"type": "string"},
-                "env": {"type": "object", "additionalProperties": {"type": "string"}},
-                "stdin": {"type": "string"}
-            },
-            "required": ["program", "args", "cwd"],
-            "additionalProperties": false
-        });
-        let mut description = "Run one finite program in the granted workspace or scratch scope. Supply a program (a name found on PATH, or an absolute path), an argument array, and an absolute working directory. The program starts from the host's environment where the host allows it, overlaid with explicit environment values and sandbox-owned temporary directory variables, and receives a bounded UTF-8 stdin string. Network access is denied. Output is bounded UTF-8 text with replacement characters for invalid bytes. Use an explicit interpreter when shell syntax is required.".to_owned();
-        if scoped {
-            schema["properties"]["directory"] = json!({"type":"string"});
-            schema["properties"]["access"] = json!({"enum":["read","read_write"]});
-            schema["required"] = json!(["program", "args", "cwd", "access"]);
-            description.push_str(" Select read or read_write access explicitly. Use a named directory ID or omit it for the captured primary. The working directory must be inside that directory.");
-        }
-        Ok(Self {
+impl CommandSupervisor {
+    /// The host must probe native support before running reviewed checks.
+    pub fn new(sandbox: Arc<Sandbox>) -> Self {
+        Self {
             sandbox,
-            scope,
-            timeout: limits.timeout,
-            definition: ToolDefinition {
-                id: ToolId::new("run_command")?,
-                version: if scoped { 2 } else { 1 },
-                description,
-                input: InputFormat::Json(schema),
-                max_input_bytes: limits.max_input_bytes,
-                max_output_bytes: limits.max_output_bytes,
-                recovery: RecoveryKind::Reconcile,
-            },
             activity: Arc::default(),
-        })
+        }
     }
 
     pub(crate) async fn invoke_reviewed(
@@ -185,26 +97,12 @@ impl CommandTool {
         command: ReviewedCommand,
         project: fn(ProcessEvidence, usize) -> (ToolOutcome, bool),
     ) -> ToolOutcome {
-        self.run_process(
-            invocation,
-            context,
-            command.scope,
-            command.spec,
-            ProcessAdmission::Reviewed(command.executable, command.spawn),
-            project,
-        )
-        .await
-    }
-
-    async fn run_process(
-        &self,
-        invocation: &Invocation,
-        context: InvocationContext,
-        mut scope: ExecutionScope,
-        spec: ProcessSpec,
-        admission: ProcessAdmission,
-        project: fn(ProcessEvidence, usize) -> (ToolOutcome, bool),
-    ) -> ToolOutcome {
+        let ReviewedCommand {
+            spec,
+            mut scope,
+            executable,
+            spawn,
+        } = command;
         let now = Instant::now();
         scope.valid_until = scope.valid_until.min(now + spec.timeout);
         if let Some(deadline) = context.deadline {
@@ -222,26 +120,32 @@ impl CommandTool {
             operation: invocation.id().clone(),
             attempt: context.attempt,
         };
-        if let Err(error) = self.activity.register(
-            identity.clone(),
-            invocation.fingerprint(),
-            cancellation.clone(),
-        ) {
+        if let Err(error) = self
+            .activity
+            .register(identity.clone(), cancellation.clone())
+        {
             return ToolOutcome::failed(&error.code);
         }
         let (send, receive) = oneshot::channel();
         let sandbox = Arc::clone(&self.sandbox);
         let activity = Arc::clone(&self.activity);
         runtime.spawn(async move {
-            let (outcome, verified) =
-                execute(sandbox, spec, scope, admission, cancellation, project).await;
-            activity.finish(&identity.operation, outcome.clone(), verified);
+            let (outcome, verified) = execute(
+                sandbox,
+                spec,
+                scope,
+                (executable, spawn),
+                cancellation,
+                project,
+            )
+            .await;
+            activity.finish(&identity.operation, verified);
             let _ = send.send(outcome);
         });
         receive.await.unwrap_or_else(|_| ToolOutcome::uncertain())
     }
 
-    /// Close this scope's command admission, request stop, and await cleanup.
+    /// Close admission, request stop, and await cleanup.
     ///
     /// A deadline leaves the supervisors owned by this capability. A later
     /// call can wait again. Unverified evidence stays visible after completion.
@@ -265,214 +169,29 @@ impl CommandTool {
     }
 }
 
-impl Drop for CommandTool {
+impl Drop for CommandSupervisor {
     fn drop(&mut self) {
         self.activity.close();
     }
 }
 
-impl Tool for CommandTool {
-    fn definition(&self) -> &ToolDefinition {
-        &self.definition
-    }
-
-    fn validate(&self, arguments: &ToolArguments) -> Result<()> {
-        CommandArguments::parse(
-            arguments,
-            self.definition.max_input_bytes,
-            matches!(self.scope, CommandScope::Authorized(_)),
-        )
-        .map(|_| ())
-    }
-
-    fn invoke(
-        &self,
-        invocation: Invocation,
-        context: InvocationContext,
-    ) -> BoxFuture<'_, ToolOutcome> {
-        Box::pin(async move {
-            if invocation.definition() != &self.definition {
-                return ToolOutcome::failed("command_definition_changed");
-            }
-            let arguments = match CommandArguments::parse(
-                invocation.arguments(),
-                self.definition.max_input_bytes,
-                matches!(self.scope, CommandScope::Authorized(_)),
-            ) {
-                Ok(arguments) => arguments,
-                Err(error) => return ToolOutcome::failed(&error.code),
-            };
-            let maximum = context
-                .max_output_bytes
-                .min(self.definition.max_output_bytes);
-            if maximum == 0 {
-                return ToolOutcome::failed("command_output_limit_unavailable");
-            }
-            let (scope, admission, environment) = match &self.scope {
-                CommandScope::Fixed(scope) => (
-                    (**scope).clone(),
-                    ProcessAdmission::Fixed,
-                    Arc::new(BTreeMap::new()),
-                ),
-                CommandScope::Authorized(resolve) => match resolve(&invocation) {
-                    Ok(authority) => (
-                        authority.scope,
-                        ProcessAdmission::Captured(authority.expected, authority.spawn),
-                        authority.environment,
-                    ),
-                    Err(error) => return ToolOutcome::failed(&error.code),
-                },
-            };
-            let spec = arguments.into_spec(self.timeout, maximum, &environment);
-            self.run_process(
-                &invocation,
-                context,
-                scope,
-                spec,
-                admission,
-                project_command,
-            )
-            .await
-        })
-    }
-
-    fn recover(
-        &self,
-        recovery: InvocationRecovery,
-        context: InvocationContext,
-    ) -> BoxFuture<'_, ToolOutcome> {
-        Box::pin(async move {
-            let outcome = self
-                .activity
-                .recover(&recovery.invocation, &context.attempt);
-            bound_projection(
-                outcome,
-                context
-                    .max_output_bytes
-                    .min(self.definition.max_output_bytes),
-            )
-        })
-    }
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct CommandArguments {
-    pub(crate) program: PathBuf,
-    pub(crate) args: Vec<String>,
-    pub(crate) cwd: PathBuf,
-    #[serde(default)]
-    pub(crate) env: BTreeMap<String, String>,
-    #[serde(default)]
-    pub(crate) stdin: String,
-    pub(crate) directory: Option<BindingId>,
-    pub(crate) access: Option<CommandAccess>,
-}
-
-impl CommandArguments {
-    pub(crate) fn parse(arguments: &ToolArguments, maximum: usize, scoped: bool) -> Result<Self> {
-        let ToolArguments::Json(value) = arguments else {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                "command_arguments_invalid",
-            ));
-        };
-        if serde_json::to_vec(arguments).map_or(usize::MAX, |bytes| bytes.len()) > maximum {
-            return Err(Error::new(ErrorKind::LimitExceeded, "command_input_limit"));
-        }
-        let command: Self = serde_json::from_value(value.clone())
-            .map_err(|_| Error::new(ErrorKind::InvalidInput, "command_arguments_invalid"))?;
-        if (scoped
-            && (command.access.is_none()
-                || value.get("directory").is_some_and(|value| value.is_null())))
-            || (!scoped && (value.get("access").is_some() || value.get("directory").is_some()))
-        {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                "command_access_invalid",
-            ));
-        }
-        let named = command.program.components().count() == 1
-            && command.program.to_str().is_some_and(|name| {
-                !name.is_empty() && !name.contains(['/', '\0']) && name != ".." && name != "."
-            });
-        if !(named || valid_path(&command.program)) || !valid_path(&command.cwd) {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                "command_absolute_path_required",
-            ));
-        }
-        if command.args.iter().any(|value| value.contains('\0'))
-            || command.env.iter().any(|(key, value)| {
-                key.is_empty() || key.contains(['\0', '=']) || value.contains('\0')
-            })
-        {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                "command_arguments_invalid",
-            ));
-        }
-        Ok(command)
-    }
-
-    /// The process to run: the inherited environment overlaid with the
-    /// tool's values, and a bare program name resolved on that search path.
-    pub(crate) fn into_spec(
-        self,
-        timeout: Duration,
-        max_output_bytes: usize,
-        inherited: &BTreeMap<String, String>,
-    ) -> ProcessSpec {
-        let mut environment = inherited.clone();
-        environment.extend(self.env);
-        let executable = resolve_program(&self.program, &environment);
-        ProcessSpec {
-            executable,
-            arguments: self.args,
-            cwd: self.cwd,
-            environment,
-            stdin: self.stdin.into_bytes(),
-            timeout,
-            max_output_bytes,
-        }
-    }
-}
-
-/// A bare name (no separator) is looked up on the environment's `PATH`, like
-/// a shell would. Anything else is used as given.
-fn resolve_program(program: &Path, environment: &BTreeMap<String, String>) -> PathBuf {
-    if program.is_absolute() || program.components().count() != 1 {
-        return program.to_owned();
-    }
-    environment
-        .get("PATH")
-        .into_iter()
-        .flat_map(|search| std::env::split_paths(search).collect::<Vec<_>>())
-        .filter(|directory| directory.is_absolute())
-        .map(|directory| directory.join(program))
-        .find(|candidate| is_executable_file(candidate))
-        .unwrap_or_else(|| program.to_owned())
-}
-
-#[cfg(unix)]
-fn is_executable_file(candidate: &Path) -> bool {
-    use std::os::unix::fs::PermissionsExt;
-    candidate
-        .metadata()
-        .is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
-}
-
-/// Native commands have no sandbox off unix, so a bare name stays unresolved
-/// and the spawn is refused by the sandbox rather than chosen from `PATH`.
-#[cfg(not(unix))]
-fn is_executable_file(_candidate: &Path) -> bool {
-    false
-}
-
-fn valid_path(path: &Path) -> bool {
+/// An absolute path with no parent components or NUL.
+pub(crate) fn valid_path(path: &Path) -> bool {
     path.is_absolute()
         && path.to_str().is_some_and(|value| !value.contains('\0'))
         && !path.components().any(|part| part == Component::ParentDir)
+}
+
+/// Whether native cleanup evidence establishes that the launch ended.
+pub(crate) fn cleanup_verified(evidence: &ProcessEvidence) -> bool {
+    evidence.temporary_removed
+        && match evidence.descendants {
+            Descendants::NoPayload | Descendants::NamespaceEnded => true,
+            Descendants::ProcessGroupSignalled => {
+                evidence.support.termination == Termination::ProcessGroup
+            }
+            Descendants::Unverified => false,
+        }
 }
 
 #[derive(Default)]
@@ -489,26 +208,19 @@ struct ActivityState {
 
 struct Job {
     identity: CommandIdentity,
-    fingerprint: Fingerprint,
     state: JobState,
 }
 
 enum JobState {
     Active(CancellationToken),
     Finished {
-        outcome: ToolOutcome,
         verified: bool,
         finished_at: Instant,
     },
 }
 
 impl Activity {
-    fn register(
-        &self,
-        identity: CommandIdentity,
-        fingerprint: Fingerprint,
-        cancellation: CancellationToken,
-    ) -> Result<()> {
+    fn register(&self, identity: CommandIdentity, cancellation: CancellationToken) -> Result<()> {
         let mut state = self.state.lock().expect("command activity lock");
         if state.closed {
             return Err(Error::new(
@@ -542,7 +254,6 @@ impl Activity {
                     JobState::Finished {
                         verified: true,
                         finished_at,
-                        ..
                     } => Some((finished_at, id)),
                     _ => None,
                 })
@@ -560,36 +271,22 @@ impl Activity {
             identity.operation.clone(),
             Job {
                 identity,
-                fingerprint,
                 state: JobState::Active(cancellation),
             },
         );
         Ok(())
     }
 
-    fn finish(&self, id: &OperationId, outcome: ToolOutcome, verified: bool) {
+    fn finish(&self, id: &OperationId, verified: bool) {
         {
             let mut state = self.state.lock().expect("command activity lock");
             let job = state.jobs.get_mut(id).expect("registered command");
             job.state = JobState::Finished {
-                outcome,
                 verified,
                 finished_at: Instant::now(),
             };
         }
         self.changed.notify_waiters();
-    }
-
-    fn recover(&self, invocation: &Invocation, attempt: &AttemptId) -> ToolOutcome {
-        let state = self.state.lock().expect("command activity lock");
-        if let Some(job) = state.jobs.get(invocation.id())
-            && job.fingerprint == invocation.fingerprint()
-            && &job.identity.attempt == attempt
-            && let JobState::Finished { outcome, .. } = &job.state
-        {
-            return outcome.clone();
-        }
-        ToolOutcome::uncertain()
     }
 
     fn close(&self) {
@@ -622,7 +319,7 @@ async fn execute(
     sandbox: Arc<Sandbox>,
     spec: ProcessSpec,
     scope: ExecutionScope,
-    admission: ProcessAdmission,
+    (executable, spawn): (TrustedExecutable, Arc<SpawnCommand>),
     cancellation: CancellationToken,
     project: fn(ProcessEvidence, usize) -> (ToolOutcome, bool),
 ) -> (ToolOutcome, bool) {
@@ -640,20 +337,8 @@ async fn execute(
         if stop.is_cancelled() {
             return Ok(None);
         }
-        match admission {
-            ProcessAdmission::Fixed => prepared.spawn(stop),
-            ProcessAdmission::Captured(expected, spawn) => {
-                if prepared.capture_fingerprint()? != expected {
-                    return Err(Error::new(ErrorKind::Conflict, "command_capture_changed"));
-                }
-                spawn(prepared, stop)
-            }
-            ProcessAdmission::Reviewed(executable, spawn) => {
-                prepared.verify_executable(&executable)?;
-                spawn(prepared, stop)
-            }
-        }
-        .map(Some)
+        prepared.verify_executable(&executable)?;
+        spawn(prepared, stop).map(Some)
     })
     .await;
     match running {
@@ -681,15 +366,9 @@ fn cancelled_before_launch() -> ToolOutcome {
     }
 }
 
-fn project_command(evidence: ProcessEvidence, maximum: usize) -> (ToolOutcome, bool) {
-    project_process(evidence, maximum, true)
-}
-
-pub(crate) fn project_process(
-    evidence: ProcessEvidence,
-    maximum: usize,
-    include_streams: bool,
-) -> (ToolOutcome, bool) {
+/// The launch's native evidence, the outcome status it supports, and whether
+/// cleanup was verified.
+pub(crate) fn summarize(evidence: &ProcessEvidence) -> (serde_json::Value, OutcomeStatus, bool) {
     let backend = match evidence.support.backend {
         Backend::Seatbelt => "seatbelt",
         Backend::Bubblewrap => "bubblewrap",
@@ -700,14 +379,7 @@ pub(crate) fn project_process(
         Descendants::NamespaceEnded => "namespace_ended",
         Descendants::Unverified => "unverified",
     };
-    let verified = evidence.temporary_removed
-        && match evidence.descendants {
-            Descendants::NoPayload | Descendants::NamespaceEnded => true,
-            Descendants::ProcessGroupSignalled => {
-                evidence.support.termination == Termination::ProcessGroup
-            }
-            Descendants::Unverified => false,
-        };
+    let verified = cleanup_verified(evidence);
     let completion = match evidence.completion {
         Completion::Exited(code) => json!({"kind": "exited", "code": code}),
         Completion::Signaled(signal) => json!({"kind": "signaled", "signal": signal}),
@@ -727,6 +399,33 @@ pub(crate) fn project_process(
         (_, _, Some(StopReason::Requested)) => OutcomeStatus::Cancelled,
         _ => OutcomeStatus::Failed,
     };
+    let details = json!({
+        "backend": backend,
+        "completion": completion,
+        "stop_reason": stop_reason,
+        "descendants": descendants,
+        "temporary_removed": evidence.temporary_removed,
+        "cleanup_verified": verified,
+    });
+    (details, status, verified)
+}
+
+/// The bounded receipt that records a launch's evidence.
+pub(crate) fn receipt(details: &serde_json::Value) -> Envelope {
+    Envelope::new(
+        SchemaId::new("grida.command.execution").expect("command receipt schema"),
+        1,
+        serde_json::to_vec(details).expect("command receipt encoding"),
+    )
+    .expect("bounded command receipt")
+}
+
+pub(crate) fn project_process(
+    evidence: ProcessEvidence,
+    maximum: usize,
+    include_streams: bool,
+) -> (ToolOutcome, bool) {
+    let (mut details, status, verified) = summarize(&evidence);
     let stdout = String::from_utf8_lossy(&evidence.stdout);
     let stderr = String::from_utf8_lossy(&evidence.stderr);
     let mut content = Vec::new();
@@ -737,22 +436,12 @@ pub(crate) fn project_process(
             }
         }
     }
-    let details = json!({
-        "backend": backend,
-        "completion": completion,
-        "stop_reason": stop_reason,
-        "descendants": descendants,
-        "temporary_removed": evidence.temporary_removed,
-        "cleanup_verified": verified,
-        "output_lossy": matches!(stdout, std::borrow::Cow::Owned(_)) || matches!(stderr, std::borrow::Cow::Owned(_)),
-        "native_output_truncated": evidence.output_truncated,
-    });
-    let receipt = Envelope::new(
-        SchemaId::new("grida.command.execution").expect("command receipt schema"),
-        1,
-        serde_json::to_vec(&details).expect("command receipt encoding"),
-    )
-    .expect("bounded command receipt");
+    details["output_lossy"] = json!(
+        matches!(stdout, std::borrow::Cow::Owned(_))
+            || matches!(stderr, std::borrow::Cow::Owned(_))
+    );
+    details["native_output_truncated"] = json!(evidence.output_truncated);
+    let receipt = receipt(&details);
     let outcome = ToolOutcome {
         status,
         content,
@@ -817,87 +506,13 @@ mod tests {
         }
     }
 
-    // Commands and absolute Unix program paths exist only on Unix.
-    #[cfg(unix)]
-    #[test]
-    fn commands_require_explicit_paths_and_reject_host_controls() {
-        let input = |extra: serde_json::Value| {
-            let mut value = json!({"program":"/bin/sh", "args":[], "cwd":"/tmp"});
-            value
-                .as_object_mut()
-                .unwrap()
-                .extend(extra.as_object().unwrap().clone());
-            ToolArguments::Json(value)
-        };
-        assert!(
-            CommandArguments::parse(&input(json!({"stdin":"\u{0000}café"})), 4096, false).is_ok()
-        );
-        // A bare name is resolved on PATH; a relative path is still refused.
-        assert!(CommandArguments::parse(&input(json!({"program":"sh"})), 4096, false).is_ok());
-        let path = BTreeMap::from([("PATH".to_owned(), "relative:/bin".to_owned())]);
-        assert_eq!(
-            resolve_program(Path::new("sh"), &path),
-            PathBuf::from("/bin/sh")
-        );
-        assert_eq!(
-            resolve_program(Path::new("no-such-program"), &path),
-            PathBuf::from("no-such-program")
-        );
-        for invalid in [
-            json!({"program":"bin/sh"}),
-            json!({"program":"./sh"}),
-            json!({"program":".."}),
-            json!({"cwd":"/tmp/../tmp"}),
-            json!({"env":{"invalid=name":"value"}}),
-            json!({"args":["\u{0000}"]}),
-            json!({"network":true}),
-            json!({"env":{"VISIBLE":42}}),
-        ] {
-            assert!(CommandArguments::parse(&input(invalid), 4096, false).is_err());
-        }
-        assert_eq!(
-            CommandArguments::parse(&input(json!({})), 1, false)
-                .err()
-                .unwrap()
-                .code,
-            "command_input_limit"
-        );
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn a_supplied_search_path_chooses_the_executable_for_a_bare_name() {
-        use std::os::unix::fs::PermissionsExt;
-        let directory = tempfile::tempdir().unwrap();
-        let planted = directory.path().join("git");
-        std::fs::write(&planted, "#!/bin/sh\n").unwrap();
-        std::fs::set_permissions(&planted, std::fs::Permissions::from_mode(0o755)).unwrap();
-        let input = CommandArguments::parse(
-            &ToolArguments::Json(json!({
-                "program": "git", "args": [], "cwd": "/tmp",
-                "env": {"PATH": directory.path()},
-            })),
-            4096,
-            false,
-        )
-        .unwrap();
-        let inherited = BTreeMap::from([("PATH".to_owned(), "/usr/bin:/bin".to_owned())]);
-        assert_eq!(
-            input
-                .into_spec(Duration::from_secs(1), 1, &inherited)
-                .executable,
-            planted
-        );
-    }
-
     #[test]
     fn closing_signals_active_jobs_and_retains_unverified_cleanup() {
         let activity = Activity::default();
         let identity = identity("command");
-        let fingerprint = Fingerprint::of(&0).unwrap();
         let cancellation = CancellationToken::new();
         activity
-            .register(identity.clone(), fingerprint, cancellation.clone())
+            .register(identity.clone(), cancellation.clone())
             .unwrap();
         activity.close();
         assert!(cancellation.is_cancelled());
@@ -905,14 +520,14 @@ mod tests {
             activity.quiescence().pending,
             std::slice::from_ref(&identity)
         );
-        activity.finish(&identity.operation, ToolOutcome::uncertain(), false);
+        activity.finish(&identity.operation, false);
         assert_eq!(
             activity.quiescence().unverified,
             std::slice::from_ref(&identity)
         );
         assert_eq!(
             activity
-                .register(identity, fingerprint, CancellationToken::new())
+                .register(identity, CancellationToken::new())
                 .unwrap_err()
                 .code,
             "command_admission_closed"
@@ -934,7 +549,7 @@ mod tests {
             descendants: Descendants::ProcessGroupSignalled,
             temporary_removed: true,
         };
-        let (outcome, verified) = project_command(evidence, 512);
+        let (outcome, verified) = project_process(evidence, 512, true);
         assert!(verified);
         assert_eq!(outcome.status, OutcomeStatus::Succeeded);
         assert!(outcome.truncated);

@@ -58,7 +58,7 @@ pub fn classify(tool: &ToolId) -> Activity {
         "svg_replace_selected_text" | "place_generated_image" | "crop_retained_image" => {
             ActivityKind::Edit
         }
-        "run_command" | "before_completion_command" => ActivityKind::Execute,
+        "exec_command" | "write_stdin" | "before_completion_command" => ActivityKind::Execute,
         "generate_image" | "generate_image_from_workspace_reference" => ActivityKind::Generate,
         "review" | "delegate_review" | "collect_review" => ActivityKind::Delegate,
         "question" | "question_async" => ActivityKind::Ask,
@@ -149,7 +149,8 @@ mod tests {
         let kind = |id: &str| classify(&ToolId::new(id).unwrap());
         assert_eq!(kind("read_file").kind, ActivityKind::Read);
         assert_eq!(kind("search_text").kind, ActivityKind::Search);
-        assert_eq!(kind("run_command").kind, ActivityKind::Execute);
+        assert_eq!(kind("exec_command").kind, ActivityKind::Execute);
+        assert_eq!(kind("write_stdin").kind, ActivityKind::Execute);
         assert_eq!(kind("svg_replace_selected_text").kind, ActivityKind::Edit);
         assert_eq!(kind("generate_image").kind, ActivityKind::Generate);
         assert_eq!(kind("question").kind, ActivityKind::Ask);

@@ -60,6 +60,8 @@ impl Fixture {
                 "/lib",
                 "/lib64",
                 "/System/Library",
+                // macOS /bin/sh reads its selected shell here.
+                "/private/var/select",
             ]
             .into_iter()
             .filter(|path| Path::new(path).is_dir())
@@ -492,7 +494,8 @@ async fn headless_profile_defaults_to_primary_and_scopes_named_reads() {
         .map(|tool| tool["function"]["name"].as_str().unwrap())
         .collect();
     assert!(names.contains(&"read_file"));
-    assert!(!names.contains(&"run_command"));
+    assert!(!names.contains(&"exec_command"));
+    assert!(!names.contains(&"write_stdin"));
 
     let primary = endpoint.request().await["messages"].to_string();
     assert!(primary.contains("primary fixture content"));
@@ -630,11 +633,12 @@ async fn plan_can_read_but_does_not_offer_the_provisioned_command_tool() {
             .iter()
             .any(|tool| tool["function"]["name"] == "read_file")
     );
-    assert!(
-        !tools
-            .iter()
-            .any(|tool| tool["function"]["name"] == "run_command")
-    );
+    assert!(!tools.iter().any(|tool| {
+        matches!(
+            tool["function"]["name"].as_str(),
+            Some("exec_command" | "write_stdin")
+        )
+    }));
     assert!(
         endpoint.request().await["messages"]
             .to_string()
@@ -648,15 +652,12 @@ async fn plan_can_read_but_does_not_offer_the_provisioned_command_tool() {
 async fn approved_native_command_dispatches_the_exact_scope_once_after_restart() {
     let fixture = Fixture::new(true);
     let arguments = Box::leak(
-        json!({
-            "directory":"extra","access":"read_write","program":"/bin/bash",
-            "args":["-c","printf x >> effect"],"cwd":fixture.extra,
-        })
-        .to_string()
-        .into_boxed_str(),
+        json!({"directory":"extra","access":"read_write","cmd":"printf x >> effect"})
+            .to_string()
+            .into_boxed_str(),
     );
     let mut endpoint = Endpoint::start(vec![
-        Reply::Tool("run_command", arguments),
+        Reply::Tool("exec_command", arguments),
         Reply::Finished("Command complete."),
     ])
     .await;

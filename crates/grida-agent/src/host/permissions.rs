@@ -1,7 +1,7 @@
 //! GRIDA-SEC-004 / GRIDA-SEC-014 — Native approval controls and turn-bound tool authority.
 
 use super::*;
-use crate::command::CommandTool;
+use crate::command::CommandSupervisor;
 use crate::permissions::{
     ApprovalDecision, ApprovalRequest, PermissionCapture, PermissionProfile, TurnPermissions,
     approval_answer, is_approval, read_approval,
@@ -430,7 +430,7 @@ const CLEANUP_WAIT: Duration = Duration::from_secs(3);
 /// delivered immediately, while the supervisor stays owned until its pending
 /// work drains or the entire host enters bounded shutdown.
 pub(super) async fn finish_commands(
-    command: Arc<CommandTool>,
+    command: Arc<CommandSupervisor>,
     completion: &mut Option<oneshot::Sender<Result<RunResult>>>,
 ) -> Result<()> {
     let mut cleanup = command

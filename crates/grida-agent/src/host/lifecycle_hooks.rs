@@ -1,7 +1,7 @@
 //! GRIDA-SEC-004 / GRIDA-SEC-014 — reviewed lifecycle handlers with private turn authority.
 
 use super::*;
-use crate::command::{CommandTool, project_process};
+use crate::command::{CommandSupervisor, project_process};
 use crate::permissions::{ReviewedLifecycleHook, TurnPermissions};
 use agent_kit_core::inference::InputFormat;
 use agent_kit_core::messages::{OutcomeStatus, ToolArguments};
@@ -32,14 +32,14 @@ struct Handler {
     grant: GrantSelection,
     definition: ToolDefinition,
     permissions: Arc<TurnPermissions>,
-    command: Arc<CommandTool>,
+    command: Arc<CommandSupervisor>,
 }
 
 impl LifecycleAccess {
     pub(super) fn bind(
         binding: &TurnBinding,
         permissions: Option<&Arc<TurnPermissions>>,
-        command: Option<&Arc<CommandTool>>,
+        command: Option<&Arc<CommandSupervisor>>,
     ) -> Result<Option<Arc<Self>>> {
         let Some(permissions) = permissions else {
             return Ok(None);

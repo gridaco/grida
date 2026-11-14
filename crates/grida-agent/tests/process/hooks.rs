@@ -25,7 +25,7 @@ const HEARTBEAT: &str = r#"
 "#;
 
 const BEFORE_TOOL_CHECK: &str = r#"
-    index($0, "\"event\":\"before_tool\"") && index($0, "\"tool\":\"run_command\"") && index($0, "printf x >> effect") { valid = 1 }
+    index($0, "\"event\":\"before_tool\"") && index($0, "\"tool\":\"exec_command\"") && index($0, "printf x >> effect") { valid = 1 }
     END { if (!valid) print "unexpected event"; else print response }
 "#;
 
@@ -69,15 +69,12 @@ fn before_tool(fixture: &Fixture, path: &str, arguments: &[&str]) -> PathBuf {
 }
 
 fn command_arguments(fixture: &Fixture) -> String {
-    json!({
-        "directory":"primary", "access":"read_write", "program":"/bin/bash",
-        "cwd":fixture.primary, "args":["-c", "printf x >> effect"],
-    })
-    .to_string()
+    let _ = fixture;
+    json!({"directory":"primary", "access":"read_write", "cmd":"printf x >> effect"}).to_string()
 }
 
 fn command_call(fixture: &Fixture) -> Reply {
-    Reply::Tool("run_command", command_arguments(fixture).leak())
+    Reply::Tool("exec_command", command_arguments(fixture).leak())
 }
 
 fn command_with_goal_report(fixture: &Fixture) -> Reply {
@@ -85,7 +82,7 @@ fn command_with_goal_report(fixture: &Fixture) -> Reply {
         {"index":0,"id":"report","type":"function","function":{
             "name":"goal_report","arguments":r#"{"report":{"kind":"progress","summary":"Checked the proposed command."}}"#}},
         {"index":1,"id":"command","type":"function","function":{
-            "name":"run_command","arguments":command_arguments(fixture)}},
+            "name":"exec_command","arguments":command_arguments(fixture)}},
     ]);
     let delta = json!({"id":"fixture-response","choices":[{"index":0,
         "delta":{"role":"assistant","tool_calls":calls},"finish_reason":null}]});
@@ -149,7 +146,7 @@ async fn before_tool_checks_the_exact_command_and_preserves_a_refusal() {
             String::from_utf8_lossy(&output.stdout)
         );
         let first = endpoint.request().await.to_string();
-        assert!(first.contains("run_command"));
+        assert!(first.contains("exec_command"));
         assert!(!first.contains("before_tool_command"));
         let next = endpoint.request().await.to_string();
         assert_eq!(next.contains("before_tool_hook_denied"), blocked, "{next}");
@@ -327,7 +324,8 @@ async fn configured_completion_command_checks_the_real_primary_workspace() {
         let request = endpoint.request().await;
         assert!(!request.to_string().contains("design-manifest.txt"));
         assert!(!request.to_string().contains("before_completion_command"));
-        assert!(!request.to_string().contains("run_command"));
+        assert!(!request["tools"].to_string().contains("exec_command"));
+        assert!(!request["tools"].to_string().contains("write_stdin"));
     }
     endpoint.done().await;
 }
@@ -524,7 +522,7 @@ async fn hooks_only_configures_a_real_check_without_offering_model_commands() {
     );
     assert!(tools.iter().all(|tool| !matches!(
         tool["function"]["name"].as_str(),
-        Some("run_command" | "before_completion_command")
+        Some("exec_command" | "write_stdin" | "before_completion_command")
     )));
     assert!(fs::read_dir(temporary).unwrap().next().is_none());
     endpoint.done().await;
@@ -788,7 +786,7 @@ async fn before_tool_checks_standard_act_goal_commands_and_accounts_known_work()
         assert_eq!(goal["result"]["inputId"], "goal", "{goal}");
         let first = endpoint.request().await["tools"].to_string();
         assert!(
-            first.contains("goal_report") && first.contains("run_command"),
+            first.contains("goal_report") && first.contains("exec_command"),
             "{first}"
         );
         assert!(!first.contains("before_tool_command"), "{first}");
@@ -1359,7 +1357,10 @@ async fn lifecycle_hooks_cover_plan_read_tools_context_and_observational_reopen(
                 .as_array()
                 .unwrap()
                 .iter()
-                .any(|tool| tool["function"]["name"] == "run_command")
+                .any(|tool| matches!(
+                    tool["function"]["name"].as_str(),
+                    Some("exec_command" | "write_stdin")
+                ))
         );
     }
     assert!(first.to_string().contains("contextual_data"));
@@ -1539,6 +1540,10 @@ async fn an_oversized_input_event_keeps_a_diagnostic_without_running_a_handler()
 #[tokio::test]
 #[ignore = "requires a provisioned native sandbox helper"]
 async fn completion_hooks_can_request_only_bounded_additional_work() {
+    // A continuation spends the task's own step allowance. A person-set goal
+    // allowance makes that bound small enough to exhaust here; exhaustion
+    // fails the check instead of extending the allowance.
+    const STEPS: usize = 4;
     let fixture = Fixture::new(true);
     lifecycle_hooks(
         &fixture,
@@ -1551,35 +1556,19 @@ async fn completion_hooks_can_request_only_bounded_additional_work() {
         )],
     );
     let mut endpoint = Endpoint::start(
-        (0..8)
+        (0..STEPS)
             .map(|_| Reply::Finished("Candidate answer."))
             .collect(),
     )
     .await;
-    let output = timeout(
-        Duration::from_secs(45),
-        fixture
-            .process(&endpoint.url, "run")
-            .arg("--cwd")
-            .arg(&fixture.primary)
-            .args(["--prompt", "Prepare an answer."])
-            .output(),
-    )
-    .await
-    .unwrap()
-    .unwrap();
-    let records = records(&output.stdout);
-    assert_eq!(
-        output.status.code(),
-        Some(1),
-        "{records:?} {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    assert_eq!(
-        records[1]["account"]["failure"]["code"],
-        "lifecycle_hook_step_limit"
-    );
-    assert_eq!(records[1]["account"]["steps"], 8);
+    let mut command = fixture.process(&endpoint.url, "serve");
+    command.arg("--stdio");
+    let mut host = connect(command).await;
+    let session = new_session(&mut host, &fixture.primary).await;
+    let accepted = host
+        .request("_co.grida/goal/start", goal_request(&session))
+        .await;
+    assert_eq!(accepted["result"]["inputId"], "goal", "{accepted}");
     endpoint.request().await;
     let second = endpoint.request().await;
     assert!(
@@ -1588,10 +1577,40 @@ async fn completion_hooks_can_request_only_bounded_additional_work() {
             .contains("Perform another bounded verification pass.")
     );
     assert!(second.to_string().contains("contextual_data"));
-    for _ in 2..8 {
+    for _ in 2..STEPS {
         endpoint.request().await;
     }
+    let settled = wait_for(&mut host, &session, |view| {
+        view["current"].is_null() && view["latest"].is_object()
+    })
+    .await;
+    assert_eq!(settled["latest"]["status"], "failed", "{settled}");
+    let goal = goal_view(&mut host, &session).await;
+    assert_eq!(
+        goal["spent"],
+        json!({"work_turns":1,"inference_steps":STEPS}),
+        "{goal}"
+    );
+    host.close().await;
     assert!(endpoint.requests.try_recv().is_err());
+    let store =
+        grida_agent::host::open_store(&fixture.state.join(grida_agent::host::DATABASE_FILE))
+            .unwrap();
+    let session = agent_kit_core::SessionId::new(session).unwrap();
+    let turn = store
+        .inspect(session.clone())
+        .await
+        .unwrap()
+        .latest
+        .unwrap();
+    let account = store
+        .inspect_turn_with(session, turn.binding.turn, |state| {
+            grida_agent_master::read_account(state.outcome().unwrap().account.as_ref().unwrap())
+        })
+        .await
+        .unwrap();
+    assert_eq!(account.steps as usize, STEPS);
+    assert_eq!(account.failure.unwrap().code, "lifecycle_hook_step_limit");
     endpoint.done().await;
 }
 

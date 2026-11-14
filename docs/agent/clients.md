@@ -372,17 +372,33 @@ Unverified cleanup blocks a replacement run.
 
 ## Run a confined command
 
-Desktop workspace chats on macOS and Linux run finite commands in the project
-under the **Default** preset. [Understand agent permissions](./permissions.md)
+Desktop workspace chats on macOS and Linux run commands in the project under
+the **Default** preset. [Understand agent permissions](./permissions.md)
 
-Headless hosts can run finite commands on macOS and Linux when
-the launcher supplies a reviewed permission profile and native helper.
-The command runs with the selected directory access and a separate temporary
-scope. Network access is denied. Plan keeps the command tool unavailable.
+Headless hosts can run commands on macOS and Linux when the launcher supplies
+a reviewed permission profile and native helper. Each command runs through
+the user's shell (`sh`, `bash`, `zsh` or `dash`, otherwise `/bin/sh`) with the
+selected directory access and a separate temporary scope. Network access is
+denied. Plan keeps the command tools unavailable.
+
+A command that is still running after its short wait, such as a development
+server or a watcher, stays with the chat as a numbered process. Later turns of
+the same chat read its output, type into it, or interrupt it. Ending a turn,
+stopping it, pausing, waiting for approval and restarting the turn leave the
+process running. Stopping it, deleting the chat, and shutting the host down
+end it; a host that exits ends its processes too. A chat keeps at most 64,
+and starting another stops the least recently used one that is not among the
+eight most recent.
+
+A private supervising client that negotiates `co.grida/session/processes` can
+list an attached chat's processes with `_co.grida/session/processes`, stop
+some or all of them with `_co.grida/session/stop-processes`, and receive the
+complete list in `session/update` metadata whenever it changes.
 
 When a command needs approval, a negotiated private reviewer can decide the
-exact pending invocation. Stop retains the observed outcome and reports
-uncertainty if the host cannot verify process cleanup. [Native permission profile](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#filesystem-services)
+exact pending invocation. Input to an approved process needs no further
+approval. Stop retains the observed outcome and reports uncertainty if the
+host cannot verify process cleanup. [Native permission profile](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#filesystem-services)
 
 ## Connect a local MCP client
 
@@ -599,6 +615,7 @@ Each suffix in a grouped row uses the displayed prefix and is negotiated separat
 | `co.grida/session/skills`                                                                  | List available skills for this chat and select a versioned reference for a prompt.                        |
 | `co.grida/config/inspect`, `update`, `reload`                                              | Inspect, change, or reload the host defaults.                                                             |
 | `co.grida/session/wakeups`, `cancel-wakeup`, `recover-wakeup`, `continue-cancelled-wakeup` | Allow one check-in on an Act submission or goal start, then inspect, cancel, restore or continue past it. |
+| `co.grida/session/processes`                                                               | List a chat's long-running command processes, stop them, and receive the list when it changes.            |
 
 Use ordinary `session/prompt` for a streamed reply. Use durable submission or
 enqueue when your client needs acceptance separately from completion. Give each

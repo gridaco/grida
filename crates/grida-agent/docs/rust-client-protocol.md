@@ -225,6 +225,17 @@ admission nor cancellation.
 | `revise`                                 | Fork parameters plus `expectedSessionRevision`, `replacementInputId`, ACP `prompt`, and optional `effort` and `reasoning`. Return the installed view and accepted input.                                |
 | `compact`                                | `sessionId`, `requestId`, and optional `recover`. Run or inspect one retained context compaction. Return its status and available usage/failure evidence.                                               |
 | `skills`                                 | `sessionId`. Read names, descriptions, sources, and versioned ACP resource-link URIs for available skills.                                                                                              |
+| `processes`                              | `sessionId`. Read the chat's command processes: running ones first, then ended ones the model has not read yet. Requires `co.grida/session/processes` on private stdio.                                 |
+| `stop-processes`                         | `sessionId`, optional `processIds` (1 to 64 distinct positive numbers; omitted stops all). Stop them, wait a bounded time for each to end, and return the `stopped` numbers that have ended.            |
+
+Each process entry carries `processId`, `command` (cut to 1 KiB with a
+trailing `…`), the absolute `cwd`, `terminal`, `startedAt` in Unix
+milliseconds, `state` (`running` or `ended`), and `exitCode`, which is null
+while running and for a process that was stopped or ended by a signal. A
+negotiating client also receives a `session/update` for each attached chat
+whose list changed: the process started, ended, was stopped, was evicted or
+had its end read. Its `_meta["co.grida/session/processes"]` holds the complete
+`processes` list. After missed live updates the host sends the current list.
 
 Select a skill by including its catalog URI as an ACP `resource_link` alongside
 the prompt. Skill references use `grida-skill:<name>@<revision>`. The catalog
@@ -485,10 +496,12 @@ wire protocols and connection lifetimes remain distinct.
 On the private supervising connection of an Act host, a client that hosts
 workspace editors negotiates `co.grida/session/editor-surfaces` version 1, and
 optionally `co.grida/session/editor-surface-open` version 1 for presentation.
-An identified Submit then carries `editorEndpointId`, the opaque UUID of the
-Desktop editor endpoint that owns the workspace view, and may set
+An identified Submit or Enqueue then carries `editorEndpointId`, the opaque
+UUID of the Desktop editor endpoint that owns the workspace view, and may set
 `editorPresentation: true` when the open capability is negotiated. The input
-retains that binding, and the turn's editor tools target only that endpoint.
+retains that binding, including while it waits in the queue, and the turn's
+editor tools target only that endpoint. Both operations apply the same
+checks: Act, text-only prompt, and the negotiated capabilities.
 
 | Direction      | Method                               | Parameters and result                                                                                                                                                                   |
 | -------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -504,10 +517,10 @@ means the request was dispatched, not that a renderer displayed the file.
 
 The client and agent negotiate
 `co.grida/session/editor-svg-text` version 1 alongside editor surfaces.
-An immediate Act text submission may carry `editorSvgTargetId` with its
+An Act text submission or queued input may carry `editorSvgTargetId` with its
 `editorEndpointId`. This is the renderer's opaque capture of the current
-workspace SVG selection. The submission retains the original capture on retry.
-Queued inputs and check-ins have no SVG target.
+workspace SVG selection. The input retains the original capture on retry.
+Check-ins have no SVG target.
 
 The reverse `_co.grida/editor/svg-selected-text` request carries the exact
 `sessionId`, `endpointId`, `targetId`, `callId`, and `expiresAtMs`, with a

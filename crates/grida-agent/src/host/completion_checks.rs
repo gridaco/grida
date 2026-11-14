@@ -1,7 +1,7 @@
 //! GRIDA-SEC-004 — Reviewed native completion check with private turn authority.
 
 use super::*;
-use crate::command::{CommandTool, project_process};
+use crate::command::{CommandSupervisor, project_process};
 use crate::permissions::{ReviewedHookCommand, TurnPermissions};
 use agent_kit_core::inference::InputFormat;
 use agent_kit_core::messages::{OutcomeStatus, ResultContent, ToolArguments};
@@ -65,7 +65,7 @@ impl CompletionAccess {
         binding: &TurnBinding,
         operating_regime: OperatingRegime,
         permissions: Option<&Arc<TurnPermissions>>,
-        command: Option<&Arc<CommandTool>>,
+        command: Option<&Arc<CommandSupervisor>>,
     ) -> Result<Arc<Self>> {
         let mut handlers = Vec::new();
         if host.require_completion_text {
@@ -137,7 +137,7 @@ enum Handler {
     Command {
         hook: ReviewedHookCommand,
         permissions: Arc<TurnPermissions>,
-        command: Arc<CommandTool>,
+        command: Arc<CommandSupervisor>,
     },
 }
 

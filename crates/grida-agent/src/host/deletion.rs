@@ -133,12 +133,29 @@ impl Host {
                 }
                 work.retiring.extend(family.iter().cloned());
             }
-            let result = host
-                .delete_owned_chat(state_dir, cwd, request, family[1..].to_vec())
-                .await;
+            // Running processes do not keep a chat from being deleted: they
+            // are stopped before its data is removed.
+            let mut result = Ok(());
+            for id in &family {
+                result = host
+                    .processes
+                    .retire(id, std::time::Instant::now() + PROCESS_STOP_WAIT)
+                    .await;
+                if result.is_err() {
+                    break;
+                }
+            }
+            let result = match result {
+                Ok(()) => {
+                    host.delete_owned_chat(state_dir, cwd, request, family[1..].to_vec())
+                        .await
+                }
+                Err(error) => Err(error),
+            };
             let mut work = host.work.lock().await;
             for id in &family {
                 work.retiring.remove(id);
+                host.processes.release(id);
             }
             result
         })

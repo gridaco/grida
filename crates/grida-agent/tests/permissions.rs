@@ -17,12 +17,13 @@ use agent_kit_sessions::{
     SessionStore, Submission, TurnSelection,
 };
 use agent_kit_store_sqlite::SqliteStore;
-use grida_agent::command::{CommandLimits, CommandTool};
+use grida_agent::command::CommandLimits;
 use grida_agent::configuration::Configuration;
 use grida_agent::permissions::{
     AccessRule, ApprovalDecision, ApprovalEffect, CommandProfile, DirectoryAccess,
     PermissionCapture, PermissionProfile, TurnPermissions, approval_answer, read_approval,
 };
+use grida_agent::processes::ProcessSessions;
 use grida_agent::workspace::{DirectorySpec, ProtectedRoots, WorkspaceSnapshot};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -68,6 +69,15 @@ impl Fixture {
     }
 
     fn profile_with(&self, command: bool, write: bool) -> Arc<PermissionProfile> {
+        self.profile_with_shell(command, write, None)
+    }
+
+    fn profile_with_shell(
+        &self,
+        command: bool,
+        write: bool,
+        shell: Option<&Path>,
+    ) -> Arc<PermissionProfile> {
         let protected = vec![
             self.protected.clone(),
             self.database.parent().unwrap().to_owned(),
@@ -130,13 +140,13 @@ impl Fixture {
                 ]
                 .into(),
                 protected,
-                command.then(|| self.command_profile()),
+                command.then(|| self.command_profile(shell)),
             )
             .unwrap(),
         )
     }
 
-    fn command_profile(&self) -> CommandProfile {
+    fn command_profile(&self, shell: Option<&Path>) -> CommandProfile {
         let helper = trusted(PathBuf::from(
             std::env::var_os("GRIDA_AGENT_TEST_SANDBOX_HELPER")
                 .expect("GRIDA_AGENT_TEST_SANDBOX_HELPER"),
@@ -157,6 +167,8 @@ impl Fixture {
                 "/lib",
                 "/lib64",
                 "/System/Library",
+                // macOS /bin/sh reads its selected shell here.
+                "/private/var/select",
             ]
             .into_iter()
             .map(PathBuf::from)
@@ -170,7 +182,12 @@ impl Fixture {
                 max_output_bytes: 4096,
             },
             disk_read: false,
-            environment: Default::default(),
+            environment: Arc::new(
+                shell
+                    .map(|shell| ("SHELL".to_owned(), shell.to_str().unwrap().to_owned()))
+                    .into_iter()
+                    .collect(),
+            ),
         }
     }
 
@@ -253,11 +270,8 @@ impl Fixture {
         Running::open(profile, capture, store, claim.lease, true, None).await
     }
 
-    fn command(&self, executable: &Path, script: &str) -> Value {
-        json!({
-            "directory": "additional", "access": "read_write", "program": executable,
-            "args": ["-c", script], "cwd": self.additional,
-        })
+    fn command(&self, script: &str) -> Value {
+        json!({"directory": "additional", "access": "read_write", "cmd": script})
     }
 }
 
@@ -265,7 +279,7 @@ struct Running {
     store: Arc<SqliteStore>,
     opened: OpenedTurn,
     permissions: Arc<TurnPermissions>,
-    command: Option<Arc<CommandTool>>,
+    processes: Arc<ProcessSessions>,
     grants: std::collections::BTreeMap<ToolId, agent_kit_core::authority::GrantSelection>,
 }
 
@@ -289,7 +303,10 @@ impl Running {
             .unwrap();
         let mut inventory = Inventory::new();
         let mut grants = Default::default();
-        let command = permissions.insert(&mut inventory, &mut grants).unwrap();
+        let processes = Arc::new(ProcessSessions::new());
+        permissions
+            .insert(&mut inventory, &mut grants, &processes)
+            .unwrap();
         let tools = inventory
             .snapshot(&grants.keys().cloned().collect::<Vec<_>>())
             .unwrap();
@@ -314,7 +331,7 @@ impl Running {
             store,
             opened,
             permissions,
-            command,
+            processes,
             grants,
         }
     }
@@ -582,18 +599,13 @@ async fn writes_and_edits_stay_inside_the_project_and_off_metadata() {
 async fn commands_write_the_project_and_shared_temp_but_not_existing_metadata() {
     let fixture = Fixture::new();
     let run = fixture.first(&fixture.profile_with(true, true), true).await;
-    let command = |script: &str| {
-        json!({
-            "access": "read_write", "program": "/bin/sh", "cwd": fixture.default,
-            "args": ["-c", script],
-        })
-    };
+    let command = |script: &str| json!({"access": "read_write", "cmd": script});
 
     // Missing repository metadata may be created, as `git init` does.
     let init = completed(
         run.invoke(
             "init",
-            "run_command",
+            "exec_command",
             command("mkdir .git && printf ref > .git/HEAD"),
         )
         .await,
@@ -603,7 +615,7 @@ async fn commands_write_the_project_and_shared_temp_but_not_existing_metadata() 
 
     // Once it exists, a later command cannot change it.
     let changed = completed(
-        run.invoke("config", "run_command", command("printf x > .git/config"))
+        run.invoke("config", "exec_command", command("printf x > .git/config"))
             .await,
     );
     assert_eq!(changed.status, OutcomeStatus::Failed, "{changed:?}");
@@ -611,7 +623,7 @@ async fn commands_write_the_project_and_shared_temp_but_not_existing_metadata() 
 
     // Agent configuration stays off limits even before it exists.
     let configured = completed(
-        run.invoke("agent-config", "run_command", command("mkdir .grida"))
+        run.invoke("agent-config", "exec_command", command("mkdir .grida"))
             .await,
     );
     assert_eq!(configured.status, OutcomeStatus::Failed, "{configured:?}");
@@ -619,7 +631,7 @@ async fn commands_write_the_project_and_shared_temp_but_not_existing_metadata() 
 
     // Ordinary project files stay writable.
     let written = completed(
-        run.invoke("file", "run_command", command("printf ok > note"))
+        run.invoke("file", "exec_command", command("printf ok > note"))
             .await,
     );
     assert_eq!(written.status, OutcomeStatus::Succeeded, "{written:?}");
@@ -630,7 +642,7 @@ async fn commands_write_the_project_and_shared_temp_but_not_existing_metadata() 
     let staged = completed(
         run.invoke(
             "tmp-write",
-            "run_command",
+            "exec_command",
             command(&format!("printf staged > {scratch}")),
         )
         .await,
@@ -639,7 +651,7 @@ async fn commands_write_the_project_and_shared_temp_but_not_existing_metadata() 
     let reread = completed(
         run.invoke(
             "tmp-read",
-            "run_command",
+            "exec_command",
             command(&format!("cat {scratch}")),
         )
         .await,
@@ -671,35 +683,49 @@ async fn decline_and_durable_approval_dispatch_only_the_exact_command_once() {
     let fixture = Fixture::new();
     let profile = fixture.profile(true);
     let run = fixture.first(&profile, true).await;
-    let baseline = completed(run.invoke("baseline", "run_command", json!({
-        "access": "read", "program": "/bin/bash", "cwd": fixture.default,
-        "args": ["-c", "printf baseline; (printf x > forbidden) 2>/dev/null; test ! -e forbidden"],
-    })).await);
-    assert_eq!(baseline.status, OutcomeStatus::Succeeded, "{baseline:?}");
-    assert_eq!(
-        baseline.content,
-        [ResultContent::Text("stdout:\nbaseline".into())]
+    let baseline = completed(
+        run.invoke(
+            "baseline",
+            "exec_command",
+            json!({
+                "access": "read",
+                "cmd": "printf baseline; (printf x > forbidden) 2>/dev/null; test ! -e forbidden",
+            }),
+        )
+        .await,
     );
+    assert_eq!(baseline.status, OutcomeStatus::Succeeded, "{baseline:?}");
+    let reported = text(&baseline);
+    assert!(
+        reported.contains("\nProcess exited with code 0\nOutput:\nbaseline"),
+        "{reported}"
+    );
+    assert!(!reported.contains("session ID"), "{reported}");
     assert!(!fixture.default.join("forbidden").exists());
     assert!(run.opened.turn.view().state.waits().is_empty());
-    let command = fixture.command(Path::new("/bin/bash"), "printf x >> effect");
+    let command = fixture.command("printf x >> effect");
     let marker = fixture.additional.join("effect");
-    let wait = deferred(run.invoke("decline", "run_command", command.clone()).await);
+    let wait = deferred(run.invoke("decline", "exec_command", command.clone()).await);
     run.answer(wait, ApprovalDecision::Decline).await;
     failed(
-        run.invoke("decline", "run_command", command.clone()).await,
+        run.invoke("decline", "exec_command", command.clone()).await,
         "permission_declined",
     );
     assert!(!marker.exists());
-    let wait = deferred(run.invoke("approve", "run_command", command.clone()).await);
+    let wait = deferred(run.invoke("approve", "exec_command", command.clone()).await);
     let request = read_approval(&run.approval(&wait).await).unwrap();
     assert!(matches!(
         request.effect,
         ApprovalEffect::Command {
             access: grida_agent::command::CommandAccess::ReadWrite,
-            executable: Some(ref executable),
+            ref command,
+            terminal: false,
+            ref executable,
+            ref cwd,
             ..
-        } if executable == Path::new("/bin/bash")
+        } if executable == Path::new("/bin/sh")
+            && command == "printf x >> effect"
+            && cwd == &fixture.additional
     ));
     run.answer(wait, ApprovalDecision::ApproveOnce).await;
     let epoch = run.opened.turn.view().state.binding().epoch;
@@ -708,22 +734,19 @@ async fn decline_and_durable_approval_dispatch_only_the_exact_command_once() {
     drop(profile);
     let restarted_profile = fixture.profile(true);
     let run = fixture.reopen(&restarted_profile, epoch).await;
-    let result = completed(run.invoke("approve", "run_command", command.clone()).await);
+    let result = completed(run.invoke("approve", "exec_command", command.clone()).await);
     assert_eq!(result.status, OutcomeStatus::Succeeded, "{result:?}");
     assert_eq!(fs::read(&marker).unwrap(), b"x");
     assert_eq!(
-        completed(run.invoke("approve", "run_command", command).await),
+        completed(run.invoke("approve", "exec_command", command).await),
         result
     );
     assert_eq!(fs::read(&marker).unwrap(), b"x");
-    assert!(
-        run.command
-            .as_ref()
-            .unwrap()
-            .stop_and_wait(Instant::now() + TIMEOUT)
-            .await
-            .is_verified()
-    );
+    assert!(run.processes.list(&session()).is_empty());
+    run.processes
+        .shutdown(Instant::now() + TIMEOUT)
+        .await
+        .unwrap();
     assert_eq!(fs::read_dir(&fixture.temporary).unwrap().count(), 0);
 }
 
@@ -731,25 +754,26 @@ async fn decline_and_durable_approval_dispatch_only_the_exact_command_once() {
 #[ignore = "requires native confinement outside the test runner's sandbox"]
 async fn replacing_approved_executable_or_root_refuses_dispatch() {
     let fixture = Fixture::new();
-    let profile = fixture.profile(true);
-    let run = fixture.first(&profile, true).await;
-    let executable = fixture.additional.join("command");
+    // The shell that runs commands is part of the approved action.
+    let executable = fixture.additional.join("bash");
     fs::copy("/bin/bash", &executable).unwrap();
-    let call = fixture.command(&executable, "printf x >> effect");
+    let profile = fixture.profile_with_shell(true, false, Some(&executable));
+    let run = fixture.first(&profile, true).await;
+    let call = fixture.command("printf x >> effect");
     let wait = deferred(
-        run.invoke("changed-program", "run_command", call.clone())
+        run.invoke("changed-program", "exec_command", call.clone())
             .await,
     );
     run.answer(wait, ApprovalDecision::ApproveOnce).await;
     fs::rename(&executable, fixture.additional.join("original")).unwrap();
     fs::copy("/bin/bash", &executable).unwrap();
     failed(
-        run.invoke("changed-program", "run_command", call.clone())
+        run.invoke("changed-program", "exec_command", call.clone())
             .await,
         "permission_action_changed",
     );
     let wait = deferred(
-        run.invoke("changed-root", "run_command", call.clone())
+        run.invoke("changed-root", "exec_command", call.clone())
             .await,
     );
     run.answer(wait, ApprovalDecision::ApproveOnce).await;
@@ -758,7 +782,7 @@ async fn replacing_approved_executable_or_root_refuses_dispatch() {
     fs::create_dir(&fixture.additional).unwrap();
     fs::copy("/bin/bash", &executable).unwrap();
     failed(
-        run.invoke("changed-root", "run_command", call).await,
+        run.invoke("changed-root", "exec_command", call).await,
         "workspace_directory_changed",
     );
     assert!(!old.join("effect").exists());
@@ -770,19 +794,16 @@ async fn replacing_approved_executable_or_root_refuses_dispatch() {
 async fn revocation_fences_approved_launch_and_stops_running_command() {
     let fixture = Fixture::new();
     let run = fixture.first(&fixture.profile(true), true).await;
-    let call = fixture.command(
-        Path::new("/bin/bash"),
-        "printf x > started; /bin/sleep 30; printf x > finished",
-    );
-    let wait = deferred(run.invoke("active", "run_command", call.clone()).await);
+    let call = fixture.command("printf x > started; /bin/sleep 30; printf x > finished");
+    let wait = deferred(run.invoke("active", "exec_command", call.clone()).await);
     run.answer(wait, ApprovalDecision::ApproveOnce).await;
-    let never = fixture.command(Path::new("/bin/bash"), "printf x > forbidden");
+    let never = fixture.command("printf x > forbidden");
     let wait = deferred(
-        run.invoke("not-dispatched", "run_command", never.clone())
+        run.invoke("not-dispatched", "exec_command", never.clone())
             .await,
     );
     run.answer(wait, ApprovalDecision::ApproveOnce).await;
-    let (operations, key, plan) = run.call("active", "run_command", call);
+    let (operations, key, plan) = run.call("active", "exec_command", call);
     let invocation = tokio::spawn(async move { operations.invoke(key, plan).await.unwrap() });
     tokio::time::timeout(TIMEOUT, async {
         while !fixture.additional.join("started").exists() {
@@ -801,25 +822,19 @@ async fn revocation_fences_approved_launch_and_stops_running_command() {
         "{result:?}"
     );
     failed(
-        run.invoke("not-dispatched", "run_command", never).await,
+        run.invoke("not-dispatched", "exec_command", never).await,
         "permission_revoked",
     );
     assert!(!fixture.additional.join("finished").exists());
     assert!(!fixture.additional.join("forbidden").exists());
-    let cleanup = run
-        .command
-        .as_ref()
-        .unwrap()
-        .stop_and_wait(Instant::now() + TIMEOUT)
-        .await;
-    assert!(cleanup.pending.is_empty(), "{cleanup:?}");
-    assert_eq!(
-        result.structured.as_ref().unwrap()["cleanup_verified"],
-        cleanup.is_verified()
-    );
-    if !cleanup.is_verified() {
+    // Revocation stopped the process: it is not kept for the chat.
+    assert!(text(&result).contains("\nProcess stopped\n"), "{result:?}");
+    let details: Value = serde_json::from_slice(result.receipt.as_ref().unwrap().bytes()).unwrap();
+    let verified = details["cleanup_verified"] == true;
+    let shutdown = run.processes.shutdown(Instant::now() + TIMEOUT).await;
+    assert_eq!(shutdown.is_ok(), verified, "{shutdown:?}");
+    if !verified {
         assert_eq!(result.status, OutcomeStatus::Uncertain);
-        assert_eq!(cleanup.unverified.len(), 1);
     }
     assert_eq!(fs::read_dir(&fixture.temporary).unwrap().count(), 0);
 }

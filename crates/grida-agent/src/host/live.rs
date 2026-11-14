@@ -16,6 +16,14 @@ pub(crate) enum LiveUpdate {
     Text(LiveText),
     Activity(LiveActivity),
     Lifecycle(Lifecycle),
+    Processes(LiveProcesses),
+}
+
+/// A chat's complete process list after it changed.
+#[derive(Clone)]
+pub(crate) struct LiveProcesses {
+    pub session: SessionId,
+    pub processes: Vec<crate::processes::ProcessEntry>,
 }
 
 /// A tool call requested by the current turn. `status` is set once the

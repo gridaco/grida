@@ -222,10 +222,12 @@ configuration. Use it after the process that owns the state directory exits.
 
 A trusted native permission profile can declare one required `beforeTool`
 command with the same `executable`, `arguments`, and `timeoutMs` fields as
-`beforeCompletion`, and `mode: "required"`. It checks the validated
-`run_command` action in Act after ordinary permission and before the action's
+`beforeCompletion`, and `mode: "required"`. It checks each validated
+`exec_command` action in Act after ordinary permission and before the action's
 attempt. Its bounded `before_tool` JSON event includes the proposed command
-arguments, including any explicit environment values and standard input. It
+arguments: the command line, working directory, terminal choice and access.
+Input sent later to the started process through `write_stdin` is not checked
+again, so a check that must see every command refuses interactive shells. It
 returns the same allow or deny JSON shape as the completion
 command, with read-only workspace access, private temporary storage, and no network. The action
 receives a generic refusal code; the handler diagnostic remains in the private
@@ -261,7 +263,7 @@ selection of this file. Loading a project does not discover or trust code.
 The command profile supplies the pinned sandbox helper, runtime roots and
 private temporary parent. The primary directory must grant read-only command
 access. `command.hooksOnly: true` runs these handlers without offering
-`run_command` to the model. Ordered hooks cover Plan and Act and the corresponding
+`exec_command` or `write_stdin` to the model. Ordered hooks cover Plan and Act and the corresponding
 Goal work. A child that inherits the primary read profile retains its checks
 under its own turn identity. Text-only reviewers without native workspace
 authority do not acquire executable-hook filesystem access.
@@ -467,6 +469,7 @@ with an underscore.
 | `co.grida/session/compact`                        | Summarize model context for future turns and retain the original transcript.        |
 | `co.grida/session/skills`                         | List available named skills and their versioned prompt references.                  |
 | `co.grida/config/inspect`, `update`, `reload`     | Read, change, or activate the host's reviewed defaults.                             |
+| `co.grida/session/processes`                      | List or stop a chat's command processes and receive the list when it changes.       |
 
 Standard `session/prompt` streams its response. Durable submission and enqueue
 acknowledge accepted input independently of completion. Exact input retries
@@ -654,6 +657,59 @@ Only the private supervising stdio client can negotiate
 Continuation rechecks the launch profile and native identity before dispatch.
 Unverified command cleanup surfaces uncertainty and stops automatic queue
 advancement.
+
+### Run commands as chat processes
+
+With command rules, Act turns offer two tools. `exec_command` takes `cmd`,
+optional absolute `workdir` (default: the selected directory's root), `tty`,
+`yield_time_ms` (default 10000, 250 to 30000) and `max_output_tokens` (default
+10000; four bytes per token, capped by the turn's output limit), plus the
+`access` and optional `directory` the approval covers. It runs `<shell> -c cmd`,
+where the shell is the profile environment's `SHELL` when that is an absolute
+path to an executable `sh`, `bash`, `zsh` or `dash`, and `/bin/sh` otherwise.
+It is never a login or interactive shell. The environment follows the profile.
+With `tty` the command gets a pseudo-terminal; otherwise stdin is closed and
+stdout and stderr share one stream. On macOS, `/bin/sh` reads
+`/private/var/select/sh`; a profile without disk read should list
+`/private/var/select` in `runtimePaths`.
+
+The call collects output until the wait ends or the command ends. A command
+that ends within the wait reports its exit and is not kept. One still running
+is kept by the chat under the next process number, which is never reused for
+that chat while the host runs. `write_stdin` takes that `session_id`, optional
+`chars` (empty polls), `yield_time_ms` (writes: default 250, at most 30000;
+polls: 5000 to 300000) and `max_output_tokens`. A pipe process accepts only
+`"\u0003"`, delivered as an interrupt; a terminal process receives the
+characters. A call's wait ends two seconds before its operation deadline. It
+needs no approval of its own and reaches only the calling chat's processes.
+The response text is:
+
+```text
+Wall time: 1.2345 seconds
+Process exited with code 0          (or: Process running with session ID 3)
+Original token count: 12            (only when output was shortened)
+Output:
+<output>
+```
+
+A process ended by a signal or a stop reports `Process terminated by signal N`
+or `Process stopped` instead of an exit code. Long output keeps its start and
+end around a `…N tokens truncated…` marker; output the process buffer dropped
+is marked `[N bytes of earlier output were dropped]`. Each process keeps up to
+1 MiB of unread output. Once a process's end has been reported, its number is
+unknown.
+
+Ending, stopping, pausing or restarting a turn and waiting for approval leave
+processes running. A call cut short by its turn's cancellation still keeps
+the process. Revoking the directory, `write_stdin` with Ctrl-C, the
+`co.grida/session/processes` stop operation, deleting the chat and host
+shutdown stop them; shutdown waits for verified cleanup within its deadline
+and exits uncertain otherwise. A chat keeps up to 64 processes: starting
+another stops the least recently used one that is not among the eight most
+recently used or in use, preferring ended ones. A process ends after 24 hours,
+and the native helper ends it if the host process disappears. Recovery after
+a restart reports an unaccounted `exec_command` or input as uncertain; an
+empty poll runs again.
 
 ### Review one configured read
 

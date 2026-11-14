@@ -104,7 +104,8 @@ use tokio::sync::{Mutex, MutexGuard, Notify, Semaphore, broadcast, oneshot};
 use tokio::task::AbortHandle;
 
 /// The session database of a state directory. External runs keep their own
-/// database under the same name in their own directories.
+/// database under the same name in their own directories and open it through
+/// [`open_store`], so `inspect` reads their receipts like any other session.
 pub const DATABASE_FILE: &str = "agent.sqlite";
 
 /// Open a host's session database with the host's catalog and turn-link
@@ -141,6 +142,8 @@ const MAX_TURN_OPERATIONS: usize = 1024;
 const CORE_INSTRUCTIONS: &str = include_str!("prompts/core.md");
 const UPDATE_CAPACITY: usize = 128;
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(8);
+/// How long stopping a chat's processes waits for each to end.
+const PROCESS_STOP_WAIT: Duration = Duration::from_secs(5);
 /// How long a new request waits for a settled turn's worker to finish.
 const SETTLING_WORKER_WAIT: Duration = Duration::from_secs(10);
 const MODEL_TIMEOUT: Duration = Duration::from_secs(120);
@@ -185,6 +188,8 @@ pub struct Host {
     workers: Arc<AtomicUsize>,
     changed: Arc<Notify>,
     live_updates: broadcast::Sender<live::LiveUpdate>,
+    /// The chats' long-running command processes.
+    processes: Arc<crate::processes::ProcessSessions>,
 }
 
 struct Execution {
@@ -551,7 +556,7 @@ enum TurnWork {
     Conversation {
         master: Box<Master>,
         input: Vec<Message>,
-        command: Option<Arc<crate::command::CommandTool>>,
+        command: Option<Arc<crate::command::CommandSupervisor>>,
     },
     Compaction(Box<compaction::CompactionPlan>),
 }
@@ -770,6 +775,7 @@ impl Host {
         let state_dir = state_dir
             .canonicalize()
             .map_err(|_| problem(ErrorKind::Unavailable, "state_directory_unavailable"))?;
+        let live_updates = broadcast::channel(UPDATE_CAPACITY).0;
         Ok(Self {
             spending: Arc::new(spending::Store::new(&state_dir, store.clone())),
             store,
@@ -797,12 +803,33 @@ impl Host {
             wake_lock: Arc::default(),
             workers: Arc::default(),
             changed: Arc::default(),
-            live_updates: broadcast::channel(UPDATE_CAPACITY).0,
+            processes: Arc::new(crate::processes::ProcessSessions::with_live(
+                live_updates.clone(),
+            )),
+            live_updates,
         })
     }
 
     pub(crate) fn observe_live(&self) -> broadcast::Receiver<live::LiveUpdate> {
         self.live_updates.subscribe()
+    }
+
+    pub(crate) fn process_sessions(&self) -> Arc<crate::processes::ProcessSessions> {
+        self.processes.clone()
+    }
+
+    /// The chat's long-running processes: running ones first, then ended
+    /// ones the model has not read yet.
+    pub fn processes(&self, session: &SessionId) -> Vec<crate::processes::ProcessEntry> {
+        self.processes.list(session)
+    }
+
+    /// Stop the chat's named processes, or all of them, waiting a bounded
+    /// time for each to end. Returns those that ended.
+    pub async fn stop_processes(&self, session: &SessionId, ids: Option<&[u64]>) -> Vec<u64> {
+        self.processes
+            .stop(session, ids, std::time::Instant::now() + PROCESS_STOP_WAIT)
+            .await
     }
 
     /// Select the allowed regime for new work without widening retained work.
@@ -1784,6 +1811,7 @@ impl Host {
                 permissions.insert_with_images(
                     &mut inventory,
                     &mut authority.tools,
+                    &self.processes,
                     capture_image,
                     capture_reference,
                 )?
@@ -1805,7 +1833,7 @@ impl Host {
             Some(command) => Some(command),
             None => permission_scope
                 .as_ref()
-                .map(|scope| scope.hook_command_tool())
+                .map(|scope| scope.hook_supervisor())
                 .transpose()?
                 .flatten(),
         };
@@ -2910,6 +2938,32 @@ impl Host {
             return Ok(accepted);
         }
         let mut policy = self.submission_policy(&request, context.allow_wakeups)?;
+        self.bind_editor(&mut policy, &request, &context)?;
+        policy.allow_library_selection = context.allow_library_selection;
+        let result = async {
+            let ticket = self.register_prompt(request.clone(), true, policy).await?;
+            prompt_acceptance(ticket.admission).await
+        }
+        .await;
+        match result {
+            Ok(accepted) => Ok(accepted),
+            // An acceptance may have committed before the claim or response
+            // failed. Re-read its identity and leave unclaimed input queued.
+            Err(error) => self
+                .existing_submission(&request, &context)
+                .await?
+                .ok_or(error),
+        }
+    }
+
+    /// Bind the request to the editor surface the client named, under the
+    /// same rules for a submitted and a queued request.
+    fn bind_editor(
+        &self,
+        policy: &mut SubmissionPolicy,
+        request: &PromptRequest,
+        context: &SubmissionContext,
+    ) -> Result<()> {
         let editor_endpoint = context.editor_endpoint.clone();
         let editor_svg_target = context.editor_svg_target.clone();
         if editor_svg_target.is_some() && (editor_endpoint.is_none() || context.allow_wakeups) {
@@ -2934,21 +2988,7 @@ impl Host {
         policy.editor_endpoint = editor_endpoint;
         policy.editor_presentation = context.editor_presentation;
         policy.editor_svg_target = editor_svg_target;
-        policy.allow_library_selection = context.allow_library_selection;
-        let result = async {
-            let ticket = self.register_prompt(request.clone(), true, policy).await?;
-            prompt_acceptance(ticket.admission).await
-        }
-        .await;
-        match result {
-            Ok(accepted) => Ok(accepted),
-            // An acceptance may have committed before the claim or response
-            // failed. Re-read its identity and leave unclaimed input queued.
-            Err(error) => self
-                .existing_submission(&request, &context)
-                .await?
-                .ok_or(error),
-        }
+        Ok(())
     }
 
     async fn existing_submission(
@@ -3116,7 +3156,10 @@ impl Host {
                 })
                 .collect::<Vec<_>>()
         };
-        let result = tokio::time::timeout_at(deadline, async {
+        // Every chat process is stopped alongside the turns and waited for
+        // within the same deadline.
+        let processes = self.processes.shutdown(deadline.into_std());
+        let turns = tokio::time::timeout_at(deadline, async {
             for (session, turn, admitted, _) in &active {
                 if *admitted {
                     control(self, session.clone(), turn.clone(), ControlDirective::Pause).await?;
@@ -3143,15 +3186,15 @@ impl Host {
                 }
                 changed.await;
             }
-        })
-        .await;
+        });
+        let (result, processes) = tokio::join!(turns, processes);
         let renewal = if let Some(gg) = &self.gg_connection {
             gg.shutdown(deadline).await
         } else {
             Ok(())
         };
         match result {
-            Ok(Ok(())) => renewal,
+            Ok(Ok(())) => processes.and(renewal),
             Ok(Err(error)) if error.kind == ErrorKind::Uncertain => Err(error),
             failure => {
                 for (_, _, _, handle) in &active {

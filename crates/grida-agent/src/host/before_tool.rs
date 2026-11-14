@@ -1,7 +1,7 @@
 //! GRIDA-SEC-004 — Required command admission check with a private turn grant.
 
 use super::*;
-use crate::command::CommandTool;
+use crate::command::CommandSupervisor;
 use crate::permissions::{ReviewedHookCommand, TurnPermissions};
 use agent_kit_core::inference::InputFormat;
 use agent_kit_core::messages::{OutcomeStatus, ResultContent, ToolArguments};
@@ -43,7 +43,7 @@ pub(super) struct BeforeToolCheck {
     definition: ToolDefinition,
     hook: ReviewedHookCommand,
     permissions: Arc<TurnPermissions>,
-    command: Arc<CommandTool>,
+    command: Arc<CommandSupervisor>,
     fenced: AtomicBool,
 }
 
@@ -51,7 +51,7 @@ impl BeforeToolCheck {
     pub(super) fn bind(
         binding: &TurnBinding,
         permissions: Option<&Arc<TurnPermissions>>,
-        command: Option<&Arc<CommandTool>>,
+        command: Option<&Arc<CommandSupervisor>>,
     ) -> Result<Option<Arc<Self>>> {
         let Some(permissions) = permissions else {
             return Ok(None);
@@ -115,8 +115,10 @@ impl BeforeToolCheck {
         &self.grant == selection
     }
 
+    /// The check reviews each `exec_command` before it starts. Input to an
+    /// already reviewed process is not checked again.
     pub(super) fn matches(&self, invocation: &Invocation) -> bool {
-        invocation.definition() == self.command.definition()
+        invocation.definition().id.as_str() == crate::processes::EXEC_COMMAND
     }
 
     fn inventory(self: &Arc<Self>) -> Result<InventorySnapshot> {
@@ -134,7 +136,7 @@ impl BeforeToolCheck {
             || event.version != 1
             || event.session != self.binding.session
             || event.turn != self.binding.turn
-            || event.tool != self.command.definition().id
+            || event.tool.as_str() != crate::processes::EXEC_COMMAND
             || event.revision != self.hook.revision
         {
             return Err(unavailable());

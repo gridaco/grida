@@ -349,8 +349,9 @@ a caller-authored authority set. The supervisor canonicalizes the workload,
 validates it as a subset of the bound authority, and applies cancellation and
 lifetime limits.
 
-Finite commands, long-lived bidirectional agents, and managed extension
-lifecycles are separate behavioral contracts. They may share a private
+Finite commands, conversation-owned command sessions, long-lived
+bidirectional agents, and managed extension lifecycles are separate behavioral
+contracts. They may share a private
 lower-level launcher only after each contract keeps its own lifecycle and
 outcome semantics. None exposes the host's raw process handle to the model.
 Platform setup, route mediation, process-tree termination, violation reporting,

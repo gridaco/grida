@@ -3,6 +3,7 @@
 use super::projection::{Outcome, activity_update};
 use super::{ConnectionSessions, Delivery};
 use crate::host::live::{LifecycleFact, LiveUpdate};
+use crate::processes::ProcessSessions;
 use agent_client_protocol::v1::ConnectionTo;
 use agent_client_protocol::v1::schema::{ContentChunk, SessionNotification, SessionUpdate};
 use agent_client_protocol::{Client, Result};
@@ -21,6 +22,7 @@ pub(super) async fn forward(
     mut updates: Receiver<LiveUpdate>,
     text_enabled: bool,
     lifecycle_enabled: bool,
+    processes: Option<Arc<ProcessSessions>>,
 ) -> Result<()> {
     let stream = async {
         loop {
@@ -106,11 +108,41 @@ pub(super) async fn forward(
                     )
                     .await?;
                 }
+                Ok(LiveUpdate::Processes(update)) => {
+                    if processes.is_none() {
+                        continue;
+                    }
+                    send(
+                        &connection,
+                        &delivery,
+                        &sessions,
+                        &update.session,
+                        ContentChunk::new("".to_owned().into()),
+                        super::extensions::PROCESSES,
+                        json!({"processes": update.processes}),
+                    )
+                    .await?;
+                }
                 Err(RecvError::Lagged(_)) => {
+                    let attached = sessions.lock().unwrap().attached.clone();
+                    if let Some(processes) = &processes {
+                        // A missed change is replaced by the current list.
+                        for session in &attached {
+                            send(
+                                &connection,
+                                &delivery,
+                                &sessions,
+                                session,
+                                ContentChunk::new("".to_owned().into()),
+                                super::extensions::PROCESSES,
+                                json!({"processes": processes.list(session)}),
+                            )
+                            .await?;
+                        }
+                    }
                     if !text_enabled {
                         continue;
                     }
-                    let attached = sessions.lock().unwrap().attached.clone();
                     for session in attached {
                         send(
                             &connection,

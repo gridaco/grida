@@ -1,8 +1,6 @@
 //! GRIDA-SEC-004 / GRIDA-SEC-014 — host-selected roots and exact action approvals.
 
-use crate::command::{
-    AuthorizedCommand, CommandAccess, CommandArguments, CommandLimits, CommandTool, ReviewedCommand,
-};
+use crate::command::{CommandAccess, CommandLimits, CommandSupervisor, ReviewedCommand};
 use crate::configuration::Configuration;
 use crate::file_tools::{
     CAPTURE_IMAGE_REFERENCE, FileAuthority, FileTools, ImageCapture, PROTECTED_METADATA,
@@ -10,11 +8,15 @@ use crate::file_tools::{
     read_request, write_request,
 };
 use crate::goal_verification::ReadVerification;
+use crate::processes::{
+    AuthorizedProcess, EXEC_COMMAND, ExecArguments, ProcessSessions, ProcessTools,
+    SESSION_LIFETIME, WRITE_STDIN,
+};
 use crate::workspace::{DirectoryBinding, DirectoryGrant, ProtectedRoots, WorkspaceSnapshot};
 use agent_kit_core::authority::{
     AuthorityBinding, AuthorityRequest, AuthorityValidator, Denial, GrantSelection,
 };
-use agent_kit_core::tools::{Inventory, Invocation, Tool};
+use agent_kit_core::tools::{Inventory, Invocation};
 use agent_kit_core::turn::{
     OperationInput, OperationState, ResponseContract, TurnBinding, WaitRecord,
 };
@@ -80,8 +82,8 @@ pub struct CommandProfile {
     /// Programs may read and execute anywhere except protected paths, as in
     /// the person's terminal. Writes still follow the grant.
     pub disk_read: bool,
-    /// The environment every program starts from; tool-supplied values win.
-    /// Empty when the profile does not inherit the host environment.
+    /// The environment every program starts from. Empty when the profile
+    /// does not inherit the host environment.
     pub environment: Arc<BTreeMap<String, String>>,
 }
 
@@ -586,8 +588,12 @@ impl PermissionProfile {
                 grants: vec![GrantId::new("workspace-file-read")?],
             },
             commands: GrantSelection {
-                authority,
+                authority: authority.clone(),
                 grants: vec![GrantId::new("workspace-command")?],
+            },
+            processes: GrantSelection {
+                authority,
+                grants: vec![GrantId::new("workspace-process-input")?],
             },
             state: Arc::default(),
         }))
@@ -685,16 +691,15 @@ pub enum ApprovalEffect {
     },
     Command {
         access: CommandAccess,
-        /// The program as the model named it.
-        program: PathBuf,
-        /// The file that runs: a bare program name resolved on the command's
-        /// `PATH`, which the model's environment may override.
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        executable: Option<PathBuf>,
+        /// The command line the shell runs.
+        command: String,
+        /// Whether the command gets a pseudo-terminal.
+        terminal: bool,
         cwd: PathBuf,
-        arguments: Vec<String>,
+        /// The shell that runs the command line.
+        executable: PathBuf,
+        /// Names of the environment the process starts with.
         environment_names: Vec<String>,
-        stdin_bytes: usize,
     },
     Write {
         tool: ToolId,
@@ -755,7 +760,8 @@ pub(crate) fn reviewed_approval_answer(
     )
 }
 
-/// Turn-local admission. Retain the returned CommandTool until native cleanup.
+/// Turn-local admission. Retain the returned CommandSupervisor until native
+/// cleanup. Model commands run as the chat's processes in the host's store.
 #[derive(Clone)]
 pub struct TurnPermissions {
     profile: Arc<PermissionProfile>,
@@ -768,6 +774,9 @@ pub struct TurnPermissions {
     settings: Option<Arc<Configuration>>,
     files: GrantSelection,
     commands: GrantSelection,
+    /// Input to and output from the chat's processes. Offered with commands
+    /// and needing no approval of its own.
+    processes: GrantSelection,
     state: Arc<Mutex<PermissionState>>,
 }
 
@@ -809,7 +818,7 @@ impl TurnPermissions {
         self.profile.lifecycle_hooks()
     }
 
-    pub(crate) fn hook_command_tool(self: &Arc<Self>) -> Result<Option<Arc<CommandTool>>> {
+    pub(crate) fn hook_supervisor(&self) -> Result<Option<Arc<CommandSupervisor>>> {
         if self
             .profile
             .lifecycle_hooks
@@ -823,12 +832,9 @@ impl TurnPermissions {
             .command
             .as_ref()
             .ok_or_else(command_unavailable)?;
-        let owner = self.clone();
-        Ok(Some(Arc::new(CommandTool::authorized(
+        Ok(Some(Arc::new(CommandSupervisor::new(
             command.sandbox.clone(),
-            command.limits,
-            Arc::new(move |invocation| owner.command_authority(invocation)),
-        )?)))
+        ))))
     }
 
     pub(crate) fn review_hook_command(
@@ -873,7 +879,9 @@ impl TurnPermissions {
 
     pub fn handles(&self, selection: &GrantSelection) -> bool {
         selection == &self.files
-            || (!self.primary_review && !self.profile.hooks_only && selection == &self.commands)
+            || (!self.primary_review
+                && !self.profile.hooks_only
+                && (selection == &self.commands || selection == &self.processes))
     }
 
     pub(crate) fn goal_read_verifier(
@@ -971,47 +979,56 @@ impl TurnPermissions {
         Ok(())
     }
 
+    /// Offer the file tools and, when the profile allows model commands,
+    /// `exec_command` and `write_stdin` on the chat's processes in
+    /// `processes`. Returns the supervisor for reviewed checks.
     pub fn insert(
         self: &Arc<Self>,
         inventory: &mut Inventory,
         grants: &mut BTreeMap<ToolId, GrantSelection>,
-    ) -> Result<Option<Arc<CommandTool>>> {
-        self.insert_with_images(inventory, grants, None, None)
+        processes: &Arc<ProcessSessions>,
+    ) -> Result<Option<Arc<CommandSupervisor>>> {
+        self.insert_with_images(inventory, grants, processes, None, None)
     }
 
     pub(crate) fn insert_with_images(
         self: &Arc<Self>,
         inventory: &mut Inventory,
         grants: &mut BTreeMap<ToolId, GrantSelection>,
+        processes: &Arc<ProcessSessions>,
         capture_image: Option<Arc<ImageCapture>>,
         capture_reference: Option<Arc<ImageCapture>>,
-    ) -> Result<Option<Arc<CommandTool>>> {
+    ) -> Result<Option<Arc<CommandSupervisor>>> {
         self.insert_file_tools_with_images(inventory, grants, capture_image, capture_reference)?;
         if self.primary_review {
             return Ok(None);
         }
+        let Some(command) = self.profile.command.as_ref() else {
+            return Ok(None);
+        };
         let model_commands = !self.profile.hooks_only
             && self.profile.directories.values().any(|rule| {
                 rule.command_read != AccessRule::Deny || rule.command_read_write != AccessRule::Deny
             });
-        let Some(command) = self.profile.command.as_ref().filter(|_| {
-            model_commands
-                || self.profile.completion_hook.is_some()
-                || self.profile.lifecycle_hooks.iter().any(|hook| hook.enabled)
-        }) else {
-            return Ok(None);
-        };
-        let owner = self.clone();
-        let tool = Arc::new(CommandTool::authorized(
-            command.sandbox.clone(),
-            command.limits,
-            Arc::new(move |invocation| owner.command_authority(invocation)),
-        )?);
         if model_commands {
-            inventory.insert(tool.clone())?;
-            grants.insert(tool.definition().id.clone(), self.commands.clone());
+            let owner = self.clone();
+            let tools = ProcessTools::authorized(
+                command.sandbox.clone(),
+                command.limits,
+                processes.clone(),
+                self.selection.0.clone(),
+                Arc::new(move |invocation| owner.process_authority(invocation)),
+            )?;
+            let [exec, write] = tools.tools();
+            grants.insert(exec.definition().id.clone(), self.commands.clone());
+            grants.insert(write.definition().id.clone(), self.processes.clone());
+            inventory.insert(exec)?;
+            inventory.insert(write)?;
         }
-        Ok(Some(tool))
+        let checks = self.profile.completion_hook.is_some()
+            || self.profile.before_tool_hook.is_some()
+            || self.profile.lifecycle_hooks.iter().any(|hook| hook.enabled);
+        Ok(checks.then(|| Arc::new(CommandSupervisor::new(command.sandbox.clone()))))
     }
 
     /// Revoke this root for the current owner and stop its running commands.
@@ -1069,13 +1086,13 @@ impl TurnPermissions {
             return Ok(ready);
         }
         let (directory, effect, command_capture, rule) = match invocation.definition().id.as_str() {
-            "run_command" if !self.profile.hooks_only && admission.grants == self.commands => {
+            EXEC_COMMAND if !self.profile.hooks_only && admission.grants == self.commands => {
                 let command = self
                     .profile
                     .command
                     .as_ref()
                     .ok_or_else(command_unavailable)?;
-                let input = CommandArguments::parse(
+                let input = ExecArguments::parse(
                     invocation.arguments(),
                     command.limits.max_input_bytes,
                     true,
@@ -1095,24 +1112,14 @@ impl TurnPermissions {
                 if rule == AccessRule::Deny {
                     return Err(denied());
                 }
-                let program = input.program.clone();
-                let cwd = input.cwd.clone();
-                let arguments = input.args.clone();
-                let environment_names = input.env.keys().cloned().collect();
-                let stdin_bytes = input.stdin.len();
-                let spec = input.into_spec(
-                    command.limits.timeout,
-                    command.limits.max_output_bytes,
-                    &command.environment,
-                );
+                let spec = input.spec(directory.root(), &command.environment);
                 let effect = ApprovalEffect::Command {
                     access,
-                    program,
-                    executable: Some(spec.executable.clone()),
-                    cwd,
-                    arguments,
-                    environment_names,
-                    stdin_bytes,
+                    command: input.cmd.clone(),
+                    terminal: input.tty,
+                    cwd: spec.cwd.clone(),
+                    executable: spec.executable.clone(),
+                    environment_names: command.environment.keys().cloned().collect(),
                 };
                 let scope = self.profile.command_scope(
                     self.commands.clone(),
@@ -1332,7 +1339,7 @@ impl TurnPermissions {
         })
     }
 
-    fn command_authority(self: &Arc<Self>, invocation: &Invocation) -> Result<AuthorizedCommand> {
+    fn process_authority(self: &Arc<Self>, invocation: &Invocation) -> Result<AuthorizedProcess> {
         if self.profile.hooks_only {
             return Err(denied());
         }
@@ -1343,11 +1350,13 @@ impl TurnPermissions {
         let ApprovalEffect::Command { access, .. } = ready.request.effect else {
             return Err(denied());
         };
-        let scope = self.profile.command_scope(
+        let mut scope = self.profile.command_scope(
             self.commands.clone(),
             ready.request.root.clone(),
             access,
         )?;
+        // The process outlives this turn; its scope ends with the session.
+        scope.valid_until = Instant::now() + SESSION_LIFETIME;
         let expected = ready.command_capture.ok_or_else(command_unavailable)?;
         let environment = self
             .profile
@@ -1356,19 +1365,21 @@ impl TurnPermissions {
             .map(|command| Arc::clone(&command.environment))
             .unwrap_or_default();
         let owner = self.clone();
-        Ok(AuthorizedCommand {
+        Ok(AuthorizedProcess {
             scope,
             expected,
             environment,
-            spawn: Arc::new(move |prepared, cancellation| {
+            root: ready.request.root.clone(),
+            spawn: Arc::new(move |prepared, options, stop| {
                 let mut state = owner.state()?;
                 current(&state, &operation, action)?;
                 let ready = state.ready.get_mut(&operation).ok_or_else(denied)?;
                 if ready.active.is_some() {
                     return Err(problem(ErrorKind::Conflict, "permission_action_dispatched"));
                 }
-                let running = prepared.spawn(cancellation.clone())?;
-                ready.active = Some(cancellation);
+                let running = prepared.spawn_session(options, stop.clone())?;
+                // Revoking the directory stops the process.
+                ready.active = Some(stop);
                 Ok(running)
             }),
         })
@@ -1384,6 +1395,19 @@ impl ToolGate for TurnPermissions {
         Box::pin(async move {
             if self.binding.get() != Some(context.operations.view().state.binding()) {
                 return Err(denied());
+            }
+            if admission.grants == self.processes {
+                // Process input follows the command grant: it reaches only
+                // this chat's processes and needs no approval of its own.
+                let tool = admission.invocation.definition().id.as_str();
+                if self.profile.hooks_only
+                    || self.primary_review
+                    || tool != WRITE_STDIN
+                    || admission.operation != *admission.invocation.id()
+                {
+                    return Err(denied());
+                }
+                return Ok(ToolDecision::Permit);
             }
             let owner = self.clone();
             let (mut ready, rule) =
@@ -1439,6 +1463,12 @@ impl ToolGate for TurnPermissions {
 impl AuthorityValidator for TurnPermissions {
     fn validate(&self, request: AuthorityRequest) -> BoxFuture<'_, Result<()>> {
         Box::pin(async move {
+            if request.selection == self.processes {
+                if self.profile.hooks_only || self.primary_review || self.binding.get().is_none() {
+                    return Err(denied());
+                }
+                return Ok(());
+            }
             let (approval, captured) = {
                 let state = self.state()?;
                 let ready = current(&state, &request.operation, request.action)?;

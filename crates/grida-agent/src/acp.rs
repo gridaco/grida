@@ -326,9 +326,13 @@ async fn serve_connection(
                     );
                     let text = reviewer && offered(live::CAPABILITY);
                     let lifecycle = reviewer && offered(live::LIFECYCLE);
-                    if !sessions.live_started && (text || lifecycle) {
+                    let processes = sessions
+                        .negotiated
+                        .contains(extensions::PROCESSES)
+                        .then(|| initialized_host.process_sessions());
+                    if !sessions.live_started && (text || lifecycle || processes.is_some()) {
                         sessions.live_started = true;
-                        Some((initialized_host.observe_live(), text, lifecycle))
+                        Some((initialized_host.observe_live(), text, lifecycle, processes))
                     } else {
                         None
                     }
@@ -353,7 +357,7 @@ async fn serve_connection(
                             env!("CARGO_PKG_VERSION"),
                         )),
                 )?;
-                if let Some((updates, text, lifecycle)) = updates {
+                if let Some((updates, text, lifecycle, processes)) = updates {
                     connection.spawn(live::forward(
                         connection.clone(),
                         initialized_delivery.clone(),
@@ -361,6 +365,7 @@ async fn serve_connection(
                         updates,
                         text,
                         lifecycle,
+                        processes,
                     ))?;
                 }
                 Ok(())

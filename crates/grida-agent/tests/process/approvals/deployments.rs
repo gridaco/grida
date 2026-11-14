@@ -162,21 +162,25 @@ fn command_reply(owner: &Fixture, other: &Fixture, text: &str, port: u16) -> Rep
     let mut profile: Value = serde_json::from_slice(&fs::read(&owner.profile).unwrap()).unwrap();
     profile["directories"][1]["commandReadWrite"] = json!("allow");
     fs::write(&owner.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
-    let arguments = json!({
-        "directory":"extra","access":"read_write","program":"/bin/bash","cwd":owner.extra,
-        "args":["-c",r#"
-            test "$(/bin/cat selected.txt)" = "$2" || exit 71
-            test -z "${GRIDA_AGENT_PROCESS_TEST_KEY+x}${GRIDA_AGENT_FIXTURE_SERVER_TOKEN+x}" || exit 72
-            if (: < "$1/selected.txt") 2>/dev/null; then exit 73; fi
-            if (printf denied > "$1/foreign-write") 2>/dev/null; then exit 74; fi
-            if (: > "/dev/tcp/127.0.0.1/$3") 2>/dev/null; then exit 75; fi
-            printf '%s' "$2" > effect || exit 76
+    // The default shell is /bin/sh; bash provides /dev/tcp for the probe.
+    let script = format!(
+        r#"exec /bin/bash -c '
+            test "$(/bin/cat selected.txt)" = "{text}" || exit 71
+            test -z "${{GRIDA_AGENT_PROCESS_TEST_KEY+x}}${{GRIDA_AGENT_FIXTURE_SERVER_TOKEN+x}}" || exit 72
+            if (: < "{other}/selected.txt") 2>/dev/null; then exit 73; fi
+            if (printf denied > "{other}/foreign-write") 2>/dev/null; then exit 74; fi
+            if (: > "/dev/tcp/127.0.0.1/{port}") 2>/dev/null; then exit 75; fi
+            printf "%s" "{text}" > effect || exit 76
             while [ ! -f release ]; do /bin/sleep 0.04; done
-            printf '%s' "$2"
-        "#,"workspace-scope",other.extra,text,port.to_string()],
+            printf "%s" "{text}"
+        '"#,
+        other = other.extra.display(),
+    );
+    let arguments = json!({
+        "directory":"extra","access":"read_write","cmd":script,"yield_time_ms":30000,
     });
     Reply::Tool(
-        "run_command",
+        "exec_command",
         Box::leak(arguments.to_string().into_boxed_str()),
     )
 }

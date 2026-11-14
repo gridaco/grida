@@ -1,17 +1,18 @@
 #![cfg(any(target_os = "macos", target_os = "linux"))]
 
-// GRIDA-SEC-004: exercise the scoped command and its native cleanup barrier.
+// GRIDA-SEC-004: chat processes under the native sandbox, outliving the call
+// and the turn that started them.
 use agent_kit_core::authority::{
     AuthorityBinding, AuthorityRequest, AuthorityValidator, GrantSelection,
 };
 use agent_kit_core::messages::{OutcomeStatus, ResultContent, ToolArguments};
 use agent_kit_core::tools::{
-    Inventory, InventorySnapshot, InvocationContext, InvocationRecovery, Tool,
+    Inventory, InventorySnapshot, InvocationContext, InvocationRecovery, ToolOutcome,
 };
-use agent_kit_core::turn::{ControlDirective, EphemeralJournal, OperationInput, TurnBinding};
+use agent_kit_core::turn::{ControlDirective, EphemeralJournal, TurnBinding};
 use agent_kit_core::{
     AttemptId, BindingId, BoxFuture, CancellationToken, ChangeId, GrantId, OperationId,
-    PrincipalId, Result, ScopeId, SessionId, TurnId,
+    PrincipalId, Result, ScopeId, SessionId, ToolId, TurnId,
 };
 use agent_kit_runtime::{
     AdmissionContext, ExecutionLimits, ExecutionServices, InvokeOutcome, OperationKey,
@@ -21,9 +22,11 @@ use agent_kit_sandbox::{
     DeniedAccess, ExecutionScope, Installation, ProtectedPath, Sandbox, Termination,
     TrustedExecutable,
 };
-use grida_agent::command::{CommandLimits, CommandTool};
-use serde_json::json;
+use grida_agent::command::CommandLimits;
+use grida_agent::processes::{ProcessSessions, ProcessState, ProcessTools};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
@@ -31,7 +34,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tempfile::TempDir;
 
-const WAIT: Duration = Duration::from_secs(8);
+const WAIT: Duration = Duration::from_secs(12);
 
 struct Fixture {
     _base: TempDir,
@@ -39,6 +42,7 @@ struct Fixture {
     temporary: PathBuf,
     sandbox: Arc<Sandbox>,
     scope: ExecutionScope,
+    sessions: Arc<ProcessSessions>,
 }
 
 impl Fixture {
@@ -72,6 +76,8 @@ impl Fixture {
             "/lib",
             "/lib64",
             "/System/Library",
+            // macOS /bin/sh reads its selected shell here.
+            "/private/var/select",
         ]
         .into_iter()
         .map(PathBuf::from)
@@ -87,7 +93,7 @@ impl Fixture {
                 grants: vec![GrantId::new("fixture-command").unwrap()],
             },
             revision: BindingId::new("fixture-scope-revision").unwrap(),
-            valid_until: Instant::now() + WAIT * 3,
+            valid_until: Instant::now() + WAIT * 5,
             read: vec![workspace.clone()],
             write: vec![workspace.clone()],
             runtime,
@@ -105,32 +111,96 @@ impl Fixture {
             temporary,
             sandbox,
             scope,
+            sessions: Arc::new(ProcessSessions::new()),
         }
     }
 
-    fn tool(&self) -> Arc<CommandTool> {
-        Arc::new(
-            CommandTool::new(
-                self.sandbox.clone(),
-                self.scope.clone(),
-                CommandLimits {
-                    timeout: WAIT * 2,
-                    max_input_bytes: 4096,
-                    max_output_bytes: 4096,
-                },
-            )
-            .unwrap(),
-        )
+    /// One claim's tools for a chat, over the fixture's store.
+    fn chat(&self, chat: &str) -> Chat {
+        self.chat_in(chat, self.sessions.clone())
     }
 
-    fn arguments(&self, script: &str) -> ToolArguments {
-        ToolArguments::Json(json!({
-            "program": "/bin/bash",
-            "args": ["-c", script],
-            "cwd": self.workspace,
-            "env": {"EXPLICIT": "fixture"},
-            "stdin": "café\n"
-        }))
+    fn chat_in(&self, chat: &str, sessions: Arc<ProcessSessions>) -> Chat {
+        let tools = ProcessTools::new(
+            self.sandbox.clone(),
+            self.scope.clone(),
+            self.workspace.clone(),
+            BTreeMap::from([("EXPLICIT".to_owned(), "fixture".to_owned())]),
+            CommandLimits {
+                timeout: WAIT,
+                max_input_bytes: 4096,
+                max_output_bytes: 16 * 1024,
+            },
+            sessions,
+            session(chat),
+        )
+        .unwrap();
+        let mut inventory = Inventory::new();
+        for tool in tools.tools() {
+            inventory.insert(tool).unwrap();
+        }
+        Chat {
+            offered: inventory
+                .snapshot(&[tool_id("exec_command"), tool_id("write_stdin")])
+                .unwrap(),
+            _tools: tools,
+            next: 0,
+        }
+    }
+
+    fn temporary_is_empty(&self) -> bool {
+        self.temporary.read_dir().unwrap().next().is_none()
+    }
+}
+
+struct Chat {
+    offered: InventorySnapshot,
+    _tools: ProcessTools,
+    next: u32,
+}
+
+impl Chat {
+    async fn call(&mut self, tool: &str, arguments: Value) -> ToolOutcome {
+        self.call_with(tool, arguments, context(CancellationToken::new()))
+            .await
+    }
+
+    async fn call_with(
+        &mut self,
+        tool: &str,
+        arguments: Value,
+        context: InvocationContext,
+    ) -> ToolOutcome {
+        self.next += 1;
+        self.offered
+            .prepare(
+                OperationId::new(format!("call-{}", self.next)).unwrap(),
+                &tool_id(tool),
+                ToolArguments::Json(arguments),
+            )
+            .unwrap()
+            .invoke(context)
+            .await
+    }
+
+    /// Poll a process until its end is reported.
+    async fn until_ended(&mut self, id: u64) -> String {
+        tokio::time::timeout(WAIT, async {
+            loop {
+                let polled = self
+                    .call(
+                        "write_stdin",
+                        json!({"session_id": id, "yield_time_ms": 5000}),
+                    )
+                    .await;
+                let reported = text(&polled);
+                if !reported.contains("Process running with session ID") {
+                    return reported;
+                }
+            }
+        })
+        .await
+        .unwrap()
     }
 }
 
@@ -142,21 +212,344 @@ fn trusted(path: impl AsRef<Path>) -> TrustedExecutable {
     }
 }
 
-fn inventory(tool: &Arc<CommandTool>) -> InventorySnapshot {
-    let mut inventory = Inventory::new();
-    inventory.insert(tool.clone()).unwrap();
-    inventory
-        .snapshot(std::slice::from_ref(&tool.definition().id))
+fn tool_id(id: &str) -> ToolId {
+    ToolId::new(id).unwrap()
+}
+
+fn session(id: &str) -> SessionId {
+    SessionId::new(id).unwrap()
+}
+
+fn context(cancellation: CancellationToken) -> InvocationContext {
+    InvocationContext {
+        attempt: AttemptId::new("attempt").unwrap(),
+        cancellation,
+        deadline: Some(Instant::now() + WAIT),
+        max_output_bytes: 16 * 1024,
+    }
+}
+
+fn text(outcome: &ToolOutcome) -> String {
+    outcome
+        .content
+        .iter()
+        .map(|part| match part {
+            ResultContent::Text(text) => text.clone(),
+            _ => String::new(),
+        })
+        .collect()
+}
+
+/// The number a still-running process was given.
+fn running_id(outcome: &ToolOutcome) -> u64 {
+    let reported = text(outcome);
+    reported
+        .lines()
+        .find_map(|line| line.strip_prefix("Process running with session ID "))
+        .unwrap_or_else(|| panic!("expected a running process: {reported}"))
+        .parse()
         .unwrap()
 }
 
-fn context(attempt: AttemptId) -> InvocationContext {
-    InvocationContext {
-        attempt,
-        cancellation: CancellationToken::new(),
-        deadline: Some(Instant::now() + WAIT),
-        max_output_bytes: 4096,
+fn output(reported: &str) -> &str {
+    reported.split_once("\nOutput:\n").unwrap().1
+}
+
+#[tokio::test]
+#[ignore = "requires a native sandbox outside the test runner's confinement"]
+async fn a_command_that_ends_within_its_wait_reports_its_exit_without_a_session() {
+    let fixture = Fixture::new();
+    let mut chat = fixture.chat("ends");
+    let operation = OperationId::new("finished").unwrap();
+    let prepared = chat
+        .offered
+        .prepare(
+            operation.clone(),
+            &tool_id("exec_command"),
+            ToolArguments::Json(json!({
+                "cmd": "printf '%s\\n' \"$EXPLICIT\"; printf 'diagnostic\\n' >&2; exit 3",
+            })),
+        )
+        .unwrap();
+    let original = prepared.invocation().clone();
+    let outcome = prepared.invoke(context(CancellationToken::new())).await;
+    let reported = text(&outcome);
+    assert_eq!(outcome.status, OutcomeStatus::Failed, "{reported}");
+    assert!(
+        reported.starts_with("Wall time: ") && reported.contains("\nProcess exited with code 3\n"),
+        "{reported}"
+    );
+    assert!(!reported.contains("session ID"), "{reported}");
+    // Pipes merge stdout and stderr.
+    assert_eq!(output(&reported), "fixture\ndiagnostic\n");
+    let details: Value = serde_json::from_slice(outcome.receipt.as_ref().unwrap().bytes()).unwrap();
+    assert_eq!(details["cleanup_verified"], true, "{details}");
+    assert!(fixture.sessions.list(&session("ends")).is_empty());
+    assert!(fixture.temporary_is_empty());
+
+    // The same claim reconciles its own attempt; any other is uncertain.
+    let recovery = InvocationRecovery {
+        invocation: original,
+        checkpoint: None,
+        receipts: vec![],
+    };
+    let tools = chat.offered.clone();
+    let recover = |attempt: &str| {
+        let tools = tools.clone();
+        let recovery = recovery.clone();
+        let mut context = context(CancellationToken::new());
+        context.attempt = AttemptId::new(attempt).unwrap();
+        async move {
+            tools
+                .prepare(
+                    recovery.invocation.id().clone(),
+                    &tool_id("exec_command"),
+                    recovery.invocation.arguments().clone(),
+                )
+                .unwrap()
+                .recover(recovery, context)
+                .await
+        }
+    };
+    assert_eq!(recover("attempt").await, outcome);
+    assert_eq!(
+        recover("another-attempt").await.status,
+        OutcomeStatus::Uncertain
+    );
+    assert_eq!(
+        fixture
+            .chat("ends")
+            .offered
+            .prepare(
+                operation,
+                &tool_id("exec_command"),
+                recovery.invocation.arguments().clone(),
+            )
+            .unwrap()
+            .recover(recovery.clone(), context(CancellationToken::new()))
+            .await
+            .status,
+        OutcomeStatus::Uncertain
+    );
+
+    let outside = fixture.workspace.with_file_name("outside");
+    for workdir in [outside.clone(), outside.join("missing")] {
+        let refused = chat
+            .call("exec_command", json!({"cmd": "true", "workdir": workdir}))
+            .await;
+        assert_eq!(refused.status, OutcomeStatus::Failed);
+        assert_eq!(
+            refused.content,
+            [ResultContent::Text("command_preparation_refused".into())]
+        );
     }
+}
+
+#[tokio::test]
+#[ignore = "requires a native sandbox outside the test runner's confinement"]
+async fn a_long_command_keeps_running_as_a_numbered_process_until_its_end_is_read() {
+    let fixture = Fixture::new();
+    let mut chat = fixture.chat("long");
+    let started = chat
+        .call(
+            "exec_command",
+            json!({"cmd": "printf a; sleep 0.3; printf b; sleep 1.5; printf done", "yield_time_ms": 1000}),
+        )
+        .await;
+    assert_eq!(started.status, OutcomeStatus::Succeeded, "{started:?}");
+    let id = running_id(&started);
+    // The wait collects everything that arrives before it ends.
+    assert_eq!(output(&text(&started)), "ab");
+    let listed = fixture.sessions.list(&session("long"));
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].process_id, id);
+    assert_eq!(listed[0].state, ProcessState::Running);
+    assert_eq!(listed[0].exit_code, None);
+    assert_eq!(listed[0].cwd, fixture.workspace);
+    assert!(!listed[0].terminal);
+    assert!(listed[0].command.starts_with("printf a;"));
+
+    let ended = chat.until_ended(id).await;
+    assert!(ended.contains("\nProcess exited with code 0\n"), "{ended}");
+    assert!(ended.ends_with("done"), "{ended}");
+    // The end is reported once; the number is then unknown.
+    assert!(fixture.sessions.list(&session("long")).is_empty());
+    let gone = chat.call("write_stdin", json!({"session_id": id})).await;
+    assert_eq!(gone.status, OutcomeStatus::Failed);
+    assert_eq!(
+        text(&gone),
+        format!("unknown session id {id} (it may have ended or been stopped)")
+    );
+    assert!(fixture.temporary_is_empty());
+}
+
+#[tokio::test]
+#[ignore = "requires a native sandbox outside the test runner's confinement"]
+async fn terminal_sessions_take_input_and_pipe_sessions_take_only_interrupts() {
+    let fixture = Fixture::new();
+    let mut chat = fixture.chat("input");
+    let terminal = chat
+        .call(
+            "exec_command",
+            json!({"cmd": "read line; printf 'got:%s\\n' \"$line\"", "tty": true, "yield_time_ms": 500}),
+        )
+        .await;
+    let id = running_id(&terminal);
+    assert!(fixture.sessions.list(&session("input"))[0].terminal);
+    let answered = chat
+        .call(
+            "write_stdin",
+            json!({"session_id": id, "chars": "hello\n", "yield_time_ms": 2000}),
+        )
+        .await;
+    let mut reported = text(&answered);
+    if reported.contains("Process running with session ID") {
+        reported.push_str(&chat.until_ended(id).await);
+    }
+    assert!(reported.contains("got:hello"), "{reported}");
+    assert!(
+        reported.contains("Process exited with code 0"),
+        "{reported}"
+    );
+
+    let pipe = chat
+        .call(
+            "exec_command",
+            json!({"cmd": "exec /bin/sleep 30", "yield_time_ms": 250}),
+        )
+        .await;
+    let id = running_id(&pipe);
+    let refused = chat
+        .call("write_stdin", json!({"session_id": id, "chars": "x"}))
+        .await;
+    assert_eq!(refused.status, OutcomeStatus::Failed);
+    assert_eq!(
+        text(&refused),
+        "stdin is closed for this session; rerun with tty=true"
+    );
+    let interrupted = chat
+        .call(
+            "write_stdin",
+            json!({"session_id": id, "chars": "\u{3}", "yield_time_ms": 3000}),
+        )
+        .await;
+    let mut reported = text(&interrupted);
+    if reported.contains("Process running with session ID") {
+        reported = chat.until_ended(id).await;
+    }
+    assert!(
+        reported.contains("\nProcess terminated by signal 2\n"),
+        "{reported}"
+    );
+    assert!(!reported.contains("exited with code"), "{reported}");
+    assert!(fixture.sessions.list(&session("input")).is_empty());
+    fixture
+        .sessions
+        .shutdown(Instant::now() + WAIT)
+        .await
+        .unwrap();
+    assert!(fixture.temporary_is_empty());
+}
+
+#[tokio::test]
+#[ignore = "requires a native sandbox outside the test runner's confinement"]
+async fn processes_belong_to_their_chat_and_numbers_are_never_reused() {
+    let fixture = Fixture::new();
+    let long = json!({"cmd": "exec /bin/sleep 30", "yield_time_ms": 250});
+    let first = {
+        let mut claim = fixture.chat("owner");
+        running_id(&claim.call("exec_command", long.clone()).await)
+    };
+    assert_eq!(first, 1);
+    // A later claim of the same chat reaches it; another chat does not.
+    let mut owner = fixture.chat("owner");
+    let polled = owner
+        .call(
+            "write_stdin",
+            json!({"session_id": first, "yield_time_ms": 250}),
+        )
+        .await;
+    assert_eq!(running_id(&polled), first);
+    let mut other = fixture.chat("other");
+    let foreign = other
+        .call("write_stdin", json!({"session_id": first}))
+        .await;
+    assert_eq!(foreign.status, OutcomeStatus::Failed);
+    assert_eq!(
+        running_id(&other.call("exec_command", long.clone()).await),
+        1
+    );
+
+    // A wait cut short by cancellation keeps the process.
+    let cancellation = CancellationToken::new();
+    let cancel = cancellation.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        cancel.cancel();
+    });
+    let cut = owner
+        .call_with(
+            "exec_command",
+            json!({"cmd": "exec /bin/sleep 30", "yield_time_ms": 30000}),
+            context(cancellation),
+        )
+        .await;
+    assert_eq!(cut.status, OutcomeStatus::Cancelled, "{cut:?}");
+    let second = running_id(&cut);
+    assert_eq!(second, 2);
+
+    // A stopped process reports its stop once; its number is not reused.
+    assert_eq!(
+        fixture
+            .sessions
+            .stop(&session("owner"), Some(&[second]), Instant::now() + WAIT)
+            .await,
+        [second]
+    );
+    let listed = fixture.sessions.list(&session("owner"));
+    assert_eq!(
+        listed
+            .iter()
+            .map(|entry| (entry.process_id, entry.state, entry.exit_code))
+            .collect::<Vec<_>>(),
+        [
+            (first, ProcessState::Running, None),
+            (second, ProcessState::Ended, None)
+        ]
+    );
+    let stopped = owner.until_ended(second).await;
+    assert!(stopped.contains("\nProcess stopped\n"), "{stopped}");
+    assert_eq!(
+        running_id(&owner.call("exec_command", long.clone()).await),
+        3
+    );
+    // A new store in the same process continues the chat's numbering.
+    let restarted = Arc::new(ProcessSessions::new());
+    let mut later = fixture.chat_in("owner", restarted.clone());
+    assert_eq!(
+        running_id(&later.call("exec_command", long.clone()).await),
+        4
+    );
+
+    // Shutdown stops every process and confirms its cleanup.
+    for store in [&fixture.sessions, &restarted] {
+        store.shutdown(Instant::now() + WAIT).await.unwrap();
+    }
+    for chat in ["owner", "other"] {
+        assert!(
+            fixture
+                .sessions
+                .list(&session(chat))
+                .iter()
+                .all(|entry| entry.state == ProcessState::Ended)
+        );
+    }
+    let refused = owner.call("exec_command", long).await;
+    assert_eq!(
+        refused.content,
+        [ResultContent::Text("process_sessions_closed".into())]
+    );
+    assert!(fixture.temporary_is_empty());
 }
 
 struct FixtureAuthority;
@@ -173,140 +566,40 @@ impl ToolGate for FixtureAuthority {
 
 #[tokio::test]
 #[ignore = "requires a native sandbox outside the test runner's confinement"]
-async fn finite_command_preserves_native_result_and_reconciles_exact_attempt() {
+async fn cancelling_the_turn_leaves_the_process_with_the_chat() {
     let fixture = Fixture::new();
-    let tool = fixture.tool();
-    let offered = inventory(&tool);
-    let operation = OperationId::new("read-stdin").unwrap();
-    let attempt = AttemptId::new("first-attempt").unwrap();
-    let prepared = offered
-        .prepare(
-            operation.clone(),
-            &tool.definition().id,
-            fixture.arguments("printf '%s\\n' \"$EXPLICIT\"; /bin/cat; printf 'diagnostic\\n' >&2"),
-        )
-        .unwrap();
-    let original = prepared.invocation().clone();
-    let outcome = prepared.invoke(context(attempt.clone())).await;
-    assert_eq!(outcome.status, OutcomeStatus::Succeeded, "{outcome:?}");
-    assert_eq!(
-        outcome.content,
-        [
-            ResultContent::Text("stdout:\nfixture\ncafé\n".into()),
-            ResultContent::Text("stderr:\ndiagnostic\n".into())
-        ]
-    );
-    assert_eq!(
-        outcome.structured.as_ref().unwrap()["cleanup_verified"],
-        true
-    );
-    assert!(outcome.receipt.is_some());
-    assert!(fixture.temporary.read_dir().unwrap().next().is_none());
-    let recovery = InvocationRecovery {
-        invocation: original,
-        checkpoint: None,
-        receipts: vec![],
-    };
-    assert_eq!(
-        tool.recover(recovery.clone(), context(attempt.clone()))
-            .await,
-        outcome
-    );
-    assert_eq!(
-        tool.recover(
-            recovery.clone(),
-            context(AttemptId::new("another-attempt").unwrap())
-        )
-        .await
-        .status,
-        OutcomeStatus::Uncertain
-    );
-    let altered = offered
-        .prepare(
-            operation,
-            &tool.definition().id,
-            fixture.arguments("exit 12"),
-        )
-        .unwrap();
-    assert_eq!(
-        tool.recover(
-            InvocationRecovery {
-                invocation: altered.invocation().clone(),
-                ..recovery.clone()
-            },
-            context(attempt.clone())
-        )
-        .await
-        .status,
-        OutcomeStatus::Uncertain
-    );
-    let fresh_scope = fixture.tool();
-    assert_eq!(
-        fresh_scope.recover(recovery, context(attempt)).await.status,
-        OutcomeStatus::Uncertain
-    );
-
-    let outside = fixture.workspace.with_file_name("outside");
-    for (id, cwd) in [
-        ("existing-outside-scope", outside.clone()),
-        ("missing-outside-scope", outside.join("missing")),
-    ] {
-        let ToolArguments::Json(mut arguments) = fixture.arguments("exit 0") else {
-            unreachable!("fixture arguments are JSON")
-        };
-        arguments["cwd"] = json!(cwd);
-        let refused = offered
-            .prepare(
-                OperationId::new(id).unwrap(),
-                &tool.definition().id,
-                ToolArguments::Json(arguments),
-            )
-            .unwrap()
-            .invoke(context(AttemptId::new("refused-attempt").unwrap()))
-            .await;
-        assert_eq!(refused.status, OutcomeStatus::Failed);
-        assert_eq!(
-            refused.content,
-            [ResultContent::Text("command_preparation_refused".into())]
-        );
-    }
-}
-
-#[tokio::test]
-#[ignore = "requires a native sandbox outside the test runner's confinement"]
-async fn runtime_cancellation_leaves_native_cleanup_under_host_ownership() {
-    let fixture = Fixture::new();
-    let tool = fixture.tool();
+    let chat = fixture.chat("turns");
     let runtime = Runtime::new(ExecutionServices {
         providers: Default::default(),
-        tools: inventory(&tool),
+        tools: chat.offered.clone(),
         authority: Arc::new(FixtureAuthority),
         gate: Arc::new(FixtureAuthority),
         limits: ExecutionLimits {
             max_operations: 4,
             max_concurrent_inferences: 1,
             max_concurrent_tools: 1,
-            max_output_bytes: 4096,
-            operation_timeout: WAIT * 2,
+            max_output_bytes: 16 * 1024,
+            operation_timeout: WAIT,
             observer_capacity: 8,
         },
     })
     .unwrap();
     let ephemeral = EphemeralJournal::create(TurnBinding {
-        session: SessionId::new("fixture-session").unwrap(),
-        turn: TurnId::new("fixture-turn").unwrap(),
+        session: session("turns"),
+        turn: TurnId::new("first-turn").unwrap(),
         epoch: 1,
     })
     .unwrap();
     let turn = runtime.open(ephemeral.lease).await.unwrap().turn;
     let operations = turn.operations();
-    let key = OperationKey::new("owned-command").unwrap();
-    let operation_id = operations.operation_id(&key).unwrap();
     let plan = PlannedInvocation {
-        tool: tool.definition().id.clone(),
-        arguments: fixture.arguments("printf started > started; exec /bin/sleep 12"),
+        tool: tool_id("exec_command"),
+        arguments: ToolArguments::Json(json!({
+            "cmd": "printf started > started; exec /bin/sleep 30", "yield_time_ms": 30000,
+        })),
         grants: fixture.scope.grants.clone(),
     };
+    let key = OperationKey::new("owned-process").unwrap();
     let invocation = tokio::spawn(async move { operations.invoke(key, plan).await });
     tokio::time::timeout(WAIT, async {
         while !fixture.workspace.join("started").is_file() {
@@ -315,11 +608,10 @@ async fn runtime_cancellation_leaves_native_cleanup_under_host_ownership() {
     })
     .await
     .unwrap();
-    assert!(fixture.temporary.read_dir().unwrap().next().is_some());
     ephemeral
         .control
         .change(
-            ChangeId::new("stop-command").unwrap(),
+            ChangeId::new("stop-turn").unwrap(),
             turn.view().state.controls().revision,
             ControlDirective::Cancel,
         )
@@ -331,53 +623,32 @@ async fn runtime_cancellation_leaves_native_cleanup_under_host_ownership() {
         .unwrap()
         .unwrap()
     else {
-        panic!("the command did not return a recorded disposition");
+        panic!("the call did not return a recorded disposition");
     };
-    assert_eq!(outcome.status, OutcomeStatus::Uncertain);
-    let view = turn.view();
-    let operation = &view.state.operations()[&operation_id];
-    let OperationInput::Tool(original) = &operation.record.input else {
-        panic!("expected tool invocation")
-    };
-    let attempt = operation.attempts[0].id.clone();
-    let cleanup = tool.stop_and_wait(Instant::now() + WAIT).await;
-    assert!(cleanup.pending.is_empty(), "{cleanup:?}");
-    #[cfg(target_os = "macos")]
-    assert!(cleanup.is_verified(), "{cleanup:?}");
-    assert!(fixture.temporary.read_dir().unwrap().next().is_none());
-    let recovered = tool
-        .recover(
-            InvocationRecovery {
-                invocation: original.clone(),
-                checkpoint: None,
-                receipts: vec![],
-            },
-            context(attempt),
+    assert_eq!(outcome.status, OutcomeStatus::Cancelled, "{outcome:?}");
+    let id = running_id(&outcome);
+    drop(turn);
+    drop(chat);
+    // The next turn's claim polls the same process.
+    let mut next = fixture.chat("turns");
+    let polled = next
+        .call(
+            "write_stdin",
+            json!({"session_id": id, "yield_time_ms": 250}),
         )
         .await;
-    assert!(recovered.receipt.is_some());
+    assert_eq!(running_id(&polled), id);
     assert_eq!(
-        recovered.structured.as_ref().unwrap()["temporary_removed"],
-        true
+        fixture
+            .sessions
+            .stop(&session("turns"), None, Instant::now() + WAIT)
+            .await,
+        [id]
     );
-    assert_eq!(
-        recovered.structured.as_ref().unwrap()["cleanup_verified"],
-        cleanup.is_verified()
-    );
-    let later = inventory(&tool)
-        .prepare(
-            OperationId::new("later-command").unwrap(),
-            &tool.definition().id,
-            fixture.arguments("printf repeated > repeated"),
-        )
+    fixture
+        .sessions
+        .shutdown(Instant::now() + WAIT)
+        .await
         .unwrap();
-    let refused = later
-        .invoke(context(AttemptId::new("later-attempt").unwrap()))
-        .await;
-    assert_eq!(refused.status, OutcomeStatus::Failed);
-    assert_eq!(
-        refused.content,
-        [ResultContent::Text("command_admission_closed".into())]
-    );
-    assert!(!fixture.workspace.join("repeated").exists());
+    assert!(fixture.temporary_is_empty());
 }

@@ -28,26 +28,26 @@ see [`tools-image.md`](./tools-image.md).
 The RFC locks 13 ids (`read`, `write`, `edit`, `glob`, `grep`,
 `bash`, `todo`, `task`, `question`, `web_search`, `web_fetch`,
 `skill`, `tool_search`). Grida currently ships a `_file` / `_files`
-suffix on the fs tools and a domain-honest name for command
-execution. The divergence is recorded here, not endorsed — a future
+suffix on the fs tools and splits command execution into a start and
+an interaction tool. The divergence is recorded here, not endorsed — a future
 RFC item should reconcile (see [Adding a new fundamental
 tool](#adding-a-new-fundamental-tool)).
 
-| RFC id        | Grida id                   | Notes                                                                                                                                                           |
-| ------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `read`        | `read_file`                | Same shape; Grida's name is more specific.                                                                                                                      |
-| `write`       | `write_file`               | Same full-file upsert shape; creates or overwrites.                                                                                                             |
-| `edit`        | `edit_file`                | Same current-content replacement shape; Grida adds a strict ambiguity rule on multi-match.                                                                      |
-| `glob`        | `list_files`               | Grida binding uses a path-scoped directory-listing shape; VFS hosts should provide it, real-fs hosts may omit it when command/search tools are stronger.        |
-| `grep`        | `grep_files`               | Same shape; literal substring search (regex is not shipped).                                                                                                    |
-| `bash`        | `run_command`              | Honest name — Grida's host does not always launch a shell.                                                                                                      |
-| `todo`        | `todo_write`               | Same shape; replace-all semantics.                                                                                                                              |
-| `task`        | _not yet shipped_          | Subagent spawn surfaced behind editor flows; expose as `task` once stable.                                                                                      |
-| `question`    | `question`                 | Shipped. Pauses the run on a human (client-resolved survey card); interactive hosts (desktop, `serve` daemon) answer it, headless hosts return a fixed refusal. |
-| `web_search`  | _not yet shipped_          | Host-bound provider; out of scope for the first cut.                                                                                                            |
-| `web_fetch`   | _not yet shipped_          | As above.                                                                                                                                                       |
-| `skill`       | _not yet shipped_          | Discovery layer pending.                                                                                                                                        |
-| `tool_search` | `tool_search` _(proposed)_ | Two-level (literal + semantic) proposed below; not yet implemented.                                                                                             |
+| RFC id        | Grida id                      | Notes                                                                                                                                                           |
+| ------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `read`        | `read_file`                   | Same shape; Grida's name is more specific.                                                                                                                      |
+| `write`       | `write_file`                  | Same full-file upsert shape; creates or overwrites.                                                                                                             |
+| `edit`        | `edit_file`                   | Same current-content replacement shape; Grida adds a strict ambiguity rule on multi-match.                                                                      |
+| `glob`        | `list_files`                  | Grida binding uses a path-scoped directory-listing shape; VFS hosts should provide it, real-fs hosts may omit it when command/search tools are stronger.        |
+| `grep`        | `grep_files`                  | Same shape; literal substring search (regex is not shipped).                                                                                                    |
+| `bash`        | `exec_command`, `write_stdin` | A command may outlive one call: the first starts it and waits briefly; the second reads, types into, or interrupts it.                                          |
+| `todo`        | `todo_write`                  | Same shape; replace-all semantics.                                                                                                                              |
+| `task`        | _not yet shipped_             | Subagent spawn surfaced behind editor flows; expose as `task` once stable.                                                                                      |
+| `question`    | `question`                    | Shipped. Pauses the run on a human (client-resolved survey card); interactive hosts (desktop, `serve` daemon) answer it, headless hosts return a fixed refusal. |
+| `web_search`  | _not yet shipped_             | Host-bound provider; out of scope for the first cut.                                                                                                            |
+| `web_fetch`   | _not yet shipped_             | As above.                                                                                                                                                       |
+| `skill`       | _not yet shipped_             | Discovery layer pending.                                                                                                                                        |
+| `tool_search` | `tool_search` _(proposed)_    | Two-level (literal + semantic) proposed below; not yet implemented.                                                                                             |
 
 ## Backends
 
@@ -194,44 +194,76 @@ prior list is replaced wholesale.
 Use it when the work is non-trivial (multiple edits, exploration,
 anything you'd break into steps). Skip it for one-shot edits.
 
-### `run_command`
+### `exec_command` and `write_stdin`
 
-Grida's binding of the RFC's `bash`. The name is honest about the
-fact that Grida's host does not always launch a shell — sometimes
-it directly spawns an allowlisted executable with argv slots.
+Grida's binding of the RFC's `bash`, split in two because a command can
+outlive the call that started it: a development server, a watcher, a long
+build, or an interactive program.
 
 ```ts
-run_command({
-  command: string,        // bare executable name, e.g. "git", "rg", "ls"
-  args?: string[],        // argv slots; no shell parsing
-  workdir?: string,       // defaults to the workspace root
-  timeout_ms?: number,    // optional, host-capped
-  description: string,    // short human-facing intent
+exec_command({
+  cmd: string,                // command line, run as `<shell> -c cmd`
+  workdir?: string,           // absolute; defaults to the selected directory's root
+  tty?: boolean,              // pseudo-terminal; otherwise pipes with stdin closed
+  yield_time_ms?: number,     // wait before returning; default 10000, 250–30000
+  max_output_tokens?: number, // output budget; default 10000, host-capped
+  // plus the host's approval fields where grants are scoped per directory
+})
+
+write_stdin({
+  session_id: number,         // from an earlier result
+  chars?: string,             // empty polls; "\u0003" interrupts
+  yield_time_ms?: number,     // writes: default 250, at most 30000; polls: 5000–300000
+  max_output_tokens?: number,
 })
 ```
 
-Result:
+Both return text:
 
-```ts
-{
-  stdout: string,
-  stderr: string,
-  exit_code: number | null,
-  signal?: string | null,
-  timed_out: boolean,
-  truncated: boolean,
-  duration_ms?: number,
-}
+```text
+Wall time: 1.2345 seconds
+Process exited with code 0          (or: Process running with session ID 3)
+Original token count: 12            (only when the output was shortened)
+Output:
+<output>
 ```
 
-The contract stays honest about what is actually executed:
+The contract:
 
-- If the host runs a real shell, name and describe it as shell execution.
-- If the host directly spawns an allowlisted executable with argv slots, name and describe it as command execution.
-- Prefer explicit `workdir` over `cd ... && ...`.
-- Prefer structured arguments over shell-string parsing when the host enforces an allowlist.
-- Include a short `description`. It is useful for permission UI, transcripts, audit logs, and human review.
-- Expose timeout and truncation metadata so the model does not reason from incomplete or prematurely killed output as if it were complete.
+- **The shell is named, not chosen by the model.** It is the user's own
+  POSIX shell when that is a known one at an absolute path, otherwise
+  `/bin/sh`, and never a login or interactive shell. The call carries no
+  environment, stdin, or shell selection.
+- **A call waits for its whole yield.** It returns at the end of its wait or
+  when the command ends, never at the first output, so one call sees
+  everything that arrived in that time.
+- **A command that ends within its wait has no session.** Its exit is
+  reported once and nothing is retained.
+- **A still-running command belongs to the conversation**, not to the call
+  or the turn. Ending, cancelling or pausing a turn, waiting for an approval,
+  and resuming elsewhere leave it running; a later turn reaches it by its
+  session ID. An explicit stop, revocation of its directory, deleting the
+  conversation, eviction, and host shutdown end it, and the host's own exit
+  ends it too.
+- **Session IDs are per conversation, increasing, and never reused.** The
+  end of a session is reported once; after that its ID is unknown.
+- **Pipes accept only an interrupt.** A terminal session receives the
+  characters as typed, including the interrupt character.
+- **Output keeps its start and end.** Over budget, the middle is replaced
+  with a counted truncation marker; bytes the host could not retain are
+  counted where they were dropped. An end by signal or stop is reported as
+  such, never as an exit code.
+- **Approval belongs to the start.** Input to an approved session needs no
+  approval of its own and reaches only the conversation's own sessions. A
+  pre-execution policy check therefore sees the command line, not later
+  input; a policy that must see every command refuses interactive shells.
+- **Recovery is honest.** A start or input whose result the host cannot
+  account for after an interruption is uncertain; an empty poll may be
+  repeated.
+- **Bounded.** A conversation keeps a bounded number of sessions. Starting
+  another evicts the least recently used one, never one of the most recently
+  used or one in use, ended ones first; if none qualifies, the start is
+  refused.
 
 Security expectation: command execution must run under a real
 sandbox boundary. Every command runs under execution confinement with its own
