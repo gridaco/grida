@@ -322,11 +322,13 @@ describe("LibraryTigris", () => {
         // client can miss tearing down the socket when the abort lands while
         // it is finishing a request body, so a stalled PUT is only bounded by
         // the upload deadline above; the server closes that connection.
-        if (method !== "PUT")
-          await vi.waitFor(
-            () => expect(stalledResponses[0].destroyed).toBe(true),
-            { timeout: 20_000 }
-          );
+        await vi.waitFor(
+          () =>
+            expect(method === "PUT" || stalledResponses[0].destroyed).toBe(
+              true
+            ),
+          { timeout: 20_000 }
+        );
         expect(requests.map((request) => request.method)).toEqual(
           ["PUT", "HEAD", "GET"].slice(
             0,
