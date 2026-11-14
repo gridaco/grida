@@ -351,7 +351,7 @@ export namespace workspaceFs {
   }
 
   /**
-   * Open a regular file inside the workspace for streamed reads (#924),
+   * Open a regular file inside the workspace for streamed reads,
    * pinned to a contained file descriptor. Resolves containment ONCE
    * (one `realpath`), opens an `O_NOFOLLOW` handle, and returns the file's
    * `size`/`mtime` (from `fstat` on THAT handle) plus a `stream` factory over
@@ -418,7 +418,7 @@ export namespace workspaceFs {
    * directory). Creates parent directories if needed. Returns the new
    * mtime so the client can update its conflict-detection state.
    *
-   * Optimistic-concurrency guard (issue #805): when the caller passes
+   * Optimistic-concurrency guard: when the caller passes
    * `expected_mtime` (the mtime it captured the last time it read or
    * wrote the file), the write is rejected with `modified-since` if the
    * file on disk has advanced past that token — an external writer (or
@@ -452,7 +452,7 @@ export namespace workspaceFs {
     // policy boundary).
     const abs = await resolveInside(workspace, relPath, { must_exist: false });
     await resolveWritableParent(workspace, abs, relPath);
-    // Optimistic-concurrency precondition (issue #805), enforced as
+    // Optimistic-concurrency precondition, enforced as
     // atomicWrite's `before_commit` hook so it runs immediately before the
     // rename that publishes the bytes — the check→replace gap is then a single
     // rename syscall, not the whole tmp-write. A mismatch (or an ENOENT: the

@@ -1,7 +1,7 @@
 /**
  * Browser-engine system harness — the GRIDA-SEC-004 perimeter exercised
  * by the one client class Node tests cannot impersonate: a REAL browser
- * (WG spec docs/wg/ai/agent/daemon.md §conformance, issue #798).
+ * (WG spec docs/wg/ai/agent/daemon.md §conformance).
  *
  * Runs inside Chromium (vitest browser mode) against two real daemons
  * booted by `test/browser-harness.global.ts`:

@@ -1,6 +1,6 @@
 // GRIDA-GG: provider — `gg` in the video provider union (docs/wg/platform/hosted-ai.md)
 /**
- * Video-generation wire protocol (#908). Client-safe: request/result shapes
+ * Video-generation wire protocol. Client-safe: request/result shapes
  * for the `/video/generate` route, no provider SDK imports.
  */
 

@@ -8,8 +8,10 @@ use agent_kit_core::turn::{OperationInput, OperationOutcome, TurnState};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Told to the model after the person interrupts work, in place of the
-/// response that was cut off. Mirrors the established agent convention: the
-/// unfinished response is not part of model context.
+/// response that was cut off. The unfinished response stays out of model
+/// context because the model cannot tell where it was cut off: kept, it reads
+/// as a finished statement of its own and anchors the next response on work
+/// the person deliberately stopped.
 pub const INTERRUPTED_GUIDANCE: &str = "The user interrupted the previous response on purpose. If any tools or commands were aborted, they may have partially executed.";
 
 /// Told to the model in place of a response cut off by a pause that the

@@ -87,8 +87,8 @@ export namespace MediaTransport {
     readonly providers = {
       gg_models: async (): Promise<GGModelsView> =>
         await this.getJson<GGModelsView>("/providers/gg/models"),
-      /** Endpoint provider configs (issue #806) — readable plain config,
-       *  unlike secrets. */
+      /** Endpoint provider configs — readable plain config, unlike
+       *  secrets. */
       list_endpoints: async (): Promise<EndpointProviderConfig[]> =>
         await this.postJson<EndpointProviderConfig[]>(
           "/providers/endpoints/list"
@@ -128,7 +128,7 @@ export namespace MediaTransport {
         await this.postJson<GridaGatewaySessionStatus>("/auth/gg/status"),
     } as const;
 
-    /** BYOK image generation (#908). Desktop-only; gated by the `images`
+    /** BYOK image generation. Desktop-only; gated by the `images`
      *  capability. Returns base64 bytes — never the user's key. */
     readonly images = {
       generate: async (
@@ -137,7 +137,7 @@ export namespace MediaTransport {
         await this.postJson<ImageGenerateResult>("/images/generate", req),
     } as const;
 
-    /** BYOK video generation (#908). Desktop-only; gated by the `video`
+    /** BYOK video generation. Desktop-only; gated by the `video`
      *  capability. Returns base64 bytes only — never a provider URL or the
      *  user's key. */
     readonly video = {

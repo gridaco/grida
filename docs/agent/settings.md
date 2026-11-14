@@ -37,6 +37,14 @@ started with.
    workspace has its own folder there, named by a digest of the workspace
    rather than its path. Desktop does not show which folder belongs to which
    workspace, so pick the one used most recently by the workspace you mean.
+
+   | Platform | Application data folder                                       |
+   | -------- | ------------------------------------------------------------- |
+   | macOS    | `~/Library/Application Support/Grida`                         |
+   | Linux    | `~/.config/Grida`, or `Grida` under `$XDG_CONFIG_HOME` if set |
+
+   Grida Insiders uses a `Grida Insiders` folder in the same place.
+
 3. Create or edit `config.toml` in that folder, for example:
 
    ```toml

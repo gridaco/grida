@@ -29,7 +29,8 @@ dotenv.config();
 const productName = IS_INSIDERS ? "Grida Insiders" : "Grida";
 const appBundleId = IS_INSIDERS ? "co.grida.insiders" : "co.grida.desktop";
 const icon = IS_INSIDERS ? "./images/insiders/icon" : "./images/icon";
-// GRIDA-SEC-005 / #955 — deep-link scheme. Insiders targets the localhost editor
+// GRIDA-SEC-005 — deep-link scheme, per channel so a dev build and an installed
+// Grida never fight over one OS handler. Insiders targets the localhost editor
 // (like dev) and so registers `grida-dev` to match the editor's dev redirect
 // target; production owns `grida`. Must agree with `DEEP_LINK_SCHEME` in
 // `src/env.ts` and the editor's `DESKTOP_AUTH_REDIRECT`.
@@ -137,7 +138,7 @@ const config: ForgeConfig = {
     ignore: packageIgnore,
     // node-pty ships native binaries that must be unpacked. Its
     // native `pty.node` addon and `spawn-helper` executable cannot load/run
-    // from inside an asar. @parcel/watcher (issue #805) is the same: its
+    // from inside an asar. @parcel/watcher is the same: its
     // per-platform prebuild package (`@parcel/watcher-<platform>-<arch>`)
     // carries the `.node` addon, which must load from the real filesystem.
     asar: {
@@ -168,7 +169,7 @@ const config: ForgeConfig = {
   //   compile from source (GitHub's ubuntu runners ship the toolchain).
   //   node-abi is overridden in pnpm-workspace.yaml so the rebuild recognizes
   //   current Electron versions.
-  // - @parcel/watcher (issue #805) ships N-API prebuilds for EVERY platform as
+  // - @parcel/watcher ships N-API prebuilds for EVERY platform as
   //   separate `@parcel/watcher-<os>-<arch>` packages, so it must never be
   //   compiled from source. Rebuilding it is not just waste — it fails on the
   //   windows runner (no configured VS C++ build tools), and the N-API prebuild

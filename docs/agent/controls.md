@@ -1,6 +1,6 @@
 ---
 title: Guide and interrupt agent work
-description: Steer the current turn, queue a follow-up, answer a question, or pause and move on.
+description: Steer the current turn, queue a follow-up, answer a question, pause and move on, or stop the chat's running processes.
 keywords: [agent controls, steer, queue, pause, resume, Grida Desktop]
 format: md
 ---
@@ -73,6 +73,24 @@ not confirm shows **Worked for … · result uncertain**; this happens, for
 example, when the model sends a tool request Grida cannot read, and the turn
 ends instead of letting the model try again. Work already done stays in the
 workspace. Review it, then send a new message to continue.
+
+## Stop running processes
+
+A command the agent starts can keep running after its turn, such as a
+development server or a watcher. While any of the chat's processes runs, the
+composer toolbar shows **N running**. Open it to see each process's command,
+its folder and whether it is running or ended. Choose **Stop** on one process,
+or **Stop all**.
+
+Type `/stop` on its own, or choose **stop** in the `/` menu, to stop every
+process of the chat without sending a message. It does not stop the current
+turn; use the composer's main button for that.
+
+Switching chats or reloading the window leaves the processes running, and the
+list returns when the chat reopens. Closing the window that shows the chat
+stops them, unless another open window also shows that chat. Deleting the
+chat or quitting Desktop stops them too. A side chat lists and stops its own
+processes the same way; they end when it closes.
 
 ## Return to background work
 

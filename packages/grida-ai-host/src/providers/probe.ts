@@ -1,5 +1,5 @@
 /**
- * GRIDA-SEC-004 — endpoint model probe (issue #806).
+ * GRIDA-SEC-004 — endpoint model probe.
  *
  * Host-side discovery of the models an OpenAI-compatible endpoint
  * serves, so the user never has to type model ids by hand. Host-side

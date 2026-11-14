@@ -19,19 +19,19 @@ export type DaemonCapabilities = {
   secrets: boolean;
   workspaces: boolean;
   /**
-   * `/providers/endpoints/*` — endpoint provider config CRUD (issue
-   * #806). Optional so older host-supplied capability shapes stay valid;
-   * clients treat a missing flag as "not served".
+   * `/providers/endpoints/*` — endpoint provider config CRUD. Optional so
+   * older host-supplied capability shapes stay valid; clients treat a
+   * missing flag as "not served".
    */
   providers?: boolean;
   /**
-   * `/images/generate` — BYOK image generation (#908). Optional so older
+   * `/images/generate` — BYOK image generation. Optional so older
    * host-supplied capability shapes stay valid; clients treat a missing flag
    * as "not served" and hide the image-generation UI.
    */
   images?: boolean;
   /**
-   * `/video/generate` — BYOK video generation (#908). Optional so older
+   * `/video/generate` — BYOK video generation. Optional so older
    * host-supplied capability shapes stay valid; clients treat a missing flag
    * as "not served" and hide the video-generation UI.
    */

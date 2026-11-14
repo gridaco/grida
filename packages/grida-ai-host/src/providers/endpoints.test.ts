@@ -1,7 +1,7 @@
 /**
  * GRIDA-SEC-008 — custom endpoint ids cannot shadow the native provider.
  *
- * Endpoint provider layer (issue #806): config validation, the file-
+ * Endpoint provider layer: config validation, the file-
  * backed store, and the `/providers/endpoints/*` + extended `/secrets/*`
  * routes. Runs against a tmp-dir store and a bare Hono app — no model,
  * no network.

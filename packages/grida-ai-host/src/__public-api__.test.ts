@@ -142,7 +142,7 @@ describe("@grida/ai-host public API", () => {
       >();
     });
 
-    it("exposes the endpoint-provider contract (issue #806)", () => {
+    it("exposes the user-configured endpoint-provider contract", () => {
       expect(root.OLLAMA_ENDPOINT_PRESET).toEqual({
         id: "ollama",
         label: "Ollama",
@@ -167,7 +167,7 @@ describe("@grida/ai-host public API", () => {
       expect("resolveProvider" in root).toBe(false);
       expect(`${"Agent"}${"Chunk"}` in root).toBe(false);
       // Daemon-owned DTOs (handshake, workspace/file resources) moved to
-      // `@grida/daemon` (#927) — the agent root must not re-grow them.
+      // `@grida/daemon`, which owns the host layer — the agent root must not re-grow them.
       expect(`${"AGENT_SERVER"}_PROTOCOL` in root).toBe(false);
       expect(`${"AGENT_SERVER"}_DEFAULT_CAPABILITIES` in root).toBe(false);
     });

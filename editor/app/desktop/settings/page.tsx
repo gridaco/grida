@@ -1276,7 +1276,7 @@ function mediaToolHref(id: string): string {
 /* ─────────────────────────── Local models ───────────────────────── */
 
 /**
- * Endpoint provider config (issue #806) — the Ollama preset slot. The
+ * Endpoint provider config — the Ollama preset slot. The
  * agent host persists configs in `endpoints.json` (plain config, not a
  * secret; the bridge may read them back, unlike keys).
  *
@@ -1711,7 +1711,7 @@ type EndpointKeyState =
   | { kind: "error"; message: string };
 
 /**
- * Optional API key for a configured endpoint (issue #806). Ollama needs
+ * Optional API key for a configured endpoint. Ollama needs
  * none; a keyed self-hosted gateway stores its key HERE — through the
  * same write/presence/delete-only `secrets` surface as BYOK keys, under
  * the ENDPOINT's id (GRIDA-SEC-004: never inside the endpoint config,

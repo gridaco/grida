@@ -78,7 +78,7 @@ export type DesktopNativeCapabilities = {
    */
   terminal: boolean;
   /**
-   * Workspace file-change watcher (issue #805) — `workspaces.subscribe_changes`.
+   * Workspace file-change watcher — `workspaces.subscribe_changes`.
    * Added after protocol 1 shipped; treat a missing/falsy value as "old
    * desktop binary" and fall back to manual/pull refresh.
    */
@@ -179,8 +179,8 @@ export type ChatGptConnectResult =
     }>;
 
 /**
- * A single coalesced external change under a watched workspace root
- * (issue #805). `kind` is intentionally coarse — the renderer reacts by
+ * A single coalesced external change under a watched workspace root.
+ * `kind` is intentionally coarse — the renderer reacts by
  * re-reading the affected path / re-listing its parent, so it doesn't
  * need byte-level deltas. A rename surfaces as `deleted` (old path) +
  * `added` (new path) in v1.
@@ -323,7 +323,7 @@ export type DesktopBridge = {
     ) => Promise<WorkspaceReadFileBytesResult>;
     /**
      * Resolve a streamable media `src` URL for `relPath`, for the read-only
-     * image/video viewer (#924). Synchronous and pure — it builds a URL the
+     * image/video viewer. Synchronous and pure — it builds a URL the
      * host can serve, no I/O. On desktop this is a `grida-workspace://`
      * privileged-scheme URL backed by a streamed, Range-capable file route, so
      * the viewer is size-independent (no 1 MiB base64 cap) and video seeking
@@ -335,7 +335,7 @@ export type DesktopBridge = {
     media_url?: (workspaceId: string, relPath: string) => string;
     /**
      * Write `content` to `relPath`. `expectedMtime` is the optimistic-
-     * concurrency token (issue #805): the mtime the renderer last
+     * concurrency token: the mtime the renderer last
      * observed for this file. When supplied and the file on disk has
      * advanced past it, the host rejects with a 409 `modified-since`
      * error instead of silently clobbering the external change. Omit it
@@ -358,8 +358,8 @@ export type DesktopBridge = {
      */
     trash_entry: (workspaceId: string, relPath: string) => Promise<void>;
     /**
-     * Subscribe to external file-system changes under the workspace root
-     * (issue #805). The host watches the real directory tree and pushes
+     * Subscribe to external file-system changes under the workspace root.
+     * The host watches the real directory tree and pushes
      * coalesced batches of {@link WorkspaceChangeEvent} — covering edits
      * made outside the editor, including the agent's own writes. Like
      * `trash_entry` this is a native host capability (the OS watcher lives
@@ -414,7 +414,7 @@ export type DesktopBridge = {
     delete: (providerId: ProviderId) => Promise<void>;
   };
   /**
-   * Endpoint provider config (issue #806) — user-configured OpenAI-
+   * Endpoint provider config — user-configured OpenAI-
    * compatible endpoints (Ollama preset, self-hosted gateways). Plain
    * readable config, unlike `secrets`: list returns full configs.
    * Optional — older desktop binaries don't carry it; renderers must
@@ -461,7 +461,7 @@ export type DesktopBridge = {
     sign_out: () => Promise<ChatGptSubscriptionStatus>;
   };
   /**
-   * BYOK image generation (#908). Desktop-only: the request resolves the
+   * BYOK image generation. Desktop-only: the request resolves the
    * user's connected provider key inside the sidecar and returns base64 image
    * bytes — never the key. Optional — older binaries lack it; renderers
    * feature-detect and hide the surface when absent.
@@ -470,7 +470,7 @@ export type DesktopBridge = {
     generate: (req: ImageGenerateRequest) => Promise<ImageGenerateResult>;
   };
   /**
-   * BYOK video generation (#908). Desktop-only; resolves the user's key in the
+   * BYOK video generation. Desktop-only; resolves the user's key in the
    * sidecar and returns base64 video bytes — never a provider URL or the key.
    * Optional — older binaries lack it; renderers feature-detect.
    */

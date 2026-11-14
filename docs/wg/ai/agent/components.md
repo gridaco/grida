@@ -719,6 +719,27 @@ The existing components consume these host resource contracts through their
 ordinary capability boundaries. Package granularity follows concrete consumers
 and dependency requirements.
 
+## Process sessions
+
+A command still running after a bounded wait can continue as a **process
+session** owned by its conversation instead of ending at a deadline. This
+section specifies only the component delta. [Execution
+authority](./execution-authority.md) owns confinement, and the
+[experience contract](./experience.md) owns what the person sees.
+
+| Concern         | Delta                                                                                                                                                                                                                                                                               |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Launch          | The native sandbox starts a session under the same profile as a finite command, with input closed or a pseudo-terminal inside the confinement. A session has no wall-clock limit of its own; scope deadlines, cancellation and stop still end it.                                   |
+| Supervision     | The confinement supervisor ends everything it launched when its owner disappears, so no session outlives its host. Interrupts reach a session only through that supervisor.                                                                                                         |
+| Host store      | The host keeps each conversation's sessions under small numbers stable for the conversation, with a bounded head-and-tail output buffer read incrementally. A per-conversation bound evicts the least recently used session and spares the most recent ones.                        |
+| Model tools     | Two operations: one runs a command and waits up to a yield time, returning the finished result or the number of the session it keeps; the other reads new output from a numbered session, types into it, or interrupts it. Both need the command capability like any raw execution. |
+| Lifetime        | A session survives turn end, interruption and approval waits. It ends when the model or the person stops it, its directory grant is revoked, its conversation is deleted or discarded, or the host shuts down.                                                                      |
+| Client controls | A negotiated client extension lists a conversation's sessions, stops one or all, and delivers the current list as it changes. Listing is observation; stopping is an explicit control. Neither starts execution.                                                                    |
+
+The store is host state, not history. The journal records each tool invocation
+and its result; a session's later output reaches the model only through a later
+invocation. Deletion accounts for sessions as owned resources.
+
 ## Agent state positions
 
 Different positions answer different questions.

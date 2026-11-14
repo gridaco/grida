@@ -309,7 +309,7 @@ export namespace DaemonTransport {
         workspaceId: string,
         relPath: string,
         content: string,
-        // Optimistic-concurrency token (issue #805): the mtime the caller
+        // Optimistic-concurrency token: the mtime the caller
         // last observed. Omitted → last-writer-wins; present → the host
         // rejects with 409 `modified-since` if disk has advanced.
         expectedMtime?: number

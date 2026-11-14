@@ -34,9 +34,6 @@ already presumes: that profile describes how to consume one provider; this
 page asks whether the host should host the _class of provider_ at all, and
 what it costs to do so forever.
 
-Tracking issue:
-[gridaco/grida#813](https://github.com/gridaco/grida/issues/813).
-
 > **Status correction (July 2026).** The
 > [ChatGPT Subscription native provider](./chatgpt-subscription-provider.md)
 > now supplies the zero-key ChatGPT on-ramp while **Grida keeps the loop**.
@@ -96,8 +93,7 @@ hand-waved.
   injects its own locked tools. The ChatGPT kind supplies subscription-backed
   capacity without becoming an agent-provider.
 - **ACP code already exists — but in the opposite direction.** What shipped
-  with the [local daemon](./daemon.md)
-  ([#798](https://github.com/gridaco/grida/issues/798)) is Grida-as-**agent**:
+  with the [local daemon](./daemon.md) is Grida-as-**agent**:
   an external client like Zed drives _Grida_ over ACP. The
   [ACP Integration](./acp.md) page specs that outward wire. The consuming
   direction—Grida driving Claude/Codex—is a separate seam, not a production
@@ -232,11 +228,8 @@ If the data clears, keep "forever" reversible until the bet is proven:
   [MCP and Connectors](./mcp.md), [Local Daemon](./daemon.md),
   [Components / sessions](./components.md#sessions), [Master / input during work and stopping](./master.md#input-during-work-and-stopping),
   [index](./index.md).
-- **Issues:** [#813](https://github.com/gridaco/grida/issues/813) (this
-  decision), [#806](https://github.com/gridaco/grida/issues/806) (local LLMs —
-  shipped), [#807](https://github.com/gridaco/grida/issues/807) (multi-provider
-  BYOK config UX), [#798](https://github.com/gridaco/grida/issues/798) (local
-  daemon).
+- **Discussion:** the open provider-class decision is discussed in
+  [gridaco/grida#813](https://github.com/gridaco/grida/issues/813).
 - **External (auth/ToS facts):** the [Agent Client
   Protocol](https://agentclientprotocol.com/); OpenAI endorses Codex on a
   ChatGPT subscription; Claude works _de facto_ via the community

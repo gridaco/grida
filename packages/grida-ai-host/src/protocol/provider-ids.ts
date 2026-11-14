@@ -29,7 +29,7 @@ export {
 /**
  * A provider id anywhere on the wire (run options, session rows, secrets):
  * a native ChatGPT subscription id, BYOK id, the grida hosted id, or a
- * configured endpoint id (issue #806). `string & {}` keeps literal
+ * user-configured endpoint id. `string & {}` keeps literal
  * completion for the known ids while admitting endpoint ids, which are
  * user-chosen slugs validated at the boundary.
  */

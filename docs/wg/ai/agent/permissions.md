@@ -143,6 +143,11 @@ access after a fresh approval of that retry. The model may also request
 escalation up front, for example to reach the network, with a justification
 shown to the reviewer.
 
+Escalation is the target behavior. The Desktop app has none today: a sandbox
+refusal stays refused, and a path outside the project is refused rather than
+asked; the [feature catalog](../../../agent/features.md) records current
+availability.
+
 ## Presets
 
 | Preset         | Sandbox level   | Approval mode | Reviewer           | Summary                                                                         |
@@ -191,6 +196,10 @@ individual fields.
 | Read or write a path outside the project             | Asks.                                               |
 | The person is unavailable and approval mode is never | Refused with a typed denial; the turn continues.    |
 | The host cannot enforce the sandbox on this platform | Commands are refused; file tools still apply L3.    |
+
+The table states the target policy. On a surface without escalation, such as
+the Desktop app today, a row that asks to retry or to reach outside the project
+is refused instead; the settings-file edit still asks.
 
 ## See also
 

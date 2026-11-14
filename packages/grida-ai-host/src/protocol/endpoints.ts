@@ -1,7 +1,8 @@
 /**
  * GRIDA-SEC-008 — endpoint ids cannot collide with the ChatGPT provider.
  *
- * Custom OpenAI-compatible endpoint providers (issue #806 — local LLMs).
+ * Custom OpenAI-compatible endpoint providers, so local LLMs and
+ * self-hosted gateways can serve the agent.
  *
  * Client-safe identity + config contract for user-configured endpoints.
  * Local **Ollama** is the flagship preset; any OpenAI-compatible gateway
@@ -137,7 +138,7 @@ export const OLLAMA_ENDPOINT_PRESET = {
 } as const;
 
 /**
- * A model discovered by probing an endpoint (issue #806 — `POST
+ * A model discovered by probing an endpoint (`POST
  * /providers/endpoints/probe`). Carries only what the endpoint actually
  * REPORTS: Ollama's `/api/tags` exposes ids + capability tags,
  * `/api/ps` / `/api/show` expose the context window; a generic

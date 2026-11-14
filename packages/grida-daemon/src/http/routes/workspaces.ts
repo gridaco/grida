@@ -180,7 +180,7 @@ export function registerWorkspaceFileRoutes(
   // GET /workspaces/file?workspace_id=&rel_path=  → streamed file bytes
   //
   // GRIDA-SEC-004 — the streamed sibling of /readfilebytes for the desktop
-  // media viewer (#924). Unlike the base64 POST routes this NEVER buffers the
+  // media viewer. Unlike the base64 POST routes this NEVER buffers the
   // whole file: it stats for size, honors a Range request, and pipes a
   // `fs.createReadStream` straight to the response (constant memory, no size
   // cap). The desktop `grida-workspace://` privileged protocol proxies to this
@@ -222,7 +222,7 @@ export function registerWorkspaceFileRoutes(
 
   // POST /workspaces/writefile
   //   { workspaceId, relPath, content, expected_mtime? } → {mtime}
-  // expected_mtime is the optimistic-concurrency token (issue #805):
+  // expected_mtime is the optimistic-concurrency token:
   // when present and the file on disk has advanced past it, the write is
   // rejected with 409 `modified-since` carrying the current mtime.
   app.post("/workspaces/writefile", async (c) => {

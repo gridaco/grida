@@ -714,8 +714,12 @@ dropped by an interruption. Only a response that a person interrupted is
 replaced; a provider failure, a retry, or a response cut off by its time limit
 is not an interruption and adds no note. A response cut off by its time limit
 stays in model context as published, and the turn ends with an uncertain result
-that asks the person to review the partial work. The rule matches the established convention for interactive coding
-agents, so behavior after an interruption is familiar.
+that asks the person to review the partial work.
+
+The interrupted text is replaced rather than kept because the model cannot
+tell where it was cut off. Kept, it reads as a finished statement of the
+model's own and anchors the next response on work the person deliberately
+stopped; the note states what happened instead.
 
 ## Performance is a product claim
 

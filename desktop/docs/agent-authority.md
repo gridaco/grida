@@ -2,10 +2,8 @@
 
 This document binds the language-agnostic
 [execution-authority model](https://github.com/gridaco/grida/blob/main/docs/wg/ai/agent/execution-authority.md)
-to Grida Desktop. Issue
-[#974](https://github.com/gridaco/grida/issues/974) lands the native provider
-transport slice described below. Model commands run in the native host and its
-sandbox helper; see [Raw execution and extensions](#raw-execution-and-extensions).
+to Grida Desktop, including the native provider transport described below.
+Model commands run in the native host and its sandbox helper; see [Raw execution and extensions](#raw-execution-and-extensions).
 
 ## Current enforcement
 

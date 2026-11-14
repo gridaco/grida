@@ -1,5 +1,5 @@
 /**
- * GRIDA-SEC-004 — endpoint provider config store (issue #806).
+ * GRIDA-SEC-004 — endpoint provider config store.
  *
  * Persists user-configured OpenAI-compatible endpoints (Ollama, self-
  * hosted gateways) at `${userData}/endpoints.json` with the same

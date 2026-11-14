@@ -1,5 +1,5 @@
 /**
- * GRIDA-SEC-004 — `/providers/endpoints/*` routes (issue #806).
+ * GRIDA-SEC-004 — `/providers/endpoints/*` routes.
  *
  * CRUD over the endpoint provider config store: user-configured
  * OpenAI-compatible endpoints (Ollama preset, self-hosted gateways).

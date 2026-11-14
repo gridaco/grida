@@ -1,6 +1,6 @@
 // GRIDA-GG: provider — `gg` in the image provider union (docs/wg/platform/hosted-ai.md)
 /**
- * Image-generation wire protocol (#908). Client-safe: request/result shapes
+ * Image-generation wire protocol. Client-safe: request/result shapes
  * for the `/images/generate` route, no provider SDK imports.
  */
 
