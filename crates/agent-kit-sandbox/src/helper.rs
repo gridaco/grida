@@ -268,16 +268,13 @@ fn supervise(mut status: File, spec: Spec) -> bool {
             }
         }
     })();
-    let Ok((primary, null)) = prepared else {
-        let _ = status.write_all(&[wire::STATUS_SETUP_FAILED]);
-        return false;
+    let (primary, null) = match prepared {
+        Ok(prepared) => prepared,
+        Err(error) => return setup_failed(&mut status, "stdio", &error),
     };
     let mut child = match command.spawn() {
         Ok(child) => child,
-        Err(_) => {
-            let _ = status.write_all(&[wire::STATUS_SETUP_FAILED]);
-            return false;
-        }
+        Err(error) => return setup_failed(&mut status, "spawn", &error),
     };
     // The command's copies of the secondary end close with it, so the
     // terminal's output ends once the payload's processes close theirs.
@@ -410,22 +407,30 @@ fn ignore_interrupts() -> std::io::Result<()> {
 
 #[allow(unsafe_code)]
 fn open_terminal() -> std::io::Result<Terminal> {
-    let check = |result: libc::c_int| {
+    let failed = |call: &str| {
+        let error = std::io::Error::last_os_error();
+        std::io::Error::new(error.kind(), format!("{call}: {error}"))
+    };
+    let check = |call: &str, result: libc::c_int| {
         if result < 0 {
-            Err(std::io::Error::last_os_error())
+            Err(failed(call))
         } else {
             Ok(result)
         }
     };
-    let fd = check(unsafe { libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY) })?;
+    let fd = check("posix_openpt", unsafe {
+        libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY)
+    })?;
     let primary = unsafe { File::from_raw_fd(fd) };
-    check(unsafe { libc::fcntl(fd, libc::F_SETFD, libc::FD_CLOEXEC) })?;
-    check(unsafe { libc::grantpt(fd) })?;
-    check(unsafe { libc::unlockpt(fd) })?;
+    check("fcntl", unsafe {
+        libc::fcntl(fd, libc::F_SETFD, libc::FD_CLOEXEC)
+    })?;
+    check("grantpt", unsafe { libc::grantpt(fd) })?;
+    check("unlockpt", unsafe { libc::unlockpt(fd) })?;
     // The helper is single threaded here, so the shared name buffer is safe.
     let name = unsafe { libc::ptsname(fd) };
     if name.is_null() {
-        return Err(std::io::Error::last_os_error());
+        return Err(failed("ptsname"));
     }
     let name = unsafe { std::ffi::CStr::from_ptr(name) };
     let path = PathBuf::from(std::ffi::OsStr::from_bytes(name.to_bytes()));
@@ -433,14 +438,19 @@ fn open_terminal() -> std::io::Result<Terminal> {
         .read(true)
         .write(true)
         .custom_flags(libc::O_NOCTTY)
-        .open(path)?;
+        .open(&path)
+        .map_err(|error| {
+            std::io::Error::new(error.kind(), format!("open {}: {error}", path.display()))
+        })?;
     let size = libc::winsize {
         ws_row: TERMINAL_ROWS,
         ws_col: TERMINAL_COLUMNS,
         ws_xpixel: 0,
         ws_ypixel: 0,
     };
-    check(unsafe { libc::ioctl(fd, libc::TIOCSWINSZ as _, &size) })?;
+    check("TIOCSWINSZ", unsafe {
+        libc::ioctl(fd, libc::TIOCSWINSZ as _, &size)
+    })?;
     Ok(Terminal { primary, secondary })
 }
 
@@ -497,6 +507,15 @@ fn relay_terminal(primary: File) -> mpsc::Receiver<()> {
             });
     }
     receiver
+}
+
+/// Report a payload that never started. The reason goes to the launcher's
+/// stderr, which the owner captures as diagnostics; it names only the setup
+/// step and the system error, never payload input.
+fn setup_failed(status: &mut File, step: &str, error: &std::io::Error) -> bool {
+    eprintln!("agent-kit-sandbox: payload setup failed at {step}: {error}");
+    let _ = status.write_all(&[wire::STATUS_SETUP_FAILED]);
+    false
 }
 
 fn report_exit(status: &mut File, kind: u8, value: i32) -> bool {

@@ -1026,7 +1026,7 @@ async fn pipe_session_interrupt_signals_the_payload_and_keeps_supervision() {
     assert_eq!(output, b"ready");
     trapped.interrupt().unwrap();
     let (output, ended) = read_until(&trapped, Duration::from_secs(10), |_| false).await;
-    assert!(ended, "{output:?}");
+    assert!(ended, "{}", String::from_utf8_lossy(&output));
     assert_eq!(output, b"interrupted");
     assert!(trapped.interrupt().is_err());
     let evidence = trapped.finish().await.unwrap();
@@ -1083,15 +1083,31 @@ async fn terminal_session_runs_on_a_pseudo_terminal() {
         contains(output, "size:")
     })
     .await;
-    assert!(contains(&output, "tty:yes\r\n"), "{output:?}");
+    assert!(
+        contains(&output, "tty:yes\r\n"),
+        "{}",
+        String::from_utf8_lossy(&output)
+    );
     session.write(b"hello\n").unwrap();
     let (rest, ended) = read_until(&session, Duration::from_secs(10), |_| false).await;
     let output = [output, rest].concat();
     assert!(ended, "{}", String::from_utf8_lossy(&output));
-    assert!(contains(&output, "size:24 80"), "{output:?}");
+    assert!(
+        contains(&output, "size:24 80"),
+        "{}",
+        String::from_utf8_lossy(&output)
+    );
     // The terminal echoes the typed line before the payload consumes it.
-    assert!(contains(&output, "hello\r\n"), "{output:?}");
-    assert!(contains(&output, "got:hello\r\n"), "{output:?}");
+    assert!(
+        contains(&output, "hello\r\n"),
+        "{}",
+        String::from_utf8_lossy(&output)
+    );
+    assert!(
+        contains(&output, "got:hello\r\n"),
+        "{}",
+        String::from_utf8_lossy(&output)
+    );
     let error = session.write(&vec![0; 64 * 1024 + 1]).err().unwrap();
     assert_eq!(error.code, "sandbox_session_input_limit");
     let evidence = session.finish().await.unwrap();
