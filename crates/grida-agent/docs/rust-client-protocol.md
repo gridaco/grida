@@ -403,12 +403,18 @@ exit code `6` when it suspends for an answer.
 Private stdio clients negotiate both version-1 keys under
 `co.grida/side-chat/`. A side chat is an ordinary session forked from its
 parent; its ID belongs to the connection that opened it. A parent can have
-several side chats open at once; each `open` forks a new one.
+several side chats open at once; each `open` forks a new one, except that an
+`open` repeating the `requestId` of a side chat still open on this connection
+returns that side chat again, even at the parent's limit. A client that loses
+an `open` reply repeats the request with the same `requestId` to learn the
+side chat it opened and close it. The same `requestId` with another parent
+returns `side_chat_request_conflict`. Once its side chat is closed, a
+`requestId` names nothing and opens a new side chat.
 
-| Method suffix | Parameters and result                                                                                                                                                                                               |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `open`        | `sessionId` of an attached parent. Fork its committed conversation into a temporary session attached here and return `sideChatId`, `parentSessionId`, `sourceContext`, `compacted`, `omissions`, `temporary: true`. |
-| `close`       | `sideChatId` opened on this connection. Cancel its running turn, stop its processes, remove its data and detach it. Returns `{}`.                                                                                   |
+| Method suffix | Parameters and result                                                                                                                                                                                                                        |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `open`        | `sessionId` of an attached parent and optional `requestId`. Fork its committed conversation into a temporary session attached here and return `sideChatId`, `parentSessionId`, `sourceContext`, `compacted`, `omissions`, `temporary: true`. |
+| `close`       | `sideChatId` opened on this connection. Cancel its running turn, stop its processes, remove its data and detach it. Returns `{}`.                                                                                                            |
 
 Every session method works on `sideChatId`: `session/prompt`, `session/cancel`,
 `_co.grida/session/submit`, queue edits, steer, stop, pause and resume,
@@ -451,10 +457,12 @@ archive listings and deletion previews never include them. Loading one from a
 connection that did not open it returns `side_chat_unavailable`, as does
 closing an unknown or closed ID. A close whose cleanup cannot be confirmed
 returns `side_chat_discard_pending`, leaves the side chat fenced and open, and
-can be retried. A parent can have at most eight side chats open
+can be retried. A retry after a close whose reply was lost can return
+`side_chat_unavailable`: the side chat is already gone. A parent can have at most eight side chats open
 (`side_chat_parent_limit`), and a connection at most thirty-two across its
 parents (`side_chat_scope_limit`). Closing one makes room again. Deleting a
-parent discards all of its side chats. Disconnect shuts the host down and then
+parent discards all of its side chats; a side chat opening while its parent is
+deleted either opens first and is discarded with it, or finds no parent. Disconnect shuts the host down and then
 discards every side chat; a host also discards any left by a crash before it
 serves.
 

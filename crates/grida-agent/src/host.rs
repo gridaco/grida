@@ -1839,6 +1839,11 @@ impl Host {
             });
         let command = match &permission_scope {
             Some(permissions) if prepared.operating_regime.is_act() && !prepared.subagent => {
+                let chat = &claim.lease.binding().session;
+                if self.processes.needs_number_floor(chat) {
+                    let floor = self.process_number_floor(chat).await?;
+                    self.processes.raise_number_floor(chat, floor);
+                }
                 permissions.insert_with_images(
                     &mut inventory,
                     &mut authority.tools,

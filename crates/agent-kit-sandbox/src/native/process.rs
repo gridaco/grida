@@ -35,6 +35,20 @@ impl Running {
         self.stop.cancel();
     }
 
+    /// Supervision is over: it returned its evidence, or it failed or was
+    /// aborted without any.
+    pub(crate) fn supervision_finished(&self) -> bool {
+        self.task.is_finished()
+    }
+
+    #[cfg(test)]
+    pub(super) fn from_task(task: JoinHandle<ProcessEvidence>) -> Self {
+        Self {
+            stop: CancellationToken::new(),
+            task,
+        }
+    }
+
     pub(crate) async fn finish(mut self) -> Result<ProcessEvidence> {
         (&mut self.task)
             .await

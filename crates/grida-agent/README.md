@@ -758,10 +758,11 @@ unknown.
 
 Ending, stopping, pausing or restarting a turn and waiting for approval leave
 processes running. A call cut short by its turn's cancellation still keeps
-the process. Revoking the directory, `write_stdin` with Ctrl-C, the
-`co.grida/session/processes` stop operation, deleting the chat and host
-shutdown stop them; shutdown waits for verified cleanup within its deadline
-and exits uncertain otherwise. A chat keeps up to 64 processes: starting
+the process. `write_stdin` with Ctrl-C, the `co.grida/session/processes`
+stop operation, deleting the chat and host shutdown stop them. A changed
+permission profile applies to later launches and does not stop a running
+process. Shutdown waits for verified cleanup within its deadline and exits
+uncertain otherwise. A chat keeps up to 64 processes: starting
 another stops the least recently used one that is not among the eight most
 recently used or in use, preferring ended ones. A process ends after 24 hours,
 and the native helper ends it if the host process disappears. Recovery after

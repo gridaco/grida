@@ -88,12 +88,14 @@ whose owner process disappears without stopping it ends too: the helper sees
 its control channel close and ends everything it launched.
 
 On macOS a terminal payload leads a session outside the launcher's process
-group, so the owner's group signal does not reach it. The helper signals the
-payload's group while the payload is still unreaped and confirms it in its
-report. Without that confirmation the evidence is `Unverified`. A descendant
-that moves to another process group or session, such as a job-control shell's
-background job, can outlive the stop. Linux sessions keep the PID namespace
-guarantee in both modes.
+group, so the owner's group signal does not reach it. Once the payload exits,
+and while it is still unreaped, the helper signals the payload's group and
+then every other process of the payload's session (a pipe payload shares the
+helper's session), which reaches a job-control shell's background jobs in
+groups of their own. It confirms in its report only when none remains;
+without that confirmation the evidence is `Unverified`. A descendant that
+starts a session of its own can outlive the stop. Linux sessions keep the PID
+namespace guarantee in both modes.
 
 ## Profiles
 

@@ -168,6 +168,11 @@ impl CapturedGuidance {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct SkillListing {
     skills: Vec<ListedSkill>,
+    /// The workspace's skills could not be listed for this turn: a source
+    /// was unreadable or held more entries than a listing accepts. The
+    /// listing then names bundled skills only.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    workspace_unavailable: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -179,6 +184,8 @@ struct ListedSkill {
 
 /// The listing's text budget. Skills past it are counted, not described.
 const MAX_LISTING_BYTES: usize = 8 * 1024;
+/// Listed in place of workspace skills that could not be listed.
+const WORKSPACE_UNAVAILABLE: &str = "- This workspace's skills could not be listed for this request. A skill the person names may still be in `.agents/skills/` or `.claude/skills/`.\n";
 /// The host tool that returns a bundled skill's instructions.
 pub(crate) const READ_SKILL: &str = "read_skill";
 
@@ -193,8 +200,18 @@ impl SkillListing {
     /// The catalog a turn lists: bundled skills, then the skills of an
     /// already readable project root (GRIDA-SEC-007), which the turn reads
     /// with its own file tools.
+    ///
+    /// Listing is best effort: a workspace whose skills cannot be listed
+    /// (an unreadable source, or more entries than a listing accepts) still
+    /// lists the bundled skills and says the workspace's are unavailable.
+    /// An explicit selection keeps its own strict errors.
     pub(crate) fn capture(root: Option<&ProjectRoot>) -> Result<Self> {
-        let mut skills: Vec<_> = catalog(root)?
+        let (described, workspace_unavailable) = match catalog(root) {
+            Ok(described) => (described, false),
+            Err(_) if root.is_some() => (catalog(None)?, true),
+            Err(error) => return Err(error),
+        };
+        let mut skills: Vec<_> = described
             .into_iter()
             .map(|skill| ListedSkill {
                 name: skill.name,
@@ -203,7 +220,10 @@ impl SkillListing {
             })
             .collect();
         skills.sort_by_key(|skill| skill.source != SkillSource::Bundled);
-        Ok(Self { skills })
+        Ok(Self {
+            skills,
+            workspace_unavailable,
+        })
     }
 
     /// The names `read_skill` serves for this turn.
@@ -238,6 +258,9 @@ impl SkillListing {
             entries.push_str(&format!(
                 "- {omitted} more workspace skills are not listed here.\n"
             ));
+        }
+        if self.workspace_unavailable {
+            entries.push_str(WORKSPACE_UNAVAILABLE);
         }
         format!(
             "## Skills\n{LISTING_INTRO}\n### Available skills\n{entries}### How to use skills\n{LISTING_USE}"
@@ -682,6 +705,62 @@ mod tests {
         assert!(text.len() < MAX_LISTING_BYTES + 4 * 1024);
         assert!(text.contains("- slides:"));
         assert!(text.contains("more workspace skills are not listed here."));
+    }
+
+    #[test]
+    fn a_workspace_whose_skills_cannot_be_listed_still_lists_bundled_skills() {
+        use std::os::unix::fs::PermissionsExt;
+        let bundled = ["dotcanvas", "slides", "svg"];
+        let unreadable = tempfile::tempdir().unwrap();
+        let root = unreadable.path().canonicalize().unwrap();
+        skill(&root, ".claude", "readable", "workspace body");
+        skill(&root, ".agents", "locked", "locked body");
+        let locked = root.join(".agents/skills/locked");
+        fs::set_permissions(&locked, fs::Permissions::from_mode(0o000)).unwrap();
+        // Root reads through permissions; the case needs a refused open.
+        let refused = fs::read_dir(&locked).is_err();
+        let many = tempfile::tempdir().unwrap();
+        let crowded = many.path().canonicalize().unwrap();
+        for index in 0..=MAX_CATALOG {
+            skill(&crowded, ".agents", &format!("w{index}"), "body");
+        }
+        let entries = tempfile::tempdir().unwrap();
+        let wide = entries.path().canonicalize().unwrap();
+        for index in 0..=native_layer_entries() {
+            fs::create_dir_all(wide.join(format!(".claude/skills/e{index}"))).unwrap();
+        }
+        let mut cases = vec![
+            (crowded, "skill_catalog_limit"),
+            (wide, "skill_layer_limit"),
+        ];
+        if refused {
+            cases.push((root.clone(), "skill_source_unavailable"));
+        }
+        for (workspace, code) in cases {
+            let project = ProjectRoot::open(&workspace).unwrap();
+            // The picker's catalog and an explicit selection stay strict.
+            assert_eq!(catalog(Some(&project)).unwrap_err().code, code);
+            let listing = SkillListing::capture(Some(&project)).unwrap();
+            assert_eq!(listing.bundled().collect::<Vec<_>>(), bundled);
+            assert_eq!(listing.skills.len(), bundled.len(), "{code}");
+            let text = listing.instructions();
+            assert!(text.contains(WORKSPACE_UNAVAILABLE), "{code}");
+            assert!(text.contains("- slides:"), "{code}");
+        }
+        fs::set_permissions(&locked, fs::Permissions::from_mode(0o700)).unwrap();
+        let listing = SkillListing::capture(Some(&ProjectRoot::open(&root).unwrap())).unwrap();
+        assert!(!listing.instructions().contains(WORKSPACE_UNAVAILABLE));
+        // A listing recorded before this field existed reads as available.
+        let restored: SkillListing = serde_json::from_str(r#"{"skills":[]}"#).unwrap();
+        assert!(!restored.workspace_unavailable);
+        assert_eq!(
+            serde_json::to_string(&restored).unwrap(),
+            r#"{"skills":[]}"#
+        );
+    }
+
+    fn native_layer_entries() -> usize {
+        native::MAX_LAYER_ENTRIES
     }
 
     #[test]

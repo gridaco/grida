@@ -23,6 +23,11 @@ const RELAY_DRAIN: Duration = Duration::from_millis(500);
 /// The window size a session terminal starts with.
 const TERMINAL_COLUMNS: u16 = 80;
 const TERMINAL_ROWS: u16 = 24;
+/// How long the helper keeps ending what remains of the payload's session.
+#[cfg(target_os = "macos")]
+const SESSION_SWEEP: Duration = Duration::from_secs(2);
+#[cfg(target_os = "macos")]
+const SESSION_SWEEP_PAUSE: Duration = Duration::from_millis(5);
 
 /// What the owner asked of the helper.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -126,6 +131,11 @@ struct Primary {
 /// The launched payload, as the helper may still signal it.
 struct Payload {
     pid: i32,
+    /// The payload's session on macOS: its own for a terminal session, the
+    /// helper's otherwise. Job control can move a process to another group
+    /// of that session, which a group signal does not reach.
+    #[cfg(target_os = "macos")]
+    session: i32,
     /// The payload's own process group: always for a terminal session, and
     /// for a pipe session on Linux, where the helper's group reaches outside
     /// the PID namespace.
@@ -190,17 +200,28 @@ impl Payload {
         // sandboxed processes. On Linux the helper is the namespace's first
         // process, and its exit ends every other process in it.
         #[cfg(target_os = "macos")]
-        unsafe {
-            libc::kill(0, libc::SIGKILL)
-        };
+        {
+            end_session(self.session);
+            unsafe { libc::kill(0, libc::SIGKILL) };
+        }
         unsafe { libc::_exit(1) }
     }
 
     /// After the payload exited and before it is reaped, end what remains
-    /// in its own group.
-    fn end_group(&self) {
+    /// in its own group and, on macOS, in its session. Returns whether
+    /// nothing of the payload remains. On Linux the PID namespace ends with
+    /// the helper.
+    fn end_group(&self) -> bool {
         if self.group.is_some() {
             self.end();
+        }
+        #[cfg(target_os = "macos")]
+        {
+            end_session(self.session)
+        }
+        #[cfg(target_os = "linux")]
+        {
+            true
         }
     }
 
@@ -280,6 +301,11 @@ fn supervise(mut status: File, spec: Spec) -> bool {
     });
     let payload = Arc::new(Payload {
         pid,
+        #[cfg(target_os = "macos")]
+        session: match spec.mode {
+            Mode::Terminal => pid,
+            _ => unsafe { libc::getsid(0) },
+        },
         group: match spec.mode {
             Mode::Terminal => Some(pid),
             Mode::Pipe if cfg!(target_os = "linux") => Some(pid),
@@ -325,7 +351,7 @@ fn supervise(mut status: File, spec: Spec) -> bool {
         let _ = payload.reap(&mut child);
         return false;
     }
-    payload.end_group();
+    let ended = payload.end_group();
     if let Some(relay) = relay {
         let _ = relay.recv_timeout(RELAY_DRAIN);
     }
@@ -339,7 +365,12 @@ fn supervise(mut status: File, spec: Spec) -> bool {
     } else {
         false
     };
-    if !reported || (session && status.write_all(&[wire::STATUS_GROUP_ENDED]).is_err()) {
+    let confirmation = if ended {
+        wire::STATUS_GROUP_ENDED
+    } else {
+        wire::STATUS_GROUP_UNVERIFIED
+    };
+    if !reported || (session && status.write_all(&[confirmation]).is_err()) {
         return false;
     }
     // Keep a live group leader until the owner signals the group or closes
@@ -376,6 +407,86 @@ fn wait_exited(pid: i32) -> std::io::Result<()> {
             unsafe { libc::waitpid(exited, std::ptr::null_mut(), 0) };
         }
     }
+}
+
+/// End every process of `session` but the helper, until none remains or the
+/// sweep's time runs out. Returns whether none remains. A process table this
+/// helper cannot read leaves the session unconfirmed.
+#[cfg(target_os = "macos")]
+#[allow(unsafe_code)]
+fn end_session(session: i32) -> bool {
+    let deadline = std::time::Instant::now() + SESSION_SWEEP;
+    loop {
+        let Some(members) = session_members(session) else {
+            return false;
+        };
+        if members.is_empty() {
+            return true;
+        }
+        for member in members {
+            // Checked again just before the signal: the member may have
+            // exited since the listing.
+            if unsafe { libc::getsid(member) } == session {
+                unsafe { libc::kill(member, libc::SIGKILL) };
+            }
+        }
+        if std::time::Instant::now() >= deadline {
+            return false;
+        }
+        std::thread::sleep(SESSION_SWEEP_PAUSE);
+    }
+}
+
+/// The live processes of `session` other than the helper. Exited processes
+/// awaiting their parent are not counted. `None` when the process table or a
+/// process's state cannot be read.
+#[cfg(target_os = "macos")]
+#[allow(unsafe_code)]
+fn session_members(session: i32) -> Option<Vec<i32>> {
+    let own = unsafe { libc::getpid() };
+    let mut capacity = 1024;
+    let pids = loop {
+        let mut pids = vec![0 as libc::pid_t; capacity];
+        let bytes = i32::try_from(capacity * std::mem::size_of::<libc::pid_t>()).ok()?;
+        let count = unsafe { libc::proc_listallpids(pids.as_mut_ptr().cast(), bytes) };
+        let count = usize::try_from(count).ok()?;
+        if count < capacity {
+            pids.truncate(count);
+            break pids;
+        }
+        capacity = capacity
+            .checked_mul(2)
+            .filter(|capacity| *capacity <= 1 << 20)?;
+    };
+    let mut members = Vec::new();
+    for pid in pids {
+        if pid <= 0 || pid == own {
+            continue;
+        }
+        let sid = unsafe { libc::getsid(pid) };
+        if sid < 0 {
+            if std::io::Error::last_os_error().raw_os_error() == Some(libc::ESRCH) {
+                continue;
+            }
+            return None;
+        }
+        if sid != session {
+            continue;
+        }
+        let mut info = unsafe { std::mem::zeroed::<libc::proc_bsdinfo>() };
+        let size = std::mem::size_of::<libc::proc_bsdinfo>() as libc::c_int;
+        let read = unsafe {
+            libc::proc_pidinfo(pid, libc::PROC_PIDTBSDINFO, 0, (&raw mut info).cast(), size)
+        };
+        if read == size && info.pbi_status == libc::SZOMB {
+            continue;
+        }
+        if read != size && std::io::Error::last_os_error().raw_os_error() == Some(libc::ESRCH) {
+            continue;
+        }
+        members.push(pid);
+    }
+    Some(members)
 }
 
 #[cfg(target_os = "macos")]

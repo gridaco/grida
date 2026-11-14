@@ -516,6 +516,14 @@ whether the parent's model context had been compacted (`compacted`), the
 material the portable copy leaves out (`omissions`) and `temporary: true`.
 The copy is the parent's complete committed transcript.
 
+Open also takes an optional `requestId` the client chooses. Repeating an open
+with the same `requestId` while its side chat is still open returns that side
+chat instead of forking another, even when the parent has no room for one
+more. A client whose open timed out repeats it with the same `requestId` to
+learn which side chat it opened and close it; the same `requestId` with a
+different parent returns `side_chat_request_conflict`. After that side chat
+closes, the `requestId` opens a new one.
+
 The side chat ID is an ordinary session ID, already attached on this
 connection. Submit, prompt, queue, steer, stop, pause and resume it; answer its
 questions and approvals; read its snapshot, transcript window and history; and
@@ -561,8 +569,11 @@ renamed. The title ends with the side chat. Another connection cannot load it
 (`side_chat_unavailable`). Close takes `sideChatId`, cancels any running turn,
 stops its processes and removes its data; a closed or unknown ID returns
 `side_chat_unavailable`. If cleanup cannot be confirmed the close fails with
-`side_chat_discard_pending` and can be retried. Deleting the parent also
-discards all of its side chats, which are then no longer attached. Closing the
+`side_chat_discard_pending` and can be retried; a retry that returns
+`side_chat_unavailable` means an earlier close finished. Deleting the parent
+also discards all of its side chats, which are then no longer attached; a side
+chat that opens while its parent is deleted is discarded with it, or the open
+finds no parent. Closing the
 connection discards every side chat, and a host discards any side chat a
 crash left behind before it serves. A parent can have eight side chats open
 (`side_chat_parent_limit`) and one connection thirty-two across its parents

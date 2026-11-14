@@ -456,14 +456,15 @@ impl ExecCommand {
         };
         let spec = arguments.spec(&root, &environment);
         let cwd = spec.cwd.clone();
-        if let Err(error) = shared.sessions.admit(&shared.session) {
-            return ToolOutcome::failed(&error.code);
-        }
+        let launch = match shared.sessions.admit(&shared.session) {
+            Ok(launch) => launch,
+            Err(error) => return ToolOutcome::failed(&error.code),
+        };
         if context.cancellation.is_cancelled() || scope.valid_until <= Instant::now() {
             return cancelled();
         }
         // The process belongs to the chat, not to this call or its turn.
-        let stop = CancellationToken::new();
+        let stop = launch.stop();
         let options = SessionOptions {
             terminal: arguments.tty,
             retained_output_bytes: RETAINED_OUTPUT_BYTES,
@@ -472,7 +473,7 @@ impl ExecCommand {
         let cancellation = context.cancellation.clone();
         let launch_stop = stop.clone();
         let launched = tokio::task::spawn_blocking(move || {
-            if cancellation.is_cancelled() {
+            if cancellation.is_cancelled() || launch_stop.is_cancelled() {
                 return Ok(None);
             }
             // Native preparation may inspect paths before it decides
@@ -481,7 +482,7 @@ impl ExecCommand {
             let prepared = sandbox
                 .prepare(spec, scope)
                 .map_err(|error| Error::new(error.kind, "command_preparation_refused"))?;
-            if cancellation.is_cancelled() {
+            if cancellation.is_cancelled() || launch_stop.is_cancelled() {
                 return Ok(None);
             }
             match capture {
@@ -507,14 +508,10 @@ impl ExecCommand {
             Err(_) => return ToolOutcome::uncertain(),
         };
         let launched_at = Instant::now();
-        let entry = shared.sessions.supervise(
-            shared.session.clone(),
-            arguments.cmd.clone(),
-            cwd,
-            arguments.tty,
-            running,
-            stop,
-        );
+        let entry =
+            shared
+                .sessions
+                .supervise(launch, arguments.cmd.clone(), cwd, arguments.tty, running);
         let mut unlisted = Unlisted {
             sessions: &shared.sessions,
             entry: &entry,

@@ -56,6 +56,24 @@ impl Captured {
     }
 }
 
+/// How a response names a running process's number to the model.
+const NUMBER_LABEL: &str = "session ID ";
+
+/// The highest process number `text` names with the label the responses use,
+/// or zero.
+pub(super) fn highest_number(text: &str) -> u64 {
+    text.match_indices(NUMBER_LABEL)
+        .filter_map(|(at, label)| {
+            let rest = &text[at + label.len()..];
+            let digits = rest
+                .find(|character: char| !character.is_ascii_digit())
+                .unwrap_or(rest.len());
+            rest[..digits].parse().ok()
+        })
+        .max()
+        .unwrap_or(0)
+}
+
 /// Where the process stands at the end of an interaction.
 pub(super) enum Standing<'a> {
     Running(u64),
@@ -72,7 +90,7 @@ pub(super) fn render(
 ) -> String {
     let mut header = vec![format!("Wall time: {:.4} seconds", wall.as_secs_f64())];
     match standing {
-        Standing::Running(id) => header.push(format!("Process running with session ID {id}")),
+        Standing::Running(id) => header.push(format!("Process running with {NUMBER_LABEL}{id}")),
         Standing::Ended(ending) => {
             match (ending.completion, ending.stopped) {
                 (_, Some(StopReason::Deadline)) => {
@@ -194,6 +212,22 @@ mod tests {
             ..SessionRead::default()
         });
         captured
+    }
+
+    #[test]
+    fn the_highest_shown_number_is_read_from_the_responses_label() {
+        let wall = Duration::from_millis(1500);
+        let text = render(
+            wall,
+            &Standing::Running(12),
+            &captured(b"session ID 3"),
+            100,
+        );
+        assert_eq!(highest_number(&text), 12);
+        assert_eq!(highest_number("session ID 7, then session ID 40."), 40);
+        assert_eq!(highest_number("session ID x, session ID "), 0);
+        assert_eq!(highest_number("no process"), 0);
+        assert_eq!(highest_number("session ID 99999999999999999999999"), 0);
     }
 
     #[test]

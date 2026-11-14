@@ -7,7 +7,10 @@
 
 use super::process::{self, DRAIN_GRACE, REAP_GRACE, Running};
 use super::*;
-use crate::wire::{CONTROL_INTERRUPT, CONTROL_STOP, STATUS_GROUP_ENDED, STATUS_SETUP_FAILED};
+use crate::wire::{
+    CONTROL_INTERRUPT, CONTROL_STOP, STATUS_GROUP_ENDED, STATUS_GROUP_UNVERIFIED,
+    STATUS_SETUP_FAILED,
+};
 use std::collections::VecDeque;
 use std::os::fd::AsRawFd;
 use std::sync::Mutex;
@@ -154,6 +157,16 @@ impl Shared {
     }
 }
 
+/// Marks the session ended when supervision returns, fails or is aborted, so
+/// no reader waits on a supervisor that is gone.
+struct EndOnDrop(Arc<Shared>);
+
+impl Drop for EndOnDrop {
+    fn drop(&mut self) {
+        self.0.end();
+    }
+}
+
 /// What the supervisor receives from the handle.
 pub(super) struct Io {
     shared: Arc<Shared>,
@@ -202,7 +215,7 @@ impl Session {
             let changed = self.shared.changed.notified();
             tokio::pin!(changed);
             changed.as_mut().enable();
-            let ended = self.shared.ended.load(Ordering::Acquire);
+            let ended = self.has_ended();
             let now = Instant::now();
             if ended || now >= until || settle.is_some_and(|settle| now >= settle) {
                 return self.take(max_bytes, ended);
@@ -282,8 +295,10 @@ impl Session {
         self.running.request_stop();
     }
 
+    /// The session ended, or its supervision stopped without recording an
+    /// end; [`Self::finish`] then reports the lost supervisor.
     pub(crate) fn has_ended(&self) -> bool {
-        self.shared.ended.load(Ordering::Acquire)
+        self.shared.ended.load(Ordering::Acquire) || self.running.supervision_finished()
     }
 
     pub(crate) async fn finish(self) -> Result<ProcessEvidence> {
@@ -314,10 +329,14 @@ async fn read_report(status: &mut OwnedReadHalf, bytes: &mut Vec<u8>) {
     }
 }
 
-/// Completion, and whether the helper confirmed ending the payload's group.
+/// Completion, and whether the helper confirmed ending the payload's group
+/// and session.
 fn parse_report(bytes: &[u8]) -> (Completion, bool) {
     match bytes.len() {
         7 if bytes[6] == STATUS_GROUP_ENDED => (process::parse_status(&bytes[..6], false), true),
+        7 if bytes[6] == STATUS_GROUP_UNVERIFIED => {
+            (process::parse_status(&bytes[..6], false), false)
+        }
         7 => (Completion::Uncertain, false),
         _ => (process::parse_status(bytes, false), false),
     }
@@ -381,6 +400,8 @@ pub(super) async fn supervise(
         input,
         mut interrupts,
     } = io;
+    // Declared first, so it marks the end after everything else is released.
+    let _ended = EndOnDrop(Arc::clone(&shared));
     let (mut status, control) = status.into_split();
     #[cfg(target_os = "macos")]
     suppress_sigpipe(&control);
@@ -499,7 +520,6 @@ pub(super) async fn supervise(
         Descendants::NoPayload | Descendants::NamespaceEnded
     ));
     let temporary_removed = prepared.temporary.close().is_ok();
-    shared.end();
     ProcessEvidence {
         support: prepared.support,
         completion,
@@ -613,6 +633,45 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn a_session_whose_supervision_died_has_ended_as_lost() {
+        let (input, _) = mpsc::unbounded_channel();
+        let (interrupts, _) = mpsc::unbounded_channel();
+        let shared = Arc::new(Shared {
+            retained: Mutex::new(Retained::new(MIN_RETAINED)),
+            changed: Notify::new(),
+            ended: AtomicBool::new(false),
+            input: Some(input),
+            queued: AtomicUsize::new(0),
+            interrupts,
+        });
+        let supervised = Arc::clone(&shared);
+        let task = tokio::spawn(async move {
+            let _ended = EndOnDrop(supervised);
+            tokio::task::yield_now().await;
+            panic!("supervision failed")
+        });
+        let session = Session {
+            shared,
+            running: Running::from_task(task),
+        };
+        let read = tokio::time::timeout(
+            Duration::from_secs(5),
+            session.read(Instant::now() + Duration::from_secs(60), 1024),
+        )
+        .await
+        .expect("a read notices the lost supervisor");
+        assert!(read.ended);
+        assert!(session.has_ended());
+        assert_eq!(
+            session.write(b"x").unwrap_err().code,
+            "sandbox_session_ended"
+        );
+        let error = session.finish().await.unwrap_err();
+        assert_eq!(error.kind, ErrorKind::Uncertain);
+        assert_eq!(error.code, "sandbox_supervisor_lost");
+    }
+
     #[test]
     fn the_report_needs_the_group_confirmation_to_vouch_for_cleanup() {
         assert_eq!(
@@ -624,6 +683,10 @@ mod tests {
             (Completion::Signaled(9), false)
         );
         assert_eq!(parse_report(b"RE\0\0\0\0X"), (Completion::Uncertain, false));
+        assert_eq!(
+            parse_report(b"RE\0\0\0\x07U"),
+            (Completion::Exited(7), false)
+        );
         assert_eq!(parse_report(b"F"), (Completion::SetupFailed, false));
         assert_eq!(parse_report(b"R"), (Completion::Uncertain, false));
         assert_eq!(parse_report(b"E\0\0\0\0K"), (Completion::Uncertain, false));

@@ -4,9 +4,10 @@
 //! chat as a numbered process. The chat's later turns read its output, type
 //! into it and stop it through `write_stdin`; a person lists and stops it
 //! through the host. Turn end, cancellation, pause and approval suspension
-//! leave it running. Revoking its directory, deleting the chat, evicting it
-//! for a newer process and shutting the host down stop it. The sandbox ends
-//! it if this process disappears.
+//! leave it running. A stop request, deleting the chat, evicting it for a
+//! newer process, its scope lifetime and shutting the host down stop it.
+//! A changed permission profile governs later launches only; it does not
+//! stop a running process. The sandbox ends it if this process disappears.
 
 mod output;
 mod tools;
@@ -40,9 +41,15 @@ const MAX_LISTED_COMMAND_BYTES: usize = 1024;
 const WATCH_INTERVAL: Duration = Duration::from_millis(250);
 const STOP_WATCH_INTERVAL: Duration = Duration::from_millis(25);
 
-/// Process numbers are never reused for a chat while this process runs, even
-/// by another store.
+/// The last process number each chat was given while this process runs,
+/// shared by every store. A chat's counter starts above the numbers its model
+/// context has already been shown (see [`ProcessSessions::raise_number_floor`])
+/// and is dropped once the chat holds no process and its deletion ends.
 static NEXT_IDS: LazyLock<Mutex<BTreeMap<SessionId, u64>>> = LazyLock::new(Mutex::default);
+
+fn next_ids() -> MutexGuard<'static, BTreeMap<SessionId, u64>> {
+    NEXT_IDS.lock().unwrap_or_else(|error| error.into_inner())
+}
 
 /// A chat's process as clients see it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -81,6 +88,8 @@ struct State {
     chats: BTreeMap<SessionId, BTreeMap<u64, Arc<Entry>>>,
     /// Chats being deleted accept no new process.
     retiring: BTreeSet<SessionId>,
+    /// Admitted launches that have no supervised process yet, by serial.
+    launching: BTreeMap<u64, (SessionId, CancellationToken)>,
     /// Every launched process until its supervision has finished, listed or
     /// not: a process still within its first wait, or one evicted.
     supervised: BTreeMap<u64, Arc<Entry>>,
@@ -105,6 +114,32 @@ pub(crate) struct Entry {
 struct Io {
     running: Option<RunningSession>,
     unread: Captured,
+}
+
+/// An admitted launch before its process is supervised. Dropping it
+/// unsupervised withdraws it.
+pub(crate) struct Launch {
+    sessions: Arc<ProcessSessions>,
+    serial: u64,
+    session: SessionId,
+    stop: CancellationToken,
+    pending: bool,
+}
+
+impl Launch {
+    /// Cancelled when the launch or its process should stop.
+    pub(crate) fn stop(&self) -> CancellationToken {
+        self.stop.clone()
+    }
+}
+
+impl Drop for Launch {
+    fn drop(&mut self) {
+        if self.pending {
+            self.sessions.state().launching.remove(&self.serial);
+            self.sessions.changed.notify_waiters();
+        }
+    }
 }
 
 struct Status {
@@ -225,10 +260,11 @@ impl ProcessSessions {
             .unwrap_or_default()
     }
 
-    /// Whether a new process may start for this chat: the store is open and
-    /// the chat has room, or a process it may evict.
-    pub(crate) fn admit(&self, session: &SessionId) -> Result<()> {
-        let state = self.state();
+    /// Admit a new process for this chat when the store is open and the chat
+    /// has room, or a process it may evict. Until it is supervised or
+    /// dropped, the launch is stopped and awaited like a running process.
+    pub(crate) fn admit(self: &Arc<Self>, session: &SessionId) -> Result<Launch> {
+        let mut state = self.state();
         if state.closed || state.retiring.contains(session) {
             return Err(closed());
         }
@@ -238,25 +274,38 @@ impl ProcessSessions {
         {
             return Err(limit());
         }
-        Ok(())
+        state.next_serial += 1;
+        let serial = state.next_serial;
+        let stop = CancellationToken::new();
+        state
+            .launching
+            .insert(serial, (session.clone(), stop.clone()));
+        Ok(Launch {
+            sessions: self.clone(),
+            serial,
+            session: session.clone(),
+            stop,
+            pending: true,
+        })
     }
 
-    /// Supervise a launched process until it ends. It is not listed until
-    /// [`Self::register`] gives it a number.
+    /// Supervise an admitted launch's process until it ends. It is not
+    /// listed until [`Self::register`] gives it a number.
     pub(crate) fn supervise(
         self: &Arc<Self>,
-        session: SessionId,
+        mut launch: Launch,
         command: String,
         cwd: PathBuf,
         terminal: bool,
         running: RunningSession,
-        stop: CancellationToken,
     ) -> Arc<Entry> {
         let mut state = self.state();
-        state.next_serial += 1;
+        state.launching.remove(&launch.serial);
+        launch.pending = false;
+        let stop = launch.stop.clone();
         let entry = Arc::new(Entry {
-            serial: state.next_serial,
-            session,
+            serial: launch.serial,
+            session: launch.session.clone(),
             id: OnceLock::new(),
             command,
             cwd,
@@ -305,7 +354,7 @@ impl ProcessSessions {
             }
         }
         let id = {
-            let mut ids = NEXT_IDS.lock().unwrap_or_else(|error| error.into_inner());
+            let mut ids = next_ids();
             let next = ids.entry(entry.session.clone()).or_insert(0);
             *next += 1;
             *next
@@ -314,7 +363,7 @@ impl ProcessSessions {
         entry.touch();
         chat.insert(id, entry.clone());
         let list = project(chat.values());
-        drop(state);
+        // Published under the lock, so lists reach clients in change order.
         self.publish(&entry.session, list);
         Ok(id)
     }
@@ -343,7 +392,6 @@ impl ProcessSessions {
         if chat.is_empty() {
             state.chats.remove(&entry.session);
         }
-        drop(state);
         self.publish(&entry.session, list);
     }
 
@@ -357,25 +405,63 @@ impl ProcessSessions {
                 .is_some_and(|listed| listed.serial == entry.serial)
                 .then(|| project(chat.values()))
         });
-        drop(state);
-        self.changed.notify_waiters();
         if let Some(list) = list {
             self.publish(&entry.session, list);
         }
+        drop(state);
+        self.changed.notify_waiters();
+    }
+
+    /// Wait until each of the given launches and processes has ended and its
+    /// supervision finished, or the deadline passes. Returns whether every
+    /// one did.
+    async fn await_serials(&self, serials: &BTreeSet<u64>, deadline: Instant) -> bool {
+        self.wait(deadline, || {
+            let state = self.state();
+            !serials.iter().any(|serial| {
+                state.launching.contains_key(serial) || state.supervised.contains_key(serial)
+            })
+        })
+        .await;
+        let state = self.state();
+        !serials.iter().any(|serial| {
+            state.launching.contains_key(serial) || state.supervised.contains_key(serial)
+        })
+    }
+
+    /// Cancel every admitted launch and supervised process of the chat,
+    /// listed or not, and return their serials.
+    fn cancel_chat(state: &State, session: &SessionId) -> BTreeSet<u64> {
+        let mut serials = BTreeSet::new();
+        for (serial, (owner, stop)) in &state.launching {
+            if owner == session {
+                stop.cancel();
+                serials.insert(*serial);
+            }
+        }
+        for entry in state.supervised.values() {
+            if &entry.session == session {
+                entry.stop.cancel();
+                serials.insert(entry.serial);
+            }
+        }
+        serials
     }
 
     /// Stop the named processes of a chat, or all of them, and wait until
     /// each has ended or the deadline passes. Returns the ones that ended.
-    /// Ended processes stay listed until the model reads their end.
+    /// Ended processes stay listed until the model reads their end. Stopping
+    /// all of them also stops a process still within its first wait and a
+    /// launch not yet started, which have no number to return.
     pub async fn stop(
         &self,
         session: &SessionId,
         ids: Option<&[u64]>,
         deadline: Instant,
     ) -> Vec<u64> {
-        let targets = {
+        let (targets, unlisted) = {
             let state = self.state();
-            state
+            let targets = state
                 .chats
                 .get(session)
                 .map(|chat| {
@@ -384,13 +470,25 @@ impl ProcessSessions {
                         .map(|(_, entry)| entry.clone())
                         .collect::<Vec<_>>()
                 })
-                .unwrap_or_default()
+                .unwrap_or_default();
+            for target in &targets {
+                target.stop.cancel();
+            }
+            let unlisted = if ids.is_none() {
+                Self::cancel_chat(&state, session)
+            } else {
+                BTreeSet::new()
+            };
+            (targets, unlisted)
         };
-        for target in &targets {
-            target.stop.cancel();
-        }
-        self.wait(deadline, || targets.iter().all(|target| target.has_ended()))
-            .await;
+        self.wait(deadline, || {
+            let state = self.state();
+            targets.iter().all(|target| target.has_ended())
+                && !unlisted.iter().any(|serial| {
+                    state.launching.contains_key(serial) || state.supervised.contains_key(serial)
+                })
+        })
+        .await;
         targets
             .iter()
             .filter(|target| target.has_ended())
@@ -405,31 +503,53 @@ impl ProcessSessions {
         let targets = {
             let mut state = self.state();
             state.retiring.insert(session.clone());
-            state
-                .supervised
-                .values()
-                .filter(|entry| &entry.session == session)
-                .cloned()
-                .collect::<Vec<_>>()
+            Self::cancel_chat(&state, session)
         };
-        for target in &targets {
-            target.stop.cancel();
-        }
-        self.wait(deadline, || targets.iter().all(|target| target.has_ended()))
-            .await;
-        if !targets.iter().all(|target| target.has_ended()) {
+        if !self.await_serials(&targets, deadline).await {
             return Err(Error::new(ErrorKind::Uncertain, "process_cleanup_pending"));
         }
-        let removed = self.state().chats.remove(session).is_some();
-        if removed {
+        let mut state = self.state();
+        if state.chats.remove(session).is_some() {
             self.publish(session, Vec::new());
         }
         Ok(())
     }
 
     /// Let a chat whose deletion finished or failed start processes again.
+    /// A chat left with no process forgets its counter: its next process
+    /// number is taken again from what its model context has been shown.
     pub(crate) fn release(&self, session: &SessionId) {
-        self.state().retiring.remove(session);
+        let mut state = self.state();
+        state.retiring.remove(session);
+        let idle = !state.chats.contains_key(session)
+            && !state.launching.values().any(|(owner, _)| owner == session)
+            && !state
+                .supervised
+                .values()
+                .any(|entry| &entry.session == session);
+        if idle {
+            next_ids().remove(session);
+        }
+    }
+
+    /// Whether this chat has no process counter yet in this process, so its
+    /// floor must be raised before it is given a number.
+    pub(crate) fn needs_number_floor(&self, session: &SessionId) -> bool {
+        !next_ids().contains_key(session)
+    }
+
+    /// The last number this chat was given in this process, or zero.
+    pub(crate) fn issued_numbers(&self, session: &SessionId) -> u64 {
+        next_ids().get(session).copied().unwrap_or(0)
+    }
+
+    /// Give this chat's later processes numbers above `floor`: the highest
+    /// number its model context, or the chat it was forked from, has shown.
+    /// Numbers are then never repeated after a restart or in a fork.
+    pub(crate) fn raise_number_floor(&self, session: &SessionId, floor: u64) {
+        let mut ids = next_ids();
+        let next = ids.entry(session.clone()).or_insert(0);
+        *next = (*next).max(floor);
     }
 
     /// Stop every process and wait for its supervision to finish. Admission
@@ -438,14 +558,20 @@ impl ProcessSessions {
         {
             let mut state = self.state();
             state.closed = true;
+            for (_, stop) in state.launching.values() {
+                stop.cancel();
+            }
             for entry in state.supervised.values() {
                 entry.stop.cancel();
             }
         }
-        self.wait(deadline, || self.state().supervised.is_empty())
-            .await;
+        let settled = || {
+            let state = self.state();
+            state.launching.is_empty() && state.supervised.is_empty()
+        };
+        self.wait(deadline, settled).await;
         let state = self.state();
-        if !state.supervised.is_empty() {
+        if !state.launching.is_empty() || !state.supervised.is_empty() {
             return Err(Error::new(ErrorKind::Uncertain, "process_cleanup_pending"));
         }
         if state.unverified {
@@ -581,6 +707,30 @@ async fn watch(sessions: Arc<ProcessSessions>, entry: Arc<Entry>) {
     }
 }
 
+/// The highest process number these messages show the model: in a command
+/// tool's response, or in text that repeats its label. Zero when none.
+pub(crate) fn shown_numbers(messages: &[agent_kit_core::messages::Message]) -> u64 {
+    use agent_kit_core::messages::{Content, ResultContent};
+    messages
+        .iter()
+        .flat_map(|message| &message.content)
+        .flat_map(|content| match content {
+            Content::Text(text) => vec![text.as_str()],
+            Content::ToolResult(result) => result
+                .content
+                .iter()
+                .filter_map(|part| match part {
+                    ResultContent::Text(text) => Some(text.as_str()),
+                    _ => None,
+                })
+                .collect(),
+            _ => Vec::new(),
+        })
+        .map(output::highest_number)
+        .max()
+        .unwrap_or(0)
+}
+
 fn candidates(chat: &BTreeMap<u64, Arc<Entry>>) -> Vec<Candidate> {
     chat.iter()
         .map(|(id, entry)| {
@@ -625,6 +775,136 @@ fn limit() -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A listed process with no native session, for store bookkeeping.
+    fn entry(sessions: &ProcessSessions, session: &SessionId) -> Arc<Entry> {
+        let mut state = sessions.state();
+        state.next_serial += 1;
+        Arc::new(Entry {
+            serial: state.next_serial,
+            session: session.clone(),
+            id: OnceLock::new(),
+            command: "true".into(),
+            cwd: PathBuf::from("/"),
+            terminal: false,
+            started_at: 0,
+            stop: CancellationToken::new(),
+            io: tokio::sync::Mutex::new(Io {
+                running: None,
+                unread: Captured::default(),
+            }),
+            status: Mutex::new(Status {
+                last_used: Instant::now(),
+                ending: None,
+            }),
+        })
+    }
+
+    #[test]
+    fn concurrent_changes_publish_lists_in_change_order() {
+        let (live, mut receiver) = broadcast::channel(256);
+        let sessions = Arc::new(ProcessSessions::with_live(live));
+        let session = SessionId::new("published-in-order").unwrap();
+        let threads = (0..8)
+            .map(|_| {
+                let (sessions, session) = (sessions.clone(), session.clone());
+                std::thread::spawn(move || {
+                    for _ in 0..8 {
+                        let entry = entry(&sessions, &session);
+                        sessions.register(&entry).unwrap();
+                    }
+                })
+            })
+            .collect::<Vec<_>>();
+        for thread in threads {
+            thread.join().unwrap();
+        }
+        let mut lengths = Vec::new();
+        while let Ok(LiveUpdate::Processes(update)) = receiver.try_recv() {
+            lengths.push(update.processes.len());
+        }
+        assert_eq!(lengths, (1..=64).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn numbers_continue_above_the_floor_and_restart_after_release() {
+        let sessions = Arc::new(ProcessSessions::new());
+        let session = SessionId::new("numbered-above-floor").unwrap();
+        assert!(sessions.needs_number_floor(&session));
+        sessions.raise_number_floor(&session, 7);
+        assert!(!sessions.needs_number_floor(&session));
+        // A lower floor, as from an ancestor, never lowers the counter.
+        sessions.raise_number_floor(&session, 3);
+        let first = entry(&sessions, &session);
+        assert_eq!(sessions.register(&first).unwrap(), 8);
+        assert_eq!(sessions.issued_numbers(&session), 8);
+        // A chat that still holds a process keeps its counter.
+        sessions.release(&session);
+        assert!(!sessions.needs_number_floor(&session));
+        sessions.state().chats.remove(&session);
+        sessions.release(&session);
+        assert!(sessions.needs_number_floor(&session));
+        assert_eq!(sessions.issued_numbers(&session), 0);
+    }
+
+    #[tokio::test]
+    async fn stopping_all_and_shutdown_include_launches_not_yet_supervised() {
+        let sessions = Arc::new(ProcessSessions::new());
+        let session = SessionId::new("launch-in-flight").unwrap();
+        let other = SessionId::new("launch-elsewhere").unwrap();
+        let launch = sessions.admit(&session).unwrap();
+        let elsewhere = sessions.admit(&other).unwrap();
+        // Named stops do not reach an unnumbered launch.
+        sessions
+            .stop(
+                &session,
+                Some(&[1]),
+                Instant::now() + Duration::from_millis(20),
+            )
+            .await;
+        assert!(!launch.stop().is_cancelled());
+        // Stopping all of a chat's processes cancels the launch and waits
+        // for it to be withdrawn.
+        let stopping = {
+            let sessions = sessions.clone();
+            let session = session.clone();
+            tokio::spawn(async move {
+                sessions
+                    .stop(&session, None, Instant::now() + Duration::from_secs(10))
+                    .await
+            })
+        };
+        let cancelled = launch.stop();
+        tokio::time::timeout(Duration::from_secs(5), cancelled.cancelled())
+            .await
+            .unwrap();
+        assert!(!stopping.is_finished());
+        assert!(!elsewhere.stop().is_cancelled());
+        drop(launch);
+        assert_eq!(
+            tokio::time::timeout(Duration::from_secs(5), stopping)
+                .await
+                .unwrap()
+                .unwrap(),
+            Vec::<u64>::new()
+        );
+        // Shutdown waits for a launch still in flight.
+        let error = sessions
+            .shutdown(Instant::now() + Duration::from_millis(50))
+            .await
+            .unwrap_err();
+        assert_eq!(error.code, "process_cleanup_pending");
+        assert!(elsewhere.stop().is_cancelled());
+        drop(elsewhere);
+        sessions
+            .shutdown(Instant::now() + Duration::from_secs(1))
+            .await
+            .unwrap();
+        assert_eq!(
+            sessions.admit(&session).err().unwrap().code,
+            "process_sessions_closed"
+        );
+    }
 
     fn candidate(id: u64, age: u64, ended: bool, locked: bool) -> Candidate {
         Candidate {

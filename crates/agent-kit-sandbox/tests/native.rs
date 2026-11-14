@@ -1203,6 +1203,70 @@ async fn stopping_a_session_ends_its_background_descendants() {
     }
 }
 
+/// Job control moves a background job to its own process group within the
+/// payload's session; stopping the session still ends it, and cleanup is
+/// confirmed only once it has.
+#[tokio::test]
+#[ignore = "requires native Seatbelt or bubblewrap and working namespaces"]
+#[allow(unsafe_code)]
+async fn stopping_a_session_ends_jobs_in_other_process_groups() {
+    for terminal in [true, false] {
+        let fixture = Fixture::new();
+        let sandbox = fixture.sandbox();
+        let session = sandbox
+            .prepare(
+                fixture.session_command(
+                    r#"
+                    set -m
+                    nohup /bin/sh -c '
+                        while :; do
+                            if [ -f after-stop ]; then printf escaped > survived; exit; fi
+                            /bin/sleep 0.05
+                        done
+                    ' > /dev/null 2>&1 &
+                    printf '%s %s' "$$" "$!" > started
+                    wait
+                    "#,
+                ),
+                fixture.scope(),
+            )
+            .unwrap()
+            .spawn_session(session_options(terminal), CancellationToken::new())
+            .unwrap();
+        assert!(wait_for_file(&fixture.workspace.join("started"), Duration::from_secs(10)).await);
+        // The job really is in a group of its own. Linux pids name the
+        // sandbox's PID namespace, which this process cannot address.
+        #[cfg(target_os = "macos")]
+        if terminal {
+            let started = fs::read_to_string(fixture.workspace.join("started")).unwrap();
+            let (shell, job) = started.split_once(' ').unwrap();
+            let shell: i32 = shell.parse().unwrap();
+            let job: i32 = job.parse().unwrap();
+            let group = unsafe { libc::getpgid(job) };
+            assert!(group > 0 && group != shell, "terminal={terminal}");
+        }
+        session.request_stop();
+        let (_, ended) = read_until(&session, Duration::from_secs(10), |_| false).await;
+        assert!(ended);
+        let evidence = session.finish().await.unwrap();
+        assert_eq!(
+            evidence.stopped,
+            Some(StopReason::Requested),
+            "{evidence:?}"
+        );
+        assert_eq!(
+            evidence.descendants, SESSION_DESCENDANTS,
+            "terminal={terminal}"
+        );
+        fs::write(fixture.workspace.join("after-stop"), b"continue").unwrap();
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        assert!(
+            !fixture.workspace.join("survived").exists(),
+            "terminal={terminal}"
+        );
+    }
+}
+
 #[tokio::test]
 #[ignore = "requires native Seatbelt or bubblewrap and working namespaces"]
 async fn a_session_ends_at_the_scope_deadline_or_when_its_handle_is_dropped() {

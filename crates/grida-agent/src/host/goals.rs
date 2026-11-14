@@ -244,87 +244,85 @@ impl Host {
         if self.work.lock().await.closed {
             return Err(problem(ErrorKind::Unavailable, "host_shutting_down"));
         }
-        let mut view = self.store.inspect(request.session.clone()).await?;
-        self.check_execution(&view)?;
-        if self
-            .permissions
-            .as_ref()
-            .is_some_and(|profile| profile.before_tool_hook().is_some())
-            && (effort != EffortPreset::Standard
-                || !request
-                    .operating_regime
-                    .unwrap_or(self.operating_regime)
-                    .is_act())
-        {
-            return Err(problem(
-                ErrorKind::Unsupported,
-                "before_tool_hook_goal_unavailable",
-            ));
-        }
-        if effort == EffortPreset::Ultra && !self.goal_sponsorship_available() {
-            return Err(funded_review_unavailable());
-        }
-        require_goal_start(&view)?;
-        if let Some(child) = &goal.named_child {
-            self.require_goal_named_child(&request.session, child)
-                .await?;
-        }
-        // A start behind a running turn or other queued work waits in the
-        // queue, like any queued input; only an idle chat admits it now.
-        if view.current.is_none() && !view.admission_paused {
-            self.check_ready_capacity(&request.session).await?;
-        }
         let mut request = request;
         request.effort = Some(effort);
-        let mut policy = self.submission_policy(&request, allow_wakeups)?;
-        if goal.named_child.is_some() && !policy.operating_regime.is_act() {
-            return Err(problem(
-                ErrorKind::Unsupported,
-                "goal_named_child_requires_act",
-            ));
-        }
-        policy.allow_host_tools = false;
-        if spending.is_some() {
-            policy.allow_library_selection = false;
-        }
-        policy.desktop_image_generation = None;
-        policy.allow_image_placement = false;
-        policy.spending = spending.clone();
-        if policy.effort.as_ref().is_some_and(|effort| {
-            goal.allowance.inference_steps.get() <= effort.reserved_child_generation_steps()
-        }) {
-            return Err(problem(
-                ErrorKind::LimitExceeded,
-                "goal_child_allowance_unavailable",
-            ));
-        }
-        // A chat started as a goal is titled from its objective, like any
-        // other first request.
-        let title = self.title_candidate(&view, &request.parts);
-        let mut input = self
-            .capture_input(&view, request.id, request.parts, policy)
-            .await?;
-        let mut stored: StoredPrompt = decode_input(&input)?;
-        stored.allow_reviewer_primary_read = false;
-        stored.goal = Some(GoalInput::Start(goal));
-        input.payload = encode_stored_prompt(&stored)?;
         // The start is accepted against the revision its preconditions were
-        // checked at. A running turn can settle meanwhile; recheck and retry.
+        // checked at. A running turn can settle meanwhile; every precondition,
+        // the title and the captured input are taken again from the newer view.
         let mut attempts = 0;
-        let accepted = loop {
+        let (accepted, title) = loop {
+            let view = self.store.inspect(request.session.clone()).await?;
+            self.check_execution(&view)?;
+            if self
+                .permissions
+                .as_ref()
+                .is_some_and(|profile| profile.before_tool_hook().is_some())
+                && (effort != EffortPreset::Standard
+                    || !request
+                        .operating_regime
+                        .unwrap_or(self.operating_regime)
+                        .is_act())
+            {
+                return Err(problem(
+                    ErrorKind::Unsupported,
+                    "before_tool_hook_goal_unavailable",
+                ));
+            }
+            if effort == EffortPreset::Ultra && !self.goal_sponsorship_available() {
+                return Err(funded_review_unavailable());
+            }
+            require_goal_start(&view)?;
+            if let Some(child) = &goal.named_child {
+                self.require_goal_named_child(&request.session, child)
+                    .await?;
+            }
+            // A start behind a running turn or other queued work waits in the
+            // queue, like any queued input; only an idle chat admits it now.
+            if view.current.is_none() && !view.admission_paused {
+                self.check_ready_capacity(&request.session).await?;
+            }
+            let mut policy = self.submission_policy(&request, allow_wakeups)?;
+            if goal.named_child.is_some() && !policy.operating_regime.is_act() {
+                return Err(problem(
+                    ErrorKind::Unsupported,
+                    "goal_named_child_requires_act",
+                ));
+            }
+            policy.allow_host_tools = false;
+            if spending.is_some() {
+                policy.allow_library_selection = false;
+            }
+            policy.desktop_image_generation = None;
+            policy.allow_image_placement = false;
+            policy.spending = spending.clone();
+            if policy.effort.as_ref().is_some_and(|effort| {
+                goal.allowance.inference_steps.get() <= effort.reserved_child_generation_steps()
+            }) {
+                return Err(problem(
+                    ErrorKind::LimitExceeded,
+                    "goal_child_allowance_unavailable",
+                ));
+            }
+            // A chat started as a goal is titled from its objective, like any
+            // other first request.
+            let title = self.title_candidate(&view, &request.parts);
+            let mut input = self
+                .capture_input(&view, request.id.clone(), request.parts.clone(), policy)
+                .await?;
+            let mut stored: StoredPrompt = decode_input(&input)?;
+            stored.allow_reviewer_primary_read = false;
+            stored.goal = Some(GoalInput::Start(goal.clone()));
+            input.payload = encode_stored_prompt(&stored)?;
             match self
                 .store
-                .submit_at_revision(request.session.clone(), input.clone(), view.revision)
+                .submit_at_revision(request.session.clone(), input, view.revision)
                 .await
             {
-                Ok(accepted) => break accepted,
+                Ok(accepted) => break (accepted, title),
                 Err(error)
                     if error.code == "stale_session_revision" && attempts < GOAL_START_ATTEMPTS =>
                 {
                     attempts += 1;
-                    view = self.store.inspect(request.session.clone()).await?;
-                    self.check_execution(&view)?;
-                    require_goal_start(&view)?;
                 }
                 Err(error) => return Err(error),
             }

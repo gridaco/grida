@@ -7,7 +7,7 @@ use std::fs::File;
 use std::io::Read as _;
 use std::path::{Component, Path};
 
-const MAX_LAYER_ENTRIES: usize = 256;
+pub(super) const MAX_LAYER_ENTRIES: usize = 256;
 
 pub(crate) struct Root(File);
 pub(super) struct Layer(File);

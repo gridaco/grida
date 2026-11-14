@@ -253,3 +253,87 @@ fn revision_refuses_noneditable_anchors_and_a_cut_without_visible_material() {
         assert_eq!(error.code, code);
     }
 }
+
+#[test]
+fn file_references_keep_their_model_text_through_forks_and_compaction() {
+    use agent_kit_core::messages::{MediaRef, Retention};
+    use agent_kit_core::{ArtifactId, ModelId};
+    use grida_agent_master::compaction::summary_request;
+    use grida_agent_master::conversation_seed::SeedOmissions;
+    use grida_agent_master::file_reference::{self, FileReference};
+
+    let reference = FileReference {
+        name: "clip.mov".into(),
+        path: "/Users/someone/Movies/clip.mov".into(),
+        workspace_path: None,
+        mime_type: Some("video/quicktime".into()),
+        size: Some(4096),
+        preview: None,
+    };
+    let media = |id: &str, media_type: &str, locator: String| {
+        Content::Media(MediaRef {
+            id: ArtifactId::new(id).unwrap(),
+            media_type: media_type.into(),
+            locator,
+            access_scope: BindingId::new("fixture").unwrap(),
+            retention: Retention::Retained,
+        })
+    };
+    let described = reference.describe();
+    let records = [message(
+        "user",
+        Role::User,
+        "fixture",
+        vec![
+            Content::Text("Trim this clip".into()),
+            media(
+                "file-reference/one",
+                file_reference::MEDIA_TYPE,
+                file_reference::locator(&reference),
+            ),
+            media("image/one", "image/png", "asset:private".into()),
+        ],
+    )];
+    let seed = ConversationSeed::lower(
+        source("source"),
+        ConversationCut::Through(anchor("user")),
+        None,
+        records.clone().into_iter().map(local),
+    )
+    .unwrap();
+    // The reference's description stays; other media is still omitted.
+    assert_eq!(
+        seed.provenance().entries[0]
+            .omissions
+            .iter()
+            .map(|omission| (omission.part, omission.kind.clone()))
+            .collect::<Vec<_>>(),
+        vec![(2, SeedOmissionKind::Media)]
+    );
+    let HistoryRecord::Message(seeded) = &seed.records()[0];
+    assert_eq!(
+        seeded.content,
+        vec![
+            Content::Text("Trim this clip".into()),
+            Content::Text(described.clone()),
+        ]
+    );
+    assert!(described.contains(r#""path":"/Users/someone/Movies/clip.mov""#));
+
+    let HistoryRecord::Message(original) = records[0].clone();
+    let request = summary_request(
+        ModelId::new("summary-model").unwrap(),
+        None,
+        vec![original],
+        Vec::new(),
+        SeedOmissions::default(),
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(request.coverage.omissions.media, 1);
+    let source = serde_json::to_string(&request.inference.messages[1]).unwrap();
+    assert!(
+        source.contains("/Users/someone/Movies/clip.mov"),
+        "{source}"
+    );
+}

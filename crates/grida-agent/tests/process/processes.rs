@@ -412,3 +412,152 @@ async fn process_controls_and_queued_editor_bindings_require_negotiation() {
     client.close().await;
     endpoint.done().await;
 }
+
+#[tokio::test]
+#[ignore = "requires a reviewed native helper and OS confinement"]
+async fn stopping_all_processes_reaches_one_still_in_its_first_wait() {
+    let fixture = fixture();
+    let start_process = json!({"access":"read_write","cmd":BEAT,"yield_time_ms":30000}).to_string();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Tool("exec_command", start_process.leak()),
+        Reply::Finished("It stopped."),
+    ])
+    .await;
+    let mut client = start(&fixture, &endpoint.url, true).await;
+    let mut updates = Updates::default();
+    let session = session(&mut updates, &mut client, &fixture.primary).await;
+    let beat = fixture.primary.join("beat");
+    let turn = client
+        .send("session/prompt", prompt(&session, "Start the server"))
+        .await;
+    endpoint.request().await;
+    wait_for_file(&beat).await;
+    // Unnumbered while its first wait runs, yet stopping all processes ends it.
+    let stopped = updates
+        .call(
+            &mut client,
+            "_co.grida/session/stop-processes",
+            json!({"sessionId":session}),
+        )
+        .await;
+    assert_eq!(stopped["result"]["stopped"], json!([]), "{stopped}");
+    assert!(!beating(&beat).await);
+    let reply = updates.reply(&mut client, turn).await;
+    assert_eq!(reply["result"]["stopReason"], "end_turn", "{reply}");
+    let ended = tool_text(&endpoint.request().await);
+    assert!(ended.contains("Process stopped"), "{ended}");
+    client.close().await;
+    endpoint.done().await;
+}
+
+#[tokio::test]
+#[ignore = "requires a reviewed native helper and OS confinement"]
+async fn process_numbers_continue_after_a_restart_and_in_a_side_chat() {
+    const SIDE_CHAT_OPEN: &str = "co.grida/side-chat/open";
+    let fixture = fixture();
+    let command = |directory: &str| -> &'static str {
+        let workdir = fixture.primary.join(directory);
+        json!({"access":"read_write","cmd":BEAT,"workdir":workdir,"yield_time_ms":250})
+            .to_string()
+            .leak()
+    };
+    for directory in ["first", "restarted", "side"] {
+        fs::create_dir(fixture.primary.join(directory)).unwrap();
+    }
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Tool("exec_command", command("first")),
+        Reply::Finished("Started."),
+        Reply::Tool("exec_command", command("restarted")),
+        Reply::Finished("Started again."),
+        Reply::Tool("exec_command", command("side")),
+        Reply::Finished("Started on the side."),
+    ])
+    .await;
+    let mut client = start(&fixture, &endpoint.url, true).await;
+    let mut updates = Updates::default();
+    let session = session(&mut updates, &mut client, &fixture.primary).await;
+    let reply = updates
+        .call(&mut client, "session/prompt", prompt(&session, "Start it"))
+        .await;
+    assert_eq!(reply["result"]["stopReason"], "end_turn", "{reply}");
+    endpoint.request().await;
+    let first = tool_text(&endpoint.request().await);
+    assert!(
+        first.contains("Process running with session ID 1"),
+        "{first}"
+    );
+    // Shutdown stops the process; its number stays in the transcript.
+    client.close().await;
+
+    let mut client = Client::from_child(
+        fixture
+            .process(&endpoint.url, "serve")
+            .arg("--stdio")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap(),
+    );
+    let mut capabilities = initialize(true);
+    for key in [SIDE_CHAT_OPEN, "co.grida/side-chat/close"] {
+        capabilities["clientCapabilities"]["_meta"][key] = 1.into();
+    }
+    let ready = client.request("initialize", capabilities).await;
+    assert_eq!(
+        ready["result"]["agentCapabilities"]["_meta"][SIDE_CHAT_OPEN], 1,
+        "{ready}"
+    );
+    let mut updates = Updates::default();
+    let loaded = updates
+        .call(
+            &mut client,
+            "session/load",
+            json!({"sessionId":session,"cwd":fixture.primary,"mcpServers":[]}),
+        )
+        .await;
+    assert!(loaded.get("error").is_none(), "{loaded}");
+    let reply = updates
+        .call(
+            &mut client,
+            "session/prompt",
+            prompt(&session, "Start it again"),
+        )
+        .await;
+    assert_eq!(reply["result"]["stopReason"], "end_turn", "{reply}");
+    endpoint.request().await;
+    let restarted = tool_text(&endpoint.request().await);
+    assert!(
+        restarted.contains("Process running with session ID 2"),
+        "{restarted}"
+    );
+
+    // A side chat inherits the parent's transcript, so it continues above it.
+    let opened = updates
+        .call(
+            &mut client,
+            "_co.grida/side-chat/open",
+            json!({"sessionId":session}),
+        )
+        .await;
+    let side = opened["result"]["sideChatId"]
+        .as_str()
+        .unwrap_or_else(|| panic!("{opened}"))
+        .to_owned();
+    let reply = updates
+        .call(
+            &mut client,
+            "session/prompt",
+            prompt(&side, "Start one here"),
+        )
+        .await;
+    assert_eq!(reply["result"]["stopReason"], "end_turn", "{reply}");
+    endpoint.request().await;
+    let forked = tool_text(&endpoint.request().await);
+    assert!(
+        forked.contains("Process running with session ID 3"),
+        "{forked}"
+    );
+    client.close().await;
+    endpoint.done().await;
+}

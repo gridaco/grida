@@ -528,9 +528,10 @@ supplies the command line, an optional working directory and a terminal
 choice; it supplies no environment values or stdin. A command still running
 when its wait ends is kept by its chat in the host's process store. Turn end,
 cancellation, pause and approval waits leave it running; it ends when the
-model or a person stops it, its directory grant is revoked, it is evicted for
-a newer process (64 per chat), its chat is deleted, or the host shuts down.
-Kept processes run under a 24-hour scope. Input written to a terminal process
+model or a person stops it, it is evicted for a newer process (64 per chat),
+its chat is deleted, or the host shuts down. Kept processes run under a
+24-hour scope. A changed permission profile applies to later launches; it
+does not stop a process that is already running. Input written to a terminal process
 after launch is covered by the launch approval and is not separately
 reviewed, so a policy that must see every command should refuse interactive
 terminals. Cleanup that cannot be verified is reported at host shutdown
@@ -631,18 +632,19 @@ exercise fresh managed-workspace creation alongside protected-root rejection.
   handle still end it. The [trusted helper](crates/agent-kit-sandbox/src/helper.rs)
   uses the owner's end of its private status channel as a control channel for
   interrupt and stop. End of stream or any unknown byte ends everything the
-  helper launched: on macOS the payload (a terminal payload's own group) and
-  then the launcher group; on Linux the helper's exit as the PID namespace's
+  helper launched: on macOS the payload (a terminal payload's own group), the
+  rest of the payload's session and then the launcher group; on Linux the helper's exit as the PID namespace's
   first process. A session or finite command therefore does not outlive an
   owner that disappears. Interrupts reach the payload only through the helper.
   A terminal session allocates its pseudo-terminal inside the sandbox through
   the existing Seatbelt pseudo-terminal allowance or bubblewrap's private
   `/dev`; sessions add no profile or syscall-filter rule. On macOS a terminal
   payload leads a session outside the launcher group. The helper signals it
-  only while it is unreaped and confirms that in its report; otherwise the
-  cleanup evidence is unverified. On macOS, descendants that change process
-  group or session can outlive a stop; Linux keeps the PID-namespace
-  guarantee. [Native sandbox tests](crates/agent-kit-sandbox/tests/native.rs)
+  only while it is unreaped, then ends every remaining process of the
+  payload's session, including job-control groups, and confirms that in its
+  report only when none remains; otherwise the cleanup evidence is
+  unverified. On macOS, a descendant that starts a session of its own can
+  outlive a stop; Linux keeps the PID-namespace guarantee. [Native sandbox tests](crates/agent-kit-sandbox/tests/native.rs)
   cover retained output, terminal input, interrupts, stop with background
   descendants, the scope deadline, handle drop and owner loss.
 - **Network (retained service, native confinement).** On macOS and Linux the
@@ -898,7 +900,8 @@ build-cleanup directory and retain the same fixed-path and binary validation.
   directory, and never opens it. The agent reaches the file only through its
   existing permissions: file tools inside the project, sandboxed commands
   elsewhere except protected paths. Nothing is copied, so no new readable
-  location exists. [Process tests](crates/grida-agent/tests/process/file_references.rs)
+  location exists. A fork, side chat or compaction keeps the reference's
+  description (name, type, size and path), never file content. [Process tests](crates/grida-agent/tests/process/file_references.rs)
   show a workspace reference read by the file tools and an outside reference
   refused by them; [Main tests](desktop/src/main/native-file-reference.test.ts)
   cover protected and non-file paths.
@@ -1160,7 +1163,10 @@ build-cleanup directory and retain the same fixed-path and binary validation.
   chat. Closing or detaching one removes only that side chat; detaching its
   parent, deleting the parent, navigating, or a scope change removes every
   side chat of that parent. Each removal drops the attachment and its
-  subscriptions before the child discards the session. A side chat's
+  subscriptions before the child discards the session. Main keeps a side
+  session it can name, including one learned by repeating a lost open by its
+  request ID, refused for loading until the child confirms its discard, and
+  retries an unconfirmed discard until then. A side chat's
   generated title reaches the frame only inside that side chat's own
   snapshot, validated like a catalog title.
 - The [Desktop background process adapter](desktop/src/main/native-agent-background-processes.ts)
@@ -1632,7 +1638,7 @@ Today:
 - `desktop/src/main/services-sidecar-socket-host.ts` — owns the exact loopback listener, pauses accepted sockets, rejects non-loopback peers, and transfers the bounded connected capability over per-spawn Node IPC.
 - `desktop/src/main/provider-network-host.ts` and `provider-network-authority.ts` — main-owned Chromium network execution, bounded response streaming, redirect/route reauthorization and per-spawn built-in/custom grant state. Main executes no command for the sidecar; native model commands run in the Rust host.
 - The [finite command supervisor](crates/grida-agent/src/command.rs) runs reviewed hook and completion checks. It retains the authorized scope, owns cleanup across runtime cancellation, and reconciles the original attempt.
-- Model commands run through the [chat process store](crates/grida-agent/src/processes.rs) and its [command tools](crates/grida-agent/src/processes/tools.rs). Each launch uses the approved scope and captured environment; later input reaches only that chat's own processes. Stop, revocation, eviction, deletion and shutdown end them, and unverified cleanup is reported at shutdown. The [native session](crates/agent-kit-sandbox/src/native/session.rs) and [trusted helper](crates/agent-kit-sandbox/src/helper.rs) end a session at its scope deadline, on stop or handle drop, and when its owner disappears. The [private process controls](crates/grida-agent/src/acp/extensions/processes.rs) list and stop processes only for an attached chat on a negotiated private connection. [Command tests](crates/grida-agent/tests/commands.rs), [process tests](crates/grida-agent/tests/process/processes.rs) and [native sandbox tests](crates/agent-kit-sandbox/tests/native.rs) cover this boundary.
+- Model commands run through the [chat process store](crates/grida-agent/src/processes.rs) and its [command tools](crates/grida-agent/src/processes/tools.rs). Each launch uses the approved scope and captured environment; later input reaches only that chat's own processes. Stop, eviction, deletion, scope lifetime and shutdown end them; a changed permission profile governs only later launches, and unverified cleanup is reported at shutdown. The [native session](crates/agent-kit-sandbox/src/native/session.rs) and [trusted helper](crates/agent-kit-sandbox/src/helper.rs) end a session at its scope deadline, on stop or handle drop, and when its owner disappears. The [private process controls](crates/grida-agent/src/acp/extensions/processes.rs) list and stop processes only for an attached chat on a negotiated private connection. [Command tests](crates/grida-agent/tests/commands.rs), [process tests](crates/grida-agent/tests/process/processes.rs) and [native sandbox tests](crates/agent-kit-sandbox/tests/native.rs) cover this boundary.
 - The [confined ACP turn driver](crates/grida-agent/src/acp/external.rs) is
   selected only by a trusted embedding. It requires a reviewed executable and
   revalidates the exact prompt grant before dispatch. The sandbox's bounded

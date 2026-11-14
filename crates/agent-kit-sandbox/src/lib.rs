@@ -17,8 +17,9 @@
 //! inside the sandbox ends everything it launched when the owner's end of
 //! its private channel closes, so a session does not outlive an owner process
 //! that disappears. On macOS a terminal session's payload leads its own
-//! session; its cleanup rests on the helper's confirmation, and descendants
-//! that change process group or session can outlive a stop.
+//! session; its cleanup rests on the helper's confirmation that no process of
+//! that session remains, and a descendant that starts a session of its own
+//! can outlive a stop.
 
 use agent_kit_core::authority::GrantSelection;
 use agent_kit_core::{BindingId, CancellationToken, Error, ErrorKind, Fingerprint, Result};

@@ -301,6 +301,71 @@ async fn listed_skills_are_read_by_the_model_without_a_selection() {
 }
 
 #[tokio::test]
+async fn a_workspace_whose_skills_cannot_be_listed_still_accepts_messages() {
+    use std::os::unix::fs::PermissionsExt;
+    for case in ["unreadable", "too-many"] {
+        let fixture = super::approvals::Fixture::new(false);
+        let skills = fixture.primary.join(".agents/skills");
+        let locked = skills.join("locked");
+        match case {
+            "unreadable" => {
+                std::fs::create_dir_all(&locked).unwrap();
+                std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).unwrap();
+                if std::fs::read_dir(&locked).is_ok() {
+                    // Permissions do not refuse this user; nothing to test.
+                    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o700))
+                        .unwrap();
+                    continue;
+                }
+            }
+            _ => {
+                for index in 0..=128 {
+                    let directory = skills.join(format!("w{index}"));
+                    std::fs::create_dir_all(&directory).unwrap();
+                    std::fs::write(
+                        directory.join("SKILL.md"),
+                        format!("---\nname: w{index}\ndescription: Workspace skill.\n---\nBody\n"),
+                    )
+                    .unwrap();
+                }
+            }
+        }
+        let mut endpoint = Endpoint::start(vec![Reply::Choose(Box::new(|request| {
+            let messages = request["messages"].to_string();
+            assert!(messages.contains("## Skills"), "{messages}");
+            assert!(messages.contains("- slides: Build a Grida slides deck"));
+            assert!(messages.contains("skills could not be listed for this request"));
+            assert!(!messages.contains("- w0:"));
+            assert!(offered(request, "read_skill"));
+            Reply::Finished("Listed the bundled skills.")
+        }))])
+        .await;
+        let output = timeout(
+            WAIT,
+            fixture
+                .process(&endpoint.url, "run")
+                .arg("--cwd")
+                .arg(&fixture.primary)
+                .args(["--prompt", "What skills can you use?"])
+                .output(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        assert!(
+            output.status.success(),
+            "{case}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        endpoint.request().await;
+        endpoint.done().await;
+        if case == "unreadable" {
+            std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o700)).unwrap();
+        }
+    }
+}
+
+#[tokio::test]
 async fn queue_retains_selected_guidance_and_new_acceptance_rejects_a_stale_reference() {
     use std::os::unix::fs::PermissionsExt;
 

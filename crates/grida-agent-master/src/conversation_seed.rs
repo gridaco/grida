@@ -1,7 +1,7 @@
 //! Portable conversation context and the provenance of its retained prefix.
 //! GRIDA-SEC-004 keeps restricted source material out of derived context.
 
-use crate::{decode, encode, questions};
+use crate::{decode, encode, file_reference, questions};
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::messages::{Content, Message, Provenance, ProvenanceKind, ResultContent, Role};
 use agent_kit_core::turn::JournalPosition;
@@ -395,6 +395,15 @@ pub(super) fn portable_parts(role: Role, parts: Vec<Content>) -> (Vec<Content>, 
                         .any(|part| matches!(part, ResultContent::Media(_))),
                     structured: result.structured.is_some(),
                 }
+            }
+            (Role::User | Role::Assistant, Content::Media(media))
+                if let Some(text) = file_reference::display(&media) =>
+            {
+                // A file reference is the person's description of a local
+                // file (name, type, size, path); its bytes never entered the
+                // conversation. Carry the text the model read for it.
+                content.push(Content::Text(text));
+                continue;
             }
             (_, Content::Reasoning(_)) => SeedOmissionKind::Reasoning,
             (_, Content::Media(_)) => SeedOmissionKind::Media,

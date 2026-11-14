@@ -18,6 +18,8 @@ use std::borrow::Cow;
 const HISTORY_PAGE: usize = 128;
 const HISTORY_PREVIEW_BYTES: usize = 256;
 const MAX_HISTORY_OFFSET: usize = 4096;
+/// Forked chats followed back when numbering a chat's processes.
+const MAX_PROCESS_NUMBER_ANCESTRY: usize = 16;
 
 pub struct HistoryQuery {
     pub session: SessionId,
@@ -223,6 +225,41 @@ impl Host {
             messages,
             disclosure: omissions.context_disclosure(),
         })
+    }
+
+    /// The highest process number this chat's model context shows: its own
+    /// command responses, then those of each chat it was forked from. A chat
+    /// first given a process in this host process numbers it above them, so a
+    /// restarted host or a fork never repeats a number its model has seen.
+    pub(super) async fn process_number_floor(&self, session: &SessionId) -> Result<u64> {
+        let mut floor = 0;
+        let mut seen = BTreeSet::new();
+        let mut next = Some(session.clone());
+        while let Some(current) = next.take() {
+            if seen.len() >= MAX_PROCESS_NUMBER_ANCESTRY || !seen.insert(current.clone()) {
+                break;
+            }
+            floor = floor.max(self.processes.issued_numbers(&current));
+            let retained = match self
+                .store
+                .context_history_with(current.clone(), None, model_context)
+                .await
+            {
+                Ok(retained) => retained,
+                // A source chat deleted since the fork shows nothing more.
+                Err(error) if &current != session && error.code == "session_missing" => break,
+                Err(error) => return Err(error),
+            };
+            next = retained
+                .seed
+                .as_ref()
+                .and_then(|seed| SeedProvenance::decode(&seed.provenance).ok())
+                .map(|provenance| provenance.source.session)
+                .filter(|source| source != &current);
+            let (messages, _, _) = context_material(retained)?;
+            floor = floor.max(crate::processes::shown_numbers(&messages));
+        }
+        Ok(floor)
     }
 
     pub async fn history_page(&self, query: HistoryQuery) -> Result<HistoryPage> {

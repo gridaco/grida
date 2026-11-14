@@ -69,6 +69,9 @@ pub const STATUS_SIGNAL: u8 = b'S';
 /// A session helper sends this after the exit report once it has signalled
 /// the payload's own process group while the payload was still unreaped.
 pub const STATUS_GROUP_ENDED: u8 = b'K';
+/// A session helper sends this in place of [`STATUS_GROUP_ENDED`] when it
+/// could not confirm that every process of the payload's session ended.
+pub const STATUS_GROUP_UNVERIFIED: u8 = b'U';
 
 /// Owner to helper: deliver an interrupt to a session payload.
 pub const CONTROL_INTERRUPT: u8 = b'I';

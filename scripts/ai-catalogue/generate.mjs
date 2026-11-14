@@ -196,8 +196,9 @@ if (bundle) {
     })
   );
   // Exact OpenAI bindings whose model and binding facts both declare PNG
-  // input and tool calls. The host offers images only on the canonical
-  // Responses route for these ids; any other model stays text-only.
+  // input and tool calls. The host offers images on a Responses connection
+  // for these exact ids, whatever its endpoint; any other model id,
+  // including a provider-prefixed one, stays text-only.
   const responsesPng = new Set();
   for (const model of Object.values(publicModels["text.catalog"])) {
     const binding = model.providers?.openai;
