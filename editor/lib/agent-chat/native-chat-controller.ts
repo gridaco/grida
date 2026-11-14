@@ -52,6 +52,7 @@ import type { ComposerDrafts } from "./composer-drafts";
 import { isSupportedImageType } from "./image-attachment";
 import { NativeSideChatController } from "./native-side-chat-controller";
 import { NativeSubagentController } from "./native-subagent-controller";
+import { NativeBackgroundProcessController } from "./native-background-process-controller";
 
 export type NativeChatEditorSurfaces = {
   readEditorSurfaces(): NativeEditorSurfaceSnapshot;
@@ -142,6 +143,8 @@ export type NativeChatView = Readonly<{
   earlierError: string | null;
   sideChat: NativeSideChatController | null;
   subagents: NativeSubagentController | null;
+  /** Present once the attached chat confirms it lists background processes. */
+  backgroundProcesses: NativeBackgroundProcessController | null;
   imageInput: boolean;
   fileInput: boolean;
   attachmentReading: boolean;
@@ -211,6 +214,7 @@ type Scope = {
   editorPresentationRevision?: number;
   sideChat?: NativeSideChatController;
   subagents?: NativeSubagentController;
+  backgroundProcesses?: NativeBackgroundProcessController;
   selectedAttachment?: SelectedAttachment;
   attachmentRead?: object;
   attachmentCapabilityRead?: object;
@@ -303,6 +307,7 @@ const EMPTY: NativeChatView = Object.freeze({
   earlierError: null,
   sideChat: null,
   subagents: null,
+  backgroundProcesses: null,
   imageInput: false,
   fileInput: false,
   attachmentReading: false,
@@ -2041,6 +2046,7 @@ export class NativeChatController {
     const literal = text.trim();
     if (literal === "/compact" || literal === "/fork")
       return this.runCommand(literal === "/compact" ? "compact" : "fork");
+    if (literal === "/stop") return this.stopBackgroundProcesses();
     if (!this.canSubmit || !text.trim())
       throw new Error("native_chat_not_ready");
     // A send that cannot go out is refused before anything changes, so a
@@ -2076,9 +2082,9 @@ export class NativeChatController {
       (this.view.effort === "ultra" && !this.view.effortAvailable)
         ? undefined
         : this.view.effort;
+    // A queued request keeps the editor binding a sent one has.
     const svgTarget =
       !retained &&
-      mode === "submit" &&
       operatingRegime === "act" &&
       !selectedAttachment &&
       this.bridge.onEditorSvgText
@@ -3422,6 +3428,7 @@ export class NativeChatController {
       this.save();
       void this.readCatalogEntry(scope);
       void this.readCommands(scope);
+      void this.readBackgroundProcesses(scope, attachment);
       await this.renewSubscription(scope);
     });
     this.attachments = opening.catch(() => {});
@@ -3440,6 +3447,8 @@ export class NativeChatController {
     scope.stopEditorSurfaceUpdates?.();
     void scope.sideChat?.close().catch(() => {});
     scope.subagents?.dispose();
+    // Switching chats leaves background processes running.
+    scope.backgroundProcesses?.dispose();
     this.attachments = this.attachments.then(async () => {
       // Detach removes the subscription. It does not stop accepted work.
       if (scope.attachment)
@@ -3505,6 +3514,49 @@ export class NativeChatController {
       if (this.owns(scope))
         this.update({ catalogEntryError: "Couldn't load the chat details." });
       return null;
+    }
+  }
+
+  private async readBackgroundProcesses(
+    scope: Scope,
+    attachment: NativeChatAttachment
+  ): Promise<void> {
+    const bridge = this.bridge;
+    if (!NativeBackgroundProcessController.supported(bridge)) return;
+    const accepted = await bridge
+      .acceptsBackgroundProcesses()
+      .catch(() => false);
+    if (!accepted || !this.owns(scope) || scope.attachment !== attachment)
+      return;
+    scope.backgroundProcesses ??= new NativeBackgroundProcessController(
+      bridge,
+      attachment.attachmentId
+    );
+    this.update({ backgroundProcesses: scope.backgroundProcesses });
+    await scope.backgroundProcesses.load();
+  }
+
+  /** Whether `/stop` can stop this chat's background processes. */
+  get canStopBackgroundProcesses(): boolean {
+    return !!this.view.backgroundProcesses;
+  }
+
+  /**
+   * Stops every background process of this chat. The current turn keeps
+   * running; stopping the turn is a separate control.
+   */
+  async stopBackgroundProcesses(): Promise<void> {
+    const processes = this.scope?.backgroundProcesses;
+    if (!processes || this.view.backgroundProcesses !== processes) {
+      const error = "Background processes are unavailable in this chat.";
+      this.update({ error });
+      throw new Error(error);
+    }
+    if (!(await processes.stop())) {
+      const error =
+        processes.read().error ?? "Couldn't stop the background processes.";
+      if (this.view.backgroundProcesses === processes) this.update({ error });
+      throw new Error(error);
     }
   }
 
@@ -4052,6 +4104,10 @@ export class NativeChatController {
     }
     if (update.kind === "activity") {
       this.receiveActivity(scope, update);
+      return;
+    }
+    if (update.kind === "processes") {
+      scope.backgroundProcesses?.receive(update.processes);
       return;
     }
     if (update.kind !== "text") {

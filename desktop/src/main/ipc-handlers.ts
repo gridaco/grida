@@ -514,14 +514,26 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       input: string,
       text: string,
       regime?: unknown,
-      effort?: unknown
-    ) => nativeChat.enqueue(event, id, input, text, regime, effort)
+      effort?: unknown,
+      svgTargetId?: unknown
+    ) => nativeChat.enqueue(event, id, input, text, regime, effort, svgTargetId)
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_EFFORT, (event) =>
     nativeChat.acceptsEffort(event)
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_GOAL_EFFORT, (event) =>
     nativeChat.acceptsGoalEffort(event)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_BACKGROUND_PROCESSES, (event) =>
+    nativeChat.acceptsBackgroundProcesses(event)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_BACKGROUND_PROCESSES, (event, id: string) =>
+    nativeChat.backgroundProcesses(event, id)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_STOP_BACKGROUND_PROCESSES,
+    (event, id: string, processIds?: unknown) =>
+      nativeChat.stopBackgroundProcesses(event, id, processIds)
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PNG, (event) =>
     nativeChat.acceptsPng(event)

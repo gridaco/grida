@@ -9,7 +9,6 @@ import type { ConfirmationProps } from "@app/ui/ai-elements/confirmation";
 import type { ToolCallEntry } from "@/lib/agent-chat/types";
 import { ToolFileContent, ToolFileDiff } from "./tool-diff";
 
-const RUN_COMMAND = "run_command";
 const SKILL = "skill";
 
 export function isHumanReadableToolCardEntry(entry: ToolCallEntry): boolean {
@@ -45,8 +44,9 @@ function ToolBody({ entry }: { entry: ToolCallEntry }) {
       return <GrepFilesCard entry={entry} />;
     case chat_vocabulary.TOOL_NAMES.todo_write:
       return <TodoWriteCard entry={entry} />;
-    case RUN_COMMAND:
-      return <RunCommandCard entry={entry} />;
+    case chat_vocabulary.TOOL_NAMES.exec_command:
+    case chat_vocabulary.TOOL_NAMES.write_stdin:
+      return <CommandCard entry={entry} />;
     case SKILL:
       return <SkillCard entry={entry} />;
     default:
@@ -230,14 +230,15 @@ function TodoWriteCard({ entry }: { entry: ToolCallEntry }) {
   );
 }
 
-function RunCommandCard({ entry }: { entry: ToolCallEntry }) {
+/** A command, or a later write to the background process it became. */
+function CommandCard({ entry }: { entry: ToolCallEntry }) {
   const input = asRecord(entry.input);
   const output = asRecord(entry.output);
   const command = commandLine(input);
   const exitCode = numberValue(output.exit_code);
-  const durationMs = numberValue(output.duration_ms);
-  const stdout = str(output.stdout);
-  const stderr = str(output.stderr);
+  const processId = numberValue(output.process_id);
+  const seconds = numberValue(output.wall_time_seconds);
+  const text = str(output.output);
   const failed = exitCode !== undefined && exitCode !== 0;
   return (
     <div className="space-y-1.5">
@@ -245,17 +246,14 @@ function RunCommandCard({ entry }: { entry: ToolCallEntry }) {
         entry={entry}
         meta={compact([
           exitCode !== undefined ? `exit ${exitCode}` : undefined,
-          durationMs !== undefined ? `${durationMs} ms` : undefined,
-          bool(output.timed_out) ? "timed out" : undefined,
-          bool(output.truncated) ? "truncated" : undefined,
+          processId !== undefined
+            ? `running as process ${processId}`
+            : undefined,
+          seconds !== undefined ? `${seconds.toFixed(1)} s` : undefined,
         ])}
       />
-      {command && (
-        <CommandTranscript
-          command={command}
-          output={compact([stdout, stderr]).join("\n")}
-          failed={failed}
-        />
+      {(command || text) && (
+        <CommandTranscript command={command} output={text} failed={failed} />
       )}
     </div>
   );
@@ -413,11 +411,15 @@ function CommandTranscript({
   output,
   failed,
 }: {
-  command: string;
+  command?: string;
   output?: string;
   failed: boolean;
 }) {
-  const value = output ? `$ ${command}\n\n${output}` : `$ ${command}`;
+  const value = command
+    ? output
+      ? `$ ${command}\n\n${output}`
+      : `$ ${command}`
+    : (output ?? "");
   return (
     <pre
       className={cn(
@@ -440,7 +442,7 @@ function resultNotice(
     return { tone: "error", text: entry.errorText };
   }
   const output = asRecord(entry.output);
-  if (getToolName(entry) === RUN_COMMAND) {
+  if (isCommand(entry)) {
     const exitCode = numberValue(output.exit_code);
     if (exitCode !== undefined && exitCode !== 0) {
       return { tone: "error", text: `Command exited with code ${exitCode}.` };
@@ -470,7 +472,7 @@ function statusTone(entry: ToolCallEntry): "running" | "ok" | "warn" | "error" {
     return "error";
   }
   const output = asRecord(entry.output);
-  if (getToolName(entry) === RUN_COMMAND) {
+  if (isCommand(entry)) {
     const exitCode = numberValue(output.exit_code);
     if (exitCode !== undefined && exitCode !== 0) return "error";
   }
@@ -572,6 +574,14 @@ function stringArray(value: unknown): string[] | undefined {
     : undefined;
 }
 
+function isCommand(entry: ToolCallEntry): boolean {
+  const name = getToolName(entry);
+  return (
+    name === chat_vocabulary.TOOL_NAMES.exec_command ||
+    name === chat_vocabulary.TOOL_NAMES.write_stdin
+  );
+}
+
 function commandLine(input: Record<string, unknown>): string | undefined {
   const command = str(input.command);
   if (!command) return undefined;
@@ -611,10 +621,6 @@ function str(value: unknown): string | undefined {
 
 function stringValue(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
-}
-
-function bool(value: unknown): boolean {
-  return value === true;
 }
 
 function numberValue(value: unknown): number | undefined {

@@ -760,6 +760,44 @@ it("keeps the captured SVG target when the same submission reply is lost", async
   }
 });
 
+it("queues an Act follow-up with the captured SVG target", async () => {
+  const { bridge, running } = fixture();
+  running.add("workbench");
+  bridge.publishEditorSurfaces = async () => {};
+  bridge.onEditorSvgText = () => () => {};
+  bridge.enqueue = async () => {
+    throw new Error("fixture uses submitInRegime");
+  };
+  const send = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(
+    async (_action, sessionId, inputId) => ({
+      sessionId,
+      inputId,
+      disposition: "queued",
+      inputPosition: 2,
+      turnId: null,
+    })
+  );
+  bridge.submitInRegime = send;
+  const target = crypto.randomUUID();
+  const controller = new NativeChatController(bridge, undefined, undefined, {
+    readEditorSurfaces: () => ({
+      active: "/poster.svg",
+      open: ["/poster.svg"],
+      truncated: false,
+    }),
+    subscribeToEditorSurfaces: () => () => {},
+    svgText: { capture: () => target, invoke: () => ({ kind: "unavailable" }) },
+  });
+  try {
+    await controller.select("workbench");
+    await controller.submit("Then tighten this selection.");
+    expect(send.mock.calls[0]?.[0]).toBe("enqueue");
+    expect(send.mock.calls[0]?.at(-1)).toBe(target);
+  } finally {
+    controller.disconnect();
+  }
+});
+
 it("replaces a retry wait when the same turn's new observation clears it", async () => {
   const { bridge, controller, running } = fixture();
   running.add("retry-chat");
@@ -4487,4 +4525,94 @@ it("starts a workspace on a newly chosen connection before the default", async (
     status.mock.invocationCallOrder[1]!
   );
   stop();
+});
+
+describe("background processes", () => {
+  const PROCESS = {
+    processId: 3,
+    command: "pnpm dev",
+    cwd: "/fixture/workspace",
+    terminal: true,
+    startedAt: 1_700_000_000_000,
+    state: "running",
+    exitCode: null,
+  } as const;
+
+  function processes(accepted = true) {
+    const f = fixture();
+    let listed: (typeof PROCESS)[] = [PROCESS];
+    const list = vi.fn<NonNullable<DesktopNativeChat["backgroundProcesses"]>>(
+      async () => listed
+    );
+    const stop = vi.fn<
+      NonNullable<DesktopNativeChat["stopBackgroundProcesses"]>
+    >(async (_id, ids) => {
+      listed = [];
+      return ids ?? [3];
+    });
+    f.bridge.acceptsBackgroundProcesses = async () => accepted;
+    f.bridge.backgroundProcesses = list;
+    f.bridge.stopBackgroundProcesses = stop;
+    return { ...f, list, stop };
+  }
+
+  it("lists the attached chat's processes and follows its live list", async () => {
+    const { controller, updates, list } = processes();
+    await controller.select("chat-a");
+    await vi.waitFor(() =>
+      expect(controller.read().backgroundProcesses?.read().running).toBe(1)
+    );
+    expect(list).toHaveBeenCalledWith("chat-a");
+    const view = controller.read().backgroundProcesses!;
+    updates.get("chat-a")!({
+      kind: "processes",
+      processes: [{ ...PROCESS, state: "ended", exitCode: 0 }],
+    });
+    expect(view.read()).toMatchObject({
+      running: 0,
+      processes: [{ processId: 3, state: "ended", exitCode: 0 }],
+    });
+    // A process list is not a transcript change.
+    expect(controller.read().repairing).toBe(false);
+  });
+
+  it("stops every process for /stop without stopping the turn", async () => {
+    const { bridge, controller, stop } = processes();
+    const control = vi.spyOn(bridge, "control");
+    const submit = vi.spyOn(bridge, "submit");
+    await controller.select("chat-a");
+    await vi.waitFor(() =>
+      expect(controller.read().backgroundProcesses).not.toBeNull()
+    );
+    await controller.submit("/stop");
+    expect(stop).toHaveBeenCalledExactlyOnceWith("chat-a", undefined);
+    expect(controller.read().backgroundProcesses?.read().running).toBe(0);
+    expect(control).not.toHaveBeenCalled();
+    expect(submit).not.toHaveBeenCalled();
+    // Stopping one process names it.
+    await controller.read().backgroundProcesses!.stop([3]);
+    expect(stop).toHaveBeenLastCalledWith("chat-a", [3]);
+  });
+
+  it("refuses /stop when the chat does not offer background processes", async () => {
+    const { bridge, controller, stop } = processes(false);
+    const submit = vi.spyOn(bridge, "submit");
+    await controller.select("chat-a");
+    await expect(controller.submit("/stop")).rejects.toThrow(
+      "Background processes are unavailable in this chat."
+    );
+    expect(controller.read().backgroundProcesses).toBeNull();
+    expect(stop).not.toHaveBeenCalled();
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  it("keeps processes running when switching chats", async () => {
+    const { controller, stop } = processes();
+    await controller.select("chat-a");
+    await vi.waitFor(() =>
+      expect(controller.read().backgroundProcesses).not.toBeNull()
+    );
+    await controller.select("chat-b");
+    expect(stop).not.toHaveBeenCalled();
+  });
 });

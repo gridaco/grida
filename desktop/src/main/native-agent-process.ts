@@ -5,6 +5,7 @@ import path from "node:path";
 import { clearTimeout, setTimeout } from "node:timers";
 import type { NativeEditorSurfaceSnapshot } from "@grida/desktop-bridge";
 import { NativeAgentArtifacts } from "./native-agent-artifacts";
+import { NativeAgentBackgroundProcesses } from "./native-agent-background-processes";
 import { NativeAgentDeletion } from "./native-agent-deletion";
 import { NativeAgentCommands } from "./native-agent-commands";
 import { NativeCommandProfiles } from "./native-agent-command-profile";
@@ -164,6 +165,7 @@ export class NativeAgentProcess {
   private artifacts = false;
   private savedChatDeletion = false;
   private savedChatDeletionPreview = false;
+  private backgroundProcesses = false;
   private goalCompletionReview = false;
   private goalManualContinuation = false;
   private goalFundedReview = false;
@@ -308,6 +310,10 @@ export class NativeAgentProcess {
 
   get acceptsSavedChatDeletionPreview(): boolean {
     return this.acceptsSavedChatDeletion && this.savedChatDeletionPreview;
+  }
+
+  get acceptsBackgroundProcesses(): boolean {
+    return this.connected && this.backgroundProcesses;
   }
 
   get availableCommands() {
@@ -597,6 +603,7 @@ export class NativeAgentProcess {
                   [NativeEditorSurfaceEndpoints.svgTextCapability]: 1,
                 }),
                 [NativeAgentArtifacts.capability]: 1,
+                [NativeAgentBackgroundProcesses.capability]: 1,
                 ...(options.gatewayJobBilling && {
                   [NativeGatewayConnection.billingCapability]: 1,
                   [NativeGatewayConnection.childBillingCapability]: 1,
@@ -692,6 +699,8 @@ export class NativeAgentProcess {
       }
       processOwner.artifacts =
         advertised?.[NativeAgentArtifacts.capability] === 1;
+      processOwner.backgroundProcesses =
+        advertised?.[NativeAgentBackgroundProcesses.capability] === 1;
       processOwner.savedChatDeletion =
         requestDeletion && advertised?.[NativeAgentDeletion.capability] === 1;
       processOwner.savedChatDeletionPreview =

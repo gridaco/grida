@@ -392,7 +392,8 @@ describe.skipIf(!supported)("Native chat store", () => {
             "read_file",
             "list_files",
             "search_text",
-            "run_command",
+            "exec_command",
+            "write_stdin",
             "surface_open",
             "spawn_agent",
           ])

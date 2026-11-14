@@ -400,7 +400,7 @@ const bridge: DesktopBridge = {
       // for V1, not a public renderer bridge capability.
       shell: true,
       // Human-interactive terminal pane (GRIDA-SEC-004) — distinct from
-      // `shell` above and from the agent's sandboxed `run_command`.
+      // `shell` above and from the agent's sandboxed `exec_command`.
       terminal: true,
       // Workspace file-change watcher (issue #805).
       workspace_watch: true,
@@ -648,6 +648,19 @@ const bridge: DesktopBridge = {
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_EFFORT),
     acceptsGoalEffort: () =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_GOAL_EFFORT),
+    acceptsBackgroundProcesses: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_BACKGROUND_PROCESSES),
+    backgroundProcesses: (attachmentId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_BACKGROUND_PROCESSES,
+        attachmentId
+      ),
+    stopBackgroundProcesses: (attachmentId, processIds) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_STOP_BACKGROUND_PROCESSES,
+        attachmentId,
+        ...(processIds === undefined ? [] : [[...processIds]])
+      ),
     acceptsPng: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PNG),
     acceptsLibrarySelection: () =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_LIBRARY_SELECTION),

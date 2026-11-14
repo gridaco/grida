@@ -1072,7 +1072,7 @@ export namespace workspaces {
 /**
  * GRIDA-SEC-004 — human-interactive terminal (PTY) pane. A real,
  * unsandboxed shell running as the user (VSCode trust model) — NOT the
- * agent's sandboxed `run_command`. The renderer only ever names a
+ * agent's sandboxed `exec_command`. The renderer only ever names a
  * workspace id; the desktop main process resolves the cwd and owns the
  * PTY. This namespace is the only surface in the editor tree that
  * touches `bridge.terminal`.

@@ -657,9 +657,37 @@ export type NativeChatActivityUpdate = Readonly<{
   activity: NativeChatActivity;
 }>;
 
+/**
+ * A command the agent started for a chat that kept running in the background.
+ * It runs across turns until the agent ends it, the person stops it, the chat
+ * is deleted, its window closes, or the app quits.
+ */
+export type NativeChatBackgroundProcess = Readonly<{
+  /** Unique within the chat and never reused. */
+  processId: number;
+  /** The shell command line as the agent wrote it. */
+  command: string;
+  /** Absolute working directory. */
+  cwd: string;
+  /** Started with a pseudo-terminal. */
+  terminal: boolean;
+  /** Unix epoch milliseconds. */
+  startedAt: number;
+  state: "running" | "ended";
+  /** Set when the process ended with an exit code. */
+  exitCode: number | null;
+}>;
+
+/** The chat's complete current process list, sent whenever it changes. */
+export type NativeChatBackgroundProcessesUpdate = Readonly<{
+  kind: "processes";
+  processes: readonly NativeChatBackgroundProcess[];
+}>;
+
 export type NativeChatStreamUpdate =
   | NativeChatTextUpdate
   | NativeChatActivityUpdate
+  | NativeChatBackgroundProcessesUpdate
   | Readonly<{ kind: "resync" }>;
 
 export type NativeChatUpdate =
@@ -780,6 +808,17 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   ): Promise<NativeChatAcceptance>;
   acceptsEffort?(): Promise<boolean>;
   acceptsGoalEffort?(): Promise<boolean>;
+  /** Whether this chat host lists and stops background processes. */
+  acceptsBackgroundProcesses?(): Promise<boolean>;
+  /** Running processes first, then ended ones not yet collected. */
+  backgroundProcesses?(
+    attachmentId: string
+  ): Promise<readonly NativeChatBackgroundProcess[]>;
+  /** Stops the named processes, or every process of the chat when omitted. */
+  stopBackgroundProcesses?(
+    attachmentId: string,
+    processIds?: readonly number[]
+  ): Promise<readonly number[]>;
   acceptsPng?(): Promise<boolean>;
   acceptsLibrarySelection?(): Promise<boolean>;
   submitWithLibrarySelection?(

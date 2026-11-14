@@ -772,6 +772,7 @@ function iconForAction(action: ToolDisplayDescription["action"]): LucideIcon {
     case "plan":
       return ListTodoIcon;
     case "command":
+    case "process":
       return SquareTerminalIcon;
     case "question":
       return MessageCircleQuestionIcon;

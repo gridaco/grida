@@ -363,7 +363,8 @@ it.runIf(Boolean(packaged) && supported)(
       );
       // Desktop runs agents under the Default preset, which includes
       // sandboxed commands in the project.
-      expect(provider.received[0]).toContain("run_command");
+      expect(provider.received[0]).toContain("exec_command");
+      expect(provider.received[0]).toContain("write_stdin");
       await expect(
         agent.request(NativeAgentPermissions.answerMethod, {})
       ).rejects.toThrow("native_agent_approval_requires_review");

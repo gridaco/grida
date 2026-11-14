@@ -33,7 +33,7 @@ import {
 export type { QuestionAnswerOutput };
 
 // The locked tool name is the native agent's vocabulary, matched by literal
-// like `tool-display.ts` matches `run_command`. The wire shape is
+// like `tool-display.ts` matches `skill`. The wire shape is
 // `tool-<name>` (AI SDK UI parts).
 const QUESTION_TOOL_NAME = "question";
 

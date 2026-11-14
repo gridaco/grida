@@ -293,8 +293,16 @@ it("binds editor observations only to an exact Act text attachment", async () =>
   });
   await ipc.submit(first.event, id, "plan", "Text", "plan");
   expect(submit.mock.calls.at(-1)).toHaveLength(4);
+  // A queued Act request keeps the same editor binding a sent one has.
   await ipc.enqueue(first.event, id, "queue", "Text", "act");
+  expect(enqueue.mock.calls.at(-1)?.[4]).toEqual({
+    editorEndpointId: endpointId,
+  });
+  await ipc.enqueue(first.event, id, "queue-plan", "Text", "plan");
   expect(enqueue.mock.calls.at(-1)).toHaveLength(4);
+  await expect(
+    ipc.enqueue(first.event, id, "queue-target", "Text", "plan", undefined, "x")
+  ).rejects.toThrow("native_chat_svg_text_target_invalid");
   const unsubscribed = { ...read, callId: randomUUID(), path: "/result.svg" };
   expect(endpoints.open(unsubscribed)).toMatchObject({ requested: false });
   ipc.publishEditorSurfaces(first.event, id, empty, 1);
@@ -2478,5 +2486,129 @@ describe("Welcome connection choices", () => {
       ipc.welcomeProfiles(windowAt(WELCOME_URL).event)
     ).resolves.toBeNull();
     expect(welcome).not.toHaveBeenCalled();
+  });
+});
+
+describe("background processes", () => {
+  const PROCESS = {
+    processId: 3,
+    command: "pnpm dev",
+    cwd: "/fixture/workspace",
+    terminal: true,
+    startedAt: 1_700_000_000_000,
+    state: "running",
+    exitCode: null,
+  } as const;
+
+  function processSetup(accepts = true) {
+    const f = setup();
+    const list = vi.fn<
+      NonNullable<ActiveNativeChat["chat"]["listBackgroundProcesses"]>
+    >(async () => [PROCESS]);
+    const stop = vi.fn<
+      NonNullable<ActiveNativeChat["chat"]["stopBackgroundProcesses"]>
+    >(async (_session, ids) => (Array.isArray(ids) ? ids : [3]));
+    Object.defineProperty(f.chat, "acceptsBackgroundProcesses", {
+      value: accepts,
+    });
+    f.chat.listBackgroundProcesses = list;
+    f.chat.stopBackgroundProcesses = stop;
+    return { ...f, list, stop };
+  }
+
+  it("lists and stops processes only for an attachment the current frame owns", async () => {
+    const { ipc, first, second, list, stop } = processSetup();
+    expect(ipc.acceptsBackgroundProcesses(first.event)).toBe(true);
+    const attachment = await ipc.create(first.event);
+    const id = attachment.attachmentId;
+    await expect(ipc.backgroundProcesses(second.event, id)).rejects.toThrow(
+      "native_chat_attachment_unavailable"
+    );
+    await expect(
+      ipc.stopBackgroundProcesses(second.event, id, [3])
+    ).rejects.toThrow("native_chat_attachment_unavailable");
+    expect(list).not.toHaveBeenCalled();
+    expect(stop).not.toHaveBeenCalled();
+    expect(await ipc.backgroundProcesses(first.event, id)).toEqual([PROCESS]);
+    expect(list.mock.calls[0]?.[0]).toEqual({ id: attachment.sessionId });
+    expect(await ipc.stopBackgroundProcesses(first.event, id, [3])).toEqual([
+      3,
+    ]);
+    expect(stop).toHaveBeenLastCalledWith({ id: attachment.sessionId }, [3]);
+    await ipc.stopBackgroundProcesses(first.event, id);
+    expect(stop).toHaveBeenLastCalledWith(
+      { id: attachment.sessionId },
+      undefined
+    );
+  });
+
+  it("reports the capability only when the chat negotiated it", () => {
+    const { ipc, first } = processSetup(false);
+    expect(ipc.acceptsBackgroundProcesses(first.event)).toBe(false);
+  });
+
+  it("forwards the live process list to the subscribed frame", async () => {
+    const { ipc, first, second, emit } = processSetup();
+    const attachment = await ipc.create(first.event);
+    const subscriptionId = randomUUID();
+    ipc.subscribe(first.event, attachment.attachmentId, subscriptionId);
+    const update = { kind: "processes", processes: [PROCESS] } as const;
+    emit(attachment.sessionId, update);
+    expect(first.frame.send).toHaveBeenCalledExactlyOnceWith(
+      IPC_CHANNELS.NATIVE_CHAT_UPDATE,
+      { subscriptionId, attachmentId: attachment.attachmentId, update }
+    );
+    expect(second.frame.send).not.toHaveBeenCalled();
+  });
+
+  it("stops a chat's processes when its window closes, not when it switches chats", async () => {
+    const { ipc, first, second, stop } = processSetup();
+    const one = await ipc.create(first.event);
+    ipc.detach(first.event, one.attachmentId);
+    const two = await ipc.create(first.event);
+    const openId = randomUUID();
+    await ipc.openSideChat(first.event, two.attachmentId, openId);
+    await ipc.closeSideChat(first.event, two.attachmentId, openId);
+    // Switching chats and closing a side chat keep processes running.
+    expect(stop).not.toHaveBeenCalled();
+    // Another window still shows the second chat.
+    await ipc.load(second.event, two.sessionId);
+    first.contents.emit("destroyed");
+    await vi.waitFor(() => expect(stop).toHaveBeenCalled());
+    const stopped = stop.mock.calls.map(([session]) => session.id);
+    expect(stopped).toContain(one.sessionId);
+    expect(stopped).not.toContain(two.sessionId);
+    // A closing window stops all of each chat's processes.
+    expect(stop.mock.calls.every((call) => call.length === 1)).toBe(true);
+    stop.mockClear();
+    second.contents.emit("destroyed");
+    await vi.waitFor(() =>
+      expect(stop).toHaveBeenCalledExactlyOnceWith({ id: two.sessionId })
+    );
+  });
+
+  it("keeps processes through a reload, navigation or renderer crash", async () => {
+    const { ipc, first, stop } = processSetup();
+    const chat = await ipc.create(first.event);
+    first.contents.emit("did-start-navigation", { isMainFrame: true });
+    first.contents.emit("did-navigate");
+    first.contents.emit("did-navigate-in-page", {}, first.frame.url, true);
+    first.contents.emit("render-process-gone");
+    // The released frame re-attaches in the same window.
+    const again = await ipc.load(first.event, chat.sessionId);
+    expect(again.sessionId).toBe(chat.sessionId);
+    expect(stop).not.toHaveBeenCalled();
+    first.contents.emit("destroyed");
+    await vi.waitFor(() =>
+      expect(stop).toHaveBeenCalledExactlyOnceWith({ id: chat.sessionId })
+    );
+  });
+
+  it("does not stop processes when the frame's scope is replaced in place", async () => {
+    const { ipc, first, stop, scopes, chat } = processSetup();
+    await ipc.create(first.event);
+    scopes.set(first.sender, { workspaceId: WORKSPACE, chat: { ...chat } });
+    await expect(ipc.create(first.event)).resolves.toBeDefined();
+    expect(stop).not.toHaveBeenCalled();
   });
 });

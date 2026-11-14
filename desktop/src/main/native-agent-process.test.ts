@@ -454,7 +454,7 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
       const meta = (extra) => ({[capability]:{requestId:read.requestId,turnId:'turn-1',...extra}});
       send({method:'session/update',params:{sessionId:'chat',
         _meta:{'co.grida/session/updates':{turnId:'turn-2',messageId:'live',activity:'execute',outcome:'running'}},
-        update:{sessionUpdate:'tool_call',toolCallId:'call-live',title:'run_command',kind:'execute',status:'in_progress'}}});
+        update:{sessionUpdate:'tool_call',toolCallId:'call-live',title:'exec_command',kind:'execute',status:'in_progress'}}});
       send({method:'session/update',params:{sessionId:'chat',_meta:meta({}),
         update:{sessionUpdate:'user_message_chunk',messageId:'ask',content:{type:'text',text:'Check it'}}}});
       send({method:'session/update',params:{sessionId:'chat',_meta:meta({}),
@@ -571,7 +571,7 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
             turnId: "turn-2",
             activity: {
               callId: "call-live",
-              title: "run_command",
+              title: "exec_command",
               kind: "execute",
               outcome: "running",
             },

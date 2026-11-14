@@ -20,7 +20,7 @@ import { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
 import { FullscreenImagePreview } from "@/kits/image-preview";
 import type { ToolCallEntry } from "@/lib/agent-chat/types";
 
-// The image generation tool name is a locked literal, like `run_command` and
+// The image generation tool name is a locked literal, like `skill` and
 // `question` in `tool-display.ts`.
 const GENERATE_IMAGE = "generate_image";
 

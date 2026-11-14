@@ -90,6 +90,11 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_ENQUEUE: "grida:native-chat:enqueue",
   NATIVE_CHAT_ACCEPTS_EFFORT: "grida:native-chat:accepts-effort",
   NATIVE_CHAT_ACCEPTS_GOAL_EFFORT: "grida:native-chat:accepts-goal-effort",
+  NATIVE_CHAT_ACCEPTS_BACKGROUND_PROCESSES:
+    "grida:native-chat:accepts-background-processes",
+  NATIVE_CHAT_BACKGROUND_PROCESSES: "grida:native-chat:background-processes",
+  NATIVE_CHAT_STOP_BACKGROUND_PROCESSES:
+    "grida:native-chat:stop-background-processes",
   NATIVE_CHAT_ACCEPTS_PNG: "grida:native-chat:accepts-png",
   NATIVE_CHAT_ACCEPTS_LIBRARY_SELECTION:
     "grida:native-chat:accepts-library-selection",

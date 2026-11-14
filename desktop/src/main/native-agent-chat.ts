@@ -5,6 +5,7 @@ import path from "node:path";
 import type {
   NativeChatAcceptance,
   NativeChatApprovalDecision,
+  NativeChatBackgroundProcess,
   NativeChatCatalogChange,
   NativeChatCatalogEntry,
   NativeChatCommand,
@@ -49,6 +50,7 @@ import type {
   NativeSubagentCreate,
 } from "@grida/desktop-bridge";
 import { NativeAgentArtifacts } from "./native-agent-artifacts";
+import { NativeAgentBackgroundProcesses } from "./native-agent-background-processes";
 import { NativeAgentHooks, type NativeHookReview } from "./native-agent-hooks";
 import type { NativeHookInspection } from "@grida/desktop-bridge";
 import type {
@@ -268,6 +270,9 @@ export class NativeAgentChat {
   private readonly sideChats = new NativeAgentSideChats((method, params) =>
     this.process.request(method, params)
   );
+  private readonly backgroundProcesses = new NativeAgentBackgroundProcesses(
+    (method, params) => this.process.request(method, params, 10_000)
+  );
   private readonly attached = new Map<string, NativeChatSession>();
   private readonly loading = new Map<string, Promise<NativeChatSession>>();
   private readonly transcripts = new Map<string, TranscriptCapture>();
@@ -307,6 +312,10 @@ export class NativeAgentChat {
 
   get acceptsSavedChatDeletion(): boolean {
     return this.connected && this.process.acceptsSavedChatDeletion;
+  }
+
+  get acceptsBackgroundProcesses(): boolean {
+    return this.connected && this.process.acceptsBackgroundProcesses;
   }
 
   ownsSession(session: NativeChatSession): boolean {
@@ -782,11 +791,36 @@ export class NativeAgentChat {
     inputId: string,
     text: string,
     operatingRegime?: NativeChatOperatingRegime,
+    editorSurfaces?: NativeEditorSurfaceSelection,
     effort?: NativeChatEffort
   ): Promise<NativeChatAcceptance> {
     return this.send("enqueue", session, inputId, text, operatingRegime, {
+      editorSurfaces,
       effort,
     });
+  }
+
+  /** Running processes first, then ended ones the agent has not collected. */
+  async listBackgroundProcesses(
+    session: NativeChatSession
+  ): Promise<readonly NativeChatBackgroundProcess[]> {
+    const sessionId = this.requireAttached(session);
+    if (!this.acceptsBackgroundProcesses)
+      throw new Error("native_chat_background_processes_unavailable");
+    const processes = await this.backgroundProcesses.list(sessionId);
+    this.requireAttached(session);
+    return processes;
+  }
+
+  /** Stops the named processes, or all of the chat's processes when omitted. */
+  async stopBackgroundProcesses(
+    session: NativeChatSession,
+    processIds?: unknown
+  ): Promise<readonly number[]> {
+    const sessionId = this.requireAttached(session);
+    if (!this.acceptsBackgroundProcesses)
+      throw new Error("native_chat_background_processes_unavailable");
+    return this.backgroundProcesses.stop(sessionId, processIds);
   }
 
   submitWithLibrarySelection(
@@ -889,11 +923,7 @@ export class NativeAgentChat {
         ...(operatingRegime && { operatingRegime }),
         ...hostEffort(effort),
         ...(allowLibrarySelection && { allowLibrarySelection }),
-        ...(mode === "submit" &&
-          operatingRegime === "act" &&
-          !image &&
-          !file &&
-          editorSurfaces),
+        ...(operatingRegime === "act" && !image && !file && editorSurfaces),
       }),
       sessionId,
       inputId
@@ -1758,6 +1788,23 @@ export class NativeAgentChat {
         return;
       }
       const listeners = this.listeners.get(sessionId);
+      const processes = metadata?.[NativeAgentBackgroundProcesses.capability];
+      if (processes !== undefined) {
+        if (!listeners || this.closed || !this.acceptsBackgroundProcesses)
+          return;
+        const projected: NativeChatStreamUpdate = Object.freeze({
+          kind: "processes",
+          processes: NativeAgentBackgroundProcesses.readUpdate(processes),
+        });
+        for (const listener of listeners) {
+          try {
+            listener(projected);
+          } catch {
+            /* Observers have independent lifetimes. */
+          }
+        }
+        return;
+      }
       const capture = this.transcripts.get(sessionId);
       if (!listeners && !capture) return;
       const update = object(notification.update);

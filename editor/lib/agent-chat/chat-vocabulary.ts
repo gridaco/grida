@@ -10,6 +10,8 @@ export namespace chat_vocabulary {
     write_file: "write_file",
     list_files: "list_files",
     grep_files: "grep_files",
+    exec_command: "exec_command",
+    write_stdin: "write_stdin",
     todo_write: "todo_write",
     view_image: "view_image",
     design_search: "design_search",

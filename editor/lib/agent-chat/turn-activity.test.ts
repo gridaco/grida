@@ -10,7 +10,7 @@ const read = {
 } as const;
 const command = {
   callId: "call-2",
-  title: "run_command",
+  title: "exec_command",
   kind: "execute",
   outcome: "failed",
 } as const;

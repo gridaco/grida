@@ -15,6 +15,7 @@ import type {
   NativeChatAcceptance,
   NativeChatAttachment,
   NativeChatApproval,
+  NativeChatBackgroundProcess,
   NativeChatCatalogEntry,
   NativeChatCommand,
   NativeChatCommandResult,
@@ -144,6 +145,9 @@ export type ActiveNativeChat = Readonly<{
         | "answerLibrarySelection"
         | "acceptsEffort"
         | "acceptsGoalEffort"
+        | "acceptsBackgroundProcesses"
+        | "listBackgroundProcesses"
+        | "stopBackgroundProcesses"
         | "registerEditorSurfaces"
         | "inspectHooks"
         | "reviewHook"
@@ -300,6 +304,11 @@ export class NativeChatIpc {
   >();
   private readonly selectingProfile = new WeakSet<WebContents>();
   private readonly svgTextReplies = new NativeEditorSvgTextReplies();
+  /** Per window, the sessions it showed for each chat host. */
+  private readonly shownSessions = new Map<
+    WebContents,
+    Map<ActiveNativeChat["chat"], Set<NativeChatSession>>
+  >();
 
   constructor(
     private readonly editorOrigin: string,
@@ -1496,16 +1505,27 @@ export class NativeChatIpc {
     inputId: string,
     text: string,
     regime?: unknown,
-    effort?: unknown
+    effort?: unknown,
+    svgTargetId?: unknown
   ) {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const mode = operatingRegime(regime);
+    if (
+      svgTargetId !== undefined &&
+      (mode !== "act" || !NativeEditorSvgText.isId(svgTargetId))
+    )
+      throw new Error("native_chat_svg_text_target_invalid");
     const selected = agentEffort(effort);
+    const surfaces =
+      mode === "act"
+        ? attachment.editorSurfaces?.selection(svgTargetId)
+        : undefined;
     const result = await owner.active.chat.enqueue(
       attachment.session,
       inputId,
       text,
-      operatingRegime(regime),
-      ...(selected ? [selected] : [])
+      mode,
+      ...submitSelections(surfaces, selected)
     );
     this.revalidate(owner, attachment);
     return result;
@@ -1544,6 +1564,39 @@ export class NativeChatIpc {
 
   acceptsEffort(event: IpcMainInvokeEvent): boolean {
     return this.owner(event).active.chat.acceptsEffort === true;
+  }
+
+  acceptsBackgroundProcesses(event: IpcMainInvokeEvent): boolean {
+    const { chat } = this.owner(event).active;
+    return (
+      chat.acceptsBackgroundProcesses === true &&
+      !!chat.listBackgroundProcesses &&
+      !!chat.stopBackgroundProcesses
+    );
+  }
+
+  async backgroundProcesses(
+    event: IpcMainInvokeEvent,
+    attachmentId: string
+  ): Promise<readonly NativeChatBackgroundProcess[]> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const list = owner.active.chat.listBackgroundProcesses;
+    if (!list) throw new Error("native_chat_background_processes_unavailable");
+    const processes = await list.call(owner.active.chat, attachment.session);
+    this.revalidate(owner, attachment);
+    return processes;
+  }
+
+  async stopBackgroundProcesses(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    processIds?: unknown
+  ): Promise<readonly number[]> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const stop = owner.active.chat.stopBackgroundProcesses;
+    if (!stop) throw new Error("native_chat_background_processes_unavailable");
+    // Stopping is not undone by a frame that navigates while it runs.
+    return stop.call(owner.active.chat, attachment.session, processIds);
   }
 
   acceptsGoalEffort(event: IpcMainInvokeEvent): boolean {
@@ -2347,6 +2400,7 @@ export class NativeChatIpc {
         goals: new Map(),
       };
       owner.attachments.set(attachment.id, attachment);
+      this.recordShown(owner, session);
       return { attachmentId: attachment.id, sessionId: session.id };
     } finally {
       owner.pending -= 1;
@@ -2488,6 +2542,51 @@ export class NativeChatIpc {
             // The frame can navigate after the host commits its deletion.
           }
         }
+      }
+    }
+  }
+
+  /**
+   * Remembers that this window showed a chat. Only the window's destruction
+   * stops the chat's background processes: a reload, a navigation or a
+   * renderer crash re-attaches in the same window, and the processes survive.
+   */
+  private recordShown(owner: Owner, session: NativeChatSession): void {
+    const { sender } = owner;
+    const { chat } = owner.active;
+    let shown = this.shownSessions.get(sender);
+    if (!shown) {
+      shown = new Map();
+      this.shownSessions.set(sender, shown);
+      sender.once("destroyed", () => this.stopClosedProcesses(sender));
+    }
+    let sessions = shown.get(chat);
+    if (!sessions) {
+      sessions = new Set();
+      shown.set(chat, sessions);
+    }
+    sessions.add(session);
+  }
+
+  /**
+   * A chat's background processes end with the last window that showed it.
+   * Switching chats inside a window detaches without stopping anything, and a
+   * session another live window has shown keeps its processes.
+   */
+  private stopClosedProcesses(sender: WebContents): void {
+    const shown = this.shownSessions.get(sender);
+    this.shownSessions.delete(sender);
+    for (const [chat, sessions] of shown ?? []) {
+      if (!chat.acceptsBackgroundProcesses || !chat.stopBackgroundProcesses)
+        continue;
+      for (const session of sessions) {
+        if (chat.ownsSession && !chat.ownsSession(session)) continue;
+        const elsewhere = [...this.shownSessions].some(
+          ([other, record]) =>
+            !other.isDestroyed() && record.get(chat)?.has(session)
+        );
+        if (elsewhere) continue;
+        void chat.stopBackgroundProcesses(session).catch(() => {});
       }
     }
   }

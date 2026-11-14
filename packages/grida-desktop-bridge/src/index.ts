@@ -382,7 +382,7 @@ export type DesktopBridge = {
    * GRIDA-SEC-004 — human-interactive terminal. A real, unsandboxed
    * login PTY on the user's own machine (VSCode trust model: the human
    * is allowed to run anything as themselves). This is deliberately
-   * NOT the agent's shell — the agent's `run_command` stays confined
+   * NOT the agent's shell — the agent's `exec_command` stays confined
    * behind the srt sandbox and is never wired to this surface.
    *
    * `create` registers `handlers` before the PTY spawns, so no output

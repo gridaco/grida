@@ -69,6 +69,7 @@ import { turn_activity } from "@/lib/agent-chat/turn-activity";
 import { native_message_parts } from "@/lib/agent-chat/native-message-parts";
 import { NativeMessageRevisionPanel } from "./native-message-revision-panel";
 import { NativeHooksPanel } from "./native-hooks-panel";
+import { NativeBackgroundProcesses } from "./native-background-processes";
 
 import {
   Dialog,
@@ -810,6 +811,17 @@ export function NativeAgentPane({
                   },
                 ]
               : []),
+            ...(state.backgroundProcesses
+              ? [
+                  {
+                    id: "stop",
+                    title: "stop",
+                    description: "Stop all background processes",
+                    standalone: true as const,
+                    run: () => controller.stopBackgroundProcesses(),
+                  },
+                ]
+              : []),
             ...state.commands.map(
               (command): ComposerCommandAction => ({
                 id: command,
@@ -831,6 +843,10 @@ export function NativeAgentPane({
             }
             if (command.id === "side") {
               controller.selectSideIntent(true);
+              return true;
+            }
+            if (command.id === "stop" && state.backgroundProcesses) {
+              void controller.stopBackgroundProcesses().catch(() => {});
               return true;
             }
             return false;
@@ -1018,6 +1034,11 @@ export function NativeAgentPane({
                   </div>
                 </PopoverContent>
               </Popover>
+              {state.backgroundProcesses && (
+                <NativeBackgroundProcesses
+                  controller={state.backgroundProcesses}
+                />
+              )}
               {state.operatingRegime === "plan" && (
                 <IntentChip
                   icon={<ListChecksIcon />}

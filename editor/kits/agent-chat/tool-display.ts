@@ -17,6 +17,7 @@ export type ToolDisplayAction =
   | "generate_image"
   | "plan"
   | "command"
+  | "process"
   | "question"
   | "skill"
   | "open_tab"
@@ -150,7 +151,21 @@ export namespace toolDisplay {
           tone,
         };
 
-      case "run_command":
+      case chat_vocabulary.TOOL_NAMES.write_stdin: {
+        const action = stringValue(args.description) ?? "used process";
+        return {
+          action: "process",
+          title: describeTitle(
+            tone,
+            capitalize(action),
+            capitalize(action),
+            "Process input failed"
+          ),
+          tone,
+        };
+      }
+
+      case chat_vocabulary.TOOL_NAMES.exec_command:
         return {
           action: "command",
           title: describeTitle(
@@ -306,6 +321,7 @@ export namespace toolDisplay {
     pushClause(clauses, counts, "search", "searched");
     pushClause(clauses, counts, "list", "listed");
     pushClause(clauses, counts, "command", "ran");
+    pushClause(clauses, counts, "process", "used");
     pushClause(clauses, counts, "plan", "updated", "plan update");
     pushClause(clauses, counts, "question", "asked");
     pushClause(clauses, counts, "skill", "loaded", "skill");
@@ -321,6 +337,7 @@ export namespace toolDisplay {
     pushClause(clauses, runningCounts, "search", "searching");
     pushClause(clauses, runningCounts, "list", "listing");
     pushClause(clauses, runningCounts, "command", "running");
+    pushClause(clauses, runningCounts, "process", "using");
     pushClause(clauses, runningCounts, "plan", "updating", "plan update");
     pushClause(clauses, runningCounts, "question", "asking");
     pushClause(clauses, runningCounts, "skill", "loading", "skill");
@@ -407,6 +424,8 @@ function nounForAction(action: ToolDisplayAction): string {
       return "listing";
     case "command":
       return "command";
+    case "process":
+      return "process";
     case "plan":
       return "plan update";
     case "question":
@@ -425,6 +444,7 @@ function nounForAction(action: ToolDisplayAction): string {
 function pluralize(noun: string, count: number): string {
   if (count === 1) return noun;
   if (noun === "search") return "searches";
+  if (noun === "process") return "processes";
   return `${noun}s`;
 }
 
