@@ -317,8 +317,11 @@ describe("LibraryTigris", () => {
         await vi.waitFor(() => expect(stalledResponses).toHaveLength(1));
         expire();
         expect(await settled).toEqual(new Error("Library upload timed out"));
-        await vi.waitFor(() =>
-          expect(stalledResponses[0].destroyed).toBe(true)
+        // The abort reaches the server socket asynchronously through the
+        // client's fetch handler; allow for a loaded test runner.
+        await vi.waitFor(
+          () => expect(stalledResponses[0].destroyed).toBe(true),
+          { timeout: 5_000 }
         );
         expect(requests.map((request) => request.method)).toEqual(
           ["PUT", "HEAD", "GET"].slice(
