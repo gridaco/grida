@@ -27,6 +27,8 @@ impl Server {
         let state = tempfile::tempdir().unwrap();
         let mut child = Command::new(env!("CARGO_BIN_EXE_grida-agent"))
             .env_clear()
+            // Windows sockets need the system root, which clearing the environment removes.
+            .envs(std::env::var_os("SystemRoot").map(|root| ("SystemRoot", root)))
             .env(TOKEN_ENV, TOKEN)
             .current_dir(state.path())
             .args([

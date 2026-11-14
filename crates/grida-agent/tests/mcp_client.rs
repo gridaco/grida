@@ -31,6 +31,8 @@ async fn native_mcp_server_grants_only_explicitly_selected_tools() {
     let state = tempfile::tempdir().unwrap();
     let mut child = Command::new(env!("CARGO_BIN_EXE_grida-agent"))
         .env_clear()
+        // Windows sockets need the system root, which clearing the environment removes.
+        .envs(std::env::var_os("SystemRoot").map(|root| ("SystemRoot", root)))
         .env("MCP_FIXTURE_TOKEN", TOKEN)
         .current_dir(state.path())
         .args([
