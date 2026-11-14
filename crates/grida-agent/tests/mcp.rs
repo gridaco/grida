@@ -43,15 +43,20 @@ impl Server {
             .spawn()
             .unwrap();
         let mut stderr = BufReader::new(child.stderr.take().unwrap()).lines();
-        let startup = tokio::time::timeout(Duration::from_secs(5), stderr.next_line())
-            .await
-            .unwrap()
-            .unwrap()
-            .unwrap();
-        let url = startup
-            .strip_prefix("grida-agent: MCP listening on ")
-            .unwrap()
-            .into();
+        let mut seen = Vec::new();
+        let url = tokio::time::timeout(Duration::from_secs(5), async {
+            while let Some(line) = stderr.next_line().await.unwrap() {
+                if let Some(url) = line.strip_prefix("grida-agent: MCP listening on ") {
+                    return Some(url.to_owned());
+                }
+                seen.push(line);
+            }
+            None
+        })
+        .await
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| panic!("the MCP listener did not start; stderr: {seen:?}"));
         let client = Client::builder()
             .no_proxy()
             .timeout(Duration::from_secs(5))
