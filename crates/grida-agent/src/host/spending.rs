@@ -721,7 +721,8 @@ impl StreamingTransport for CappedTransport {
     }
 }
 
-#[cfg(test)]
+// Task spending exists only on macOS and Linux.
+#[cfg(all(test, any(target_os = "macos", target_os = "linux")))]
 mod tests {
     use super::*;
 

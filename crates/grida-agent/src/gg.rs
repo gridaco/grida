@@ -1467,7 +1467,8 @@ mod tests {
             "https://api.example",
             "fixture-owner",
             7,
-            i64::MAX,
+            // A live expiry every platform clock can represent.
+            32_503_680_000_000,
             "synthetic.gg.grant",
         )
         .unwrap();

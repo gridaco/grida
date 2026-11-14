@@ -817,6 +817,8 @@ mod tests {
         }
     }
 
+    // Commands and absolute Unix program paths exist only on Unix.
+    #[cfg(unix)]
     #[test]
     fn commands_require_explicit_paths_and_reject_host_controls() {
         let input = |extra: serde_json::Value| {
