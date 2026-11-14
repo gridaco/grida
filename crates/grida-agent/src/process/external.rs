@@ -229,7 +229,7 @@ async fn admit(
     let (intent, owned_store) = if let Some(identity) = identity {
         let intent = Fingerprint::of(&(&options.profile, &bytes, &input, options.timeout))?;
         // The store lock serializes the first admission with every retry.
-        let store = SqliteStore::open(&database)?;
+        let store = crate::host::open_store(&database)?;
         if let Some(record) = observation(&store, identity, Some(intent)).await? {
             return Ok(Admission::Observed(record));
         }
@@ -249,7 +249,7 @@ async fn admit(
     )?;
     let store = match owned_store {
         Some(store) => store,
-        None => SqliteStore::open(&database)?,
+        None => crate::host::open_store(&database)?,
     };
     let (session, turn) = match identity {
         Some(identity) => (identity.session.clone(), identity.turn.clone()),
@@ -428,7 +428,7 @@ pub async fn inspect(state: &Path, id: Uuid) -> Result<u8> {
         }
         Ok(_) => {}
     }
-    let store = SqliteStore::open(database)?;
+    let store = crate::host::open_store(&database)?;
     let record = observation(&store, &identity, None)
         .await?
         .ok_or_else(missing)?;
