@@ -7,7 +7,7 @@ export const preferences =
   /* generated:service:preferences:start */
   {
     text: {
-      default_id: "openai/gpt-5.6-terra",
+      default_id: "openai/gpt-6.1-terra",
     },
     image: {
       default_id: "openai/gpt-image-2.5-flare",

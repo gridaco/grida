@@ -875,9 +875,9 @@ describe("models.video catalogue invariants", () => {
 describe("models.text.byTier", () => {
   it("pins the accepted capability and cost topology", () => {
     expect(TIER_MODEL_IDS).toEqual({
-      nano: "openai/gpt-5.6-luna",
-      mini: "openai/gpt-5.6-terra",
-      pro: "openai/gpt-5.6-sol",
+      nano: "openai/gpt-6-luna",
+      mini: "openai/gpt-6.1-terra",
+      pro: "openai/gpt-6.1-sol",
       max: "openai/gpt-6-astra",
     });
     expect(new Set(Object.values(TIER_MODEL_IDS)).size).toBe(4);
@@ -1089,34 +1089,45 @@ describe("models.text current catalogue", () => {
   });
 
   it("keeps catalogue lifecycle markers scoped to the requested models", () => {
-    expect(
-      models.text.catalog["openai/gpt-6-astra"].deprecated
-    ).toBeUndefined();
-    expect(
-      models.text.catalog["openai/gpt-5.6-sol"].deprecated
-    ).toBeUndefined();
-    expect(models.text.catalog["openai/gpt-5.5"].deprecated).toBe(true);
-    expect(
-      models.text.catalog["openai/gpt-5.5-pro"].deprecated
-    ).toBeUndefined();
-    expect(
-      models.text.catalog["anthropic/claude-fable-5.1"].deprecated
-    ).toBeUndefined();
-    expect(models.text.catalog["anthropic/claude-fable-5"].deprecated).toBe(
-      true
+    const active = [
+      "openai/gpt-6-astra",
+      "openai/gpt-6.1-sol",
+      "openai/gpt-6.1-terra",
+      "openai/gpt-6-sol",
+      "openai/gpt-6-luna",
+      "anthropic/claude-opus-5.5",
+      "anthropic/claude-sonnet-5.5",
+      "anthropic/claude-haiku-5.5",
+      "anthropic/claude-fable-5.1",
+      "google/gemini-4-argon",
+      "google/gemini-3.8-flash",
+    ];
+    const retired = [
+      "openai/gpt-5.5",
+      "openai/gpt-5.5-pro",
+      "openai/gpt-5.6-sol",
+      "openai/gpt-5.6-terra",
+      "openai/gpt-5.6-luna",
+      "anthropic/claude-opus-5",
+      "anthropic/claude-opus-4.8",
+      "anthropic/claude-sonnet-5",
+      "anthropic/claude-fable-5",
+      "google/gemini-3.7-flash",
+      "google/gemini-3.1-pro-preview",
+    ];
+    // Every catalogued model is classified, so a marker cannot leak onto an
+    // unlisted id without failing here.
+    expect(Object.keys(models.text.catalog).sort()).toEqual(
+      [...active, ...retired].sort()
     );
-    expect(
-      models.text.catalog["anthropic/claude-opus-5"].deprecated
-    ).toBeUndefined();
-    expect(models.text.catalog["anthropic/claude-opus-4.8"].deprecated).toBe(
-      true
-    );
-    expect(
-      models.text.catalog["google/gemini-3.8-flash"].deprecated
-    ).toBeUndefined();
-    expect(models.text.catalog["google/gemini-3.7-flash"].deprecated).toBe(
-      true
-    );
+    for (const id of active)
+      expect(
+        models.text.catalog[id as keyof typeof models.text.catalog].deprecated
+      ).toBeUndefined();
+    for (const id of retired)
+      expect(
+        models.text.catalog[id as keyof typeof models.text.catalog].deprecated
+      ).toBe(true);
   });
 });
 

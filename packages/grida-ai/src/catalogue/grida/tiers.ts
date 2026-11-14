@@ -42,9 +42,9 @@ export type ModelTier = "nano" | "mini" | "pro" | "max";
 export const TIER_MODEL_IDS = Object.freeze(
   /* generated:service:tiers:start */
   {
-    nano: "openai/gpt-5.6-luna",
-    mini: "openai/gpt-5.6-terra",
-    pro: "openai/gpt-5.6-sol",
+    nano: "openai/gpt-6-luna",
+    mini: "openai/gpt-6.1-terra",
+    pro: "openai/gpt-6.1-sol",
     max: "openai/gpt-6-astra",
   } /* generated:service:tiers:end */ as const satisfies Record<
     ModelTier,
