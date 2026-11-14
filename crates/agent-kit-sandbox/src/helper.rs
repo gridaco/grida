@@ -250,6 +250,7 @@ fn supervise(mut status: File, spec: Spec) -> bool {
                 // call on a close-on-exec copy of the helper's stderr.
                 let diagnostics =
                     unsafe { libc::fcntl(libc::STDERR_FILENO, libc::F_DUPFD_CLOEXEC, 3) };
+                eprintln!("DIAGNOSTIC: diagnostics fd {diagnostics}");
                 unsafe {
                     command.pre_exec(move || {
                         let fail = |message: &[u8]| {
@@ -265,6 +266,8 @@ fn supervise(mut status: File, spec: Spec) -> bool {
                         if libc::ioctl(0, libc::TIOCSCTTY as _, 0 as libc::c_int) < 0 {
                             return fail(b"agent-kit-sandbox: terminal payload TIOCSCTTY failed\n");
                         }
+                        let probe = b"DIAGNOSTIC: terminal claimed, executing\n";
+                        libc::write(diagnostics, probe.as_ptr().cast(), probe.len());
                         Ok(())
                     });
                 }
