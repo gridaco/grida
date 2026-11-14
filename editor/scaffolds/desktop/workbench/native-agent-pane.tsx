@@ -49,7 +49,12 @@ import {
   type NativeChatView,
 } from "@/lib/agent-chat/native-chat-controller";
 import { subscribeToNativeNotificationFocus } from "@/lib/desktop/agent-focus-session";
-import type { ComposerCatalog, ComposerController } from "@/kits/composer";
+import {
+  ComposerDropArea,
+  type ComposerCatalog,
+  type ComposerController,
+  type ComposerTransfer,
+} from "@/kits/composer";
 import { AgentApprovalPrompt } from "../shared/agent-approval";
 import { AgentLibraryAttachmentPicker } from "../shared/agent-library-attachment-picker";
 import {
@@ -587,8 +592,18 @@ function NativeChatPane({
     );
   };
 
+  // A drop anywhere in the pane takes the same intake as one on the composer
+  // editor; the composer consumes its own drops first, so each is handled once.
+  // (see test/desktop-agent-chat-pane-drop.md)
+  const transferAttachment = ({ resources }: ComposerTransfer.Event) =>
+    void controller.pickTransferredAttachment(state.scope, resources);
+
   return (
-    <div data-testid={testId} className="flex min-h-0 flex-1 flex-col">
+    <ComposerDropArea
+      data-testid={testId}
+      className="flex min-h-0 flex-1 flex-col"
+      onTransfer={transferAttachment}
+    >
       {header(state)}
       {(state.profileError || state.catalogEntryError) && (
         <p role="alert" className="px-3 py-1 text-xs text-destructive">
@@ -904,9 +919,7 @@ function NativeChatPane({
               />
             )
           }
-          onAttachmentTransfer={({ resources }) =>
-            void controller.pickTransferredAttachment(state.scope, resources)
-          }
+          onAttachmentTransfer={transferAttachment}
           awaitSubmission
           canSubmit={
             controller.canSubmit &&
@@ -1179,7 +1192,7 @@ function NativeChatPane({
             />
           )}
       </div>
-    </div>
+    </ComposerDropArea>
   );
 }
 

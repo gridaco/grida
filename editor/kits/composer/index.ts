@@ -14,6 +14,10 @@ export {
 
 export { ComposerTransfer } from "./composer-transfer";
 
+export { ComposerDropZone } from "./composer-drop-zone";
+
+export { ComposerDropArea, ComposerDropOverlay } from "./composer-drop-area";
+
 export type {
   ComposerAttachment,
   ComposerAttachmentFilter,
