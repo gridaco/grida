@@ -263,6 +263,7 @@ impl Endpoint {
     }
 
     /// The next chat title request the endpoint answered.
+    #[cfg_attr(not(unix), allow(dead_code))]
     async fn title_request(&mut self) -> Value {
         timeout(self.wait, self.titles.recv())
             .await
@@ -294,6 +295,7 @@ impl Endpoint {
 
     /// Stops the endpoint while a reply may still be open, and reports any
     /// fixture assertion that failed before it stopped.
+    #[cfg_attr(not(unix), allow(dead_code))]
     async fn abort(self) {
         self.task.abort();
         match self.task.await {
