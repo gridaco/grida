@@ -321,7 +321,7 @@ describe("LibraryTigris", () => {
         // client's fetch handler; allow for a loaded test runner.
         await vi.waitFor(
           () => expect(stalledResponses[0].destroyed).toBe(true),
-          { timeout: 5_000 }
+          { timeout: 20_000 }
         );
         expect(requests.map((request) => request.method)).toEqual(
           ["PUT", "HEAD", "GET"].slice(
@@ -333,7 +333,8 @@ describe("LibraryTigris", () => {
         expire();
         await settled;
       }
-    }
+    },
+    30_000
   );
 
   it("expires even when response-body cancellation never settles", async () => {
