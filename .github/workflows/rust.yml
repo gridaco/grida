@@ -32,7 +32,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -45,7 +45,7 @@ jobs:
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - name: Test
         run: cargo test --workspace --all-features --locked
-      - name: Native sandbox
+      - name: Native sandbox and agent commands
         if: runner.os != 'Windows'
         shell: bash
         run: |
@@ -56,6 +56,9 @@ jobs:
             export AGENT_KIT_TEST_BWRAP=/usr/bin/bwrap
           fi
           cargo test -p agent-kit-sandbox --locked --test native -- --include-ignored --test-threads=1
+          cargo build -p agent-kit-sandbox --locked --bin agent-kit-sandbox-helper
+          export GRIDA_AGENT_TEST_SANDBOX_HELPER="$PWD/target/debug/agent-kit-sandbox-helper"
+          cargo test -p grida-agent --locked --test commands --test permissions --test process --test external_acp -- --include-ignored --test-threads=1
       - name: Build
         run: cargo build --workspace --locked
   conformance:
