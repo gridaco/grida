@@ -21,6 +21,10 @@ pub(super) fn capabilities(private: bool) -> impl Iterator<Item = &'static str> 
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Open {
     session_id: SessionId,
+    /// The client's key for this open. Repeating it returns the side chat it
+    /// opened while that side chat stays open.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    request_id: Option<ChangeId>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
@@ -55,16 +59,30 @@ pub(super) fn handlers(
                         require(&open.1, key, Some(&request.session_id))?;
                     }
                     let scope = open.2.as_ref().ok_or_else(Error::method_not_found)?;
-                    open.1.lock().unwrap().ensure_capacity(None)?;
+                    let sessions = &open.1;
                     let view = scope
-                        .open(&open.0, request.session_id)
+                        .open(
+                            &open.0,
+                            request.session_id,
+                            request.request_id,
+                            || {
+                                sessions.lock().unwrap().ensure_capacity(None).map_err(|_| {
+                                    agent_kit_core::Error::new(
+                                        agent_kit_core::ErrorKind::LimitExceeded,
+                                        "attached_session_limit",
+                                    )
+                                })
+                            },
+                            |view| {
+                                sessions
+                                    .lock()
+                                    .unwrap()
+                                    .attached
+                                    .insert(view.side_chat_id.clone());
+                            },
+                        )
                         .await
                         .map_err(host_error)?;
-                    open.1
-                        .lock()
-                        .unwrap()
-                        .attached
-                        .insert(view.side_chat_id.clone());
                     Ok(Opened(view))
                 }
                 .await;

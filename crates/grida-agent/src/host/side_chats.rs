@@ -160,8 +160,19 @@ impl Host {
     /// under the parent's execution.
     async fn open_side_chat(&self, parent: SessionId) -> Result<SideChatView> {
         self.owned_control(move |host| async move {
-            if host.work.lock().await.closed {
-                return Err(problem(ErrorKind::Unavailable, "host_shutting_down"));
+            // Deleting the parent holds this admission from its idle check
+            // until its data is gone, then discards the side chats it can
+            // list. Opening under the same admission either completes first,
+            // so that discard finds this side chat, or finds no parent.
+            let _admission = host.configuration_admission.lock().await;
+            {
+                let work = host.work.lock().await;
+                if work.closed {
+                    return Err(problem(ErrorKind::Unavailable, "host_shutting_down"));
+                }
+                if work.retiring.contains(&parent) {
+                    return Err(problem(ErrorKind::Conflict, "session_deletion_in_progress"));
+                }
             }
             let execution = host.execution()?;
             let source = host.store.inspect(parent.clone()).await?;
@@ -402,20 +413,58 @@ pub(crate) struct SideChats {
 #[derive(Default)]
 struct SideChatState {
     closed: bool,
-    /// Open side chats and their parents.
-    open: BTreeMap<SessionId, SessionId>,
+    /// Open side chats by id.
+    open: BTreeMap<SessionId, OpenSideChat>,
+}
+
+/// A side chat this connection holds, and the client request that opened it.
+struct OpenSideChat {
+    request: Option<ChangeId>,
+    view: SideChatView,
+}
+
+impl SideChatState {
+    fn opened_by(&self, request: &ChangeId) -> Option<&SideChatView> {
+        self.open
+            .values()
+            .find(|side| side.request.as_ref() == Some(request))
+            .map(|side| &side.view)
+    }
 }
 
 impl SideChats {
-    pub(crate) async fn open(&self, host: &Host, parent: SessionId) -> Result<SideChatView> {
+    /// Open a side chat of `parent`. `admit` runs before a new side chat is
+    /// created and `attach` once it exists, both while no other open, close
+    /// or parent deletion of this connection can interleave.
+    ///
+    /// A client request id makes opening idempotent while the side chat it
+    /// opened stays open: the same id returns that side chat instead of
+    /// opening another, so a client that lost the reply learns which side chat
+    /// to close.
+    pub(crate) async fn open(
+        &self,
+        host: &Host,
+        parent: SessionId,
+        request: Option<ChangeId>,
+        admit: impl FnOnce() -> Result<()>,
+        attach: impl FnOnce(&SideChatView),
+    ) -> Result<SideChatView> {
         let mut state = self.state.lock().await;
         if state.closed {
             return Err(problem(ErrorKind::Unavailable, "side_chat_scope_closed"));
         }
+        if let Some(view) = request.as_ref().and_then(|id| state.opened_by(id)) {
+            if view.parent_session_id != parent {
+                return Err(problem(ErrorKind::Conflict, "side_chat_request_conflict"));
+            }
+            let view = view.clone();
+            attach(&view);
+            return Ok(view);
+        }
         if state
             .open
             .values()
-            .filter(|owner| **owner == parent)
+            .filter(|side| side.view.parent_session_id == parent)
             .count()
             >= MAX_OPEN_PER_PARENT
         {
@@ -424,10 +473,16 @@ impl SideChats {
         if state.open.len() >= MAX_OPEN_PER_CONNECTION {
             return Err(problem(ErrorKind::LimitExceeded, "side_chat_scope_limit"));
         }
+        admit()?;
         let view = host.open_side_chat(parent).await?;
-        state
-            .open
-            .insert(view.side_chat_id.clone(), view.parent_session_id.clone());
+        attach(&view);
+        state.open.insert(
+            view.side_chat_id.clone(),
+            OpenSideChat {
+                request,
+                view: view.clone(),
+            },
+        );
         Ok(view)
     }
 
@@ -463,7 +518,7 @@ impl SideChats {
         let removed: Vec<_> = state
             .open
             .iter()
-            .filter(|(_, owner)| *owner == parent)
+            .filter(|(_, side)| side.view.parent_session_id == *parent)
             .map(|(id, _)| id.clone())
             .collect();
         for id in &removed {
@@ -480,4 +535,56 @@ impl SideChats {
 
 fn missing() -> Error {
     problem(ErrorKind::Unavailable, "side_chat_unavailable")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn opening_waits_out_a_parent_deletion_and_finds_no_parent() {
+        let root = tempfile::tempdir().unwrap();
+        let host = Host::open(
+            &root.path().join("state"),
+            Some(ProviderOptions {
+                endpoint: "http://127.0.0.1:9/v1".into(),
+                protocol: ProviderProtocol::OpenAiCompatible,
+                model: ModelId::new("fixture").unwrap(),
+                credential_env: None,
+                credential_home: None,
+                max_output_tokens: 1024,
+                compatible_output_limit_field: None,
+                llama_cpp_input_count: false,
+                reasoning: Default::default(),
+            }),
+        )
+        .unwrap();
+        // A parent without history is forked by a plain create.
+        let parent = host
+            .new_session(root.path().canonicalize().unwrap())
+            .await
+            .unwrap();
+
+        // Deletion holds the admission and fences its family before it
+        // removes the parent and lists the side chats to discard.
+        let deletion = host.configuration_admission.lock().await;
+        let opening = tokio::spawn({
+            let host = host.clone();
+            let parent = parent.clone();
+            async move { host.open_side_chat(parent).await }
+        });
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        assert!(
+            !opening.is_finished(),
+            "opened during the parent's deletion"
+        );
+        host.work.lock().await.retiring.insert(parent.clone());
+        drop(deletion);
+
+        let refused = opening.await.unwrap().unwrap_err();
+        assert_eq!(refused.code, "session_deletion_in_progress");
+        assert!(host.side_sessions().await.unwrap().is_empty());
+        host.work.lock().await.retiring.remove(&parent);
+        host.shutdown().await.unwrap();
+    }
 }

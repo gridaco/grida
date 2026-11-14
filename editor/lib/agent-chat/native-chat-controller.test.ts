@@ -1699,7 +1699,7 @@ it.each(["standard", "ultra", "standard plan"] as const)(
         };
       }
     );
-    start.mockRejectedValueOnce(new Error("fixture lost reply"));
+    start.mockRejectedValueOnce(new Error("native_chat_goal_start_unverified"));
     bridge.startGoal = start;
     bridge.acceptsGoalEffort = async () => effort === "ultra";
     const regime = effort === "standard plan" ? "plan" : "act";
@@ -2371,7 +2371,7 @@ it("reports a side chat that did not close", async () => {
   await controller.closeSideChat(side.id);
   expect(controller.read().sideChats).toEqual([]);
   expect(controller.read().error).toBe(
-    "Couldn't confirm that the side chat closed."
+    "Couldn't confirm that the side chat closed yet. Closing continues in the background."
   );
   controller.disconnect();
 });
@@ -4524,7 +4524,7 @@ it("starts a composer goal only on send and reuses its accepted request after a 
   expect(start).not.toHaveBeenCalled();
   start.mockImplementationOnce(async () => {
     running.add("new");
-    throw new Error("lost acknowledgement");
+    throw new Error("native_chat_goal_start_unverified");
   });
   await expect(
     controller.submit("Prepare an SVG that opens correctly")
@@ -4626,6 +4626,86 @@ it("allows a corrected Goal allowance after an explicit pre-admission refusal", 
   ).toBe(true);
   expect(start).toHaveBeenCalledTimes(2);
   expect(start.mock.calls[1][1]).not.toBe(start.mock.calls[0][1]);
+  controller.disconnect();
+});
+
+it.each([
+  ["session_goal_queued", "A goal is already waiting to start in this chat."],
+  [
+    "session_goal_exists",
+    "This chat already has a goal. Clear it before starting another.",
+  ],
+  ["side_chat_goals_unavailable", "Goals are unavailable in this chat."],
+  ["native_chat_goal_spending_unavailable", "Couldn't start the goal."],
+])(
+  "frees the composer after the host refuses a goal start with %s",
+  async (code, shown) => {
+    const { bridge, controller } = fixture();
+    bridge.goal = async () => ({ observationId: null, goal: null });
+    const start = vi.fn<NonNullable<DesktopNativeChat["startGoal"]>>(
+      async (sessionId, inputId) => ({
+        sessionId,
+        inputId,
+        disposition: "queued",
+        inputPosition: 1,
+        turnId: null,
+      })
+    );
+    bridge.startGoal = start;
+    await controller.select("chat-a");
+    const request = {
+      objective: "Review the export",
+      criteria: ["Collect the review"],
+      automatic: true,
+    };
+    start.mockRejectedValueOnce(
+      new Error(`Error invoking remote method: Error: ${code}`)
+    );
+    expect(await controller.startGoal(request)).toBe(false);
+    expect(controller.read().error).toBe(shown);
+    // Goal entry can be turned off, and a different goal can start.
+    controller.selectGoalIntent(true);
+    controller.selectGoalIntent(false);
+    expect(controller.read().goalIntent).toBe(false);
+    expect(
+      await controller.startGoal({ ...request, objective: "Another goal" })
+    ).toBe(true);
+    expect(start).toHaveBeenCalledTimes(2);
+    expect(start.mock.calls[1][1]).not.toBe(start.mock.calls[0][1]);
+    controller.disconnect();
+  }
+);
+
+it("keeps an unverified goal start for a retry of the same draft", async () => {
+  const { bridge, controller } = fixture();
+  bridge.goal = async () => ({ observationId: null, goal: null });
+  const start = vi.fn<NonNullable<DesktopNativeChat["startGoal"]>>(
+    async (sessionId, inputId) => ({
+      sessionId,
+      inputId,
+      disposition: "queued",
+      inputPosition: 1,
+      turnId: null,
+    })
+  );
+  bridge.startGoal = start;
+  await controller.select("chat-a");
+  const request = {
+    objective: "Review the export",
+    criteria: ["Collect the review"],
+    automatic: true,
+  };
+  start.mockRejectedValueOnce(new Error("native_agent_request_timeout"));
+  expect(await controller.startGoal(request)).toBe(false);
+  expect(controller.read().error).toBe(
+    "Couldn't confirm the goal start. Your draft is still here."
+  );
+  expect(
+    await controller.startGoal({ ...request, objective: "Another goal" })
+  ).toBe(false);
+  expect(await controller.startGoal(request)).toBe(true);
+  expect(start).toHaveBeenCalledTimes(2);
+  expect(start.mock.calls[1]).toEqual(start.mock.calls[0]);
   controller.disconnect();
 });
 

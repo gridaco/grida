@@ -13,13 +13,19 @@ export namespace video_attachment {
   export type Preview = Readonly<{
     /** A JPEG data URL of at most {@link MAX_POSTER_BYTES}, when one was drawn. */
     poster?: string;
-    durationMs: number;
-    width: number;
-    height: number;
+    /** Left out when the clip reports more than {@link MAX_DURATION_MS}. */
+    durationMs?: number;
+    /** Left out, with `height`, when a side exceeds {@link MAX_DIMENSION}. */
+    width?: number;
+    height?: number;
   }>;
 
   /** The host keeps posters up to this size with the message. */
   export const MAX_POSTER_BYTES = 48 * 1024;
+  /** Longest duration the host keeps with the message: seven days. */
+  export const MAX_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
+  /** Largest frame side the host keeps with the message, in pixels. */
+  export const MAX_DIMENSION = 16_384;
   /** Longest edge of a poster frame, in pixels. */
   export const POSTER_EDGE = 320;
   /** Where the poster frame is taken, capped at half the clip. */
@@ -116,7 +122,7 @@ export namespace video_attachment {
   /**
    * Read a video's duration, dimensions and a poster frame. Null when the
    * clip cannot be decoded; a preview without `poster` when only the frame
-   * could not be drawn.
+   * could not be drawn, and without a fact the host would not keep.
    */
   export async function probe(
     file: Blob,
@@ -139,10 +145,13 @@ export namespace video_attachment {
         height <= 0
       )
         return null;
+      // A corrupt clip can report facts no message keeps; leave them out
+      // rather than refuse the message.
+      const durationMs = Math.round(duration * 1000);
       const preview = {
-        durationMs: Math.round(duration * 1000),
-        width,
-        height,
+        ...(durationMs <= MAX_DURATION_MS && { durationMs }),
+        ...(width <= MAX_DIMENSION &&
+          height <= MAX_DIMENSION && { width, height }),
       };
       const poster = await frame(video, media, duration).catch(() => undefined);
       return Object.freeze(poster ? { ...preview, poster } : preview);

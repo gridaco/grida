@@ -111,49 +111,30 @@ export namespace NativeFileReference {
       : undefined;
   }
 
-  /** The preview the renderer showed, bounded like the host bounds it. */
+  /**
+   * The preview the renderer showed, bounded like the host bounds it. A
+   * preview only decorates the reference, so a fact out of bounds (a corrupt
+   * clip's duration, an oversized frame, a poster that is not a small image)
+   * is dropped rather than refusing the message; dimensions go as a pair.
+   */
   export function preview(
     value: unknown
   ): NativeChatAttachmentPreview | undefined {
-    if (value === undefined) return undefined;
     if (!value || typeof value !== "object" || Array.isArray(value))
-      throw invalidPreview();
+      return undefined;
     const { poster, durationMs, width, height, ...rest } = value as Record<
       string,
       unknown
     >;
-    if (Object.keys(rest).length) throw invalidPreview();
-    if (
-      poster !== undefined &&
-      (typeof poster !== "string" ||
-        poster.length > MAX_POSTER_BYTES ||
-        !POSTER.test(poster))
-    )
-      throw invalidPreview();
-    if (
-      durationMs !== undefined &&
-      !(
-        Number.isSafeInteger(durationMs) &&
-        (durationMs as number) >= 0 &&
-        (durationMs as number) <= MAX_DURATION_MS
-      )
-    )
-      throw invalidPreview();
-    for (const side of [width, height])
-      if (
-        side !== undefined &&
-        !(
-          Number.isSafeInteger(side) &&
-          (side as number) > 0 &&
-          (side as number) <= MAX_DIMENSION
-        )
-      )
-        throw invalidPreview();
+    if (Object.keys(rest).length) return undefined;
+    const sized =
+      within(width, 1, MAX_DIMENSION) && within(height, 1, MAX_DIMENSION);
     const result = {
-      ...(poster !== undefined && { poster: poster as string }),
-      ...(durationMs !== undefined && { durationMs: durationMs as number }),
-      ...(width !== undefined && { width: width as number }),
-      ...(height !== undefined && { height: height as number }),
+      ...(typeof poster === "string" &&
+        poster.length <= MAX_POSTER_BYTES &&
+        POSTER.test(poster) && { poster }),
+      ...(within(durationMs, 0, MAX_DURATION_MS) && { durationMs }),
+      ...(sized && { width, height }),
     };
     return Object.keys(result).length ? Object.freeze(result) : undefined;
   }
@@ -188,14 +169,14 @@ export namespace NativeFileReference {
     const details = (meta as Record<string, unknown>)[DETAILS];
     if (!details || typeof details !== "object" || Array.isArray(details))
       return undefined;
-    try {
-      return preview((details as Record<string, unknown>).preview);
-    } catch {
-      return undefined;
-    }
+    return preview((details as Record<string, unknown>).preview);
   }
 
-  function invalidPreview() {
-    return new Error("native_chat_file_reference_preview_invalid");
+  function within(value: unknown, min: number, max: number): value is number {
+    return (
+      Number.isSafeInteger(value) &&
+      (value as number) >= min &&
+      (value as number) <= max
+    );
   }
 }

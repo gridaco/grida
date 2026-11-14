@@ -1291,6 +1291,54 @@ it.runIf(Boolean(packaged))(
   20000
 );
 
+it("reports a goal start the host may have accepted as unverified", async () => {
+  const test = fixture();
+  const request =
+    vi.fn<
+      (method: string, input?: Record<string, unknown>) => Promise<unknown>
+    >();
+  const start = vi.spyOn(NativeAgentProcess, "start").mockResolvedValueOnce({
+    request,
+    close: async () => {},
+  } as unknown as NativeAgentProcess);
+  let client: NativeAgentChat | undefined;
+  try {
+    client = await NativeAgentChat.start({
+      resourcesPath: test.root,
+      stateDirectory: test.stateDirectory,
+      cwd: test.cwd,
+      endpoint: "http://127.0.0.1:1/v1",
+      provider: "openai-compatible",
+      model: "fixture",
+    });
+    request.mockResolvedValueOnce({ sessionId: "parent" });
+    const parent = await client.create();
+    const goal = {
+      objective: "Review the export",
+      criteria: ["Collect the review"],
+      automatic: true,
+    };
+    // A lost reply or an unreadable receipt leaves acceptance unknown.
+    request.mockRejectedValueOnce(new Error("native_agent_request_timeout"));
+    await expect(client.startGoal(parent, "goal-1", goal)).rejects.toThrow(
+      "native_chat_goal_start_unverified"
+    );
+    request.mockResolvedValueOnce({ sessionId: "parent", inputId: "other" });
+    await expect(client.startGoal(parent, "goal-1", goal)).rejects.toThrow(
+      "native_chat_goal_start_unverified"
+    );
+    // A refusal made before acceptance reaches the renderer as it is.
+    request.mockRejectedValueOnce(new Error("session_goal_queued"));
+    await expect(client.startGoal(parent, "goal-1", goal)).rejects.toThrow(
+      /^session_goal_queued$/
+    );
+  } finally {
+    await client?.close();
+    start.mockRestore();
+    test.close();
+  }
+});
+
 it("lends a side chat only through the attachment that opened it", async () => {
   const test = fixture();
   const request =
@@ -1325,7 +1373,7 @@ it("lends a side chat only through the attachment that opened it", async () => {
     const { session, side } = await client.openSideChat(parent);
     expect(request.mock.calls.at(-1)).toEqual([
       "_co.grida/side-chat/open",
-      { sessionId: "parent" },
+      { sessionId: "parent", requestId: expect.any(String) },
     ]);
     expect(side).toEqual({
       id: sideId,

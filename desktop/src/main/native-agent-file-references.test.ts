@@ -131,6 +131,28 @@ it("sends a file outside the workspace as a path with its facts, never its bytes
   }
 });
 
+it("sends a reference whose preview is out of bounds without that preview", async () => {
+  const test = await started();
+  try {
+    await test.client.submitFileReference(test.session, {
+      ...input(path.join(test.downloads, "clip.mov")),
+      preview: {
+        poster: "data:text/html;base64,AA",
+        durationMs: 8 * 24 * 60 * 60 * 1000,
+        width: 20_000,
+        height: 1080,
+      },
+    });
+    const [method, params] = test.request.mock.lastCall ?? [];
+    expect(method).toBe("_co.grida/session/submit");
+    const link = (params as { prompt: Record<string, unknown>[] }).prompt[1];
+    expect(link.name).toBe("clip.mov");
+    expect(link._meta).toBeUndefined();
+  } finally {
+    await test.close();
+  }
+});
+
 it("names a workspace file by its workspace path", async () => {
   const test = await started();
   try {
@@ -167,12 +189,6 @@ it("refuses protected stores, unknown fields and unnegotiated chats before sendi
         bytes: new ArrayBuffer(4),
       })
     ).rejects.toThrow("native_chat_invalid_protocol_value");
-    await expect(
-      test.client.submitFileReference(test.session, {
-        ...input(path.join(test.downloads, "clip.mov")),
-        preview: { poster: "data:text/html;base64,AA" },
-      })
-    ).rejects.toThrow("native_chat_file_reference_preview_invalid");
     test.process.acceptsFileReference = false;
     await expect(
       test.client.submitFileReference(

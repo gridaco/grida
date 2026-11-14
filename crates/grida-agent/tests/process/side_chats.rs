@@ -894,6 +894,49 @@ async fn a_parent_holds_eight_side_chats_and_a_connection_thirty_two() {
 }
 
 #[tokio::test]
+async fn repeating_an_open_request_returns_the_side_chat_it_opened() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let workspace = TempDir::new().unwrap();
+    let mut client = start(&state, "http://127.0.0.1:9/v1").await;
+    let parent = created(&mut client, workspace.path()).await;
+    let other = created(&mut client, workspace.path()).await;
+    let keyed = |key: &str| json!({"sessionId":parent,"requestId":key});
+
+    // A client that lost the reply repeats the request and learns the same
+    // side chat instead of opening another.
+    let first = ok(client.request(OPEN, keyed("open-1")).await);
+    let repeated = ok(client.request(OPEN, keyed("open-1")).await);
+    assert_eq!(first["sideChatId"], repeated["sideChatId"]);
+    assert_eq!(first["sourceContext"], repeated["sourceContext"]);
+    refused(
+        &client
+            .request(OPEN, json!({"sessionId":other,"requestId":"open-1"}))
+            .await,
+        "side_chat_request_conflict",
+    );
+
+    // A repeat is answered even when the parent holds no room for another.
+    for index in 2..=8 {
+        ok(client.request(OPEN, keyed(&format!("open-{index}"))).await);
+    }
+    refused(
+        &client.request(OPEN, keyed("open-9")).await,
+        "side_chat_parent_limit",
+    );
+    let again = ok(client.request(OPEN, keyed("open-1")).await);
+    assert_eq!(again["sideChatId"], first["sideChatId"]);
+
+    // A closed side chat is no longer named by its request.
+    ok(client
+        .request(CLOSE, json!({"sideChatId":first["sideChatId"]}))
+        .await);
+    let reopened = ok(client.request(OPEN, keyed("open-1")).await);
+    assert_ne!(reopened["sideChatId"], first["sideChatId"]);
+    client.close().await;
+}
+
+#[tokio::test]
 async fn a_side_chat_is_titled_like_a_chat_and_stays_out_of_the_catalog() {
     let temporary = TempDir::new().unwrap();
     let state = temporary.path().join("agent-state");

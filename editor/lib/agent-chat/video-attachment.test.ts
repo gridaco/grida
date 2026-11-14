@@ -147,6 +147,36 @@ describe("video_attachment.probe", () => {
     });
   });
 
+  it("leaves out a duration or size the host would not keep", async () => {
+    // A corrupt container can report years of footage or a huge frame.
+    const endless = new StubVideo({
+      duration: 8 * 24 * 60 * 60,
+      width: 640,
+      height: 360,
+    });
+    expect(await video_attachment.probe(clip, media(endless).surface)).toEqual({
+      poster: POSTER,
+      width: 640,
+      height: 360,
+    });
+    const huge = new StubVideo({ duration: 2, width: 16_385, height: 360 });
+    expect(await video_attachment.probe(clip, media(huge).surface)).toEqual({
+      poster: POSTER,
+      durationMs: 2000,
+    });
+    const bounded = new StubVideo({
+      duration: video_attachment.MAX_DURATION_MS / 1000,
+      width: video_attachment.MAX_DIMENSION,
+      height: video_attachment.MAX_DIMENSION,
+    });
+    expect(await video_attachment.probe(clip, media(bounded).surface)).toEqual({
+      poster: POSTER,
+      durationMs: video_attachment.MAX_DURATION_MS,
+      width: video_attachment.MAX_DIMENSION,
+      height: video_attachment.MAX_DIMENSION,
+    });
+  });
+
   it("has no preview for a clip it cannot decode", async () => {
     const video = new StubVideo("undecodable");
     const { surface, revoked } = media(video);

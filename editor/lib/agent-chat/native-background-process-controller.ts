@@ -20,6 +20,10 @@ type View = Readonly<{
   error: string | null;
 }>;
 
+/** The processes one stop request names, or every process of the chat. */
+type Targets = ReadonlySet<number> | "all";
+type Stop = { targets: Targets; done: Promise<boolean> };
+
 const EMPTY: View = Object.freeze({
   processes: [],
   running: 0,
@@ -36,7 +40,10 @@ export class NativeBackgroundProcessController {
   private readonly listeners = new Set<() => void>();
   private view: View = EMPTY;
   private disposed = false;
-  private stopping?: Promise<boolean>;
+  /** The stop request the agent is handling. */
+  private running?: Stop;
+  /** Processes asked for while `running` was pending, sent after it. */
+  private queued?: Stop;
   /** Bumped by every list, so an older read never replaces a newer one. */
   private revision = 0;
 
@@ -90,15 +97,27 @@ export class NativeBackgroundProcessController {
 
   /**
    * Stops the named processes, or every process of the chat when omitted.
-   * Resolves whether the agent confirmed the stop. A request made while
-   * another stop is pending shares that stop's outcome.
+   * Resolves whether the agent confirmed the stop. A request the pending stop
+   * already covers shares its outcome; any other waits for it, joined with
+   * every other request made meanwhile, and is then sent on its own.
    */
   stop(processIds?: readonly number[]): Promise<boolean> {
     if (this.disposed) return Promise.resolve(false);
-    this.stopping ??= this.request(processIds).finally(() => {
-      this.stopping = undefined;
-    });
-    return this.stopping;
+    const wanted: Targets = processIds ? new Set(processIds) : "all";
+    const running = this.running;
+    if (!running) return this.send(wanted);
+    if (covers(running.targets, wanted)) return running.done;
+    if (this.queued) this.queued.targets = union(this.queued.targets, wanted);
+    else {
+      const queued: Stop = { targets: wanted, done: Promise.resolve(false) };
+      queued.done = running.done.then(() => {
+        if (this.queued === queued) this.queued = undefined;
+        return this.send(queued.targets);
+      });
+      this.queued = queued;
+    }
+    this.update({ stopping: this.pending() });
+    return this.queued.done;
   }
 
   dispose(): void {
@@ -106,26 +125,66 @@ export class NativeBackgroundProcessController {
     this.listeners.clear();
   }
 
+  private send(targets: Targets): Promise<boolean> {
+    if (this.disposed) return Promise.resolve(false);
+    const stop: Stop = { targets, done: Promise.resolve(false) };
+    this.running = stop;
+    stop.done = this.request(
+      targets === "all" ? undefined : [...targets]
+    ).finally(() => {
+      if (this.running === stop) this.running = undefined;
+    });
+    return stop.done;
+  }
+
+  /** Every process a sent or waiting stop request names. */
+  private pending(): View["stopping"] {
+    const { running, queued } = this;
+    if (running && queued) return shown(union(running.targets, queued.targets));
+    const only = running ?? queued;
+    return only ? shown(only.targets) : null;
+  }
+
   private async request(processIds?: readonly number[]): Promise<boolean> {
-    this.update({ stopping: processIds ?? "all", error: null });
+    this.update({ stopping: this.pending(), error: null });
     try {
       await this.bridge.stopBackgroundProcesses(this.attachmentId, processIds);
       if (this.disposed) return true;
-      this.update({ stopping: null });
+      this.update({ stopping: this.queuedStopping() });
       await this.load();
       return true;
     } catch {
       if (!this.disposed)
         this.update({
-          stopping: null,
+          stopping: this.queuedStopping(),
           error: "Couldn't stop the background processes. Try again.",
         });
       return false;
     }
   }
 
+  /** What stays shown as stopping once the sent request settles. */
+  private queuedStopping(): View["stopping"] {
+    return this.queued ? shown(this.queued.targets) : null;
+  }
+
   private update(change: Partial<View>): void {
     this.view = { ...this.view, ...change };
     for (const listener of this.listeners) listener();
   }
+}
+
+function covers(sent: Targets, wanted: Targets): boolean {
+  if (sent === "all") return true;
+  if (wanted === "all") return false;
+  for (const id of wanted) if (!sent.has(id)) return false;
+  return true;
+}
+
+function union(a: Targets, b: Targets): Targets {
+  return a === "all" || b === "all" ? "all" : new Set([...a, ...b]);
+}
+
+function shown(targets: Targets): readonly number[] | "all" {
+  return targets === "all" ? "all" : [...targets];
 }

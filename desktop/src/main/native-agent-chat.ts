@@ -268,8 +268,9 @@ export class NativeAgentChat {
   private readonly goals = new NativeAgentGoals((method, params) =>
     this.process.request(method, params)
   );
-  private readonly sideChats = new NativeAgentSideChats((method, params) =>
-    this.process.request(method, params)
+  private readonly sideChats = new NativeAgentSideChats(
+    (method, params) => this.process.request(method, params),
+    (id) => this.forget(id)
   );
   private readonly backgroundProcesses = new NativeAgentBackgroundProcesses(
     (method, params) => this.process.request(method, params, 10_000)
@@ -649,8 +650,7 @@ export class NativeAgentChat {
       ...(expectedOwnedChildren && { expectedOwnedChildren }),
     });
     // The host discards the deleted chat's side chats with it.
-    for (const side of this.sideChats.forgetParent(sessionId))
-      this.forget(side);
+    this.sideChats.forgetParent(sessionId);
     if (!this.ownsSession(session)) return;
     this.forget(sessionId);
   }
@@ -761,12 +761,14 @@ export class NativeAgentChat {
     return { session: this.attach(side.id), side };
   }
 
-  /** Discard a side chat this connection opened. */
+  /**
+   * Discard a side chat this connection opened. A discard the host does not
+   * confirm keeps being retried; the side chat is forgotten once it is gone.
+   */
   async closeSideChat(session: NativeChatSession): Promise<void> {
     if (!this.sideChats.has(session.id) || !this.ownsSession(session))
       throw new Error("native_chat_side_unavailable");
     await this.sideChats.close(session.id);
-    this.forget(session.id);
   }
 
   registerEditorSurfaces(
@@ -1463,17 +1465,24 @@ export class NativeAgentChat {
     request: unknown
   ): Promise<NativeChatAcceptance> {
     const sessionId = this.requireAttached(session);
-    const accepted = await this.goals.start(
-      sessionId,
-      identity(inputId),
-      request,
-      {
+    let accepted: unknown;
+    try {
+      accepted = await this.goals.start(sessionId, identity(inputId), request, {
         fundedReview: this.acceptsGoalEffort,
         namedChild: this.process.acceptsGoalNamedChild,
         spending: this.process.acceptsGoalSpending,
-      }
-    );
-    return acceptance(accepted, sessionId, inputId);
+      });
+    } catch (error) {
+      if (NativeAgentGoals.isUnverifiedStart(error))
+        throw new Error(NativeAgentGoals.startUnverified, { cause: error });
+      throw error;
+    }
+    try {
+      return acceptance(accepted, sessionId, inputId);
+    } catch (error) {
+      // The host answered, so it may have accepted the input.
+      throw new Error(NativeAgentGoals.startUnverified, { cause: error });
+    }
   }
 
   controlGoal(

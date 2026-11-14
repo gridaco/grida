@@ -24,6 +24,21 @@ const BLOCKERS = [
   "uncertain_work",
 ] as const;
 
+/** Failures after which the host may have accepted a goal start. */
+const UNVERIFIED_START = new Set([
+  "native_agent_request_timeout",
+  "sqlite_commit_unconfirmed",
+  "store_task_interrupted",
+  "control_worker_interrupted",
+  "native_agent_disconnected",
+  "native_agent_input_failed",
+  "native_agent_output_failed",
+  "native_agent_diagnostics_failed",
+  "native_agent_invalid_frame",
+  "native_agent_invalid_response",
+  "native_agent_request_failed",
+]);
+
 export type NativeGoalInspection = Readonly<{
   sessionId: string;
   sessionRevision: number;
@@ -39,7 +54,18 @@ export class NativeAgentGoals {
   static readonly fundedReviewCapability = "co.grida/goal/funded-review";
   static readonly namedChildCapability = "co.grida/goal/named-child";
   static readonly spendingCapability = "co.grida/goal/spending";
+  /**
+   * Thrown when a goal start may have been accepted: the client keeps its
+   * input id and retries the same start. Every other failure is a refusal
+   * made before the host accepted the input.
+   */
+  static readonly startUnverified = "native_chat_goal_start_unverified";
   private readonly issued = new WeakSet<NativeGoalInspection>();
+
+  /** Whether a failed start leaves its acceptance unknown. */
+  static isUnverifiedStart(error: unknown): boolean {
+    return error instanceof Error && UNVERIFIED_START.has(error.message);
+  }
 
   constructor(
     private readonly request: (

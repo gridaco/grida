@@ -29,9 +29,9 @@ export type ComposerDraftAttachment =
       mimeType?: string;
       preview?: Readonly<{
         poster?: string;
-        durationMs: number;
-        width: number;
-        height: number;
+        durationMs?: number;
+        width?: number;
+        height?: number;
       }>;
     }>;
 

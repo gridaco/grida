@@ -325,6 +325,14 @@ type SideChatScope = {
 };
 
 const SIDE_CHAT_UNAVAILABLE = "Side chats are unavailable in this chat.";
+/**
+ * Failures after which the host may have accepted a goal start. Older Desktop
+ * builds report a lost reply as the raw request timeout.
+ */
+const GOAL_START_UNVERIFIED = [
+  "native_chat_goal_start_unverified",
+  "native_agent_request_timeout",
+];
 const GOALS_UNAVAILABLE = "Goals are unavailable in this chat.";
 /** Plan applies to the next message, which waits for the running turn. */
 const PLAN_QUEUES_STEERING =
@@ -1874,7 +1882,10 @@ export class NativeChatController {
       await this.releaseSide(side);
     } catch {
       if (this.owns(scope))
-        this.update({ error: "Couldn't confirm that the side chat closed." });
+        this.update({
+          error:
+            "Couldn't confirm that the side chat closed yet. Closing continues in the background.",
+        });
     }
   }
 
@@ -2149,14 +2160,13 @@ export class NativeChatController {
       return true;
     } catch (error) {
       if (this.owns(scope)) {
-        // These refusals precede admission; an unknown outcome must keep its identity.
-        if (
+        // Only a start the host may have accepted keeps its input id, so a
+        // retry cannot start the goal twice. Any other failure is a refusal
+        // made before acceptance and frees the composer.
+        const unverified =
           error instanceof Error &&
-          /goal_child_allowance_unavailable|goal_named_child_unavailable/.test(
-            error.message
-          )
-        )
-          scope.pendingGoalStart = undefined;
+          GOAL_START_UNVERIFIED.some((code) => error.message.includes(code));
+        if (!unverified) scope.pendingGoalStart = undefined;
         this.update({
           error:
             error instanceof Error &&
@@ -2165,7 +2175,9 @@ export class NativeChatController {
               : error instanceof Error &&
                   error.message.includes("goal_named_child_unavailable")
                 ? "Choose an available named subagent from this chat."
-                : "Couldn't confirm the goal start. Your draft is still here.",
+                : unverified
+                  ? "Couldn't confirm the goal start. Your draft is still here."
+                  : goalStartRefusal(error),
         });
         await this.refresh(scope);
       }
@@ -4965,6 +4977,17 @@ function applyText(
     text: (existing?.text ?? "") + update.text,
     ...(activity && { activity }),
   };
+}
+
+/** Why the host refused a goal start before accepting it. */
+function goalStartRefusal(error: unknown): string {
+  const message = error instanceof Error ? error.message : "";
+  if (message.includes("session_goal_queued"))
+    return "A goal is already waiting to start in this chat.";
+  if (message.includes("session_goal_exists"))
+    return "This chat already has a goal. Clear it before starting another.";
+  if (message.includes("side_chat_goals_unavailable")) return GOALS_UNAVAILABLE;
+  return "Couldn't start the goal.";
 }
 
 /** Why a side chat could not open, for the chat that asked for it. */

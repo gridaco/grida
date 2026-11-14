@@ -94,20 +94,38 @@ describe("NativeFileReference.preview", () => {
     expect(NativeFileReference.preview(undefined)).toBeUndefined();
   });
 
-  it("refuses anything else", () => {
+  it("drops facts out of bounds instead of refusing the message", () => {
+    // A corrupt clip can report a duration or frame no preview can carry.
+    expect(
+      NativeFileReference.preview({
+        poster: POSTER,
+        durationMs: 7 * 24 * 60 * 60 * 1000 + 1,
+        width: 640,
+        height: 360,
+      })
+    ).toEqual({ poster: POSTER, width: 640, height: 360 });
+    expect(
+      NativeFileReference.preview({
+        poster: POSTER,
+        durationMs: 1500,
+        width: 16_385,
+        height: 360,
+      })
+    ).toEqual({ poster: POSTER, durationMs: 1500 });
     for (const value of [
       { poster: "data:text/html;base64,AA" },
       { poster: `data:image/jpeg;base64,${"A".repeat(48 * 1024)}` },
       { durationMs: -1 },
-      { width: 0 },
-      { height: 1.5 },
-      { extra: true },
+      { durationMs: Number.POSITIVE_INFINITY },
+      { width: 0, height: 360 },
+      { width: 640, height: 1.5 },
+      { width: 640 },
+      { durationMs: 1500, extra: true },
       [],
       "poster",
+      null,
     ])
-      expect(() => NativeFileReference.preview(value)).toThrow(
-        "native_chat_file_reference_preview_invalid"
-      );
+      expect(NativeFileReference.preview(value)).toBeUndefined();
   });
 
   it("drops a malformed replayed preview instead of failing", () => {
