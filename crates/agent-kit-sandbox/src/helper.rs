@@ -246,12 +246,24 @@ fn supervise(mut status: File, spec: Spec) -> bool {
                 // Between fork and exec only async-signal-safe calls run.
                 // Stdio is already the terminal, so it becomes the new
                 // session's controlling terminal.
+                // The child cannot format an error, so it names the failing
+                // call on a close-on-exec copy of the helper's stderr.
+                let diagnostics =
+                    unsafe { libc::fcntl(libc::STDERR_FILENO, libc::F_DUPFD_CLOEXEC, 3) };
                 unsafe {
-                    command.pre_exec(|| {
-                        if libc::setsid() < 0
-                            || libc::ioctl(0, libc::TIOCSCTTY as _, 0 as libc::c_int) < 0
-                        {
-                            return Err(std::io::Error::last_os_error());
+                    command.pre_exec(move || {
+                        let fail = |message: &[u8]| {
+                            let error = std::io::Error::last_os_error();
+                            if diagnostics >= 0 {
+                                libc::write(diagnostics, message.as_ptr().cast(), message.len());
+                            }
+                            Err(error)
+                        };
+                        if libc::setsid() < 0 {
+                            return fail(b"agent-kit-sandbox: terminal payload setsid failed\n");
+                        }
+                        if libc::ioctl(0, libc::TIOCSCTTY as _, 0 as libc::c_int) < 0 {
+                            return fail(b"agent-kit-sandbox: terminal payload TIOCSCTTY failed\n");
                         }
                         Ok(())
                     });
