@@ -313,7 +313,7 @@ impl Turn {
         };
         match receipt {
             CommitReceipt::Settled(receipt) => {
-                self.release_owner();
+                Self::release_owner(&self.inner, &mut self.monitor).await;
                 Ok(FinishOutcome::Settled(Box::new(receipt)))
             }
             _ => Err(self.inner.freeze("invalid_settlement_receipt")),
@@ -373,7 +373,7 @@ impl Turn {
         };
         match receipt {
             CommitReceipt::Suspended(receipt) => {
-                self.release_owner();
+                Self::release_owner(&self.inner, &mut self.monitor).await;
                 Ok(SuspendOutcome::Suspended(receipt))
             }
             _ => Err(self.inner.freeze("invalid_suspension_receipt")),
@@ -382,14 +382,19 @@ impl Turn {
 }
 
 impl Turn {
-    fn release_owner(&self) {
-        if let Some(monitor) = &self.monitor {
-            monitor.abort();
-        }
-        self.inner.lease.lock().expect("lease lock").take();
+    /// Release ownership before settlement or suspension returns. The control
+    /// monitor holds the turn, and through it the journal, so it is awaited
+    /// rather than only aborted: once this returns, nothing of the turn keeps
+    /// the session's store open.
+    async fn release_owner(inner: &Inner, monitor: &mut Option<tokio::task::JoinHandle<()>>) {
+        inner.lease.lock().expect("lease lock").take();
         // Release helpers still waiting on this owner, such as an open
         // interaction a suspension retained, so they drop their lease handles.
-        self.inner.cancellation.cancel();
+        inner.cancellation.cancel();
+        if let Some(monitor) = monitor.take() {
+            monitor.abort();
+            let _ = monitor.await;
+        }
     }
 }
 
