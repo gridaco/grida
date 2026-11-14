@@ -864,6 +864,16 @@ fn has_control_or_format(value: &str) -> bool {
 mod tests {
     use super::*;
 
+    // Absolute on each platform, as the agent's directories must be.
+    #[cfg(windows)]
+    const STATE_DIR: &str = "--state-dir=C:\\state";
+    #[cfg(not(windows))]
+    const STATE_DIR: &str = "--state-dir=/state";
+    #[cfg(windows)]
+    const CWD: &str = "--cwd=C:\\workspace";
+    #[cfg(not(windows))]
+    const CWD: &str = "--cwd=/workspace";
+
     fn args(values: &[&str]) -> Vec<String> {
         values.iter().map(|value| (*value).to_owned()).collect()
     }
@@ -940,8 +950,8 @@ mod tests {
             "run",
             "--provider=gg",
             "--model=openai/gpt-5.6-sol",
-            "--state-dir=/state",
-            "--cwd=/workspace",
+            STATE_DIR,
+            CWD,
             "--input-png=example.png",
         ];
         let Command::Agent(AgentCommand {
@@ -975,7 +985,7 @@ mod tests {
                 "serve",
                 "--provider=gg",
                 "--model=openai/gpt-5.6-sol",
-                "--state-dir=/state",
+                STATE_DIR,
                 "--stdio",
                 "--input-png=example.png",
             ]))
@@ -990,8 +1000,8 @@ mod tests {
             "run",
             "--provider=gg",
             "--model=fixture",
-            "--state-dir=/state",
-            "--cwd=/workspace",
+            STATE_DIR,
+            CWD,
             "--skill=slides",
             "--skill=svg",
         ]);
@@ -1012,8 +1022,8 @@ mod tests {
                 "run",
                 "--provider=gg",
                 "--model=fixture",
-                "--state-dir=/state",
-                "--cwd=/workspace",
+                STATE_DIR,
+                CWD,
                 "--skill=../outside",
             ]))
             .unwrap_err(),
