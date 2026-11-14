@@ -42,6 +42,15 @@ facts authoring homes. Updating the public dependency requires reviewing the
 model facts diff, regenerating and testing its consumers. Ordinary GG catalogue
 updates do not require changing product defaults or native adapters.
 
+The generator also projects context windows for exact OpenAI model bindings used
+by the native Responses profile. The host uses them only for the canonical
+OpenAI route.
+
+The generator lists the OpenRouter models that take PNG input: listed product
+models whose exact public OpenRouter binding declares tool calls and PNG input.
+Native image input also requires the canonical OpenRouter route and stored
+OpenRouter key.
+
 The hosted renderer feature-detects the discovery bridge. Released Desktop binaries
 without that method retain their existing finite native choices and server-validated
 execution; they are not represented as a live discovery snapshot. A new bridge with

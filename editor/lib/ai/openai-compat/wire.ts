@@ -129,12 +129,20 @@ export type WireMessage = z.infer<typeof messageSchema>;
 // ---------------------------------------------------------------------------
 
 export type WireUsage = {
-  prompt_tokens: number;
-  completion_tokens: number;
-  total_tokens: number;
-  prompt_tokens_details: { cached_tokens: number };
-  completion_tokens_details: { reasoning_tokens: number };
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+  prompt_tokens_details?: { cached_tokens: number };
+  completion_tokens_details?: { reasoning_tokens: number };
 };
+
+export type GatewayBillingReceipt = {
+  version: 1;
+  request_id: string;
+} & (
+  | { status: "pending"; charged_mills: null }
+  | { status: "settled"; charged_mills: string }
+);
 
 export type WireResponseToolCall = {
   id: string;
@@ -157,7 +165,7 @@ export type ChatCompletionResponse = {
     };
     finish_reason: WireFinishReason;
   }>;
-  usage: WireUsage;
+  usage?: WireUsage;
 };
 
 export type WireFinishReason =
@@ -171,6 +179,7 @@ export type ChatCompletionChunk = {
   object: "chat.completion.chunk";
   created: number;
   model: string;
+  grida_billing?: GatewayBillingReceipt;
   choices: Array<{
     index: 0;
     delta: {
@@ -189,7 +198,7 @@ export type ChatCompletionChunk = {
   usage?: WireUsage;
 };
 
-/** Trailing usage-only chunk (only when `stream_options.include_usage`). */
+/** Trailing usage-only chunk for reported counts when `include_usage` is set. */
 export type ChatCompletionUsageChunk = {
   id: string;
   object: "chat.completion.chunk";

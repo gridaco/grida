@@ -21,7 +21,7 @@ format, resource lookup.
 
 For tools that apply to **any** agent (filesystem, planning, tool
 discovery, future env basics), see
-[\`tools.md\`](./tools.md) — the fundamental toolset. Fundamentals
+[\`tools.md\`](./tools-fundamentals.md) — the fundamental toolset. Fundamentals
 assume a virtual filesystem (or real fs / shell when available) and
 nothing else; canvas tools assume an active editor instance.
 

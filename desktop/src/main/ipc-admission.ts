@@ -28,8 +28,23 @@ const ONBOARDING_CHANNELS = new Set<IpcChannel>([
 const TOOLS_ONLY_CHANNELS = new Set<IpcChannel>([
   IPC_CHANNELS.MEDIA_LIST,
   IPC_CHANNELS.MEDIA_READ,
+  IPC_CHANNELS.MEDIA_SAVE_COPY,
   IPC_CHANNELS.MEDIA_REVEAL,
   IPC_CHANNELS.MEDIA_OPEN_FOLDER,
+]);
+
+const PROJECT_CONFIGURATION_CHANNELS = new Set<IpcChannel>([
+  IPC_CHANNELS.NATIVE_CHAT_SELECT_PROFILE,
+  IPC_CHANNELS.NATIVE_CHAT_HOOKS,
+  IPC_CHANNELS.NATIVE_CHAT_IMPORT_HOOK,
+  IPC_CHANNELS.NATIVE_CHAT_REMOVE_HOOK,
+]);
+
+const WORKBENCH_LIBRARY_CHANNELS = new Set<IpcChannel>([
+  IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_LIBRARY_SELECTION,
+  IPC_CHANNELS.NATIVE_CHAT_SUBMIT_LIBRARY_SELECTION,
+  IPC_CHANNELS.NATIVE_CHAT_LIBRARY_SELECTIONS,
+  IPC_CHANNELS.NATIVE_CHAT_ANSWER_LIBRARY_SELECTION,
 ]);
 
 /**
@@ -45,10 +60,14 @@ export namespace ipc_admission {
     role,
     channel,
     pathname,
+    selectedDocument = false,
+    nestedDeck = false,
   }: {
     role: DesktopIpcRole;
     channel: IpcChannel;
     pathname: string;
+    selectedDocument?: boolean;
+    nestedDeck?: boolean;
   }): boolean {
     switch (role) {
       case "main":
@@ -64,6 +83,38 @@ export namespace ipc_admission {
         }
         if (TOOLS_ONLY_CHANNELS.has(channel)) {
           return pathname === "/desktop/tools";
+        }
+        if (
+          WORKBENCH_LIBRARY_CHANNELS.has(channel) ||
+          channel === IPC_CHANNELS.NATIVE_CHAT_TAKE_NOTIFICATION_FOCUS
+        ) {
+          return pathname === "/desktop/workspace";
+        }
+        // The Welcome composer lists connections for a chat it hands to the
+        // workspace it opens; it never reaches a workspace chat itself.
+        if (channel === IPC_CHANNELS.WELCOME_CHAT_PROFILES) {
+          return pathname === "/desktop/welcome";
+        }
+        if (
+          channel === IPC_CHANNELS.DOCUMENT_READ ||
+          channel === IPC_CHANNELS.DOCUMENT_WRITE
+        ) {
+          return pathname === "/desktop/file";
+        }
+        if (channel.startsWith("grida:native-chat:")) {
+          return (
+            pathname === "/desktop/workspace" ||
+            (pathname === "/desktop/file" &&
+              channel !== IPC_CHANNELS.NATIVE_CHAT_EDITOR_SURFACE_OPEN &&
+              (!(selectedDocument || nestedDeck) ||
+                !PROJECT_CONFIGURATION_CHANNELS.has(channel)))
+          );
+        }
+        if (
+          channel.startsWith("grida:native-external:") ||
+          channel === IPC_CHANNELS.WORKSPACE_PUBLISH_EDITOR_SURFACES
+        ) {
+          return pathname === "/desktop/workspace";
         }
         return true;
       case "sign-in":

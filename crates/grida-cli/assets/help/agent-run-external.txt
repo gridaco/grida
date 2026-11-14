@@ -1,0 +1,14 @@
+Usage: grida agent run-external --profile FILE --state-dir DIRECTORY
+
+Options:
+  --prompt TEXT     Use this prompt. Omit to read bounded UTF-8 from stdin.
+  --deadline-ms N   Run deadline, default 120000.
+  --no-input        Run without terminal interaction.
+
+Use an absolute private profile and state directory. On macOS and Linux the
+profile selects one reviewed ACP v1 stdio peer from a system installation and
+supplies the matching native sandbox helper. The peer has read-only workspace
+access and raw networking is denied.
+Results are JSON Lines on stdout. Diagnostics use stderr.
+
+Documentation: https://grida.co/docs/cli/agent

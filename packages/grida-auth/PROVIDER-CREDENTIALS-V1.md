@@ -223,6 +223,10 @@ fields, and bounds violations are `invalid_store`. Input validation uses
 contains credential contents, parser excerpts, filesystem paths, host exception
 text, environment values, or nested causes.
 
+The Node API also supports a synchronous action after a locked exact-key match.
+Its action exceptions and non-boolean results use `admission_failed`. This
+operation uses the existing lock and makes no changes to the file protocol.
+
 Presence and migration outcomes are safe metadata. The explicit read result and
 source import entries are secrets; hosts must keep them outside logs, model
 context, renderers, status output, and exceptions. Public `CredentialLock` failures

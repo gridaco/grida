@@ -2,8 +2,8 @@
 use serde_json::{Map, Value, json};
 
 use crate::{
-    Command, GenerationSource, Invocation, MeshOperation, MeshSource, ModelSelection, Request,
-    RiggingSource, Selector,
+    AgentAction, Command, GenerationSource, Invocation, MeshOperation, MeshSource, ModelSelection,
+    Request, RiggingSource, Selector,
 };
 
 type Object = Map<String, Value>;
@@ -71,6 +71,60 @@ pub fn project(invocation: &Invocation) -> Value {
         }
         Command::Version => "version",
         Command::Fx => "fx",
+        Command::Agent(agent) => {
+            put(&mut object, "provider", "gg");
+            put(&mut object, "model", agent.model.as_str());
+            put(&mut object, "stateDir", json!(agent.state_dir));
+            put(&mut object, "maxOutputTokens", agent.max_output_tokens);
+            selector(&mut object, &agent.selector);
+            match &agent.action {
+                AgentAction::Run {
+                    cwd,
+                    session,
+                    prompt,
+                    input_png,
+                    input_file,
+                    skills,
+                    questions,
+                    deadline_ms,
+                } => {
+                    put(&mut object, "cwd", json!(cwd));
+                    optional(
+                        &mut object,
+                        "session",
+                        session.as_ref().map(|id| id.as_str()),
+                    );
+                    optional(&mut object, "prompt", prompt.as_deref());
+                    if let Some(path) = input_png {
+                        put(&mut object, "inputPng", json!(path));
+                    }
+                    if let Some(path) = input_file {
+                        put(&mut object, "inputFile", json!(path));
+                    }
+                    if !skills.is_empty() {
+                        put(
+                            &mut object,
+                            "skills",
+                            skills.iter().map(|skill| skill.name()).collect::<Vec<_>>(),
+                        );
+                    }
+                    put(&mut object, "questions", *questions);
+                    put(&mut object, "deadlineMs", *deadline_ms);
+                    "agent run"
+                }
+                AgentAction::ServeStdio => {
+                    put(&mut object, "stdio", true);
+                    "agent serve"
+                }
+            }
+        }
+        Command::AgentExternal(command) => {
+            put(&mut object, "stateDir", json!(command.state_dir));
+            put(&mut object, "profile", json!(command.profile));
+            optional(&mut object, "prompt", command.prompt.as_deref());
+            put(&mut object, "deadlineMs", command.deadline_ms);
+            "agent run-external"
+        }
         Command::Docs(topic) => {
             put(&mut object, "topic", topic.name());
             "docs"

@@ -14,3 +14,7 @@ import { FullscreenImagePreview } from "@/kits/image-preview";
 
 Viewport behavior lives in the shared `ZoomableImage` component and immutable
 `ImageCamera` backend.
+
+For retained images, pass `loadImage` in place of `src`. The loader runs
+when the preview opens and returns a Blob. The preview releases its display
+URL on close. Copy and Download use the loaded bytes directly.

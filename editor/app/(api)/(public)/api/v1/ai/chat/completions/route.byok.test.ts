@@ -15,8 +15,15 @@ import type { ProductBilling } from "@/lib/platform/product-billing";
 vi.mock("@/lib/ai/openai-compat/limits", () => ({
   allowAiRequest: async () => ({ success: true }),
 }));
+vi.mock("@/lib/ai/openai-compat/hosted-models", () => ({
+  isHostedTextModel: async (id: string) => id === "anthropic/claude-sonnet-5",
+}));
 
-import type { LanguageModelV3, LanguageModelV3Usage } from "@ai-sdk/provider";
+import type {
+  LanguageModelV3,
+  LanguageModelV3StreamPart,
+  LanguageModelV3Usage,
+} from "@ai-sdk/provider";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 
 const h = vi.hoisted(() => ({
@@ -57,7 +64,27 @@ vi.mock("@/lib/ai/models", async (orig) => {
       };
     },
     doStream: async () => {
-      throw new Error("unused");
+      h.calls += 1;
+      return {
+        response: { headers: { "x-request-id": "req_bare" } },
+        stream: new ReadableStream<LanguageModelV3StreamPart>({
+          start(controller) {
+            controller.enqueue({
+              type: "finish",
+              finishReason: { unified: "stop", raw: "stop" },
+              usage: USAGE,
+              providerMetadata: {
+                gg: {
+                  requestId: "req_bare",
+                  billingStatus: "settled",
+                  chargedMills: "9",
+                },
+              },
+            });
+            controller.close();
+          },
+        }),
+      };
     },
   });
   return {
@@ -82,6 +109,7 @@ vi.mock("@/lib/ai/models", async (orig) => {
 });
 
 import { POST } from "./route";
+import { POST as CAPPED_POST } from "./capped/route";
 import { signGgToken } from "@/lib/auth/gg-token";
 
 const SECRET = "byok-secret-0123456789abcdef0123456789abcdef00";
@@ -106,6 +134,28 @@ beforeEach(() => {
 });
 
 describe("BYOK carve-out on /api/v1/ai/chat/completions", () => {
+  it("refuses the capped route instead of substituting an unbounded BYOK model", async () => {
+    const { token } = await signGgToken("user-1", 7);
+    const response = await CAPPED_POST(
+      new Request("http://grida.test/api/v1/ai/chat/completions/capped", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+          "x-gg-max-cost-mills": "1",
+        },
+        body: JSON.stringify({
+          model: "anthropic/claude-sonnet-5",
+          messages: [{ role: "user", content: "hello" }],
+          stream: true,
+        }),
+      })
+    );
+    expect(response.status).toBe(400);
+    expect(h.calls).toBe(0);
+    expect(h.begin).not.toHaveBeenCalled();
+    expect(h.complete).not.toHaveBeenCalled();
+  });
   it("serves unbilled text (no gate, no ingest) but auth still runs", async () => {
     const { token } = await signGgToken("user-1", 7);
     const result = await clientModel(token).doGenerate({
@@ -128,5 +178,30 @@ describe("BYOK carve-out on /api/v1/ai/chat/completions", () => {
       (err: unknown) => (err as { statusCode?: number }).statusCode === 401
     );
     expect(h.calls).toBe(0);
+  });
+
+  it("withholds Gateway billing evidence from the bare model", async () => {
+    const { token } = await signGgToken("user-1", 7);
+    const response = await POST(
+      new Request("http://grida.test/api/v1/ai/chat/completions", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+          "x-grida-billing-receipt": "1",
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          messages: [{ role: "user", content: "fixture" }],
+          stream: true,
+        }),
+      })
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.has("x-request-id")).toBe(false);
+    const stream = await response.text();
+    expect(stream).not.toContain("grida_billing");
+    expect(stream.endsWith("data: [DONE]\n\n")).toBe(true);
+    expect(h.calls).toBe(1);
   });
 });

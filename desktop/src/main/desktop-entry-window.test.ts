@@ -61,6 +61,36 @@ describe("DesktopEntryWindow.authControlPathForUrl", () => {
 });
 
 describe("DesktopEntryWindow lifecycle", () => {
+  it("revokes admission and drops focus probes during committed quit", async () => {
+    const window = makeWindow();
+    const auxiliary = makeWindow();
+    const pending = deferred<DesktopAccountState>();
+    const account = makeAccount([]);
+    account.status
+      .mockResolvedValueOnce("signed-in")
+      .mockImplementationOnce(() => pending.promise);
+    windowFactory.mockReturnValue(window);
+    const entry = makeController(account, { onboarding_complete: true });
+    await entry.open();
+    expect(entry.registerSecondary(auxiliary as never)).toBe(true);
+
+    const inFlight = entry.reconcile();
+    await vi.waitFor(() => expect(account.status).toHaveBeenCalledTimes(2));
+    const queued = entry.reconcile({ focus: true });
+    entry.beginShutdown();
+    expect(entry.ipcRoleFor(window as never)).toBeNull();
+    expect(entry.ipcRoleFor(auxiliary as never)).toBeNull();
+    window.destroy();
+    pending.resolve("signed-in");
+    await Promise.all([inFlight, queued]);
+    await entry.open();
+    await entry.reconcile({ focus: true });
+
+    expect(account.status).toHaveBeenCalledTimes(2);
+    expect(windowFactory).toHaveBeenCalledOnce();
+    expect(entry.window).toBeNull();
+  });
+
   it("shows signed-out startup as one compact sign-in window", async () => {
     const window = makeWindow();
     const account = makeAccount(["signed-out"]);
@@ -103,6 +133,7 @@ describe("DesktopEntryWindow lifecycle", () => {
 
   it("does not present onboarding/main until the authenticated backend is ready", async () => {
     const window = makeWindow();
+    const auxiliary = makeWindow();
     const backend = deferred<void>();
     windowFactory.mockReturnValue(window);
     const entry = makeController(makeAccount(["signed-in"]), {
@@ -114,6 +145,8 @@ describe("DesktopEntryWindow lifecycle", () => {
     await Promise.resolve();
     expect(window.loadURL).not.toHaveBeenCalled();
     expect(entry.role).toBe("booting");
+    expect(entry.registerSecondary(auxiliary as never)).toBe(false);
+    expect(auxiliary.close).toHaveBeenCalledOnce();
 
     backend.resolve();
     await opening;

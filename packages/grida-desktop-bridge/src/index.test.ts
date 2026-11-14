@@ -14,7 +14,7 @@ import type {
   TextToSpeechListVoicesResult,
   ThreeDGenerateRequest,
   ThreeDGenerateResult,
-} from "@grida/agent";
+} from "@grida/ai-host";
 import type { MediaItem } from "@grida/daemon";
 import type {
   ChatGptConnectResult,

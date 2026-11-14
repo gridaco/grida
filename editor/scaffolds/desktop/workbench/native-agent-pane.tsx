@@ -1,0 +1,1190 @@
+"use client";
+
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import type {
+  DesktopNativeChat,
+  NativeChatMessage,
+  NativeChatReadiness,
+} from "@grida/desktop-bridge";
+import { Button } from "@app/ui/components/button";
+import { readLibraryAttachment } from "@/app/(library)/library/attachment";
+import { encodeLibraryPng } from "@/lib/agent-chat/image-attachment";
+import {
+  CheckIcon,
+  ShieldIcon,
+  PlayIcon,
+  SquareIcon,
+  LibraryIcon,
+  PaperclipIcon,
+  PlusIcon,
+  GoalIcon,
+  ListChecksIcon,
+  MessageSquareTextIcon,
+  ImageIcon,
+  XIcon,
+} from "lucide-react";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationScrollButton,
+} from "@app/ui/ai-elements/conversation";
+import {
+  ChatMessageView,
+  CompactionNotice,
+  PendingTurnIndicator,
+  QuestionPrompt,
+  workspace_links,
+} from "@/kits/agent-chat";
+import {
+  NativeChatController,
+  type NativeChatEditorSurfaces,
+} from "@/lib/agent-chat/native-chat-controller";
+import { subscribeToNativeNotificationFocus } from "@/lib/desktop/agent-focus-session";
+import type { ComposerCatalog, ComposerController } from "@/kits/composer";
+import { AgentApprovalPrompt } from "../shared/agent-approval";
+import { AgentLibraryAttachmentPicker } from "../shared/agent-library-attachment-picker";
+import {
+  AgentComposerInput,
+  type ComposerCommandAction,
+} from "../shared/agent-composer-input";
+import { useWorkspaceFileMentions } from "../shared/use-workspace-file-mentions";
+import { NativeComposerTray } from "./native-composer-tray";
+import { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
+import { ContextMeter } from "../shared/context-meter";
+import { computeContextUsage } from "@/lib/agent-chat/context-usage";
+import { cn } from "@app/ui/lib/utils";
+import styles from "./agent-pane.module.css";
+import { SideChatPlacement } from "./side-chat-placement";
+import { NativeTurnArtifacts } from "./native-turn-summary";
+import { NativeAttachmentCard } from "./native-attachment-card";
+import { NativeEarlierMessages } from "./native-earlier-messages";
+import { NativeTurnActivity } from "./native-turn-activity";
+import { turn_activity } from "@/lib/agent-chat/turn-activity";
+import { native_message_parts } from "@/lib/agent-chat/native-message-parts";
+import { NativeMessageRevisionPanel } from "./native-message-revision-panel";
+import { NativeHooksPanel } from "./native-hooks-panel";
+import { NativeBackgroundProcesses } from "./native-background-processes";
+
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@app/ui/components/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+} from "@app/ui/components/dropdown-menu";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@app/ui/components/popover";
+import { NativeChatHeader, NativeModelPicker } from "./native-chat-controls";
+
+const NO_COMMANDS: ComposerCatalog["commands"] = [];
+const COMMAND_DESCRIPTIONS = {
+  compact: "Summarize earlier context while keeping the transcript",
+  fork: "Create a separate chat from the latest committed message",
+};
+const MAX_DRAFT_BYTES = 512 * 1024;
+const APPROVAL_ACTION = {
+  read_file: "Read file",
+  list_files: "List folder",
+  search_text: "Search files",
+  write_file: "Replace file",
+  edit_file: "Edit file",
+} as const;
+const selectionMemory = {
+  getItem: (key: string) => window.localStorage.getItem(key),
+  setItem: (key: string, value: string) =>
+    window.localStorage.setItem(key, value),
+};
+
+/** One store per window, so a draft outlives any composer instance. */
+const COMPOSER_DRAFTS = new ComposerDrafts();
+
+/**
+ * A first message chosen before the workspace opened, with its connection.
+ * `take` hands the text over once (see `welcome-message.ts`); `waiting`
+ * tells whether it is still there to take.
+ */
+export type NativeFirstMessage = Readonly<{
+  profileId: string | null;
+  waiting: () => boolean;
+  take: () => string | null;
+}>;
+
+export function NativeAgentPaneGate({
+  bridge,
+  selectionKey,
+  workspaceId,
+  initialSession,
+  editorSurfaces,
+  sideChatPlacement,
+  firstMessage,
+}: {
+  bridge: DesktopNativeChat;
+  selectionKey?: string;
+  workspaceId?: string;
+  initialSession: string | null;
+  editorSurfaces?: NativeChatEditorSurfaces;
+  /** Where this chat's side chat is shown. */
+  sideChatPlacement: SideChatPlacement;
+  /** Sent once as a new chat's first turn when the chat is ready. */
+  firstMessage?: NativeFirstMessage;
+}) {
+  const [attempt, setAttempt] = useState(0);
+  const [messageDropped, setMessageDropped] = useState(false);
+  const [selection, setSelection] = useState<{
+    bridge: DesktopNativeChat;
+    attempt: number;
+    readiness: NativeChatReadiness | null;
+  }>();
+  useEffect(() => {
+    // A first message starts on the connection chosen with it, not on the
+    // workspace's remembered model.
+    const message = firstMessage?.waiting() ? firstMessage : undefined;
+    const remembered = message
+      ? message.profileId
+      : NativeChatController.rememberedProfile(
+          selectionMemory,
+          selectionKey && `grida.nativeChat.${selectionKey}`
+        );
+    return NativeChatController.watchReadiness(
+      bridge,
+      (readiness) => setSelection({ bridge, attempt, readiness }),
+      remembered ? { kind: message ? "new" : "saved", id: remembered } : null
+    );
+  }, [bridge, attempt, selectionKey, firstMessage]);
+  const readiness =
+    selection?.bridge === bridge && selection.attempt === attempt
+      ? selection.readiness
+      : undefined;
+  // While the agent starts, the ordinary pane is shown; it connects and
+  // accepts sends once startup finishes.
+  const starting = readiness === undefined || readiness === "native-starting";
+  // Without a usable default connection the pane still opens; its composer
+  // asks for a model, and choosing one continues in the same pane.
+  const connectionRequired =
+    !starting &&
+    readiness !== "native-ready" &&
+    readiness !== null &&
+    readiness !== "native-unavailable" &&
+    readiness !== "native-workspace-capacity" &&
+    !!workspaceId &&
+    !!bridge.profiles &&
+    !!bridge.selectProfile;
+  const unavailable =
+    !starting && readiness !== "native-ready" && !connectionRequired;
+  // Chat cannot open here, so the message is dropped with a notice instead
+  // of waiting to be sent whenever this workspace opens again.
+  useEffect(() => {
+    if (unavailable && firstMessage?.take()) setMessageDropped(true);
+  }, [unavailable, firstMessage]);
+  if (unavailable)
+    return (
+      <div className="flex flex-col gap-2 px-3 py-2 text-xs">
+        <span role="alert" className="text-destructive">
+          {readiness === null
+            ? "Couldn't check chat availability."
+            : (nativeChatConnectionNote[readiness] ??
+              "Native chat is unavailable.")}
+          {messageDropped && " Your message from Welcome wasn't sent."}
+        </span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          onClick={() => setAttempt((current) => current + 1)}
+        >
+          Retry
+        </Button>
+      </div>
+    );
+  return (
+    <NativeAgentPane
+      key={initialSession}
+      bridge={bridge}
+      starting={starting}
+      connectionRequired={connectionRequired}
+      connectionNote={
+        connectionRequired && readiness
+          ? nativeChatConnectionNote[readiness]
+          : undefined
+      }
+      selectionKey={selectionKey}
+      workspaceId={workspaceId}
+      initialSession={initialSession}
+      editorSurfaces={editorSurfaces}
+      sideChatPlacement={sideChatPlacement}
+      firstMessage={firstMessage}
+    />
+  );
+}
+
+/** Shown only when the person must act outside the chat before choosing. */
+const nativeChatConnectionNote: Partial<Record<NativeChatReadiness, string>> = {
+  "native-provider-key-required":
+    "Add an API key for the selected provider in Desktop settings, or choose another model.",
+  "native-provider-model-unavailable":
+    "The selected model is unavailable. Choose another model.",
+  "native-provider-endpoint-https-required":
+    "Native chat requires HTTPS for an endpoint on another device. Update the saved endpoint in Desktop settings, or choose another model.",
+  "native-provider-endpoint-approval-required":
+    "Save the selected endpoint in Desktop settings and approve its address, or choose another model.",
+  "native-workspace-capacity":
+    "Chat is already running in as many projects as Desktop keeps open at once. Quit and reopen Grida Desktop, then retry.",
+};
+
+export function NativeAgentPane({
+  bridge,
+  starting = false,
+  connectionRequired = false,
+  connectionNote,
+  selectionKey,
+  workspaceId,
+  initialSession,
+  editorSurfaces,
+  sideChatPlacement,
+  firstMessage,
+}: {
+  bridge: DesktopNativeChat;
+  /** The agent is still starting; the pane shows but does not connect yet. */
+  starting?: boolean;
+  /** No connection can run yet; the composer's model picker starts the chat. */
+  connectionRequired?: boolean;
+  connectionNote?: string;
+  selectionKey?: string;
+  workspaceId?: string;
+  initialSession: string | null;
+  editorSurfaces?: NativeChatEditorSurfaces;
+  /** Where this chat's side chat is shown; see `side-chat-placement.ts`. */
+  sideChatPlacement: SideChatPlacement;
+  /** Sent once as a new chat's first turn; see {@link NativeAgentPaneGate}. */
+  firstMessage?: NativeFirstMessage;
+}) {
+  const controller = useMemo(() => {
+    const created = new NativeChatController(
+      bridge,
+      selectionMemory,
+      selectionKey && `grida.nativeChat.${selectionKey}`,
+      editorSurfaces,
+      !!workspaceId
+    );
+    created.keepDrafts(COMPOSER_DRAFTS, workspaceId ?? "standalone");
+    return created;
+  }, [bridge, selectionKey, editorSurfaces, workspaceId]);
+  // Workspace file links in replies open in the workbench, which validates
+  // the path against the workspace before opening a tab.
+  const openWorkspaceLink = useMemo(() => {
+    const open = editorSurfaces?.open;
+    return open
+      ? (path: string) => {
+          const target = workspace_links.workspacePath(path);
+          if (target)
+            void open.call(editorSurfaces, target, () => true).catch(() => {});
+        }
+      : null;
+  }, [editorSurfaces]);
+  const state = useSyncExternalStore(
+    controller.subscribe,
+    controller.read,
+    controller.read
+  );
+  // One preview per staged draft; a new draft object means a new attachment.
+  const attachmentPreview = useMemo(
+    () => (state.attachmentDraft ? controller.attachmentPreview() : null),
+    [controller, state.attachmentDraft]
+  );
+  const mentions = useWorkspaceFileMentions(workspaceId);
+  const catalog = useMemo(
+    () => ({ commands: NO_COMMANDS, mentions }),
+    [mentions]
+  );
+  const draft = useRef<Pick<ComposerController, "appendText">>(null);
+  const pngPicker = useRef<HTMLInputElement>(null);
+  const filePicker = useRef<HTMLInputElement>(null);
+  const [libraryScope, setLibraryScope] = useState<number | null>(null);
+  const [libraryRequest, setLibraryRequest] = useState<{
+    scope: number;
+    selectionId: string;
+  } | null>(null);
+  // The side chat shows wherever the host places it.
+  useEffect(
+    () => SideChatPlacement.connect(controller, sideChatPlacement),
+    [controller, sideChatPlacement]
+  );
+  useEffect(() => {
+    const profile =
+      workspaceId && initialSession
+        ? new URLSearchParams(window.location.hash.slice(1)).get("chat-profile")
+        : null;
+    if (starting) return;
+    // A message that could not be sent stays in the composer.
+    const keep = (text: string | null) => {
+      if (text) draft.current?.appendText(text, MAX_DRAFT_BYTES);
+    };
+    const message = firstMessage?.waiting() ? firstMessage : undefined;
+    if (connectionRequired) {
+      controller.connectForSelection();
+      if (message) keep(controller.declineMessage(message.take));
+    } else if (message && !initialSession)
+      void controller.startChat(message.profileId, message.take).then(keep);
+    else controller.connect(initialSession, profile);
+    const stopFocus =
+      workspaceId &&
+      subscribeToNativeNotificationFocus(
+        bridge,
+        workspaceId,
+        (sessionId, profileId) =>
+          void controller.focusChat(sessionId, profileId)
+      );
+    return () => {
+      if (stopFocus) stopFocus();
+      controller.disconnect();
+    };
+  }, [
+    bridge,
+    controller,
+    initialSession,
+    firstMessage,
+    workspaceId,
+    connectionRequired,
+    starting,
+  ]);
+  const snapshot = state.observation?.snapshot;
+  const editHistory = controller.canReviseHistory && !state.revisionDraft;
+  const turn = snapshot?.current;
+  const running =
+    turn?.disposition === "running" && !turn.paused && !turn.cancelled;
+  const canResume = controller.hasPausedTurn;
+  const goalTurn =
+    !!turn && state.goal?.goal?.reservation?.turnId === turn.turnId;
+  // A paused turn resumes from the composer; a Goal's own pause resumes from
+  // its strip.
+  const resumable = canResume && !(goalTurn && state.goal?.goal?.paused);
+  // Show Resume as soon as Pause is chosen; it waits for the pause to settle.
+  const pausing =
+    !!turn && !turn.cancelled && (state.pausing === turn.turnId || turn.paused);
+  const approval =
+    turn?.disposition === "suspended" && !turn.paused && !turn.cancelled
+      ? state.approvals[0]
+      : undefined;
+  const question = turn && !turn.cancelled ? state.questions[0] : undefined;
+  const librarySelection = state.librarySelection;
+  const retrying =
+    running && !question && snapshot?.retryNotBeforeMs !== undefined;
+  const queued = snapshot?.queuedInputs ?? 0;
+  const streamingControlsOnly = running && !bridge.enqueue;
+  const error = state.error ?? state.approvalError ?? state.questionError;
+
+  const selectedProfile =
+    state.profiles?.saved.find((p) => p.id === state.profiles?.active) ??
+    state.profiles?.choices.find((p) => p.id === state.profiles?.active);
+  const contextWindow =
+    selectedProfile?.contextWindow ??
+    (state.profiles?.active === null
+      ? state.profiles.defaultContextWindow
+      : undefined);
+  const measuredContext = turn_activity.measuredContext(state.turnRecords);
+  const contextUsage = computeContextUsage(
+    state.messages.map((message) => ({
+      role: message.role,
+      parts: [{ type: "text", text: message.text }],
+    })),
+    contextWindow,
+    measuredContext
+  );
+  const blocks = turn_activity.group(
+    state.messages,
+    state.turnRecords,
+    snapshot?.current,
+    snapshot?.latest
+  );
+  const records = new Map<string, (typeof state.turnRecords)[number]>();
+  for (const record of state.turnRecords)
+    if (!records.has(record.turnId)) records.set(record.turnId, record);
+  // A turn's actions sit under its final answer only, once it settles.
+  const finalAnswer = new Map<string, string>();
+  // The first user message of a goal-start turn is the one that set it.
+  const firstRequest = new Map<string, string>();
+  for (const message of state.messages)
+    if (message.role === "assistant" && message.turnId)
+      finalAnswer.set(message.turnId, message.messageId);
+    else if (
+      message.role === "user" &&
+      message.turnId &&
+      !firstRequest.has(message.turnId)
+    )
+      firstRequest.set(message.turnId, message.messageId);
+  const renderMessage = (message: NativeChatMessage) => {
+    const record = message.turnId ? records.get(message.turnId) : undefined;
+    const goalStart =
+      record?.goalStart &&
+      !!message.turnId &&
+      firstRequest.get(message.turnId) === message.messageId;
+    return (
+      <ChatMessageView
+        key={message.messageId}
+        actions={
+          message.role === "user"
+            ? {
+                // Only plain-text requests can be edited; a request with an
+                // attachment or one that started a goal cannot be resubmitted.
+                ...(editHistory &&
+                  !message.attachments?.length &&
+                  !goalStart && {
+                    onEdit: (messageId: string) =>
+                      void controller.prepareRevision(messageId),
+                  }),
+                sentAtMs: record?.startedAtMs,
+                note: goalStart ? (
+                  <>
+                    <GoalIcon />
+                    Sent as goal
+                  </>
+                ) : undefined,
+              }
+            : message.turnId &&
+                (finalAnswer.get(message.turnId) !== message.messageId ||
+                  (record && record.settledAtMs === undefined))
+              ? { hidden: true }
+              : record?.settledAtMs !== undefined
+                ? { sentAtMs: record.settledAtMs }
+                : undefined
+        }
+        message={{
+          id: message.messageId,
+          role: message.role,
+          parts: native_message_parts.of(message),
+        }}
+      />
+    );
+  };
+
+  return (
+    <div
+      data-testid="workspace-native-chat"
+      className="flex min-h-0 flex-1 flex-col"
+    >
+      <NativeChatHeader controller={controller} state={state} />
+      {(state.profileError || state.catalogEntryError) && (
+        <p role="alert" className="px-3 py-1 text-xs text-destructive">
+          {state.profileError ?? state.catalogEntryError}
+        </p>
+      )}
+      {connectionRequired && !state.scope && (
+        <div className="text-muted-foreground px-3 py-1 text-xs">
+          {connectionNote && <p>{connectionNote}</p>}
+          {state.profiles &&
+            state.profiles.choices.length + state.profiles.saved.length ===
+              0 && (
+              <p>Add a provider in Desktop settings, then refresh models.</p>
+            )}
+        </div>
+      )}
+      <workspace_links.Opener.Provider value={openWorkspaceLink}>
+        <Conversation
+          className="min-h-0 flex-1"
+          initial="instant"
+          resize={running ? "smooth" : "instant"}
+        >
+          <ConversationContent
+            className="gap-4 px-3 py-4"
+            scrollClassName={cn(
+              styles.chatScroll,
+              "desktop-native-drag-scroll-viewport scroll-fade-y scroll-fade-4"
+            )}
+          >
+            <NativeEarlierMessages
+              canLoad={state.canReadEarlier}
+              loading={state.readingEarlier}
+              error={state.earlierError}
+              count={state.messages.length}
+              onLoad={() => void controller.loadEarlierMessages()}
+            />
+            {/* See test/desktop-agent-chat-turn-activity.md. */}
+            {blocks.map((block) =>
+              block.kind === "turn" ? (
+                <NativeTurnActivity
+                  key={block.turnId}
+                  block={block}
+                  renderMessage={renderMessage}
+                />
+              ) : block.kind === "compaction" ? (
+                <CompactionNotice
+                  key={block.turnId}
+                  summary={block.summary}
+                  auto={block.automatic}
+                />
+              ) : (
+                renderMessage(block.message)
+              )
+            )}
+            {running &&
+              !retrying &&
+              state.messages.at(-1)?.role !== "assistant" && (
+                <PendingTurnIndicator />
+              )}
+            {/* See test/desktop-agent-chat-transcript-history.md. */}
+            {!turn &&
+              !state.loading &&
+              !state.repairing &&
+              state.turnSummary &&
+              state.turnSummary.turnId === snapshot?.latest?.turnId &&
+              bridge.readArtifact && (
+                <NativeTurnArtifacts
+                  key={state.turnSummary.turnId}
+                  summary={state.turnSummary}
+                  controller={controller}
+                />
+              )}
+          </ConversationContent>
+          <ConversationScrollButton />
+        </Conversation>
+      </workspace_links.Opener.Provider>
+      {state.revisionDraft ? (
+        <NativeMessageRevisionPanel
+          draft={state.revisionDraft}
+          submitting={state.revisionSubmitting}
+          effortAvailable={state.effortAvailable}
+          onChange={(text) => controller.changeRevisionText(text)}
+          onCancel={() => controller.cancelRevision()}
+          onSubmit={() => void controller.submitRevision()}
+        />
+      ) : state.revisionSubmitting ? (
+        <div role="status" className="px-3 pt-2 text-xs text-muted-foreground">
+          Opening edit…
+        </div>
+      ) : null}
+      {error && (
+        <div
+          role="alert"
+          className="flex items-center gap-2 px-3 pt-2 text-xs text-destructive"
+        >
+          <span className="flex-1">{error}</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            onClick={() => void controller.repair()}
+          >
+            Refresh
+          </Button>
+        </div>
+      )}
+      {approval && (
+        <AgentApprovalPrompt
+          description={
+            approval.tool === "write_file" || approval.tool === "edit_file"
+              ? "The agent is asking to change its settings file."
+              : "The agent is asking for additional read access."
+          }
+          detail={
+            <div className="mt-1 max-h-24 overflow-y-auto break-all font-mono text-xs text-foreground/80">
+              <div>
+                {APPROVAL_ACTION[approval.tool]}{" "}
+                {reviewText(approval.relativePath || ".")}
+              </div>
+              <div>Folder {reviewText(approval.root)}</div>
+              {approval.query !== undefined && (
+                <div>Search {reviewText(approval.query)}</div>
+              )}
+            </div>
+          }
+          acceptLabel="Allow once"
+          declineLabel="Decline"
+          disabled={state.acting}
+          onDecision={(allowed) =>
+            controller.answerApproval(
+              approval.reviewId,
+              allowed ? "approve_once" : "decline"
+            )
+          }
+        />
+      )}
+      {question && (
+        <div className="shrink-0 px-3 py-2">
+          <QuestionPrompt
+            key={question.questionId}
+            input={{
+              questions: [
+                {
+                  question: question.question,
+                  options: question.options.map((label) => ({ label })),
+                },
+              ],
+            }}
+            onSubmit={async (survey) => {
+              const answer = survey.singleAnswer();
+              return answer
+                ? controller.answerQuestion(question.questionId, answer)
+                : false;
+            }}
+            disabled={!state.questionReady || state.acting}
+          />
+        </div>
+      )}
+      {librarySelection && (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-t px-3 py-2 text-xs">
+          <p>The agent is asking for a Library reference.</p>
+          <Button
+            type="button"
+            size="xs"
+            variant="outline"
+            disabled={state.acting}
+            onClick={() =>
+              setLibraryRequest({
+                scope: state.scope,
+                selectionId: librarySelection.selectionId,
+              })
+            }
+          >
+            {state.librarySelectionRetry ? "Review answer" : "Choose reference"}
+          </Button>
+        </div>
+      )}
+      <Dialog
+        open={state.hooksOpen}
+        onOpenChange={(open) => {
+          if (!open) controller.closeHooks();
+        }}
+      >
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Lifecycle checks</DialogTitle>
+            <DialogDescription>
+              Checks that run with every chat in this workspace.
+            </DialogDescription>
+          </DialogHeader>
+          <NativeHooksPanel controller={controller} state={state} />
+        </DialogContent>
+      </Dialog>
+      <div className="shrink-0 p-3">
+        {state.imageInput && (
+          <input
+            key={`png-${state.scope}`}
+            ref={pngPicker}
+            type="file"
+            accept="image/png,.png"
+            aria-label="Select PNG"
+            className="hidden"
+            onChange={(event) => {
+              const input = event.currentTarget;
+              const file = input.files?.[0];
+              input.value = "";
+              if (file)
+                void controller.pickAttachment(state.scope, "png", file);
+            }}
+          />
+        )}
+        {state.fileInput && (
+          <input
+            key={`file-${state.scope}`}
+            ref={filePicker}
+            type="file"
+            aria-label="Select file to inspect"
+            className="hidden"
+            onChange={(event) => {
+              const input = event.currentTarget;
+              const file = input.files?.[0];
+              input.value = "";
+              if (file)
+                void controller.pickAttachment(state.scope, "file", file);
+            }}
+          />
+        )}
+        {state.attachmentReading && (
+          <p role="status" className="text-muted-foreground px-1 pb-1 text-xs">
+            Reading attachment…
+          </p>
+        )}
+        {state.attachmentDraft &&
+          (state.attachmentDraft.error ||
+            !(state.attachmentDraft.kind === "png"
+              ? state.imageInput
+              : state.fileInput)) && (
+            <p
+              role="status"
+              className="text-muted-foreground px-1 pb-1 text-xs"
+            >
+              {state.attachmentDraft.error ??
+                (state.attachmentDraft.kind === "png"
+                  ? "This connection cannot use the attached PNG. Remove it from this draft or use a compatible connection."
+                  : "This chat cannot inspect the attached file. Remove it to send the message by itself.")}
+            </p>
+          )}
+        {state.attachmentNotice && (
+          <p role="status" className="text-muted-foreground px-1 pb-1 text-xs">
+            {state.attachmentNotice}
+          </p>
+        )}
+        {(state.commandRunning || state.commandNotice) && (
+          <div className="flex items-center gap-2 px-1 pb-1 text-xs">
+            <span role="status">
+              {state.commandRunning === "compact"
+                ? "Compacting…"
+                : state.commandRunning === "fork"
+                  ? "Creating fork…"
+                  : state.commandNotice}
+            </span>
+            {state.commandFork && (
+              <Button
+                type="button"
+                size="xs"
+                variant="ghost"
+                onClick={() => void controller.select(state.commandFork)}
+              >
+                Open fork
+              </Button>
+            )}
+          </div>
+        )}
+        <NativeComposerTray
+          controller={controller}
+          view={state}
+          onReturnedText={(text) =>
+            void draft.current?.appendText(text, MAX_DRAFT_BYTES)
+          }
+        />
+        <AgentComposerInput
+          key={state.scope}
+          draft={{
+            key: controller.draftKey() ?? "",
+            store: COMPOSER_DRAFTS,
+          }}
+          catalog={catalog}
+          className="@container"
+          commandActions={[
+            ...(bridge.submitInRegime &&
+            state.scope > 0 &&
+            !state.loading &&
+            !state.profileBusy &&
+            !state.steering &&
+            !state.acting
+              ? [
+                  {
+                    id: "plan",
+                    title: "plan",
+                    description: "Plan before making changes",
+                    standalone: true as const,
+                    run: () => controller.selectOperatingRegime("plan"),
+                  },
+                ]
+              : []),
+            ...(controller.canStartGoal && !state.sideIntent
+              ? [
+                  {
+                    id: "goal",
+                    title: "goal",
+                    description:
+                      "Work toward a goal with automatic continuation",
+                    standalone: true as const,
+                    run: () => controller.selectGoalIntent(true),
+                  },
+                ]
+              : []),
+            ...(controller.canAskSide && !state.sideIntent
+              ? [
+                  {
+                    id: "side",
+                    title: "side",
+                    description:
+                      "Ask a quick question on the side; this chat is unchanged",
+                    standalone: true as const,
+                    run: () => controller.selectSideIntent(true),
+                  },
+                ]
+              : []),
+            ...(state.backgroundProcesses
+              ? [
+                  {
+                    id: "stop",
+                    title: "stop",
+                    description: "Stop all background processes",
+                    standalone: true as const,
+                    run: () => controller.stopBackgroundProcesses(),
+                  },
+                ]
+              : []),
+            ...state.commands.map(
+              (command): ComposerCommandAction => ({
+                id: command,
+                title: command,
+                description: COMMAND_DESCRIPTIONS[command],
+                standalone: true,
+                run: () => controller.runCommand(command),
+              })
+            ),
+          ]}
+          onCommandSelect={(command) => {
+            if (command.id === "plan") {
+              controller.selectOperatingRegime("plan");
+              return true;
+            }
+            if (command.id === "goal") {
+              controller.selectGoalIntent(true);
+              return true;
+            }
+            if (command.id === "side") {
+              controller.selectSideIntent(true);
+              return true;
+            }
+            if (command.id === "stop" && state.backgroundProcesses) {
+              void controller.stopBackgroundProcesses().catch(() => {});
+              return true;
+            }
+            return false;
+          }}
+          attachments={
+            state.attachmentDraft &&
+            !state.attachmentReading && (
+              <NativeAttachmentCard
+                name={state.attachmentDraft.name}
+                size={state.attachmentDraft.size}
+                png={state.attachmentDraft.kind === "png"}
+                preview={attachmentPreview}
+                onRemove={() => controller.removeAttachment(state.scope)}
+              />
+            )
+          }
+          onAttachmentTransfer={({ resources }) =>
+            void controller.pickTransferredAttachment(state.scope, resources)
+          }
+          awaitSubmission
+          canSubmit={
+            controller.canSubmit &&
+            (!state.goalIntent || controller.canStartGoal)
+          }
+          busy={!!turn}
+          isStreaming={streamingControlsOnly}
+          emptyAction={
+            resumable || (pausing && !(goalTurn && state.goal?.goal?.paused))
+              ? {
+                  label: "Resume",
+                  icon: <PlayIcon className="size-3.5 fill-current" />,
+                  onClick: () => void controller.resumeTurn(),
+                }
+              : state.acting
+                ? undefined
+                : running && !turn?.paused
+                  ? {
+                      label: "Pause",
+                      icon: <SquareIcon className="size-3.5" />,
+                      onClick: () => void controller.control("pause"),
+                    }
+                  : controller.canResumeQueue && queued > 0 && !state.acting
+                    ? {
+                        label: "Resume queue",
+                        icon: <PlayIcon className="size-3.5 fill-current" />,
+                        onClick: () =>
+                          void controller.editQueue({ action: "resume" }),
+                      }
+                    : undefined
+          }
+          placeholder={
+            connectionRequired && !state.scope
+              ? "Choose a model to start chatting…"
+              : state.goalIntent
+                ? "Describe the goal…"
+                : state.operatingRegime === "plan"
+                  ? "What would you like to plan?"
+                  : state.attachmentDraft
+                    ? "Add a message to send this attachment…"
+                    : turn || snapshot?.admissionPaused || queued
+                      ? "Queue a follow-up…"
+                      : undefined
+          }
+          submissionScope={state.scope}
+          draftRef={draft}
+          onSubmit={(text) => controller.submit(text, state.scope)}
+          onStop={() => void controller.control("stop")}
+          toolbarStart={
+            <>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label="Add to message"
+                    title="Add to message"
+                    className="shrink-0 rounded-full text-muted-foreground"
+                  >
+                    <PlusIcon className="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="top" align="start" className="w-72">
+                  <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                    Add
+                  </DropdownMenuLabel>
+                  {state.fileInput && (
+                    <DropdownMenuItem
+                      disabled={
+                        state.goalIntent || !controller.canAttach("file")
+                      }
+                      onSelect={() => filePicker.current?.click()}
+                    >
+                      <PaperclipIcon className="size-4" />
+                      Files
+                    </DropdownMenuItem>
+                  )}
+                  {state.imageInput && (
+                    <DropdownMenuItem
+                      disabled={
+                        state.goalIntent || !controller.canAttach("png")
+                      }
+                      onSelect={() => pngPicker.current?.click()}
+                    >
+                      <ImageIcon className="size-4" />
+                      Image
+                    </DropdownMenuItem>
+                  )}
+                  {workspaceId && state.imageInput && (
+                    <DropdownMenuItem
+                      disabled={state.acting || state.goalIntent}
+                      onSelect={() => setLibraryScope(state.scope)}
+                    >
+                      <LibraryIcon className="size-4" />
+                      Library
+                    </DropdownMenuItem>
+                  )}
+                  {bridge.startGoal && (
+                    <DropdownMenuItem
+                      disabled={
+                        state.acting ||
+                        state.goalIntent ||
+                        !controller.canStartGoal
+                      }
+                      onSelect={() => controller.selectGoalIntent(true)}
+                    >
+                      <GoalIcon className="size-4" />
+                      Goal
+                      <span className="text-muted-foreground">
+                        Set a goal to keep pursuing
+                      </span>
+                    </DropdownMenuItem>
+                  )}
+                  {bridge.submitInRegime && (
+                    <DropdownMenuItem
+                      disabled={state.acting || state.steering}
+                      onSelect={() =>
+                        controller.selectOperatingRegime(
+                          state.operatingRegime === "plan" ? "act" : "plan"
+                        )
+                      }
+                    >
+                      <ListChecksIcon className="size-4" />
+                      Plan mode
+                      <span className="text-muted-foreground">
+                        {state.operatingRegime === "plan"
+                          ? "Turn plan mode off"
+                          : "Turn plan mode on"}
+                      </span>
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="ghost"
+                    className="shrink-0 gap-1 px-1.5 text-muted-foreground"
+                    aria-label="Access: Default"
+                  >
+                    <ShieldIcon className="size-3.5" />
+                    <span className="hidden @[26rem]:inline">Default</span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  side="top"
+                  align="start"
+                  className="w-80 p-1 text-sm"
+                >
+                  <p className="px-2 pt-1.5 pb-1 text-xs text-muted-foreground">
+                    What can the agent access?
+                  </p>
+                  <div className="flex items-start gap-2 rounded-md px-2 py-1.5">
+                    <ShieldIcon className="mt-0.5 size-4 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p>Default</p>
+                      <p className="text-xs text-muted-foreground">
+                        Reads and edits files in this project and runs commands
+                        in a sandbox. Other folders and the internet are off.
+                      </p>
+                    </div>
+                    <CheckIcon className="mt-0.5 size-4 shrink-0" />
+                  </div>
+                </PopoverContent>
+              </Popover>
+              {state.backgroundProcesses && (
+                <NativeBackgroundProcesses
+                  controller={state.backgroundProcesses}
+                />
+              )}
+              {state.operatingRegime === "plan" && (
+                <IntentChip
+                  icon={<ListChecksIcon />}
+                  label="Plan"
+                  disabled={state.acting}
+                  onRemove={() => controller.selectOperatingRegime("act")}
+                />
+              )}
+              {state.goalIntent && (
+                <IntentChip
+                  icon={<GoalIcon />}
+                  label="Goal"
+                  disabled={state.acting}
+                  onRemove={() => controller.selectGoalIntent(false)}
+                />
+              )}
+              {state.sideIntent && (
+                <IntentChip
+                  icon={<MessageSquareTextIcon />}
+                  label="Side"
+                  disabled={state.acting}
+                  onRemove={() => controller.selectSideIntent(false)}
+                />
+              )}
+            </>
+          }
+          toolbarEnd={
+            <>
+              <ContextMeter usage={contextUsage} />
+              <NativeModelPicker
+                profiles={state.profiles}
+                defaultUnavailable={connectionRequired}
+                busy={state.profileBusy || state.acting}
+                onSelect={
+                  bridge.selectProfile
+                    ? (selection) => void controller.selectProfile(selection)
+                    : undefined
+                }
+                onRefresh={() => void controller.readProfiles()}
+                effort={state.effort}
+                ultraAvailable={state.effortAvailable}
+                goal={state.goalIntent}
+                onEffort={(effort) => controller.selectEffort(effort)}
+              />
+            </>
+          }
+        />
+        {workspaceId && state.imageInput && libraryScope === state.scope && (
+          <AgentLibraryAttachmentPicker
+            open
+            single
+            onOpenChange={(open) => {
+              if (!open) setLibraryScope(null);
+            }}
+            onAttach={([pin]) => {
+              if (!pin) return;
+              void controller.pickLibraryImage(
+                state.scope,
+                `Library: ${pin.title}`,
+                (maxBytes) => readLibraryPng(pin.id, maxBytes)
+              );
+            }}
+          />
+        )}
+        {librarySelection &&
+          libraryRequest?.scope === state.scope &&
+          libraryRequest.selectionId === librarySelection.selectionId && (
+            <AgentLibraryAttachmentPicker
+              key={librarySelection.selectionId}
+              open
+              single
+              onOpenChange={(open) => {
+                if (!open) setLibraryRequest(null);
+              }}
+              onAttach={([pin]) => {
+                if (pin)
+                  void controller.answerLibrarySelection(
+                    librarySelection.selectionId,
+                    {
+                      id: pin.id,
+                      readPng: (maxBytes) => readLibraryPng(pin.id, maxBytes),
+                    }
+                  );
+              }}
+              request={{
+                initialQuery: librarySelection.initialSearchQuery,
+                busy: state.acting,
+                error: state.librarySelectionError,
+                skip: () => {
+                  void controller.answerLibrarySelection(
+                    librarySelection.selectionId,
+                    "skip"
+                  );
+                },
+                retry: state.librarySelectionRetry
+                  ? () => {
+                      void controller.answerLibrarySelection(
+                        librarySelection.selectionId,
+                        "retry"
+                      );
+                    }
+                  : undefined,
+              }}
+            />
+          )}
+      </div>
+    </div>
+  );
+}
+
+async function readLibraryPng(
+  id: string,
+  maxBytes: number
+): Promise<ArrayBuffer> {
+  const source = await readLibraryAttachment(id);
+  if (!source) throw new Error("library_image_unavailable");
+  return encodeLibraryPng(source, maxBytes);
+}
+
+function reviewText(value: string): string {
+  return JSON.stringify(value).replace(
+    /[\u007f-\u009f\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069]/g,
+    (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`
+  );
+}
+
+/** A removable composer intent. The icon turns into a remove button on hover. */
+function IntentChip({
+  icon,
+  label,
+  disabled,
+  onRemove,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  disabled?: boolean;
+  onRemove: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      aria-label={`Remove ${label.toLowerCase()}`}
+      title={`Remove ${label.toLowerCase()}`}
+      onClick={onRemove}
+      className="group/chip flex h-6 shrink-0 items-center gap-1 rounded-md px-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50 [&_svg]:size-3.5"
+    >
+      <span className="group-hover/chip:hidden">{icon}</span>
+      <XIcon className="hidden group-hover/chip:block" />
+      {label}
+    </button>
+  );
+}

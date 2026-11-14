@@ -50,7 +50,7 @@ import {
 import { randomUUID } from "node:crypto";
 import { GgThreeDHttp } from "./gg-three-d-http";
 import { catalog as ai_models } from "@grida/ai/catalogue";
-import type { VideoGenerateRequest, VideoGenerateResult } from "@grida/agent";
+import type { VideoGenerateRequest, VideoGenerateResult } from "@grida/ai-host";
 import Replicate from "replicate";
 import { createLibraryClient } from "@/lib/supabase/server";
 import { requireOrganizationId } from "@/lib/auth/organization";
@@ -182,7 +182,7 @@ export { isByokActive };
 export type { ModelTier };
 
 // The producer contract for `providerOptions.grida` lives in `@grida/ai`
-// — the one package both this seam and the framework-free `@grida/agent` share
+// — the one package both this seam and the framework-free `@grida/ai-host` share
 // — so every billed call site (editor OR package) is compiled against ONE key
 // definition. Re-exported here so editor call sites keep importing it from the
 // GG adapter validates the same organization and feature fields at runtime.

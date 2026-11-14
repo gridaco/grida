@@ -1,0 +1,13 @@
+Usage: grida agent serve --stdio --provider gg --model ID --state-dir DIRECTORY
+
+Options:
+  --org SLUG | --org-id ID  Select a funding organization.
+  --max-output-tokens N     Output-token allowance, default 4096.
+  --no-input                Serve without terminal interaction.
+
+Configure the client to launch this command. Stdin and stdout carry ACP.
+Use an absolute state directory. Sign in first with grida auth login.
+The service renews its scoped grant when needed for the account and organization
+that opened it.
+
+Documentation: https://grida.co/docs/cli/agent

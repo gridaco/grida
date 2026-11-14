@@ -1,8 +1,7 @@
 ---
 title: Built-in subagents
-description: Grida's specialized subagents (titler, compactor, planner) — concrete bindings of the RFC's specialized-subagent pattern with the Grida-specific tier, model, sentinel, and cost discipline.
-keywords:
-  [agent, subagent, titler, compactor, planner, grida, specialized-subagent]
+description: Grida's specialized internal agents (chat titles and context compaction) — concrete bindings of the specialized-subagent pattern with their provider and cost discipline.
+keywords: [agent, subagent, titler, compaction, grida, specialized-subagent]
 format: md
 tags:
   - internal
@@ -13,156 +12,78 @@ tags:
 
 # Built-in subagents
 
-This page is the **Grida binding** of the agent RFC's specialized
-subagent pattern ([`../agent/subagents.md#specialized-subagents`](../agent/subagents.md)).
-The RFC names the shape (a `subagent`-mode agent the runtime invokes
-internally, with a constrained system prompt and bounded cost). This
-page records what Grida ships, and the product-shape decisions for each.
+This page is the **Grida binding** of the specialized subagent pattern
+([Master / delegation and verification](../agent/master.md#delegation-and-verification)).
+The master names the shape: an internal agent the host invokes with a
+constrained prompt and bounded cost. This page records what Grida runs and
+the product decisions for each.
 
-For the abstract `task` tool, the `subagent` agent mode, and permission
-inheritance, read the RFC. What follows is delta: which subagents Grida
-runs, on which tier, against which provider, with which sentinel.
-
-Every built-in subagent inherits the parent session's provider-qualified
-choice. Titling, compaction, planning, and recovery MUST NOT silently move a
-session to a different capacity source. If the chosen provider cannot serve
-the auxiliary tier, that operation defers or fails without changing provider.
+Every built-in operation stays on the chat's provider authority. Titling and
+compaction never move a chat to a different capacity source; if that
+provider cannot serve the request, the operation fails without changing
+provider.
 
 ## Catalog
 
-| Id          | Status  | Triggers when                                                                        | Output                                                    |
-| ----------- | ------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------- |
-| `titler`    | shipped | Every `/agent/run` against a session with default title                              | Updates `chat_sessions.title`                             |
-| `compactor` | shipped | Context window exceeds usable threshold (auto) or user-fired `/sessions/:id/compact` | A `data-compaction` part on a synthetic assistant message |
-| `planner`   | future  | Agent asks for plan/build workflow exit                                              | A plan document the parent agent reads as a tool result   |
+| Operation  | Triggers when                                                  | Output                                          |
+| ---------- | -------------------------------------------------------------- | ----------------------------------------------- |
+| Chat title | The first text request of an untitled chat is accepted         | The chat's catalogue label                      |
+| Compaction | Context nears the verified window (automatic) or the user asks | A bounded summary that replaces earlier context |
 
-## titler — auto-titling sessions
+## Chat title
 
-**Trigger.** The agent host's `/agent/run` route fires title generation on
-**every** turn, in parallel with the chat stream.
+**Opt-in.** A client enables titles at launch, because a title costs one model
+request that one-shot runs and scripted providers do not expect. Temporary
+hosts — side chats and the titler itself — never title.
 
-**Idempotency.** `maybeGenerateTitle()` reads the row; bails when the
-title is anything other than the sentinel `"New Chat"` (`session_title.DEFAULT`).
-Re-firing on every turn is safe because the sentinel changes after the
-first successful run.
+**Trigger.** When a chat's first text request is accepted, the title runs in
+the background alongside the first turn. Subagent chats and chats that already
+have a turn are not titled.
 
-**Provider.** Same provider-qualified choice as the parent session. This rule
-applies equally to BYOK, GG, configured endpoint/local capacity, and the
-experimental ChatGPT subscription provider. Signing in or out of another
-provider does not silently move auxiliary work; an unavailable stored provider
-defers or fails until the user intentionally changes provider/model.
+**Shape.** A temporary, in-memory, tool-free conversation under the same
+launch's provider execution. Input is the bounded first request text only.
 
-**Tier.** Cheapest the provider exposes (`nano` tier in
-[`@grida/ai/catalogue`](https://github.com/gridaco/grida/tree/main/packages/grida-ai/src/catalogue)).
-Hard ceiling for any future provider: a tier explicitly marked
-"low-cost / low-latency."
+**Bounds.** The request text is capped near 1 KB, the run has a fixed timeout,
+and the output is reduced to the first line without quotes, reasoning markup,
+or trailing punctuation, then bounded to a short label. Empty output leaves the
+chat untitled.
 
-**Bounded cost discipline.**
+**Race safety.** The title is written only if the chat is still untitled at
+the same catalogue revision. A person's rename always wins. Failure is
+silent; the chat stays untitled.
 
-| Knob              | Value                                            |
-| ----------------- | ------------------------------------------------ |
-| `maxOutputTokens` | `32`                                             |
-| `temperature`     | `0.3`                                            |
-| `abortSignal`     | `AbortSignal.timeout(15_000)` — 15s hard cap     |
-| Input             | First user message text only — no system context |
-| Tools             | None                                             |
+## Compaction
 
-**Output constraints.** System prompt requires `≤ 8 words AND
-≤ 50 chars`, same language as the user. The sanitizer strips quotes,
-`<think>` blocks, trailing punctuation, and caps at a 60-char hard
-ceiling. If the cleaned output is empty (e.g. the model emitted only a
-`<think>` block) the title is left as the sentinel.
+**Contract.** Realizes [Master / context and tool design](../agent/master.md#context-and-tool-design)
+as one bounded, tool-free summary of portable earlier context.
 
-**Race-safe persistence.** Re-read the session row after `generateText`
-resolves, before persisting; abort if the title changed in the
-meantime. A user rename always wins.
+**Triggers.** Automatic when the assembled context approaches the model's
+verified context window, and manual on request.
 
-**Fire-and-forget.** Title gen never blocks the SSE response. Any
-thrown error is logged via `console.warn` (not surfaced to the
-renderer); the sentinel stays as the fallback.
+**Bounds.** The summarized source and the summary have fixed byte ceilings and
+the summary a fixed output-token ceiling. A summary that is invalid or does not
+reduce context is refused.
 
-**Source.** [`packages/grida-ai-agent/src/sessions/titler.ts`](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/src/sessions/titler.ts).
+**Authority.** Compaction runs on the chat's own model and captured provider
+authority. If the live principal, scope, or provider differs during the run or
+its recovery, it fails as an authority change instead of continuing elsewhere.
 
-## compactor — context-window compaction (shipped)
+**Outcome.** An installed summary replaces the covered records; every other
+outcome (stale, stopped, uncertain, failed, no change) leaves history intact.
 
-**Status.** Shipped. Realizes the abstract contract in
-[`../agent/session.md#compaction`](../agent/session.md) as a Grida
-`compactor` subagent under the same cost discipline as `titler`.
+## Adding a built-in subagent
 
-**Shape.** A cheap-tier, single-shot `generateText` call with bounded
-`maxOutputTokens`, low temperature, no tools, and a constrained
-system prompt (Goal / Progress / Decisions / Next steps) that produces
-the `data-compaction` part on a synthetic assistant message.
+Bar: would every Grida agent want this, regardless of host environment? If
+yes, it is a built-in. Titling and compaction pass; canvas-specific extraction
+or form-builder helpers do not. Planning is an operating regime of the chat
+itself ([Plan mode](../agent/mode-plan.md)), not a built-in subagent.
 
-**Cost discipline.**
-
-| Knob              | Value                          |
-| ----------------- | ------------------------------ |
-| Tier              | `nano` (matches `titler`)      |
-| `maxOutputTokens` | `1024` (default; configurable) |
-| `temperature`     | `0.2`                          |
-| `abortSignal`     | `AbortSignal.timeout(30_000)`  |
-| Tools             | None                           |
-
-**Trigger.** Both modes ship:
-
-- **Auto** — `AgentRuntime.run` checks `context_window_used >= usable`
-  (`usable = context_limit − reserve`, per-model) before each turn and
-  blocks the turn on the summarizer when over.
-- **Manual** — `POST /sessions/:id/compact` (`auto: false`).
-
-**Tail + recovery.** Keeps the last `tail_turns` (default 2, capped at
-25% of usable, drops to 1 when over budget) verbatim; the head is
-summarized and soft-hidden. The failure ladder is: transient retry →
-proceed uncompacted; spec-limit → tool-output prune → chunked summarize
-→ drop-middle. A separate `pruneToolOutputs` pass can run at a lower
-threshold.
-
-**Model view.** The summary lives on a synthetic _assistant_ message in
-the DB (for inspection) but is **folded into the next user turn** in the
-model view, so the prompt stays user-led (Anthropic requires user-first).
-
-**Source.**
-[`packages/grida-ai-agent/src/session/compaction.ts`](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/src/session/compaction.ts)
-
-- [`compactor.ts`](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/src/session/compactor.ts).
-
-## planner — plan/build workflow (future)
-
-**Status.** Future. Plan/build is an opinionated subagent pattern named
-in [`../agent/subagents.md#plan--build-mode`](../agent/subagents.md);
-when Grida ships it, the planner agent lives here.
-
-Until shipped, agents that want a plan step use the locked `todo` tool
-inline.
-
-## Adding a new built-in subagent
-
-Bar: would every Grida agent want this, regardless of host
-environment? If yes, it's a built-in subagent. Examples that pass:
-titling, compaction, plan generation, summary, summarize-tool-output.
-Examples that fail: SVG-shape extraction (Grida-canvas-specific),
-form-builder helpers (form-specific).
-
-Process:
-
-1. Confirm the RFC carries the pattern shape — if not, propose it to
-   [`../agent/subagents.md`](../agent/subagents.md) first.
-2. Drop the implementation under `packages/grida-ai-agent/src/sessions/`
-   (titler-shaped helpers) or
-   `packages/grida-agent/src/<name>.ts` (full agent definitions).
-3. Add a row to the [catalog](#catalog) and a per-agent section here.
-4. Document the cost discipline knobs (tier, output cap, temperature,
-   timeout) explicitly. Specialized subagents are a place runaway cost
-   compounds silently if left unbounded.
+1. Confirm the master carries the pattern shape — if not, propose it to
+   [Master / delegation and verification](../agent/master.md#delegation-and-verification) first.
+2. Add a row to the [catalog](#catalog) and a section here.
+3. State the cost bounds (input, output, timeout, tools) explicitly.
+   Specialized subagents are where runaway cost compounds silently.
 
 ## See also
 
-- [Agent system RFC / Subagents](../agent/subagents.md) — abstract
-  contract for specialized subagents.
-- [Agent system RFC / Session lifecycle / compaction](../agent/session.md#compaction)
-  — the compaction shape `compactor` will implement.
-- [Fundamental tools (Grida binding)](./tools-fundamentals.md) — how
-  the locked-tool RFC lands in Grida.
-- [`@grida/ai/catalogue`](https://github.com/gridaco/grida/tree/main/packages/grida-ai/src/catalogue)
-  — the tier / model / pricing catalog these subagents resolve against.
+- [Fundamental tools (Grida binding)](./tools-fundamentals.md)

@@ -3,13 +3,15 @@
 /**
  * `AgentComposerInput` — the desktop agent chat's input, built on the
  * `@/kits/composer` Tiptap kit. Replaces the plain `PromptInputTextarea`
- * so the chat input gains slash `/` commands (skills) and `@` mentions
+ * so the chat input gains slash `/` commands and `@` mentions
  * (workspace file references), plus light rich text.
  *
  * Headless-ish: the caller supplies the `catalog` (commands + mentions)
  * and optional start/end toolbar content, and receives the lowered prompt
  * text on submit. The composer owns trigger state + editing; this component
- * owns the surrounding frame + send/stop affordances.
+ * owns the surrounding frame + send/stop affordances. Attachments belong to
+ * the host: dropped or pasted items go to `onAttachmentTransfer`, and staged
+ * items render through `attachments`.
  *
  * Lowering: the prompt is `message.meta.text` plus an explicit list of
  * any referenced file paths (from `@`-mentions / file-ref parts) so the
@@ -19,67 +21,44 @@
 import {
   useCallback,
   useEffect,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
-  type ChangeEvent,
   type ReactNode,
+  type Ref,
 } from "react";
-import {
-  ArrowUpIcon,
-  LibraryIcon,
-  PlusIcon,
-  SquareIcon,
-  UploadIcon,
-} from "lucide-react";
-import type { FileUIPart } from "ai";
+import { ArrowUpIcon, SquareIcon } from "lucide-react";
+import type { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
+import { ComposerDraftBinding } from "@/lib/agent-chat/composer-draft-binding";
 import { Button } from "@app/ui/components/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@app/ui/components/dropdown-menu";
 import { cn } from "@app/ui/lib/utils";
 import {
-  ComposerAttachmentCards,
   ComposerContent,
   ComposerProvider,
   ComposerTransfer,
   ComposerTriggerMenu,
   useComposer,
   type ComposerCatalog,
+  type ComposerController,
   type ComposerMessage,
 } from "@/kits/composer";
-import {
-  InputResourcePolicy,
-  InputResourceRouter,
-  OPERABLE_FILE_POLICY,
-  PreparedResourceLedger,
-  ScratchSeedBudget,
-  type SendExtras,
-} from "@/lib/agent-chat";
-import { ai as desktopAi, useDesktopBridge } from "@/lib/desktop/bridge";
-import { AgentLibraryAttachmentPicker } from "./agent-library-attachment-picker";
-import { AgentComposerResourceId } from "./agent-composer-resource-id";
 import {
   AgentComposerQueueSubmitGuard,
   isSameComposerDraft,
   type AgentComposerQueueSubmitLease,
 } from "./agent-composer-queue-submit";
-import type { DesignLibraryPin } from "./design-search";
-
-const NO_PROVIDER_FILE_MIMES: readonly string[] = [];
 
 /**
  * A `/`-command that runs an action (e.g. `/compact`) instead of being
  * lowered into the prompt. Shown in the trigger menu; intercepted on
- * submit. Distinct from skill commands, which become a prompt hint.
+ * submit.
  */
 export type ComposerCommandAction = {
   id: string;
   title: string;
   description?: string;
+  standalone?: true;
   run: () => void | Promise<void>;
 };
 
@@ -88,71 +67,47 @@ export type AgentComposerInputProps = {
   /** Action `/`-commands (e.g. `/compact`). Merged into the menu, ahead
    *  of the catalog's own commands, and intercepted on submit. */
   commandActions?: ComposerCommandAction[];
+  /** Handle intent commands when selected, before they become prompt chips. */
+  onCommandSelect?: (command: ComposerCatalog["commands"][number]) => boolean;
   /**
-   * Receives the lowered prompt text, provider-native media as AI-SDK `file`
-   * parts, and `extras` — operable scratch copies + their marker. One raster
-   * upload may intentionally appear in both. Empty submissions (no text AND no
-   * attachments) are filtered unless `allowEmptySubmit` is set.
+   * Receives the lowered prompt text. Empty submissions are filtered unless
+   * `allowEmptySubmit` is set.
    */
-  onSubmit: (
-    text: string,
-    files?: FileUIPart[],
-    extras?: SendExtras
-  ) => void | Promise<void>;
+  onSubmit: (text: string) => void | Promise<void>;
   isStreaming: boolean;
   /**
-   * The session's combined busy signal (streaming OR maintenance like
-   * compaction OR core-busy), as used by the turn-queue controller to decide
-   * whether a submit enqueues. Text can ride the queue, but the queue is
-   * text-only — so image submits are blocked whenever `busy`, not just while
-   * THIS client streams. Defaults to `isStreaming` when omitted.
+   * The session's busy signal. A busy submit keeps the draft until the host
+   * acknowledges it. Defaults to `isStreaming` when omitted.
    */
   busy?: boolean;
+  /** Preserve the draft until the host acknowledges an idle submission. */
+  awaitSubmission?: boolean;
+  canSubmit?: boolean;
   /**
    * Stable identity for the currently bound chat session. A late queue
    * acknowledgement from an older scope must never clear an identical draft
    * in the newly selected session.
    */
   submissionScope?: string | number;
+  draftRef?: Ref<Pick<ComposerController, "appendText">>;
   onStop: () => void;
+  /**
+   * What the single primary button does while the draft is empty, such as
+   * Stop for a running turn. Typing turns it back into Send.
+   */
+  emptyAction?: { label: string; icon: ReactNode; onClick: () => void };
+  /**
+   * Where unsent text is kept, keyed by chat. The draft survives remounting,
+   * reconnection and restarts; only deleting it or an accepted send clears it.
+   */
+  draft?: { key: string; store: ComposerDrafts };
   placeholder?: string;
   autofocus?: boolean;
+  /** Send dropped or pasted items to the surface's own attachment intake. */
+  onAttachmentTransfer?: (event: ComposerTransfer.Event) => void;
   /**
-   * Exact provider-native MIME capability declared by the selected runtime and
-   * model seam. A broad `multimodal` flag is intentionally insufficient: when
-   * omitted, direct provider attachments are unavailable.
-   */
-  providerFileMimes?: readonly string[];
-  /** Exact MIME types the selected provider can fetch from a remote URL.
-   * Empty by default: model MIME support alone never implies network fetch. */
-  providerUrlFileMimes?: readonly string[];
-  /**
-   * Whether non-image files may be staged into session scratch. Workspace-less
-   * chat surfaces pass `false`: they have no tool-visible scratch binding, so
-   * accepting a PDF/zip there would create an inoperable attachment. Inline
-   * images remain available. Defaults to `true`.
-   */
-  operableFiles?: boolean;
-  /**
-   * Whether this surface accepts attachments and shows the "+" attach menu.
-   * Default `true`. A start surface whose submit ignores attachments (the
-   * welcome screen, which uses a separate reference tray) passes `false`, so
-   * paste/drop cannot stage content that would be silently discarded.
-   */
-  attach?: boolean;
-  /**
-   * Ordered attachment/reference preferences. Feasibility still comes from the
-   * active model, scratch binding, and trusted host adapters. Defaults to the
-   * behavior-preserving policy; callers can opt into reference-first routing
-   * without replacing source handlers.
-   */
-  resourcePolicy?: InputResourcePolicy.Config;
-  /** Scratch capacity already claimed by another payload merged into this
-   * turn (for example a first-turn template bundle). */
-  scratchReservation?: ScratchSeedBudget.Reservation;
-  /**
-   * Allows a submit with empty text/files when the host has out-of-band context
-   * to attach or gives an empty submission its own host action.
+   * Allows an empty submit when the host gives an empty submission its own
+   * action.
    */
   allowEmptySubmit?: boolean;
   /**
@@ -160,7 +115,9 @@ export type AgentComposerInputProps = {
    * Hosts that give an empty submission its own action should describe it here.
    */
   emptySubmitLabel?: string;
-  /** Footer content grouped with the attachment button. */
+  /** Attachments the host stages itself, shown above the editor. */
+  attachments?: ReactNode;
+  /** Footer content at the start of the toolbar. */
   toolbarStart?: ReactNode;
   /** Footer content right-aligned before the submit/stop button. */
   toolbarEnd?: ReactNode;
@@ -170,6 +127,7 @@ export type AgentComposerInputProps = {
 export function AgentComposerInput({
   catalog,
   commandActions,
+  onCommandSelect,
   ...rest
 }: AgentComposerInputProps) {
   // Surface action commands in the `/` menu alongside catalog commands.
@@ -187,7 +145,10 @@ export function AgentComposerInput({
   }, [catalog, commandActions]);
 
   return (
-    <ComposerProvider catalog={effectiveCatalog}>
+    <ComposerProvider
+      catalog={effectiveCatalog}
+      onCommandSelect={onCommandSelect}
+    >
       <AgentComposerInner commandActions={commandActions} {...rest} />
     </ComposerProvider>
   );
@@ -198,29 +159,52 @@ function AgentComposerInner({
   onSubmit,
   isStreaming,
   busy,
+  awaitSubmission = false,
+  canSubmit = true,
   submissionScope,
+  draftRef,
   onStop,
+  emptyAction,
+  draft,
   placeholder = "Ask anything…",
   autofocus,
-  providerFileMimes = NO_PROVIDER_FILE_MIMES,
-  providerUrlFileMimes = NO_PROVIDER_FILE_MIMES,
-  operableFiles = true,
-  attach = true,
-  resourcePolicy = InputResourcePolicy.CURRENT,
-  scratchReservation = ScratchSeedBudget.NONE,
+  onAttachmentTransfer,
   allowEmptySubmit = false,
   emptySubmitLabel,
+  attachments,
   toolbarStart,
   toolbarEnd,
   className,
 }: Omit<AgentComposerInputProps, "catalog">) {
-  // The image-block gate must match the queue controller's enqueue decision,
-  // which keys off the combined busy signal — not just this client's stream.
-  // Fall back to `isStreaming` if the host doesn't pass `busy`.
   const isBusy = busy ?? isStreaming;
   const composer = useComposer();
-  const { addAttachment } = composer;
-  const desktopBridge = useDesktopBridge();
+  const { readDocument, restoreDocument } = composer;
+  // Restore this chat's unsent draft once the editor exists, then keep every
+  // change. A different chat starts from its own draft.
+  const draftKey = draft?.key;
+  const draftStore = draft?.store;
+  const [binding] = useState(() => new ComposerDraftBinding());
+  useEffect(() => {
+    if (!draftKey || !draftStore) return;
+    const meeting = binding.meet(draftKey);
+    if (meeting === "held") return;
+    if (meeting === "renamed") {
+      draftStore.write(draftKey, readDocument());
+      return;
+    }
+    const saved = draftStore.read(draftKey);
+    if (binding.held !== null) composer.clear();
+    if (saved === null || restoreDocument(saved)) binding.restored(draftKey);
+    // composer.clear is stable for a given editor, like restoreDocument.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [binding, draftKey, draftStore, readDocument, restoreDocument]);
+  useEffect(() => {
+    if (!draftKey || !draftStore || binding.held !== draftKey) return;
+    draftStore.write(draftKey, readDocument());
+  }, [binding, composer.snapshot, draftKey, draftStore, readDocument]);
+  useImperativeHandle(draftRef, () => ({ appendText: composer.appendText }), [
+    composer.appendText,
+  ]);
 
   const actionById = useMemo(() => {
     const map = new Map<string, ComposerCommandAction>();
@@ -228,12 +212,6 @@ function AgentComposerInner({
     return map;
   }, [commandActions]);
 
-  // In-flight file encoding (image downscale OR base64 of an operable upload).
-  // Tracked through a ref (read synchronously by `submit`, which races the async
-  // resource preparation) and mirrored to state (to disable the send button).
-  // A counter, not a boolean, so queued picks don't clear it too early.
-  const encodingCountRef = useRef(0);
-  const [isEncodingFiles, setIsEncodingFiles] = useState(false);
   const queueSubmitGuardRef = useRef<AgentComposerQueueSubmitGuard | null>(
     null
   );
@@ -254,7 +232,7 @@ function AgentComposerInner({
   }, [queueSubmitGuard]);
 
   // Minimal, neutral inline feedback for cases that would otherwise do nothing
-  // visible: a provider-capability miss or a busy out-of-band attachment send.
+  // visible, such as an unconfirmed send.
   const [notice, setNotice] = useState<string | null>(null);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notify = useCallback((msg: string | null) => {
@@ -269,209 +247,11 @@ function AgentComposerInner({
     []
   );
 
-  const preparedResources = useRef(new PreparedResourceLedger());
-  const preparationTail = useRef<Promise<void>>(Promise.resolve());
-
-  // Feasibility is dynamic and separate from the selected preference policy.
-  // In particular, a File from paste/drop/picker is bytes-only until a trusted
-  // file-scope contract exists; folders can use today's opaque directory scope.
-  const attachDirectory = operableFiles
-    ? desktopBridge?.agent.attach_directory
-    : undefined;
-  const scratchSeedBase64Supported =
-    desktopAi.supportsScratchSeedBase64(desktopBridge);
-  const scratchBinaryToolsSupported =
-    desktopAi.supportsScratchBinaryTools(desktopBridge);
-  const resourceEnvironment = useMemo<InputResourceRouter.Environment>(
-    () => ({
-      // The runtime has path-aware filesystem tools but no general URL reader.
-      reference: { path: true, url: false, attachDirectory },
-      attachment: {
-        provider: {
-          inlineMimes: providerFileMimes,
-          remoteUrlMimes: providerUrlFileMimes,
-        },
-        ...(operableFiles && scratchSeedBase64Supported
-          ? {
-              scratch: {
-                maxFileBytes: OPERABLE_FILE_POLICY.maxBytes,
-                maxFiles: OPERABLE_FILE_POLICY.maxFiles,
-                maxTotalBytes: OPERABLE_FILE_POLICY.maxTotalBytes,
-                reservation: scratchReservation,
-                binaryTools: scratchBinaryToolsSupported,
-              },
-            }
-          : {}),
-      },
-    }),
-    [
-      attachDirectory,
-      scratchBinaryToolsSupported,
-      scratchSeedBase64Supported,
-      operableFiles,
-      providerFileMimes,
-      providerUrlFileMimes,
-      scratchReservation,
-    ]
-  );
-
-  // The card owns display only. The resource ledger, keyed by the stable card
-  // id assigned by ComposerCore, owns the exact route and prepared body.
-  const addPreparedResource = useCallback(
-    (resource: InputResourceRouter.PreparedResource): boolean => {
-      const attachment = addAttachment(InputResourceRouter.card(resource), {
-        filter: () =>
-          !resource.dedupeKey ||
-          !preparedResources.current.hasDedupeKey(resource.dedupeKey),
-      });
-      if (!attachment) return false;
-      preparedResources.current.bind(attachment.id, resource);
-      return true;
-    },
-    [addAttachment]
-  );
-
-  // Reconcile defensive cleanup if the composer is cleared by a future owner.
-  useEffect(() => {
-    preparedResources.current.reconcile(
-      composer.snapshot.attachments.map((attachment) => attachment.id)
-    );
-  }, [composer.snapshot.attachments]);
-
-  const prepareResources = useCallback(
-    async (inputs: InputResourceRouter.Input[]) => {
-      if (inputs.length === 0) return;
-      // Mark preparation in-flight before the first await so pick-then-Enter
-      // cannot submit while a resource is still being materialized.
-      encodingCountRef.current += 1;
-      setIsEncodingFiles(true);
-      const work = preparationTail.current.then(async () => {
-        const results = await InputResourceRouter.prepareBatch(
-          inputs,
-          resourceEnvironment,
-          resourcePolicy,
-          preparedResources.current.all()
-        );
-        let added = 0;
-        const failures: ResourcePreparationFailure[] = [];
-        inputs.forEach((input, index) => {
-          const result = results[index];
-          if (!result) return;
-          if (result.status === "accept") {
-            if (addPreparedResource(result.resource)) added += 1;
-          } else {
-            failures.push({ input, reason: result.reason });
-          }
-        });
-        notify(
-          resourcePreparationNotice(failures, added, {
-            folderReferencesEnabled: operableFiles,
-            hasDesktopBridge: desktopBridge !== null,
-          })
-        );
-      });
-      preparationTail.current = work.catch(() => undefined);
-      try {
-        await work;
-      } finally {
-        encodingCountRef.current -= 1;
-        if (encodingCountRef.current === 0) setIsEncodingFiles(false);
-      }
-    },
-    [
-      addPreparedResource,
-      desktopBridge,
-      notify,
-      operableFiles,
-      resourceEnvironment,
-      resourcePolicy,
-    ]
-  );
-
-  // Paste/drop retain gesture provenance in one ordered envelope. The generic
-  // composer does no attachment policy; this agent adapter describes each raw
-  // resource and sends it through the same configured router.
-  const onTransfer = useCallback(
-    (event: ComposerTransfer.Event) => {
-      const inputs: InputResourceRouter.Input[] = [];
-      for (const resource of event.resources) {
-        if (resource.kind === "file") {
-          inputs.push({
-            kind: "browser-file",
-            id: AgentComposerResourceId.create(event.source),
-            source: event.source,
-            file: resource.file,
-          });
-        } else if (event.source === "drop") {
-          inputs.push({
-            kind: "browser-directory",
-            id: AgentComposerResourceId.create(event.source),
-            source: event.source,
-            directory: resource.file,
-          });
-        }
-      }
-      void prepareResources(inputs);
-    },
-    [prepareResources]
-  );
-
-  // "+" upload feeds the same router with explicit picker provenance. The input
-  // stays mounted as a sibling of the menu so selecting a file doesn't unmount
-  // it mid-gesture.
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const openUpload = useCallback(() => {
-    fileInputRef.current?.click();
-  }, []);
-  const onUploadPicked = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(e.target.files ?? []);
-      // Reset so re-picking the same file still fires `change`.
-      e.target.value = "";
-      if (files.length > 0) {
-        void prepareResources(
-          files.map((file) => ({
-            kind: "browser-file",
-            id: AgentComposerResourceId.create("picker"),
-            source: "picker",
-            file,
-          }))
-        );
-      }
-    },
-    [prepareResources]
-  );
-
-  const [libraryOpen, setLibraryOpen] = useState(false);
-  const onLibraryPicked = useCallback(
-    (pins: DesignLibraryPin[]) => {
-      void prepareResources(
-        pins.map((pin) => ({
-          kind: "library-file",
-          id: pin.id,
-          source: "library",
-          name: pin.title,
-          mimeType: pin.mime,
-          url: pin.url,
-        }))
-      );
-    },
-    [prepareResources]
-  );
-
   const submit = async () => {
+    if (!canSubmit) return;
     if (queueSubmitGuard.inFlightFor(submissionScope)) return;
-    // Hold a submit while resource preparation is still in flight — otherwise a
-    // pick-then-Enter races the async router and sends without the
-    // attachment. Keep the editor content so the user can retry.
-    if (encodingCountRef.current > 0) {
-      notify("Still adding the file — one moment…");
-      return;
-    }
-    // No blanket `isStreaming` early-return: submitting WHILE a turn streams is
-    // how a TEXT message gets queued (RFC `queue`). Out-of-band attachments are
-    // the exception — the turn queue persists text only, so they need an idle
-    // session.
+    // No `isStreaming` early-return: submitting while a turn runs queues the
+    // message.
     // `allow_empty` mirrors the later `allowEmptySubmit` guard: without it the
     // composer core returns null for a blank editor and we'd bail here, before
     // that guard — so a picked-template start or host-owned empty action would
@@ -487,73 +267,80 @@ function AgentComposerInner({
       .filter((p) => p.type === "command")
       .map((p) => (p as { id: string }).id)
       .filter((id) => actionById.has(id));
+    const parts = message.parts.filter(
+      (part) => part.type !== "text" || part.text.trim()
+    );
+    const first = parts[0];
+    const literal =
+      parts.length === 1 &&
+      first?.type === "text" &&
+      first.text.trim().startsWith("/")
+        ? actionById.get(first.text.trim().slice(1))
+        : undefined;
+    const standalone =
+      actions
+        .map((id) => actionById.get(id))
+        .find((action) => action?.standalone) ??
+      (literal?.standalone ? literal : undefined);
+    if (standalone) {
+      if (parts.length !== 1) {
+        notify(`Send /${standalone.id} on its own.`);
+        return;
+      }
+      const lease = queueSubmitGuard.begin(submissionScope);
+      if (!lease) return;
+      setQueueingLease(lease);
+      try {
+        await standalone.run();
+        if (queueSubmitGuard.owns(lease, submissionScopeRef.current)) {
+          const current = composer.submit({
+            submitted_at: message.meta.submitted_at,
+            allow_empty: true,
+          });
+          if (current && isSameComposerDraft(message, current))
+            composer.clear();
+          notify(null);
+        }
+      } catch {
+        if (queueSubmitGuard.owns(lease, submissionScopeRef.current))
+          notify("Couldn't confirm the command — your draft is still here.");
+      } finally {
+        if (queueSubmitGuard.finish(lease)) {
+          setQueueingLease((current) => (current === lease ? null : current));
+        }
+      }
+      return;
+    }
     if (actions.length > 0) {
-      preparedResources.current.clear();
       composer.clear();
       for (const id of actions) void actionById.get(id)!.run();
       return;
     }
 
-    const selected = preparedResources.current.select(
-      message.meta.attachments.map((attachment) => attachment.id)
-    );
-    if (selected.status === "missing") {
-      notify("Attachments need to be added again before sending.");
-      return;
-    }
-    const lowered = InputResourceRouter.lower(selected.resources, {
-      provider: resourceEnvironment.attachment.provider,
-      scratch: resourceEnvironment.attachment.scratch,
-    });
-    const blockingRejections = lowered.rejected.filter(
-      (rejection) => rejection.reason !== "provider-capability-unavailable"
-    );
-    if (blockingRejections.length > 0) {
-      notify(resourceLoweringNotice(blockingRejections));
-      return;
-    }
-    const text = lowerPrompt(message, lowered.references);
-    const hasOutOfBandResources =
-      lowered.files.length > 0 || lowered.extras !== undefined;
-    const droppedImages = lowered.rejected.some(
-      (rejection) => rejection.reason === "provider-capability-unavailable"
-    );
-    if (!text.trim() && !hasOutOfBandResources && !allowEmptySubmit) {
-      if (droppedImages) {
-        notify(
-          "Direct image attachment isn't available for the selected model/provider."
-        );
-      }
-      return;
-    }
-    // Provider files, scratch uploads, and registered directory contexts cannot
-    // ride the text-only queue. Path/URL references can: they are honestly
-    // lowered into the queued prompt text.
-    // block on the combined busy signal (streaming OR compaction OR core-busy) —
-    // the queue controller would enqueue text only and silently drop them. Don't
-    // clear, so the user keeps their attachments until the session is idle.
-    if (isBusy && hasOutOfBandResources) {
-      notify(
-        "Can't send attachments while the session is busy — wait until it's idle."
-      );
-      return;
-    }
-    const submitArgs = [
-      text,
-      lowered.files.length > 0 ? lowered.files : undefined,
-      lowered.extras,
-    ] as const;
-    if (isBusy) {
+    const text = lowerPrompt(message);
+    if (!text.trim() && !allowEmptySubmit) return;
+    if (isBusy || awaitSubmission) {
       // Busy/admission-blocked submits take the durable text queue path. Keep
-      // the draft and its resource ledger intact until enqueue is confirmed;
-      // otherwise a transient bridge failure would clear the only copy of the
-      // user's text. The guard also prevents Enter/button double-enqueues while
+      // the draft intact until enqueue is confirmed; otherwise a transient
+      // bridge failure would clear the only copy of the user's text. The guard also prevents Enter/button double-enqueues while
       // that acknowledgement is in flight.
       const lease = queueSubmitGuard.begin(submissionScope);
       if (!lease) return;
       setQueueingLease(lease);
+      // The chat this draft belongs to can change while the send is confirmed,
+      // e.g. when a new chat is created. Clear exactly the draft that was sent.
+      const sentDraft = draftKey && {
+        key: draftKey,
+        doc: JSON.stringify(readDocument()),
+      };
+      if (sentDraft) binding.send(sentDraft.key);
       try {
-        await onSubmit(...submitArgs);
+        await onSubmit(text);
+        // A new chat's draft is kept under the id it was assigned meanwhile.
+        if (sentDraft && draftStore)
+          for (const key of binding.settle(sentDraft.key))
+            if (JSON.stringify(draftStore.read(key)) === sentDraft.doc)
+              draftStore.write(key, null);
         if (queueSubmitGuard.owns(lease, submissionScopeRef.current)) {
           // The editor remains usable while the bridge acknowledges enqueue.
           // Re-read it now: a user edit or session switch may have produced a
@@ -562,21 +349,20 @@ function AgentComposerInner({
             submitted_at: message.meta.submitted_at,
             allow_empty: true,
           });
-          if (currentMessage && isSameComposerDraft(message, currentMessage)) {
-            preparedResources.current.clear();
+          if (currentMessage && isSameComposerDraft(message, currentMessage))
             composer.clear();
-          }
-          notify(
-            droppedImages
-              ? "Images weren't sent — direct attachment isn't available for the selected model/provider."
-              : null
-          );
+          notify(null);
         }
       } catch {
         if (queueSubmitGuard.owns(lease, submissionScopeRef.current)) {
-          notify("Couldn't queue the message — your draft is still here.");
+          notify(
+            awaitSubmission
+              ? "Couldn't confirm the send — your draft is still here."
+              : "Couldn't queue the message — your draft is still here."
+          );
         }
       } finally {
+        if (sentDraft) binding.settle(sentDraft.key);
         if (queueSubmitGuard.finish(lease)) {
           setQueueingLease((current) => (current === lease ? null : current));
         }
@@ -584,16 +370,9 @@ function AgentComposerInner({
       return;
     }
 
-    preparedResources.current.clear();
     composer.clear();
-    // Text still sends; if undeclared provider attachments were stripped, say
-    // so rather than dropping them silently. Otherwise clear any stale notice.
-    notify(
-      droppedImages
-        ? "Images weren't sent — direct attachment isn't available for the selected model/provider."
-        : null
-    );
-    void onSubmit(...submitArgs);
+    notify(null);
+    void onSubmit(text);
   };
 
   return (
@@ -604,64 +383,23 @@ function AgentComposerInner({
       )}
     >
       <ComposerTriggerMenu />
-      <ComposerAttachmentCards
-        className="px-3 pt-2"
-        onRemoveAttachment={(attachment) =>
-          preparedResources.current.remove(attachment.id)
-        }
-      />
+      {attachments && (
+        <div className="flex flex-wrap items-center gap-1.5 px-3 pt-2">
+          {attachments}
+        </div>
+      )}
       <ComposerContent
         autofocus={autofocus}
         onSubmitRequest={submit}
-        onTransfer={attach ? onTransfer : undefined}
+        onTransfer={onAttachmentTransfer}
         placeholder={placeholder}
         className="px-3 pt-2"
-        editorClassName="min-h-9 max-h-48 overflow-y-auto text-sm"
+        editorClassName="min-h-9 max-h-48 overflow-y-auto text-[15px] leading-6"
       />
       {notice && (
         <p className="px-3 pb-1 text-xs text-muted-foreground">{notice}</p>
       )}
       <div className="flex items-center gap-1 px-2 pb-2 pt-1">
-        {/* "+" attach menu — pinned shrink-0 (like the send button) so the
-            attach affordance is never culled as the composer narrows. The
-            hidden file input is a sibling of the menu, not a child, so it
-            stays mounted when the menu closes on select. No `accept` filter:
-            the configured agent resource policy decides each route. */}
-        {attach && (
-          <div className="shrink-0">
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              tabIndex={-1}
-              className="hidden"
-              onChange={onUploadPicked}
-            />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  size="icon-sm"
-                  variant="ghost"
-                  className="rounded-full text-muted-foreground"
-                  aria-label="Add attachment"
-                >
-                  <PlusIcon className="size-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" side="top">
-                <DropdownMenuItem onSelect={openUpload}>
-                  <UploadIcon />
-                  Add files or photos
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setLibraryOpen(true)}>
-                  <LibraryIcon />
-                  Add from Library
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        )}
         {/* Start/end tools share a shrinkable, clipping track. `ml-auto`
             creates the space-between split while the submit button stays
             outside as shrink-0, so pickers truncate before the terminal
@@ -673,7 +411,17 @@ function AgentComposerInner({
           </div>
         </div>
         <div className="shrink-0">
-          {isStreaming ? (
+          {emptyAction && !isStreaming && !composer.snapshot.text.trim() ? (
+            <Button
+              type="button"
+              size="icon-xs"
+              className="size-7 rounded-full"
+              onClick={emptyAction.onClick}
+              aria-label={emptyAction.label}
+            >
+              {emptyAction.icon}
+            </Button>
+          ) : isStreaming ? (
             <Button
               type="button"
               size="icon-xs"
@@ -689,12 +437,11 @@ function AgentComposerInner({
               size="icon-xs"
               className="size-7 rounded-full"
               onClick={submit}
-              disabled={isEncodingFiles || isQueueing}
+              disabled={!canSubmit || isQueueing}
               aria-label={
                 allowEmptySubmit &&
                 emptySubmitLabel &&
-                !composer.snapshot.text.trim() &&
-                composer.snapshot.attachments.length === 0
+                !composer.snapshot.text.trim()
                   ? emptySubmitLabel
                   : "Send"
               }
@@ -704,186 +451,28 @@ function AgentComposerInner({
           )}
         </div>
       </div>
-      <AgentLibraryAttachmentPicker
-        open={libraryOpen}
-        onOpenChange={setLibraryOpen}
-        onAttach={onLibraryPicked}
-      />
     </div>
   );
 }
 
 /**
- * Build the prompt text the agent receives. Starts from the composer's
- * plain text, then appends:
- *   - any referenced file paths (`@`-mentions / file-refs) as an explicit
- *     list so the agent can resolve them, and
- *   - any `/`-command (skill) requests as a hint so the agent loads the
- *     named skill via its `skill` tool.
+ * Build the prompt text the agent receives: the composer's plain text, then
+ * any referenced workspace paths (`@`-mentions / file-refs) as an explicit
+ * list so the agent can resolve them.
  */
-function lowerPrompt(
-  message: ComposerMessage,
-  references: readonly InputResourceRouter.Reference[] = []
-): string {
-  const workspacePaths = new Set<string>();
-  const referencePaths = new Set<string>();
-  const urls = new Map<string, string>();
-  const skills = new Set<string>();
+function lowerPrompt(message: ComposerMessage): string {
+  const paths = new Set<string>();
   for (const part of message.parts) {
-    if (part.type === "mention" && part.target.path) {
-      workspacePaths.add(part.target.path);
-    } else if (part.type === "file-ref") {
-      workspacePaths.add(part.ref.path);
-    } else if (part.type === "command") {
-      skills.add(part.id);
-    }
-  }
-  for (const reference of references) {
-    if (reference.kind === "path") {
-      const paths =
-        reference.space === "workspace" ? workspacePaths : referencePaths;
-      paths.add(reference.path);
-    } else {
-      urls.set(reference.url, reference.name);
-    }
+    if (part.type === "mention" && part.target.path)
+      paths.add(part.target.path);
+    else if (part.type === "file-ref") paths.add(part.ref.path);
   }
   const sections = [message.meta.text.trim()];
-  if (workspacePaths.size > 0) {
+  if (paths.size > 0)
     sections.push(
-      `Referenced workspace files:\n${[...workspacePaths]
+      `Referenced workspace files:\n${[...paths]
         .map((path) => `- ${path}`)
         .join("\n")}`
     );
-  }
-  if (referencePaths.size > 0) {
-    sections.push(
-      `Referenced external files:\n${[...referencePaths]
-        .map((path) => `- ${path}`)
-        .join("\n")}`
-    );
-  }
-  if (urls.size > 0) {
-    sections.push(
-      `Referenced resources:\n${[...urls]
-        .map(([url, name]) => `- ${name}: ${url}`)
-        .join("\n")}`
-    );
-  }
-  if (skills.size > 0) {
-    sections.push(`Use these skills: ${[...skills].join(", ")}.`);
-  }
   return sections.filter((s) => s.length > 0).join("\n\n");
-}
-
-type ResourcePreparationFailure = {
-  input: InputResourceRouter.Input;
-  reason: InputResourceRouter.PreparationFailure;
-};
-
-function resourcePreparationNotice(
-  failures: readonly ResourcePreparationFailure[],
-  added: number,
-  options: {
-    folderReferencesEnabled: boolean;
-    hasDesktopBridge: boolean;
-  }
-): string | null {
-  if (failures.length === 0) return null;
-  const reasons = new Set(failures.map((failure) => failure.reason));
-  const some = added > 0;
-
-  if (reasons.size === 1 && reasons.has("provider-capability-unavailable")) {
-    const libraryOnly = failures.every(
-      (failure) => failure.input.kind === "library-file"
-    );
-    if (some) {
-      return "Some images weren't added because direct attachment isn't available for the selected model/provider.";
-    }
-    return libraryOnly
-      ? "Direct Library image attachment isn't available for the selected model/provider."
-      : "Direct image attachment isn't available for the selected model/provider.";
-  }
-  if (reasons.size === 1 && reasons.has("scratch-unavailable")) {
-    return some
-      ? "Some files weren't added because this chat has no scratch space."
-      : "This chat can only attach images.";
-  }
-  if (reasons.size === 1 && reasons.has("scratch-binary-tools-required")) {
-    return some
-      ? "Some files weren't added because their formats need binary tools that aren't available in this chat."
-      : "This file's format needs binary tools that aren't available in this chat.";
-  }
-  if (
-    reasons.size === 1 &&
-    reasons.has("reference-capability-unavailable") &&
-    failures.every((failure) => failure.input.kind === "browser-directory")
-  ) {
-    if (!options.folderReferencesEnabled) {
-      return some
-        ? "Some folders weren't added because this chat can't attach folders."
-        : "This chat can't attach folders.";
-    }
-    if (!options.hasDesktopBridge) {
-      return some
-        ? "Some folders weren't added because folder references require Grida Desktop."
-        : "Folder references require Grida Desktop.";
-    }
-    return some
-      ? "Some folders weren't added because references aren't available."
-      : "Folder references aren't available in this Desktop version.";
-  }
-  if (
-    reasons.size === 1 &&
-    reasons.has("directory-reference-failed") &&
-    failures.every((failure) => failure.input.kind === "browser-directory")
-  ) {
-    return some
-      ? "Some folders weren't added because access couldn't be registered."
-      : "Couldn't attach the folder — access couldn't be registered.";
-  }
-  if (reasons.size === 1 && reasons.has("file-too-large")) {
-    return some
-      ? "Some files weren't added because they're too large."
-      : "Couldn't add the file — it's too large.";
-  }
-  if (reasons.size === 1 && reasons.has("scratch-file-count-exceeded")) {
-    return some
-      ? "Some files weren't added because this turn already has too many scratch files."
-      : "Too many files for one turn — add fewer and try again.";
-  }
-  if (reasons.size === 1 && reasons.has("scratch-budget-exceeded")) {
-    return some
-      ? "Some files weren't added because this turn's scratch budget is full."
-      : "These files exceed this turn's scratch budget — add fewer and try again.";
-  }
-  if (reasons.size === 1 && reasons.has("representation-unavailable")) {
-    return some
-      ? "Some items weren't added because their format isn't supported."
-      : "These items can't be attached with the current policy.";
-  }
-  return some
-    ? "Some attachments couldn't be added."
-    : "Couldn't add the attachment — it may be unavailable or unreadable.";
-}
-
-function resourceLoweringNotice(
-  rejections: readonly InputResourceRouter.Lowered["rejected"][number][]
-): string {
-  const reasons = new Set(rejections.map((rejection) => rejection.reason));
-  if (reasons.has("scratch-file-count-exceeded")) {
-    return "Too many attached files for one turn — remove some and try again.";
-  }
-  if (reasons.has("scratch-budget-exceeded")) {
-    return "Attached files exceed this turn's scratch budget — remove some and try again.";
-  }
-  if (reasons.has("scratch-unavailable")) {
-    return "These files need scratch space, which isn't available in this chat.";
-  }
-  if (reasons.has("scratch-binary-tools-required")) {
-    return "These files need binary tools, which aren't available in this chat.";
-  }
-  if (reasons.has("file-too-large")) {
-    return "An attached file is too large — remove it and try again.";
-  }
-  return "Attachments need to be added again before sending.";
 }

@@ -7,10 +7,9 @@ tags: [agent, artifact, surface, workbench, canvas]
 status: untested
 severity: high
 date: 2026-07-23
-updated: 2026-07-23
+updated: 2026-11-13
 automatable: false
 covered_by:
-  - packages/grida-ai-agent/src/surface/index.test.ts
   - editor/scaffolds/desktop/workbench/workspace-surface-host.test.ts
 ---
 

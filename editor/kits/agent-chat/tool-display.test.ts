@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { toolDisplay } from "./tool-display";
-import type { ToolCallEntry } from "@/lib/agent-chat";
+import type { ToolCallEntry } from "@/lib/agent-chat/types";
 
 describe("toolDisplay", () => {
   it("summarizes mixed tool chunks in stable product copy", () => {
@@ -8,7 +8,7 @@ describe("toolDisplay", () => {
       toolDisplay.summarize([
         tool("1", "edit_file", { path: "/src/a.ts" }),
         tool("2", "read_file", { path: "/src/b.ts" }),
-        tool("3", "run_command", {
+        tool("3", "exec_command", {
           command: "pnpm",
           args: ["typecheck"],
           description: "Typecheck editor",
@@ -17,10 +17,18 @@ describe("toolDisplay", () => {
     ).toBe("Edited 1 file, read 1 file, ran 1 command");
   });
 
+  it("counts a listing's folders apart from its files", () => {
+    const listing = (files: string[]) =>
+      toolDisplay.describe(tool("1", "list_files", {}, { files })).detail;
+    expect(listing(["src/", "assets/", "README.md"])).toBe("1 file, 2 folders");
+    expect(listing(["src/"])).toBe("1 folder");
+    expect(listing([])).toBe("0 files");
+  });
+
   it("uses agent-provided command descriptions before argv", () => {
     expect(
       toolDisplay.describe(
-        tool("1", "run_command", {
+        tool("1", "exec_command", {
           command: "pnpm",
           args: ["test"],
           description: "Run agent sidecar tests",
@@ -31,6 +39,25 @@ describe("toolDisplay", () => {
       title: "Ran command",
       detail: "Run agent sidecar tests",
     });
+  });
+
+  it("names a write to a background process by what it did", () => {
+    expect(
+      toolDisplay.describe(
+        tool("1", "write_stdin", {
+          session_id: 3,
+          chars: "",
+          description: "checked process 3",
+        })
+      )
+    ).toMatchObject({ action: "process", title: "Checked process 3" });
+    expect(
+      toolDisplay.summarize([
+        tool("1", "exec_command", { command: "pnpm dev" }),
+        tool("2", "write_stdin", { description: "checked process 3" }),
+        tool("3", "write_stdin", { description: "interrupted process 3" }),
+      ])
+    ).toBe("Ran 1 command, used 2 processes");
   });
 
   it("counts distinct files instead of repeated file tool calls", () => {
@@ -98,7 +125,7 @@ describe("toolDisplay", () => {
   it("labels tool protocol errors as failures", () => {
     expect(
       toolDisplay.describe({
-        type: "tool-run_command",
+        type: "tool-exec_command",
         toolCallId: "1",
         state: "output-error",
         input: { command: "pnpm", args: ["typecheck"] },

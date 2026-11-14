@@ -26,7 +26,11 @@ import {
   verifyNative,
 } from "./native.mjs";
 import { proveNative } from "./native-proof.mjs";
-import { fixtureBinary, prepareHostFixture } from "./native-fixture.mjs";
+import {
+  buildFixtureBinary,
+  fixtureBinary,
+  prepareHostFixture,
+} from "./native-fixture.mjs";
 import { verifyGlibcBaseline, verifyMuslStatic } from "./native-abi.mjs";
 import {
   publishVerifiedArchive,
@@ -603,7 +607,8 @@ test("platform metadata is exact, libc-specific and never guesses another archit
 
 test(
   "one bundled archive packs all eight binaries and installs from a fresh npm registry",
-  { timeout: 120_000 },
+  // Without a supplied binary, the first run builds the host fixture profile.
+  { timeout: 15 * 60_000 },
   async (t) => {
     const scratch = await mkdtemp(
       path.join(tmpdir(), "grida-native-proof-test-")
@@ -612,12 +617,7 @@ test(
     const host = selectPlatform();
     assert(host);
     const binary =
-      process.env.GRIDA_NATIVE_TEST_BINARY ??
-      path.join(
-        root,
-        "target/debug",
-        process.platform === "win32" ? "grida.exe" : "grida"
-      );
+      process.env.GRIDA_NATIVE_TEST_BINARY ?? (await buildFixtureBinary());
     const out = path.join(scratch, "candidate");
     const report = await prepareHostFixture(binary, out);
     await assert.rejects(

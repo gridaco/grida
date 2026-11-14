@@ -10,6 +10,10 @@ deadlines and response bounds, reject redirects, make one request, and omit
 ambient cookies. Run blocking auth work on a worker and await its completion
 through cancellation. No default network transport is installed.
 
+`GgGrant::scope` captures the verified account subject, organization and API
+origin. `AuthClient::renew_gg` checks that scope against current custody before
+minting through the existing registered endpoint.
+
 Keyring custody is the default. Explicit file selection is remembered; failures
 never select a fallback backend. macOS uses Security Framework generic-password
 items, and Linux uses the exact keytar Secret Service schema/service/account

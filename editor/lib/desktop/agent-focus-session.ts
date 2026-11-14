@@ -3,41 +3,63 @@
  * §click-to-attend) — a desktop notification click focused this window
  * and names the agent session to bring into view.
  *
- * The Electron main process pushes `AGENT_FOCUS_SESSION` over IPC; the
- * preload re-dispatches it as a window `CustomEvent` (only the
- * structured-clone payload crosses the bridge, mirroring the
- * workspace-command channel). This module owns the renderer half: the
- * event-name constant (must match the desktop shell's IPC channel id)
- * and a thin edge-wire hook (per `code-react`) the agent pane mounts.
+ * The native pane takes the latest pending click once after connecting; later
+ * pushes only wake the same guarded read.
  */
 
-import { useEffect, useRef } from "react";
+import type {
+  DesktopNativeChat,
+  NativeChatNotificationFocus,
+} from "@grida/desktop-bridge";
 
 /** Mirrors `IPC_CHANNELS.AGENT_FOCUS_SESSION` in the desktop shell. */
 export const DESKTOP_AGENT_FOCUS_SESSION_EVENT = "grida:agent:focus-session";
 
-/**
- * Subscribe to focus-session pushes for the lifetime of the component.
- * The callback is ref-held so a re-render never re-subscribes.
- */
-export function useDesktopAgentFocusSession(
-  onFocusSession: (sessionId: string) => void
-): void {
-  const callbackRef = useRef(onFocusSession);
-  callbackRef.current = onFocusSession;
-  useEffect(() => {
-    const handler = (event: Event) => {
-      const detail = (event as CustomEvent<unknown>).detail as
-        | { session_id?: unknown }
-        | undefined;
-      const id = detail?.session_id;
-      if (typeof id === "string" && id.length > 0) {
-        callbackRef.current(id);
+export function subscribeToNativeNotificationFocus(
+  bridge: Pick<DesktopNativeChat, "takeNotificationFocus">,
+  workspaceId: string,
+  focus: (sessionId: string, profileId?: string) => void
+): () => void {
+  let active = true;
+  let requested = false;
+  let reading = false;
+  const ownsWorkspace = () => {
+    const { pathname, search } = window.location;
+    const [id, duplicate] = new URLSearchParams(search).getAll("id");
+    return (
+      pathname === "/desktop/workspace" &&
+      id === workspaceId &&
+      duplicate === undefined
+    );
+  };
+  const readLatest = async () => {
+    // Let synchronous mount/cleanup probes finish before taking a click.
+    await Promise.resolve();
+    let latest: NativeChatNotificationFocus | undefined;
+    while (active && requested && ownsWorkspace()) {
+      requested = false;
+      try {
+        const target = await bridge.takeNotificationFocus();
+        if (target) latest = target;
+      } catch {
+        // The host can withdraw admission while the workbench disconnects.
+        latest = undefined;
       }
-    };
-    window.addEventListener(DESKTOP_AGENT_FOCUS_SESSION_EVENT, handler);
-    return () => {
-      window.removeEventListener(DESKTOP_AGENT_FOCUS_SESSION_EVENT, handler);
-    };
-  }, []);
+    }
+    reading = false;
+    if (active && latest && ownsWorkspace())
+      focus(latest.sessionId, latest.profileId);
+  };
+  const request = () => {
+    requested = true;
+    if (reading) return;
+    reading = true;
+    void readLatest();
+  };
+  window.addEventListener(DESKTOP_AGENT_FOCUS_SESSION_EVENT, request);
+  request();
+  return () => {
+    active = false;
+    window.removeEventListener(DESKTOP_AGENT_FOCUS_SESSION_EVENT, request);
+  };
 }

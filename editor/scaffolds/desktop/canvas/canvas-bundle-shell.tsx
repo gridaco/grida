@@ -21,17 +21,20 @@ import { useWorkspaceChanges } from "../workbench/workspace-changes";
 import { workspaceBundleFs } from "./workspace-bundle-fs";
 import { DesktopCanvasShell } from "./canvas-shell";
 import { DesktopBoardShell } from "./board-shell";
+import type { DocumentSurfaceHost } from "../file/document-surface-host";
 
 export function DesktopCanvasBundleShell({
   workspaceId,
   basePath = "",
   active,
+  slideSurfaceHost,
 }: {
   workspaceId: string;
   basePath?: string;
   /** Slides-only: gates the deck's Cmd+S when embedded as an inactive tab. The
    *  board host auto-persists, so it ignores this. */
   active?: boolean;
+  slideSurfaceHost?: DocumentSurfaceHost;
 }) {
   const [editor, setEditor] = useState<dotcanvas.EditorType | null>(null);
 
@@ -92,6 +95,7 @@ export function DesktopCanvasBundleShell({
       workspaceId={workspaceId}
       basePath={basePath}
       active={active}
+      slideSurfaceHost={slideSurfaceHost}
     />
   );
 }

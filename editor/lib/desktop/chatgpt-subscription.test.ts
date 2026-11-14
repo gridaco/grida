@@ -1,5 +1,5 @@
 // GRIDA-SEC-008 — stale status reads cannot restore an older account state.
-import type { ChatGptSubscriptionStatus } from "@grida/agent";
+import type { ChatGptSubscriptionStatus } from "@grida/ai-host";
 import type { ChatGptConnectResult } from "@grida/desktop-bridge";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -55,6 +55,15 @@ describe("ChatGPT subscription state", () => {
     expect(mocks.status).toHaveBeenCalledTimes(1);
     expect(a).toEqual(b);
     expect(subscription.peek()).toEqual({ kind: "ready", status: signedOut });
+  });
+
+  it("does not offer ChatGPT when Desktop reports it as not configured", async () => {
+    mocks.status.mockResolvedValue({ ...signedOut, configured: false });
+    await expect(subscription.refresh()).resolves.toEqual({
+      kind: "unsupported",
+    });
+    expect(subscription.peek()).toEqual({ kind: "unsupported" });
+    expect(subscription.isReady()).toBe(false);
   });
 
   it("warms the ready cache after browser sign-in", async () => {

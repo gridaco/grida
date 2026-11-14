@@ -11,29 +11,30 @@
  *   - **the editor** — the SVG canvas vs the slides deck.
  * The chrome (title bar + chat-left AI sidebar) is shared.
  *
- * The AI sidebar is mounted ONCE and bound to whichever editor is active via a
- * stable `AgentFs` whose mount is re-pointed (see {@link ./active-editor-agent-fs}).
- * In deck mode that's the active slide's editor — switching slides re-points the
- * agent while the conversation stays put.
+ * A deck can use native chat scoped to the bundle. A standalone SVG can use
+ * its own saved chats and share the selected text with the agent.
  */
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import type { SvgEditor } from "@grida/svg-editor";
 import { cn } from "@app/ui/lib/utils";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@app/ui/components/resizable";
-import { CurrentArtifactSurfaceHost } from "@/lib/desktop/current-artifact-surface-host";
-import { WorkspaceArtifact } from "@/lib/desktop/workspace-artifact";
-import { AISidebarChat } from "../ai-sidebar/chat";
+import { useDesktopBridge } from "@/lib/desktop/bridge";
 import { TitleBar } from "../chrome/title-bar";
 import { DesktopCanvasBundleShell } from "../canvas/canvas-bundle-shell";
 import { WorkspaceChangesProvider } from "../workbench/workspace-changes";
-import { CANVAS_PATH } from "../ai-sidebar/agent-fs-binding";
-import { useActiveEditorAgentFs } from "./active-editor-agent-fs";
+import { NativeAgentPaneGate } from "../workbench/native-agent-pane";
+import {
+  SideChatInlinePlacement,
+  SideChatInlineRegion,
+} from "../workbench/side-chat-inline-placement";
+import { DocumentSurfaceHost } from "./document-surface-host";
 import { SingleFileSvgSurface, type FileMeta } from "./single-file-svg-surface";
 
 /**
@@ -52,7 +53,7 @@ export function DesktopFileShell({
   workspaceId,
   basePath = "",
 }: {
-  /** Single-file mode: the agent sidecar's opaque doc id. */
+  /** Single-file mode: the selected document's opaque id. */
   docId?: string;
   /** Bundle (deck) mode: the workspace the `.canvas` is registered as. */
   workspaceId?: string;
@@ -64,22 +65,24 @@ export function DesktopFileShell({
     : workspaceId
       ? "deck"
       : "empty";
+  const bridge = useDesktopBridge();
+  const nativeChat = useMemo(() => {
+    const chat = bridge?.nativeChat;
+    if (!chat || mode !== "deck" || !basePath) return chat;
+    return {
+      ...chat,
+      profiles: undefined,
+      selectProfile: undefined,
+    };
+  }, [bridge, mode, basePath]);
 
-  const { fs, setActiveEditor } = useActiveEditorAgentFs();
-  const currentSurfacePath =
-    mode === "doc"
-      ? CANVAS_PATH
-      : mode === "deck"
-        ? basePath
-          ? WorkspaceArtifact.toAgentPath(basePath)
-          : "/"
-        : null;
-  const surfaceHost = useMemo(
-    () =>
-      currentSurfacePath
-        ? new CurrentArtifactSurfaceHost(currentSurfacePath)
-        : undefined,
-    [currentSurfacePath]
+  const [fileSurface] = useState(() => new DocumentSurfaceHost());
+  // The file window has no tabbed editor region; its side chat shows inline
+  // under the chat.
+  const [sideChat] = useState(() => new SideChatInlinePlacement());
+  const setActiveEditor = useCallback(
+    (editor: SvgEditor | null) => fileSurface.setEditor(editor),
+    [fileSurface]
   );
   // The deck auto-persists (no dirty) and has no filename — its title is the
   // bundle dir's basename, falling back to a generic label for a directly-opened
@@ -108,6 +111,14 @@ export function DesktopFileShell({
     );
   }
 
+  // See test/desktop-agent-chat-standalone-svg.md and
+  // test/desktop-agent-chat-nested-deck.md.
+  const fileChatAvailable =
+    mode === "doc"
+      ? nativeChat?.document
+      : basePath
+        ? nativeChat?.nestedDeck
+        : nativeChat?.deck;
   return (
     <div className="flex h-svh w-full flex-col bg-background">
       <TitleBar>
@@ -121,20 +132,36 @@ export function DesktopFileShell({
           minSize={SIDEBAR_MIN_SIZE}
           maxSize={SIDEBAR_MAX_SIZE}
         >
-          <aside className="h-full w-full">
-            {/* Deck mode is WORKSPACE-bound: the agent gets a server-side fs over
-                the `.canvas` dir (sees the manifest + every slide). Single-file
-                mode resolves fs tools client-side against the in-memory editor. */}
-            {/* The agent discovers skills from disk (repo-root `skills/` +
-                workspace `.claude/skills`) and advertises them itself — a
-                `.canvas` bundle loads the dotcanvas/slides skill on demand. */}
-            {mode === "deck" ? (
-              <AISidebarChat
-                workspaceId={workspaceId}
-                surfaceHost={surfaceHost}
-              />
+          <aside className="flex h-full w-full flex-col">
+            {nativeChat && fileChatAvailable ? (
+              <>
+                <NativeAgentPaneGate
+                  bridge={nativeChat}
+                  selectionKey={
+                    mode === "deck" && !basePath ? workspaceId : undefined
+                  }
+                  initialSession={null}
+                  editorSurfaces={
+                    mode === "doc" || nativeChat.deckSvgText
+                      ? fileSurface
+                      : undefined
+                  }
+                  sideChatPlacement={sideChat}
+                />
+                <SideChatInlineRegion
+                  placement={sideChat}
+                  className="max-h-[40%] shrink-0 border-t"
+                />
+              </>
             ) : (
-              <AISidebarChat fs={fs} surfaceHost={surfaceHost} />
+              <p
+                role="status"
+                className="px-3 py-2 text-xs text-muted-foreground"
+              >
+                {mode === "doc" && nativeChat?.documentUnavailable
+                  ? "Chat is available in the workspace workbench."
+                  : "Chat is unavailable for this file."}
+              </p>
             )}
           </aside>
         </ResizablePanel>
@@ -155,6 +182,11 @@ export function DesktopFileShell({
                 <DesktopCanvasBundleShell
                   workspaceId={workspaceId!}
                   basePath={basePath}
+                  slideSurfaceHost={
+                    nativeChat?.deckSvgText && fileChatAvailable
+                      ? fileSurface
+                      : undefined
+                  }
                 />
               </WorkspaceChangesProvider>
             )}

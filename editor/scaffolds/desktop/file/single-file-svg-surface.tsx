@@ -1,7 +1,7 @@
 /**
  * Single-file SVG editor surface for the desktop **file window** — the
  * `?docId=` (single document) mode. Extracted from the former
- * `WorkstationShell`: it loads the file via the agent sidecar's docId registry
+ * `WorkstationShell`: it loads the file via the services sidecar's docId registry
  * (`bridge.files.read/write` — opaque ids per GRIDA-SEC-004, never the absolute
  * path), renders the editor canvas, and owns Cmd+S / dirty / the
  * `set_document_edited` close-prompt signal.
@@ -56,7 +56,8 @@ export function SingleFileSvgSurface({
   onMeta,
 }: {
   docId?: string;
-  /** Report the live editor up so the shell's AgentFs binds the sidebar to it. */
+  /** Report the live editor up so the shell publishes it as the window's
+   *  document surface. */
   onActiveEditor: (editor: SvgEditor | null) => void;
   /** Report title-bar metadata (filename, path, dirty) up to the shell. */
   onMeta: (meta: FileMeta) => void;
@@ -156,7 +157,7 @@ function Surface({
   const [saveError, setSaveError] = useState<string | null>(null);
   const isDirty = contentVersion !== savedVersion;
 
-  // Bind the sidebar's AgentFs to this editor for as long as it's mounted.
+  // Publish this editor as the window's document surface while it's mounted.
   useEffect(() => {
     onActiveEditor(editor);
     return () => onActiveEditor(null);

@@ -116,7 +116,7 @@ injects, not a new tool and not a renamed one.
 
 The hard part is mechanical, not conceptual: a tool **result** must reach
 the model as a provider image block, and the model's view is rebuilt from
-the **persisted** record every turn (see [`session`](./session.md),
+the **persisted** record every turn (see [Components / sessions](./components.md#sessions),
 [`compositor / lowering`](./compositor.md#templating-user-view-vs-model-view)),
 not from the live return value. So the lowering must be reproducible from
 what was stored.
@@ -144,7 +144,7 @@ format**, not on taste:
    substrate cannot carry media in a tool output (Chat Completions /
    openai-compatible), and always correct since a user-message image is the
    universal vision input. For the AI SDK realization (a `prepareStep`
-   hoist), see [`ai-sdk / vision-lowering`](./ai-sdk/vision-lowering.md).
+   hoist), see [Components / inference](./components.md#inference).
 
 Either way the **persisted result is the durable record** and the lowering
 is derived from it — never a side effect that only happened during the live
@@ -229,5 +229,3 @@ A conforming implementation SHOULD:
   user-view-vs-model-view lowering chain, attachment storage.
 - [Binary file handling](./binary.md) — attachments the model can't read
   natively; the adjacent, non-overlapping problem.
-- [Session Lifecycle](./session.md) — why the model view is rebuilt from the
-  persisted record every turn (the reason lowering must be reproducible).

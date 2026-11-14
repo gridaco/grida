@@ -13,7 +13,7 @@
  * fail); 402 is a clean pre-stream response; 404 before any provider
  * call.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { ProductBilling } from "@/lib/platform/product-billing";
 
 // Rate limits are pinned by their own module; route tests must NEVER
@@ -26,7 +26,10 @@ vi.mock("@/lib/ai/openai-compat/hosted-models", () => ({
 }));
 
 vi.mock("@/lib/ai/openai-compat/limits", () => ({
-  allowAiRequest: async () => ({ success: true }),
+  allowAiRequest: async () =>
+    h.retryAfter === null
+      ? { success: true }
+      : { success: false, retryAfterSeconds: h.retryAfter },
 }));
 
 import { SignJWT } from "jose";
@@ -46,6 +49,10 @@ const h = vi.hoisted(() => ({
   parts: [] as unknown[],
   lastCallOptions: null as unknown,
   denied: false,
+  retryAfter: null as number | null,
+  downstreamLimit: false,
+  upstreamRequestId: null as string | null,
+  useRealGateway: false,
 }));
 
 vi.mock("@/lib/platform/product-consumer", () => ({
@@ -78,7 +85,7 @@ vi.mock("@/lib/ai/gateway-product", async (orig) => {
   const real = await orig<typeof import("@/lib/ai/gateway-product")>();
   const fakeLanguageModel = (modelId: string) => ({
     specificationVersion: "v3" as const,
-    provider: "fake-gg",
+    provider: "gg",
     modelId,
     supportedUrls: {},
     doGenerate: async (options: unknown) => {
@@ -89,8 +96,13 @@ vi.mock("@/lib/ai/gateway-product", async (orig) => {
     doStream: async (options: unknown) => {
       if (h.denied) throw new ProductBillingError("blocked");
       h.lastCallOptions = options;
+      if (h.downstreamLimit)
+        throw new real.GatewayProductError(429, "fixture_rate_limit");
       const parts = h.parts as never[];
       return {
+        response: h.upstreamRequestId
+          ? { headers: { "x-request-id": h.upstreamRequestId } }
+          : undefined,
         stream: new ReadableStream({
           start(controller) {
             for (const part of parts) controller.enqueue(part);
@@ -102,7 +114,10 @@ vi.mock("@/lib/ai/gateway-product", async (orig) => {
   });
   return {
     ...real,
-    gatewayLanguageModel: fakeLanguageModel,
+    gatewayLanguageModel: (modelId: string) =>
+      h.useRealGateway
+        ? real.gatewayLanguageModel(modelId)
+        : fakeLanguageModel(modelId),
     vercelAiGateway: {
       languageModel: fakeLanguageModel,
       imageModel: () => {
@@ -122,6 +137,7 @@ vi.mock("@/lib/ai/models", async (original) => ({
 }));
 
 import { POST } from "./route";
+import { POST as CAPPED_POST } from "./capped/route";
 import { ProductBillingError } from "@/lib/platform/product-billing";
 import { signGgToken, GG_TOKEN_AUDIENCE } from "@/lib/auth/gg-token";
 
@@ -159,11 +175,15 @@ async function mintedToken(): Promise<string> {
 }
 
 beforeEach(() => {
-  process.env.GG_TOKEN_SECRET = SECRET;
+  vi.stubEnv("GG_TOKEN_SECRET", SECRET);
   h.generate = null;
   h.parts = [];
   h.lastCallOptions = null;
   h.denied = false;
+  h.retryAfter = null;
+  h.downstreamLimit = false;
+  h.upstreamRequestId = null;
+  h.useRealGateway = false;
   mockedAdmission.mockReset();
   mockedCompletion.mockReset();
   mockedAdmission.mockImplementation(async (context) => ({
@@ -197,6 +217,11 @@ beforeEach(() => {
   }));
 });
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
+
 const PROMPT: LanguageModelV3CallOptions["prompt"] = [
   { role: "system", content: "be helpful" },
   { role: "user", content: [{ type: "text", text: "weather in Seoul?" }] },
@@ -216,6 +241,375 @@ const TOOLS: LanguageModelV3CallOptions["tools"] = [
 ];
 
 describe("POST /api/v1/ai/chat/completions (contract)", () => {
+  it("keeps capped admission when the router accepted an encoded path spelling", async () => {
+    const response = await CAPPED_POST(
+      new Request("http://grida.test/api/v1/ai/chat/completions/%63apped", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${await mintedToken()}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          messages: [{ role: "user", content: "hello" }],
+          stream: true,
+        }),
+      })
+    );
+    expect(response.status).toBe(400);
+    expect(h.lastCallOptions).toBeNull();
+  });
+  it.each([undefined, "-1", "1e3", "NaN", "1.0000000000000000001", "01"])(
+    "rejects an invalid capped request before provider work: %s",
+    async (maximum) => {
+      const response = await CAPPED_POST(
+        new Request("http://grida.test/api/v1/ai/chat/completions/capped", {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${await mintedToken()}`,
+            "content-type": "application/json",
+            ...(maximum === undefined
+              ? {}
+              : { "x-gg-max-cost-mills": maximum }),
+          },
+          body: JSON.stringify({
+            model: MODEL,
+            messages: [{ role: "user", content: "hello" }],
+            stream: true,
+          }),
+        })
+      );
+      expect(response.status).toBe(400);
+      expect(h.lastCallOptions).toBeNull();
+      expect(mockedAdmission).not.toHaveBeenCalled();
+    }
+  );
+
+  it("captures the exact capped-route authorization in Gateway provider options", async () => {
+    const response = await CAPPED_POST(
+      new Request("http://grida.test/api/v1/ai/chat/completions/capped", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${await mintedToken()}`,
+          "content-type": "application/json",
+          "x-gg-max-cost-mills": "0.000000000000000001",
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          messages: [{ role: "user", content: "hello" }],
+          stream: true,
+        }),
+      })
+    );
+    expect(response.status).toBe(200);
+    await response.text();
+    expect(h.lastCallOptions).toMatchObject({
+      providerOptions: {
+        grida: { organizationId: ORG, maxCostMills: "0.000000000000000001" },
+      },
+    });
+    expect(mockedAdmission).not.toHaveBeenCalled();
+  });
+
+  it("refuses nonstreaming execution on the capped route", async () => {
+    const response = await CAPPED_POST(
+      new Request("http://grida.test/api/v1/ai/chat/completions/capped", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${await mintedToken()}`,
+          "content-type": "application/json",
+          "x-gg-max-cost-mills": "1",
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          messages: [{ role: "user", content: "hello" }],
+        }),
+      })
+    );
+    expect(response.status).toBe(400);
+    expect(h.lastCallOptions).toBeNull();
+  });
+  it.each([
+    ["timeout", "req_native", "pending", "TimeoutError"],
+    ["cancelled", "req_native", "pending", "AbortError"],
+    ["unavailable", "req_native", "pending", undefined],
+    ["settled", "req_native", "settled", undefined],
+    ["missing identity", null, undefined, undefined],
+    ["invalid identity", "req_invalid.id", undefined, undefined],
+  ])(
+    "finishes the opted-in native Gateway stream when billing is %s",
+    async (observation, requestId, expectedBilling, abortName) => {
+      h.useRealGateway = true;
+      const origin = "http://127.0.0.1:8080";
+      const workloadToken = "a".repeat(43);
+      vi.stubEnv("GRIDA_AI_GATEWAY_ORIGIN", origin);
+      vi.stubEnv("GRIDA_AI_GATEWAY_ALLOW_LOCAL", "1");
+      vi.stubEnv("GRIDA_AI_GATEWAY_KEY_ID", "product-test");
+      vi.stubEnv("GRIDA_AI_GATEWAY_TOKEN", workloadToken);
+      const request = new AbortController();
+      let posted = 0;
+      const observed: {
+        url: string;
+        method: string;
+        organization: string | null;
+      }[] = [];
+      let observedAbort: string | undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string, init: RequestInit) => {
+          const headers = new Headers(init.headers);
+          expect(headers.get("authorization")).toBe(`Bearer ${workloadToken}`);
+          expect(headers.get("x-grida-organization-id")).toBe(String(ORG));
+          if (url === `${origin}/internal/grida/v1/chat/completions`) {
+            posted++;
+            expect(init.method).toBe("POST");
+            expect(JSON.parse(String(init.body))).not.toHaveProperty(
+              "nativeChatBillingReceipt"
+            );
+            const frames = [
+              { choices: [{ index: 0, delta: { content: "Finished." } }] },
+              { choices: [{ index: 0, delta: {}, finish_reason: "stop" }] },
+              {
+                choices: [],
+                usage: {
+                  prompt_tokens: 8,
+                  completion_tokens: 2,
+                  total_tokens: 10,
+                },
+              },
+            ];
+            return new Response(
+              frames
+                .map((frame) => `data: ${JSON.stringify(frame)}\n\n`)
+                .join("") + "data: [DONE]\n\n",
+              {
+                headers: {
+                  "content-type": "text/event-stream",
+                  ...(requestId && { "x-request-id": requestId }),
+                },
+              }
+            );
+          }
+          observed.push({
+            url,
+            method: init.method ?? "GET",
+            organization: headers.get("x-grida-organization-id"),
+          });
+          if (observation === "unavailable")
+            return new Response(null, { status: 503 });
+          if (observation === "settled")
+            return Response.json({
+              id: requestId,
+              request_id: requestId,
+              result_status: "unavailable",
+              billing: { status: "settled", charged_mills: "0" },
+            });
+          const { signal } = init;
+          if (!signal) throw new Error("Missing billing read signal");
+          const held = new Promise<Response>((_resolve, reject) => {
+            signal.addEventListener(
+              "abort",
+              () => {
+                observedAbort = signal.reason?.name;
+                reject(signal.reason);
+              },
+              { once: true }
+            );
+          });
+          if (observation === "cancelled") request.abort();
+          return held;
+        })
+      );
+      const response = await POST(
+        new Request("http://grida.test/api/v1/ai/chat/completions", {
+          method: "POST",
+          signal: request.signal,
+          headers: {
+            authorization: `Bearer ${await mintedToken()}`,
+            "content-type": "application/json",
+            "x-grida-billing-receipt": "1",
+          },
+          body: JSON.stringify({
+            model: MODEL,
+            messages: [{ role: "user", content: "fixture" }],
+            stream: true,
+            stream_options: { include_usage: true },
+          }),
+        })
+      );
+      expect(response.status).toBe(200);
+      expect(response.headers.get("x-request-id")).toBe(
+        expectedBilling ? requestId : null
+      );
+      const stream = await response.text();
+      expect(stream).toContain("Finished.");
+      expect(stream.endsWith("data: [DONE]\n\n")).toBe(true);
+      const frames = stream
+        .split("\n\n")
+        .filter((part) => part.startsWith("data: {"))
+        .map((part) => JSON.parse(part.slice(6)));
+      expect(frames.find((frame) => frame.usage)?.usage).toMatchObject({
+        prompt_tokens: 8,
+        completion_tokens: 2,
+      });
+      const finish = frames.find(
+        (frame) => frame.choices[0]?.finish_reason === "stop"
+      );
+      expect(finish).toBeDefined();
+      expect(finish.grida_billing).toEqual(
+        expectedBilling
+          ? {
+              version: 1,
+              request_id: requestId,
+              status: expectedBilling,
+              charged_mills: expectedBilling === "settled" ? "0" : null,
+            }
+          : undefined
+      );
+      expect(observed).toEqual(
+        expectedBilling
+          ? [
+              {
+                url: `${origin}/internal/grida/v1/jobs/${requestId}`,
+                method: "GET",
+                organization: String(ORG),
+              },
+            ]
+          : []
+      );
+      expect(posted).toBe(1);
+      expect(observedAbort).toBe(abortName);
+    }
+  );
+
+  it.each([
+    {
+      optIn: true,
+      id: "req_chat",
+      status: "settled",
+      amount: "0.125",
+      expected: "settled",
+    },
+    {
+      optIn: true,
+      id: "req_chat",
+      status: "unrecognized",
+      amount: "0",
+      expected: "pending",
+    },
+    {
+      optIn: true,
+      id: "req_other",
+      status: "settled",
+      amount: "0.125",
+      expected: undefined,
+    },
+    {
+      optIn: false,
+      id: "req_chat",
+      status: "settled",
+      amount: "0.125",
+      expected: undefined,
+    },
+  ])(
+    "projects only opted-in, correlated Gateway billing evidence (%j)",
+    async ({ optIn, id, status, amount, expected }) => {
+      h.upstreamRequestId = "req_chat";
+      h.parts = [
+        {
+          type: "finish",
+          finishReason: { unified: "stop", raw: "stop" },
+          usage: USAGE,
+          providerMetadata: {
+            gg: { requestId: id, billingStatus: status, chargedMills: amount },
+          },
+        },
+      ] satisfies LanguageModelV3StreamPart[];
+      const response = await POST(
+        new Request("http://grida.test/api/v1/ai/chat/completions", {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${await mintedToken()}`,
+            "content-type": "application/json",
+            ...(optIn && { "x-grida-billing-receipt": "1" }),
+          },
+          body: JSON.stringify({
+            model: MODEL,
+            messages: [{ role: "user", content: "fixture" }],
+            stream: true,
+            stream_options: { include_usage: true },
+          }),
+        })
+      );
+      expect(response.status).toBe(200);
+      expect(response.headers.get("x-request-id")).toBe(
+        optIn ? "req_chat" : null
+      );
+      const stream = await response.text();
+      expect(stream.endsWith("data: [DONE]\n\n")).toBe(true);
+      const frames = stream
+        .split("\n\n")
+        .filter((part) => part.startsWith("data: {"))
+        .map((part) => JSON.parse(part.slice(6)));
+      expect(frames.find((frame) => frame.usage)?.usage.prompt_tokens).toBe(
+        100
+      );
+      expect(
+        frames.find((frame) => frame.choices[0]?.finish_reason === "stop")
+          ?.grida_billing
+      ).toEqual(
+        expected
+          ? {
+              version: 1,
+              request_id: "req_chat",
+              status: expected,
+              charged_mills: expected === "settled" ? amount : null,
+            }
+          : undefined
+      );
+    }
+  );
+
+  it("separates the pre-dispatch throttle from a downstream 429", async () => {
+    const token = await mintedToken();
+    const request = (body: string) =>
+      POST(
+        new Request("http://grida.test/api/v1/ai/chat/completions", {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${token}`,
+            "content-type": "application/json",
+          },
+          body,
+        })
+      );
+    h.retryAfter = 2;
+    const early = await request("unparsed");
+    expect(early.status).toBe(429);
+    expect(early.headers.get("retry-after")).toBe("2");
+    expect(await early.json()).toMatchObject({
+      error: { code: "rate_limit_exceeded", type: "rate_limit_error" },
+    });
+    expect(h.lastCallOptions).toBeNull();
+    expect(mockedAdmission).not.toHaveBeenCalled();
+
+    h.retryAfter = null;
+    h.downstreamLimit = true;
+    const downstream = await request(
+      JSON.stringify({
+        model: MODEL,
+        stream: true,
+        messages: [{ role: "user", content: "Hello." }],
+      })
+    );
+    expect(downstream.status).toBe(429);
+    expect(downstream.headers.get("retry-after")).toBeNull();
+    expect(await downstream.json()).toMatchObject({
+      error: { code: "rate_limit_exceeded", type: "server_error" },
+    });
+    expect(h.lastCallOptions).not.toBeNull();
+  });
+
   it("non-stream: roundtrips the prompt, returns content + usage, does not issue a native receipt", async () => {
     h.generate = {
       content: [{ type: "text", text: "It is sunny." }],

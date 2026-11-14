@@ -1,10 +1,9 @@
 import { nanoid } from "nanoid";
-import { AgentFs } from "@grida/agent/fs";
-import { OpfsBackend } from "@grida/agent/fs/backends/opfs";
 import { dotcanvas } from "dotcanvas";
 import type { SvgEditor } from "@grida/svg-editor";
-import { svgEditorBinding } from "../_ai/binding-svg";
-import { bundleFs, ManifestHidingBackend } from "./bundle-fs";
+import { MemoryBackend, type BundleBackend } from "./backend";
+import { bundleFs } from "./bundle-fs";
+import { OpfsBackend } from "./opfs-backend";
 import { svgToDataUri } from "./thumbnails";
 
 export type SvgDocSummary = {
@@ -18,8 +17,12 @@ export type SvgDocStoreOptions = {
   opfsBase: readonly string[];
   /** Initial SVG used when the store is empty on first hydrate. */
   defaultSvg: string;
-  /** Debounced thumbnail refresh window for active-doc edits. Default 250 ms. */
+  /** Debounced persist + thumbnail refresh window for active-doc edits.
+   *  Default 250 ms. */
   commitDebounceMs?: number;
+  /** Bundle storage. Defaults to OPFS under `opfsBase`, or memory where OPFS
+   *  is unavailable. */
+  backend?: BundleBackend;
 };
 
 /** The `.canvas` editor this demo writes — a linear deck of SVG slides. The
@@ -41,9 +44,9 @@ function readAppExt(ext: Record<string, unknown>): AppExt {
   return v && typeof v === "object" && !Array.isArray(v) ? (v as AppExt) : {};
 }
 
-function pickBackend(opfsBase: readonly string[]): AgentFs.Backend {
+function pickBackend(opfsBase: readonly string[]): BundleBackend {
   if (OpfsBackend.isSupported()) return new OpfsBackend(opfsBase);
-  return new AgentFs.MemoryBackend();
+  return new MemoryBackend();
 }
 
 function pathOf(id: string): string {
@@ -58,24 +61,22 @@ function idFromPath(path: string): string | null {
 /**
  * Owns the multi-document state for one SVG demo route, persisted as a
  * portable `.canvas` bundle (a `.canvas.json` manifest + `<id>.svg` files)
- * via `dotcanvas`. Composes:
+ * via `dotcanvas`, over a {@link BundleBackend} (OPFS or memory).
  *
- *  - **Bundle backend** — OPFS (or memory) holding `.canvas.json` + every
- *    `/<id>.svg`. The manifest (order + per-doc `name`/`createdAt` + the
- *    active id in `ext`) is read with `dotcanvas.read` and rewritten with
- *    `dotcanvas.write` on every mutation.
- *  - **Agent `AgentFs`** — built over `ManifestHidingBackend(bundle)` so the
- *    AI copilot sees only the `/<id>.svg` documents, never `.canvas.json`.
- *    Hot-swaps a `LiveBinding` to the active editor on `attachEditor` /
- *    `setActiveId`. This is the fs returned by `getFs()`.
+ * The manifest (order + per-doc `name`/`createdAt` + the active id in `ext`)
+ * is read with `dotcanvas.read` and rewritten with `dotcanvas.write` on every
+ * mutation. The active editor's SVG is serialized on a debounce and written
+ * to `/<id>.svg`; a final flush runs whenever the editor detaches.
+ *
+ * Invariant: `content` holds the last bytes queued to the backend for every
+ * document, so an unchanged serialization never re-writes.
  */
 export class SvgDocStore {
-  private readonly fs: AgentFs;
-  private readonly canvasBackend: AgentFs.Backend;
+  private readonly backend: BundleBackend;
   private readonly defaultSvg: string;
   private readonly commitDebounceMs: number;
-  /** Serializes manifest writes so the latest snapshot is the last to land. */
-  private manifestWriteChain: Promise<void> = Promise.resolve();
+  /** Serializes every backend write/delete so they land in call order. */
+  private io: Promise<void> = Promise.resolve();
 
   private docs: SvgDocSummary[] = [];
   private activeId: string | null = null;
@@ -90,7 +91,6 @@ export class SvgDocStore {
 
   private editor: SvgEditor | null = null;
   private editor_unsub: (() => void) | null = null;
-  private fs_unwatch: (() => void) | null = null;
   private commit_timer: ReturnType<typeof setTimeout> | null = null;
   /** Editor version at the last successful `persistActive`. Guards against
    *  re-serializing on emits that didn't change document state (camera, hover). */
@@ -99,17 +99,9 @@ export class SvgDocStore {
   private readonly listeners = new Set<() => void>();
 
   constructor(opts: SvgDocStoreOptions) {
-    this.canvasBackend = pickBackend(opts.opfsBase);
-    // The agent fs is built over a manifest-hiding view: the copilot sees the
-    // `/<id>.svg` documents but never `.canvas.json` (read/written separately).
-    this.fs = new AgentFs(new ManifestHidingBackend(this.canvasBackend));
+    this.backend = opts.backend ?? pickBackend(opts.opfsBase);
     this.defaultSvg = opts.defaultSvg;
     this.commitDebounceMs = opts.commitDebounceMs ?? 250;
-    // Reflect agent-driven fs mutations into the doc list. Events for the
-    // active doc are short-circuited (the binding chain already updates
-    // the editor); echoes from our own writes are filtered by content
-    // equality inside the handler.
-    this.fs_unwatch = this.fs.watch((event) => this.onCanvasFsEvent(event));
   }
 
   // ──────────────────────────────────────────────────────────────────
@@ -123,25 +115,34 @@ export class SvgDocStore {
   }
 
   private async runHydrate(): Promise<void> {
-    await this.fs.hydrate();
+    // Load every SVG document's bytes. A per-file read failure is logged and
+    // skipped; the manifest pass below notices the gap.
+    const paths = await this.backend.list().catch((err) => {
+      console.warn(`[svg-doc-store] backend.list failed:`, err);
+      return [] as string[];
+    });
+    await Promise.all(
+      paths.map(async (path) => {
+        const id = idFromPath(path);
+        if (id == null) return;
+        try {
+          const content = await this.backend.read(path);
+          if (content != null) this.content.set(id, content);
+        } catch (err) {
+          console.warn(`[svg-doc-store] backend.read(${path}) failed:`, err);
+        }
+      })
+    );
     if (this.disposed) return;
-
-    // Load every SVG document's bytes (the manifest is hidden from `this.fs`).
-    for (const path of this.fs.list()) {
-      const id = idFromPath(path);
-      if (id == null) continue;
-      const r = this.fs.read(path);
-      if (r) this.content.set(id, r.content);
-    }
 
     // Read the manifest. `dotcanvas.read` reconciles it against disk: it skips
     // documents whose file is missing, appends on-disk SVGs the manifest omits,
     // and derives the list from disk entirely when `.canvas.json` is absent.
-    const resolved = await dotcanvas.read(bundleFs(this.canvasBackend));
+    const resolved = await dotcanvas.read(bundleFs(this.backend));
     if (this.disposed) return;
 
     // Tracks whether any on-disk document was skipped because its bytes didn't
-    // load (AgentFs.hydrate logs-and-continues on per-file read failures). When
+    // load (the read pass above logs-and-continues on failures). When
     // true we must NOT rewrite the manifest below, or a transiently-unreadable
     // slide would be pruned from `.canvas.json` permanently.
     let skippedDocs = false;
@@ -184,12 +185,7 @@ export class SvgDocStore {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    if (this.fs_unwatch) {
-      this.fs_unwatch();
-      this.fs_unwatch = null;
-    }
     this.flushAndDetach();
-    this.fs.dispose();
     this.listeners.clear();
   }
 
@@ -215,8 +211,6 @@ export class SvgDocStore {
   getDocs = (): readonly SvgDocSummary[] => this.docs;
   getActiveId = (): string | null => this.activeId;
   isHydrated = (): boolean => this.hydrated;
-  getFs = (): AgentFs => this.fs;
-  pathOf = (id: string): string => pathOf(id);
 
   getActiveSvg(): string {
     if (!this.activeId) return this.defaultSvg;
@@ -236,7 +230,7 @@ export class SvgDocStore {
 
     this.createdAt.set(id, Date.now());
     this.content.set(id, content);
-    this.fs.write(pathOf(id), { content, expected_version: null });
+    this.writeDoc(id, content);
     this.docs = [...this.docs, this.summarize(id, displayName)];
     this.switchActive(id);
     this.persistManifest();
@@ -254,12 +248,9 @@ export class SvgDocStore {
     const wasActive = this.activeId === id;
     if (wasActive) this.detachEditorWithoutFlush();
 
-    this.fs.unmount(pathOf(id));
     this.content.delete(id);
     this.createdAt.delete(id);
-    void this.canvasBackend.delete(pathOf(id)).catch((err) => {
-      console.warn(`[svg-doc-store] backend.delete failed:`, err);
-    });
+    this.deleteDoc(id);
 
     this.docs = this.docs.filter((d) => d.id !== id);
 
@@ -284,79 +275,6 @@ export class SvgDocStore {
     this.notify();
   }
 
-  // ──────────────────────────────────────────────────────────────────
-  // External (agent) fs mutations
-  // ──────────────────────────────────────────────────────────────────
-
-  /**
-   * Route `AgentFs.watch` events into doc-list mutations. The agent
-   * operates on a virtual fs; the editor surface needs to mirror that.
-   *
-   * Filters applied here:
-   *   - Paths that don't match `/{id}.svg` are scratch files; skip.
-   *   - Active doc writes are handled by the binding chain (editor.load
-   *     → editor.emit → queueCommitTick); skip to avoid double-update.
-   *   - Writes whose content equals our cached bytes are echoes from our
-   *     own `fs.write` calls (appendDoc, seedFirstDoc); skip.
-   *   - Deletes for unknown ids are no-ops.
-   */
-  private onCanvasFsEvent(event: AgentFs.Event): void {
-    if (this.disposed) return;
-    const id = idFromPath(event.path);
-    if (id == null) return;
-
-    if (event.type === "delete") {
-      if (!this.content.has(id)) return;
-      this.handleExternalDelete(id);
-      return;
-    }
-
-    if (id === this.activeId) return;
-
-    const r = this.fs.read(event.path);
-    if (!r) return;
-    if (this.content.get(id) === r.content) return;
-
-    if (this.docs.some((d) => d.id === id)) {
-      this.handleExternalUpdate(id, r.content);
-    } else {
-      this.handleExternalCreate(id, r.content);
-    }
-  }
-
-  /** Agent wrote to a brand-new path. Persist current editor first,
-   *  append the new doc, and switch to it so the result is visible. */
-  private handleExternalCreate(id: string, content: string): void {
-    this.persistActive();
-    this.createdAt.set(id, Date.now());
-    this.content.set(id, content);
-    this.docs = [...this.docs, this.summarize(id, id)];
-    this.switchActive(id);
-    this.persistManifest();
-    this.notify();
-  }
-
-  /** Agent overwrote an existing non-active doc. Refresh its content
-   *  cache + thumbnail; do not switch active. */
-  private handleExternalUpdate(id: string, content: string): void {
-    this.content.set(id, content);
-    this.docs = this.docs.map((d) =>
-      d.id === id ? this.summarize(id, d.name) : d
-    );
-    this.notify();
-  }
-
-  /** Agent deleted a non-active doc. Strip it from the list. Active doc
-   *  can't reach here — `AgentFs.delete` rejects mounted paths. */
-  private handleExternalDelete(id: string): void {
-    if (this.docs.length <= 1) return;
-    this.content.delete(id);
-    this.createdAt.delete(id);
-    this.docs = this.docs.filter((d) => d.id !== id);
-    this.persistManifest();
-    this.notify();
-  }
-
   setActiveId(id: string): void {
     if (id === this.activeId) return;
     if (!this.docs.some((d) => d.id === id)) return;
@@ -373,12 +291,7 @@ export class SvgDocStore {
   reset(svg?: string, name?: string): string {
     this.detachEditorWithoutFlush();
 
-    for (const d of this.docs) {
-      this.fs.unmount(pathOf(d.id));
-      void this.canvasBackend.delete(pathOf(d.id)).catch((err) => {
-        console.warn(`[svg-doc-store] backend.delete failed:`, err);
-      });
-    }
+    for (const d of this.docs) this.deleteDoc(d.id);
     this.docs = [];
     this.content.clear();
     this.createdAt.clear();
@@ -400,9 +313,6 @@ export class SvgDocStore {
     this.flushAndDetach();
     this.editor = editor;
     this.last_persisted_version = editor.state.version;
-    if (this.activeId) {
-      this.fs.mount(pathOf(this.activeId), svgEditorBinding(editor));
-    }
     // Subscribes to the full channel (not subscribe_geometry) so
     // presentation-only edits — fill, opacity — also refresh the
     // thumbnail. `queueCommitTick` early-exits on unchanged version.
@@ -425,33 +335,17 @@ export class SvgDocStore {
     this.activeId = id;
   }
 
-  /** Final-flush bytes to OPFS, unmount, drop editor refs. */
+  /** Final-flush the active editor's bytes, then drop editor refs. */
   private flushAndDetach(): void {
     this.clearCommitTimer();
-    if (this.editor && this.activeId) {
-      const changed = this.persistActive();
-      this.fs.unmount(pathOf(this.activeId));
-      if (changed) {
-        const svg = this.content.get(this.activeId);
-        if (svg != null) {
-          void this.canvasBackend
-            .write(pathOf(this.activeId), svg)
-            .catch((err) => {
-              console.warn(`[svg-doc-store] backend.write failed:`, err);
-            });
-        }
-      }
-    }
+    this.persistActive();
     this.releaseEditor();
   }
 
-  /** Detach without flushing — used by `removeDoc` where the OPFS file is
-   *  about to be deleted, so a final write would race the delete. */
+  /** Detach without flushing — used by `removeDoc` / `reset`, where the
+   *  document file is about to be deleted. */
   private detachEditorWithoutFlush(): void {
     this.clearCommitTimer();
-    if (this.editor && this.activeId) {
-      this.fs.unmount(pathOf(this.activeId));
-    }
     this.releaseEditor();
   }
 
@@ -471,9 +365,10 @@ export class SvgDocStore {
     }
   }
 
-  /** Snapshot the active editor into the content cache + summary. Returns
-   *  `true` if bytes actually changed. Skips entirely when the editor's
-   *  version hasn't moved since the last call. */
+  /** Snapshot the active editor into the content cache + summary and queue
+   *  the bytes to the backend. Returns `true` if bytes actually changed.
+   *  Skips entirely when the editor's version hasn't moved since the last
+   *  call. */
   private persistActive(): boolean {
     const editor = this.editor;
     const id = this.activeId;
@@ -484,6 +379,7 @@ export class SvgDocStore {
     const svg = editor.serialize();
     if (this.content.get(id) === svg) return false;
     this.content.set(id, svg);
+    this.writeDoc(id, svg);
     this.docs = this.docs.map((d) =>
       d.id === id ? this.summarize(id, d.name) : d
     );
@@ -513,7 +409,7 @@ export class SvgDocStore {
     const content = svg ?? this.defaultSvg;
     this.createdAt.set(id, Date.now());
     this.content.set(id, content);
-    this.fs.write(pathOf(id), { content, expected_version: null });
+    this.writeDoc(id, content);
     this.docs = [this.summarize(id, name ?? "Document 1")];
     this.activeId = id;
     return id;
@@ -537,17 +433,37 @@ export class SvgDocStore {
     };
   }
 
-  /**
-   * Persist the manifest. Writes are chained so concurrent mutations land in
-   * call order (the latest snapshot is the last to hit disk). Best-effort,
-   * matching the store's fire-and-forget document writes.
-   */
+  /** Persist a snapshot of the manifest (built now, written in order). */
   private persistManifest(): void {
     const manifest = this.buildManifest();
-    this.manifestWriteChain = this.manifestWriteChain
-      .then(() => dotcanvas.write(bundleFs(this.canvasBackend), manifest))
-      .catch((err) => {
-        console.warn("[svg-doc-store] manifest write failed:", err);
-      });
+    this.enqueue("manifest write", () =>
+      dotcanvas.write(bundleFs(this.backend), manifest)
+    );
+  }
+
+  private writeDoc(id: string, svg: string): void {
+    this.enqueue(`write ${pathOf(id)}`, () =>
+      this.backend.write(pathOf(id), svg)
+    );
+  }
+
+  private deleteDoc(id: string): void {
+    this.enqueue(`delete ${pathOf(id)}`, () => this.backend.delete(pathOf(id)));
+  }
+
+  /**
+   * Chain one backend operation behind every earlier one, so a document's
+   * writes and deletes (and manifest snapshots) land in call order. Failures
+   * are best-effort: logged, and the chain continues.
+   */
+  private enqueue(label: string, op: () => Promise<void>): void {
+    this.io = this.io.then(op).catch((err) => {
+      console.warn(`[svg-doc-store] ${label} failed:`, err);
+    });
+  }
+
+  /** Resolves once every backend operation queued so far has settled. */
+  settled(): Promise<void> {
+    return this.io;
   }
 }

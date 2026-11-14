@@ -37,4 +37,4 @@ Swap the trailing placeholder slot to the `password-field-show-hide-adornment` t
 ## FAQ
 
 - Q: How do I handle the password type field?
-  - A: Use a combo of text-field's trailing slot and your own show/hide toggle button - [follow this read](./19-text-field-password)
+  - A: Use a combo of text-field's trailing slot and your own show/hide toggle button

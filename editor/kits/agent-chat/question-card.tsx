@@ -1,14 +1,10 @@
 /**
  * `@/kits/agent-chat` — the locked `question` (ask-user) tool's UI.
  *
- * Mental model: the agent **asks**. This is NOT a tool card buried in the
- * transcript — it is a SESSION-GLOBAL prompt the host surface pins above its
- * composer (exactly like the supervised-approval bar). The run is paused on the
- * human; {@link findPendingQuestion} finds the one open question for the
- * session, the surface mounts {@link QuestionCard} above the composer, and the
- * committed answer leaves through `onAnswer` — the surface owns the `Chat` and
- * calls `chat.addToolResult({ tool: "question", toolCallId, output })`. The
- * transcript only shows a passive record of what was asked/answered.
+ * Mental model: the agent **asks**. The host surface pins
+ * {@link QuestionPrompt} above its composer while the run is paused on the
+ * human; the transcript only shows a passive record of what was asked and
+ * answered ({@link AnsweredQuestionSummary}).
  *
  * This file is a THIN VIEW. All form logic — per-question selections, write-ins,
  * per-question skip, the wizard step, answer-building, and validation — lives in
@@ -19,7 +15,7 @@
 
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useId, useState } from "react";
 import { getToolName } from "ai";
 import { cn } from "@app/ui/lib/utils";
 import { Button } from "@app/ui/components/button";
@@ -27,7 +23,7 @@ import { Checkbox } from "@app/ui/components/checkbox";
 import { Label } from "@app/ui/components/label";
 import { RadioGroup, RadioGroupItem } from "@app/ui/components/radio-group";
 import { Textarea } from "@app/ui/components/textarea";
-import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat";
+import type { ToolCallEntry } from "@/lib/agent-chat/types";
 import {
   parseQuestions,
   QuestionSurvey,
@@ -36,33 +32,14 @@ import {
 
 export type { QuestionAnswerOutput };
 
-/**
- * Commit an answer to the open `question`. The surface wires this to
- * `chat.addToolResult`, so the human's answer becomes the tool result and the
- * paused run resumes.
- */
-export type AnswerQuestionHandler = (
-  toolCallId: string,
-  output: QuestionAnswerOutput
-) => void;
-
-// The locked tool name is producer-owned vocabulary (`@grida/agent`'s
-// `QUESTION_TOOL_NAME`). It is mirrored here as a one-char-cheap string rather
-// than imported so this render-only kit needn't pull the package's neutral
-// runtime entrypoint for a constant — the same reason `tool-display.ts` matches
-// `run_command` by literal. The wire shape is `tool-<name>` (AI SDK UI parts).
-export const QUESTION_TOOL_NAME = "question";
-const QUESTION_PART_TYPE = `tool-${QUESTION_TOOL_NAME}`;
+// The locked tool name is the native agent's vocabulary, matched by literal
+// like `tool-display.ts` matches `skill`. The wire shape is
+// `tool-<name>` (AI SDK UI parts).
+const QUESTION_TOOL_NAME = "question";
 
 /** True iff this tool part is the locked `question` tool. */
 export function isQuestionEntry(entry: ToolCallEntry): boolean {
   return getToolName(entry) === QUESTION_TOOL_NAME;
-}
-
-/** Tolerate the AI SDK's `toolCallId` plus legacy persisted `tool_call_id`. */
-function toolCallIdOf(entry: ToolCallEntry): string {
-  const e = entry as { toolCallId?: string; tool_call_id?: string };
-  return e.toolCallId ?? e.tool_call_id ?? "";
 }
 
 function inputOf(entry: ToolCallEntry): unknown {
@@ -82,70 +59,20 @@ function optionDescriptionClassName(selected: boolean) {
   return cn("text-xs", selected ? "text-primary/80" : "text-muted-foreground");
 }
 
-/**
- * The session's ONE open question, or null. A `question` call pauses the run,
- * so it lives on the last assistant message at `input-available` (the same
- * shape rule as the approval bar's `findPendingApproval`). The surface renders
- * {@link QuestionCard} for it above the composer. Tolerates camelCase (live)
- * and snake_case (rehydrated) part shapes.
- */
-export function findPendingQuestion(
-  messages: ChatMessage[]
-): ToolCallEntry | null {
-  const last = messages[messages.length - 1];
-  if (!last || last.role !== "assistant") return null;
-  for (const part of last.parts) {
-    const p = part as {
-      type?: string;
-      state?: string;
-      toolCallId?: string;
-      tool_call_id?: string;
-    };
-    const toolCallId = p.toolCallId ?? p.tool_call_id;
-    if (
-      p.type === QUESTION_PART_TYPE &&
-      p.state === "input-available" &&
-      toolCallId
-    ) {
-      return part as ToolCallEntry;
-    }
-  }
-  return null;
-}
-
-/**
- * The interactive survey form — a thin view over {@link QuestionSurvey}. Rendered
- * while the `question` part is `input-available` (the run is paused on the user).
- * On submit/skip it calls `onAnswer(toolCallId, output)`; the host wires that to
- * `addToolResult`.
- */
-export function QuestionCard({
-  entry,
-  onAnswer,
+export function QuestionPrompt({
+  input,
+  onSubmit,
   disabled,
 }: {
-  entry: ToolCallEntry;
-  onAnswer: AnswerQuestionHandler;
+  input: unknown;
+  onSubmit: (survey: QuestionSurvey) => void | Promise<boolean>;
   disabled?: boolean;
 }) {
   // Stable prefix for `aria-labelledby` ids tying each write-in to its question
   // text (the form gives screen readers no other accessible name).
   const labelId = useId();
-  const [survey, setSurvey] = useState(() =>
-    QuestionSurvey.from(inputOf(entry))
-  );
+  const [survey, setSurvey] = useState(() => QuestionSurvey.from(input));
   const [submitted, setSubmitted] = useState(false);
-
-  // Reset when the pending tool call changes — a surface may reuse this instance
-  // for a NEW question without unmounting (two questions back-to-back in one
-  // turn). React's guarded "adjust state during render" pattern.
-  const toolCallId = toolCallIdOf(entry);
-  const seenToolCallId = useRef(toolCallId);
-  if (seenToolCallId.current !== toolCallId) {
-    seenToolCallId.current = toolCallId;
-    setSurvey(QuestionSurvey.from(inputOf(entry)));
-    setSubmitted(false);
-  }
 
   if (survey.count === 0) return null;
 
@@ -161,7 +88,14 @@ export function QuestionCard({
   const finalize = (s: QuestionSurvey) => {
     if (busy) return;
     setSubmitted(true);
-    onAnswer(toolCallId, s.buildOutput());
+    const pending = onSubmit(s);
+    if (pending)
+      void pending.then(
+        (accepted) => {
+          if (!accepted) setSubmitted(false);
+        },
+        () => setSubmitted(false)
+      );
   };
   // Skip is PER QUESTION: skip the current one (its answer becomes empty) and
   // advance, or finalize if it's the last/only question.

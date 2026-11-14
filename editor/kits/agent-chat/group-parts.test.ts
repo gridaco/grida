@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { groupMessageParts } from "./group-parts";
-import type { ChatMessage } from "@/lib/agent-chat";
+import type { ChatMessage } from "@/lib/agent-chat/types";
 
 type Part = ChatMessage["parts"][number];
 

@@ -1,5 +1,6 @@
 // GRIDA-SEC-010 / GRIDA-SEC-013 / GRIDA-SEC-015 — real installed executable,
 // disposable local OAuth/account/GG endpoints, no Node network or clock preloads.
+// GRIDA-SEC-006 / GRIDA-GG: provider — scoped chat authority through the native entrypoint.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -13,6 +14,7 @@ import {
 } from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
+import { createInterface } from "node:readline";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -195,6 +197,13 @@ export async function proveInstalled({ binary, launcher, workdir }) {
   let heldRoute;
   let routeReached;
   let releaseRoute;
+  let issuedGrant = grant;
+  let grantLifetimeMs = 600_000;
+  let renewalGate;
+  let chatOrganization = organization;
+  let chatStatus = 200;
+  let chatBilling = "settled";
+  const chatRequests = [];
   const respond = (res, value, status = 200) => {
     res.writeHead(status, { "content-type": "application/json" });
     res.end(JSON.stringify(value));
@@ -274,6 +283,70 @@ export async function proveInstalled({ binary, launcher, workdir }) {
         res.end();
         return;
       }
+      if (req.url === "/api/v1/ai/chat/completions") {
+        assert.equal(req.headers.authorization, `Bearer ${issuedGrant}`);
+        assert.equal(req.headers.accept, "text/event-stream");
+        assert.equal(req.headers["x-grida-billing-receipt"], "1");
+        assert.equal(req.method, "POST");
+        const body = JSON.parse(bytes);
+        assert.equal(body.model, "openai/fixture-chat");
+        assert.equal(body.stream, true);
+        assert.equal(body.stream_options.include_usage, true);
+        assert.equal(body.max_completion_tokens, 4096);
+        chatRequests.push(body);
+        if (chatStatus !== 200) {
+          respond(
+            res,
+            { error: { message: "private-upstream-error" } },
+            chatStatus
+          );
+          return;
+        }
+        const requestId = `req_fixture_chat_${chatRequests.length}`;
+        const gridaBilling =
+          chatBilling === "missing"
+            ? {}
+            : {
+                grida_billing: {
+                  version: 1,
+                  request_id:
+                    chatBilling === "mismatched" ? "req_other" : requestId,
+                  status: chatBilling === "pending" ? "pending" : "settled",
+                  charged_mills: chatBilling === "pending" ? null : "0",
+                },
+              };
+        res.writeHead(200, {
+          "content-type": "text/event-stream",
+          "x-request-id": requestId,
+        });
+        res.write(
+          `data: ${JSON.stringify({
+            id: "fixture-gg-chat",
+            choices: [
+              {
+                index: 0,
+                delta: { role: "assistant", content: "Scoped reply" },
+              },
+            ],
+          })}\n\n`
+        );
+        res.end(
+          `data: ${JSON.stringify({
+            id: "fixture-gg-chat",
+            choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+            ...gridaBilling,
+          })}\n\ndata: ${JSON.stringify({
+            id: "fixture-gg-chat",
+            choices: [],
+            usage: {
+              prompt_tokens: 10,
+              completion_tokens: 3,
+              total_tokens: 13,
+            },
+          })}\n\ndata: [DONE]\n\n`
+        );
+        return;
+      }
       if (req.url.startsWith("/api/v1/ai/")) {
         assert.equal(req.headers.authorization, `Bearer ${grant}`);
         assert.equal(req.method, "POST");
@@ -309,7 +382,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
         return;
       }
       if (req.url === "/api/v1/account/organizations") {
-        respond(res, { organizations: [organization], next_cursor: null });
+        respond(res, { organizations: [chatOrganization], next_cursor: null });
         return;
       }
       if (req.url === "/api/v1/account/credits?organization_id=1") {
@@ -326,11 +399,20 @@ export async function proveInstalled({ binary, launcher, workdir }) {
         return;
       }
       if (req.url === "/api/v1/auth/gg") {
-        assert.deepEqual(JSON.parse(bytes), { organization_id: 1 });
+        if (renewalGate) {
+          const renewal = renewalGate;
+          renewal.reached();
+          await renewal.released;
+          issuedGrant = renewal.token;
+          grantLifetimeMs = 600_000;
+        }
+        assert.deepEqual(JSON.parse(bytes), {
+          organization_id: chatOrganization.id,
+        });
         respond(res, {
-          token: grant,
-          expires_at: new Date(Date.now() + 600000).toISOString(),
-          organization,
+          token: issuedGrant,
+          expires_at: new Date(Date.now() + grantLifetimeMs).toISOString(),
+          organization: chatOrganization,
         });
         return;
       }
@@ -350,7 +432,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     });
     children.add(operation);
     operation.closed.then(() => children.delete(operation));
-    operation.child.stdin.end(stdin);
+    if (stdin !== null) operation.child.stdin.end(stdin);
     return operation;
   }
   async function run(argv, { stdin = "", exit = 0 } = {}) {
@@ -359,11 +441,318 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     assert.equal(r.code, exit, r.stderr || r.stdout);
     assertInstalledStderr(r);
     if (failure) throw failure;
-    for (const secret of [account, refresh, grant])
+    for (const secret of [account, refresh, grant, issuedGrant])
       assert(!r.stdout.includes(secret));
     return argv.includes("--json") ? JSON.parse(r.stdout) : r.stdout;
   }
   const checks = [];
+  function holdRenewal(token) {
+    const { promise: started, resolve: reached } = Promise.withResolvers();
+    const { promise: released, resolve: release } = Promise.withResolvers();
+    renewalGate = { token, reached, released, release };
+    return { started, release };
+  }
+  function agentService(settings) {
+    const operation = start(["agent", "serve", "--stdio", ...settings], null);
+    const lines = createInterface({ input: operation.child.stdout });
+    const output = lines[Symbol.asyncIterator]();
+    const updates = [];
+    const replies = new Map();
+    function send(id, method, params) {
+      operation.child.stdin.write(
+        JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n"
+      );
+    }
+    async function receive(id) {
+      while (!replies.has(id)) {
+        const line = await output.next();
+        assert.equal(line.done, false, "agent ACP disconnected before reply");
+        const reply = JSON.parse(line.value);
+        if (reply.id !== undefined) replies.set(reply.id, reply);
+        else {
+          assert.equal(reply.method, "session/update");
+          updates.push(reply.params.update);
+        }
+      }
+      const reply = replies.get(id);
+      replies.delete(id);
+      assert.equal(reply.error, undefined);
+      return reply.result;
+    }
+    return {
+      operation,
+      updates,
+      send,
+      receive,
+      async rpc(id, method, params) {
+        send(id, method, params);
+        return receive(id);
+      },
+      close: () => lines.close(),
+    };
+  }
+  async function checkAgent() {
+    const settings = [
+      "--provider",
+      "gg",
+      "--model",
+      "openai/fixture-chat",
+      "--state-dir",
+      path.join(owned, "native-agent"),
+    ];
+    const task = ["agent", "run", ...settings, "--cwd", owned, "--no-input"];
+    const records = (stdout) =>
+      stdout
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line));
+    const checkBilling = (record, kind, chargedMills) => {
+      const { attempts, omittedAttempts } = record.gateway_billing;
+      assert.equal(attempts.length, 1);
+      assert.equal(omittedAttempts, 0);
+      const [attempt] = attempts;
+      assert.equal(typeof attempt.operationId, "string");
+      assert.equal(typeof attempt.attemptId, "string");
+      assert.equal(attempt.refreshable, false);
+      assert.equal(attempt.kind, kind);
+      assert.equal(attempt.chargedMills, chargedMills);
+    };
+    const billingReads = () =>
+      [...counts.entries()].reduce(
+        (total, [route, count]) =>
+          total + (route.startsWith("/api/v1/ai/jobs") ? count : 0),
+        0
+      );
+    const readsBefore = billingReads();
+    issuedGrant = "synthetic.agent.first";
+    const [accepted, finished] = records(
+      await run(task, { stdin: "Remember this fixture." })
+    );
+    assert.equal(accepted.kind, "accepted");
+    assert.equal(finished.kind, "finished");
+    assert.equal(finished.turn_id, accepted.turn_id);
+    assert.equal(finished.disposition, "succeeded");
+    checkBilling(finished, "settled", "0");
+    assert.equal(chatRequests.length, 1);
+
+    issuedGrant = "synthetic.agent.near-expiry";
+    grantLifetimeMs = 20_000;
+    const service = agentService(settings);
+    try {
+      const initialized = await service.rpc(1, "initialize", {
+        protocolVersion: 1,
+        clientCapabilities: { _meta: { "co.grida/session/snapshot": 1 } },
+      });
+      assert.equal(initialized.protocolVersion, 1);
+      const sessionId = accepted.session_id;
+      await service.rpc(2, "session/load", {
+        sessionId,
+        cwd: owned,
+        mcpServers: [],
+      });
+      const second = await service.rpc(3, "session/new", {
+        cwd: owned,
+        mcpServers: [],
+      });
+      assert.equal(chatRequests.length, 1, "load is observational");
+      const minted = counts.get("/api/v1/auth/gg");
+      const memberships = counts.get("/api/v1/account/organizations");
+      const renewal = holdRenewal("synthetic.agent.renewed");
+      try {
+        service.send(4, "session/prompt", {
+          sessionId,
+          prompt: [{ type: "text", text: "Use the saved context." }],
+        });
+        service.send(5, "session/prompt", {
+          sessionId: second.sessionId,
+          prompt: [{ type: "text", text: "Renew on this chat too." }],
+        });
+        await Promise.race([
+          renewal.started,
+          service.operation.result.then(() => {
+            throw new Error("Agent service exited before grant renewal.");
+          }),
+        ]);
+        let secondAccepted = false;
+        for (let id = 6; id < 26 && !secondAccepted; id++) {
+          const snapshot = await service.rpc(id, "_co.grida/session/snapshot", {
+            sessionId: second.sessionId,
+          });
+          secondAccepted = snapshot.current != null;
+        }
+        assert(
+          secondAccepted,
+          "both chats were admitted during the held renewal"
+        );
+        assert.equal(
+          chatRequests.length,
+          1,
+          "no inference uses the near-expiry grant"
+        );
+        renewal.release();
+        assert.equal((await service.receive(4)).stopReason, "end_turn");
+        assert.equal((await service.receive(5)).stopReason, "end_turn");
+        assert.equal(
+          counts.get("/api/v1/auth/gg"),
+          minted + 1,
+          "one shared mint"
+        );
+        assert.equal(
+          counts.get("/api/v1/account/organizations"),
+          memberships,
+          "renewal does not reselect the funding organization"
+        );
+      } finally {
+        renewal.release();
+        renewalGate = undefined;
+      }
+      assert(
+        service.updates.some(
+          (update) => update.content?.text === "Scoped reply"
+        )
+      );
+      service.operation.child.stdin.end();
+      const stopped = await service.operation.result;
+      assert.equal(stopped.code, 0, stopped.stderr);
+      assertInstalledStderr(stopped);
+      assert(!stopped.stdout.includes(issuedGrant));
+    } finally {
+      service.close();
+    }
+    assert.equal(chatRequests.length, 3);
+    const continuation = chatRequests.find((request) =>
+      request.messages.some(
+        (message) => message.content === "Use the saved context."
+      )
+    );
+    assert(
+      continuation.messages.some(
+        (message) => message.content === "Remember this fixture."
+      )
+    );
+    assert(
+      continuation.messages.some(
+        (message) => message.content === "Scoped reply"
+      )
+    );
+
+    chatOrganization = {
+      id: 2,
+      name: "other-fixture",
+      display_name: "Other fixture",
+    };
+    issuedGrant = "synthetic.agent.other";
+    const changed = await start([
+      ...task,
+      "--session",
+      accepted.session_id,
+      "--org-id",
+      "2",
+      "--prompt",
+      "Must stay local.",
+    ]).result;
+    assert.equal(changed.code, 1);
+    assert.match(changed.stderr, /session_execution_configuration_changed/);
+    assert.equal(changed.stdout, "");
+    assert.equal(
+      chatRequests.length,
+      3,
+      "different organization cannot dispatch saved session"
+    );
+
+    chatOrganization = organization;
+    issuedGrant = "synthetic.agent.no-credits";
+    chatStatus = 402;
+    const [, rejected] = records(
+      await run(
+        [
+          ...task,
+          "--session",
+          accepted.session_id,
+          "--prompt",
+          "One request only.",
+        ],
+        { exit: 1 }
+      )
+    );
+    assert.equal(rejected.disposition, "failed");
+    assert.equal(rejected.account.inference_failure.code, "payment_required");
+    assert.equal(
+      chatRequests.length,
+      4,
+      "credit refusal is never retried or moved to another provider"
+    );
+    assert(!JSON.stringify(rejected).includes("private-upstream-error"));
+    chatStatus = 200;
+    issuedGrant = "synthetic.agent.shutdown-near-expiry";
+    grantLifetimeMs = 20_000;
+    const closing = agentService(settings);
+    try {
+      await closing.rpc(1, "initialize", { protocolVersion: 1 });
+      const sessionId = accepted.session_id;
+      await closing.rpc(2, "session/load", {
+        sessionId,
+        cwd: owned,
+        mcpServers: [],
+      });
+      const renewal = holdRenewal("synthetic.agent.shutdown-renewed");
+      try {
+        closing.send(3, "session/prompt", {
+          sessionId,
+          prompt: [{ type: "text", text: "Stop while renewal is held." }],
+        });
+        await Promise.race([
+          renewal.started,
+          closing.operation.result.then(() => {
+            throw new Error("Agent service exited before the held renewal.");
+          }),
+        ]);
+        closing.operation.child.stdin.end();
+        await Promise.race([
+          new Promise((resolve) => setTimeout(resolve, 100)),
+          closing.operation.result.then(() => {
+            throw new Error("Agent shutdown dropped a live renewal owner.");
+          }),
+        ]);
+        renewal.release();
+        const stopped = await closing.operation.result;
+        assert.equal(stopped.code, 0, stopped.stderr);
+        assertInstalledStderr(stopped);
+      } finally {
+        renewal.release();
+        renewalGate = undefined;
+      }
+    } finally {
+      closing.close();
+    }
+    assert.equal(
+      chatRequests.length,
+      4,
+      "shutdown does not dispatch after a held renewal"
+    );
+    issuedGrant = grant;
+    grantLifetimeMs = 600_000;
+    for (const [scenario, expected] of [
+      ["pending", "pending"],
+      ["missing", "unavailable"],
+      ["mismatched", "unavailable"],
+    ]) {
+      chatBilling = scenario;
+      const [, finished] = records(
+        await run([...task, "--prompt", `Check ${scenario} billing.`])
+      );
+      assert.equal(finished.disposition, "succeeded");
+      assert.equal(finished.account.text, "Scoped reply");
+      checkBilling(finished, expected);
+    }
+    assert.equal(chatRequests.length, 7);
+    assert.equal(billingReads(), readsBefore);
+    checks.push(
+      "installed_native_agent_scoped_chat",
+      "installed_native_agent_renewal",
+      "installed_native_agent_billing_receipt"
+    );
+  }
   async function cancelAt(route, argv) {
     heldRoute = route;
     const reached = new Promise((resolve) => {
@@ -724,6 +1113,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     );
     releaseResponse?.();
     checks.push("installed_signal_cancellation");
+    await checkAgent();
     const logout = await run(["auth", "logout", "--json"]);
     assert.equal(logout.revocation, "confirmed");
     assert.equal(
@@ -747,6 +1137,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
       requests: Object.fromEntries(counts),
     };
   } finally {
+    renewalGate?.release();
     releaseResponse?.();
     releaseRoute?.();
     await Promise.all([...children].map((operation) => operation.stop()));

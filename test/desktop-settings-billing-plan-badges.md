@@ -9,8 +9,7 @@ severity: medium
 date: 2026-07-31
 updated: 2026-07-31
 automatable: partial
-covered_by:
-  - editor/lib/desktop/billing.test.ts
+covered_by: []
 ---
 
 ## Behavior

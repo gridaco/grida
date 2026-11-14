@@ -162,6 +162,33 @@ Since our project is in a rapid development, some large modules still lives unde
 
 For each individual package, refer to the README of its own.
 
+## Agent-system contract work
+
+For agent behavior and its host/client boundaries, read the
+[feature catalog](docs/agent/features.md) and the
+[coverage model and regression obligations](crates/grida-agent/docs/rust-core-pressure-test.md#coverage-model).
+
+- Trace the affected entrypoint, adjacent tests, and relevant fix history before
+  changing behavior. Classify findings as an invariant, a replaceable implementation
+  choice, or an unresolved requirement.
+- Canonical feature descriptions keep current facts, intended user outcomes,
+  and consequential caveats together. Describe scenarios through user actions
+  and observable results. Keep test mechanics in their supporting evidence.
+- Implementation plans name the applicable feature rows and product scenarios,
+  the required evidence, and remaining unknowns.
+- Keep the plan's user-guide inventory current. Each feature slice identifies
+  the guide or reference to create or update and the evidence needed to verify it.
+- Update the active plan's milestone checklists and derived overall progress
+  after each implementation task. Mark completion only with the required evidence.
+- Keep delivery identifiers and progress history in the working plan. Shipped
+  code, comments, tests, and maintained documentation use enduring domain names
+  and omit private study references. Final consolidation produces verified
+  user-facing guides and current reference contracts.
+- A discovered failure updates its owning behavior contract and supporting
+  regression obligation. Reuse an existing case when it describes the failure.
+- Report source inspection, automated tests, native execution, and visual or
+  interaction checks according to what was actually verified.
+
 ## Testing & Development
 
 We use turborepo (except few isolated packages).

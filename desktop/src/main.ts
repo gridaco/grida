@@ -3,6 +3,7 @@ import { app, shell, BrowserWindow, Menu, dialog, session } from "electron";
 import path from "node:path";
 import { updateElectronApp } from "update-electron-app";
 import started from "electron-squirrel-startup";
+import { MediaStore, RecentStore } from "@grida/daemon/server";
 import create_menu, {
   focus_or_open_canvas_window,
   rebuild_application_menu,
@@ -15,22 +16,25 @@ import {
   create_runtime_app_icon,
 } from "./branding";
 import {
-  startAgentSidecar,
-  getAgentSidecarInfo,
-  stopAgentSidecar,
+  startServicesSidecar,
+  getServicesSidecarInfo,
+  getServicesSidecarMode,
+  stopServicesSidecar,
   approveAgentProviderEndpoint,
   describeAgentProviderEndpoint,
-  type AgentSidecarInfo,
-} from "./main/agent-sidecar-supervisor";
-import { closeChatGptOAuth, registerIpcHandlers } from "./main/ipc-handlers";
+  type ServicesSidecarInfo,
+} from "./main/services-sidecar-supervisor";
+import { registerIpcHandlers } from "./main/ipc-handlers";
 import { disposeAllTerminals } from "./main/terminal-host";
 import { disposeAllWorkspaceWatches } from "./main/workspace-watcher-host";
-import { agentSidecarClient } from "./main/agent-sidecar-client";
+import { servicesSidecarClient } from "./main/services-sidecar-client";
 import {
   registerWorkspaceMediaScheme,
   handleWorkspaceMediaProtocol,
 } from "./main/workspace-media-protocol";
-import { startAgentNotifications } from "./main/agent-notifications";
+import { notifyNativeChat } from "./main/agent-notifications";
+import type { NativeChatLifecycle } from "./main/native-agent-chat";
+import { NativeCommandProfiles } from "./main/native-agent-command-profile";
 import { protocol_router } from "./main/protocol-router";
 import { dirtyState } from "./main/dirty-state";
 import { open_handoff } from "./main/open-handoff";
@@ -38,6 +42,23 @@ import { startup_window } from "./main/startup-window-policy";
 import { DesktopAccountSession } from "./main/account-session";
 import { DesktopEntryWindow } from "./main/desktop-entry-window";
 import { DesktopPreferences } from "./main/desktop-preferences";
+import { NativeDesktopAgent } from "./main/native-desktop-agent";
+import { NativeDesktopProfile } from "./main/native-desktop-profile";
+import { NativeMcpLaunch } from "./main/native-mcp-launch";
+import { NativeEditorMcpExport } from "./main/native-editor-mcp-export";
+import { NativeExternalRuns } from "./main/native-external-runs";
+import {
+  nativeWorkspaceCatalog,
+  nativeWorkspaceMedia,
+  ordinarySelectedSvgFiles,
+} from "./main/workspace-media-access";
+import type { NativeWorkspaceCatalog } from "./main/native-workspace-catalog";
+import { NativeDocumentFiles } from "./main/native-document-files";
+import { ipc_sender } from "./main/ipc-sender";
+import { DesktopMediaRoot } from "./main/media-root";
+import { NativeImagePlacement } from "./main/native-image-placement";
+import type { ImageReferenceReview } from "./main/native-image-generation";
+import { NativeWorkspaceReview } from "./main/native-workspace-review";
 
 // GRIDA-SEC-004 — single-instance enforcement is acquired in the `ready`
 // handler, NOT here at module top. It must run AFTER `open-file` has fired:
@@ -110,8 +131,27 @@ registerWorkspaceMediaScheme();
 // main. Auxiliary document/settings/workspace windows are admitted and
 // registered through this controller only after it reaches `main`.
 let entryWindow: DesktopEntryWindow | null = null;
+const workspaceReview = new NativeWorkspaceReview(
+  new URL(EDITOR_BASE_URL).origin,
+  (window) => entryWindow?.ipcRoleFor(window) === "main"
+);
+let nativeDesktopAgent: NativeDesktopAgent | undefined;
+let nativeDocuments: NativeDocumentFiles | undefined;
+let nativeFileWorkspaces: NativeWorkspaceCatalog | undefined;
+let recentFiles = servicesSidecarClient.recent;
+let nativeQuitDrain: Promise<void> | undefined;
+let nativeEditorMcp: NativeEditorMcpExport | undefined;
+let nativeExternalRuns: NativeExternalRuns | undefined;
+let nativeQuitReady = false;
 const windowAdmission = {
   can_open: () => entryWindow?.isMain ?? false,
+  admits: (window: BrowserWindow) => entryWindow?.ipcRoleFor(window) === "main",
+  native_file_available: (filePath?: string) =>
+    filePath === undefined
+      ? nativeDocuments !== undefined
+      : open_handoff.isSupportedFile(filePath) &&
+        nativeDocumentOwner(filePath) !== undefined,
+  native_workspaces: () => nativeFileWorkspaces,
   register: (window: BrowserWindow) => {
     if (entryWindow) return entryWindow.registerSecondary(window);
     window.close();
@@ -238,10 +278,8 @@ app.on("browser-window-focus", () => {
 const pendingFiles: string[] = [];
 const pendingAuthCallbacks: string[] = [];
 
-// Live document windows, keyed by agent-server-assigned docId. Used so that
-// re-opening an already-open file focuses the existing window instead
-// of spawning a duplicate. (The agent server returns the same docId for the
-// same normalized path; see `@grida/daemon`'s file registry.)
+// The selected owner assigns an opaque document ID. A second OS open of the
+// same file focuses its existing window rather than duplicating its edits.
 const documentWindows = new Map<string, BrowserWindow>();
 
 /**
@@ -283,18 +321,29 @@ function attach_dirty_close_handler(window: BrowserWindow) {
   });
 }
 
+function nativeDocumentOwner(filePath: string) {
+  if (
+    NativeDesktopProfile.selected() ||
+    path.extname(filePath).toLowerCase() === ".svg"
+  )
+    return nativeDocuments;
+}
+
 async function openDocumentWindowForPath(filePath: string) {
-  if (!agentSidecarInfo) {
-    console.warn("[grida] cannot open file: agent sidecar not ready");
+  const owner = nativeDocumentOwner(filePath);
+  if (!owner && !servicesSidecarInfo) {
+    console.warn("[grida] cannot open file: services sidecar not ready");
     return;
   }
   let docId: string;
   try {
-    docId = await agentSidecarClient.registerPath(filePath);
+    docId = owner
+      ? await owner.register(filePath)
+      : await servicesSidecarClient.registerPath(filePath);
   } catch (err) {
     // Surface, don't silently drop — a dropped open with no feedback is
     // exactly what made the "open while running" bug hard to diagnose.
-    console.error("[grida] /files/register failed:", err);
+    console.error("[grida] document registration failed:", err);
     dialog.showErrorBox(
       "Couldn't open file",
       `Grida couldn't open this file.\n\n${
@@ -306,17 +355,17 @@ async function openDocumentWindowForPath(filePath: string) {
 
   // Dedup: same path → same docId → focus existing window.
   const existing = documentWindows.get(docId);
-  if (existing && !existing.isDestroyed()) {
-    if (existing.isMinimized()) existing.restore();
-    existing.focus();
-    return;
-  }
-
   // Registration above is asynchronous. Authentication or onboarding may
   // have changed while it was in flight; queue rather than letting a late
   // document window escape the entry admission gate.
   if (!entryWindow?.isMain) {
+    if (!existing || existing.isDestroyed()) owner?.release(docId);
     if (!pendingFiles.includes(filePath)) pendingFiles.push(filePath);
+    return;
+  }
+  if (existing && !existing.isDestroyed()) {
+    if (existing.isMinimized()) existing.restore();
+    existing.focus();
     return;
   }
 
@@ -324,23 +373,37 @@ async function openDocumentWindowForPath(filePath: string) {
     app,
     base_url: EDITOR_BASE_URL,
     doc_id: docId,
+    native: owner !== undefined,
+    native_chat: nativeDesktopAgent !== undefined,
   });
-  if (!entryWindow.registerSecondary(window)) return;
+  if (!entryWindow.registerSecondary(window)) {
+    owner?.release(docId);
+    return;
+  }
   documentWindows.set(docId, window);
+  const unwatch =
+    owner &&
+    ipc_sender.watchNavigation(window.webContents, () =>
+      owner.invalidate(docId)
+    );
   attach_dirty_close_handler(window);
   window.on("closed", () => {
-    documentWindows.delete(docId);
+    unwatch?.();
+    if (documentWindows.get(docId) === window) {
+      documentWindows.delete(docId);
+      owner?.release(docId);
+    }
   });
 
   // macOS proxy-icon in title bar. Safe to call cross-platform — Electron
   // no-ops on non-darwin.
   window.setRepresentedFilename(filePath);
 
-  // Recent — both OS (Dock right-click / jump list) and the agent server's
-  // persistent recent.json. Fire-and-forget; failures are non-fatal.
+  // Recent — both OS (Dock right-click / jump list) and the selected
+  // persistent recent-file owner.
   app.addRecentDocument(filePath);
-  agentSidecarClient.touchRecent(filePath).catch((err) => {
-    console.warn("[grida] /recent/touch failed:", err);
+  recentFiles.touch(filePath).catch(() => {
+    console.warn("[grida] recent file could not be recorded");
   });
 }
 
@@ -351,14 +414,16 @@ async function openDocumentWindowForPath(filePath: string) {
  * expansion — and open (or focus) its canvas window.
  */
 async function openCanvasBundleForPath(dirPath: string) {
-  const agentSidecar = getAgentSidecarInfo();
-  if (!agentSidecar) {
-    console.warn("[grida] cannot open .canvas: agent sidecar not ready");
+  const owner = nativeFileWorkspaces;
+  if (!owner && !getServicesSidecarInfo()) {
+    console.warn("[grida] cannot open .canvas: services sidecar not ready");
     return;
   }
   let workspaceId: string;
   try {
-    const workspace = await agentSidecarClient.openWorkspace(dirPath);
+    const workspace = owner
+      ? await owner.openSelected(dirPath)
+      : await servicesSidecarClient.openWorkspace(dirPath);
     workspaceId = workspace.id;
   } catch (err) {
     console.error("[grida] open .canvas failed:", err);
@@ -376,7 +441,6 @@ async function openCanvasBundleForPath(dirPath: string) {
   }
   focus_or_open_canvas_window({
     app,
-    agentSidecar,
     workspace_id: workspaceId,
     admission: windowAdmission,
   });
@@ -390,7 +454,8 @@ function handleFilePath(filePath: string) {
     return;
   }
   if (
-    !agentSidecarInfo ||
+    (!(isCanvas ? nativeFileWorkspaces : nativeDocumentOwner(filePath)) &&
+      !servicesSidecarInfo) ||
     !startup_window.canDispatchLaunchIntent({
       app_ready: app.isReady(),
       entry_main: entryWindow?.isMain ?? false,
@@ -453,14 +518,20 @@ app.on("open-url", (event, url) => {
   void handleDeepLink(url);
 });
 
-// agent sidecar info is set once on ready; stays in scope for `activate`,
+// services sidecar info is set once on ready; stays in scope for `activate`,
 // menu actions, and the file-handle path. The supervisor maintains
 // the live reference internally for restart-on-crash continuity.
-let agentSidecarInfo: AgentSidecarInfo | null = null;
+let servicesSidecarInfo: ServicesSidecarInfo | null = null;
 let providerApprovalStarted = false;
 
 function approveConfiguredProviderEndpointsWhenReady(): void {
-  if (providerApprovalStarted || !agentSidecarInfo || !entryWindow?.isMain) {
+  const mode = getServicesSidecarMode();
+  if (
+    providerApprovalStarted ||
+    mode === null ||
+    mode === "disabled" ||
+    !entryWindow?.isMain
+  ) {
     return;
   }
   providerApprovalStarted = true;
@@ -547,9 +618,31 @@ app.on("ready", async () => {
     return;
   }
 
-  // Primary-only: auto-update checks should never run in a secondary that is
-  // about to quit.
-  updateElectronApp({ notifyUser: true });
+  // Agent commands run in the person's login-shell environment. Capturing it
+  // takes about a second, so start now, alongside window creation, instead of
+  // when the first chat launches its agent.
+  void NativeCommandProfiles.programEnvironment();
+
+  // Keep a disposable profile on the build it was launched to exercise.
+  const nativeProfile = NativeDesktopProfile.selected();
+  const ordinaryNativeChat = NativeDesktopProfile.ordinaryChat();
+  const nativeResources = NativeDesktopProfile.resourcesPath(app);
+  let externalProfile: string | undefined;
+  try {
+    externalProfile = NativeExternalRuns.launchProfile(
+      process.argv,
+      nativeProfile
+    );
+  } catch {
+    dialog.showErrorBox(
+      "External agent could not start",
+      "Use one trusted launch profile with an isolated Linux workspace."
+    );
+    app.quit();
+    return;
+  }
+  // A disposable profile stays on the build it was launched to exercise.
+  if (!nativeProfile) updateElectronApp({ notifyUser: true });
 
   if (USE_DEV_INSIDERS_BRANDING && process.platform === "darwin") {
     app.dock?.setIcon(create_runtime_app_icon());
@@ -563,6 +656,160 @@ app.on("ready", async () => {
     fetch: async (url, init) =>
       (await session.defaultSession.fetch(url, init)) as Response,
   });
+  const onNativeLifecycle = (
+    workspaceId: string,
+    event: NativeChatLifecycle,
+    current: () => boolean,
+    profileId?: string
+  ) =>
+    notifyNativeChat(workspaceId, event, windowAdmission, current, profileId);
+  let workspaceCatalog: NativeWorkspaceCatalog | undefined;
+  if (nativeProfile) {
+    try {
+      const provider = await NativeDesktopProfile.configure(app);
+      const mcp = await NativeMcpLaunch.configure(
+        process.argv,
+        app.getPath("userData"),
+        provider
+      );
+      workspaceCatalog = nativeWorkspaceCatalog();
+      const catalog = workspaceCatalog;
+      const documentWorkers = nativeWorkspaceMedia();
+      const media =
+        documentWorkers && new MediaStore(DesktopMediaRoot.current());
+      {
+        const options = {
+          provider,
+          mcp,
+          onLifecycle: onNativeLifecycle,
+          openExternal: (url: string) => shell.openExternal(url),
+          workspaceCatalogRoot: path.dirname(catalog.directory),
+          workspaceGrant: catalog.fileGrant.bind(catalog),
+          imagePlacement:
+            documentWorkers && media
+              ? (
+                  workspace: ConstructorParameters<
+                    typeof NativeImagePlacement
+                  >[0]
+                ) =>
+                  new NativeImagePlacement(workspace, {
+                    catalog,
+                    workers: documentWorkers,
+                    media,
+                    review: ({ workspace, relative, signal }) =>
+                      workspaceReview.confirm(workspace.workspaceId, signal, {
+                        message: "Place this generated image in the workspace?",
+                        detail: path.join(workspace.root, relative),
+                        accept: "Place image",
+                      }),
+                  })
+              : undefined,
+          reviewImageReference:
+            (workspace: { id: string; root: string }): ImageReferenceReview =>
+            ({ signal, model, source }) => {
+              const input =
+                source.kind === "workspace"
+                  ? `the captured PNG from ${path.join(workspace.root, source.path)}`
+                  : "the PNG attached to this turn";
+              return workspaceReview.confirm(workspace.id, signal, {
+                message: "Send the reference PNG to OpenRouter?",
+                detail: `OpenRouter will receive ${input} to generate an image with ${model}.`,
+                accept: "Send PNG",
+              });
+            },
+          chatTitles: true,
+        };
+        nativeDesktopAgent = await NativeDesktopAgent.prepareFresh(
+          accountSession,
+          nativeResources,
+          options
+        );
+      }
+      await workspaceCatalog.initialize();
+      if (externalProfile) {
+        const profileFile = externalProfile;
+        nativeExternalRuns = await workspaceCatalog.openExternalRuns((access) =>
+          NativeExternalRuns.open({
+            ...access,
+            profileFile,
+            resourcesPath: nativeResources,
+            packaged: app.isPackaged,
+          })
+        );
+      }
+      if (documentWorkers) {
+        nativeFileWorkspaces = workspaceCatalog;
+        nativeDocuments = new NativeDocumentFiles(
+          workspaceCatalog.fileProtectionPaths(),
+          app.getPath("home"),
+          documentWorkers,
+          path.join(app.getPath("userData"), "document-identities")
+        );
+      }
+      recentFiles = new RecentStore(app.getPath("userData"), {
+        privateFile: true,
+      });
+      servicesSidecarClient.setWorkspaceCatalog(workspaceCatalog);
+      if (process.argv.includes("--native-chat")) {
+        const catalog = workspaceCatalog;
+        nativeEditorMcp = await NativeEditorMcpExport.start(
+          process.argv,
+          app.getPath("userData"),
+          nativeResources,
+          {
+            editorOrigin: new URL(EDITOR_BASE_URL).origin,
+            admits: (sender) => {
+              const window = BrowserWindow.fromWebContents(sender);
+              return (
+                window !== null && entryWindow?.ipcRoleFor(window) === "main"
+              );
+            },
+            workspaceRoot: async (id) => (await catalog.fileGrant(id)).root,
+          }
+        );
+      }
+    } catch {
+      dialog.showErrorBox(
+        externalProfile
+          ? "External agent could not start"
+          : "Chat could not start",
+        externalProfile
+          ? "Check the private launch profile, registered workspace, and installed sandbox helper."
+          : "Use a fresh Desktop profile with a separate Grida agent data directory."
+      );
+      app.quit();
+      return;
+    }
+  } else {
+    nativeDocuments = ordinarySelectedSvgFiles();
+    if (ordinaryNativeChat) {
+      try {
+        const protectedPaths =
+          NativeDesktopProfile.ordinaryChatProtectedPaths(app);
+        nativeDesktopAgent = await NativeDesktopAgent.prepareOrdinary(
+          accountSession,
+          nativeResources,
+          protectedPaths,
+          {
+            onLifecycle: onNativeLifecycle,
+            openExternal: (url) => shell.openExternal(url),
+            chatTitles: true,
+          }
+        );
+        nativeDocuments = ordinarySelectedSvgFiles(
+          nativeDesktopAgent.documentIdentitiesDirectory,
+          protectedPaths
+        );
+      } catch {
+        dialog.showErrorBox(
+          "Chat could not start",
+          "Grida could not prepare chat storage for this Desktop profile. Relaunch the app or report this issue."
+        );
+        app.quit();
+        return;
+      }
+    }
+  }
   let desktopPreferences: DesktopPreferences;
   try {
     desktopPreferences = await DesktopPreferences.open({
@@ -594,7 +841,16 @@ app.on("ready", async () => {
       await authenticatedEntryReady;
     },
     clear_hosted_session: async () => {
-      await agentSidecarClient.clearGridaGatewaySession();
+      nativeEditorMcp?.revoke();
+      await Promise.all([
+        servicesSidecarClient.clearGridaGatewaySession(),
+        nativeDesktopAgent?.clearAccount(),
+        nativeExternalRuns?.close().catch(() => {
+          console.error(
+            "[grida] external agent shutdown could not be verified"
+          );
+        }),
+      ]);
     },
     on_role_change: (role) => {
       refresh_recent_menu();
@@ -607,8 +863,56 @@ app.on("ready", async () => {
 
   // Native-OS IPC handlers are needed before any window opens —
   // otherwise the renderer's first bridge call races the registration.
+  const native = nativeDesktopAgent;
   registerIpcHandlers({
     resolve_ipc_role: (window) => entryWindow?.ipcRoleFor(window) ?? null,
+    recent_files: recentFiles,
+    native_chat_disabled: !native,
+    document_files: nativeDocuments,
+    native_external_agent: nativeExternalRuns,
+    resolve_document_window: (id) => documentWindows.get(id),
+    publish_workspace_surfaces: (event, snapshot) =>
+      nativeEditorMcp?.publish(event, snapshot) ?? Promise.resolve(false),
+    ...(native && {
+      resolve_native_chat: (_window, workspaceId, profileId) =>
+        native.current(workspaceId, profileId),
+      ensure_native_chat: (workspaceId) => native.ensure(workspaceId),
+      forget_native_workspace: (workspaceId) =>
+        native.forgetWorkspace(workspaceId),
+      resolve_native_deck: workspaceCatalog
+        ? workspaceCatalog.rootDeck.bind(workspaceCatalog)
+        : ordinaryNativeChat
+          ? native.rootDeck.bind(native)
+          : undefined,
+      native_nested_deck_chat:
+        workspaceCatalog || ordinaryNativeChat
+          ? {
+              grant: workspaceCatalog
+                ? workspaceCatalog.nestedDeck.bind(workspaceCatalog)
+                : native.nestedDeck.bind(native),
+              current: (parent, key) => native.currentNestedDeck(parent, key),
+              ensure: (grant, requireCurrent) =>
+                native.ensureNestedDeck(grant, requireCurrent),
+              close: (key) => native.closeNestedDeck(key),
+            }
+          : undefined,
+      native_document_chat: {
+        current: (key) => native.currentDocument(key),
+        ensure: (key, requireCurrent) =>
+          native.ensureDocument(key, requireCurrent),
+        close: (key) => native.closeDocument(key),
+      },
+      native_chat_profiles: native.selectableProfiles
+        ? {
+            list: (workspaceId) => native.profiles(workspaceId),
+            select: (workspaceId, selection, requireCurrent) =>
+              native.selectProfile(workspaceId, selection, requireCurrent),
+            fallback: () => native.fallbackProfile(),
+            welcome: () => native.welcomeProfiles(),
+          }
+        : undefined,
+      native_chatgpt_oauth: native.chatgptOAuth,
+    }),
     on_onboarding_complete: async ({ window, workspace_id: workspaceId }) => {
       try {
         await entryWindow?.completeOnboarding(window, workspaceId);
@@ -652,24 +956,22 @@ app.on("ready", async () => {
   // approval UI—sit in front of the required Grida account entry flow.
   const sidecarStartup = (async (): Promise<boolean> => {
     try {
-      agentSidecarInfo = await startAgentSidecar();
-      console.log(
-        `[grida] agent sidecar ready on 127.0.0.1:${agentSidecarInfo.port}`
+      servicesSidecarInfo = await startServicesSidecar(
+        workspaceCatalog?.directory
       );
-      // Desktop notifications on turn-finish / pending-approval (RFC
-      // `events.md` §the first consumer). Main-owned so a turn with no
-      // renderer attached (queue drain, closed window) still notifies.
-      startAgentNotifications(windowAdmission);
+      console.log(
+        `[grida] services sidecar ready on 127.0.0.1:${servicesSidecarInfo.port}`
+      );
       // Now that the sidecar is up, serve `grida-workspace://` media requests
       // by proxying to its streamed `/workspaces/file` route (#924).
-      handleWorkspaceMediaProtocol();
+      handleWorkspaceMediaProtocol(workspaceCatalog);
       markAuthenticatedEntryReady();
       return true;
     } catch (err) {
-      console.error("[grida] agent sidecar failed to start:", err);
+      console.error("[grida] services sidecar failed to start:", err);
       dialog.showErrorBox(
         "Grida couldn't start",
-        "The Grida agent sidecar failed to start. Please relaunch the app or report this issue."
+        "Grida's background service failed to start. Relaunch the app or report this issue."
       );
       app.quit();
       return false;
@@ -702,7 +1004,7 @@ app.on("ready", async () => {
 });
 
 async function approveConfiguredProviderEndpoints(): Promise<void> {
-  const endpoints = await agentSidecarClient.listProviderEndpoints();
+  const endpoints = await servicesSidecarClient.listProviderEndpoints();
   if (endpoints.length === 0) return;
   const rows: Array<{
     id: string;
@@ -760,19 +1062,46 @@ app.on("window-all-closed", () => {
 });
 
 app.on("activate", () => {
-  if (!agentSidecarInfo || !entryWindow) return;
+  if (!servicesSidecarInfo || !entryWindow) return;
   void entryWindow.reconcile({ focus: true }).catch((error) => {
     console.warn("[grida] account revalidation failed:", error);
     entryWindow?.focus();
   });
 });
 
-app.on("before-quit", () => {
-  // Belt-and-suspenders — supervisor also listens for this event, and
-  // terminal PTYs / workspace watches are also torn down per-window on
-  // webContents teardown.
-  closeChatGptOAuth();
-  stopAgentSidecar();
+app.once("will-quit", () => {
+  // A dirty window can cancel quit. Keep shared services available until
+  // Electron confirms that all windows have closed.
+  stopServicesSidecar();
   disposeAllTerminals();
   void disposeAllWorkspaceWatches();
+});
+
+app.on("will-quit", (event) => {
+  if (accountRevalidationTimer) {
+    clearTimeout(accountRevalidationTimer);
+    accountRevalidationTimer = null;
+  }
+  entryWindow?.beginShutdown();
+  if (
+    (!nativeDesktopAgent && !nativeEditorMcp && !nativeExternalRuns) ||
+    nativeQuitReady
+  )
+    return;
+  event.preventDefault();
+  nativeQuitDrain ??= Promise.allSettled([
+    nativeDesktopAgent?.close(),
+    nativeEditorMcp?.close(),
+    nativeExternalRuns?.close(),
+  ])
+    .then((outcomes) => {
+      if (outcomes.some((outcome) => outcome.status === "rejected"))
+        console.error("[grida] local agent shutdown could not be verified");
+    })
+    .finally(() => {
+      nativeQuitReady = true;
+      // Electron still handles the canceled quit while a fast drain settles
+      // in microtasks. Retry after the native event has returned.
+      setImmediate(() => app.quit());
+    });
 });

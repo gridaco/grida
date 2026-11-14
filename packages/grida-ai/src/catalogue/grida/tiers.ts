@@ -52,5 +52,8 @@ export const TIER_MODEL_IDS = Object.freeze(
   >
 );
 
+/** The tier a product surface uses when no tier is chosen. */
+export const AGENT_DEFAULT_TIER = "pro" as const satisfies ModelTier;
+
 /** Literal union of tier-mapped model ids (values of {@link TIER_MODEL_IDS}). */
 export type TierModelId = (typeof TIER_MODEL_IDS)[ModelTier];

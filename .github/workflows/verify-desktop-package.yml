@@ -3,23 +3,27 @@ permissions:
 
 name: Verify Desktop Package
 
-# Proves the desktop app PACKAGES correctly on every OS — i.e. the bundles'
-# externalized dependencies are actually shipped — without publishing. The
-# `electron-forge package` step runs the GRIDA-DESKTOP-BUILD-GUARD oracle
-# (desktop/scripts/verify-packaged-bundle.mjs, a postPackage hook) which fails
-# the build if the packaged app would crash on launch with "Cannot find module"
-# or ship packages outside the runtime closure. No signing/secrets required.
+# Builds unsigned installers on each supported target without publishing.
+# Forge verifies the package's runtime dependency closure and runs the bundled
+# native executable on that target before handing the package to its makers.
 on:
   pull_request:
     paths:
       - "desktop/**"
-      - "packages/grida-ai-agent/**"
+      - "crates/**"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "rust-toolchain.toml"
+      - "skills/**"
+      - "scripts/cli-release/native*.mjs"
+      - "packages/grida-ai-host/**"
       - "packages/grida-ai/**"
       - "packages/grida-daemon/**"
       - "packages/grida-auth/**"
       - "data/ai/**"
       - "packages/grida-desktop-bridge/**"
       - "packages/grida-home/**"
+      - ".github/workflows/realease-desktop-app.yml"
       - ".github/workflows/verify-desktop-package.yml"
   workflow_dispatch:
 
@@ -28,8 +32,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - image: ubuntu-24.04
+            arch: x64
+          - image: ubuntu-24.04-arm
+            arch: arm64
+          - image: windows-latest
+            arch: x64
+          - image: macos-26
+            arch: arm64
+          - image: macos-15-intel
+            arch: x64
+    runs-on: ${{ matrix.image }}
     defaults:
       run:
         working-directory: ./desktop
@@ -65,11 +79,9 @@ jobs:
           pnpm install --frozen-lockfile --ignore-scripts
           pnpm turbo run build \
             --filter=@grida/desktop-bridge \
-            --filter=@grida/agent \
+            --filter=@grida/ai-host \
             --filter=@grida/daemon \
             --filter=@grida/home
 
-      - name: Package (runs the GRIDA-DESKTOP-BUILD-GUARD oracle)
-        # `electron-forge package` produces the unsigned .app/.exe + app.asar and
-        # runs the postPackage oracle. No makers, no publish, no secrets.
-        run: pnpm exec electron-forge package
+      - name: Verify package and make unsigned installers
+        run: pnpm run make --arch="${{ matrix.arch }}"

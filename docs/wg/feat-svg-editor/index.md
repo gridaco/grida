@@ -136,11 +136,11 @@ package-internal docs. Those have moved to their canonical homes:
   (`transform=` syntax, viewport / viewBox, `<use>` instancing).
   Useful to both this package and the Rust importer in `feat-svg/`.
 - **Comparative research** —
-  [`research/usvg-tree-notes.md`](../research/usvg-tree-notes.md):
+  [`research/usvg-tree-notes.md`](https://github.com/gridaco/nothing/blob/main/docs/wg/research/usvg-tree-notes.md):
   what resvg's `usvg` IR normalises away and what an editor IR must
   refuse.
 - **Security research** —
-  [`research/untrusted-svg-rendering.md`](../research/untrusted-svg-rendering.md):
+  [`research/untrusted-svg-rendering.md`](https://github.com/gridaco/nothing/blob/main/docs/wg/research/untrusted-svg-rendering.md):
   how the web platform and peer editors render untrusted SVG inertly
   (script-vector inventory, sanitizers, secure static image mode,
   sandboxed frames, CSP semantics). Input to

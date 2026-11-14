@@ -9,7 +9,7 @@
  *
  * This is the single, typed producer contract shared by EVERY billed call
  * site: the editor seam (`editor/lib/ai/server.ts`, which re-exports this and
- * derives its read-side type from it) AND the framework-free `@grida/agent`
+ * derives its read-side type from it) AND the framework-free `@grida/ai-host`
  * package, which cannot import the seam. `organizationId` and `feature` — the
  * two fields the middleware requires — are MANDATORY, so a missing or
  * misspelled key is a compile error at the call site, not a runtime

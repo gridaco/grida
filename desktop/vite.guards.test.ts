@@ -10,7 +10,7 @@ describe("externalizedWorkspaceImports", () => {
       externalizedWorkspaceImports([
         "node:fs",
         "electron",
-        "@anthropic-ai/sandbox-runtime",
+        "node-pty",
         "@grida/desktop-bridge",
       ])
     ).toEqual(["@grida/desktop-bridge"]);
@@ -26,14 +26,13 @@ describe("externalizedWorkspaceImports", () => {
         "electron",
         "hono",
         "hono/jsx",
-        "undici",
       ])
     ).toEqual([]);
   });
 
   it("dedupes repeated offenders", () => {
     expect(
-      externalizedWorkspaceImports(["@grida/agent", "@grida/agent"])
-    ).toEqual(["@grida/agent"]);
+      externalizedWorkspaceImports(["@grida/ai-host", "@grida/ai-host"])
+    ).toEqual(["@grida/ai-host"]);
   });
 });

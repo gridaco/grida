@@ -9,14 +9,14 @@
  *   - Image (.png/.jpg/.gif/.webp/…) / Video (.mp4/.webm/.mov/…) → on desktop,
  *     streamed straight from the `grida-workspace://` privileged scheme (#924):
  *     size-independent, Range-capable (video seeking), no base64. On hosts
- *     without that scheme (web-daemon dev bridge) we fall back to the capped
+ *     without that scheme we fall back to the capped
  *     base64 reader (`readFileBytes` → `<img/video data:…>`).
  *   - Text (everything else) → Shiki-highlighted code block, with
  *     `plaintext` as the language fallback so unrecognised
  *     extensions still render readably.
  *
  * Each viewer owns its own load-state (`useFileText` / `useFileBytes`
- * helpers below). Errors surface inline — the agent sidecar's
+ * helpers below). Errors surface inline — the services sidecar's
  * `file-not-utf8`, `file-too-large`, etc. messages are already
  * human-readable, so we don't try to second-guess them here.
  */
@@ -197,7 +197,7 @@ function inferMime(relPath: string): string {
  * `media_url` (`grida-workspace://`, proxied to the sidecar's Range-capable
  * `/workspaces/file` route) — the `<img>/<video>` points at it directly, so the
  * viewer is size-independent (no 1 MiB base64 cap) and video seeking works. On
- * hosts without that scheme (web-daemon dev bridge) `mediaUrl` returns
+ * hosts without that scheme `mediaUrl` returns
  * `undefined` and we fall back to the base64 reader. The dispatcher picks a
  * separate child component per transport so each owns its own hooks. Images get
  * the shared {@link ZoomableImage} surface (pinch-zoom, scroll/drag-pan).

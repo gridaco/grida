@@ -10,13 +10,8 @@ const SCOPES = [
 ];
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx"]);
-// bridge.ts is the READ funnel; web-daemon-dev-boot.tsx is an INSTALLER
-// (the dev-only web sibling of the Electron preload — it assigns
-// `window.grida`, never reads through it).
-const ALLOWED_WINDOW_GRIDA = new Set([
-  "lib/desktop/bridge.ts",
-  "scaffolds/desktop/web-daemon-dev-boot.tsx",
-]);
+// Electron preload installs the bridge. Desktop editor code reads it here.
+const BRIDGE_CLIENT = "lib/desktop/bridge.ts";
 
 function files(dir: string): string[] {
   const out: string[] = [];
@@ -51,7 +46,7 @@ function sourceFiles(): Array<{ path: string; rel: string; text: string }> {
 describe("/desktop bridge boundary", () => {
   it("keeps raw window.grida access behind the typed bridge client", () => {
     const offenders = sourceFiles()
-      .filter((file) => !ALLOWED_WINDOW_GRIDA.has(file.rel))
+      .filter((file) => file.rel !== BRIDGE_CLIENT)
       .filter((file) => file.text.includes("window.grida"))
       .map((file) => file.rel);
 

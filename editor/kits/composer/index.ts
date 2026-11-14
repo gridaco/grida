@@ -7,6 +7,7 @@ export {
 } from "./composer-react";
 
 export {
+  ComposerAttachmentCard,
   ComposerAttachmentCards,
   ComposerTriggerMenu,
 } from "./composer-defaults";

@@ -3,7 +3,7 @@ import { gridaBundleGuard } from "./vite.guards";
 
 // https://vitejs.dev/config
 //
-// Preload value-imports `@grida/agent`, so it carries the same
+// Preload value-imports `@grida/ai-host`, so it carries the same
 // silent-broken-bundle risk as the main process.
 export default defineConfig({
   // GRIDA-DESKTOP-BUILD-GUARD — fail the build if a @grida/* workspace

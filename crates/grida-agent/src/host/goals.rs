@@ -1,0 +1,1026 @@
+//! GRIDA-SEC-004 — explicit goal work and turn-local metadata tools.
+
+use super::*;
+use agent_kit_core::driver_state::{DriverStateChange, DriverStateRevision};
+use agent_kit_core::messages::OutcomeStatus;
+use agent_kit_core::turn::TurnBinding;
+use agent_kit_core::{GrantId, ToolId};
+use agent_kit_store_sqlite::driver::{DriverControlPlan, DriverControlRequest};
+use grida_agent_master::goals::{
+    Allowance, Basis, ChildWork, ChildWorkObserver, CompletionReview, Continuation, Goal,
+    Objective, Reservation, Status, Usage, inference_attempts, tools,
+};
+use std::num::NonZeroU32;
+
+pub(super) fn funded_review_unavailable() -> Error {
+    problem(ErrorKind::Unsupported, "goal_funded_review_unavailable")
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GoalRequest {
+    pub objective: Objective,
+    /// A client that names no allowance receives the product default, which
+    /// is then captured with the goal like an explicit one.
+    #[serde(default)]
+    pub allowance: Allowance,
+    #[serde(default)]
+    pub automatic: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub user_review: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub named_child: Option<SessionId>,
+}
+
+impl GoalRequest {
+    fn start(&self, id: ChangeId) -> Result<Goal> {
+        let mut goal =
+            Goal::start_with_review(id, self.objective.clone(), self.allowance, self.user_review)?;
+        if let Some(child) = &self.named_child {
+            goal.select_named_child(child.clone())?;
+        }
+        Ok(goal)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub(super) enum GoalInput {
+    Start(GoalRequest),
+    Continue(Continuation),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
+pub enum GoalAction {
+    Pause,
+    Resume,
+    Revise { objective: Objective },
+    ConfirmCompletion { turn: TurnId },
+    ReconcileReview { turn: TurnId },
+    Clear,
+}
+
+#[derive(Clone)]
+pub struct GoalControl {
+    pub id: ChangeId,
+    pub session: SessionId,
+    pub expected_revision: SessionRevision,
+    pub expected_state: DriverStateRevision,
+    pub basis: Basis,
+    pub action: GoalAction,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GoalInspection {
+    pub session: SessionId,
+    pub revision: SessionRevision,
+    pub state_revision: DriverStateRevision,
+    pub goal: Option<GoalView>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GoalView {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spending: Option<SpendingInspection>,
+    pub basis: Basis,
+    pub objective: Objective,
+    pub status: Status,
+    pub paused: bool,
+    pub automatic: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub continuation_pending: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub effort: Option<EffortPreset>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub named_child_id: Option<SessionId>,
+    pub progress: Option<String>,
+    pub allowance: Allowance,
+    pub spent: Usage,
+    pub remaining: Usage,
+    pub reservation: Option<Reservation>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review: Option<CompletionReview>,
+}
+
+#[derive(PartialEq, Eq)]
+pub(super) struct GoalResumeWake {
+    pub(super) binding: TurnBinding,
+    position: JournalPosition,
+    revision: SessionRevision,
+}
+
+impl Host {
+    /// Accept an explicit user goal. Its first reservation is made at claim.
+    pub async fn start_goal(
+        &self,
+        request: PromptRequest,
+        goal: GoalRequest,
+    ) -> Result<DurableSubmission> {
+        self.start_goal_with_wakeup(request, goal, false).await
+    }
+
+    pub(crate) async fn start_goal_with_wakeup(
+        &self,
+        request: PromptRequest,
+        goal: GoalRequest,
+        allow_wakeups: bool,
+    ) -> Result<DurableSubmission> {
+        self.owned_control(move |host| async move {
+            host.accept_goal(request, goal, allow_wakeups, None).await
+        })
+        .await
+    }
+
+    /// Start a Gateway Goal with a retained exact USD-mills spending ceiling.
+    /// Each generation receives a bounded partition of the same authority.
+    pub async fn start_goal_with_spending(
+        &self,
+        request: PromptRequest,
+        goal: GoalRequest,
+        max_cost_mills: String,
+        allow_wakeups: bool,
+    ) -> Result<DurableSubmission> {
+        self.owned_control(move |host| async move {
+            host.accept_goal(request, goal, allow_wakeups, Some(max_cost_mills))
+                .await
+        })
+        .await
+    }
+
+    pub(crate) fn supports_goal_spending(&self) -> bool {
+        cfg!(any(target_os = "macos", target_os = "linux"))
+            && self.side_context.is_none()
+            && self.state_dir.is_some()
+            && self.supervised_gateway().is_some()
+    }
+
+    async fn accept_goal(
+        &self,
+        request: PromptRequest,
+        goal: GoalRequest,
+        allow_wakeups: bool,
+        max_cost_mills: Option<String>,
+    ) -> Result<DurableSubmission> {
+        let effort = request.effort.unwrap_or(EffortPreset::Standard);
+        if goal.named_child.is_some() && effort != EffortPreset::Ultra {
+            return Err(problem(
+                ErrorKind::InvalidInput,
+                "goal_named_child_requires_ultra",
+            ));
+        }
+        if allow_wakeups && effort == EffortPreset::Ultra {
+            return Err(problem(
+                ErrorKind::Unsupported,
+                "goal_wakeup_requires_standard",
+            ));
+        }
+        validate_prompt_parts(&request.parts)?;
+        goal.start(request.id.clone())?;
+        let _admission = self.configuration_admission.lock().await;
+        let previous = self
+            .store
+            .input(request.session.clone(), request.id.clone())
+            .await?;
+        let spending = max_cost_mills
+            .as_ref()
+            .map(|maximum| {
+                if !self.supports_goal_spending() {
+                    return Err(problem(ErrorKind::Unsupported, "goal_spending_unavailable"));
+                }
+                let gateway = self
+                    .supervised_gateway()
+                    .ok_or_else(|| problem(ErrorKind::Unsupported, "goal_spending_unavailable"))?;
+                gateway.validate()?;
+                spending::Store::select(
+                    gateway.scope,
+                    &request.session,
+                    &request.id,
+                    maximum,
+                    goal.allowance.inference_steps.get(),
+                )
+            })
+            .transpose()?;
+        if let Some(accepted) = previous {
+            let stored = retained_goal_prompt(&accepted.input)?;
+            if stored.goal.as_ref() != Some(&GoalInput::Start(goal))
+                || stored.spending != spending
+                || !images::same_prompt(&stored.parts, &request.parts)
+                || stored.allow_wakeups != allow_wakeups
+                || request
+                    .operating_regime
+                    .is_some_and(|regime| regime != stored.operating_regime)
+                || stored
+                    .effort
+                    .as_ref()
+                    .map_or(EffortPreset::Standard, EffortPolicy::preset)
+                    != effort
+                || request
+                    .reasoning
+                    .is_some_and(|level| Some(level) != stored.reasoning)
+            {
+                return Err(problem(ErrorKind::Conflict, "input_identity_reused"));
+            }
+            if let Some(selection) = &spending {
+                self.spending.inspect(selection)?;
+            }
+            if accepted.disposition == InputDisposition::Queued
+                && (effort != EffortPreset::Ultra || self.goal_sponsorship_available())
+            {
+                self.kick_queue(request.session.clone()).await;
+            }
+            return Ok(DurableSubmission {
+                session: request.session,
+                input: request.id,
+                position: accepted.position,
+                disposition: accepted.disposition,
+            });
+        }
+        if self.work.lock().await.closed {
+            return Err(problem(ErrorKind::Unavailable, "host_shutting_down"));
+        }
+        let view = self.store.inspect(request.session.clone()).await?;
+        self.check_execution(&view)?;
+        if self
+            .permissions
+            .as_ref()
+            .is_some_and(|profile| profile.before_tool_hook().is_some())
+            && (effort != EffortPreset::Standard
+                || !request
+                    .operating_regime
+                    .unwrap_or(self.operating_regime)
+                    .is_act())
+        {
+            return Err(problem(
+                ErrorKind::Unsupported,
+                "before_tool_hook_goal_unavailable",
+            ));
+        }
+        if effort == EffortPreset::Ultra && !self.goal_sponsorship_available() {
+            return Err(funded_review_unavailable());
+        }
+        require_goal_start(&view)?;
+        if let Some(child) = &goal.named_child {
+            self.require_goal_named_child(&request.session, child)
+                .await?;
+        }
+        self.check_ready_capacity(&request.session).await?;
+        let mut request = request;
+        request.effort = Some(effort);
+        let mut policy = self.submission_policy(&request, allow_wakeups)?;
+        if goal.named_child.is_some() && !policy.operating_regime.is_act() {
+            return Err(problem(
+                ErrorKind::Unsupported,
+                "goal_named_child_requires_act",
+            ));
+        }
+        policy.allow_host_tools = false;
+        if spending.is_some() {
+            policy.allow_library_selection = false;
+        }
+        policy.desktop_image_generation = None;
+        policy.allow_image_placement = false;
+        policy.spending = spending.clone();
+        if policy.effort.as_ref().is_some_and(|effort| {
+            goal.allowance.inference_steps.get() <= effort.reserved_child_generation_steps()
+        }) {
+            return Err(problem(
+                ErrorKind::LimitExceeded,
+                "goal_child_allowance_unavailable",
+            ));
+        }
+        // A chat started as a goal is titled from its objective, like any
+        // other first request.
+        let title = self.title_candidate(&view, &request.parts);
+        let mut input = self
+            .capture_input(&view, request.id, request.parts, policy)
+            .await?;
+        let mut stored: StoredPrompt = decode_input(&input)?;
+        stored.allow_reviewer_primary_read = false;
+        stored.goal = Some(GoalInput::Start(goal));
+        input.payload = encode_stored_prompt(&stored)?;
+        let accepted = self
+            .store
+            .submit_at_revision(request.session, input, view.revision)
+            .await?;
+        if let Some(selection) = &spending {
+            self.spending.publish_initial(selection).map_err(|_| {
+                problem(
+                    ErrorKind::Uncertain,
+                    "goal_spending_publication_unconfirmed",
+                )
+            })?;
+        }
+        self.start_title(title);
+        self.kick_queue(accepted.session.clone()).await;
+        Ok(DurableSubmission {
+            session: accepted.session,
+            input: accepted.input,
+            position: accepted.position,
+            disposition: InputDisposition::Queued,
+        })
+    }
+
+    async fn require_goal_named_child(&self, parent: &SessionId, child: &SessionId) -> Result<()> {
+        let unavailable = || problem(ErrorKind::Unavailable, "goal_named_child_unavailable");
+        if !self.subagents_available() || !self.goal_sponsorship_available() {
+            return Err(unavailable());
+        }
+        let child_view = self
+            .store
+            .inspect(child.clone())
+            .await
+            .map_err(|_| unavailable())?;
+        let profile = session_configuration(&child_view)
+            .map_err(|_| unavailable())?
+            .subagent
+            .filter(|profile| profile.parent() == parent && profile.sponsorship().is_none())
+            .ok_or_else(unavailable)?;
+        self.check_execution(&child_view)
+            .map_err(|_| unavailable())?;
+        let allocation = profile
+            .allocation(&child_view.driver_state)
+            .map_err(|_| unavailable())?;
+        if allocation.reserved >= allocation.work_turns {
+            return Err(unavailable());
+        }
+        profile
+            .require_authority(&self.execution()?.authority.inference.authority)
+            .map_err(|_| unavailable())
+    }
+
+    /// Read the committed goal without claiming a turn or scheduling work.
+    pub async fn inspect_goal(&self, session: SessionId) -> Result<GoalInspection> {
+        let view = self.store.inspect(session.clone()).await?;
+        let goal = if let Some(value) = view.driver_state.value() {
+            let goal = Goal::decode(value)?;
+            let (captured, automatic) = self.goal_origin(&session, goal.basis()).await?;
+            Some(GoalView {
+                spending: captured
+                    .spending
+                    .as_ref()
+                    .map(|selection| self.spending.inspect(selection))
+                    .transpose()?,
+                basis: goal.basis().clone(),
+                objective: goal.objective().clone(),
+                status: goal.status(),
+                paused: goal.paused(),
+                automatic,
+                continuation_pending: goal.explicit_continuation(),
+                effort: captured.effort.as_ref().map(EffortPolicy::preset),
+                named_child_id: goal.named_child().cloned(),
+                progress: goal.progress().map(str::to_owned),
+                allowance: goal.allowance(),
+                spent: goal.spent(),
+                remaining: goal.remaining(),
+                reservation: goal.reservation().cloned(),
+                review: goal.completion_review().cloned(),
+            })
+        } else {
+            None
+        };
+        Ok(GoalInspection {
+            session,
+            revision: view.revision,
+            state_revision: view.driver_state.revision(),
+            goal,
+        })
+    }
+
+    /// Reconsider an explicitly authorized goal after an owner restart.
+    /// Observation does not call this method. Interrupted work still requires
+    /// recovery or a stop instead of silently dispatching again.
+    pub async fn recover_goal_work(&self, session: SessionId) -> Result<()> {
+        self.owned_control(move |host| async move {
+            let view = host.store.inspect(session.clone()).await?;
+            host.check_execution(&view)?;
+            if view.driver_state.value().is_none() {
+                return Err(problem(ErrorKind::Unavailable, "goal_missing"));
+            }
+            host.reconcile_goal_child(&view).await?;
+            host.check_ready_capacity(&session).await?;
+            host.kick_queue(session).await;
+            Ok(())
+        })
+        .await
+    }
+
+    async fn reconcile_goal_child(&self, view: &SessionView) -> Result<()> {
+        let Some(value) = view.driver_state.value() else {
+            return Ok(());
+        };
+        let mut goal = Goal::decode(value)?;
+        let Some((turn, parent_steps, child_steps)) = self.goal_review_usage(view, &goal).await?
+        else {
+            return Ok(());
+        };
+        goal.reconcile_child_work(&turn, parent_steps, child_steps)?;
+        let value = goal.encode()?;
+        let request = Fingerprint::of(&("goal-child-account", &view.session, &turn))?;
+        self.store
+            .control_driver_state(
+                DriverControlRequest {
+                    id: ChangeId::new(request.to_hex())?,
+                    session: view.session.clone(),
+                    expected_revision: view.revision,
+                    expected_state: view.driver_state.revision(),
+                    intent: encode("grida.agent.goal.child-account", 1, &turn)?,
+                },
+                move |_, current| {
+                    if current.is_some() {
+                        return Err(problem(ErrorKind::Conflict, "goal_work_reserved"));
+                    }
+                    Ok(DriverControlPlan {
+                        value: Some(value),
+                        directive: None,
+                    })
+                },
+            )
+            .await?;
+        Ok(())
+    }
+
+    async fn goal_review_usage(
+        &self,
+        view: &SessionView,
+        goal: &Goal,
+    ) -> Result<Option<(TurnId, u32, u32)>> {
+        let Some(work) = goal
+            .reservation()
+            .filter(|work| work.uncertain_steps.is_some() && work.child_inference_steps.is_some())
+        else {
+            return Ok(None);
+        };
+        if view.current.is_some() {
+            return Ok(None);
+        }
+        let turn = work.turn.clone();
+        let Some(parent) = self
+            .store
+            .inspect_turn_with(view.session.clone(), turn.clone(), |state| {
+                Ok((state
+                    .outcome()
+                    .is_some_and(|outcome| outcome.status != OutcomeStatus::Uncertain)
+                    && state.operations().values().all(|operation| {
+                        operation.outcome().is_some() && !operation.is_uncertain()
+                    }))
+                .then(|| state.clone()))
+            })
+            .await?
+        else {
+            return Ok(None);
+        };
+        let ChildWork::Settled { observed_steps } = sponsorship::GoalChildWork(self.store.clone())
+            .observe(&parent)
+            .await
+        else {
+            return Ok(None);
+        };
+        Ok(Some((turn, inference_attempts(&parent)?, observed_steps)))
+    }
+
+    async fn goal_review_for_control(
+        &self,
+        control: &GoalControl,
+        turn: &TurnId,
+    ) -> Result<(u32, u32)> {
+        let view = self.store.inspect(control.session.clone()).await?;
+        let changed = || problem(ErrorKind::Conflict, "goal_review_reservation_changed");
+        if view.revision != control.expected_revision
+            || view.driver_state.revision() != control.expected_state
+        {
+            return Err(changed());
+        }
+        let goal = Goal::decode(view.driver_state.value().ok_or_else(changed)?)?;
+        if goal.basis() != &control.basis
+            || !goal.reservation().is_some_and(|work| {
+                &work.turn == turn
+                    && work.child_inference_steps.is_some()
+                    && work.uncertain_steps.is_some()
+            })
+        {
+            return Err(changed());
+        }
+        self.goal_review_usage(&view, &goal)
+            .await?
+            .map(|(_, parent, child)| (parent, child))
+            .ok_or_else(|| problem(ErrorKind::Unavailable, "goal_review_still_held"))
+    }
+
+    pub(super) async fn goal_continuation(&self, view: &SessionView) -> Result<Option<Submission>> {
+        let Some(value) = view.driver_state.value() else {
+            return Ok(None);
+        };
+        if session_configuration(view)?.subagent.is_some() {
+            return Ok(None);
+        }
+        let goal = Goal::decode(value)?;
+        let Some(continuation) = goal.continuation() else {
+            return Ok(None);
+        };
+        let (mut captured, automatic) =
+            self.goal_origin(&view.session, &continuation.basis).await?;
+        if !automatic && !goal.explicit_continuation() {
+            return Ok(None);
+        }
+        if captured.effort.is_some()
+            && (!self.sponsorship_enabled || !self.goal_sponsorship_enabled)
+        {
+            return Ok(None);
+        }
+        captured.effort = goal.continuation_effort(captured.effort.take());
+        let id = continuation.input_id(&view.session)?;
+        captured.parts.clear();
+        captured.allow_wakeups = false;
+        captured.allow_library_selection = false;
+        captured.desktop_image_generation = None;
+        captured.allow_image_reference = false;
+        captured.allow_attachment_reference = false;
+        captured.allow_workspace_reference = false;
+        captured.allow_image_placement = false;
+        if let Some(permission) = &captured.permission_capture {
+            let profile = self
+                .permissions
+                .as_ref()
+                .ok_or_else(|| problem(ErrorKind::Unavailable, "permission_profile_unavailable"))?;
+            profile.validate_capture(permission)?;
+            captured.permission_capture = Some(profile.capture(ScopeId::new(id.as_str())?));
+        }
+        captured.goal = Some(GoalInput::Continue(continuation));
+        Ok(Some(Submission {
+            id,
+            payload: encode_stored_prompt(&captured)?,
+        }))
+    }
+
+    async fn goal_origin(
+        &self,
+        session: &SessionId,
+        basis: &Basis,
+    ) -> Result<(StoredPrompt, bool)> {
+        let original = self
+            .store
+            .input(session.clone(), basis.goal.clone())
+            .await?
+            .ok_or_else(|| problem(ErrorKind::InvalidState, "goal_origin_unavailable"))?;
+        let captured = retained_goal_prompt(&original.input)?;
+        let Some(GoalInput::Start(request)) = captured.goal.as_ref() else {
+            return Err(problem(ErrorKind::InvalidState, "goal_origin_unavailable"));
+        };
+        let automatic = request.automatic;
+        Ok((captured, automatic))
+    }
+
+    /// Apply a goal control through the same owned admission/control boundary.
+    pub async fn control_goal(&self, control: GoalControl) -> Result<ControlReceipt> {
+        self.owned_control(move |host| async move { host.control_goal_owned(control).await })
+            .await
+    }
+
+    async fn control_goal_owned(&self, control: GoalControl) -> Result<ControlReceipt> {
+        // Keep lookup errors as part of the decision so the store can replay
+        // an exact accepted control even after its held reservation is gone.
+        let review_usage = match &control.action {
+            GoalAction::ReconcileReview { turn } => {
+                Some(self.goal_review_for_control(&control, turn).await)
+            }
+            _ => None,
+        };
+        // Exact control retries are answered by the store before using this lookup.
+        let automatic = if matches!(&control.action, GoalAction::Resume) {
+            Some(
+                self.goal_origin(&control.session, &control.basis)
+                    .await
+                    .and_then(|(captured, automatic)| {
+                        if captured.effort.is_some() && !self.goal_sponsorship_enabled {
+                            return Err(funded_review_unavailable());
+                        }
+                        Ok(automatic)
+                    }),
+            )
+        } else {
+            None
+        };
+        let session = control.session;
+        let basis = control.basis;
+        let action = control.action;
+        let intent = encode("grida.agent.goal.control", 1, &(&basis, &action))?;
+        let decision = action.clone();
+        let request = control.id.clone();
+        let goal_sponsorship_enabled = self.goal_sponsorship_enabled;
+        let receipt = self
+            .store
+            .control_driver_state(
+                DriverControlRequest {
+                    id: control.id,
+                    session: session.clone(),
+                    expected_revision: control.expected_revision,
+                    expected_state: control.expected_state,
+                    intent,
+                },
+                move |snapshot, current| {
+                    let mut goal = Goal::decode(
+                        snapshot
+                            .value()
+                            .ok_or_else(|| problem(ErrorKind::Unavailable, "goal_missing"))?,
+                    )?;
+                    if let Some(current) = current
+                        && goal
+                            .reservation()
+                            .is_none_or(|work| work.turn != current.binding.turn)
+                    {
+                        return Err(problem(
+                            ErrorKind::Conflict,
+                            "goal_control_requires_owned_turn",
+                        ));
+                    }
+                    if current.is_some()
+                        && goal
+                            .reservation()
+                            .is_some_and(|work| work.child_inference_steps.is_some())
+                    {
+                        return Err(problem(
+                            ErrorKind::Conflict,
+                            "goal_use_task_controls_for_funded_review",
+                        ));
+                    }
+                    let directive = match decision {
+                        GoalAction::Pause => {
+                            goal.set_paused(&basis, true)?;
+                            current.map(|_| ControlDirective::Pause)
+                        }
+                        GoalAction::Resume => {
+                            if let Some(current) = current {
+                                if !goal_sponsorship_enabled {
+                                    automatic.expect("goal resume decision")?;
+                                }
+                                if current.disposition != TurnDisposition::Suspended
+                                    || !current.controls.paused
+                                    || current.controls.cancelled
+                                {
+                                    return Err(problem(
+                                        ErrorKind::Conflict,
+                                        "goal_turn_not_suspended",
+                                    ));
+                                }
+                                goal.resume_reserved(&basis, &current.binding.turn)?;
+                                Some(ControlDirective::Resume)
+                            } else {
+                                if automatic.expect("goal resume decision")? {
+                                    goal.resume_idle(&basis)?;
+                                } else {
+                                    goal.resume_idle_once(&basis)?;
+                                }
+                                None
+                            }
+                        }
+                        GoalAction::Revise { objective } => {
+                            goal.revise(&basis, objective)?;
+                            if current.is_some() && goal.basis() == &basis {
+                                return Err(problem(
+                                    ErrorKind::InvalidInput,
+                                    "goal_objective_unchanged",
+                                ));
+                            }
+                            current.map(|_| ControlDirective::Cancel)
+                        }
+                        GoalAction::ConfirmCompletion { turn } => {
+                            if current.is_some() {
+                                return Err(problem(ErrorKind::Conflict, "goal_work_reserved"));
+                            }
+                            goal.confirm_completion(&basis, &turn, request)?;
+                            None
+                        }
+                        GoalAction::ReconcileReview { turn } => {
+                            let (parent, child) =
+                                review_usage.expect("review reconciliation decision")?;
+                            goal.reconcile_child_work(&turn, parent, child)?;
+                            None
+                        }
+                        GoalAction::Clear => {
+                            goal.clear(&basis)?;
+                            current.map(|_| ControlDirective::Cancel)
+                        }
+                    };
+                    Ok(DriverControlPlan {
+                        value: Some(goal.encode()?),
+                        directive,
+                    })
+                },
+            )
+            .await?;
+        match action {
+            GoalAction::Clear | GoalAction::Revise { .. } => {
+                if let Some(turn) = &receipt.turn {
+                    let turn = turn.record().binding.turn.clone();
+                    self.release_timer(&session, &turn).await;
+                    self.kick_stopped(session, turn).await;
+                }
+            }
+            GoalAction::Resume => {
+                if let Some(turn) = &receipt.turn {
+                    let record = turn.record();
+                    self.kick_goal_resume(GoalResumeWake {
+                        binding: record.binding.clone(),
+                        position: record.position,
+                        revision: receipt.revision,
+                    })
+                    .await;
+                } else {
+                    // An idle Resume may recover its original admission after
+                    // restart. Its receipt cannot authorize a later queue.
+                    self.kick_queue_at(session, Some(receipt.revision)).await;
+                }
+            }
+            GoalAction::Pause
+            | GoalAction::ConfirmCompletion { .. }
+            | GoalAction::ReconcileReview { .. } => {}
+        }
+        Ok(receipt)
+    }
+
+    pub(super) async fn kick_goal_resume(&self, wake: GoalResumeWake) {
+        let Ok(view) = self.store.inspect(wake.binding.session.clone()).await else {
+            return;
+        };
+        self.kick_resumed_goal(&view, Some(wake)).await;
+    }
+
+    pub(super) async fn kick_resumed_goal(&self, view: &SessionView, wake: Option<GoalResumeWake>) {
+        if view.admission_paused {
+            return;
+        }
+        let Some(current) = view.current.as_ref().filter(|current| {
+            current.disposition == TurnDisposition::Suspended && current.controls.admits_work()
+        }) else {
+            return;
+        };
+        if wake.as_ref().is_some_and(|wake| {
+            wake.revision != view.revision
+                || wake.binding != current.binding
+                || wake.position != current.position
+                || self.check_execution(view).is_err()
+        }) || require_resumable(view, &current.binding.turn).is_err()
+        {
+            return;
+        }
+        if wake.is_some() {
+            self.changed.notify_waiters();
+        }
+        let session = view.session.clone();
+        let turn = current.binding.turn.clone();
+        if !self
+            .store
+            .inspect_turn_with(session.clone(), turn.clone(), |state| {
+                Ok(state.waits().values().all(|wait| {
+                    !wait.is_pending()
+                        && (!grida_agent_master::wakeups::is_wakeup(wait)
+                            || wakeups::was_delivered(wait))
+                }))
+            })
+            .await
+            .unwrap_or(false)
+        {
+            return;
+        }
+        let Ok(id) = change_id() else {
+            return;
+        };
+        let claim = ClaimRequest {
+            id,
+            session: session.clone(),
+            expected_revision: view.revision,
+            selection: TurnSelection::Resume {
+                turn: turn.clone(),
+                epoch: current.binding.epoch,
+                position: current.position,
+            },
+        };
+        let mut work = self.work.lock().await;
+        if work.closed {
+            return;
+        }
+        if work.active.contains_key(&session) || work.active.len() >= MAX_ACTIVE_RUNS {
+            work.defer(wake.map_or(ReadyWork::Queue(session, None), ReadyWork::GoalResume));
+            return;
+        }
+        let _ = self.register(&mut work, session, turn, Launch::Resume(claim));
+    }
+}
+
+pub(super) fn require_resumable(view: &SessionView, turn: &TurnId) -> Result<()> {
+    let goal = Goal::decode(
+        view.driver_state
+            .value()
+            .ok_or_else(|| problem(ErrorKind::InvalidState, "goal_state_missing"))?,
+    )?;
+    if goal.paused()
+        || goal.status() != Status::Active
+        || goal
+            .reservation()
+            .is_none_or(|work| &work.turn != turn || &work.basis != goal.basis())
+    {
+        return Err(problem(ErrorKind::Conflict, "goal_control_required"));
+    }
+    Ok(())
+}
+
+pub(super) fn claim_update(
+    view: &SessionView,
+    input: &ChangeId,
+    turn: &TurnId,
+    request: &GoalInput,
+    steps: u32,
+    effort: Option<&EffortPolicy>,
+) -> Result<DriverStateChange> {
+    require_idle(view)?;
+    let mut goal = match request {
+        GoalInput::Start(request) => {
+            // Later accepted inputs remain behind the explicit goal start.
+            require_no_active_goal(view)?;
+            request.start(input.clone())?
+        }
+        GoalInput::Continue(continuation) => {
+            let value = view
+                .driver_state
+                .value()
+                .ok_or_else(|| problem(ErrorKind::Conflict, "goal_continuation_changed"))?;
+            let goal = Goal::decode(value)?;
+            if goal.continuation().as_ref() != Some(continuation)
+                || &continuation.input_id(&view.session)? != input
+            {
+                return Err(problem(ErrorKind::Conflict, "goal_continuation_changed"));
+            }
+            goal
+        }
+    };
+    let child = effort.and_then(|policy| NonZeroU32::new(policy.reserved_child_generation_steps()));
+    let steps = effort
+        .map_or(Some(steps), |policy| {
+            policy
+                .parent_generation_steps()
+                .checked_add(policy.reserved_child_generation_steps())
+        })
+        .and_then(NonZeroU32::new)
+        .ok_or_else(|| problem(ErrorKind::InvalidInput, "invalid_master_limits"))?;
+    goal.reserve_with_child(&goal.basis().clone(), turn.clone(), steps, child)?;
+    Ok(DriverStateChange {
+        expected: view.driver_state.revision(),
+        value: Some(goal.encode()?),
+    })
+}
+
+fn require_goal_start(view: &SessionView) -> Result<()> {
+    require_idle(view)?;
+    if !view.queued.is_empty() {
+        return Err(problem(ErrorKind::Conflict, "session_queue_waiting"));
+    }
+    require_no_active_goal(view)
+}
+
+fn require_no_active_goal(view: &SessionView) -> Result<()> {
+    require_resolved_goal(&view.driver_state)
+}
+
+pub(super) fn require_resolved_goal(
+    state: &agent_kit_core::driver_state::DriverStateSnapshot,
+) -> Result<()> {
+    if let Some(value) = state.value() {
+        let goal = Goal::decode(value)?;
+        if goal.reservation().is_some()
+            || !matches!(goal.status(), Status::Complete | Status::Cleared)
+        {
+            return Err(problem(ErrorKind::Conflict, "session_goal_exists"));
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn require_goal_resolved_for_revision(view: &SessionView) -> Result<()> {
+    if let Some(value) = view.driver_state.value() {
+        let goal = Goal::decode(value)?;
+        if matches!(goal.status(), Status::Active | Status::Blocked(_)) {
+            return Err(problem(
+                ErrorKind::Conflict,
+                "history_revision_requires_goal_resolution",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn retained_goal_prompt(input: &Submission) -> Result<StoredPrompt> {
+    if !is_stored_input(&input.payload) {
+        return Err(problem(ErrorKind::Conflict, "input_identity_reused"));
+    }
+    decode_input(input)
+}
+
+/// Product-local grants for the two captured, non-effecting goal tools.
+pub(super) struct GoalAuthority {
+    selection: GrantSelection,
+    tools: [Arc<dyn agent_kit_core::tools::Tool>; 2],
+    base: Arc<dyn AuthorityValidator>,
+    gate: Arc<dyn ToolGate>,
+    before_tool: Option<Arc<before_tool::BeforeToolCheck>>,
+    lifecycle_hooks: Option<Arc<lifecycle_hooks::LifecycleAccess>>,
+}
+
+impl GoalAuthority {
+    pub(super) async fn bind(
+        claim: &agent_kit_sessions::ClaimedTurn,
+        base: Arc<dyn AuthorityValidator>,
+        gate: Arc<dyn ToolGate>,
+        before_tool: Option<Arc<before_tool::BeforeToolCheck>>,
+        lifecycle_hooks: Option<Arc<lifecycle_hooks::LifecycleAccess>>,
+    ) -> Result<Arc<Self>> {
+        let state = claim.lease.journal().load().await?;
+        let value = state
+            .driver_state()
+            .value()
+            .ok_or_else(|| problem(ErrorKind::InvalidState, "goal_state_missing"))?;
+        let goal = Goal::decode(value)?;
+        let binding = state.binding();
+        let id = Fingerprint::of(&(&binding.session, &binding.turn, goal.basis()))?;
+        let scope = id.to_hex();
+        Ok(Arc::new(Self {
+            selection: GrantSelection {
+                authority: AuthorityBinding {
+                    principal: PrincipalId::new("grida.goal")?,
+                    binding: BindingId::new("goal-local-v1")?,
+                    scope: ScopeId::new(scope)?,
+                },
+                grants: vec![GrantId::new("goal-work")?],
+            },
+            tools: tools::for_work(&goal, &binding.turn)?,
+            base,
+            gate,
+            before_tool,
+            lifecycle_hooks,
+        }))
+    }
+
+    pub(super) fn insert(
+        &self,
+        inventory: &mut Inventory,
+        grants: &mut BTreeMap<ToolId, GrantSelection>,
+    ) -> Result<()> {
+        for tool in &self.tools {
+            inventory.insert(tool.clone())?;
+            grants.insert(tool.definition().id.clone(), self.selection.clone());
+        }
+        Ok(())
+    }
+}
+
+impl AuthorityValidator for GoalAuthority {
+    fn validate(&self, request: AuthorityRequest) -> BoxFuture<'_, Result<()>> {
+        if request.selection != self.selection {
+            return self.base.validate(request);
+        }
+        if self
+            .before_tool
+            .as_ref()
+            .is_some_and(|check| check.is_fenced())
+        {
+            return Box::pin(async { Err(before_tool::uncertain()) });
+        }
+        Box::pin(async { Ok(()) })
+    }
+}
+
+impl ToolGate for GoalAuthority {
+    fn decide(
+        &self,
+        admission: ToolAdmission,
+        context: AdmissionContext,
+    ) -> BoxFuture<'_, Result<ToolDecision>> {
+        if admission.grants != self.selection {
+            return self.gate.decide(admission, context);
+        }
+        if let Some(check) = &self.before_tool
+            && let Err(error) = check.require_unfenced(&context)
+        {
+            return Box::pin(async { Err(error) });
+        }
+        if self
+            .tools
+            .iter()
+            .any(|tool| tool.definition() == admission.invocation.definition())
+        {
+            Box::pin(async move {
+                if let Some(hooks) = &self.lifecycle_hooks {
+                    if hooks.unverified(&context.operations.view()) {
+                        return Err(problem(ErrorKind::Uncertain, "lifecycle_hook_uncertain"));
+                    }
+                    return hooks.before_tool(&admission, &context).await;
+                }
+                Ok(ToolDecision::Permit)
+            })
+        } else {
+            Box::pin(async { Err(problem(ErrorKind::InvalidInput, "goal_tool_scope_mismatch")) })
+        }
+    }
+}

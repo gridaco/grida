@@ -1,15 +1,29 @@
 // GRIDA-GG: gateway — trusted, organization-scoped server execution.
 import "server-only";
 import { randomUUID } from "node:crypto";
-import type { ImageModelV3, LanguageModelV3 } from "@ai-sdk/provider";
+import type {
+  ImageModelV3,
+  LanguageModelV3,
+  LanguageModelV3Usage,
+} from "@ai-sdk/provider";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { ProductBillingError } from "@/lib/platform/product-billing";
+import { GatewaySpending } from "./gateway-spending";
 
 export type GatewayContext = {
   organizationId: number;
   feature: string;
   transactionId?: string;
+  maxCostMills?: string;
 };
+
+// Native chat can refresh pending billing after inference finishes.
+const NATIVE_CHAT_BILLING_TIMEOUT_MS = 500;
+
+export function gatewayChatRequestId(value: string | null) {
+  return value && /^req_[A-Za-z0-9_-]{1,124}$/.test(value) ? value : undefined;
+}
+
 export class GatewayProductError extends Error {
   readonly isRetryable = false;
   constructor(
@@ -60,7 +74,8 @@ export function gatewayContext(options: unknown): GatewayContext {
     !g ||
     !Number.isSafeInteger(g.organizationId) ||
     g.organizationId <= 0 ||
-    !/^[A-Za-z0-9][A-Za-z0-9/_.:-]{0,127}$/.test(g.feature)
+    !/^[A-Za-z0-9][A-Za-z0-9/_.:-]{0,127}$/.test(g.feature) ||
+    (g.maxCostMills !== undefined && !GatewaySpending.amount(g.maxCostMills))
   )
     throw new GatewayProductError(400, "missing_organization_id");
   return g;
@@ -89,6 +104,8 @@ export async function gatewayFetch(
   headers.set("X-Grida-Organization-ID", String(ctx.organizationId));
   headers.set("X-Grida-Feature", ctx.feature);
   if (identity) headers.set("Idempotency-Key", identity);
+  if (ctx.maxCostMills !== undefined)
+    headers.set("X-GG-Max-Cost-Mills", ctx.maxCostMills);
   let response: Response;
   try {
     response = await fetch(`${c.origin}/internal/grida${path}`, {
@@ -179,10 +196,16 @@ export async function gatewayWait(
   }
   throw new GatewayProductError(504, "result_pending", id);
 }
-async function charge(ctx: GatewayContext, id: string | null) {
+async function charge(
+  ctx: GatewayContext,
+  id: string | null,
+  signal?: AbortSignal
+) {
   if (!id) throw new GatewayProductError(502, "missing_request_identity");
   try {
-    const job = await gatewayJob(ctx, id);
+    signal?.throwIfAborted();
+    const job = await gatewayJob(ctx, id, signal);
+    signal?.throwIfAborted();
     return {
       requestId: id,
       billingStatus: job.billing.status,
@@ -193,6 +216,20 @@ async function charge(ctx: GatewayContext, id: string | null) {
     // throw away an already delivered result or encourage paid regeneration.
     return { requestId: id, billingStatus: "pending", chargedMills: null };
   }
+}
+
+function nativeChatCharge(
+  ctx: GatewayContext,
+  id: string | null,
+  requestSignal?: AbortSignal
+) {
+  const requestId = gatewayChatRequestId(id);
+  if (!requestId) return undefined;
+  const timeout = AbortSignal.timeout(NATIVE_CHAT_BILLING_TIMEOUT_MS);
+  const signal = requestSignal
+    ? AbortSignal.any([requestSignal, timeout])
+    : timeout;
+  return charge(ctx, requestId, signal);
 }
 export function gatewayCostMills(metadata: unknown): number | undefined {
   const gg = (
@@ -252,6 +289,41 @@ export function gatewayLanguageModel(modelId: string): LanguageModelV3 {
       name: "gg",
       baseURL: "https://gateway.grida.ai/v1",
       apiKey: "server-authority",
+      convertUsage: (usage) => {
+        // The SDK default fills omitted counts with zero when a usage object
+        // exists. Keep absent categories unknown on the Gateway connection.
+        const input = usage?.prompt_tokens ?? undefined;
+        const output = usage?.completion_tokens ?? undefined;
+        const cacheRead =
+          usage?.prompt_tokens_details?.cached_tokens ?? undefined;
+        const reasoning =
+          usage?.completion_tokens_details?.reasoning_tokens ?? undefined;
+        return {
+          inputTokens: {
+            total: input,
+            noCache:
+              input !== undefined &&
+              cacheRead !== undefined &&
+              cacheRead <= input
+                ? input - cacheRead
+                : undefined,
+            cacheRead,
+            cacheWrite: undefined,
+          },
+          outputTokens: {
+            total: output,
+            text:
+              output !== undefined &&
+              reasoning !== undefined &&
+              reasoning <= output
+                ? output - reasoning
+                : undefined,
+            reasoning,
+          },
+          // The SDK validates known fields on an already decoded JSON object.
+          raw: (usage ?? undefined) as LanguageModelV3Usage["raw"],
+        };
+      },
       fetch: async (_url, init) => {
         const response = await gatewayFetch(
           ctx,
@@ -301,6 +373,9 @@ export function gatewayLanguageModel(modelId: string): LanguageModelV3 {
     },
     async doStream(options) {
       const d = delegate(options);
+      const nativeChatBilling =
+        d.ctx.feature === "v1/ai/chat" &&
+        options.providerOptions?.grida?.nativeChatBillingReceipt === true;
       try {
         const value = await d.model.doStream(options);
         return {
@@ -314,7 +389,17 @@ export function gatewayLanguageModel(modelId: string): LanguageModelV3 {
                     warnings: [...part.warnings, ...vendorWarnings(options)],
                   });
                 } else if (part.type === "finish") {
-                  const metadata = await charge(d.ctx, d.identity());
+                  const metadata = nativeChatBilling
+                    ? await nativeChatCharge(
+                        d.ctx,
+                        d.identity(),
+                        options.abortSignal
+                      )
+                    : await charge(d.ctx, d.identity());
+                  if (!metadata) {
+                    controller.enqueue(part);
+                    return;
+                  }
                   controller.enqueue({
                     ...part,
                     providerMetadata: {

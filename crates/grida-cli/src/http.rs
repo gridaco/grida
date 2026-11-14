@@ -23,6 +23,8 @@ use tokio_rustls::TlsConnector;
 use tokio_util::sync::CancellationToken;
 use url::Url;
 
+mod gg_chat;
+
 #[cfg(test)]
 #[path = "http_tests.rs"]
 mod tests;
@@ -428,13 +430,12 @@ impl Transport {
         select_public(&addresses)
     }
 
-    async fn open(
+    async fn connect(
         &self,
-        lane: Lane,
-        request: &Request,
+        method: &Method,
         target: &Url,
         address: SocketAddr,
-    ) -> Result<Response> {
+    ) -> Result<Connection> {
         let connect = async {
             let socket = TcpStream::connect(address)
                 .await
@@ -458,46 +459,38 @@ impl Transport {
         let io = timeout(Duration::from_secs(15), connect)
             .await
             .map_err(|_| Error::Failed)??;
-        let guard = wire::WireGuard::new(io, request.method == Method::HEAD);
-        let (mut sender, connection) = hyper::client::conn::http1::Builder::new()
+        let guard = wire::WireGuard::new(io, *method == Method::HEAD);
+        let (sender, connection) = hyper::client::conn::http1::Builder::new()
             .max_buf_size(wire::HEAD_LIMIT)
             .handshake(TokioIo::new(guard))
             .await
             .map_err(|_| Error::Failed)?;
-        let connection = AbortConnection(tokio::spawn(connection));
-        let path = match target.query() {
-            Some(query) => format!("{}?{query}", target.path()),
-            None => target.path().to_owned(),
-        };
-        let mut outgoing = hyper::Request::builder()
-            .method(request.method.clone())
-            .uri(path)
-            .body(Full::new(request.body.clone()))
-            .map_err(|_| Error::Failed)?;
-        *outgoing.headers_mut() = request.headers.clone();
-        let host = match target.port() {
-            Some(port) => format!("{}:{port}", target.host_str().ok_or(Error::Failed)?),
-            None => target.host_str().ok_or(Error::Failed)?.to_owned(),
-        };
-        outgoing.headers_mut().insert(
-            "host",
-            HeaderValue::from_str(&host).map_err(|_| Error::Failed)?,
-        );
-        outgoing
-            .headers_mut()
-            .insert("connection", HeaderValue::from_static("close"));
-        let incoming = sender
-            .send_request(outgoing)
-            .await
-            .map_err(|_| Error::Failed)?;
-        let status = incoming.status().as_u16();
-        if !(200..600).contains(&status) || (lane != Lane::Download && (300..400).contains(&status))
-        {
+        Ok(Connection {
+            sender,
+            _task: AbortConnection(tokio::spawn(connection)),
+        })
+    }
+
+    async fn open(
+        &self,
+        lane: Lane,
+        request: &Request,
+        target: &Url,
+        address: SocketAddr,
+    ) -> Result<Response> {
+        let ConnectionResponse {
+            status,
+            headers,
+            mut body,
+            connection,
+        } = self
+            .connect(&request.method, target, address)
+            .await?
+            .send(request, target)
+            .await?;
+        if lane != Lane::Download && (300..400).contains(&status) {
             return Err(Error::Failed);
         }
-        let (parts, mut body) = incoming.into_parts();
-        let mut headers = parts.headers;
-        headers.remove("set-cookie");
         // Account failures and logout are status-only. Do not retain or wait
         // for an upstream body, including an endless or oversized response.
         if lane == Lane::Account
@@ -509,19 +502,6 @@ impl Transport {
                 body: Bytes::new(),
             });
         }
-        let length = if let Some(value) = headers.get("content-length") {
-            let value = value.to_str().map_err(|_| Error::Failed)?;
-            if value.is_empty() || !value.bytes().all(|b| b.is_ascii_digit()) {
-                return Err(Error::Failed);
-            }
-            let number = value.parse::<u64>().map_err(|_| Error::Failed)?;
-            if number > 9_007_199_254_740_991 {
-                return Err(Error::Failed);
-            }
-            Some(number)
-        } else {
-            None
-        };
         let limit = request.max_response_bytes.min(if lane == Lane::Discovery {
             2 * 1024 * 1024
         } else if lane == Lane::Account {
@@ -529,10 +509,7 @@ impl Transport {
         } else {
             MAX_RESPONSE
         });
-        let unsafe_body = headers
-            .get("content-encoding")
-            .is_some_and(|value| value.as_bytes() != b"identity")
-            || length.is_some_and(|n| n > limit as u64);
+        let unsafe_body = unsafe_response_body(&headers, limit)?;
         if unsafe_body && status < 400 {
             return Err(if lane == Lane::Account {
                 Error::InvalidResponse
@@ -580,6 +557,82 @@ impl Transport {
             body: bytes.freeze(),
         })
     }
+}
+
+struct Connection {
+    sender: hyper::client::conn::http1::SendRequest<Full<Bytes>>,
+    _task: AbortConnection,
+}
+
+struct ConnectionResponse {
+    status: u16,
+    headers: HeaderMap,
+    body: hyper::body::Incoming,
+    connection: Connection,
+}
+
+impl Connection {
+    async fn send(mut self, request: &Request, target: &Url) -> Result<ConnectionResponse> {
+        let path = match target.query() {
+            Some(query) => format!("{}?{query}", target.path()),
+            None => target.path().to_owned(),
+        };
+        let mut outgoing = hyper::Request::builder()
+            .method(request.method.clone())
+            .uri(path)
+            .body(Full::new(request.body.clone()))
+            .map_err(|_| Error::Failed)?;
+        *outgoing.headers_mut() = request.headers.clone();
+        let host = match target.port() {
+            Some(port) => format!("{}:{port}", target.host_str().ok_or(Error::Failed)?),
+            None => target.host_str().ok_or(Error::Failed)?.to_owned(),
+        };
+        outgoing.headers_mut().insert(
+            "host",
+            HeaderValue::from_str(&host).map_err(|_| Error::Failed)?,
+        );
+        outgoing
+            .headers_mut()
+            .insert("connection", HeaderValue::from_static("close"));
+        let incoming = self
+            .sender
+            .send_request(outgoing)
+            .await
+            .map_err(|_| Error::Failed)?;
+        let status = incoming.status().as_u16();
+        if !(200..600).contains(&status) {
+            return Err(Error::Failed);
+        }
+        let (parts, body) = incoming.into_parts();
+        let mut headers = parts.headers;
+        headers.remove("set-cookie");
+        Ok(ConnectionResponse {
+            status,
+            headers,
+            body,
+            connection: self,
+        })
+    }
+}
+
+fn unsafe_response_body(headers: &HeaderMap, limit: usize) -> Result<bool> {
+    let length = if let Some(value) = headers.get("content-length") {
+        let value = value.to_str().map_err(|_| Error::Failed)?;
+        if value.is_empty() || !value.bytes().all(|b| b.is_ascii_digit()) {
+            return Err(Error::Failed);
+        }
+        let number = value.parse::<u64>().map_err(|_| Error::Failed)?;
+        if number > 9_007_199_254_740_991 {
+            return Err(Error::Failed);
+        }
+        Some(number)
+    } else {
+        None
+    };
+    Ok(headers
+        .get("content-encoding")
+        .is_some_and(|value| value.as_bytes() != b"identity")
+        || length.is_some_and(|n| n > limit as u64))
 }
 
 trait Io: AsyncRead + AsyncWrite + Unpin + Send {}
@@ -644,6 +697,13 @@ fn snapshot(route: Route, target: &Url, request: &mut Request) -> Result<()> {
             Route::Token => matches!(name, "accept" | "content-type"),
             Route::Logout => matches!(name, "accept" | "content-type" | "authorization" | "apikey"),
             Route::Account => matches!(name, "accept" | "content-type" | "authorization"),
+            Route::Gg if name == gg_chat::BILLING_RECEIPT_HEADER => {
+                target.path() == gg_chat::CHAT_PATH
+                    && target.query().is_none()
+                    && request.method == Method::POST
+                    && value.as_bytes() == b"1"
+                    && request.headers.get_all(name).iter().count() == 1
+            }
             Route::Vercel => {
                 common
                     || name == "authorization"

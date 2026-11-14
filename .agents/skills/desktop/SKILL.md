@@ -19,9 +19,10 @@ The renderer is still the editor's Next.js app under `editor/app/desktop/`;
 Electron URL-loads it from `http://localhost:3000/desktop/*` in dev and
 `https://grida.co/desktop/*` in prod.
 
-Use [`agent-system`](../agent-system/SKILL.md) for the daemon + agent-tenant core,
-sessions, workspaces, providers, tool execution, HTTP routes, and tests in
-`packages/grida-daemon` and `packages/grida-ai-agent`.
+Use [`agent-system`](../agent-system/SKILL.md) for the native Rust agent
+(chat, sessions, tools, permissions, providers), its Main integration
+contracts, and the retained daemon and media services in
+`packages/grida-daemon` and `packages/grida-ai-host`.
 
 > Adjacent: [`security`](../security/SKILL.md) for the GRIDA-SEC-004 trust
 > boundary, [`code-react`](../code-react/SKILL.md) for React code under
@@ -44,9 +45,9 @@ sessions, workspaces, providers, tool execution, HTTP routes, and tests in
   native version bump or coordinated release.
 
 Use `agent-system` to implement core agent behavior that can be tested without
-Electron: `packages/grida-daemon/**`, `packages/grida-ai-agent/**`, daemon HTTP
-routes, sessions, files/workspaces, providers, tools, runtime, skills, and
-BYOK/secrets. Also use this skill when auditing whether that work changes the
+Electron: the native agent crates, `packages/grida-daemon/**`,
+`packages/grida-ai-host/**`, daemon HTTP routes, files/workspaces, media
+providers, and BYOK/secrets. Also use this skill when auditing whether that work changes the
 packaged Desktop payload or its compatibility with the hosted renderer.
 
 ---
@@ -58,7 +59,7 @@ Electron main (desktop/src/main.ts)
   - single-instance lock
   - BrowserWindow.loadURL(`${EDITOR_BASE_URL}/desktop/welcome`)
   - grida:// protocol router, open-file/argv queue
-  - starts/supervises the AgentSidecar adapter
+  - starts/supervises the ServicesSidecar adapter
         |
         | contextBridge.exposeInMainWorld("grida", ...)
         | only for /desktop or /desktop/*
@@ -69,7 +70,7 @@ Renderer (editor/app/desktop/**)
   - CSP strict, no analytics, no third-party scripts
         |
         v
-AgentSidecar loopback service
+ServicesSidecar loopback service
   - owned by the agent-system skill
 ```
 
@@ -225,15 +226,15 @@ judging the bridge state.
 
 ## Boundaries
 
-| Concern                   | Lives in                                              | Notes                                                                 |
-| ------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------- |
-| Window/menu/dialog wiring | `desktop/src/main/**`                                 | Native shell behavior                                                 |
-| Protocol and file routing | `desktop/src/main/**`, `desktop/Info.plist`           | `grida://` (prod) / `grida-dev://` (dev, #955), open-file, argv queue |
-| Agent sidecar supervision | `desktop/src/main/**`, `desktop/src/agent-sidecar.ts` | Adapter only; core is `agent-system`                                  |
-| Preload bridge            | `desktop/src/preload.ts`                              | Path-scoped `window.grida`, auth held in closure                      |
-| Renderer desktop routes   | `editor/app/desktop/**`                               | No server actions, no `next/headers`                                  |
-| Renderer scaffolds        | `editor/scaffolds/desktop/**`                         | UI using `@/lib/desktop/*`                                            |
-| Typed bridge client       | `editor/lib/desktop/**`                               | Pure TS client, no server-only imports                                |
+| Concern                      | Lives in                                                 | Notes                                                                 |
+| ---------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------- |
+| Window/menu/dialog wiring    | `desktop/src/main/**`                                    | Native shell behavior                                                 |
+| Protocol and file routing    | `desktop/src/main/**`, `desktop/Info.plist`              | `grida://` (prod) / `grida-dev://` (dev, #955), open-file, argv queue |
+| Services sidecar supervision | `desktop/src/main/**`, `desktop/src/services-sidecar.ts` | Adapter only; core is `agent-system`                                  |
+| Preload bridge               | `desktop/src/preload.ts`                                 | Path-scoped `window.grida`, auth held in closure                      |
+| Renderer desktop routes      | `editor/app/desktop/**`                                  | No server actions, no `next/headers`                                  |
+| Renderer scaffolds           | `editor/scaffolds/desktop/**`                            | UI using `@/lib/desktop/*`                                            |
+| Typed bridge client          | `editor/lib/desktop/**`                                  | Pure TS client, no server-only imports                                |
 
 Do not put OPFS or IndexedDB desktop storage in `editor/app/desktop/**`.
 Desktop storage goes through the bridge and agent host.
@@ -262,7 +263,7 @@ When changing the bridge or navigation rules, review `SECURITY.md` and the
 
 Production Desktop has two independently shipped halves: the renderer loaded
 from `https://grida.co/desktop/*`, and the native app containing Electron plus
-the bundled daemon/agent sidecar. A change can require a Desktop release
+the bundled daemon/services sidecar. A change can require a Desktop release
 without touching `desktop/src/**`.
 
 At the start and before handoff, run the bundled audit from the repository

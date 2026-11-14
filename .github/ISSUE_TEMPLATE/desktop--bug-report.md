@@ -7,7 +7,7 @@ assignees: softmarshmallow
 ---
 
 > Use this template **only** for problems that happen in the installed Grida
-> Desktop app — the agent sidecar, app windows, deep links / file
+> Desktop app — the services sidecar, app windows, deep links / file
 > associations, updates, or native crashes. If the same problem also happens
 > in the browser editor at grida.co, file a general **Bug report** instead.
 
@@ -33,7 +33,7 @@ A clear and concise description of what you expected to happen.
 
 **Internal logs (required)**
 
-The desktop app prints its Electron main-process and agent-sidecar logs to
+The desktop app prints its Electron main-process and services-sidecar logs to
 the terminal — they are **not** written to a log file, so they are only
 visible when you launch the app from a terminal. Please reproduce the bug
 with the app started this way and paste the full output below.
@@ -80,7 +80,7 @@ Add any other context about the problem here.
 
 **Confirm this is a desktop-specific issue**
 
-- [ ] This issue reproduces in the Grida Desktop app (e.g. agent sidecar
+- [ ] This issue reproduces in the Grida Desktop app (e.g. services sidecar
       errors, Electron windows, deep links, file associations, updates,
       native crashes) and **not** in the browser editor at grida.co. If it
       also happens in the browser, I will file a general Bug report instead.

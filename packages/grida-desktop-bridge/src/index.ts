@@ -6,12 +6,10 @@
  * This package carries only the `window.grida` contract that a URL-loaded
  * renderer may compile against. Electron IPC channel names and native
  * implementation details stay in the Desktop app; daemon HTTP stays in
- * `@grida/daemon/transport` + `@grida/agent/transport`.
+ * `@grida/daemon/transport` + `@grida/ai-host/media-transport`.
  */
 
 import type {
-  AgentRunOptions,
-  AgentUIMessageChunk,
   ProviderId,
   EndpointProviderConfig,
   GGModelsView,
@@ -35,19 +33,10 @@ import type {
   TextToSpeechGenerateRequest,
   TextToSpeechGenerateResult,
   TextToSpeechListVoicesResult,
-  ChatMessageWithParts,
-  ChatSessionRow,
   ChatGptSubscriptionStatus,
-  CreateSessionOptions,
-  PatchSessionOptions,
-  RewindResult,
-  SessionListFilter,
-  SessionListPage,
-  SessionStatus,
   GridaGatewaySession,
   GridaGatewaySessionStatus,
-  DirectoryScopeDescriptor,
-} from "@grida/agent";
+} from "@grida/ai-host";
 import type {
   DaemonHandshakeResponse,
   FileReadResult,
@@ -61,6 +50,19 @@ import type {
   WorkspaceReadFileResult,
   WorkspaceWriteFileResult,
 } from "@grida/daemon";
+
+import type { DesktopNativeChat } from "./native-chat";
+import type { DesktopNativeExternalAgent } from "./native-external-agent";
+import type { NativeEditorSurfaceSnapshot } from "./native-editor-surfaces";
+export type * from "./native-chat";
+export type * from "./native-external-agent";
+export type * from "./native-subagents";
+export { NativeEditorSurfaces } from "./native-editor-surfaces";
+export { NativeEditorSvgText } from "./native-editor-svg-text";
+export type {
+  NativeEditorSurfaceOpen,
+  NativeEditorSurfaceSnapshot,
+} from "./native-editor-surfaces";
 
 export const DESKTOP_BRIDGE_PROTOCOL = 1 as const;
 
@@ -83,22 +85,6 @@ export type DesktopNativeCapabilities = {
   workspace_watch: boolean;
 };
 
-export type DesktopAgentCapabilities = {
-  /**
-   * The host accepts base64 scratch seeds (`{ path, base64 }`) on agent runs.
-   * Added after protocol 1 shipped; renderers must treat a missing/falsy value
-   * as an old host that accepts text-only scratch seeds.
-   */
-  scratch_seed_base64?: boolean;
-  /**
-   * The host exposes binary-operable tools for scratch-backed files (today,
-   * the confined `run_command` capability). Omission/false means a path-only
-   * PDF/archive/etc. would be inert, so renderers must not offer scratch-only
-   * arbitrary-byte attachments.
-   */
-  scratch_binary_tools?: boolean;
-};
-
 export type DesktopCapabilities = {
   native: DesktopNativeCapabilities;
   /** Bundled media capabilities; omission means an older Desktop binary. */
@@ -112,8 +98,6 @@ export type DesktopCapabilities = {
     /** Grida credits for eligibility and rigging, including native signed uploads. */
     rigging_gg?: boolean;
   };
-  /** Optional because protocol-1 hosts shipped before agent capabilities. */
-  agent?: DesktopAgentCapabilities;
 };
 
 export type HandshakeResponse = DaemonHandshakeResponse;
@@ -232,11 +216,15 @@ export type DesktopMediaReadResult = {
   bytes: ArrayBuffer;
 };
 
+export type DesktopMediaSaveCopyResult = "saved" | "cancelled" | "failed";
+
 export type DesktopBridge = {
   protocol: typeof DESKTOP_BRIDGE_PROTOCOL;
   app: { version: string; platform: string };
   caps: DesktopCapabilities;
   handshake: () => Promise<HandshakeResponse>;
+  nativeChat?: DesktopNativeChat;
+  nativeExternalAgent?: DesktopNativeExternalAgent;
   /**
    * Grida account lifecycle owned by the native entry controller. Optional
    * because older protocol-1 hosts let individual renderer windows sign out
@@ -301,11 +289,17 @@ export type DesktopBridge = {
   media?: {
     list: () => Promise<MediaItem[]>;
     read: (id: string) => Promise<DesktopMediaReadResult>;
+    save_copy?: (id: string) => Promise<DesktopMediaSaveCopyResult>;
     reveal: (id: string) => Promise<void>;
     open_folder: () => Promise<void>;
   };
   workspaces: {
     list: () => Promise<Workspace[]>;
+    publish_editor_surfaces?: (
+      snapshot: NativeEditorSurfaceSnapshot
+    ) => Promise<boolean>;
+    /** Open the exact directory selected in a native folder picker. */
+    choose?: () => Promise<Workspace | null>;
     open: (rootPath: string) => Promise<Workspace>;
     /**
      * Auto-create a fresh project (managed root, seeded `.canvas` board) and
@@ -335,10 +329,8 @@ export type DesktopBridge = {
      * the viewer is size-independent (no 1 MiB base64 cap) and video seeking
      * works.
      *
-     * OPTIONAL: a host that can't serve a streaming scheme (e.g. the
-     * web-daemon dev bridge running in a plain browser) omits this; the viewer
-     * falls back to {@link read_file_bytes}. Gate on its presence, not on
-     * `caps`.
+     * OPTIONAL: when the host omits this capability, the viewer uses
+     * {@link read_file_bytes}.
      */
     media_url?: (workspaceId: string, relPath: string) => string;
     /**
@@ -358,7 +350,7 @@ export type DesktopBridge = {
     /**
      * Move a workspace entry (file or folder) to the OS trash
      * (recoverable; a folder takes its whole subtree). Unlike the sibling
-     * fs methods — which route to the agent sidecar — this is a host
+     * fs methods — which route to the services sidecar — this is a host
      * capability: the desktop main process performs the native trash
      * after re-validating that `relPath` resolves inside the workspace
      * root (and isn't the root itself). Renderers must confirm with the
@@ -371,7 +363,7 @@ export type DesktopBridge = {
      * coalesced batches of {@link WorkspaceChangeEvent} — covering edits
      * made outside the editor, including the agent's own writes. Like
      * `trash_entry` this is a native host capability (the OS watcher lives
-     * in the desktop main process), not an agent-sidecar operation.
+     * in the desktop main process), not a services-sidecar operation.
      *
      * `subscribe_changes` registers `on_change` before the OS watch
      * starts (caller-mints-id, mirroring `terminal.create`) so an early
@@ -390,7 +382,7 @@ export type DesktopBridge = {
    * GRIDA-SEC-004 — human-interactive terminal. A real, unsandboxed
    * login PTY on the user's own machine (VSCode trust model: the human
    * is allowed to run anything as themselves). This is deliberately
-   * NOT the agent's shell — the agent's `run_command` stays confined
+   * NOT the agent's shell — the agent's `exec_command` stays confined
    * behind the srt sandbox and is never wired to this surface.
    *
    * `create` registers `handlers` before the PTY spawns, so no output
@@ -442,10 +434,6 @@ export type DesktopBridge = {
       source: "ollama" | "openai";
       models: ProbedEndpointModel[];
     }>;
-    /** Is the user's `claude` CLI resolvable on the host (issue #813)? Cheap
-     *  filesystem probe, NOT a login check (login surfaces on the first run).
-     *  Optional — older binaries lack it; renderers feature-detect. */
-    detect_claude?: () => Promise<{ installed: boolean; path?: string }>;
   };
   /**
    * Grida hosted ("included") AI session — GRIDA-SEC-006. Push-only
@@ -463,7 +451,7 @@ export type DesktopBridge = {
   /**
    * Native ChatGPT-subscription provider control surface. OAuth credentials,
    * authorization codes, PKCE material, and provider access tokens stay in
-   * Electron main + the agent sidecar; only secret-free status crosses into
+   * Electron main + the services sidecar; only secret-free status crosses into
    * the renderer. Optional because protocol-1 Desktop builds predate it.
    */
   chatgpt?: {
@@ -528,81 +516,5 @@ export type DesktopBridge = {
         req: TextToSpeechGenerateRequest
       ) => Promise<TextToSpeechGenerateResult>;
     };
-  };
-  agent: {
-    /**
-     * Turn an OS-backed directory `File` from a real drop into an opaque,
-     * read-only agent scope. Optional on protocol 1: older desktop binaries and
-     * browser hosts omit it. The absolute path is resolved inside Electron's
-     * preload and never returns to renderer code.
-     */
-    attach_directory?: (file: File) => Promise<DirectoryScopeDescriptor>;
-    run: (
-      opts: AgentRunOptions,
-      onChunk: (chunk: AgentUIMessageChunk) => void
-    ) => Promise<{
-      stream_id: string;
-      session_id: string;
-      done: Promise<void>;
-    }>;
-    abort: (sessionId: string) => Promise<void>;
-    reconnect: (
-      sessionId: string,
-      lastEventId: number,
-      onChunk: (chunk: AgentUIMessageChunk) => void
-    ) => Promise<{
-      stream_id: string;
-      session_id: string;
-      done: Promise<void>;
-    } | null>;
-  };
-  sessions: {
-    list: (filter?: SessionListFilter) => Promise<SessionListPage>;
-    get: (id: string) => Promise<ChatSessionRow | null>;
-    create: (opts: CreateSessionOptions) => Promise<ChatSessionRow>;
-    patch: (id: string, opts: PatchSessionOptions) => Promise<ChatSessionRow>;
-    delete: (id: string) => Promise<void>;
-    list_messages: (id: string) => Promise<ChatMessageWithParts[]>;
-    /** Soft-truncate to a prior message (`restore: true` un-rewinds). */
-    rewind: (
-      id: string,
-      fromMessageId: string,
-      opts?: { restore?: boolean }
-    ) => Promise<RewindResult>;
-    /** Fork the session at a message; resolves to the new forked session. */
-    fork: (
-      id: string,
-      fromMessageId: string,
-      metadata?: Record<string, unknown>
-    ) => Promise<ChatSessionRow>;
-    /** User-fired compaction. */
-    compact: (id: string) => Promise<{
-      compacted: boolean;
-      reason?: string;
-      summary_message_id?: string;
-    }>;
-    /** Queued sends: enqueue a pending user message (held out of the model
-     *  view + transcript until it fires). The caller mints the id. */
-    enqueue: (
-      id: string,
-      message: { id?: string; text: string }
-    ) => Promise<ChatMessageWithParts>;
-    /** The pending queue, FIFO by `queued_at`. */
-    list_queued: (id: string) => Promise<ChatMessageWithParts[]>;
-    /** Cancel a queued message before it fires. */
-    cancel_queued: (id: string, messageId: string) => Promise<void>;
-    /**
-     * Subscribe to the session's run-state (RFC `session` §Session status):
-     * the current status arrives first, then every idle⇄busy⇄waiting⇄error
-     * transition. Returns a `subscription_id` to later
-     * {@link unsubscribe_status}, and a `done` that settles when the
-     * subscription ends.
-     */
-    subscribe_status: (
-      id: string,
-      onStatus: (status: SessionStatus) => void
-    ) => Promise<{ subscription_id: string; done: Promise<void> }>;
-    /** Stop a status subscription started by {@link subscribe_status}. */
-    unsubscribe_status: (subscriptionId: string) => Promise<void>;
   };
 };

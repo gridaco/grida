@@ -8,11 +8,6 @@
 
 "use client";
 
-import { useGGModels } from "@/lib/desktop/gg-models";
-import { useMemo } from "react";
-import type { UIMessage } from "ai";
-import type { EndpointProviderConfig } from "@/lib/desktop/bridge";
-import { registered_models } from "./registered-models";
 import { Button } from "@app/ui/components/button";
 import {
   Popover,
@@ -26,7 +21,7 @@ import {
   TooltipTrigger,
 } from "@app/ui/components/tooltip";
 import { cn } from "@app/ui/lib/utils";
-import { computeContextUsage } from "@/lib/agent-chat";
+import type { computeContextUsage } from "@/lib/agent-chat/context-usage";
 
 const compact = new Intl.NumberFormat("en-US", { notation: "compact" });
 const percent = new Intl.NumberFormat("en-US", {
@@ -54,45 +49,25 @@ const CATEGORIES = [
   { key: "other", label: "Other", color: "bg-muted-foreground/40" },
 ] as const;
 
-export function DesktopContextMeter({
-  messages,
-  modelId,
-  providerId,
+/**
+ * The ring and its breakdown for an already computed usage. Renders nothing
+ * until both the window and the transcript size are known.
+ */
+export function ContextMeter({
+  usage,
   costUsd,
-  endpoints = [],
 }: {
-  messages: UIMessage[];
-  /** Active model id — its resolved spec supplies the context window. */
-  modelId: string;
-  /** Exact provider paired with `modelId`, when selected or persisted. */
-  providerId?: string;
-  /** Session cumulative base-rate estimate from aggregate per-turn usage.
-   * Request-level pricing bands are not reconstructible from this rollup. */
+  usage: Pick<
+    ReturnType<typeof computeContextUsage>,
+    "usedTokens" | "maxTokens" | "percent" | "breakdown"
+  > &
+    Partial<Pick<ReturnType<typeof computeContextUsage>, "measured">>;
   costUsd?: number;
-  /** Configured endpoint providers (issue #806) — registered local models
-   *  resolve their real (often small) windows through these. */
-  endpoints?: readonly EndpointProviderConfig[];
 }) {
-  // Memoized: chat panels re-render per streamed token, and resolve()
-  // rebuilds the flattened spec list each call.
-  const ggModels = useGGModels();
-  const contextWindow = useMemo(
-    () =>
-      registered_models.resolve(modelId, endpoints, providerId, ggModels)
-        ?.contextWindow,
-    [modelId, providerId, endpoints, ggModels]
-  );
-  const {
-    usedTokens,
-    maxTokens,
-    percent: ratio,
-    breakdown,
-  } = useMemo(
-    () => computeContextUsage(messages, contextWindow),
-    [messages, contextWindow]
-  );
-
+  const { usedTokens, maxTokens, percent: ratio, breakdown } = usage;
   if (maxTokens === 0 || usedTokens === 0) return null;
+  // Experience contract: an estimate is labeled as one.
+  const source = usage.measured ? "Reported by provider" : "Estimated";
 
   const pct = percent.format(ratio);
   const rows = [
@@ -134,6 +109,7 @@ export function DesktopContextMeter({
               {compact.format(usedTokens)} / {compact.format(maxTokens)} tokens
               used
             </div>
+            <div className="text-background/70">{source}</div>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -141,7 +117,12 @@ export function DesktopContextMeter({
       <PopoverContent align="start" className="w-72 p-0">
         <div className="space-y-2 p-3">
           <div className="flex items-center justify-between text-xs">
-            <span className="font-medium">Context · {pct}</span>
+            <span className="font-medium">
+              Context · {pct}{" "}
+              <span className="font-normal text-muted-foreground">
+                · {source}
+              </span>
+            </span>
             <span className="font-mono text-muted-foreground">
               {compact.format(usedTokens)} / {compact.format(maxTokens)}
             </span>

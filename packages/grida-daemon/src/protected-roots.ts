@@ -30,6 +30,18 @@ export class ProtectedRoots {
     });
   }
 
+  /** Exact spellings whose metadata a confined host needs to resolve aliases. */
+  metadataPaths(): string[] {
+    return [
+      ...new Set(this.roots.flatMap((root) => [root, this.canonical(root)])),
+    ];
+  }
+
+  /** Resolve aliases before giving physical paths to a confined reader. */
+  canonicalPaths(): string[] {
+    return [...new Set(this.roots.map((root) => this.canonical(root)))];
+  }
+
   private canonical(value: string): string {
     let current = path.resolve(value);
     const suffix: string[] = [];

@@ -2,183 +2,58 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   IMAGE_ATTACHMENT_POLICY,
   decodedBytes,
-  encodeLibraryImageUrl,
+  encodeLibraryPng,
   isSupportedImageType,
   planResize,
-  toFileUiParts,
-  trustedLibraryImageUrl,
 } from "./image-attachment";
-
-type StubImage = {
-  onload: (() => void) | null;
-  onerror: (() => void) | null;
-  src: string;
-};
-
-function stubImage(): () => StubImage {
-  const instances: StubImage[] = [];
-  vi.stubGlobal(
-    "Image",
-    class {
-      crossOrigin = "";
-      decoding = "";
-      naturalWidth = 0;
-      naturalHeight = 0;
-      onload: (() => void) | null = null;
-      onerror: (() => void) | null = null;
-      src = "";
-
-      constructor() {
-        instances.push(this);
-      }
-    }
-  );
-  return () => {
-    const instance = instances[0];
-    if (!instance) throw new Error("Image was not constructed");
-    return instance;
-  };
-}
 
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
-  vi.unstubAllEnvs();
 });
 
-describe("encodeLibraryImageUrl", () => {
-  const base = "https://project.supabase.co";
-  const url = `${base}/storage/v1/object/public/library/example.png`;
-  const policy = { ...IMAGE_ATTACHMENT_POLICY, loadTimeoutMs: 25 };
-
-  it("stops a stalled Library image load at the configured timeout", async () => {
-    vi.useFakeTimers();
-    const getImage = stubImage();
-
-    const encoded = encodeLibraryImageUrl(
-      url,
-      "example.png",
-      "image/png",
-      policy,
-      ["image/png"],
-      base
-    );
-    expect(getImage().src).toBe(url);
-
-    await vi.advanceTimersByTimeAsync(policy.loadTimeoutMs);
-
-    await expect(encoded).resolves.toBeNull();
-    expect(vi.getTimerCount()).toBe(0);
-    expect(getImage()).toMatchObject({
-      onload: null,
-      onerror: null,
-      src: "",
-    });
+it("normalizes captured WebP bytes into a bounded PNG without opening an image URL", async () => {
+  const input = Uint8Array.of(1, 2, 3);
+  const output = Uint8Array.of(137, 80, 78, 71);
+  const close = vi.fn<() => void>();
+  const drawImage = vi.fn<CanvasRenderingContext2D["drawImage"]>();
+  const canvas = {
+    width: 0,
+    height: 0,
+    getContext: () => ({ drawImage }),
+    toDataURL: (mime: string) => {
+      expect(mime).toBe("image/png");
+      const bytes = canvas.width > 240 ? new Uint8Array(32) : output;
+      return `data:image/png;base64,${Buffer.from(bytes).toString("base64")}`;
+    },
+  };
+  const decode = vi.fn<(source: Blob) => Promise<unknown>>(async (source) => {
+    expect(source.type).toBe("image/webp");
+    expect(new Uint8Array(await source.arrayBuffer())).toEqual(input);
+    return { width: 1000, height: 500, close };
   });
-
-  it.each(["load", "error"] as const)(
-    "clears the timeout and image state after %s",
-    async (event) => {
-      vi.useFakeTimers();
-      const getImage = stubImage();
-
-      const encoded = encodeLibraryImageUrl(
-        url,
-        "example.png",
-        "image/png",
-        policy,
-        ["image/png"],
-        base
-      );
-      const image = getImage();
-      if (event === "load") image.onload?.();
-      else image.onerror?.();
-
-      await expect(encoded).resolves.toBeNull();
-      expect(vi.getTimerCount()).toBe(0);
-      expect(image).toMatchObject({ onload: null, onerror: null, src: "" });
+  vi.stubGlobal("document", { createElement: () => canvas });
+  vi.stubGlobal("createImageBitmap", decode);
+  vi.stubGlobal(
+    "Image",
+    class {
+      constructor() {
+        throw new Error("Unexpected remote image materialization");
+      }
     }
   );
-});
 
-// GRIDA-SEC-004: Reject unrelated origins and non-Library paths before image loading.
-describe("trustedLibraryImageUrl", () => {
-  const base = "https://project.supabase.co";
-  const sha = "a".repeat(64);
-
-  it("accepts only public-storage objects on the configured Library origin", () => {
-    expect(
-      trustedLibraryImageUrl(
-        `${base}/storage/v1/object/public/library/example.png`,
-        base
-      )?.href
-    ).toBe(`${base}/storage/v1/object/public/library/example.png`);
-    expect(
-      trustedLibraryImageUrl(`${base}/storage/v1/object/private/x.png`, base)
-    ).toBeNull();
-    expect(
-      trustedLibraryImageUrl(
-        "https://attacker.test/storage/v1/object/public/library/x.png",
-        base
-      )
-    ).toBeNull();
-    expect(
-      trustedLibraryImageUrl(
-        "http://project.supabase.co/storage/v1/object/public/library/x.png",
-        base
-      )
-    ).toBeNull();
-  });
-
-  it("does not admit Tigris images before the explicit provider switch", () => {
-    vi.stubEnv("NEXT_PUBLIC_GRIDA_LIBRARY_STORAGE_PROVIDER", "supabase");
-    expect(
-      trustedLibraryImageUrl(`https://library.grida.co/${sha}.png`, base)
-    ).toBeNull();
-  });
-
-  it("admits hash-key images while retaining saved Supabase references", () => {
-    vi.stubEnv("NEXT_PUBLIC_GRIDA_LIBRARY_STORAGE_PROVIDER", "tigris");
-    vi.stubEnv("NEXT_PUBLIC_GRIDA_LIBRARY_ASSET_ORIGIN", undefined);
-    const url = `https://library.grida.co/${sha}.png`;
-    expect(trustedLibraryImageUrl(url, base)?.href).toBe(url);
-    expect(trustedLibraryImageUrl(url, "")?.href).toBe(url);
-    expect(
-      trustedLibraryImageUrl(
-        `${base}/storage/v1/object/public/library/legacy.png`,
-        base
-      )?.href
-    ).toBe(`${base}/storage/v1/object/public/library/legacy.png`);
-  });
-
-  it.each([
-    `https://library.grida.co.attacker.test/${sha}.png`,
-    `https://other.t3.tigrisbucket.io/${sha}.png`,
-    `http://library.grida.co/${sha}.png`,
-    `https://user:secret@library.grida.co/${sha}.png`,
-    "https://library.grida.co/legacy/image.png",
-    `https://library.grida.co/_qualification/${sha}.png`,
-    `https://library.grida.co/${sha.toUpperCase()}.png`,
-    `https://library.grida.co/${sha}.png?download=`,
-    `https://library.grida.co/${sha}.png#fragment`,
-  ])("rejects a noncanonical or foreign Tigris image URL: %s", (url) => {
-    vi.stubEnv("NEXT_PUBLIC_GRIDA_LIBRARY_STORAGE_PROVIDER", "tigris");
-    vi.stubEnv("NEXT_PUBLIC_GRIDA_LIBRARY_ASSET_ORIGIN", undefined);
-    expect(trustedLibraryImageUrl(url, base)).toBeNull();
-  });
-
-  it("supports an explicitly configured local object-store origin", () => {
-    vi.stubEnv("NEXT_PUBLIC_GRIDA_LIBRARY_STORAGE_PROVIDER", "tigris");
-    vi.stubEnv(
-      "NEXT_PUBLIC_GRIDA_LIBRARY_ASSET_ORIGIN",
-      "http://127.0.0.1:9000"
-    );
-    const local = `http://127.0.0.1:9000/${sha}.webp`;
-    expect(trustedLibraryImageUrl(local, base)?.href).toBe(local);
-    expect(
-      trustedLibraryImageUrl(`https://library.grida.co/${sha}.png`, base)
-    ).toBeNull();
-  });
+  const png = await encodeLibraryPng(
+    { mime: "image/webp", bytes: input.buffer },
+    16
+  );
+  expect(new Uint8Array(png)).toEqual(output);
+  expect(decode).toHaveBeenCalledOnce();
+  expect(drawImage.mock.calls.map((call) => call.slice(3))).toEqual([
+    [768, 384],
+    [240, 120],
+  ]);
+  expect(close).toHaveBeenCalledOnce();
 });
 
 describe("planResize", () => {
@@ -236,50 +111,5 @@ describe("decodedBytes", () => {
   it("strips a data: URL prefix before measuring", () => {
     expect(decodedBytes("data:image/png;base64,AAAA")).toBe(3);
     expect(decodedBytes("data:image/png;base64,")).toBe(0);
-  });
-});
-
-describe("toFileUiParts", () => {
-  it("maps only inlined raster image attachments to FileUIParts", () => {
-    const parts = [
-      {
-        type: "file-attachment",
-        mime: "image/png",
-        url: "data:image/png;base64,AAA",
-        name: "a.png",
-      },
-      // svg — excluded (text)
-      {
-        type: "file-attachment",
-        mime: "image/svg+xml",
-        url: "data:image/svg+xml;base64,AAA",
-        name: "b.svg",
-      },
-      // no url — excluded
-      { type: "file-attachment", mime: "image/png", name: "c.png" },
-      // not an image — excluded
-      {
-        type: "file-attachment",
-        mime: "application/pdf",
-        url: "data:application/pdf;base64,AAA",
-        name: "d.pdf",
-      },
-      // not a file-attachment — excluded
-      { type: "text", url: "data:image/png;base64,AAA" },
-    ];
-
-    expect(toFileUiParts(parts)).toEqual([
-      {
-        type: "file",
-        url: "data:image/png;base64,AAA",
-        mediaType: "image/png",
-        filename: "a.png",
-      },
-    ]);
-  });
-
-  it("returns an empty array when nothing qualifies", () => {
-    expect(toFileUiParts([])).toEqual([]);
-    expect(toFileUiParts([{ type: "text" }])).toEqual([]);
   });
 });

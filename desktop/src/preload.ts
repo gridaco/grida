@@ -1,7 +1,7 @@
 // GRIDA-GG: desktop — install the `gg` bridge namespace (docs/wg/platform/hosted-ai.md)
 // GRIDA-SEC-008 — expose only secret-free native-provider operations.
 /**
- * GRIDA-SEC-004 — Desktop agent-sidecar trust boundary (renderer side).
+ * GRIDA-SEC-004 — Desktop services-sidecar trust boundary (renderer side).
  *
  * Exposes `window.grida` via `contextBridge` **only when** the page
  * pathname is `/desktop` or starts with `/desktop/`. Without this scope, any XSS on
@@ -17,23 +17,24 @@
  */
 
 import { contextBridge, ipcRenderer, webUtils } from "electron";
-import { AgentTransport } from "@grida/agent/transport";
-import type {
-  AgentRunOptions,
-  AgentUIMessageChunk,
-  CreateSessionOptions,
-  DirectoryScopeDescriptor,
-  PatchSessionOptions,
-  SessionListFilter,
-} from "@grida/agent";
+import { MediaTransport } from "@grida/ai-host/media-transport";
+import {
+  NativeEditorSurfaces,
+  NativeEditorSvgText,
+  type NativeEditorSurfaceOpen,
+} from "@grida/desktop-bridge";
 import {
   DESKTOP_BRIDGE_PROTOCOL,
   IPC_CHANNELS,
+  NATIVE_DOCUMENT_ARGUMENT,
+  NATIVE_DOCUMENT_CHAT_ARGUMENT,
+  NATIVE_WORKSPACE_CHAT_ARGUMENT,
   type ConfirmOptions,
   type DesktopBridge,
   type DesktopHostAppInfo,
   type HandshakeResponse,
   type NavigationState,
+  type NativeChatUpdate,
   type OpenDialogOptions,
   type SaveDialogOptions,
   type TerminalCreateOptions,
@@ -53,6 +54,10 @@ function getCliArg(name: string): string | undefined {
 
 const appVersion = getCliArg("grida-version") ?? "0.0.0";
 const appPlatform = process.platform;
+const nativeDocumentId = getCliArg(NATIVE_DOCUMENT_ARGUMENT);
+const nativeDocumentChatId = getCliArg(NATIVE_DOCUMENT_CHAT_ARGUMENT);
+const nativeWorkspaceChatOnly =
+  getCliArg(NATIVE_WORKSPACE_CHAT_ARGUMENT) === "1";
 
 function isDesktopPath(pathname: string): boolean {
   return (
@@ -60,7 +65,7 @@ function isDesktopPath(pathname: string): boolean {
   );
 }
 
-const agentServerFetch: AgentTransport.Fetcher = async (path, init) => {
+const mediaServiceFetch: MediaTransport.Fetcher = async (path, init) => {
   // GRIDA-SEC-004 — fetch fresh connection info for every request.
   // The sidecar can restart on a new port with a new password; caching
   // `{port,password}` in preload would make the next renderer call leak
@@ -69,28 +74,188 @@ const agentServerFetch: AgentTransport.Fetcher = async (path, init) => {
     port: number;
     password: string;
   };
-  const fetcher = AgentTransport.makeFetcher({
+  const fetcher = MediaTransport.makeFetcher({
     port: info.port,
     password: info.password,
   });
   return await fetcher(path, init);
 };
 
-const agentClient = new AgentTransport.Client({ fetcher: agentServerFetch });
+const mediaClient = new MediaTransport.Client({ fetcher: mediaServiceFetch });
 
-// One controller per active agent stream, keyed by sessionId. The
-// AgentHost's StreamRegistry enforces one-run-per-session so a Map keyed
-// by sessionId is enough — we don't need a separate streamId reverse-
-// index. Fresh runs hold a UUID placeholder until the server's in-band
-// `grida-session` frame yields the real id; the entry is then re-keyed.
-const agentRuns = new Map<string, AbortController>();
-// Long-lived session-status subscriptions, keyed by a per-subscription id so
-// two subscribers to the same session never collide (cf. `agentRuns`, keyed by
-// session). Each owns an AbortController that `unsubscribe_status` trips.
-const statusSubs = new Map<string, AbortController>();
+const nativeChatHandlers = new Map<
+  string,
+  {
+    attachmentId: string;
+    onUpdate: (update: NativeChatUpdate) => void;
+  }
+>();
+const nativeEditorHandlers = new Map<
+  string,
+  {
+    href: string;
+    open(request: NativeEditorSurfaceOpen, isCurrent: () => boolean): void;
+  }
+>();
+const nativeSvgTextHandlers = new Map<
+  string,
+  {
+    href: string;
+    invoke(request: NativeEditorSvgText.Request): NativeEditorSvgText.Result;
+  }
+>();
+
+function clearNativeChatDelivery(): void {
+  nativeChatHandlers.clear();
+  nativeEditorHandlers.clear();
+  nativeSvgTextHandlers.clear();
+}
+
+function selectedDocumentRoute(): boolean {
+  const params = new URLSearchParams(location.search);
+  return (
+    nativeDocumentId !== undefined &&
+    location.pathname === "/desktop/file" &&
+    !location.hash &&
+    params.size === 1 &&
+    params.get("docId") === nativeDocumentId
+  );
+}
+
+function selectedDocumentChatRoute(): boolean {
+  return (
+    nativeDocumentChatId !== undefined &&
+    nativeDocumentChatId === nativeDocumentId &&
+    selectedDocumentRoute()
+  );
+}
+
+function liveSvgTextRoute(): boolean {
+  if (location.pathname === "/desktop/workspace" || selectedDocumentChatRoute())
+    return true;
+  const params = new URLSearchParams(location.search);
+  return (
+    location.pathname === "/desktop/file" &&
+    !location.hash &&
+    /^[a-f0-9]{16}$/.test(params.get("id") ?? "") &&
+    (params.size === 1 || (params.size === 2 && !!params.get("path")))
+  );
+}
+
+ipcRenderer.on(
+  IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT,
+  (_event, value: unknown) => {
+    if (!liveSvgTextRoute() || !value || typeof value !== "object") return;
+    const { attachmentId, callId, targetId, expiresAtMs, operation } =
+      value as Record<string, unknown>;
+    const action = NativeEditorSvgText.operation(operation);
+    if (
+      !NativeEditorSvgText.isId(attachmentId) ||
+      !NativeEditorSvgText.isId(callId) ||
+      !NativeEditorSvgText.isId(targetId) ||
+      typeof expiresAtMs !== "number" ||
+      !Number.isSafeInteger(expiresAtMs) ||
+      !action
+    )
+      return;
+    const handler = nativeSvgTextHandlers.get(attachmentId);
+    try {
+      const result =
+        handler?.href === location.href && Date.now() < expiresAtMs
+          ? NativeEditorSvgText.result(
+              handler.invoke({ targetId, expiresAtMs, operation: action })
+            )
+          : { kind: "unavailable" };
+      if (result)
+        void ipcRenderer
+          .invoke(
+            IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT_RESULT,
+            attachmentId,
+            callId,
+            result
+          )
+          .catch(() => {});
+    } catch {
+      // An exception after dispatch is unverified. Do not send a false receipt.
+    }
+  }
+);
+
+ipcRenderer.on(
+  IPC_CHANNELS.NATIVE_CHAT_EDITOR_SURFACE_OPEN,
+  (_event, value: unknown) => {
+    if (
+      location.pathname !== "/desktop/workspace" ||
+      !value ||
+      typeof value !== "object"
+    )
+      return;
+    const { attachmentId, path, revision, expiresAtMs } = value as Record<
+      string,
+      unknown
+    >;
+    if (
+      typeof attachmentId !== "string" ||
+      !NativeEditorSurfaces.isPath(path) ||
+      typeof revision !== "number" ||
+      !Number.isSafeInteger(revision) ||
+      revision < 1 ||
+      typeof expiresAtMs !== "number" ||
+      !Number.isSafeInteger(expiresAtMs) ||
+      expiresAtMs <= Date.now()
+    )
+      return;
+    const handler = nativeEditorHandlers.get(attachmentId);
+    if (!handler || handler.href !== location.href) return;
+    const isCurrent = () =>
+      nativeEditorHandlers.get(attachmentId) === handler &&
+      handler.href === location.href;
+    try {
+      handler.open({ path, revision, expiresAtMs }, isCurrent);
+    } catch {
+      // Presentation is auxiliary and belongs to the subscribed workbench.
+    }
+  }
+);
+
+ipcRenderer.on(
+  IPC_CHANNELS.NATIVE_CHAT_UPDATE,
+  (
+    _event,
+    payload: {
+      subscriptionId: string;
+      attachmentId: string;
+      update: NativeChatUpdate;
+    }
+  ) => {
+    if (
+      location.pathname !== "/desktop/workspace" &&
+      location.pathname !== "/desktop/file"
+    )
+      return;
+    const subscriber = nativeChatHandlers.get(payload.subscriptionId);
+    if (!subscriber || subscriber.attachmentId !== payload.attachmentId) return;
+    if (payload.update.kind === "closed")
+      nativeChatHandlers.delete(payload.subscriptionId);
+    try {
+      subscriber.onUpdate(payload.update);
+    } catch {
+      /* Consumers own their updates. */
+    }
+  }
+);
 
 async function handshake(): Promise<HandshakeResponse> {
-  return await agentClient.handshake();
+  const response = await mediaClient.handshake();
+  return {
+    ...response,
+    capabilities: {
+      ...response.capabilities,
+      files: response.capabilities.files || selectedDocumentRoute(),
+      recent: true,
+      workspaces: true,
+    },
+  };
 }
 
 /**
@@ -127,16 +292,13 @@ ipcRenderer.on(IPC_CHANNELS.WORKSPACE_COMMAND, (_event, command: unknown) => {
   );
 });
 
-// Main → renderer "bring this session into view" push (RFC `events`
+// Main → renderer "bring this session into view" wake (RFC `events`
 // §click-to-attend): a notification click focused this window; the agent
-// pane selects the named session. Same re-dispatch pattern as
-// WORKSPACE_COMMAND — only the structured-clone payload crosses, never the
-// Electron event object (GRIDA-SEC-004).
-ipcRenderer.on(IPC_CHANNELS.AGENT_FOCUS_SESSION, (_event, payload: unknown) => {
+// pane takes the staged target through its guarded read. Nothing crosses,
+// never the Electron event object (GRIDA-SEC-004).
+ipcRenderer.on(IPC_CHANNELS.AGENT_FOCUS_SESSION, () => {
   if (!isDesktopPath(location.pathname)) return;
-  window.dispatchEvent(
-    new CustomEvent(IPC_CHANNELS.AGENT_FOCUS_SESSION, { detail: payload })
-  );
+  window.dispatchEvent(new Event(IPC_CHANNELS.AGENT_FOCUS_SESSION));
 });
 
 /**
@@ -200,100 +362,27 @@ function installDesktopNavigationGuard(): void {
   const pushState = window.history.pushState.bind(window.history);
   window.history.pushState = (data, unused, url) => {
     assertAllowed(url);
-    return pushState(data, unused, url);
+    const before = window.location.href;
+    pushState(data, unused, url);
+    if (window.location.href !== before) clearNativeChatDelivery();
   };
 
   const replaceState = window.history.replaceState.bind(window.history);
   window.history.replaceState = (data, unused, url) => {
     assertAllowed(url);
-    return replaceState(data, unused, url);
+    const before = window.location.href;
+    replaceState(data, unused, url);
+    if (window.location.href !== before) clearNativeChatDelivery();
   };
 
   window.addEventListener("popstate", () => {
+    clearNativeChatDelivery();
     if (!isDesktopPath(window.location.pathname)) {
       window.location.replace("/desktop/welcome");
     }
   });
-}
-
-/**
- * Open an agent SSE stream and fan out chunks to `onChunk`. Returns `null` only on the
- * reconnect path when the agent server has no in-flight run for the given
- * session — the caller falls back to DB hydration.
- *
- * Resolves with `{streamId, sessionId, done}`:
- *   - `streamId` is internal preload bookkeeping (today: equals the
- *     sessionId once the server echoes it; a UUID placeholder before
- *     that for fresh runs).
- *   - `done` resolves when upstream emits `[DONE]` or the socket
- *     closes cleanly; rejects on transport error; resolves on abort.
- *
- * **Why a hand-rolled SSE reader.** The browser's `EventSource` doesn't
- * support custom headers (we need `Authorization: Basic`) and can't
- * carry a request body. We use `fetch` + a manual line buffer on the
- * `ReadableStream<Uint8Array>` body. `TextDecoderStream` would be
- * cleaner but isn't reliably available across all Electron webContents.
- *
- * **Frame format**: standard AI SDK UI-message SSE —
- * `data: <UIMessageChunk JSON>\n\n`, then `data: [DONE]\n\n`.
- */
-type AgentOpenSpec =
-  | { kind: "run"; opts: AgentRunOptions }
-  | { kind: "reconnect"; session_id: string; last_event_id: number };
-
-async function openAgentStream(
-  spec: AgentOpenSpec,
-  onChunk: (chunk: AgentUIMessageChunk) => void
-): Promise<{
-  stream_id: string;
-  session_id: string;
-  done: Promise<void>;
-} | null> {
-  const placeholderKey =
-    spec.kind === "reconnect" ? spec.session_id : crypto.randomUUID();
-  const controller = new AbortController();
-  agentRuns.set(placeholderKey, controller);
-
-  let handle: AgentTransport.AgentStreamHandle | null;
-  try {
-    handle =
-      spec.kind === "run"
-        ? await agentClient.agent.run(spec.opts, onChunk, {
-            signal: controller.signal,
-          })
-        : await agentClient.agent.reconnect(
-            spec.session_id,
-            spec.last_event_id,
-            onChunk,
-            { signal: controller.signal }
-          );
-  } catch (err) {
-    agentRuns.delete(placeholderKey);
-    throw err;
-  }
-
-  if (handle === null) {
-    agentRuns.delete(placeholderKey);
-    return null;
-  }
-
-  // Promote the registry key from the placeholder UUID to the real
-  // session id once the server echoes it. `abort(sessionId)` can then
-  // hit the controller in O(1) without scanning a reverse-index map.
-  const sessionId =
-    spec.kind === "reconnect" ? spec.session_id : handle.session_id;
-  let runKey = placeholderKey;
-  if (sessionId && sessionId !== placeholderKey) {
-    agentRuns.delete(placeholderKey);
-    agentRuns.set(sessionId, controller);
-    runKey = sessionId;
-  }
-
-  const done = handle.done.finally(() => {
-    agentRuns.delete(runKey);
-  });
-
-  return { stream_id: runKey, session_id: sessionId, done };
+  window.addEventListener("pagehide", clearNativeChatDelivery);
+  window.addEventListener("hashchange", clearNativeChatDelivery);
 }
 
 const bridge: DesktopBridge = {
@@ -301,13 +390,6 @@ const bridge: DesktopBridge = {
   app: { version: appVersion, platform: appPlatform },
   caps: {
     media: { tripo: true, rigging: true, tripo_gg: true, rigging_gg: true },
-    agent: {
-      // This host accepts `{ path, base64 }` scratch seeds on agent runs.
-      scratch_seed_base64: true,
-      // Windows intentionally withholds confined run_command; a scratch-only
-      // PDF/archive would therefore be a path the agent cannot operate on.
-      scratch_binary_tools: process.platform !== "win32",
-    },
     native: {
       host_apps: true,
       // Native-OS surfaces — always present in a desktop build.
@@ -318,7 +400,7 @@ const bridge: DesktopBridge = {
       // for V1, not a public renderer bridge capability.
       shell: true,
       // Human-interactive terminal pane (GRIDA-SEC-004) — distinct from
-      // `shell` above and from the agent's sandboxed `run_command`.
+      // `shell` above and from the agent's sandboxed `exec_command`.
       terminal: true,
       // Workspace file-change watcher (issue #805).
       workspace_watch: true,
@@ -326,6 +408,442 @@ const bridge: DesktopBridge = {
   },
 
   handshake,
+
+  nativeExternalAgent: {
+    status: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_EXTERNAL_STATUS),
+    start: (id, text) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_EXTERNAL_START, id, text),
+    stop: (id) => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_EXTERNAL_STOP, id),
+  },
+
+  nativeChat: {
+    deck: true,
+    nestedDeck: true,
+    deckSvgText: true,
+    ...(selectedDocumentChatRoute()
+      ? { document: true as const }
+      : nativeWorkspaceChatOnly && { documentUnavailable: true as const }),
+    status: (start) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_STATUS, start),
+    takeNotificationFocus: async () => {
+      if (location.pathname !== "/desktop/workspace") return null;
+      const href = location.href;
+      const target = await ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_TAKE_NOTIFICATION_FOCUS
+      );
+      return location.href === href ? target : null;
+    },
+    list: (cursor) => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_LIST, cursor),
+    ...(!selectedDocumentChatRoute() && {
+      profiles: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_PROFILES),
+      welcomeProfiles: () =>
+        ipcRenderer.invoke(IPC_CHANNELS.WELCOME_CHAT_PROFILES),
+      selectProfile: (selection) =>
+        ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_SELECT_PROFILE, selection),
+    }),
+    listArchived: (cursor) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_LIST_ARCHIVED, cursor),
+    catalogEntry: (attachmentId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_CATALOG_ENTRY, attachmentId),
+    organize: (attachmentId, change) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_ORGANIZE,
+        attachmentId,
+        change
+      ),
+    deleteSavedChat: (attachmentId, observationId, catalogRevision) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_DELETE,
+        attachmentId,
+        observationId,
+        catalogRevision
+      ),
+    commands: (attachmentId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_COMMANDS, attachmentId),
+    runCommand: (attachmentId, command, requestId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_RUN_COMMAND,
+        attachmentId,
+        command,
+        requestId
+      ),
+    prepareRevision: (attachmentId, observationId, messageId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_PREPARE_REVISION,
+        attachmentId,
+        observationId,
+        messageId
+      ),
+    revise: (attachmentId, input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_REVISE, attachmentId, input),
+    listSubagents: (attachmentId, afterChildId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_LIST_SUBAGENTS,
+        attachmentId,
+        afterChildId
+      ),
+    inspectSubagent: (attachmentId, childId, inputId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_INSPECT_SUBAGENT,
+        attachmentId,
+        childId,
+        inputId
+      ),
+    createSubagent: (attachmentId, input) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_CREATE_SUBAGENT,
+        attachmentId,
+        input
+      ),
+    assignSubagent: (attachmentId, input) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_ASSIGN_SUBAGENT,
+        attachmentId,
+        input
+      ),
+    stopSubagent: (attachmentId, stopObservationId, requestId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_STOP_SUBAGENT,
+        attachmentId,
+        stopObservationId,
+        requestId
+      ),
+    controlSubagentTurn: (attachmentId, observationId, requestId, control) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_CONTROL_SUBAGENT_TURN,
+        attachmentId,
+        observationId,
+        requestId,
+        control
+      ),
+    controlSubagentChild: (attachmentId, observationId, requestId, control) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_CONTROL_SUBAGENT_CHILD,
+        attachmentId,
+        observationId,
+        requestId,
+        control
+      ),
+    create: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_CREATE),
+    load: (sessionId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_LOAD, sessionId),
+    openSideChat: (attachmentId, openId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_OPEN_SIDE,
+        attachmentId,
+        openId
+      ),
+    askSideChat: (attachmentId, openId, requestId, text) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_ASK_SIDE,
+        attachmentId,
+        openId,
+        requestId,
+        text
+      ),
+    closeSideChat: (attachmentId, openId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_CLOSE_SIDE,
+        attachmentId,
+        openId
+      ),
+    detach: async (attachmentId) => {
+      nativeEditorHandlers.delete(attachmentId);
+      nativeSvgTextHandlers.delete(attachmentId);
+      for (const [id, subscriber] of nativeChatHandlers) {
+        if (subscriber.attachmentId === attachmentId)
+          nativeChatHandlers.delete(id);
+      }
+      await ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_DETACH, attachmentId);
+    },
+    publishEditorSurfaces: (attachmentId, snapshot, revision) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_PUBLISH_EDITOR_SURFACES,
+        attachmentId,
+        snapshot,
+        nativeEditorHandlers.get(attachmentId)?.href === location.href
+          ? revision
+          : undefined
+      ),
+    ...(!selectedDocumentChatRoute() && {
+      onEditorSurfaceOpen: (attachmentId, open) => {
+        if (
+          location.pathname !== "/desktop/workspace" ||
+          !/^[a-f0-9-]{36}$/.test(attachmentId) ||
+          typeof open !== "function" ||
+          nativeEditorHandlers.has(attachmentId) ||
+          nativeEditorHandlers.size >= 16
+        )
+          throw new Error("native_chat_editor_presentation_unavailable");
+        const handler = { href: location.href, open };
+        nativeEditorHandlers.set(attachmentId, handler);
+        return () => {
+          if (nativeEditorHandlers.get(attachmentId) === handler)
+            nativeEditorHandlers.delete(attachmentId);
+        };
+      },
+    }),
+    onEditorSvgText: (attachmentId, invoke) => {
+      if (
+        !NativeEditorSvgText.isId(attachmentId) ||
+        typeof invoke !== "function" ||
+        nativeSvgTextHandlers.has(attachmentId) ||
+        nativeSvgTextHandlers.size >= 16 ||
+        !liveSvgTextRoute()
+      )
+        throw new Error("native_chat_svg_text_unavailable");
+      const handler = { href: location.href, invoke };
+      nativeSvgTextHandlers.set(attachmentId, handler);
+      return () => {
+        if (nativeSvgTextHandlers.get(attachmentId) === handler)
+          nativeSvgTextHandlers.delete(attachmentId);
+      };
+    },
+    submit: (attachmentId, inputId, text) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_SUBMIT,
+        attachmentId,
+        inputId,
+        text
+      ),
+    submitInRegime: (
+      action,
+      attachmentId,
+      inputId,
+      text,
+      operatingRegime,
+      effort,
+      editorSvgTargetId
+    ) =>
+      ipcRenderer.invoke(
+        action === "enqueue"
+          ? IPC_CHANNELS.NATIVE_CHAT_ENQUEUE
+          : IPC_CHANNELS.NATIVE_CHAT_SUBMIT,
+        attachmentId,
+        inputId,
+        text,
+        operatingRegime,
+        ...(editorSvgTargetId !== undefined
+          ? [effort, editorSvgTargetId]
+          : effort === undefined
+            ? []
+            : [effort])
+      ),
+    enqueue: (attachmentId, inputId, text) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_ENQUEUE,
+        attachmentId,
+        inputId,
+        text
+      ),
+    inputReceipt: (attachmentId, inputId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_INPUT_RECEIPT,
+        attachmentId,
+        inputId
+      ),
+    observe: (attachmentId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_OBSERVE, attachmentId),
+    acceptsEffort: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_EFFORT),
+    acceptsGoalEffort: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_GOAL_EFFORT),
+    acceptsBackgroundProcesses: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_BACKGROUND_PROCESSES),
+    backgroundProcesses: (attachmentId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_BACKGROUND_PROCESSES,
+        attachmentId
+      ),
+    stopBackgroundProcesses: (attachmentId, processIds) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_STOP_BACKGROUND_PROCESSES,
+        attachmentId,
+        ...(processIds === undefined ? [] : [[...processIds]])
+      ),
+    acceptsPng: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PNG),
+    acceptsLibrarySelection: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_LIBRARY_SELECTION),
+    submitWithLibrarySelection: (
+      attachmentId,
+      inputId,
+      text,
+      operatingRegime,
+      effort
+    ) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_SUBMIT_LIBRARY_SELECTION,
+        attachmentId,
+        inputId,
+        text,
+        operatingRegime,
+        effort
+      ),
+    acceptsFile: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_FILE),
+    ...(!selectedDocumentChatRoute() && {
+      inspectHooks: (attachmentId?: string) =>
+        ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_HOOKS, attachmentId),
+      importHook: () =>
+        ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_IMPORT_HOOK),
+      removeHook: (id: string, revision: string) =>
+        ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_REMOVE_HOOK, id, revision),
+    }),
+    submitImage: (attachmentId, input) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_SUBMIT_IMAGE,
+        attachmentId,
+        input
+      ),
+    submitFile: (attachmentId, input) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_SUBMIT_FILE,
+        attachmentId,
+        input
+      ),
+    turnSummary: (
+      attachmentId,
+      observationId,
+      refreshGatewayAttempt,
+      childBillingAfter
+    ) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_TURN_SUMMARY,
+        attachmentId,
+        observationId,
+        refreshGatewayAttempt,
+        childBillingAfter
+      ),
+    readArtifact: (attachmentId, observationId, artifactId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_READ_ARTIFACT,
+        attachmentId,
+        observationId,
+        artifactId
+      ),
+    saveArtifact: (attachmentId, observationId, artifactId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_SAVE_ARTIFACT,
+        attachmentId,
+        observationId,
+        artifactId
+      ),
+    queue: (attachmentId, observationId, offset) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_QUEUE,
+        attachmentId,
+        observationId,
+        offset
+      ),
+    queuedText: (attachmentId, observationId, inputId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_QUEUED_TEXT,
+        attachmentId,
+        observationId,
+        inputId
+      ),
+    editQueue: (attachmentId, change) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_EDIT_QUEUE,
+        attachmentId,
+        change
+      ),
+    steer: (attachmentId, input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_STEER, attachmentId, input),
+    goal: (attachmentId, observationId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_GOAL,
+        attachmentId,
+        observationId
+      ),
+    startGoal: (attachmentId, inputId, request) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_START_GOAL,
+        attachmentId,
+        inputId,
+        request
+      ),
+    controlGoal: (attachmentId, change) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_CONTROL_GOAL,
+        attachmentId,
+        change
+      ),
+    approvals: (attachmentId, observationId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_APPROVALS,
+        attachmentId,
+        observationId
+      ),
+    answerApproval: (attachmentId, reviewId, decision) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_ANSWER_APPROVAL,
+        attachmentId,
+        reviewId,
+        decision
+      ),
+    questions: (attachmentId, observationId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_QUESTIONS,
+        attachmentId,
+        observationId
+      ),
+    answerQuestion: (attachmentId, reviewId, answer) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_ANSWER_QUESTION,
+        attachmentId,
+        reviewId,
+        answer
+      ),
+    librarySelections: (attachmentId, observationId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_LIBRARY_SELECTIONS,
+        attachmentId,
+        observationId
+      ),
+    answerLibrarySelection: (attachmentId, reviewId, answer) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_ANSWER_LIBRARY_SELECTION,
+        attachmentId,
+        reviewId,
+        answer
+      ),
+    transcript: (attachmentId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_TRANSCRIPT, attachmentId),
+    transcriptPage: (attachmentId, before) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_TRANSCRIPT_PAGE,
+        attachmentId,
+        before
+      ),
+    control: (attachmentId, control) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_CONTROL,
+        attachmentId,
+        control
+      ),
+    subscribe: async (attachmentId, onUpdate) => {
+      if (nativeChatHandlers.size >= 8)
+        throw new Error("native_chat_subscription_limit");
+      const id = crypto.randomUUID();
+      nativeChatHandlers.set(id, { attachmentId, onUpdate });
+      try {
+        await ipcRenderer.invoke(
+          IPC_CHANNELS.NATIVE_CHAT_SUBSCRIBE,
+          attachmentId,
+          id
+        );
+        return id;
+      } catch (error) {
+        nativeChatHandlers.delete(id);
+        throw error;
+      }
+    },
+    unsubscribe: async (id) => {
+      nativeChatHandlers.delete(id);
+      await ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_UNSUBSCRIBE, id);
+    },
+  },
 
   account: {
     sign_out: () => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_SIGN_OUT),
@@ -393,21 +911,24 @@ const bridge: DesktopBridge = {
   },
 
   files: {
-    read: (docId) => agentClient.files.read(docId),
-    write: (docId, content) => agentClient.files.write(docId, content),
+    read: (docId) =>
+      nativeDocumentId !== undefined
+        ? ipcRenderer.invoke(IPC_CHANNELS.DOCUMENT_READ, docId)
+        : mediaClient.files.read(docId),
+    write: (docId, content) =>
+      nativeDocumentId !== undefined
+        ? ipcRenderer.invoke(IPC_CHANNELS.DOCUMENT_WRITE, docId, content)
+        : mediaClient.files.write(docId, content),
   },
 
   recent: {
-    list: () => agentClient.recent.list(),
-    touch: async (filePath) => {
-      await agentClient.recent.touch(filePath);
-    },
-    pin: async (filePath, pinned) => {
-      await agentClient.recent.pin(filePath, pinned);
-    },
-    forget: async (filePath) => {
-      await agentClient.recent.forget(filePath);
-    },
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.RECENT_LIST),
+    touch: (filePath) =>
+      ipcRenderer.invoke(IPC_CHANNELS.RECENT_TOUCH, filePath),
+    pin: (filePath, pinned) =>
+      ipcRenderer.invoke(IPC_CHANNELS.RECENT_PIN, filePath, pinned),
+    forget: (filePath) =>
+      ipcRenderer.invoke(IPC_CHANNELS.RECENT_FORGET, filePath),
   },
 
   // GRIDA-SEC-004 — app-managed media stays behind purpose-scoped native IPC.
@@ -416,6 +937,7 @@ const bridge: DesktopBridge = {
   media: {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.MEDIA_LIST),
     read: (id) => ipcRenderer.invoke(IPC_CHANNELS.MEDIA_READ, id),
+    save_copy: (id) => ipcRenderer.invoke(IPC_CHANNELS.MEDIA_SAVE_COPY, id),
     reveal: async (id) => {
       await ipcRenderer.invoke(IPC_CHANNELS.MEDIA_REVEAL, id);
     },
@@ -425,21 +947,44 @@ const bridge: DesktopBridge = {
   },
 
   workspaces: {
-    list: () => agentClient.workspaces.list(),
-    open: (rootPath) => agentClient.workspaces.open(rootPath),
-    create: (input) => agentClient.workspaces.create(input),
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_LIST),
+    publish_editor_surfaces: (snapshot) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.WORKSPACE_PUBLISH_EDITOR_SURFACES,
+        snapshot
+      ),
+    choose: () => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_CHOOSE),
+    open: (rootPath) =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_REOPEN, rootPath),
+    create: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_CREATE, input?.name),
     pin: async (id, pinned) => {
-      await agentClient.workspaces.pin(id, pinned);
+      await ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_PIN, id, pinned);
     },
     forget: async (id) => {
-      await agentClient.workspaces.forget(id);
+      await ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_FORGET, id);
     },
     readdir: (workspaceId, relPath) =>
-      agentClient.workspaces.readdir(workspaceId, relPath ?? ""),
+      ipcRenderer.invoke(
+        IPC_CHANNELS.WORKSPACE_READ,
+        workspaceId,
+        relPath ?? "",
+        "directory"
+      ),
     read_file: (workspaceId, relPath) =>
-      agentClient.workspaces.read_file(workspaceId, relPath),
+      ipcRenderer.invoke(
+        IPC_CHANNELS.WORKSPACE_READ,
+        workspaceId,
+        relPath,
+        "text"
+      ),
     read_file_bytes: (workspaceId, relPath) =>
-      agentClient.workspaces.read_file_bytes(workspaceId, relPath),
+      ipcRenderer.invoke(
+        IPC_CHANNELS.WORKSPACE_READ,
+        workspaceId,
+        relPath,
+        "bytes"
+      ),
     // #924 — the streamable media `src` for the read-only viewer. Pure string
     // build: a `grida-workspace://` URL the main-process protocol handler
     // resolves by proxying to the sidecar's streamed `/workspaces/file` route.
@@ -452,14 +997,15 @@ const bridge: DesktopBridge = {
         .map(encodeURIComponent)
         .join("/")}`,
     write_file: (workspaceId, relPath, content, expectedMtime) =>
-      agentClient.workspaces.write_file(
+      ipcRenderer.invoke(
+        IPC_CHANNELS.WORKSPACE_WRITE,
         workspaceId,
         relPath,
         content,
         expectedMtime
       ),
     // Unlike its siblings, trash is a native host capability rather than
-    // an agent-sidecar operation: it routes to the main process (which
+    // a services-sidecar operation: it routes to the main process (which
     // re-validates workspace containment) and calls `shell.trashItem`.
     trash_entry: (workspaceId, relPath) =>
       ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TRASH_ENTRY, {
@@ -540,39 +1086,38 @@ const bridge: DesktopBridge = {
   },
 
   secrets: {
-    has: (providerId) => agentClient.secrets.has(providerId),
+    has: (providerId) => mediaClient.secrets.has(providerId),
     set: async (providerId, key) => {
-      await agentClient.secrets.set(providerId, key);
+      await mediaClient.secrets.set(providerId, key);
     },
     delete: async (providerId) => {
-      await agentClient.secrets.delete(providerId);
+      await mediaClient.secrets.delete(providerId);
     },
   },
 
   providers: {
-    gg_models: () => agentClient.providers.gg_models(),
-    list_endpoints: () => agentClient.providers.list_endpoints(),
+    gg_models: () => mediaClient.providers.gg_models(),
+    list_endpoints: () => mediaClient.providers.list_endpoints(),
     set_endpoint: async (config) => {
       await ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_ENDPOINT_SET, config);
     },
     delete_endpoint: async (id) => {
       await ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_ENDPOINT_DELETE, id);
     },
-    info: () => agentClient.providers.info(),
+    info: () => mediaClient.providers.info(),
     probe_endpoint: (baseUrl) =>
       ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_ENDPOINT_PROBE, baseUrl),
-    detect_claude: () => agentClient.providers.detect_claude(),
   },
 
   // GRIDA-SEC-006 — hosted-session custody push (renderer → sidecar).
   gg: {
     set_session: async (session) => {
-      await agentClient.gg.set_session(session);
+      await mediaClient.gg.set_session(session);
     },
     clear_session: async () => {
-      await agentClient.gg.clear_session();
+      await mediaClient.gg.clear_session();
     },
-    status: () => agentClient.gg.status(),
+    status: () => mediaClient.gg.status(),
   },
 
   // Native provider OAuth is main-owned. The renderer can start/cancel the
@@ -588,135 +1133,34 @@ const bridge: DesktopBridge = {
   },
 
   images: {
-    generate: (req) => agentClient.images.generate(req),
+    generate: (req) => mediaClient.images.generate(req),
   },
 
   video: {
-    generate: (req) => agentClient.video.generate(req),
+    generate: (req) => mediaClient.video.generate(req),
   },
 
   threeD: {
-    generate: (req) => agentClient.threeD.generate(req),
+    generate: (req) => mediaClient.threeD.generate(req),
   },
   rigging: {
-    check: (req) => agentClient.rigging.check(req),
-    generate: (req) => agentClient.rigging.generate(req),
+    check: (req) => mediaClient.rigging.check(req),
+    generate: (req) => mediaClient.rigging.generate(req),
   },
   modelGeneration: {
-    generate: (req) => agentClient.modelGeneration.generate(req),
+    generate: (req) => mediaClient.modelGeneration.generate(req),
   },
 
   audio: {
     music: {
-      generate: (req) => agentClient.audio.music.generate(req),
+      generate: (req) => mediaClient.audio.music.generate(req),
     },
     soundEffects: {
-      generate: (req) => agentClient.audio.soundEffects.generate(req),
+      generate: (req) => mediaClient.audio.soundEffects.generate(req),
     },
     textToSpeech: {
-      listVoices: () => agentClient.audio.textToSpeech.listVoices(),
-      generate: (req) => agentClient.audio.textToSpeech.generate(req),
-    },
-  },
-
-  agent: {
-    attach_directory: async (file): Promise<DirectoryScopeDescriptor> => {
-      // GRIDA-SEC-004 — keep trusted-gesture provenance and path custody in
-      // preload. `getPathForFile` resolves only an OS-backed File (a JS-created
-      // File yields an empty string); the renderer receives only the daemon's
-      // opaque scope descriptor, never this absolute path.
-      let directoryPath = "";
-      try {
-        directoryPath = webUtils.getPathForFile(file);
-      } catch {
-        // Invalid/non-File values fail closed below; no daemon call is made.
-      }
-      if (!directoryPath) {
-        throw new Error("directory drop is not backed by a local path");
-      }
-      return await agentClient.directory_scopes.attach(directoryPath);
-    },
-    run: (opts, onChunk) =>
-      // Fresh runs always return a stream (only `reconnect` may return
-      // null on 404); cast to the non-nullable shape DesktopBridge expects.
-      openAgentStream({ kind: "run", opts }, onChunk) as Promise<{
-        stream_id: string;
-        session_id: string;
-        done: Promise<void>;
-      }>,
-    abort: async (sessionId) => {
-      await agentClient.agent.abort(sessionId);
-      const controller = agentRuns.get(sessionId);
-      if (controller) {
-        agentRuns.delete(sessionId);
-        controller.abort();
-      }
-    },
-    reconnect: (sessionId, lastEventId, onChunk) =>
-      openAgentStream(
-        {
-          kind: "reconnect",
-          session_id: sessionId,
-          last_event_id: lastEventId,
-        },
-        onChunk
-      ),
-  },
-
-  sessions: {
-    list: (filter?: SessionListFilter) => agentClient.sessions.list(filter),
-    get: (id: string) => agentClient.sessions.get(id),
-    create: (opts: CreateSessionOptions) => agentClient.sessions.create(opts),
-    patch: (id: string, opts: PatchSessionOptions) =>
-      agentClient.sessions.patch(id, opts),
-    delete: (id: string) => agentClient.sessions.delete(id),
-    list_messages: (id: string) => agentClient.sessions.list_messages(id),
-    rewind: (id: string, fromMessageId: string, opts?: { restore?: boolean }) =>
-      agentClient.sessions.rewind(id, fromMessageId, opts),
-    fork: (
-      id: string,
-      fromMessageId: string,
-      metadata?: Record<string, unknown>
-    ) => agentClient.sessions.fork(id, fromMessageId, metadata),
-    compact: (id: string) => agentClient.sessions.compact(id),
-    enqueue: (id: string, message: { id?: string; text: string }) =>
-      agentClient.sessions.enqueue(id, message),
-    list_queued: (id: string) => agentClient.sessions.list_queued(id),
-    cancel_queued: (id: string, messageId: string) =>
-      agentClient.sessions.cancel_queued(id, messageId),
-    subscribe_status: async (id, onStatus) => {
-      const subscriptionId = crypto.randomUUID();
-      const controller = new AbortController();
-      statusSubs.set(subscriptionId, controller);
-      try {
-        const { done } = await agentClient.sessions.subscribe_status(
-          id,
-          onStatus,
-          { signal: controller.signal }
-        );
-        return {
-          subscription_id: subscriptionId,
-          done: done.finally(() => {
-            statusSubs.delete(subscriptionId);
-          }),
-        };
-      } catch (err) {
-        // `useSessionStatus` reconnects indefinitely. A failed handshake has
-        // no `done` promise whose finally can clean this registry entry, so
-        // release it here or every retry leaks one controller in preload.
-        if (statusSubs.get(subscriptionId) === controller) {
-          statusSubs.delete(subscriptionId);
-        }
-        controller.abort();
-        throw err;
-      }
-    },
-    unsubscribe_status: async (subscriptionId) => {
-      const controller = statusSubs.get(subscriptionId);
-      if (controller) {
-        statusSubs.delete(subscriptionId);
-        controller.abort();
-      }
+      listVoices: () => mediaClient.audio.textToSpeech.listVoices(),
+      generate: (req) => mediaClient.audio.textToSpeech.generate(req),
     },
   },
 };

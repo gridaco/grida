@@ -7,7 +7,7 @@
 // physically present in the packaged app, or it crashes on launch with
 // "Cannot find module" — while every other CI check stays green. We
 // learned this the expensive way, one missing module per release
-// (@grida/desktop-bridge, then @anthropic-ai/sandbox-runtime, ...).
+// (unbuilt workspace modules or native addons).
 //
 // This oracle inspects the ACTUAL packaged bundles, discovers every
 // external require, and verifies each one resolves in the packaged
@@ -22,6 +22,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { verifyNativeAgentRuntime } from "./native-agent-package.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
@@ -102,6 +103,17 @@ if (!asar || !fs.existsSync(asar)) {
   process.exit(2);
 }
 
+if (process.argv[3] === "--native-agent") {
+  const [platform, arch] = process.argv.slice(4);
+  const resources = path.dirname(asar);
+  const ran = await verifyNativeAgentRuntime(resources, platform, arch);
+  console.log("✔ packaged native agent executables verified.");
+  if (ran)
+    console.log(
+      "✔ packaged native agent ACP startup, reopen and EOF verified."
+    );
+}
+
 // Extract the asar so we can resolve modules against the packaged tree
 // with a plain Node resolver (createRequire). asar.unpack'd files are
 // still listed in the archive, so extraction is sufficient to answer
@@ -131,8 +143,8 @@ const bundles = fs
 
 // Verify the FULL transitive closure of every external is present in the
 // packaged tree — not just the top-level requires. A direct external can
-// resolve while one of ITS runtime deps is missing (e.g. sandbox-runtime
-// present but `commander` pruned), which still crashes on launch.
+// resolve while one of ITS runtime deps is missing (e.g. a native watcher
+// present but its platform prebuild pruned), which still crashes on launch.
 const missing = [];
 const closure = new Set(); // package names that legitimately ship
 const visited = new Set();

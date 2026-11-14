@@ -1,10 +1,6 @@
-import { AgentFs } from "@grida/agent/fs";
-import { AgentTodos } from "@grida/agent/todos";
-import { AgentVision } from "@grida/agent/vision";
-import { AgentDesignSearch } from "@grida/agent/tools/design-search";
-import { AgentSurface } from "@grida/agent/surface";
+import { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
 import { getToolName } from "ai";
-import type { ToolCallEntry } from "@/lib/agent-chat";
+import type { ToolCallEntry } from "@/lib/agent-chat/types";
 import { SurfaceToolCall } from "./surface-tool";
 
 const GENERATE_IMAGE = "generate_image";
@@ -21,6 +17,7 @@ export type ToolDisplayAction =
   | "generate_image"
   | "plan"
   | "command"
+  | "process"
   | "question"
   | "skill"
   | "open_tab"
@@ -46,7 +43,7 @@ export namespace toolDisplay {
     const tone = describeTone(entry);
 
     switch (toolName) {
-      case AgentFs.TOOL_NAMES.read_file:
+      case chat_vocabulary.TOOL_NAMES.read_file:
         return {
           action: "read",
           title: describeTitle(
@@ -60,7 +57,7 @@ export namespace toolDisplay {
           tone,
         };
 
-      case AgentFs.TOOL_NAMES.edit_file:
+      case chat_vocabulary.TOOL_NAMES.edit_file:
         return {
           action: "edit",
           title: describeTitle(
@@ -74,7 +71,7 @@ export namespace toolDisplay {
           tone,
         };
 
-      case AgentFs.TOOL_NAMES.write_file:
+      case chat_vocabulary.TOOL_NAMES.write_file:
         return {
           action: "write",
           title: describeTitle(
@@ -88,7 +85,7 @@ export namespace toolDisplay {
           tone,
         };
 
-      case AgentFs.TOOL_NAMES.list_files:
+      case chat_vocabulary.TOOL_NAMES.list_files:
         return {
           action: "list",
           title: describeTitle(
@@ -101,7 +98,7 @@ export namespace toolDisplay {
           tone,
         };
 
-      case AgentFs.TOOL_NAMES.grep_files:
+      case chat_vocabulary.TOOL_NAMES.grep_files:
         return {
           action: "search",
           title: describeTitle(
@@ -114,7 +111,7 @@ export namespace toolDisplay {
           tone,
         };
 
-      case AgentTodos.TOOL_NAMES.todo_write:
+      case chat_vocabulary.TOOL_NAMES.todo_write:
         return {
           action: "plan",
           title: describeTitle(
@@ -127,7 +124,7 @@ export namespace toolDisplay {
           tone,
         };
 
-      case AgentVision.TOOL_NAMES.view_image:
+      case chat_vocabulary.TOOL_NAMES.view_image:
         return {
           action: "view_image",
           title: describeTitle(
@@ -154,7 +151,21 @@ export namespace toolDisplay {
           tone,
         };
 
-      case "run_command":
+      case chat_vocabulary.TOOL_NAMES.write_stdin: {
+        const action = stringValue(args.description) ?? "used process";
+        return {
+          action: "process",
+          title: describeTitle(
+            tone,
+            capitalize(action),
+            capitalize(action),
+            "Process input failed"
+          ),
+          tone,
+        };
+      }
+
+      case chat_vocabulary.TOOL_NAMES.exec_command:
         return {
           action: "command",
           title: describeTitle(
@@ -193,7 +204,7 @@ export namespace toolDisplay {
           tone,
         };
 
-      case AgentDesignSearch.TOOL_NAME:
+      case chat_vocabulary.TOOL_NAMES.design_search:
         return {
           action: "pick_references",
           title: describeTitle(
@@ -207,12 +218,12 @@ export namespace toolDisplay {
           // while pending, but don't attribute the final picks to that query.
           detail:
             tone === "running"
-              ? AgentDesignSearch.initialSearchQuery(args)
+              ? chat_vocabulary.initialSearchQuery(args)
               : undefined,
           tone,
         };
 
-      case AgentSurface.TOOL_NAMES.surface_open: {
+      case chat_vocabulary.TOOL_NAMES.surface_open: {
         const surface = SurfaceToolCall.from(entry);
         const surfaceTone =
           surface?.data.kind === "open" &&
@@ -237,7 +248,7 @@ export namespace toolDisplay {
         };
       }
 
-      case AgentSurface.TOOL_NAMES.surface_list_open: {
+      case chat_vocabulary.TOOL_NAMES.surface_list_open: {
         const surface = SurfaceToolCall.from(entry);
         const open = surface?.data.kind === "list" ? surface.data.open : null;
         return {
@@ -310,6 +321,7 @@ export namespace toolDisplay {
     pushClause(clauses, counts, "search", "searched");
     pushClause(clauses, counts, "list", "listed");
     pushClause(clauses, counts, "command", "ran");
+    pushClause(clauses, counts, "process", "used");
     pushClause(clauses, counts, "plan", "updated", "plan update");
     pushClause(clauses, counts, "question", "asked");
     pushClause(clauses, counts, "skill", "loaded", "skill");
@@ -325,6 +337,7 @@ export namespace toolDisplay {
     pushClause(clauses, runningCounts, "search", "searching");
     pushClause(clauses, runningCounts, "list", "listing");
     pushClause(clauses, runningCounts, "command", "running");
+    pushClause(clauses, runningCounts, "process", "using");
     pushClause(clauses, runningCounts, "plan", "updating", "plan update");
     pushClause(clauses, runningCounts, "question", "asking");
     pushClause(clauses, runningCounts, "skill", "loading", "skill");
@@ -411,6 +424,8 @@ function nounForAction(action: ToolDisplayAction): string {
       return "listing";
     case "command":
       return "command";
+    case "process":
+      return "process";
     case "plan":
       return "plan update";
     case "question":
@@ -429,6 +444,7 @@ function nounForAction(action: ToolDisplayAction): string {
 function pluralize(noun: string, count: number): string {
   if (count === 1) return noun;
   if (noun === "search") return "searches";
+  if (noun === "process") return "processes";
   return `${noun}s`;
 }
 
@@ -465,9 +481,18 @@ function describeEditDetail(
 }
 
 function describeListDetail(entry: ToolCallEntry): string | undefined {
-  const files = asArray(asRecord(readToolOutput(entry)).files);
-  if (!files) return undefined;
-  return `${files.length} ${pluralize("file", files.length)}`;
+  const entries = asArray(asRecord(readToolOutput(entry)).files);
+  if (!entries) return undefined;
+  // A listing marks each folder with a trailing slash.
+  const folders = entries.filter(
+    (name) => typeof name === "string" && name.endsWith("/")
+  ).length;
+  const files = entries.length - folders;
+  const parts = [
+    ...(files || !folders ? [`${files} ${pluralize("file", files)}`] : []),
+    ...(folders ? [`${folders} ${pluralize("folder", folders)}`] : []),
+  ];
+  return parts.join(", ");
 }
 
 function describeTodosDetail(entry: ToolCallEntry): string | undefined {

@@ -1,8 +1,13 @@
-// Re-export the canonical doc-summary shape from the shared storage
-// layer. Slides used to own a richer page model with embedded SVG
-// content; the per-doc bytes now live inside the `SvgDocStore`'s
-// AgentFs, so the UI only needs the summary.
-
-export type { SvgDocSummary as SlidePage } from "../../../_storage";
+/**
+ * One slide as the deck UI renders it. Structurally the storage layer's
+ * `SvgDocSummary`, so the web demo's store feeds it directly, while hosts
+ * that keep slides elsewhere (Desktop's deck shell) build it without
+ * reaching into the demo's storage.
+ */
+export type SlidePage = {
+  id: string;
+  name: string;
+  thumbnailDataUri: string;
+};
 
 export { BLANK_SLIDE_SVG as EMPTY_SLIDE_SVG } from "./templates";

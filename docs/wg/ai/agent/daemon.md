@@ -25,7 +25,7 @@ tags:
 
 An agent system that conforms to this guide is already an HTTP
 server on a loopback interface — the host starts it, a client
-transport drives it ([`foundations`](./foundations.md)). What a
+transport drives it ([Components / integration capabilities and bounds](./components.md#integration-capabilities-and-bounds)). What a
 single-host embedding lacks is **discoverability**: the server's
 address and credential live in one supervisor's memory, so only
 that supervisor's client can reach it. Every other would-be client
@@ -171,7 +171,7 @@ every client finds it**.
 
 ## Auth model
 
-Everything in [the session guide's perimeter](./session.md) holds;
+Everything in [the session guide's perimeter](./components.md#sessions) holds;
 the daemon model adds the credential-lifetime question and one
 attach affordance.
 
@@ -198,6 +198,9 @@ attach affordance.
   streams, where the header limitation actually exists.)
 
 ## The browser exception
+
+These transport patterns apply to a daemon with an authorized browser client.
+Grida Desktop receives its local connection through the app bridge.
 
 Discovery-by-file serves local-process clients. A browser tab can
 fetch `http://127.0.0.1:…` (subject to CORS), but it **cannot read
@@ -228,12 +231,6 @@ and requires both:
   single-use token; the page exchanges it for the credential and
   holds it in memory.
 
-In development, path 2 degrades honestly: the developer reads the
-credential from the daemon's own output (it is their credential,
-on their machine) and supplies it to the dev page; the allowlist
-admits the dev origin. The handoff ceremony is for when a real
-product rides this path, not for the dev loop.
-
 What is NOT conformant: widening CORS to `*`, an unauthenticated
 route "just for the web client", or embedding a long-lived
 credential in served-from-elsewhere page source.
@@ -244,10 +241,8 @@ Two shapes, one direction:
 
 - **Shape A — shell over daemon.** The desktop product keeps its
   shell and supervisor, but the supervised server _also_ publishes
-  a registration. The shell's private channel keeps working;
-  every other client (CLI, ACP, dev browser) can now attach to the
-  same live system. Strictly additive; this is the migration
-  step.
+  a registration. The shell keeps its private channel while other
+  authorized local clients can attach to the same service.
 - **Shape B — daemon as the product.** The daemon is the unit
   that ships. Shells, CLIs, web pages, and editor adapters are
   all thin clients; the web UI is served by the daemon
@@ -284,9 +279,10 @@ A conforming daemon implementation can demonstrate:
    **browser-engine tests** — a real browser context driving the
    daemon: a preflighted, authenticated request from an
    allowlisted origin succeeds end-to-end; a non-allowlisted
-   origin is blocked by CORS; an event-stream attach (including
-   the header-less query-token affordance) delivers ordered frames
-   and survives detach/reattach. This harness is a **system
+   origin is blocked by CORS; where the daemon serves event
+   streams, an attach (including any header-less query-token
+   affordance it offers) delivers ordered frames and survives
+   detach/reattach. This harness is a **system
    harness**, not product end-to-end testing: it proves the
    perimeter contract for the one client class that server-side
    tests cannot impersonate.
@@ -308,11 +304,7 @@ A conforming daemon implementation can demonstrate:
 
 ## See also
 
-- [Session Lifecycle](./session.md) — the perimeter the daemon
-  inherits; status streams, resume.
 - [ACP Integration](./acp.md) — the editor-facing adapter that
   rides the daemon as a local-process client.
-- [Debugging](./debugging.md) — what "debug what you ship"
-  buys; the inspection formats served over the same wire.
 - [Environments](./environments.md) — where the daemon sits in
   the web / sandbox / computer taxonomy.

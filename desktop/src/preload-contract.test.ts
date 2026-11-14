@@ -8,8 +8,26 @@ const preloadSource = fs.readFileSync(
 );
 
 describe("Desktop preload agent seam", () => {
-  it("delegates AgentHost HTTP routes to AgentTransport.Client", () => {
-    expect(preloadSource).toContain("new AgentTransport.Client");
+  it("keeps native selected-file reads and saves separate from the chat offer", () => {
+    expect(preloadSource).toContain(
+      "files: response.capabilities.files || selectedDocumentRoute()"
+    );
+    expect(preloadSource).toContain(
+      "nativeDocumentChatId === nativeDocumentId"
+    );
+    expect(preloadSource).toMatch(
+      /selectedDocumentChatRoute\(\)\s*\?\s*{ document: true as const }/
+    );
+    expect(preloadSource).toMatch(
+      /nativeDocumentId !== undefined\s*\? ipcRenderer.invoke\(IPC_CHANNELS.DOCUMENT_READ, docId\)/
+    );
+    expect(preloadSource).toMatch(
+      /nativeDocumentId !== undefined\s*\? ipcRenderer.invoke\(IPC_CHANNELS.DOCUMENT_WRITE, docId, content\)/
+    );
+  });
+  it("delegates media-service HTTP routes to the chat-free MediaTransport.Client", () => {
+    expect(preloadSource).toContain("new MediaTransport.Client");
+    expect(preloadSource).not.toContain("@grida/ai-host/transport");
     expect(preloadSource).not.toContain('"/agent/run"');
     expect(preloadSource).not.toContain('"/secrets/has"');
     expect(preloadSource).not.toContain('"/sessions"');
@@ -19,10 +37,6 @@ describe("Desktop preload agent seam", () => {
   it("exposes a versioned Electron-specific bridge protocol", () => {
     expect(preloadSource).toContain("protocol: DESKTOP_BRIDGE_PROTOCOL");
     expect(preloadSource).toContain("native:");
-    expect(preloadSource).toContain("scratch_seed_base64: true");
-    expect(preloadSource).toContain(
-      'scratch_binary_tools: process.platform !== "win32"'
-    );
     expect(preloadSource).not.toContain("agentServer:");
   });
 
@@ -32,28 +46,28 @@ describe("Desktop preload agent seam", () => {
     );
   });
 
-  it("delegates media generation through the agent transport", () => {
+  it("delegates media generation through the media transport", () => {
     expect(preloadSource).toContain("rigging: true");
     expect(preloadSource).toContain(
-      "check: (req) => agentClient.rigging.check(req)"
+      "check: (req) => mediaClient.rigging.check(req)"
     );
     expect(preloadSource).toContain(
-      "generate: (req) => agentClient.rigging.generate(req)"
+      "generate: (req) => mediaClient.rigging.generate(req)"
     );
     expect(preloadSource).toContain(
-      "generate: (req) => agentClient.threeD.generate(req)"
+      "generate: (req) => mediaClient.threeD.generate(req)"
     );
     expect(preloadSource).toContain(
-      "generate: (req) => agentClient.audio.music.generate(req)"
+      "generate: (req) => mediaClient.audio.music.generate(req)"
     );
     expect(preloadSource).toContain(
-      "generate: (req) => agentClient.audio.soundEffects.generate(req)"
+      "generate: (req) => mediaClient.audio.soundEffects.generate(req)"
     );
     expect(preloadSource).toContain(
-      "listVoices: () => agentClient.audio.textToSpeech.listVoices()"
+      "listVoices: () => mediaClient.audio.textToSpeech.listVoices()"
     );
     expect(preloadSource).toContain(
-      "generate: (req) => agentClient.audio.textToSpeech.generate(req)"
+      "generate: (req) => mediaClient.audio.textToSpeech.generate(req)"
     );
   });
 
@@ -65,11 +79,66 @@ describe("Desktop preload agent seam", () => {
       "ipcRenderer.invoke(IPC_CHANNELS.MEDIA_READ, id)"
     );
     expect(preloadSource).toContain(
+      "ipcRenderer.invoke(IPC_CHANNELS.MEDIA_SAVE_COPY, id)"
+    );
+    expect(preloadSource).toContain(
       "ipcRenderer.invoke(IPC_CHANNELS.MEDIA_REVEAL, id)"
     );
     expect(preloadSource).toContain(
       "ipcRenderer.invoke(IPC_CHANNELS.MEDIA_OPEN_FOLDER)"
     );
-    expect(preloadSource).not.toContain("agentClient.media");
+    expect(preloadSource).not.toContain("mediaClient.media");
+  });
+
+  it("routes the existing recents bridge through Main", () => {
+    for (const channel of [
+      "RECENT_LIST",
+      "RECENT_TOUCH",
+      "RECENT_PIN",
+      "RECENT_FORGET",
+    ]) {
+      expect(preloadSource).toMatch(
+        new RegExp(`ipcRenderer\\.invoke\\(\\s*IPC_CHANNELS\\.${channel}`)
+      );
+    }
+    expect(preloadSource).not.toContain("mediaClient.recent");
+  });
+
+  it("delivers native chat updates only to the matching preload subscription", () => {
+    expect(preloadSource).toContain(
+      "nativeChatHandlers.get(payload.subscriptionId)"
+    );
+    expect(preloadSource).toContain(
+      "subscriber.attachmentId !== payload.attachmentId"
+    );
+    expect(preloadSource).toContain("subscriber.onUpdate(payload.update)");
+    expect(preloadSource).toContain(
+      'window.addEventListener("pagehide", clearNativeChatDelivery)'
+    );
+  });
+
+  it("preserves the optional effort slot when forwarding an SVG target", () => {
+    const submission = preloadSource.match(
+      /submitInRegime:\s*\(([^)]*)\)\s*=>\s*ipcRenderer\.invoke\(([\s\S]*?)\),/
+    );
+    expect(submission?.[1]).toMatch(/\beffort,\s*editorSvgTargetId\s*$/);
+    expect(submission?.[2]).toMatch(
+      /editorSvgTargetId !== undefined\s*\?\s*\[effort, editorSvgTargetId\]\s*:\s*effort === undefined\s*\?\s*\[\]\s*:\s*\[effort\]/
+    );
+  });
+
+  it("forwards only the reviewed external run identity and text", () => {
+    const external = preloadSource.match(
+      /nativeExternalAgent:\s*\{([\s\S]*?)\},/
+    );
+    expect(external?.[1]).toContain(
+      "ipcRenderer.invoke(IPC_CHANNELS.NATIVE_EXTERNAL_STATUS)"
+    );
+    expect(external?.[1]).toContain(
+      "ipcRenderer.invoke(IPC_CHANNELS.NATIVE_EXTERNAL_START, id, text)"
+    );
+    expect(external?.[1]).toContain(
+      "ipcRenderer.invoke(IPC_CHANNELS.NATIVE_EXTERNAL_STOP, id)"
+    );
   });
 });

@@ -1,5 +1,5 @@
 import { catalog as models } from "@grida/ai/catalogue";
-import { byokProvidersFor } from "@grida/agent";
+import { byokProvidersFor } from "@grida/ai-host";
 import type { CurrentGGModel } from "@/lib/desktop/gg-models";
 import type { DesktopBridge } from "@/lib/desktop/bridge";
 

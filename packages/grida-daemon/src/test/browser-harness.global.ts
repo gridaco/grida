@@ -10,11 +10,6 @@
  *   - the FOREIGN daemon allowlists an unrelated origin — the negative:
  *     the browser itself must refuse the cross-origin read (CORS), which
  *     no Node-side test can prove.
- *
- * Both daemons mount the STUB TENANT (see `browser-harness.origins.ts`):
- * one POST echo route + one GET SSE route declared via
- * `sse_query_token_paths`, so the query-token carriage rule
- * (GRIDA-SEC-004) is exercised through the real tenant seam.
  */
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
@@ -22,14 +17,8 @@ import os from "node:os";
 import path from "node:path";
 import type { TestProject } from "vitest/node";
 import { DaemonServer } from "../daemon-server";
-import type { DaemonTenant } from "../http/server";
 import { DaemonTransport } from "../transport";
-import {
-  BROWSER_HARNESS_ORIGINS,
-  STUB_ECHO_PATH,
-  STUB_SSE_EVENT,
-  STUB_STREAM_PATH,
-} from "./browser-harness.origins";
+import { BROWSER_HARNESS_ORIGINS } from "./browser-harness.origins";
 
 declare module "vitest" {
   export interface ProvidedContext {
@@ -41,41 +30,6 @@ declare module "vitest" {
     daemon_foreign_url: string;
   }
 }
-
-/** Minimal tenant: an authenticated mutating route + a long-lived SSE
- *  stream route that opts into `auth_token` query carriage. */
-const stubTenant: DaemonTenant = {
-  sse_query_token_paths: [
-    new RegExp(`^${STUB_STREAM_PATH}/[^/]+$`.replace(/\//g, "\\/")),
-  ],
-  register: (app) => {
-    app.post(STUB_ECHO_PATH, (c) => c.json({ ok: true }));
-    app.get(`${STUB_STREAM_PATH}/:id`, (c) => {
-      const id = c.req.param("id");
-      const body = new ReadableStream<Uint8Array>({
-        start(controller) {
-          controller.enqueue(
-            new TextEncoder().encode(
-              `event: ${STUB_SSE_EVENT}\ndata: ${JSON.stringify({
-                id,
-                state: "idle",
-              })}\n\n`
-            )
-          );
-          // Deliberately left open: EventSource clients stay attached
-          // until they close; the socket teardown ends the stream.
-        },
-      });
-      return new Response(body, {
-        headers: {
-          "content-type": "text/event-stream",
-          "cache-control": "no-cache",
-        },
-      });
-    });
-    return { capabilities: {} };
-  },
-};
 
 export default async function setup(project: TestProject) {
   const password = crypto.randomBytes(32).toString("base64url");
@@ -89,7 +43,6 @@ export default async function setup(project: TestProject) {
   const harness = new DaemonServer({
     password,
     user_data_path: harnessDir,
-    tenants: [stubTenant],
     http_access: {
       allowed_origins: BROWSER_HARNESS_ORIGINS,
       // The vitest page paths are an implementation detail of the runner;
@@ -100,7 +53,6 @@ export default async function setup(project: TestProject) {
   const foreign = new DaemonServer({
     password,
     user_data_path: foreignDir,
-    tenants: [stubTenant],
     http_access: {
       allowed_origins: ["https://allowlisted.example"],
       allowed_referer_paths: ["/"],

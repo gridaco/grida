@@ -8,6 +8,7 @@ mod config;
 #[cfg(feature = "conformance")]
 #[doc(hidden)]
 pub mod conformance;
+mod credential_continuity;
 mod credential_lock;
 mod custody;
 mod keyring;
@@ -15,12 +16,22 @@ mod native;
 mod providers;
 mod wire;
 
-pub use client::{AuthClient, GgGrant, Request, Response, Transport};
+pub use client::{AuthClient, GgGrant, GgGrantScope, Request, Response, Transport};
 pub use config::Config;
+pub use credential_continuity::CredentialContinuityStore;
 pub use credential_lock::CredentialLock;
 pub use custody::{Backend, StorageInfo};
 pub use providers::{Presence, ProviderStore};
 pub use wire::{Identity, Logout, Organization, OrganizationsPage, Status};
+
+/// Refuse a path whose extended access control list grants any access. On
+/// macOS an "allow" entry fails, a deny-only list passes, and a path that
+/// cannot be queried fails closed. Elsewhere private-file checks rely on the
+/// mode bits, so this always passes. The path's final link is not followed.
+#[cfg(unix)]
+pub fn refuse_granting_acl(path: &std::path::Path) -> Result<()> {
+    native::acl(path)
+}
 
 /// Public failures carry only a fixed code. Native/parser/HTTP diagnostics and
 /// source errors never cross this boundary.

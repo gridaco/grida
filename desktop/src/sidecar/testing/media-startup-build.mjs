@@ -6,7 +6,7 @@ const [desktop, output] = process.argv.slice(2);
 if (!desktop || !output) throw new Error("missing owned build paths");
 await build({
   root: desktop,
-  configFile: path.join(desktop, "vite.agent-sidecar.config.ts"),
+  configFile: path.join(desktop, "vite.services-sidecar.config.ts"),
   envDir: false,
   logLevel: "error",
   define: { EDITOR_BASE_URL: JSON.stringify("https://example.invalid") },
@@ -15,7 +15,7 @@ await build({
     emptyOutDir: true,
     minify: false,
     lib: {
-      entry: path.join(desktop, "src/agent-sidecar.ts"),
+      entry: path.join(desktop, "src/services-sidecar.ts"),
       formats: ["cjs"],
       fileName: () => "sidecar.cjs",
     },

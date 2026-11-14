@@ -4,37 +4,26 @@
  * Desktop welcome window — the reference-first artwork studio front door.
  *
  * Composer-first and outcome-first: describe what you want, or gather references
- * from the gallery — then Grida AUTO-CREATES a fresh, EMPTY project for you (a
- * plain folder under `~/Documents/Grida Projects`) and hands your prompt to that
- * project's agent as its first turn via {@link welcome_handoff}. No workspace
- * picker, no folder dialog to get started: the newcomer never has to choose a
- * folder. "Open folder…" and the recents list stay for opening work that
- * already exists (files stay visible — a named tree, not hidden). Submitting an
- * otherwise empty composer simply enters the selected/default workspace without
- * starting an agent turn.
+ * from the gallery, and the workspace opens with that request as the first turn
+ * of a new native chat (see {@link welcome_message}). The composer targets the
+ * DEFAULT workspace — the managed root `~/Documents/Grida Projects`, always
+ * registered — unless the top-left picker aims it at an existing project.
+ * "Open folder…" and the recents list stay for opening work that already
+ * exists. Submitting an otherwise empty composer simply enters the
+ * selected/default workspace without starting a turn.
  *
- * The home NEVER mints a per-session folder and NEVER dirties the user's
- * workspace. Starting a session roots the agent at the DEFAULT workspace — the
- * managed root itself (`~/Documents/Grida Projects`), always registered — and the agent
- * takes the wheel: whether the workspace becomes a board, a slides deck, or a
- * tree of files is the AGENT's choice on turn one (guided by the advertised
- * skills), and produced files land where the agent decides. The system provides
- * MINIMALLY — the default workspace + a per-session scratch dir. (The old flow
- * minted `~/Documents/Grida Projects/<prompt>` folders per session and pre-picked where
- * to work; that's the legacy this replaces.)
+ * The home NEVER mints a per-session folder: the agent roots at the workspace
+ * and decides on turn one whether it becomes a board, a deck or a tree of
+ * files (guided by its skills), writing only what it decides.
  *
  * A reference card opens related Library ideas; its Add action drops that
  * reference into the composer's tray. A slides template is selected directly
  * (references multi-select; a template is single-select, like choosing one
- * Keynote theme). Neither action starts work on its own. The user can add a
- * prompt, then start ONE session. References fold into the first-turn prompt as
- * plain URLs; a picked template's unzipped `.canvas` bundle rides the handoff
- * into the session's SCRATCH dir — agent-only reference, like an attachment (WG
- * `scratch.md`), never the user's workspace — and the prompt tells the agent to
- * read it from scratch and build the adapted deck. Every start opens the MAIN
- * workbench (`/desktop/workspace`) — the full surface with the file tree,
- * tool-approval, and auto-accept — whose agent pane consumes the handoff and
- * auto-sends when there's a prompt.
+ * Keynote theme). Neither action starts work on its own. References fold into
+ * the first message as plain URLs. A picked template is copied into the
+ * workspace as its own deck, and the first message names that copy so the
+ * agent adapts it. The model picker offers the native connections a new chat
+ * can choose before its workspace opens; the opened workspace selects it.
  */
 
 import {
@@ -53,19 +42,13 @@ import {
   workspaces as workspacesNs,
   type Workspace,
 } from "@/lib/desktop/bridge";
-import {
-  welcome_handoff,
-  type ScratchSeedFile,
-  type WelcomeHandoff,
-} from "@/lib/desktop/welcome-handoff";
+import { welcome_message } from "@/lib/desktop/welcome-message";
+import type { NativeChatProfileCatalog } from "@grida/desktop-bridge";
 import { dotcanvas } from "dotcanvas";
 import { TitleBar } from "@/scaffolds/desktop/chrome/title-bar";
 import { AgentComposerInput } from "@/scaffolds/desktop/shared/agent-composer-input";
-import {
-  DesktopModelPicker,
-  useModelPickerState,
-} from "@/scaffolds/desktop/shared/model-picker";
-import { useEndpointProviders } from "@/scaffolds/desktop/shared/registered-models";
+import { NativeModelPicker } from "@/scaffolds/desktop/workbench/native-chat-controls";
+import { WorkspaceCanvasCreation } from "@/scaffolds/desktop/workbench/workspace-canvas-creation";
 import type { ComposerCatalog } from "@/kits/composer";
 import {
   LibraryExplorerView,
@@ -77,7 +60,7 @@ import { SlidesTemplateGallery } from "@/scaffolds/desktop/home/slides-template-
 // `import type` is erased at build — it does NOT pull the loader (and its
 // fflate/dotcanvas deps) into the home chunk; the gallery's dynamic `import()`
 // stays the sole code-split boundary. The home only holds the picked template
-// object and reads its `files` (the unzipped bundle) to seed the session scratch.
+// object and copies its `files` (the unzipped bundle) into the workspace.
 import type { SlidesTemplate } from "@/lib/slides-templates";
 import { RecentProjectsCommand } from "@/scaffolds/desktop/home/recent-projects-command";
 import { WorkspacePicker } from "@/scaffolds/desktop/home/workspace-picker";
@@ -87,7 +70,7 @@ import {
 } from "@/scaffolds/desktop/home/application-preset";
 import { PresetRail } from "@/scaffolds/desktop/home/preset-rail";
 import { PresetChip } from "@/scaffolds/desktop/home/preset-chip";
-import type { AgentDesignSearch } from "@grida/agent/tools/design-search";
+import type { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
 import { last_workspace } from "@/lib/desktop/last-workspace";
 
 const NOOP = () => {};
@@ -163,23 +146,6 @@ function StartupRestoreScreen() {
  *  readdirs per mount just to yield this same empty shape. */
 const EMPTY_CATALOG: ComposerCatalog = { commands: [], mentions: [] };
 
-/** Fold picked references into the first-turn prompt as plain context. The
- *  workspace starts empty — there is no seeded document to place references in
- *  anymore — so the agent receives them as URLs and decides what to make of
- *  them (a moodboard board, style refs for a deck, …). Returns `text` unchanged
- *  when nothing is picked. */
-function composePromptWithRefs(
-  text: string,
-  refs: AgentDesignSearch.DesignSearchResult[]
-): string {
-  if (refs.length === 0) return text;
-  const list = refs
-    .map((r) => `- ${r.title || "reference"}: ${r.url}`)
-    .join("\n");
-  const lead = text || "Use these visual references as the starting point.";
-  return `${lead}\n\nReferences:\n${list}`;
-}
-
 function WelcomeSurface({
   initialWorkspaceId,
 }: {
@@ -213,7 +179,7 @@ function WelcomeSurface({
   // References the user has gathered from the gallery (multi-select). They seed
   // ONE fresh board on submit; a click in the gallery toggles membership here.
   const [pickedRefs, setPickedRefs] = useState<
-    AgentDesignSearch.DesignSearchResult[]
+    chat_vocabulary.DesignReference[]
   >([]);
   const selectedRefIds = useMemo(
     () => new Set(pickedRefs.map((p) => p.id)),
@@ -335,184 +301,145 @@ function WelcomeSurface({
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const ids = await Promise.all(
-        workspaces.map(async (w) => {
-          try {
-            const entries = await workspacesNs.readdir(w.id);
-            return entries.some(
-              (e) => e.rel_path === dotcanvas.MANIFEST_FILENAME
-            )
-              ? w.id
-              : null;
-          } catch {
-            return null;
-          }
-        })
-      );
-      if (!cancelled) {
-        setCanvasIds(new Set(ids.filter((x): x is string => x !== null)));
+      const ids = new Set<string>();
+      // The native reader has finite workers. Leave room for open editors
+      // while checking every remembered workspace.
+      for (let index = 0; index < workspaces.length; index += 2) {
+        if (cancelled) return;
+        await Promise.all(
+          workspaces.slice(index, index + 2).map(async (w) => {
+            try {
+              const entries = await workspacesNs.readdir(w.id);
+              if (
+                entries.some((e) => e.rel_path === dotcanvas.MANIFEST_FILENAME)
+              )
+                ids.add(w.id);
+            } catch {
+              // Unavailable folders remain available as ordinary workspace rows.
+            }
+          })
+        );
       }
+      if (!cancelled) setCanvasIds(ids);
     })();
     return () => {
       cancelled = true;
     };
   }, [workspaces]);
 
-  // Configured endpoint providers (issue #806): registered local models
-  // join the welcome composer's picker too.
-  const endpoints = useEndpointProviders();
-
-  // Model selection for the composer. No sessions here (the welcome page never
-  // loads a chat), so this just holds the user's pick; it rides the handoff so
-  // the session's first turn runs on the chosen model.
-  const {
-    model_id: modelId,
-    provider_id: modelProviderId,
-    setSelection: setModelSelection,
-    is_user_pick: isUserPick,
-  } = useModelPickerState({
-    current_id: null,
-    binding_epoch: 0,
-    sessions: [],
-    endpoints,
-  });
-
-  // Stash the (possibly empty) prompt + model + scratch seed for a workspace's
-  // agent and become the workspace window. Shared by the default-workspace and
-  // existing-target paths; an empty prompt lands primed but doesn't auto-send a
-  // turn. `scratchSeed` (a picked template's unzipped bundle) rides into the
-  // session scratch on the first turn — agent-only, never the workspace.
-  const handoffAndGo = useCallback(
-    (
-      workspace: Workspace,
-      prompt: string,
-      scratchSeed?: ScratchSeedFile[],
-      templateContext?: WelcomeHandoff["template_context"]
-    ) => {
-      welcome_handoff.set(workspace.id, {
-        prompt,
-        // Carry the model only when the user deliberately picked one. An
-        // untouched default — or a GG upgrade that hasn't resolved yet — is
-        // left off so the workspace resolves its own (GG-aware) default;
-        // otherwise a fast submit before the async session settles would
-        // seed the workspace with the hosted default as a false explicit
-        // pick, and keyless users would hit `auth_required` (#942).
-        ...(isUserPick
-          ? {
-              model_id: modelId,
-              ...(modelProviderId ? { provider_id: modelProviderId } : {}),
-            }
-          : {}),
-        ...(scratchSeed && scratchSeed.length > 0
-          ? { scratch_seed: scratchSeed }
-          : {}),
-        ...(templateContext ? { template_context: templateContext } : {}),
-      });
-      router.push(workspaceWorkbenchHref(workspace));
-    },
-    [modelId, modelProviderId, isUserPick, router]
+  // Native connection choices for the first chat. Only choices that do not
+  // depend on a workspace are offered here; the opened workspace selects the
+  // chosen one as a new connection. `null` keeps the workspace default.
+  const [profiles, setProfiles] = useState<NativeChatProfileCatalog | null>(
+    null
   );
-
-  // Start a session in the DEFAULT workspace (`~/Documents/Grida Projects`). We NEVER mint
-  // a per-session folder — that littered the managed root and pre-picked where to
-  // work; the agent roots at the default workspace and takes the wheel, writing
-  // only what it decides. Optional `scratchSeed` (a picked template's unzipped
-  // bundle) rides the handoff into the session scratch — agent-only reference,
-  // never the user's workspace.
-  const startFresh = useCallback(
-    async (opts: {
-      prompt: string;
-      scratchSeed?: ScratchSeedFile[];
-      templateContext?: WelcomeHandoff["template_context"];
-    }) => {
-      const bridge = getDesktopBridge();
-      if (!bridge) {
-        setError("Desktop bridge not available.");
-        return;
-      }
-      try {
-        setBusy(true);
-        setError(null);
-        const ws = await workspacesNs.getDefault();
-        if (!ws) {
-          setError("No default workspace available on this host.");
-          setBusy(false);
-          return;
-        }
-        // Opens the MAIN workbench (`/desktop/workspace`) — the full surface with
-        // the file tree, tool-approval bar, and auto-accept picker; its agent pane
-        // consumes the handoff and auto-sends the prompt as turn one.
-        handoffAndGo(ws, opts.prompt, opts.scratchSeed, opts.templateContext);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Couldn't start a session."
+  const [profileId, setProfileId] = useState<string | null>(null);
+  const readProfiles = useCallback(() => {
+    const list = getDesktopBridge()?.nativeChat?.welcomeProfiles;
+    if (!list) return;
+    void list()
+      .then((next) => {
+        setProfiles(next);
+        // A choice that is no longer offered falls back to the default.
+        setProfileId((current) =>
+          current && next?.choices.some(({ id }) => id === current)
+            ? current
+            : null
         );
-        setBusy(false); // navigation unmounts on success; only reset on failure
-      }
-    },
-    [handoffAndGo]
-  );
+      })
+      .catch(() => {
+        // Without choices the first chat uses the workspace default.
+      });
+  }, []);
+  useEffect(() => {
+    readProfiles();
+    // Settings can add a provider key or endpoint in another window.
+    window.addEventListener("focus", readProfiles);
+    return () => window.removeEventListener("focus", readProfiles);
+  }, [readProfiles]);
 
-  // The one "start" path, shared by the composer's send and the reference
-  // tray's Start button. Picked references (if any) fold into the first-turn
-  // prompt as context and always start a FRESH project — they take precedence
-  // over the target picker, since they're only meaningful for a new start. An
-  // otherwise empty submit simply enters the selected/default workspace without
-  // starting an agent turn (see test/desktop-welcome-empty-submit.md).
+  // Open a workspace and, when there is one, leave the first message for its
+  // chat. An empty message enters the workspace without starting a turn.
   const start = useCallback(
     (text: string) => {
-      const t = text.trim();
       if (busy) return;
-      // A picked template starts a session in the default workspace. Its unzipped
-      // `.canvas` bundle rides into the session SCRATCH (agent-only), and the
-      // template itself rides as a `user_template_selection` CONTEXT part (a chip
-      // in the transcript, a `<user_template_selection>` block for the model) —
-      // NOT fabricated into the message. The user's raw text `t` is the only ask
-      // (empty ⇒ a context-only send; the agent-pane fires it anyway).
-      if (pickedTemplate) {
-        void startFresh({
-          prompt: t,
-          scratchSeed: pickedTemplate.files,
-          templateContext: {
-            name: pickedTemplate.name,
-            title: pickedTemplate.title,
-            slides: pickedTemplate.pages.length,
-            system: pickedTemplate.system,
-          },
-        });
+      const template = pickedTemplate;
+      const references = template ? [] : pickedRefs;
+      // Picked context only makes sense for a fresh start in the default
+      // workspace; plain text goes to the selected workspace.
+      const fresh = !!template || references.length > 0;
+      if ((fresh || text.trim()) && !getDesktopBridge()?.nativeChat) {
+        setError("Chat isn't available in this version of Grida Desktop.");
         return;
       }
-      if (pickedRefs.length > 0) {
-        void startFresh({ prompt: composePromptWithRefs(t, pickedRefs) });
-        return;
-      }
-      // Send into an existing opened workspace, or enter it without a turn when
-      // the composer is empty. The default-workspace path follows the same rule.
-      if (target) handoffAndGo(target, t);
-      else void startFresh({ prompt: t });
+      setBusy(true);
+      setError(null);
+      void (async () => {
+        try {
+          const workspace =
+            fresh || !target ? await workspacesNs.getDefault() : target;
+          if (!workspace) {
+            setError("No default workspace available on this host.");
+            setBusy(false);
+            return;
+          }
+          const copied = template
+            ? await WorkspaceCanvasCreation.copy(workspace.id, template).catch(
+                () => {
+                  throw new Error(
+                    "Couldn't copy the template into the workspace."
+                  );
+                }
+              )
+            : null;
+          const message = welcome_message.compose({
+            text,
+            references,
+            template:
+              template && copied
+                ? {
+                    title: template.title,
+                    slides: template.pages.length,
+                    path: copied,
+                  }
+                : null,
+          });
+          if (
+            message !== null &&
+            !welcome_message.stash(workspace.id, { text: message, profileId })
+          ) {
+            setError("Couldn't keep your message for the workspace.");
+            setBusy(false);
+            return;
+          }
+          router.push(workspaceWorkbenchHref(workspace));
+        } catch (err) {
+          setError(
+            err instanceof Error ? err.message : "Couldn't start a session."
+          );
+          setBusy(false); // navigation unmounts on success
+        }
+      })();
     },
-    [busy, pickedTemplate, pickedRefs, target, handoffAndGo, startFresh]
+    [busy, pickedTemplate, pickedRefs, target, profileId, router]
   );
 
   // A Library card's Add action toggles it in the composer's tray (multi-select)
   // instead of starting a board on its own — the user gathers several, then
   // starts one board from all of them via the composer / the tray's Start button.
-  const togglePick = useCallback(
-    (pin: AgentDesignSearch.DesignSearchResult) => {
-      setPickedRefs((cur) =>
-        cur.some((p) => p.id === pin.id)
-          ? cur.filter((p) => p.id !== pin.id)
-          : [...cur, pin]
-      );
-    },
-    []
-  );
+  const togglePick = useCallback((pin: chat_vocabulary.DesignReference) => {
+    setPickedRefs((cur) =>
+      cur.some((p) => p.id === pin.id)
+        ? cur.filter((p) => p.id !== pin.id)
+        : [...cur, pin]
+    );
+  }, []);
 
   // Picking a slides template SELECTS it into the composer (single-select), like
   // attaching a reference — it does NOT start a session on its own. Clicking the
-  // already-picked one clears it. The start (composer send / Enter) attaches it
-  // as a `user_template_selection` context part + seeds the deck's bundle into
-  // scratch, handing it to the agent to adapt; see `start`.
+  // already-picked one clears it. The start (composer send / Enter) copies the
+  // deck into the workspace and names the copy in the first message; see
+  // `start`.
   const togglePickTemplate = useCallback((template: SlidesTemplate) => {
     setPickedTemplate((cur) => (cur?.name === template.name ? null : template));
   }, []);
@@ -526,13 +453,8 @@ function WelcomeSurface({
     try {
       setBusy(true);
       setError(null);
-      // `createDirectory` surfaces the macOS "New Folder" button; macOS-only,
-      // safely ignored on Windows/Linux.
-      const paths = await bridge.dialog.open({
-        properties: ["openDirectory", "createDirectory"],
-      });
-      if (!paths || paths.length === 0) return;
-      const ws = await workspacesNs.openFolder(paths[0]);
+      const ws = await workspacesNs.chooseFolder();
+      if (!ws) return;
       await refreshWorkspaces();
       setTarget(ws); // aim the composer at the just-opened project
     } catch (err) {
@@ -691,10 +613,6 @@ function WelcomeSurface({
                     onSubmit={start}
                     isStreaming={false}
                     onStop={NOOP}
-                    // Welcome uses the reference tray ("Start from an idea"), not
-                    // composer attachments — its `start` ignores files/uploads, so
-                    // hide the "+" rather than offer a dead control.
-                    attach={false}
                     allowEmptySubmit
                     emptySubmitLabel={
                       pickedTemplate || pickedRefs.length > 0
@@ -715,15 +633,19 @@ function WelcomeSurface({
                       <PresetChip value={preset} onChange={setPreset} />
                     }
                     toolbarEnd={
-                      <DesktopModelPicker
-                        value={{
-                          model_id: modelId,
-                          ...(modelProviderId
-                            ? { provider_id: modelProviderId }
-                            : {}),
+                      <NativeModelPicker
+                        profiles={{
+                          active: profileId,
+                          choices: profiles?.choices ?? [],
+                          saved: [],
                         }}
-                        onValueChange={setModelSelection}
-                        endpoints={endpoints}
+                        busy={busy}
+                        onSelect={(selection) =>
+                          setProfileId(
+                            selection.kind === "default" ? null : selection.id
+                          )
+                        }
+                        onRefresh={readProfiles}
                       />
                     }
                   />

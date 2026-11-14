@@ -354,7 +354,7 @@ not repeated.
   hole, not because the call is rejected.
 - **`group`** — `core/group.ts plan_group` (referenced in
   `editor.ts:21`). Policy lives in
-  [grouping.md](grouping.md).
+  [grouping](https://github.com/gridaco/nothing/blob/main/docs/wg/canvas/grouping.md).
   Refuses (essential) on: empty selection, cross-parent
   selection, paint-server / resource members, and `<defs>` /
   `<svg>` / `<symbol>` / `<switch>` parents.

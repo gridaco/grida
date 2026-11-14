@@ -1,33 +1,51 @@
-import type { AgentSurface } from "@grida/agent/surface";
+import {
+  NativeEditorSurfaces,
+  type NativeEditorSurfaceSnapshot,
+} from "@grida/desktop-bridge";
 import { WorkspaceArtifact } from "@/lib/desktop/workspace-artifact";
 import type { WorkspaceViewState } from "@/lib/desktop/workspace-view-state";
 import type { EditorGroup } from "./editor-group";
+import { WorkbenchTab } from "./workbench-tab";
+import { WorkspaceSvgText } from "./workspace-svg-text";
 
 /**
  * Interactive surface host for one workspace workbench.
  *
- * The host validates every model-supplied path against live workspace
+ * The host validates every agent-supplied path against live workspace
  * directory truth before handing a relative id to the editor group. The
- * server owns the tool result; this renderer adapter only applies the
+ * agent owns the tool result; this renderer adapter only applies the
  * presentation request as an auxiliary side effect. Tab mutation stays in
- * `EditorGroup`.
+ * `EditorGroup`. The host deals in file tabs only: panels are neither listed
+ * to the agent nor remembered for a later restore.
  */
-export class WorkspaceSurfaceHost implements AgentSurface.Host {
+export class WorkspaceSurfaceHost {
+  readonly svgText: WorkspaceSvgText;
+
   constructor(
     private readonly readdir: WorkspaceArtifact.Readdir,
     private readonly group: Pick<
       EditorGroup,
-      "getSnapshot" | "open" | "restore"
-    >,
-    private readonly isVirtual: (id: string) => boolean = (id) =>
-      id.startsWith("virtual://")
-  ) {}
+      "getSnapshot" | "open" | "restore" | "subscribe"
+    >
+  ) {
+    this.svgText = new WorkspaceSvgText(this.group.getSnapshot);
+  }
 
-  async open(path: string): Promise<void> {
+  async open(
+    path: string,
+    requireCurrent: () => boolean = () => true
+  ): Promise<void> {
+    if (!requireCurrent()) return;
     const relPath = WorkspaceArtifact.fromAgentPath(path);
     if (relPath === null) return;
     const expectedSnapshot = this.group.getSnapshot();
-    await this.openValidated(relPath, expectedSnapshot);
+    const target = await this.resolveOpenableRelative(relPath);
+    if (
+      target !== null &&
+      requireCurrent() &&
+      this.group.getSnapshot() === expectedSnapshot
+    )
+      this.group.open(WorkbenchTab.file(target));
   }
 
   /**
@@ -42,38 +60,18 @@ export class WorkspaceSurfaceHost implements AgentSurface.Host {
     );
     if (this.group.getSnapshot() !== expectedSnapshot) return;
 
-    const tabs = restored.filter((path): path is string => path !== null);
+    const paths = restored.filter((path): path is string => path !== null);
     const requestedActive =
       state.active === null
         ? null
         : WorkspaceArtifact.normalizeRelativePath(state.active);
     this.group.restore({
-      tabs,
+      tabs: paths.map(WorkbenchTab.file),
       active:
-        requestedActive !== null && tabs.includes(requestedActive)
-          ? requestedActive
+        requestedActive !== null && paths.includes(requestedActive)
+          ? WorkbenchTab.file(requestedActive)
           : null,
     });
-  }
-
-  private async openValidated(
-    path: string,
-    expectedSnapshot?: ReturnType<EditorGroup["getSnapshot"]>
-  ): Promise<void> {
-    const relPath = await this.resolveOpenableRelative(path);
-    if (relPath === null) return;
-
-    // Validation crosses the asynchronous Desktop bridge. Any tab mutation in
-    // the meantime is newer navigation and supersedes this auxiliary agent
-    // presentation request. `restoreRelative` independently guards its whole
-    // batch against the same race.
-    if (
-      expectedSnapshot !== undefined &&
-      this.group.getSnapshot() !== expectedSnapshot
-    ) {
-      return;
-    }
-    this.group.open(relPath);
   }
 
   private async resolveOpenableRelative(path: string): Promise<string | null> {
@@ -88,37 +86,81 @@ export class WorkspaceSurfaceHost implements AgentSurface.Host {
     }
   }
 
-  listOpen(): AgentSurface.Snapshot {
+  /** Agent paths of the open file tabs, and the active one. */
+  listOpen(): { active: string | null; open: string[] } {
     const { tabs, active } = this.group.getSnapshot();
-    const open = tabs.flatMap((id) => {
-      if (this.isVirtual(id)) return [];
-      const path = WorkspaceArtifact.toAgentPath(id);
+    const open = tabs.flatMap((key) => {
+      const relPath = WorkbenchTab.relPath(key);
+      const path =
+        relPath === null ? null : WorkspaceArtifact.toAgentPath(relPath);
       return path === null ? [] : [path];
     });
+    const activeRelPath = WorkbenchTab.relPath(active);
     const activePath =
-      active === null || this.isVirtual(active)
+      activeRelPath === null
         ? null
-        : WorkspaceArtifact.toAgentPath(active);
+        : WorkspaceArtifact.toAgentPath(activeRelPath);
     return { active: activePath, open };
   }
 
+  readEditorSurfaces() {
+    return NativeEditorSurfaces.capture(this.listOpen());
+  }
+
+  subscribeToEditorSurfaces(listener: () => void): () => void {
+    return this.group.subscribe(listener);
+  }
+
+  publishEditorSurfaces(
+    publish: (snapshot: NativeEditorSurfaceSnapshot) => Promise<boolean>
+  ): () => void {
+    let current = true;
+    let pending = false;
+    let dirty = false;
+    const flush = async () => {
+      while (current && dirty) {
+        dirty = false;
+        current =
+          (await publish(this.readEditorSurfaces()).catch(() => false)) &&
+          current;
+      }
+      pending = false;
+    };
+    const update = () => {
+      if (!current) return;
+      dirty = true;
+      if (pending) return;
+      pending = true;
+      void flush();
+    };
+    const unsubscribe = this.subscribeToEditorSurfaces(update);
+    update();
+    return () => {
+      current = false;
+      unsubscribe();
+    };
+  }
+
   /**
-   * Pick the ordered real tabs safe to persist for a later workspace restore.
+   * Pick the ordered tabs safe to persist for a later workspace restore.
    *
-   * A virtual tab can own focus while real tabs are independently closed.
-   * Persisting the old active path in that state resurrects a closed artifact,
-   * so fall back to the last still-open real tab, or clear the path when none
-   * remain.
+   * Only file tabs are persisted. Only an active path that is still open is
+   * persisted; otherwise fall back to the last open file, or clear the path
+   * when none remain.
    */
   rememberedTabs(): WorkspaceViewState.Tabs {
     const { tabs, active } = this.group.getSnapshot();
-    const open = tabs.flatMap((id) => {
-      if (this.isVirtual(id)) return [];
-      const path = WorkspaceArtifact.normalizeRelativePath(id);
+    const open = tabs.flatMap((key) => {
+      const relPath = WorkbenchTab.relPath(key);
+      const path =
+        relPath === null
+          ? null
+          : WorkspaceArtifact.normalizeRelativePath(relPath);
       return path === null ? [] : [path];
     });
-    if (active !== null && !this.isVirtual(active)) {
-      const normalized = WorkspaceArtifact.normalizeRelativePath(active);
+    const activeRelPath = WorkbenchTab.relPath(active);
+    if (activeRelPath !== null) {
+      const normalized = WorkspaceArtifact.normalizeRelativePath(activeRelPath);
       if (normalized !== null && open.includes(normalized)) {
         return { open, active: normalized };
       }

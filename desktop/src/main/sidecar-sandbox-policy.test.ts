@@ -1,0 +1,156 @@
+// GRIDA-SEC-014 — explicit provider-root forwarding and host isolation.
+import { describe, expect, it } from "vitest";
+import { execFile } from "node:child_process";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { promisify } from "node:util";
+import { SidecarSandboxPolicy } from "./sidecar-sandbox-policy";
+
+describe("SidecarSandboxPolicy", () => {
+  it("is socketless and gives the sidecar tree no direct Internet hosts", () => {
+    const policy = SidecarSandboxPolicy.build({
+      userData: "/Users/test/.grida/agent",
+      providerRoot: "/isolated-grida/providers",
+      mediaRoot: "/Users/test/Library/Application Support/Grida/Media",
+      home: "/Users/test",
+    });
+
+    expect(policy.filesystem.allow_read).toContain("/isolated-grida/providers");
+    expect(policy.filesystem.allow_write).toContain(
+      "/isolated-grida/providers"
+    );
+    expect(policy.network.allow_local_binding).toBe(false);
+    expect(policy.network.allowed_domains).toEqual([]);
+    expect(policy.filesystem.allow_read).toContain(
+      "/Users/test/Library/Application Support/Grida/Media"
+    );
+    expect(policy.filesystem.allow_write).toContain(
+      "/Users/test/Library/Application Support/Grida/Media"
+    );
+  });
+
+  it("keeps the native browser profile outside retained sidecar custody", () => {
+    const desktopStateRoot = "/isolated-grida/browser";
+    const policy = SidecarSandboxPolicy.build({
+      userData: "/isolated-grida/agent",
+      mediaRoot: "/isolated-grida/media",
+      desktopStateRoot,
+      home: "/Users/test",
+    });
+    expect(policy.filesystem.deny_read).toContain(desktopStateRoot);
+    expect(policy.filesystem.deny_write).toContain(desktopStateRoot);
+    expect(policy.filesystem.allow_write).not.toContain(desktopStateRoot);
+  });
+
+  it("adds literal protected-state read and write denials only when supplied", () => {
+    const launch = {
+      userData: "/isolated/agent",
+      mediaRoot: "/isolated/media",
+      home: "/Users/test",
+    };
+    const root = "/Users/test/.grida";
+    const ordinary = SidecarSandboxPolicy.build(launch);
+    const preview = SidecarSandboxPolicy.build({
+      ...launch,
+      protectedStateRoots: [root],
+    });
+    expect(ordinary.filesystem.deny_read).not.toContain(root);
+    expect(ordinary.filesystem.deny_write).not.toContain(root);
+    expect(preview.filesystem.deny_read).toContain(root);
+    expect(preview.filesystem.deny_write).toContain(root);
+    expect(() =>
+      SidecarSandboxPolicy.build({
+        ...launch,
+        protectedStateRoots: [root + "[old]"],
+      })
+    ).toThrow("native_desktop_protected_state_path_not_literal");
+  });
+
+  it.runIf(
+    process.platform === "darwin" &&
+      Boolean(process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES)
+  )(
+    "keeps Media nested in the ordinary browser root writable under Seatbelt",
+    async () => {
+      const root = await fs.mkdtemp(
+        path.join(await fs.realpath(os.tmpdir()), "grida-ordinary-seatbelt-")
+      );
+      const browser = path.join(root, "Application Support", "Grida");
+      const mediaRoot = path.join(browser, "Media");
+      const native = path.join(browser, "chats");
+      const agent = path.join(root, "agent");
+      const installed = path.join(
+        root,
+        "Application Support",
+        "Grida Insiders"
+      );
+      const { RetainedServiceSandbox } =
+        await import("./retained-service-sandbox");
+      try {
+        await Promise.all(
+          [mediaRoot, native, agent, installed].map((directory) =>
+            fs.mkdir(directory, { recursive: true })
+          )
+        );
+        const protectedFiles = [
+          path.join(native, "agent.sqlite"),
+          path.join(installed, "recent.json"),
+        ];
+        await Promise.all(
+          protectedFiles.map((file) => fs.writeFile(file, "retained"))
+        );
+        const output = path.join(mediaRoot, "new.bin");
+        const script = path.join(root, "probe.cjs");
+        await fs.writeFile(
+          script,
+          `
+          const assert = require('node:assert/strict');
+          const fs = require('node:fs');
+          fs.writeFileSync(${JSON.stringify(output)}, 'new media');
+          assert.equal(fs.readFileSync(${JSON.stringify(output)}, 'utf8'), 'new media');
+          for (const file of ${JSON.stringify(protectedFiles)}) {
+            assert.throws(() => fs.readFileSync(file), { code: 'EPERM' });
+            assert.throws(() => fs.writeFileSync(file, 'changed'), { code: 'EPERM' });
+          }
+        `
+        );
+        const policy = SidecarSandboxPolicy.build({
+          home: root,
+          userData: agent,
+          mediaRoot,
+          desktopStateRoot: native,
+          protectedStateRoots: [installed],
+        });
+        const sandbox = new RetainedServiceSandbox({
+          network: {
+            allowedDomains: [],
+            deniedDomains: [],
+            allowLocalBinding: false,
+          },
+          filesystem: {
+            denyRead: policy.filesystem.deny_read,
+            allowRead: policy.filesystem.allow_read,
+            denyWrite: policy.filesystem.deny_write,
+            allowWrite: policy.filesystem.allow_write,
+          },
+        });
+        const plan = sandbox.prepare(process.execPath, [script]);
+        plan.recheck();
+        await promisify(execFile)(plan.executable, plan.arguments, {
+          env: { HOME: root, PATH: "/usr/bin:/bin" },
+          timeout: 5000,
+        });
+        expect(await fs.readFile(output, "utf8")).toBe("new media");
+        expect(
+          await Promise.all(
+            protectedFiles.map((file) => fs.readFile(file, "utf8"))
+          )
+        ).toEqual(["retained", "retained"]);
+      } finally {
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    },
+    15_000
+  );
+});

@@ -1,0 +1,87 @@
+import crypto from "node:crypto";
+import { ProviderNetworkPolicy } from "../provider-network-policy";
+
+/**
+ * GRIDA-SEC-004 — main-process ownership of provider-network grants.
+ *
+ * Built-in provider origins exist for one Desktop spawn. Custom endpoint
+ * grants are memory-only and appear only after a native, human-visible
+ * approval. They intentionally expire on relaunch: persisting a grant where
+ * the sidecar or one of its descendants can rewrite it would turn endpoint
+ * config into network authority.
+ */
+export class ProviderNetworkAuthority {
+  private readonly builtIns: ProviderNetworkPolicy.Grant[];
+  private readonly mainOnly = ProviderNetworkPolicy.mainOnlyGrants();
+  private readonly customByEndpoint = new Map<
+    string,
+    { baseUrl: string; grant: ProviderNetworkPolicy.Grant }
+  >();
+  private revisionValue = 1;
+
+  constructor(ggOrigin: string) {
+    this.builtIns = ProviderNetworkPolicy.builtInGrants(ggOrigin);
+  }
+
+  get revision(): number {
+    return this.revisionValue;
+  }
+
+  grants(): ProviderNetworkPolicy.Grant[] {
+    const custom = [...this.customByEndpoint.values()].map(
+      ({ grant }) => grant
+    );
+    return [...this.builtIns, ...custom].map((grant) => ({
+      ...grant,
+      origins: [...grant.origins],
+    }));
+  }
+
+  /** Grants Main may dispatch for native hosts: the published set plus the
+   * Main-only grants the sidecar never receives. */
+  nativeGrants(): ProviderNetworkPolicy.Grant[] {
+    return [
+      ...this.grants(),
+      ...this.mainOnly.map((grant) => ({
+        ...grant,
+        origins: [...grant.origins],
+      })),
+    ];
+  }
+
+  isCustomGrant(grantId: string): boolean {
+    for (const { grant } of this.customByEndpoint.values()) {
+      if (grant.id === grantId) return true;
+    }
+    return false;
+  }
+
+  approvedEndpointGrant(endpointId: string, baseUrl: string): string | null {
+    const current = this.customByEndpoint.get(endpointId);
+    return current?.baseUrl === new URL(baseUrl).href ? current.grant.id : null;
+  }
+
+  approveCustomEndpoint(endpointId: string, baseUrl: string): void {
+    if (!/^[a-z][a-z0-9_-]{0,63}$/.test(endpointId)) {
+      throw new Error("custom endpoint id is invalid");
+    }
+    const origin = ProviderNetworkPolicy.canonicalOrigin(baseUrl);
+    const canonicalBase = new URL(baseUrl).href;
+    const current = this.customByEndpoint.get(endpointId);
+    if (current?.baseUrl === canonicalBase) return;
+    this.customByEndpoint.set(endpointId, {
+      baseUrl: canonicalBase,
+      grant: {
+        id: `provider:custom:${crypto.randomUUID()}`,
+        lane: "provider",
+        origins: [origin],
+      },
+    });
+    this.revisionValue += 1;
+  }
+
+  revokeCustomEndpoint(endpointId: string): void {
+    if (!this.customByEndpoint.delete(endpointId)) return;
+    this.revisionValue += 1;
+  }
+}

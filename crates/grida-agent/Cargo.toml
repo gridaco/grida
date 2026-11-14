@@ -1,0 +1,72 @@
+[package]
+name = "grida-agent"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+agent-client-protocol = "=5.0.0"
+agent-kit-core = { path = "../agent-kit-core" }
+agent-kit-providers = { path = "../agent-kit-providers" }
+agent-kit-runtime = { path = "../agent-kit-runtime" }
+agent-kit-sandbox = { path = "../agent-kit-sandbox" }
+agent-kit-sessions = { path = "../agent-kit-sessions" }
+agent-kit-store-sqlite = { path = "../agent-kit-store-sqlite" }
+base64 = "0.22"
+clap = { workspace = true, features = ["help", "usage", "error-context"] }
+futures-channel = "0.3"
+futures-util = "0.3"
+grida-agent-master = { path = "../grida-agent-master" }
+grida-auth = { path = "../grida-auth" }
+http-body-util = "0.1"
+hyper = { version = "1", default-features = false, features = [
+  "http1",
+  "server",
+] }
+hyper-util = { version = "0.1", default-features = false, features = ["tokio"] }
+png = "0.18"
+libc = "0.2"
+reqwest = { version = "=0.13.5", default-features = false, features = [
+  "rustls",
+  "stream",
+  "system-proxy",
+] }
+rmcp = { version = "=3.9.0", default-features = false, features = [
+  "server",
+  "transport-streamable-http-server",
+] }
+serde = { version = "1", features = ["derive"] }
+serde_json.workspace = true
+sha2 = "0.11"
+sse-stream = "=0.2.6"
+subtle = "2"
+tempfile = "3"
+toml_edit = "=0.25.15"
+tokio = { version = "1", features = [
+  "io-std",
+  "io-util",
+  "macros",
+  "net",
+  "rt-multi-thread",
+  "signal",
+  "sync",
+  "time",
+] }
+tokio-tungstenite = { version = "=0.30.0", default-features = false, features = [
+  "handshake",
+] }
+uuid = { version = "1", features = ["v4"] }
+zeroize = "1"
+
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "1", features = ["fs", "process"] }
+
+[dev-dependencies]
+socket2 = "0.6"
+tokio = { version = "1", features = ["net", "process"] }
+tokio-util = { version = "0.7", features = ["compat"] }
+
+[lints]
+workspace = true

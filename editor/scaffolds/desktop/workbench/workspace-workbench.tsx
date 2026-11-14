@@ -23,6 +23,10 @@
  * an mkdir/cp/git-mv from the agent pane). Pure prop drilling — no
  * context, no store — because nothing else needs to subscribe.
  *
+ * Tabs are files or panels (`workbench-tab.ts`). The agent pane's side chat
+ * opens as a panel tab through `SideChatTabPlacement`, handed down to the
+ * chat like the surface host.
+ *
  * The host (`page.tsx`) is responsible for resolving the workspace
  * from the `?id=` query param; this component renders against an
  * already-resolved `Workspace` so it never needs to deal with the
@@ -74,14 +78,11 @@ import { AgentPane } from "./agent-pane";
 import { TerminalPane } from "./terminal-pane";
 import { WorkspaceChangesProvider } from "./workspace-changes";
 import { EditorGroup } from "./editor-group";
+import { WorkbenchTab } from "./workbench-tab";
+import { WorkbenchPanels } from "./workbench-panels";
+import { SideChatTabPlacement } from "./side-chat-tab-placement";
 import { WorkspaceSurfaceHost } from "./workspace-surface-host";
 import { WorkspaceCanvasCreation } from "./workspace-canvas-creation";
-import {
-  DESIGN_SEARCH_TAB_ID,
-  isVirtualTab,
-  pickToolCallId,
-  type DesignSearchSession,
-} from "./design-search-tab";
 import styles from "./workspace-workbench.module.css";
 
 /**
@@ -150,35 +151,46 @@ export function WorkspaceWorkbench({
   initialActiveRelPath?: string;
 }) {
   // The editor group (VSCode's tab model) owns all tab state + rules — open
-  // order, the active-tab-on-close neighbor rule, reopen-closed history, and the
-  // picker's preview-tab lifecycle — as a plain, unit-tested class. React is a
+  // order, the active-tab-on-close neighbor rule, and reopen-closed history —
+  // as a plain, unit-tested class. React is a
   // wire: `useSyncExternalStore` mirrors its snapshot, and the handlers below are
   // one-line calls into it. `active === null` means no tabs open; otherwise it's
   // always one of `tabs`. (Per the `code-react` doctrine: load-bearing UX logic
   // lives where it's testable, not smeared across effects + refs + nested
   // setState updaters.)
-  const group = useMemo(() => new EditorGroup(isVirtualTab), []);
+  const group = useMemo(
+    () => new EditorGroup({ reopenable: WorkbenchTab.reopenable }),
+    []
+  );
+  const panels = useMemo(() => new WorkbenchPanels(group), [group]);
+  const sideChatPlacement = useMemo(
+    () => new SideChatTabPlacement(panels),
+    [panels]
+  );
   const surfaceHost = useMemo(
     () =>
       new WorkspaceSurfaceHost(
         (relPath) => workspacesNs.readdir(workspace.id, relPath),
-        group,
-        isVirtualTab
+        group
       ),
     [group, workspace.id]
   );
-  const { tabs: openTabs, active: activeRelPath } = useSyncExternalStore(
+  const { tabs: openTabs, active: activeTab } = useSyncExternalStore(
     group.subscribe,
     group.getSnapshot,
     group.getSnapshot
   );
-  // The active tab can now be the picker's VIRTUAL id (`virtual://…`), which is
-  // not a workspace file. The filesystem shortcuts (reveal / copy path / trash)
-  // must never be handed that sentinel, so derive a file-only active path they
-  // key on — null when the active tab is virtual.
-  const activeFileRelPath =
-    activeRelPath && !isVirtualTab(activeRelPath) ? activeRelPath : null;
+  // File rules (reveal, copy path, trash, tree selection) follow the active
+  // tab only when it is a file.
+  const activeRelPath = WorkbenchTab.relPath(activeTab);
   const [restoreSettled, setRestoreSettled] = useState(false);
+
+  useEffect(() => {
+    if (restoreSettled)
+      return surfaceHost.publishEditorSurfaces(
+        workspacesNs.publishEditorSurfaces
+      );
+  }, [restoreSettled, surfaceHost]);
 
   // Workspace continuity is a one-shot host action. The persisted renderer
   // state supplies order + focus; the surface host still checks every path
@@ -218,13 +230,6 @@ export function WorkspaceWorkbench({
   // (see test/desktop-workbench-start-tab.md)
   const showStart = restoreSettled && openTabs.length === 0;
   const [treeRefreshKey, setTreeRefreshKey] = useState(0);
-  // The live `design_search` pick, lifted from the agent pane so the editor
-  // pane can host the picker as a virtual tab (the agent pane owns the chat +
-  // `addToolResult`; it pushes the session up via `onDesignSearchChange`). null
-  // when no pick is pending.
-  const [designSearch, setDesignSearch] = useState<DesignSearchSession | null>(
-    null
-  );
   // File tree pane visibility. It starts hidden so the primary agent + editor
   // surfaces get the full workspace; ⌘B / Ctrl+B toggles it. The main title
   // bar carries the toggle while closed; the tree's own title bar carries it
@@ -283,11 +288,7 @@ export function WorkspaceWorkbench({
       // A trashed file closes its own tab; a trashed folder closes its whole
       // subtree. The group focuses the nearest surviving tab and (being a trash,
       // not a close) never records them for reopen.
-      group.closeMatching((tab) =>
-        isDirectory
-          ? tab === relPath || tab.startsWith(`${relPath}/`)
-          : tab === relPath
-      );
+      group.closeMatching(WorkbenchTab.trashed(relPath, isDirectory));
       bumpTreeRefresh();
     },
     [group, bumpTreeRefresh]
@@ -337,16 +338,16 @@ export function WorkspaceWorkbench({
       // predictable. The shortcut "did nothing" rather than reloading
       // the renderer.
       e.preventDefault();
-      if (!activeFileRelPath) return;
+      if (!activeRelPath) return;
       switch (action) {
         case "reveal":
-          void revealInFinder(workspace, activeFileRelPath);
+          void revealInFinder(workspace, activeRelPath);
           return;
         case "copy-path":
-          void copyAbsolutePath(workspace, activeFileRelPath);
+          void copyAbsolutePath(workspace, activeRelPath);
           return;
         case "copy-relative-path":
-          void copyRelativePath(activeFileRelPath);
+          void copyRelativePath(activeRelPath);
           return;
         case "trash":
           // Confirms via a native dialog, then drops the tab + refreshes
@@ -354,9 +355,9 @@ export function WorkspaceWorkbench({
           // first and stops propagation so folders can be targeted by the
           // tree's focused-node selection. This window-level fallback targets
           // the active editor tab only.
-          void confirmAndTrashEntry(workspace, activeFileRelPath, false).then(
+          void confirmAndTrashEntry(workspace, activeRelPath, false).then(
             (trashed) => {
-              if (trashed) handleEntryTrashed(activeFileRelPath, false);
+              if (trashed) handleEntryTrashed(activeRelPath, false);
             }
           );
           return;
@@ -385,7 +386,7 @@ export function WorkspaceWorkbench({
     };
   }, [
     toggleTree,
-    activeFileRelPath,
+    activeRelPath,
     workspace,
     handleEntryTrashed,
     supportsTerminal,
@@ -393,7 +394,7 @@ export function WorkspaceWorkbench({
   ]);
 
   const openFile = useCallback(
-    (relPath: string) => group.open(relPath),
+    (relPath: string) => group.open(WorkbenchTab.file(relPath)),
     [group]
   );
   const createCanvas = useCallback(
@@ -403,38 +404,16 @@ export function WorkspaceWorkbench({
         editor
       );
       bumpTreeRefresh();
-      group.open(relPath);
+      group.open(WorkbenchTab.file(relPath));
     },
     [workspace.id, group, bumpTreeRefresh]
   );
   const activateTab = useCallback(
-    (relPath: string) => group.activate(relPath),
+    (tab: string) => group.activate(tab),
     [group]
   );
-  const closeTab = useCallback(
-    (relPath: string) => {
-      if (relPath === DESIGN_SEARCH_TAB_ID) designSearch?.onSkip();
-      group.close(relPath);
-    },
-    [group, designSearch]
-  );
+  const closeTab = useCallback((tab: string) => group.close(tab), [group]);
   const reopenClosedTab = useCallback(() => group.reopenClosed(), [group]);
-
-  // Focus the picker for the current pending pick from the agent-pane note.
-  const focusDesignSearchTab = useCallback(() => {
-    if (designSearch) group.open(DESIGN_SEARCH_TAB_ID);
-  }, [group, designSearch]);
-
-  // Wire the lifted pick session into the group's ephemeral (preview) tab: a new
-  // pending pick opens + focuses it, resolving it (session → null) closes it. All
-  // the rising-edge / neighbor-restore logic lives in EditorGroup (tested); this
-  // is a pure wire.
-  useEffect(() => {
-    group.syncEphemeral(
-      DESIGN_SEARCH_TAB_ID,
-      designSearch ? pickToolCallId(designSearch.entry) : null
-    );
-  }, [group, designSearch]);
 
   return (
     <WorkspaceChangesProvider workspaceId={workspace.id}>
@@ -467,11 +446,8 @@ export function WorkspaceWorkbench({
               <div className="min-h-0 flex-1">
                 <AgentPane
                   workspace={workspace}
-                  activeRelPath={activeRelPath}
                   surfaceHost={surfaceHost}
-                  onMaybeMutated={bumpTreeRefresh}
-                  onDesignSearchChange={setDesignSearch}
-                  onOpenPicker={focusDesignSearchTab}
+                  sideChatPlacement={sideChatPlacement}
                 />
               </div>
             </div>
@@ -506,8 +482,10 @@ export function WorkspaceWorkbench({
                     <ResizablePanel data-workbench-decorative-overflow>
                       <EditorPane
                         workspace={workspace}
+                        svgText={surfaceHost.svgText}
+                        panels={panels}
                         openTabs={openTabs}
-                        activeRelPath={activeRelPath}
+                        activeTab={activeTab}
                         onSelectTab={activateTab}
                         onCloseTab={closeTab}
                         onReopenClosedTab={reopenClosedTab}
@@ -519,7 +497,6 @@ export function WorkspaceWorkbench({
                         hasBottomPane={terminalSpawned}
                         onSaved={bumpTreeRefresh}
                         onFileTrashed={(rp) => handleEntryTrashed(rp, false)}
-                        designSearch={designSearch}
                       />
                     </ResizablePanel>
                     {terminalSpawned && (

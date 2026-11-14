@@ -4,79 +4,66 @@ This document binds the language-agnostic
 [execution-authority model](https://github.com/gridaco/grida/blob/main/docs/wg/ai/agent/execution-authority.md)
 to Grida Desktop. Issue
 [#974](https://github.com/gridaco/grida/issues/974) lands the native provider
-transport slice described below; issue
-[#916](https://github.com/gridaco/grida/issues/916) binds finite shell workers
-to supervisor-owned per-command confinement.
+transport slice described below. Model commands run in the native host and its
+sandbox helper; see [Raw execution and extensions](#raw-execution-and-extensions).
 
-On macOS and Linux, the implementation wraps the entire AgentSidecar with
-`@anthropic-ai/sandbox-runtime` (`srt`) 0.0.65 and one global destination
-policy. Its direct external destination set is empty and
-`allow_local_binding` is false. Electron main owns the exact loopback listener,
-transfers only already-accepted connected sockets to the socketless sidecar,
-and routes trusted provider HTTP through a separate private stdio channel.
-BYOK/GG hosts are absent from the outer policy. The wrap remains the shipping
-backstop for the sidecar's structured capabilities and in-process state.
-Model-selected finite commands no longer spawn inside that coarse authority:
-the sidecar requests them over the same inherited capability channel and main
-creates a fresh SRT filesystem profile for each command. Removing the outer
-wrap would still expose the sidecar itself and is not implied by this narrower
-worker boundary; Desktop continues to withhold the external ACP agent.
+## Current enforcement
 
-Windows currently starts AgentSidecar unwrapped. Shell and external ACP are
-withheld, but
-structured local filesystem capabilities remain available; that is a known
-nonconformance with the target fail-closed posture below, not a sandbox claim.
-The package-level empty destination intent is not a Windows kernel egress
-fence; an AgentSidecar compromise there retains ambient process networking.
-Base64 scratch staging remains available there for raster perception and
-structured text/SVG filesystem access. The renderer refuses a scratch-only
-arbitrary binary file when no provider route exists, because Windows withholds
-the confined binary command capability and a bare path would be inoperable.
+Private sidecar bootstrap and local service readiness are independent of provider
+network configuration. Chromium's system-proxy setup runs only for an authorized
+provider request. While it is pending, control and shutdown remain available;
+failure never selects a direct or unconfined network fallback. The request must
+still hold its current destination grant when dispatch becomes possible.
+
+Ordinary macOS and Linux Desktop chat runs in the Rust host over private ACP
+pipes. The shared master owns conversation behavior and durable execution.
+Electron owns user presence, editor tool hosting, provider networking and worker
+lifetime. Native finite commands use their own scoped sandbox helpers.
+
+A socketless service sidecar retains files, workspaces, recents, provider
+settings and media. Main owns its authenticated loopback listener and transfers
+accepted sockets. Native Seatbelt or bubblewrap/seccomp confines this retained
+composition without direct destinations or socket creation.
+
+The historical TypeScript chat runtime is absent from distributed entrypoints.
+Main is the retained sidecar's only spawner and selects only retained services.
+Native startup failure never selects another chat engine. Windows starts retained services with chat unavailable
+until native private storage is supported. Its retained filesystem routes have
+no kernel containment; HTTP admission does not establish that boundary.
 
 ## Decision
 
-Desktop uses four authority roles:
+Desktop keeps these authority roles separate:
 
-1. **Electron main is the control supervisor.** It validates user-originated
-   grants, starts principals, owns process lifetime, and owns the exact
-   `127.0.0.1` ephemeral daemon listener. It does not expose a generic fetch,
-   listen, connect, or spawn primitive to the renderer or model.
-2. **AgentSidecar is the contained agent host.** It owns sessions, structured
-   file capabilities, the model loop, and the authenticated renderer perimeter.
-   It starts the daemon socketless and serves only connected sockets transferred
-   by main. Its outer profile is a coarse filesystem/process backstop. Provider
-   egress is not represented by its agent destination allowlist.
-3. **The native provider transport runs in Electron main.** It uses a dedicated
-   non-persistent Chromium network session, owns registered provider origins,
-   and exposes only provider-request and credential-free provider-asset
-   operation classes over the private channel. AgentSidecar still owns and
-   injects BYOK/GG credentials; main can observe them in transit but never
-   stores or logs them.
-4. **Supervisor-owned execution workers contain raw principals.** Shell
-   commands, external ACP agents, local MCP servers, install-time executables,
-   and other raw runtimes are launched with a host-issued grant in an authority
-   domain that cannot mutate another domain.
+1. **Electron main supervises control and user presence.** It validates grants,
+   pins the selected workspace or editor connection, owns worker lifetime and
+   the exact loopback listener. It exposes purpose-specific actions.
+2. **The Rust chat host owns durable execution.** It uses the shared master,
+   records accepted work and invokes registered capabilities. Native command
+   helpers enforce captured filesystem, process and network scope.
+3. **Electron hosts editor tools and provider transport.** The editor decides
+   document semantics. A dedicated Chromium network session handles approved
+   provider requests and credential-free asset downloads on private channels.
+   Credential owners supply execution-time credentials. The renderer and model
+   receive no generic network or process primitive.
+4. **The retained service sidecar owns existing non-chat services.** Its
+   authenticated interface keeps file, workspace, settings and media callers
+   available without opening the chat store. It keeps its existing
+   containment until separately replaced.
 
 ```text
-hosted renderer
-      │ path-scoped bridge + per-spawn auth
+Desktop renderer
+      │ path-scoped preload / sender-checked IPC
       ▼
-main-owned 127.0.0.1 listener
-      │ accepted connected socket (Node IPC fd 3)
-      ▼
-socketless contained AgentSidecar ── provider frames ─► native network service
-      │                                                   │
-      │ opaque grant + workload                           └─ Chromium host route
-      ▼
-execution supervisor
-      ├─ confined shell process tree
-      ├─ confined external-agent process tree
-      └─ confined extension process tree
+Electron main ─── private ACP ───► Rust host + shared master
+      │                              │
+      │ editor tools / provider I/O  └──► scoped native execution helper
+      │
+      └── authenticated accepted sockets ───► retained non-chat services
 ```
 
-The roles are security boundaries, not package names. An implementation may
-split them further, but it may not collapse a raw principal into the network
-service or expose either service's underlying I/O primitive to model output.
+These roles define authority rather than requiring a language or package for
+every capability. Raw execution cannot inherit provider-service authority.
 
 ## User grant ceremony
 
@@ -100,8 +87,13 @@ discovery and PAC/WPAD evaluation, host routing, and platform trust behavior.
 The landed implementation uses a dedicated, non-persistent `Session` owned by
 Electron main. It does not attach the webview partition or its cookie jar.
 Moving the service into a separately confined native helper remains desirable
-if steady-state credential custody ever moves out of AgentSidecar; a bare
+if steady-state credential custody ever moves out of ServicesSidecar; a bare
 `utilityProcess` alone would be process isolation, not authority confinement.
+
+The provider context identifies requests as `Grida/<version> NativeProviderClient`,
+independently of the renderer browser identity. Explicit provider SDK headers
+remain intact. A missing SDK identity must not make native API calls look like
+browser navigations that can complete cookie-based sign-in.
 
 The provider transport uses a dedicated credential-clean network context. It
 MUST NOT attach the webview's Electron session or partition, inherit its cookie
@@ -109,10 +101,11 @@ jar, or receive its durable login. Proxy authentication belongs to the host
 route; provider authorization comes only from the provider grant.
 
 The native ChatGPT-subscription provider is a narrow instance of this split:
-AgentSidecar owns OAuth persistence, refresh, account scoping, and request
-credential injection; Electron main owns the system-browser launch, temporary
-dual-stack loopback callback, and the exact `auth.openai.com` / `chatgpt.com`
-network route. The renderer receives only a reconstructed secret-free status
+a Main-owned subscription host owns OAuth persistence, refresh, account scoping,
+and request credential injection; Electron main also owns the system-browser
+launch, temporary dual-stack loopback callback, and the exact
+`auth.openai.com` / `chatgpt.com` network route. That route is a Main-only grant
+the retained sidecar never receives. The renderer receives only a reconstructed secret-free status
 DTO. The experimental binding defaults to the public Codex native OAuth client
 id with a host override; it never starts Codex or ACP. Account/display claims
 are parsed only from the exact TLS-authenticated token response, without an
@@ -123,9 +116,9 @@ ceremony and cancel/sign-out races are bound in
 The package exposes two construction-time operations: provider requests and
 credential-free provider-asset downloads. The service accepts one of those
 classes plus an opaque host-issued grant, validates the
-method/origin/headers/body bounds, and performs the request. AgentSidecar's
+method/origin/headers/body bounds, and performs the request. ServicesSidecar's
 provider adapter adds credentials before the private hop; the service never
-invents a credential or accepts a renderer URL. The outer `srt` profile omits
+invents a credential or accepts a renderer URL. The outer native profile omits
 BYOK/GG destinations, so the injected operation is an authority boundary rather
 than a routing preference.
 
@@ -181,8 +174,8 @@ IP literal or `.localhost` origin does not make a broader hostname grant.
 
 Grida Gateway keeps its current weak-token handoff. The signed-in webview mints
 the short-lived, `gg:ai`-audience token through its same-origin cookie session
-and transiently pushes it to AgentSidecar through the authenticated daemon
-route. AgentSidecar retains steady-state memory custody and adds the bearer to
+and transiently pushes it to ServicesSidecar through the authenticated daemon
+route. ServicesSidecar retains steady-state memory custody and adds the bearer to
 each GG request; Electron main sees it only in the in-flight private frame and
 Chromium request. The token retains the existing ≤15-minute bearer residual.
 The durable webview cookie, refresh token, and Supabase access token never enter
@@ -221,10 +214,8 @@ published until the sidecar acknowledges application; the host re-authorizes a
 completed upload against its current grant snapshot immediately before I/O.
 Unknown, stale, out-of-order, oversized, or grant-mismatched messages terminate
 the channel. A bounded network-cancellation tombstone accepts only the late
-response frames that an in-flight abort can legitimately race. A finite command
-instead has a terminal handshake: `command.abort` keeps its tool promise pending
-until main has joined the worker and completed per-command cleanup, then
-`command.aborted` releases the turn's settlement barrier. Channel failure exits
+response frames that an in-flight abort can legitimately race. The channel has
+no command lane. Channel failure exits
 the sidecar so supervision restarts a fresh pair. The renderer can invoke the
 existing typed product bridge, but never receives the channel or a service
 credential.
@@ -243,84 +234,71 @@ This channel is why the sidecar can run with `allow_local_binding: false` and
 why its daemon remains reachable when Linux Bubblewrap gives it a private
 network namespace. It does not grant arbitrary loopback access: main chooses
 the listener, accepts the peer, and transfers only that connected capability.
-The macOS transfer path has an end-to-end `srt` proof. Linux descriptor
-preservation and namespace behavior are source-audited; a packaged Linux
-end-to-end transfer test remains a release gate.
+Actual native macOS and unprivileged Linux ARM64 fixtures verify private IPC,
+Main-transferred paused sockets, file access, protected-state denial and blocked
+bind/connect. The built ordinary macOS sidecar also verifies its authenticated
+workspace catalog and media/custody services. Linux installer and signed
+Desktop delivery remain separate qualification gates.
 
-## AgentSidecar host containment
+## Retained-service containment
 
-The outer AgentSidecar boundary remains a coarse backstop for structured file
-capabilities:
+The retained file/media sidecar keeps its existing outer sandbox and Main-owned
+provider transport. It does not construct a chat scheduler, session database,
+skill loader or model command executor. Its process can read only through the
+existing secret-path exclusions and has no direct provider networking or local
+binding. Human-selected file/workspace operations keep their established owner.
+The native retained-service launcher uses Seatbelt on macOS and bubblewrap with
+a native-ABI seccomp filter on Linux. It rechecks the executable identity and
+never uses a shell or provider proxy. Linux receives its bounded compiled filter
+on descriptor 4, which bubblewrap consumes before executing the service;
+descriptor 3 remains the sole Node IPC capability channel. The filter rejects
+new sockets, namespace changes and out-of-process descriptor acquisition. A
+missing or unsupported native boundary fails startup closed.
 
-- reads deny user credential/configuration locations the sidecar does not own;
-- writes are limited to the union of opened workspaces, sidecar state, and
-  scratch roots;
-- direct external networking is denied in Desktop; provider HTTP uses the
-  private host service;
-- generic local bind/connect authority is denied; daemon access arrives only as
-  a main-accepted connected-socket capability;
-- model-selected commands reach process creation only through the structured
-  `run_command` and approval path; the sidecar delegates each finite command
-  back to Electron main for a fresh exact-root SRT profile; external ACP is
-  absent; and
-- fixed helpers, if any, have host-fixed executable and argument shapes.
+On macOS, exact protected roots and their ancestors retain only the metadata
+needed to revalidate canonical path identities. Private contents, directory
+listings and other descendant metadata remain denied. File/workspace admission
+can therefore reject protected paths without disabling ordinary fresh workspace
+creation.
 
-This outer boundary cannot hide sidecar-owned BYOK/session data from a
-compromise in the same process, and by itself cannot distinguish roots held by
-one sidecar. The per-command host closes the model-selected ambient-path gap
-for scratch and secrets: main denies the shared scratch parent, `userData`,
-and the shared provider credential directory (GRIDA-SEC-014), then re-allows only the request's own scratch and private temp. Workspace reads
-retain SRT's default broad-read posture; the exact workspace is the command's
-cwd/write grant, not its exclusive readable tree.
+Linux user namespaces do not preserve root-owned host ancestor identities.
+The launcher therefore builds a private root view and binds the existing
+settings, provider directory and media library beneath `/retained-service`.
+It validates the actual host directories before binding; strict credential
+ownership, ACL, path and migration checks are unchanged. These are views of the
+same files and SQLite lock inodes, not copies or replacement stores. The host's
+normal top-level entries and selected file/workspace paths stay available;
+the namespace does not take over `/media` or removable-drive paths. Both the
+physical private roots and their namespace prefix are excluded from file and
+workspace admission. The chat-state and preview-profile exclusions also apply
+inside bound directories. Internal temporary work uses a namespace-local tmpfs.
 
-The sidecar runtime—not the model—supplies those roots, but the current private
-frame still names them as paths. Main canonicalizes their shape and overlap; it
-does not authenticate them against a fully compromised sidecar. A capability
-that must resist that threat belongs in its own worker or must receive a
-main-issued opaque workspace/session grant rather than caller-named paths.
+Linux bind masks for absent protected paths use exclusively created owned
+mountpoints. Concurrent generations retain them until the last child closes.
+Cleanup checks identity, removes only empty unchanged nodes and leaves changed
+or pre-existing data alone. Abrupt host loss can leave empty mask nodes; they
+are never adopted as removable user data by a later launch.
 
 ## Raw execution and extensions
 
-The runtime never treats `sandbox_enforced: true` as command authority. The
-capability is the injected `ShellExecutor`: the sidecar emits a bounded private
-request, and main independently canonicalizes the working directory, named
-workspace, session-shaped scratch, shared scratch authority root, host secret
-root, and command temp before launch. The command and arguments remain
-structured until main shell-quotes the complete argv solely for SRT's wrapper;
-the resulting wrapper is spawned with `shell: false`.
+Model commands run through the Rust host and native sandbox helper. The host
+captures explicit directory permissions, protected paths, trusted executable
+identity, deadlines and bounded output. Plan withholds command execution. A
+profile denies the shared provider credential root (GRIDA-SEC-014) alongside
+host state and other protected paths; additional access cannot override it. A
+failed or unavailable boundary refuses the command rather than selecting an
+unconfined executor. Native macOS/Linux confinement, cancellation and trusted
+checks have built-process coverage.
 
-One-shot shell, long-lived ACP stdio, and managed MCP/extension lifecycle are
-separate behavioral contracts. A private launcher may serve all three, but no
-public shared API is promoted until these consumers have proved the common
-shape.
+The retained service supervisor supplies no command executor, scratch sweep or
+skills root, and its private channel has no command lane. The native master retains operation identity and uncertain outcomes independently
+of provider networking and editor semantics. Shutdown and Stop join the work
+owned by each process; platform-specific descendant revocation limits still
+follow the native sandbox contract.
 
-`runShell` owns a fresh POSIX process group and terminates that group before
-main removes command temp or releases SRT's per-command bookkeeping. This
-reclaims ordinary background descendants. It is not a macOS kernel job object:
-model-selected code that deliberately creates a new session with `setsid(2)`
-can leave the original group while retaining its inherited Seatbelt profile.
-The current command surface therefore does not claim hard process revocation
-against deliberate daemonization on macOS. Any workload requiring that
-guarantee needs a dedicated worker/job mechanism; Linux Bubblewrap's PID
-namespace is stronger, but its packaged end-to-end evidence remains pending.
-
-Turn cancellation observes the same ordering. The sidecar forwards the AI SDK
-tool abort as `command.abort`; main does not acknowledge it until the executor
-returns and the cleanup above has finished. The agent runtime keeps the session
-occupied through both that acknowledgement and the model pump consuming the
-aborted tool result. A replacement run or session deletion therefore remains
-busy rather than overlapping a command whose authority is still being
-reclaimed. This does not make a deliberately detached macOS process revocable;
-it only closes the lifecycle gap for the process group and SRT worker the host
-still owns.
-
-The installed srt `0.0.65` manager has process-global proxy state. Desktop
-therefore gives every finite command the same empty external-domain set and
-never mutates a global command allowlist as requests come and go. Per-command
-custom filesystem configuration supplies exact scratch/workspace grants. A
-future feature that needs distinct command network identities must use one
-manager-owning worker per concurrent authority domain, add an attributable
-mediator, or replace the enforcer.
+One-shot commands, external ACP stdio and managed MCP/extension lifecycles keep
+their own contracts. Capability discovery does not grant authority or turn an
+unqualified platform into a supported execution environment.
 
 Raw networking follows these postures:
 
@@ -337,32 +315,17 @@ responsible for consuming the user's OS configuration like any other installed
 software. Filesystem/process containment and tool-call permission remain in
 force.
 
-## Permission modes
-
-`accept-edits` and `auto` decide when a cleared action needs user approval.
-They do not widen a kernel authority set:
-
-- `accept-edits` keeps the supervised Allow/Deny gate for non-read-only command
-  execution;
-- `auto` removes that interaction gate but still uses the same host-issued
-  confinement ceiling; and
-- neither mode converts an unavailable enforcer into ambient execution.
-
-The explicit CLI development posture may inject an honestly named unsandboxed
-execution host. It is not available to Desktop by default and must never set or
-return a `sandbox_enforced` assertion.
-
 ## Unsupported platforms
 
 The target contract is: no containment means no model-invocable local
 filesystem, raw shell, external agent, or extension runtime unless the user
-deliberately enters a visibly unsandboxed posture. srt 0.0.65 contains an alpha
-Windows backend, but Desktop deliberately withholds it until its argv-based
-spawn, provisioning, packaging, lifecycle, and regression contract are owned.
+deliberately enters a visibly unsandboxed posture. A Windows confinement
+backend requires its own provisioning, lifecycle and regression contract.
 
-The current Windows build is therefore nonconforming with that target: it runs
-AgentSidecar unwrapped and withholds shell and external ACP, but still exposes
-structured local filesystem capabilities and has no kernel network fence.
+The current Windows build starts retained file and media services unwrapped.
+It does not start either chat engine, so it provides no model-invocable local
+capabilities. Retained structured filesystem routes still have no kernel network
+fence.
 Controls at the renderer/HTTP boundary and the bounded provider transport
 remain real for ordinary product calls; they must not be described as
 filesystem or compromise containment. Closing this gap is a release
@@ -372,6 +335,62 @@ Provider-only host services may still operate through a native host transport
 that satisfies the credential-service boundary because they do not expose
 local file or process authority to the model. Missing local-agent containment
 does not authorize those local capabilities.
+
+## Chat state
+
+Ordinary macOS and Linux Desktop keeps chats in one Main-owned store under the
+browser profile. The retained service sandbox denies reads and writes there.
+Desktop claims no custody of other installed versions' data, and native
+startup failure never selects another chat engine.
+
+## Retained services
+
+Desktop uses the native retained-service launcher for ordinary
+services. Compatibility profiles use the sidecar for standalone document
+and workspace registration, file I/O, recents, and ranged workspace media.
+Main's workspace Trash helper covers one path-checked native operation.
+Moving file I/O out of the compatibility process requires equivalent
+per-workspace containment and the existing exact registered-handle checks.
+
+The private selected-document worker on macOS uses a separate Seatbelt
+scope. The caller supplies a canonical file and the captured native
+identities of the file and parent. The worker can traverse the parent
+without listing it. A read exposes only the selected regular file. A save
+can replace that file through one private sibling created for the request.
+It checks the captured identity and modification time before replacement
+and returns the new identity after verifying the write. Document bytes
+stream in bounded chunks without the workspace text writer's size limit.
+On the packaged macOS arm64 native profile, Main registers the exact file
+opened through a trusted Desktop action and issues an opaque document ID.
+The standalone window's preload sends that ID over native IPC. Main checks
+the originating window and current top-level document route before work and
+before returning results. Navigation clears the read basis for saving. A
+changed file stops the save and leaves the editor's dirty content open.
+
+The native workspace reader can open one registered directory's file and
+stream an exact byte span from the descriptor used for metadata. It checks
+the registered directory's native identity and protected roots, then
+confirms the open file remains in scope before delivering each chunk.
+In-root symbolic aliases can resolve to regular files. Hard links without
+proven scope and cross-device targets are refused. On the packaged macOS
+arm64 native chat profile, Main captures the directory identity when the user
+opens a workspace through a trusted Desktop action. After restarting Desktop,
+selecting **Open Recent** or a recent project reopens the exact registered
+folder for media previews. If the folder changed, select it through the native
+**Open Folder** picker to admit its current identity. The native media route
+requires a current registration and streams through a bounded pool of
+read-only Seatbelt workers. It preserves Range seeking and cancels the
+corresponding worker when the viewer cancels a request. A refused native read
+ends the request.
+
+Set `GRIDA_DESKTOP_TEST_NATIVE_RESOURCES` to the canonical packaged Resources
+directory containing `native-agent/grida-agent` and run
+`pnpm --dir desktop exec vitest run src/main/workspace-media-protocol.test.ts`
+to exercise the route with real Seatbelt workers on macOS arm64.
+
+Linux arm64 Node has a separate feasibility check for Node IPC and socket
+transfer under bubblewrap and native seccomp. A Linux Electron package and
+Windows launch require their own qualification.
 
 ## Replacement gates
 
@@ -384,12 +403,12 @@ true in the same change set:
   main-owned user-presence ceremony and revocable ledger grant;
 - private service channels are process-bound, bounded, tied to peer/grant
   lifetime, and tolerate bounded late-frame races;
-- AgentSidecar keeps a tested filesystem/process host-containment profile;
+- ServicesSidecar keeps a tested filesystem/process host-containment profile;
 - shell execution uses a supervisor-owned grant rather than ambient parent
   inheritance or a boolean assertion;
 - external ACP and local MCP/extension processes have independently tested
   authority domains or are withheld;
-- parallel grants cannot bleed through srt's global manager state;
+- captured native launch scopes do not share mutable process-global policy;
 - redirects, directly observed private-address resolution, external-proxy trust
   boundaries, cancellation, cleanup, and SSE have deterministic regression
   coverage; and
@@ -436,10 +455,10 @@ The implementation must prove at least:
   reauthentication work from resurrecting stale credentials.
 
 Current platform evidence is intentionally narrower than this full contract.
-The main-accepted socket transfer has been exercised end to end under the
-macOS `srt` wrapper. The Linux descriptor path and Bubblewrap namespace behavior
-have been source-audited, but a packaged Linux end-to-end transfer run is still
-pending. No release or PR description may collapse those two evidence levels
+Main-accepted socket transfer has native macOS and unprivileged Linux ARM64
+process evidence. The built ordinary macOS service has authenticated workspace,
+provider/custody and durable media evidence. The current Linux installer and
+signed delivery paths still require their own qualification. No release or PR description may collapse those two evidence levels
 into one cross-platform verification claim.
 
 ## Release impact
@@ -451,8 +470,6 @@ reviews. The architecture does not justify a dependency-version bump by
 itself; the version decision belongs to the implementing change set.
 
 Shared provider credentials also remain outside structured file access: the
-daemon refuses overlapping file/workspace grants and rechecks saved IDs, while
-agent bindings refuse overlapping workspace, scratch and directory-reference
-roots before hydration and recheck them before backend I/O. This covers ancestor
-selections and resolved aliases without granting the worker access to the shared
-provider directory.
+daemon refuses overlapping file/workspace grants and rechecks saved IDs. This
+covers ancestor selections and resolved aliases without granting the worker
+access to the shared provider directory.

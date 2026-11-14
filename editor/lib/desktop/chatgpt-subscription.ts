@@ -3,7 +3,7 @@
  *
  * Renderer-side, secret-free state for the native ChatGPT provider.
  *
- * OAuth and token custody live in Electron main + the agent sidecar. This
+ * OAuth and token custody live in Electron main + the services sidecar. This
  * module only caches the status DTO exposed by the narrow Desktop bridge so
  * onboarding, settings, and new-chat provider selection share one truth.
  */
@@ -81,10 +81,7 @@ export async function connect(): Promise<ChatGptSubscriptionState> {
     // Main owns the cancellation race and carries this stable outcome through
     // IPC; renderer behavior never depends on serialized Error prose.
     if (result.outcome === "cancelled") return await readStatus();
-    return {
-      kind: "ready",
-      status: result,
-    };
+    return fromStatus(result);
   });
 }
 
@@ -98,23 +95,25 @@ export async function cancel(): Promise<void> {
 
 export async function signOut(): Promise<ChatGptSubscriptionState> {
   if (!isSupported()) return setCached(UNSUPPORTED);
-  return await mutate(async () => {
-    return {
-      kind: "ready",
-      status: await chatgptBridge.signOut(),
-    };
-  });
+  return await mutate(async () => fromStatus(await chatgptBridge.signOut()));
 }
 
 async function readStatus(): Promise<ChatGptSubscriptionState> {
   try {
-    return {
-      kind: "ready",
-      status: await chatgptBridge.status(),
-    };
+    return fromStatus(await chatgptBridge.status());
   } catch (error) {
     return errorState(error);
   }
+}
+
+/**
+ * A Desktop launch without a ChatGPT subscription owner reports
+ * `configured: false`; the provider is then not offered at all.
+ */
+function fromStatus(
+  status: ChatGptSubscriptionStatus
+): ChatGptSubscriptionState {
+  return status.configured ? { kind: "ready", status } : UNSUPPORTED;
 }
 
 async function mutate(

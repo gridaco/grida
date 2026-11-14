@@ -20,16 +20,21 @@ this layer binds those shapes to Grida's actual surfaces — the
 canvas, the image-generation provider seam, and the host-level
 fundamentals as Grida ships them.
 
+The [Rust/Electron tool-host contract](https://github.com/gridaco/grida/blob/main/crates/grida-agent/docs/tool-host-contract.md)
+defines shared Grida capabilities exposed directly and through MCP, including
+live editor ownership and headless execution. The pages below also retain
+current implementation evidence and earlier domain-tool proposals.
+
 ## Pages
 
 | Page                                                                  | Covers                                                                                                                                                                                                                     |
 | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [**Architecture** (start here for implementation)](./architecture.md) | Grida's master implementation blueprint. The daemon/tenant split (`DaemonServer` + the agent tenant), package map, host landings, sequencing, anti-goals.                                                                  |
+| [**Architecture** (start here for implementation)](./architecture.md) | Grida's implementation blueprint: native agent host, retained media sidecar, Desktop process ownership, capacity providers, anti-goals.                                                                                    |
 | [Workspace Surfaces](./workspace-surfaces.md)                         | Current product model for repository-backed workspaces and visible artifacts: canvas-first policy, agnostic surface tools, host interactivity, user authority, and reopen continuity.                                      |
 | [Fundamental Tools (Grida binding)](./tools-fundamentals.md)          | How the locked-tool RFC ([`../agent/tools.md`](../agent/tools.md)) lands in Grida — virtual-fs adapter, in-canvas `bash`, the `view_image` perception extension ([`../agent/vision.md`](../agent/vision.md)), host wiring. |
 | [Canvas Tools](./tools-canvas.md)                                     | The canvas-only tool surface: scene-graph search and selection, specialized inserts, canvas exec / lint / format, resource lookup. Requires an active editor instance.                                                     |
 | [Image Tools](./tools-image.md)                                       | Image-generation tools: text-to-image and image-to-image, provider-agnostic abstraction, credit-aware operations, canvas-image-node integration.                                                                           |
-| [Built-in subagents](./agents-builtin.md)                             | Grida's specialized subagents (titler today; compactor + planner future). Concrete tier / model / sentinel / cost-discipline bindings of the RFC subagent pattern.                                                         |
+| [Built-in subagents](./agents-builtin.md)                             | Grida's specialized internal agents (chat titles and compaction), with their provider and cost bounds.                                                                                                                     |
 
 ## See also
 

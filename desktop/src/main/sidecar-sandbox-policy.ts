@@ -1,0 +1,74 @@
+// GRIDA-SEC-014 — explicit shared provider custody and protected native roots.
+/**
+ * GRIDA-SEC-004 — Desktop's fail-closed outer-sandbox authority intent for
+ * the retained media sidecar.
+ */
+import { buildDaemonSandboxPolicy } from "@grida/daemon/sandbox";
+import path from "node:path";
+
+/** Desktop's complete intent for the retained sidecar's outer sandbox. */
+export namespace SidecarSandboxPolicy {
+  export function build(input: {
+    userData: string;
+    providerRoot?: string;
+    mediaRoot: string;
+    desktopStateRoot?: string;
+    workspaceCatalogRoot?: string;
+    protectedStateRoots?: readonly string[];
+    home: string;
+  }) {
+    const policy = buildDaemonSandboxPolicy({
+      user_data: input.userData,
+      home: input.home,
+      // Main owns the listener and transfers only already-accepted loopback
+      // sockets. The sandboxed sidecar needs no bind or generic local-connect
+      // authority.
+      allow_local_binding: false,
+      // Provider/GG requests use Electron's system-network session, so the
+      // sidecar tree has no direct destination and a missed injection fails
+      // closed.
+      include_dev_network_hosts: false,
+    });
+    const mediaRoot = path.resolve(input.mediaRoot);
+    const providerRoot = path.resolve(
+      input.providerRoot ?? path.join(input.userData, "providers")
+    );
+    if (input.protectedStateRoots?.some((root) => /[*?[\]]/u.test(root)))
+      throw new Error("native_desktop_protected_state_path_not_literal");
+    const mainOnly = [
+      ...(input.desktopStateRoot ? [input.desktopStateRoot] : []),
+      ...(input.protectedStateRoots ?? []),
+    ];
+    return {
+      ...policy,
+      filesystem: {
+        ...policy.filesystem,
+        // The native profile's browser state, including Main-owned recents,
+        // is outside the retained sidecar's file and workspace authority.
+        deny_read: uniquePaths([...policy.filesystem.deny_read, ...mainOnly]),
+        deny_write: uniquePaths([
+          ...policy.filesystem.deny_write,
+          ...mainOnly,
+          ...(input.workspaceCatalogRoot ? [input.workspaceCatalogRoot] : []),
+        ]),
+        // The long-lived sidecar owns durable media writes. The root remains
+        // outside the agent secret directory and is denied again in every
+        // native command profile.
+        allow_read: uniquePaths([
+          ...(policy.filesystem.allow_read ?? []),
+          mediaRoot,
+          providerRoot,
+        ]),
+        allow_write: uniquePaths([
+          ...policy.filesystem.allow_write,
+          mediaRoot,
+          providerRoot,
+        ]),
+      },
+    };
+  }
+
+  function uniquePaths(values: readonly string[]): string[] {
+    return [...new Set(values.map((value) => path.resolve(value)))];
+  }
+}

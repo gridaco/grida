@@ -83,6 +83,7 @@ function textCard(card) {
     image_input_mimes: "imageInputMimes",
     context_window: "contextWindow",
     output_limit: "outputLimit",
+    reasoning_providers: "reasoningProviders",
   });
   if (result.cost) {
     result.cost = fields(result.cost, {
@@ -171,6 +172,52 @@ if (bundle) {
   }
   for (const [name, value] of Object.entries(values))
     write(path.join(root, "crates/grida-ai/data", name + ".json"), json(value));
+  const responseWindows = new Map();
+  for (const model of Object.values(publicModels["text.catalog"])) {
+    const binding = model.providers?.openai;
+    const window = model.context_window;
+    if (
+      model.reference_provider !== "openai" ||
+      binding?.provider !== "openai" ||
+      !binding.id ||
+      !Number.isSafeInteger(window) ||
+      window <= 0
+    )
+      continue;
+    if (responseWindows.has(binding.id))
+      throw Error(`Duplicate OpenAI context binding: ${binding.id}`);
+    responseWindows.set(binding.id, window);
+  }
+  write(
+    path.join(root, "crates/grida-agent/data/responses-context-windows.json"),
+    json({
+      models_release: release,
+      windows: Object.fromEntries([...responseWindows].sort()),
+    })
+  );
+  // Listed models whose OpenRouter binding takes PNG input and tool calls.
+  // The transport is the same for each: the canonical OpenRouter route with a
+  // saved key, and exact PNG bytes resolved only for an admitted request.
+  const openRouterPng = Object.entries(publicModels["text.catalog"])
+    .filter(([id, model]) => {
+      const binding = model?.providers?.openrouter;
+      return (
+        service.definitions.text.members[id]?.status === "listed" &&
+        model?.tool_call === true &&
+        model?.image_input_mimes?.includes("image/png") &&
+        binding?.provider === "openrouter" &&
+        binding.id === id &&
+        binding.url === `https://openrouter.ai/${id}`
+      );
+    })
+    .map(([id]) => id)
+    .sort();
+  if (openRouterPng.length === 0)
+    throw Error("No listed OpenRouter model takes PNG input");
+  write(
+    path.join(root, "crates/grida-agent/data/openrouter-png-models.json"),
+    json({ models_release: release, models: openRouterPng })
+  );
   write(
     path.join(root, "packages/grida-ai/schemas/operations.generated.json"),
     json(values.operations)

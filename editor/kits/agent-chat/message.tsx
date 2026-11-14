@@ -26,12 +26,7 @@ import {
   type ReactNode,
 } from "react";
 import { isFileUIPart, isTextUIPart, type FileUIPart } from "ai";
-import {
-  CONTEXT_MARKERS,
-  USER_DIRECTORY_REFERENCES,
-  USER_FILE_ATTACHMENTS,
-  USER_TEMPLATE_SELECTION,
-} from "@grida/agent";
+import { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
 import { cn } from "@app/ui/lib/utils";
 import { cjk } from "@streamdown/cjk";
 import { code } from "@streamdown/code";
@@ -46,15 +41,13 @@ import {
   FilePenLineIcon,
   FilePlus2Icon,
   FolderTreeIcon,
-  GitBranchIcon,
   ImageIcon,
   ImagesIcon,
-  LayoutTemplateIcon,
   ListTodoIcon,
   MessageCircleQuestionIcon,
   PaperclipIcon,
   PanelsTopLeftIcon,
-  RotateCcwIcon,
+  PencilIcon,
   SearchIcon,
   SparklesIcon,
   SquareTerminalIcon,
@@ -75,7 +68,7 @@ import { Task, TaskContent, TaskTrigger } from "@app/ui/ai-elements/task";
 // Message/tool types stay in the shared `@/lib/agent-chat` seam (the
 // bridge transport + session helpers use them too); `toolDisplay` is
 // this renderer's own label/summary formatting, colocated in the kit.
-import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat";
+import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat/types";
 import { toolDisplay, type ToolDisplayDescription } from "./tool-display";
 import {
   formatElapsed,
@@ -92,6 +85,7 @@ import {
 } from "./design-search-widget";
 import { groupMessageParts } from "./group-parts";
 import { AnsweredQuestionSummary, isQuestionEntry } from "./question-card";
+import { workspace_links } from "./workspace-links";
 import {
   hasOpenTabsResult,
   isSurfaceToolEntry,
@@ -100,18 +94,24 @@ import {
 
 export type { ChatMessage, ToolCallEntry };
 
+/** The size and line height of chat messages, user and agent alike. */
+const CHAT_TEXT = "text-[15px] leading-6";
+
 const markdown = {
-  className: "grida-ai-response-markdown space-y-2 text-[13px] leading-6",
+  // Markdown uses the shared chat reading size; see CHAT_TEXT.
+  className: `grida-ai-response-markdown space-y-2 ${CHAT_TEXT}`,
   controls: {
     code: { copy: true, download: false },
     table: { copy: true, download: false, fullscreen: false },
   },
   plugins: { cjk, code, math, mermaid },
+  rehypePlugins: workspace_links.rehypePlugins,
+  components: workspace_links.components,
 } as const;
 
 /**
- * Shared class string for the hover/focus-revealed action rows (copy /
- * rewind / branch). The `pointer-events-none` while hidden is the important
+ * Shared class string for the hover/focus-revealed action rows. The
+ * `pointer-events-none` while hidden is the important
  * part: an `opacity-0` button is still hit-testable, so without it a tooltip
  * could open over actions the user can't even see. Gating pointer-events on
  * the same `group-hover` / `focus-within` states as opacity keeps
@@ -124,12 +124,19 @@ const revealOnHoverActions =
   "focus-within:opacity-100 focus-within:pointer-events-auto";
 
 export type ChatMessageActions = {
-  /** Soft-truncate the conversation to this user message (RFC `rewinding`). */
-  onRewind?: (messageId: string) => void;
-  /** Fork a new session at this user message (RFC `fork`). */
-  onFork?: (messageId: string) => void;
+  /** Open an editor for this user message. */
+  onEdit?: (messageId: string) => void;
   /** Disable the actions (e.g. while a run is in flight). */
   disabled?: boolean;
+  /** When the message was sent, in UTC milliseconds. Shown with the actions. */
+  sentAtMs?: number;
+  /** A short, always-visible label after the actions, e.g. how it was sent. */
+  note?: ReactNode;
+  /**
+   * Show no actions under an assistant message, e.g. commentary inside a turn
+   * whose final answer carries them.
+   */
+  hidden?: boolean;
 };
 
 export function ChatMessageView({
@@ -139,7 +146,7 @@ export function ChatMessageView({
 }: {
   message: ChatMessage;
   isStreaming?: boolean;
-  /** Per-turn affordances rendered under user bubbles. Omit to hide. */
+  /** Per-turn affordances under a message. User bubbles show copy without them. */
   actions?: ChatMessageActions;
 }) {
   // A compaction summary (synthetic assistant turn carrying a
@@ -165,37 +172,31 @@ export function ChatMessageView({
       (part): part is FileUIPart =>
         isFileUIPart(part) && part.mediaType.startsWith("image/")
     );
-    // Registered context tokens (WG `compositor.md` §templating) the host
-    // attached on the user's behalf — e.g. a picked template. Rendered as a chip
-    // (the USER view) so the context is visible WITHOUT being fabricated into the
-    // user's prose. Same array live + DB-rebuilt (reads `message.parts`).
+    // Context the host attached on the user's behalf — the files sent with the
+    // message. Rendered as a chip so it is visible without being written into
+    // the user's prose.
     const contexts = message.parts.filter(
       (part) =>
         typeof (part as { type?: unknown }).type === "string" &&
-        (part as { type: string }).type in CONTEXT_MARKERS
+        (part as { type: string }).type in chat_vocabulary.CONTEXT_MARKERS
     );
     return (
       <Message from="user">
-        <MessageContent className="text-[13px]">
+        <MessageContent className={CHAT_TEXT}>
           <CollapsibleBubbleBody>
             {contexts.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {contexts.map((rawPart, index) => {
                   // `data-*` context part — read past the closed UIMessagePart
-                  // union; the filter above already gated `type` to CONTEXT_MARKERS.
+                  // union; the filter above already gated `type` to the context markers.
                   const part = rawPart as {
                     type: string;
                     data?: Record<string, unknown>;
                   };
-                  const isTemplate = part.type === USER_TEMPLATE_SELECTION;
-                  const isFiles = part.type === USER_FILE_ATTACHMENTS;
-                  const isDirectories = part.type === USER_DIRECTORY_REFERENCES;
+                  const isFiles =
+                    part.type === chat_vocabulary.CONTEXT_PARTS.files;
                   const d = part.data ?? {};
-                  const title =
-                    typeof d.title === "string" ? d.title : undefined;
-                  const slides =
-                    typeof d.slides === "number" ? d.slides : undefined;
-                  // Uploaded-file marker: name the chip by the file(s) in scratch.
+                  // Name the chip by the file(s) sent with the message.
                   const fileNames = (
                     Array.isArray(d.files) ? d.files : []
                   ).flatMap((f) =>
@@ -203,31 +204,11 @@ export function ChatMessageView({
                       ? [(f as { name: string }).name]
                       : []
                   );
-                  const directoryNames = (
-                    Array.isArray(d.directories) ? d.directories : []
-                  ).flatMap((directory) =>
-                    directory &&
-                    typeof (directory as { name?: unknown }).name === "string"
-                      ? [(directory as { name: string }).name]
-                      : []
-                  );
-                  const Icon = isTemplate
-                    ? LayoutTemplateIcon
-                    : isDirectories
-                      ? FolderTreeIcon
-                      : PaperclipIcon;
-                  const label =
-                    isTemplate && title
-                      ? `${title} template`
-                      : isFiles
-                        ? fileNames.length === 1
-                          ? fileNames[0]
-                          : `${fileNames.length} files`
-                        : isDirectories
-                          ? directoryNames.length === 1
-                            ? directoryNames[0]
-                            : `${directoryNames.length} folders`
-                          : CONTEXT_MARKERS[part.type];
+                  const label = isFiles
+                    ? fileNames.length === 1
+                      ? fileNames[0]
+                      : `${fileNames.length} files`
+                    : chat_vocabulary.CONTEXT_MARKERS[part.type];
                   return (
                     // Index key: a sent user message's parts are immutable and
                     // never reorder (same reasoning as the images below).
@@ -235,18 +216,8 @@ export function ChatMessageView({
                       key={index}
                       className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs shadow-sm"
                     >
-                      <Icon className="size-3.5 text-muted-foreground" />
+                      <PaperclipIcon className="size-3.5 text-muted-foreground" />
                       <span className="font-medium">{label}</span>
-                      {isTemplate && slides !== undefined && (
-                        <span className="text-muted-foreground">
-                          · {slides} slides
-                        </span>
-                      )}
-                      {isDirectories && (
-                        <span className="text-muted-foreground">
-                          · read only
-                        </span>
-                      )}
                     </span>
                   );
                 })}
@@ -272,7 +243,11 @@ export function ChatMessageView({
               </div>
             )}
             {text.length > 0 && (
-              <MessageResponse plugins={markdown.plugins}>
+              <MessageResponse
+                plugins={markdown.plugins}
+                rehypePlugins={markdown.rehypePlugins}
+                components={markdown.components}
+              >
                 {text}
               </MessageResponse>
             )}
@@ -280,29 +255,30 @@ export function ChatMessageView({
         </MessageContent>
         {/* Subtle until hover so the transcript stays clean; right-aligned
             to sit under the user bubble. Copy is always available (a pure
-            clipboard action, never disabled); rewind/fork appear only
+            clipboard action, never disabled). History controls appear only
             when the host wires them. */}
-        <MessageActions className={`ml-auto ${revealOnHoverActions}`}>
-          <CopyMessageAction text={text} />
-          {actions?.onRewind && (
-            <MessageAction
-              tooltip="Rewind to here"
-              disabled={actions.disabled}
-              onClick={() => actions.onRewind?.(message.id)}
-            >
-              <RotateCcwIcon />
-            </MessageAction>
+        <div className="ml-auto flex items-center gap-2">
+          <MessageActions className={revealOnHoverActions}>
+            {actions?.sentAtMs !== undefined && (
+              <MessageTime at={actions.sentAtMs} />
+            )}
+            <CopyMessageAction text={text} />
+            {actions?.onEdit && (
+              <MessageAction
+                tooltip="Edit and resubmit"
+                disabled={actions.disabled}
+                onClick={() => actions.onEdit?.(message.id)}
+              >
+                <PencilIcon />
+              </MessageAction>
+            )}
+          </MessageActions>
+          {actions?.note && (
+            <span className="text-muted-foreground flex items-center gap-1 text-xs [&_svg]:size-3.5">
+              {actions.note}
+            </span>
           )}
-          {actions?.onFork && (
-            <MessageAction
-              tooltip="Fork from here"
-              disabled={actions.disabled}
-              onClick={() => actions.onFork?.(message.id)}
-            >
-              <GitBranchIcon />
-            </MessageAction>
-          )}
-        </MessageActions>
+        </div>
       </Message>
     );
   }
@@ -322,7 +298,7 @@ export function ChatMessageView({
     .join("\n\n");
   return (
     <Message from="assistant" className="w-full max-w-none">
-      <MessageContent className="w-full max-w-full text-[13px]">
+      <MessageContent className={`w-full max-w-full ${CHAT_TEXT}`}>
         {groups.map((group) => {
           if (group.type === "text") {
             return (
@@ -331,6 +307,8 @@ export function ChatMessageView({
                 className={markdown.className}
                 controls={markdown.controls}
                 plugins={markdown.plugins}
+                rehypePlugins={markdown.rehypePlugins}
+                components={markdown.components}
               >
                 {group.text}
               </MessageResponse>
@@ -345,12 +323,30 @@ export function ChatMessageView({
       {/* Copy mirrors the user-bubble affordance but left-aligned under the
           assistant response. Shown only once the turn has settled with real
           text — never over a half-streamed or tool-only (text-less) turn. */}
-      {!isStreaming && responseText.trim().length > 0 && (
+      {!isStreaming && !actions?.hidden && responseText.trim().length > 0 && (
         <MessageActions className={revealOnHoverActions}>
+          {actions?.sentAtMs !== undefined && (
+            <MessageTime at={actions.sentAtMs} />
+          )}
           <CopyMessageAction text={responseText} />
         </MessageActions>
       )}
     </Message>
+  );
+}
+
+/** The local time a message was sent, shown with its hover actions. */
+function MessageTime({ at }: { at: number }) {
+  return (
+    <time
+      dateTime={new Date(at).toISOString()}
+      className="text-muted-foreground px-1 text-xs tabular-nums"
+    >
+      {new Date(at).toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit",
+      })}
+    </time>
   );
 }
 
@@ -487,22 +483,6 @@ function findCompactionSummary(
 }
 
 /**
- * Horizontal divider with centered content — the section break that marks a
- * compaction in the transcript. Shared by the in-flight indicator
- * ({@link CompactingIndicator}) and the settled notice
- * ({@link CompactionNotice}) so the two states sit on one consistent line.
- */
-function CompactionDivider({ children }: { children: ReactNode }) {
-  return (
-    <div className="my-3 flex w-full items-center gap-3 px-1 text-muted-foreground">
-      <span aria-hidden className="h-px flex-1 bg-border" />
-      {children}
-      <span aria-hidden className="h-px flex-1 bg-border" />
-    </div>
-  );
-}
-
-/**
  * How long an in-flight indicator runs bare before the elapsed-time counter
  * appears, in milliseconds. Below this only the shimmering label shows; at or
  * past it the "· {time}" counter is revealed.
@@ -510,9 +490,8 @@ function CompactionDivider({ children }: { children: ReactNode }) {
 const ELAPSED_REVEAL_AFTER_MS = 3000;
 
 /**
- * A shimmering label trailed by a live elapsed-time counter — the shared body
- * of the transcript's in-flight indicators ({@link CompactingIndicator},
- * {@link PendingTurnIndicator}) so they tick identically.
+ * A shimmering label trailed by a live elapsed-time counter — the body of the
+ * transcript's in-flight indicator ({@link PendingTurnIndicator}).
  *
  * The counter stays hidden for the first {@link ELAPSED_REVEAL_AFTER_MS}: a fast
  * operation settles before a timer grows, and only a wait long enough to feel
@@ -538,22 +517,6 @@ function ShimmerWithElapsed({ label }: { label: string }) {
 }
 
 /**
- * In-flight compaction (RFC `session / compaction`). A divider whose centered
- * label shimmers while the summarizer runs, trailed by a live elapsed-time
- * counter so a slow summarize reads as progress, not a hang. The host renders
- * this at the tail of the conversation while a manual `/compact` is awaiting;
- * once the summary message hydrates it is replaced by the settled
- * {@link CompactionNotice}.
- */
-export function CompactingIndicator() {
-  return (
-    <CompactionDivider>
-      <ShimmerWithElapsed label="Compacting conversation" />
-    </CompactionDivider>
-  );
-}
-
-/**
  * Pre-first-token indicator — the dead-air window between a send and the first
  * streamed chunk. The AI-SDK reducer doesn't create the assistant message until
  * the first content chunk arrives, so the per-turn "Thinking" shimmer that lives
@@ -573,27 +536,12 @@ export function PendingTurnIndicator() {
   );
 }
 
-/**
- * Transient confirmation that a fork happened (RFC `session / fork`). Forking
- * switches to a copy that looks identical to the source, so without this the
- * action reads as a no-op. A surface renders it while
- * `useSessionFork().justForked` is true; it auto-dismisses there.
- */
-export function ForkedNotice() {
-  return (
-    <div className="flex items-center gap-2 border-t bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-      <span className="flex-1">
-        Forked into a new session — you&apos;re now in a copy.
-      </span>
-    </div>
-  );
-}
-
 // The settled compaction affordance (RFC `session / compaction`: "the user
 // sees a one-line affordance"). A divider reading "Conversation compacted";
 // clicking the label expands the summary the model now sees in place of the
 // hidden turns.
-function CompactionNotice({
+/** A divider where earlier context was summarized, with the summary inside. */
+export function CompactionNotice({
   summary,
   auto,
 }: {
@@ -619,7 +567,8 @@ function CompactionNotice({
 
 // A lone tool call renders as a single `Task` row; a run of consecutive
 // calls nests those rows inside one summary `Task`.
-function ToolCallGroupView({ entries }: { entries: ToolCallEntry[] }) {
+/** Tool calls as cards; consecutive calls collapse into one summary row. */
+export function ToolCallGroupView({ entries }: { entries: ToolCallEntry[] }) {
   if (entries.length === 1) {
     return <ToolCallView entry={entries[0]} />;
   }
@@ -664,8 +613,8 @@ function approvalOf(entry: ToolCallEntry) {
 
 function ToolCallView({ entry }: { entry: ToolCallEntry }) {
   // The `question` tool's INTERACTIVE prompt is session-global (pinned above the
-  // composer by the surface — see `findPendingQuestion` / `QuestionCard`). In
-  // the transcript it's only a passive record of what was asked / answered.
+  // composer by the surface as `QuestionPrompt`). In the transcript it's only a
+  // passive record of what was asked / answered.
   if (isQuestionEntry(entry)) {
     return <QuestionToolView entry={entry} />;
   }
@@ -726,7 +675,7 @@ function ToolCallView({ entry }: { entry: ToolCallEntry }) {
 }
 
 // The `question` tool's PASSIVE transcript record. The interactive prompt is
-// session-global (the surface pins `QuestionCard` above its composer), so here
+// session-global (the surface pins `QuestionPrompt` above its composer), so here
 // we only show what was asked — a one-line header — and, once answered, the
 // read-only echo of the answer. While the run is paused on the user the header
 // points them at the prompt; `input-streaming` (partial input) shows nothing.
@@ -823,6 +772,7 @@ function iconForAction(action: ToolDisplayDescription["action"]): LucideIcon {
     case "plan":
       return ListTodoIcon;
     case "command":
+    case "process":
       return SquareTerminalIcon;
     case "question":
       return MessageCircleQuestionIcon;

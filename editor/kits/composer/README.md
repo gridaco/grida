@@ -66,6 +66,7 @@ function ComposerBox() {
 ## Capabilities
 
 - Slash commands with keyboard selection.
+- Optional host actions on explicit command selection, shared by keyboard and menu clicks.
 - Mentions from a caller-provided catalog.
 - File attachments as message parts.
 - Inline file references.
@@ -99,6 +100,29 @@ Use the provider/controller for behavior:
 - `setContexts(contexts)`
 - `submit({ submitted_at })`
 - `clear()`
+
+`ComposerProvider` accepts an optional synchronous
+`onCommandSelect?: (command: ComposerCommand) => boolean`. It runs once when a
+command is explicitly selected through the keyboard or menu, never when a prefix
+is merely typed. Return `true` to handle that command as a host action: the kit
+removes only the typed slash trigger, closes its menu, and retains editor focus.
+Other draft text, formatting, references, attachments, and context remain intact.
+Return `false`, or omit the callback, to insert the usual command chip. Mentions
+do not invoke this callback. The callback receives only catalog command data;
+its implementation and result never become message parts.
+
+```tsx
+<ComposerProvider
+  catalog={catalog}
+  onCommandSelect={(command) => {
+    if (command.id !== "choose-intent") return false;
+    chooseIntent();
+    return true;
+  }}
+>
+  <ComposerBox />
+</ComposerProvider>
+```
 
 `ComposerContent` accepts `onTransfer(event)` for paste/drop gestures that
 contain browser `File` objects. The event preserves `source` (`paste` or
@@ -138,4 +162,21 @@ When using the default attachment cards with host-owned resources such as object
 
 This kit does not upload files, fetch mention results, own chat rendering, or bind to workbench/editor global state. Callers provide catalogs, attachments, editor contexts, and submission handling.
 
+Command actions remain host-owned. The kit does not define product modes, run
+commands, or host a plugin registry.
+
 The current home is `editor/kits/composer` because the API is reusable inside the editor but not yet promoted to a separately versioned package.
+
+## Validation
+
+Run the pure model, adapter mapping, and transfer tests from `editor` with
+`pnpm exec vitest run kits/composer`. The real-editor command selection tests
+require installed Google Chrome:
+
+```sh
+pnpm exec vitest run --config kits/composer/vitest.browser.config.ts
+```
+
+These browser tests exercise keyboard and menu-equivalent selection against
+Tiptap, including draft preservation, retained focus, normal chips, mentions,
+and duplicate/re-entrant selection guards.

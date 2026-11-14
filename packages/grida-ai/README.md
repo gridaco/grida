@@ -20,7 +20,7 @@ primitives belong here when a concrete consumer establishes their contract.
 Future primitives must earn their API through a complete operation and independent
 producer tests; there are no reserved executors or empty future subpaths.
 
-The configured [`@grida/agent`](../grida-ai-agent), its prompts/tools/skills, chat storage, workspace
+The configured [`@grida/ai-host`](../grida-ai-host), its prompts/tools/skills, chat storage, workspace
 policy, HTTP routes, application defaults, and external-agent runtimes belong to
 their hosts. This package must not import their source, types, manifests, or test
 setup. the pinned public `@grida/ai-models` release supplies canonical facts; its explicit

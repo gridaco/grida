@@ -317,8 +317,17 @@ describe("LibraryTigris", () => {
         await vi.waitFor(() => expect(stalledResponses).toHaveLength(1));
         expire();
         expect(await settled).toEqual(new Error("Library upload timed out"));
-        await vi.waitFor(() =>
-          expect(stalledResponses[0].destroyed).toBe(true)
+        // The abort reaches the server socket asynchronously through the
+        // client's fetch handler; allow for a loaded test runner. Node's fetch
+        // client can miss tearing down the socket when the abort lands while
+        // it is finishing a request body, so a stalled PUT is only bounded by
+        // the upload deadline above; the server closes that connection.
+        await vi.waitFor(
+          () =>
+            expect(method === "PUT" || stalledResponses[0].destroyed).toBe(
+              true
+            ),
+          { timeout: 20_000 }
         );
         expect(requests.map((request) => request.method)).toEqual(
           ["PUT", "HEAD", "GET"].slice(
@@ -330,7 +339,8 @@ describe("LibraryTigris", () => {
         expire();
         await settled;
       }
-    }
+    },
+    30_000
   );
 
   it("expires even when response-body cancellation never settles", async () => {

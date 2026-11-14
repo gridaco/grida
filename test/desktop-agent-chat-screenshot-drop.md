@@ -4,17 +4,16 @@ title: Drag a macOS screenshot floating-thumbnail into the agent composer
 module: desktop
 area: agent-chat
 tags: [agent-chat, composer, image, drag-drop, macos, screenshot, sandbox]
-status: untested
+status: deprecated
 severity: high
 date: 2026-06-07
-updated: 2026-07-30
+updated: 2026-11-13
 automatable: false
 covered_by:
   - editor/kits/composer/composer-transfer.test.ts
   - editor/lib/agent-chat/image-attachment.test.ts
-  - editor/lib/agent-chat/input-resource-router.test.ts
-  - packages/grida-ai-agent/src/http/routes/agent.test.ts
-  - packages/grida-ai-agent/src/runtime/runtime.live.test.ts
+  - desktop/src/main/native-agent-images.test.ts
+  - crates/grida-agent/tests/process/images.rs
 ---
 
 ## Behavior
@@ -61,3 +60,5 @@ is the failure mode to capture here. **Run this case early.**
 - If this fails, the fallback is the clipboard path: **⌘⇧Ctrl+4** copies the
   screenshot to the clipboard, then paste (TC-DESKTOP-AGENT-CHAT-001), which
   never touches a temp file.
+
+- Retired with the previous chat. Native Desktop chat accepts one PNG or file of at most 256 KiB per message; see TC-DESKTOP-AGENT-CHAT-021 for pasting or dropping it and TC-DESKTOP-AGENT-CHAT-009 for an oversize file. The covered_by tests exercise the previous chat.

@@ -1,6 +1,6 @@
 ---
 title: Cost Optimization
-description: Doctrine for running frontier models as agent models without burning money on waste. The agent-loop cost model (every token is re-billed every step), the ledger of measured leaks — missing prompt caching, tool-result echo, unbounded replay, window/threshold/tier decided separately — and the quality-first ordering that spends effort on quality-neutral fixes before quality-tradeoff ones.
+description: Doctrine for running frontier models in an agent loop without paying for waste. The loop's cost model (every token is re-sent every step, at one of several price tiers), the recurring failure classes — missing prompt caching, tool results that echo their input, unbounded and stale tool output, window and compaction decided apart from pricing, rewrite-heavy revision, an unaudited baseline — and the quality-first order for addressing them.
 keywords:
   [
     agent-system,
@@ -24,372 +24,210 @@ tags:
 
 # Cost Optimization
 
-An agent system that runs a frontier model runs the most expensive
-compute it will ever buy, in a loop, unattended. Cost is therefore a
-**first-class design dimension** of the system — on par with the tool
-contract and the session lifecycle, and designed in the same places.
+An agent that runs a frontier model runs the most expensive compute the product
+buys, in a loop, often unattended. Cost is therefore a design dimension of the
+agent system, decided in the same places as the tool contract and the session
+model. This page is doctrine: it states the cost model of an agent loop, the
+failure classes that follow from ignoring it, and the order in which to address
+them. The normative mechanisms it relies on belong to
+[Master / context and tool design](./master.md#context-and-tool-design),
+[Tools](./tools.md), and [Tool design](./tool-design.md).
 
-This page is a **doctrine and case study**, not a tool spec. It names
-the cost model of an agent loop, the recurring leaks that follow from
-ignoring it, and the discipline that closes them. Tools and mechanisms
-mentioned here may be idealized rather than as-shipped; the sibling
-pages ([Session Lifecycle](./session.md), [Tools](./tools.md),
-[Tool Design](./tool-design.md)) own the normative contracts this page
-reasons about.
+The keywords **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and **MAY** are
+used as in [RFC 2119](https://datatracker.ietf.org/doc/html/rfc2119).
 
-The keywords **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, **MAY**
-are used as in [RFC 2119](https://datatracker.ietf.org/doc/html/rfc2119).
+## Quality comes first
 
-## Quality is still P1
+Cost optimization MUST NOT degrade task quality. A frontier model is chosen for
+quality; trading quality for cost defeats the choice.
 
-Before anything else: **cost optimization MUST NOT be pursued by
-degrading quality.** The reason an agent system picks a frontier model
-is quality; an optimization that trades it away defeats the purchase.
+The doctrine works because much of what an unoptimized loop spends buys nothing:
+the model sees identical bytes at a higher price, or sees stale bytes it no
+longer needs. The discipline is:
 
-The doctrine is possible because most of the money an unoptimized agent
-loop burns buys **nothing** — the model sees identical bytes either
-way, or sees stale bytes it no longer needs. The discipline is:
-
-1. **Close the quality-neutral leaks first.** Prompt caching,
-   tool-result echo, output truncation with a re-fetch handle. These
-   change what a token _costs_, not what the model _sees_.
-2. **Take quality-tradeoff measures deliberately, case by case.**
-   Compaction, pruning, cheaper models, smaller windows. Each replaces
-   verbatim context with less; each needs its own argument. (Often the
-   argument exists — a half-million-token prompt also degrades the
-   model's attention, so compacting earlier can be a quality _win_ —
-   but it must be made, not assumed.)
-
-A system that reaches for step 2 before finishing step 1 is paying for
-quality loss it did not have to take.
-
-## Provenance
-
-This doctrine was sharpened by a **measured incident in a peer agent
-system** — a different product, with a different design, sharing this
-guide's DNA (a universal LLM loop over a persisted session, streaming
-AI-SDK-shaped chunks, replaying the transcript each step). The
-specifics below are that system's, not this one's; the failure classes
-are the domain's. Because the peer persisted per-step token usage
-(see [Observability](#observability-no-invisible-spend)), the numbers
-are forensic, not estimated:
-
-- A single build session on a frontier model cost **hundreds of
-  dollars in under an hour**.
-- The session totaled **millions of input tokens over a few dozen
-  steps**, with single steps carrying over half a million input
-  tokens each.
-- Across **every** session ever run against a provider whose prompt
-  cache is opt-in, cache reads were **zero**. Sessions on a provider
-  with implicit caching had the large majority of their input served
-  from cache for free — which is precisely why the leak went
-  unnoticed.
-
-Reference systems in this domain (opencode and Codex were the ones
-studied) ship the countermeasures below as **core loop behavior, not
-optimizations** — cache breakpoints, output caps, history pruning are
-table stakes in a production agent loop. It is easy to adopt a
-reference system's visible tool semantics and miss its invisible cost
-hygiene; the peer system had done exactly that.
+1. **Close quality-neutral waste first.** Prompt caching, acknowledgment-only
+   tool results, and output bounds with a retrieval handle change what a token
+   costs, not what the model sees.
+2. **Take quality tradeoffs deliberately, one at a time.** Compaction, pruning,
+   smaller windows, and cheaper models replace verbatim context with less. Each
+   needs its own argument. That argument often exists — very long prompts also
+   dilute attention — but it is made, not assumed.
 
 ## The cost model of an agent loop
 
-Everything in this page follows from four facts about how an agent
-loop is billed. None of them is exotic; the leaks come from designing
-as if they weren't true.
-
-**1. The transcript is re-sent on every step.** A turn is a loop:
-model call → tool call → tool result → model call again. Each model
-call carries the _entire_ conversation so far — system prompt, every
-message, every tool input, every tool result. A token that enters the
-transcript at step 3 is billed again at steps 4, 5, … N. Input cost is
-therefore **quadratic** in the number of steps: an N-step session
-whose steps append roughly constant-size content pays on the order of
-N²/2 token-sends. Every byte in the transcript is **rent**, paid every
-remaining step of the session — the same rent framing as
-[Tool Design's context economy lens](./tool-design.md#3-context-economy--every-token-is-rent),
+**1. The transcript is re-sent every step.** A turn alternates model calls and
+tool results, and each model call carries the whole conversation so far. A token
+that enters at step 3 is paid again at every later step. With roughly constant
+growth per step, input cost grows with the square of the step count. Every byte
+in the transcript is rent, the same framing as
+[Tool design / context economy](./tool-design.md#3-context-economy--every-token-is-rent)
 seen from the billing side.
 
-**2. Input tokens have four prices.** Providers price the same token
-differently depending on how it arrives:
+**2. Input tokens have several prices.** The same token costs differently by how
+it arrives:
 
-| Kind                 | Typical price (relative to uncached input) |
-| -------------------- | ------------------------------------------ |
-| Cache read           | ~0.1×                                      |
-| Uncached input       | 1×                                         |
-| Cache write          | ~1.25×                                     |
-| Long-context premium | ~2× on the portion above a threshold       |
+| Kind                 | Typical price relative to uncached input |
+| -------------------- | ---------------------------------------- |
+| Cache read           | about 0.1×                               |
+| Uncached input       | 1×                                       |
+| Cache write          | about 1.25×                              |
+| Long-context premium | about 2× above a provider threshold      |
 
-The spread between the cheapest and the most expensive way to send the
-same prompt is roughly **20×**. An agent loop's dominant cost driver is
-not _how many_ tokens it sends but **which price tier they land in**.
+The spread between the cheapest and most expensive way to send one prompt is
+roughly twentyfold. Which tier tokens land in matters more than how many there
+are.
 
-**3. Caching regimes differ by provider.** Some providers cache
-implicitly (repeated prefixes are served from cache with no request
-changes); others require **opt-in cache breakpoints** stamped onto the
-request. A loop that works on both will silently pay full price on the
-opt-in provider while looking cheap on the implicit one. Gateways
-(OpenRouter is the common case) carry the underlying provider's cache
-options through provider-specific request fields — routing through a
-gateway does not exempt the loop from stamping them.
+**3. Caching regimes differ by provider.** Some providers cache repeated
+prefixes implicitly. Others cache only where the request marks cache
+breakpoints. A routing gateway passes the underlying provider's caching options
+through; routing through one does not remove the need to mark them. A loop that
+works with both kinds pays full price on the explicit kind while looking cheap
+on the implicit kind.
 
-**4. Output is expensive per token but small in volume.** Output rates
-run several times the input rate, but an agent session's output is
-typically 1–2% of its input volume. In the measured incident, input
-volume outweighed output by roughly two orders of magnitude. **Input
-volume × input tier is where the money is**; output-side tuning is a
-second-order concern.
+**4. Output is expensive per token but small in volume.** Output rates are
+several times input rates, but output is usually one to two percent of input
+volume in an agent session. Input volume times input tier is where the money
+is.
 
-## The ledger of leaks
+## Failure classes
 
-Each leak below was observed, measured, and closed (or scoped) in the
-peer incident. They are ordered by measured impact. The first three are
-quality-neutral; the fourth is the one genuine tradeoff; the last two
-are steering concerns.
+Ordered by typical impact. The first three are quality-neutral, the fourth is
+the one genuine tradeoff, and the last two are steering concerns.
 
-### Leak 1 — no prompt caching on an opt-in provider (~90% of input cost)
+### 1. No prompt caching where the provider requires it
 
-On a provider with opt-in caching, a loop that never stamps cache
-breakpoints pays the full uncached rate for the entire re-sent
-transcript, every step. With breakpoints, everything up to the last
-breakpoint is a ~0.1× cache read; only each step's new suffix pays the
-~1.25× write surcharge. In a long session that converts roughly **90%+
-of input volume to the 0.1× tier** — the single largest lever in the
-entire doctrine, and a strictly quality-neutral one: the model sees
-identical bytes.
+Without breakpoints on an explicit-caching provider, the entire re-sent
+transcript pays the uncached rate every step. With them, everything before the
+last breakpoint is a cache read, and only each step's new suffix pays the write
+surcharge. In long sessions most input moves to the cheapest tier while the
+model sees identical bytes.
 
-The discipline:
+- The loop MUST mark cache breakpoints where the provider requires them,
+  covering the stable instructions and the most recent messages so the cached
+  prefix spans everything already sent.
+- The prefix MUST stay stable. Instruction assembly order is fixed, history is
+  append-only, and replayed history MUST NOT be rewritten between steps. Any
+  rewrite of earlier content invalidates the cache from that point. Rewrites
+  belong at compaction boundaries, where the prefix is rebuilt anyway.
+- A session-stable cache key SHOULD be sent where the provider supports one.
 
-- **The loop MUST stamp cache breakpoints when the provider requires
-  them.** The recurring placement (used by the reference systems): a
-  breakpoint on the system prompt and on the last message(s) of each
-  request, so the cacheable prefix covers everything already sent.
-- **The prefix MUST be stable.** Caching is prefix-matching. The
-  system-prompt assembly order is fixed
-  ([Session / system prompt assembly](./session.md#system-prompt-assembly)),
-  history is append-only, and — critically — **replayed history MUST
-  NOT be mutated between steps**. Any transformation of past messages
-  (pruning, placeholder substitution, re-serialization that reorders
-  keys) invalidates the cached prefix from the mutation point onward.
-  Mutations are legal only at **compaction boundaries**, where the
-  prefix is being rebuilt anyway.
-- **A session-stable cache key SHOULD be sent where the provider or
-  gateway supports one** (a per-session `prompt_cache_key` or
-  equivalent), so the provider's cache routing sees one continuous
-  conversation rather than accidental prefix collisions.
+Implicit caching on one provider can hide the absence of caching on another.
+Cost MUST be evaluated per provider, not as a blended average.
 
-The cross-provider disparity deserves its own warning: **implicit
-caching on one provider masks the absence of caching on another.** A
-cost dashboard that aggregates across providers will show the blended
-average and hide the leak. Cost MUST be evaluated **per provider**,
-not per feature.
+### 2. Tool results that echo their input
 
-### Leak 2 — tool results that echo their inputs (~25% of transcript volume)
+A tool result is appended to the transcript and paid on every later step. A
+mutation tool that returns the content it was just given stores that content
+twice for the rest of the session.
 
-A tool's result envelope is not a return value that gets consumed and
-dropped — it is **appended to the transcript and re-billed every
-subsequent step**. Envelope design _is_ prompt design.
+- A mutation result MUST be an acknowledgment: what changed, where, and the
+  state needed to proceed, such as a size, a revision, or a change summary.
+  Never the content the agent just sent.
+- A result field nobody reads has a per-step price. The
+  [retraction asymmetry](./tool-design.md#the-consumer-you-cannot-change)
+  applies to result fields as much as to parameters.
 
-The measured instance: a file-write tool that returned the full
-written content back in its success envelope. Every produced artifact
-therefore sat in the transcript **twice** — once as the tool call's
-input, once as the result's echo — for the rest of the session. In a
-build-heavy session the echo alone was ~25% of all tool bytes. No
-consumer of the field existed; it was a convenience nobody used, billed
-on every step of every session.
+### 3. Unbounded and stale tool output
 
-The discipline is [Tool Design's context economy
-lens](./tool-design.md#3-context-economy--every-token-is-rent) with
-teeth:
+- **Unbounded output.** A command or search can return megabytes. Each tool
+  bounds its output and returns a head plus a retrieval handle for the rest, as
+  [Tools / truncation](./tools.md#truncation) defines. Nothing is lost; it
+  moves behind a handle.
+- **Stale output.** A file read forty steps ago, of a file since rewritten, is
+  both waste and a source of error. Older outputs can be replaced with a stub
+  that keeps the call and its arguments while dropping the bytes.
 
-- A mutation tool's result MUST be an **acknowledgment, not an echo**
-  — what changed, where, and the state the agent needs to proceed
-  (a diff stat, a byte count, a version stamp). Never the content the
-  agent just sent.
-- A result field nobody consumes is not harmless — it has a **per-step
-  price**. When in doubt, leave it out; the retraction asymmetry
-  ([Tool Design](./tool-design.md#the-consumer-you-cannot-change))
-  applies to result fields exactly as it does to parameters.
+Pruning MUST respect prefix stability. Rewriting replayed history mid-session
+invalidates the cache and can cost more than it saves. Prune at compaction
+boundaries, or only behind a freshly established breakpoint.
 
-### Leak 3 — unbounded and unpruned tool outputs
+### 4. Window, compaction threshold, and price tier decided separately
 
-Two related failures:
+A larger context window is not free headroom. Three quantities are coupled:
 
-- **No output cap at execution time.** A shell command or a search
-  over a large tree can return megabytes; returned verbatim, that
-  volume is rent forever. The contract answer is
-  [truncation with a re-fetch handle](./tools.md#truncation): a
-  per-tool max output size, head + `truncated` flag in the result, full
-  payload spilled to a file the agent can `read` on demand. Quality-
-  neutral by construction — nothing is lost, it moves behind a handle.
-- **No pruning of stale outputs at replay time.** A file read from
-  forty steps ago — of a file since rewritten — is not just dead
-  weight; it is _stale_ context that can mislead. The contract answer
-  is [tool-output pruning](./session.md#tool-output-pruning-vs-compaction):
-  protect a recent-output budget, replace older outputs with a stub
-  that preserves the call + arguments ("I read file X" survives; X's
-  old bytes do not).
+- the window the loop requests;
+- the compaction threshold, which follows the window; and
+- the price tier, where input above a provider threshold pays a premium.
 
-The cost-specific addition to those contracts: **pruning MUST compose
-with Leak 1's prefix stability.** A prune pass that rewrites replayed
-history mid-session invalidates the cache prefix and can cost more
-than it saves. Prune at compaction boundaries (or apply stubs only to
-messages already behind a fresh breakpoint), never on a live cached
-prefix.
+Raising the window alone moves the compaction threshold past where sessions
+actually live, so compaction stops running, while every token above the premium
+line pays more. The larger window disables the system's own hygiene and raises
+the price of the traffic that hygiene would have removed.
 
-### Leak 4 — window, threshold, and price tier decided separately
+These three MUST be decided together:
 
-The one leak that is a genuine design tradeoff rather than pure waste.
+- Long-context windows SHOULD be selected per task that needs verbatim long
+  history, not by default.
+- The default compaction threshold SHOULD sit below the provider's premium
+  line.
+- Compaction trades verbatim history for a summary, so the tradeoff is argued
+  per product; a session compacted early often performs better than one
+  carrying hundreds of thousands of stale tokens.
 
-A bigger context window is **not free headroom**. Three quantities are
-coupled, and the measured incident showed what happens when they are
-configured independently:
+### 5. Rewrite-heavy revision
 
-- The **window** the loop requests (some providers gate a long-context
-  window behind an opt-in request flag).
-- The **compaction threshold**, which
-  [derives from the window](./session.md#threshold) — raise the window
-  and the threshold rises with it.
-- The **price tier**: the portion of input above the provider's
-  long-context threshold bills at a premium (~2×).
+A whole-file rewrite and a targeted edit can produce the same result at very
+different cost: the rewrite pays the full artifact size as input on that step
+and every later one. When the tool set already offers the targeted path, this is
+a steering problem. Tool descriptions SHOULD position creation and revision
+separately, and task guidance SHOULD prefer targeted edits where revision is the
+common case — the
+[awareness lens](./tool-design.md#1-awareness--can-the-agent-ground-and-express-this)
+applied to cost.
 
-In the incident, unconditionally enabling a 1M-token window moved the
-compaction trigger to just under the window — past where any real
-session lived, so **compaction never fired** — while every token
-above the provider's premium line billed at the premium rate. The larger window did not buy
-capability; it silently disabled the system's own hygiene and doubled
-the marginal price of exactly the traffic that hygiene would have
-removed.
+### 6. An unaudited baseline
 
-The discipline: **window size, compaction threshold, and pricing tier
-MUST be decided together, as one decision.**
+Every session's first step pays the baseline: instructions, project guidance,
+the skill index, environment context, the offered tools, and anything the host
+injects. The baseline is the prefix of every later step.
 
-- Long-context windows SHOULD be **opt-in per session or per task**,
-  reserved for tasks that demonstrably need verbatim long history —
-  never a default.
-- The default compaction threshold SHOULD sit **below the provider's
-  premium-tier line**, so ordinary sessions never enter premium
-  pricing at all.
-- This is the one measure with a quality dimension: compaction
-  replaces verbatim history with a summary. The counter-argument is
-  also real — extreme prompts degrade attention, and a session that
-  compacts at 150k often _outperforms_ one dragging 500k of stale tool
-  output. Make the argument per product shape; do not default into
-  premium pricing by omission.
-
-### Leak 5 — full-rewrite bias in revision loops
-
-When an agent revises an artifact, a whole-file rewrite and a targeted
-string-replace edit produce the same outcome at wildly different token
-cost — the rewrite pays the full artifact size in tool input (and, per
-Leak 2, possibly again in the result), on that step and every step
-after. The measured incident showed a revision loop calling
-whole-file writes nearly an order of magnitude more often than
-targeted edits, on artifacts in the tens of kilobytes.
-
-This is a **steering problem, not a contract problem**: the tool set
-already contains the cheap path; the model defaults to the expensive
-one. The fix lives in tool descriptions and skills — the write tool's
-description SHOULD position it for creation, the edit tool's for
-revision, and task-domain skills SHOULD say "revise with targeted
-edits" where revisions are the common case. This is the
-[awareness lens](./tool-design.md#1-awareness--can-the-agent-ground-and-express-this):
-the agent can only take the cheap path it has been told exists and
-told when to prefer.
-
-### Leak 6 — an unaudited baseline prompt
-
-The first step of every session pays the **baseline**: system prompt,
-project instructions, skill index, environment context, tool catalog
-([Session / system prompt assembly](./session.md#system-prompt-assembly))
-— plus whatever a host injects (workspace listings, template
-catalogs, upload manifests). In the measured incident the baseline
-alone approached 100k tokens before the user's first word.
-
-The baseline is rent with a multiplier: it is the **prefix of every
-step of every session**. The discipline:
-
-- With Leak 1 closed, a large baseline is cheap-ish (cached after step
-  one) — but it still occupies window and still degrades attention.
-  Fix caching first, then audit; an audit before caching optimizes the
+- Fix caching first. A cached baseline is cheap per step, though it still
+  occupies the window and attention. Auditing before caching optimizes the
   wrong number.
-- The lazy-loading machinery exists to keep the baseline small: skills
-  advertise one-line descriptions and load bodies on demand
-  ([Skills](./skills.md)); bulk tool catalogs sit behind search
-  ([MCP / lazy materialization](./mcp.md)). A baseline that inlines
-  what those layers were built to defer is re-importing the cost they
-  were built to remove.
+- Keep deferred material deferred. Skills advertise short descriptions and load
+  their bodies on selection; large tool catalogs sit behind discovery
+  ([MCP and connectors](./mcp.md)). A baseline that inlines what those layers
+  defer reintroduces the cost they remove.
 
-## Observability: no invisible spend
+## Observability
 
-The entire incident above was reconstructible **weeks later, offline,
-with SQL** — because the peer system persisted per-step usage into the
-session store. That is the contract this guide already pins
-([Session / context-window tracking](./session.md#context-window-tracking),
-with the [cache normalization rule](./ai-sdk/index.md#token-usage--the-cache-normalization-rule)),
-and the incident is the argument for it: **usage persistence is the
-flight recorder that pays for itself the first time cost goes wrong.**
+Per-step usage by tier is recorded with the session, as
+[Master / usage and cost presentation](./master.md#usage-and-cost-presentation)
+requires. Recording makes a cost failure reconstructible after the fact. Two
+obligations follow:
 
-The doctrine adds two obligations on top of recording:
+- **A zero cache-read rate on a caching-capable provider is an alarm**, not a
+  statistic. The system SHOULD surface it where a person will see it.
+- **Cost regressions are evaluated per provider**, never only as a blended or
+  per-feature view.
 
-- **A zero cache-hit rate on a caching-capable provider is an alarm,
-  not a statistic.** The per-turn breakdown already carries
-  `cache_read`; a session whose `cache_read` stays at zero across
-  steps, on a provider that supports caching, is leaking (Leak 1) and
-  the system SHOULD surface it — in the session's context indicator,
-  in a dashboard, anywhere a human will actually see it. In the
-  incident, the zero sat in the database for months, silent.
-- **Cost regressions are evaluated per provider** (Leak 1's
-  disparity). A per-feature or blended view hides a full-price
-  provider behind an implicitly-cached one.
+Prices stay with the model catalogue, not in the usage record. The record holds
+tokens by tier; the catalogue turns tiers into money.
 
-Pricing itself stays where the guide put it: next to the model
-catalog, not inside the recorder
-([Session / cost](./session.md#cost)). Observability records tokens by
-tier; the catalog turns tiers into money.
+## The order
 
-## The ordering
+| Order | Measure                                                 | Quality impact                   |
+| ----- | ------------------------------------------------------- | -------------------------------- |
+| 1     | Prompt caching: breakpoints, stable prefix, session key | None — identical bytes           |
+| 2     | Acknowledgment-only tool results                        | None — removes unread bytes      |
+| 3     | Output bounds with a retrieval handle                   | None — content moves to a handle |
+| 4     | Stale-output pruning at compaction boundaries           | Near none — removes stale bytes  |
+| 5     | Window, threshold, and tier as one decision             | Tradeoff, argued per product     |
+| 6     | Steering: targeted edits, baseline audit, model tiering | None to positive                 |
 
-The doctrine compressed to a decision rule — when spending effort on
-agent cost, spend it in this order:
-
-| Order | Measure                                                | Quality impact                       | Typical lever             |
-| ----- | ------------------------------------------------------ | ------------------------------------ | ------------------------- |
-| 1     | Prompt caching (breakpoints, stable prefix, cache key) | None — identical bytes               | ~90% of input cost        |
-| 2     | Tool-result envelopes (no echo, ack not payload)       | None — removes unread bytes          | ~25% of transcript volume |
-| 3     | Output truncation with re-fetch handle                 | None — content moves behind a handle | Bounds the worst case     |
-| 4     | Stale-output pruning at compaction boundaries          | Near-none — removes stale bytes      | Grows with session length |
-| 5     | Window / threshold / tier as one decision              | Tradeoff — argued per product        | Avoids ~2× premium tier   |
-| 6     | Steering (edit-over-rewrite, baseline audit, tiering)  | None to positive                     | Task-shape dependent      |
-
-Model tiering — the cheapest sufficient model for auxiliary work — is
-already normative where it matters most
-([Session / summarizer cost discipline](./session.md#summarizer-cost-discipline));
-the same reasoning extends to any specialized subagent whose task does
-not need the frontier tier.
+Model tiering — the cheapest sufficient model for auxiliary work such as titles
+and summaries — extends to any specialized child task that does not need the
+frontier tier.
 
 ## The test
 
-Before shipping any agent-system surface — a tool, an envelope field,
-a prompt section, a window default — ask the billing-side twin of
-[Tool Design's test](./tool-design.md#the-test):
+Before shipping a tool, a result field, an instruction section, or a window
+default, ask the billing-side twin of [Tool design's test](./tool-design.md#the-test):
 
-> What does this cost on step 40? Every byte this surface puts into
-> the transcript is re-billed on every remaining step of the session —
-> at which price tier, and who is watching the number?
-
-If the answer is "full price, nobody" — that is this page's incident,
-waiting to be measured.
+> What does this cost on step 40? Every byte it adds to the transcript is paid
+> on every remaining step — at which price tier, and who sees the number?
 
 ## See also
 
-- [Tool Design](./tool-design.md) — the context economy lens this page
-  prices; the retraction asymmetry that applies to result fields.
-- [Tools](./tools.md) — the result envelope and the truncation
-  contract.
-- [Session Lifecycle](./session.md) — compaction, tool-output pruning,
-  context-window tracking, the summarizer's cost discipline.
-- [AI SDK annex](./ai-sdk/index.md) — the cache normalization rule
-  that keeps recorded usage honest.
-- [Skills](./skills.md) and [MCP](./mcp.md) — the lazy-loading layers
-  that keep the baseline small.
+- [Tool design](./tool-design.md) — the context economy lens this page prices.
+- [Tools](./tools.md) — the result envelope and truncation contract.

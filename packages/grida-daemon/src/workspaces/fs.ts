@@ -150,9 +150,17 @@ export namespace workspaceFs {
       }
       throw err;
     }
-    const entries = dirents
-      .filter((dirent) => isListableEntry(dirent.name))
-      .map((dirent) => directoryEntry(relPath, dirent));
+    return projectDirectory(relPath, dirents.map(projectDirent));
+  }
+
+  /** Project names already enumerated inside the authorized directory. */
+  export function projectDirectory(
+    relPath: string,
+    children: readonly Pick<Entry, "name" | "kind">[]
+  ): Entry[] {
+    const entries = children
+      .filter((entry) => isListableEntry(entry.name))
+      .map((entry) => directoryEntry(relPath, entry));
     entries.sort((a, b) => {
       if (a.kind === "directory" && b.kind !== "directory") return -1;
       if (b.kind === "directory" && a.kind !== "directory") return 1;
@@ -198,7 +206,7 @@ export namespace workspaceFs {
         const dirent = await dir.read();
         if (dirent === null) return;
         if (!isListableEntry(dirent.name)) continue;
-        yield directoryEntry(relPath, dirent);
+        yield directoryEntry(relPath, projectDirent(dirent));
       }
     } finally {
       try {
@@ -249,6 +257,18 @@ export namespace workspaceFs {
       });
     }
     const buf = await fs.readFile(abs);
+    return {
+      content: decodeText(workspace, relPath, buf),
+      mtime: stat.mtimeMs,
+    };
+  }
+
+  /** Decode authorized bytes with the editor's existing UTF-8 and BOM policy. */
+  export function decodeText(
+    workspace: Pick<Scope, "id">,
+    relPath: string,
+    buf: Uint8Array
+  ): string {
     // Binary detection: a null byte in the first 8 KiB is a reliable
     // heuristic for non-text content. The encoder round-trip would
     // catch the rest, but null-byte short-circuits the common case
@@ -264,9 +284,8 @@ export namespace workspaceFs {
       }
     }
     const decoder = new TextDecoder("utf-8", { fatal: true });
-    let content: string;
     try {
-      content = decoder.decode(buf);
+      return decoder.decode(buf);
     } catch {
       throw new Exception({
         code: "file-not-utf8",
@@ -274,7 +293,6 @@ export namespace workspaceFs {
         rel_path: relPath,
       });
     }
-    return { content, mtime: stat.mtimeMs };
   }
 
   /**
@@ -521,19 +539,28 @@ function isListableEntry(name: string): boolean {
   );
 }
 
-function directoryEntry(relPath: string, dirent: Dirent): workspaceFs.Entry {
+function projectDirent(
+  dirent: Dirent
+): Pick<workspaceFs.Entry, "name" | "kind"> {
   let kind: workspaceFs.Entry["kind"];
   if (dirent.isDirectory()) kind = "directory";
   else if (dirent.isFile()) kind = "file";
   else if (dirent.isSymbolicLink()) kind = "symlink";
   else kind = "other";
+  return { name: dirent.name, kind };
+}
+
+function directoryEntry(
+  relPath: string,
+  entry: Pick<workspaceFs.Entry, "name" | "kind">
+): workspaceFs.Entry {
   // Build a posix-style relPath even on Windows for client consistency. The
   // daemon-side resolveInside uses path.resolve (platform-aware) on write.
   const child =
     relPath === "" || relPath === "."
-      ? dirent.name
-      : `${relPath.replace(/\\/g, "/").replace(/\/+$/, "")}/${dirent.name}`;
-  return { name: dirent.name, rel_path: child, kind };
+      ? entry.name
+      : `${relPath.replace(/\\/g, "/").replace(/\/+$/, "")}/${entry.name}`;
+  return { ...entry, rel_path: child };
 }
 
 /**

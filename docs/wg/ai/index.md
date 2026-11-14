@@ -1,60 +1,38 @@
 ---
 title: AI (WG)
-description: Working group hub for AI-related docs. Two layers — the implementation-agnostic agent system RFC, and the Grida-specific bindings (canvas tools, image tools, host tool surface) that ride on top of it.
-keywords: [ai, agent, rfc, grida, tools, canvas, image]
+description: Agent design proposals, user expectations, reusable execution contracts, and existing Grida integration studies.
+keywords: [ai, agent, harness, product, components, durability]
 format: md
-tags:
-  - internal
-  - wg
-  - ai
+tags: [internal, wg, ai]
 ---
 
 # AI (WG)
 
-Three siblings live here:
+The [agent working group](./agent/index.md) owns the design of the agent system.
+Its renewed contract separates reusable components, the master that makes
+product decisions, and the product a user should experience. Engineering starts
+by establishing component responsibilities and invariants, then tests them
+through different masters and concrete experience scenarios.
 
-- **[`agent/`](./agent/index.md)** — the implementation-agnostic
-  agent system RFC. RFC 2119 normative tone. No product-specific
-  references. Plays a role similar to
-  [ACP](https://agentclientprotocol.com/) or
-  [LSP](https://microsoft.github.io/language-server-protocol/): the
-  contract a conforming implementation MUST honor.
-- **[`grida/`](./grida/index.md)** — Grida-specific bindings of the
-  RFC. The canvas-tool catalog, the image-generation surface, the
-  built-in subagents (titler / compactor / planner), and how Grida's
-  host wires the locked-tool set.
-- **[`grida/architecture.md`](./grida/architecture.md)** — Grida's
-  implementation blueprint. Names the orchestrator god class
-  (`DaemonServer` + the agent tenant), the package map, the host landings, the sequencing,
-  and the anti-goals. **Read this first if you're implementing.**
+For product review, read the three proposals in this order.
 
-## Reading order
+1. [User experience](./agent/experience.md) describes expected features and
+   observable behavior, including Ultra effort and final turn summaries.
+2. [Master](./agent/master.md) defines the thin product harness and its control
+   over task strategy, context, tools, verification, and performance.
+3. [Components](./agent/components.md) defines Messages, Inference, Tools,
+   History, Context, Runtime, and Sessions, including their independence,
+   execution authority, durability, and failure behavior.
 
-If you're trying to **understand** the system end-to-end:
+These are the current contracts, with release availability recorded in the
+[feature catalog](../../agent/features.md). They are independent of programming
+language and transport. The
+[agent index](./agent/index.md#topic-contracts-and-studies) also locates the
+topic contracts on tools, permissions, workspaces, events, and hosting.
 
-1. Start at [`agent/index.md`](./agent/index.md) for vocabulary and
-   the cross-cutting invariants.
-2. Read [`agent/foundations.md`](./agent/foundations.md) for the
-   bedrock (AI SDK v6 chunk shape, the locked-tool set summary,
-   the watchdog, the directory-rooted execution model).
-3. Skim the locked-tool spec in
-   [`agent/tools.md`](./agent/tools.md) and the storage shape in
-   [`agent/persistency.md`](./agent/persistency.md).
-4. Pick the surface that matches your work — sessions, subagents,
-   skills, MCP, environments — from the `agent/` sidebar.
-5. Cross over to [`grida/`](./grida/index.md) for the bindings,
-   the Grida-canvas tool surface, and the image-generation tools.
-
-If you're trying to **build** Grida's implementation:
-
-1. Start at [`grida/architecture.md`](./grida/architecture.md) for the
-   blueprint.
-2. Then steps 2–4 above.
-3. Then [`../desktop/`](../desktop/index.md) for the V1 host landing.
-
-## Scope
-
-This WG focuses on the agent protocol and Grida's bindings.
-Provider auth and credentials are out of scope (host territory).
-The hosted billing / model-seam architecture lives in
-[`../platform/`](../platform/index.md).
+[Grida's existing bindings](./grida/index.md) and
+[implementation architecture](./grida/architecture.md) describe the existing
+integration. They are useful when investigating that implementation. The
+[Desktop working group](../desktop/index.md) owns the application host, and the
+[Platform working group](../platform/index.md) owns account, billing, and hosted
+service concerns.

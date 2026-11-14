@@ -1,48 +1,41 @@
 ---
 id: TC-DESKTOP-AGENT-CHAT-009
-title: Drop a large raster without exceeding provider limits
+title: An oversize PNG is refused and the draft is kept
 module: desktop
 area: agent-chat
-tags: [agent-chat, composer, image, drag-drop, multimodal, vision, limits]
-status: verified
+tags: [agent-chat, composer, image, drag-drop, multimodal, limits]
+status: untested
 severity: high
 date: 2026-07-30
-updated: 2026-07-30
+updated: 2026-11-13
 automatable: false
 covered_by:
-  - editor/lib/agent-chat/image-attachment.test.ts
-  - editor/lib/agent-chat/input-resource-router.test.ts
-  - packages/grida-ai-agent/src/runtime/runtime.live.test.ts
+  - editor/lib/agent-chat/native-chat-controller.test.ts
+  - desktop/src/main/native-agent-images.test.ts
 ---
 
 ## Behavior
 
-A large raster dropped into a workspace-bound agent composer remains
-perceivable without sending provider-hostile source bytes. The provider-native
-representation is bounded independently from the byte-exact scratch twin, so
-provider limits do not silently make the attachment unusable.
+Native chat accepts one PNG of at most 256 KiB within the supported image
+dimensions. A larger PNG is not resized or sent. The composer explains the
+limit, keeps the typed text, and blocks the send until the person removes or
+replaces the attachment. Nothing reaches the model.
 
 ## Steps
 
-1. Open the desktop app, open a workspace, and focus the agent composer.
-2. From Finder, drop the checked-in asset `editor/public/west/poster.png`
-   (2,910 × 4,338 px; 303,282 bytes; SHA-256
-   `4439944baae26bd9895274f50445d9f16036457626714bb3297fee189e7b2c99`).
-   Its 4,338 px longest edge deterministically exceeds the 1,568 px provider
-   representation ceiling while its original bytes fit the scratch budget.
-   - Expected: a thumbnail chip appears without an attachment error.
-3. Send "What is shown in this black-and-white image?"
-   - Expected: the model identifies multiple cowboys riding horses (and may
-     mention birds or smoke) without a provider size error.
+1. Open Desktop, open a workspace, and focus the native agent composer.
+2. Type "What is shown in this image?".
+3. From Finder, drop the checked-in asset `editor/public/west/poster.png`
+   (303,282 bytes, above the 256 KiB limit).
+   - Expected: the composer says to choose a PNG of at most 256 KiB and the
+     typed text remains.
+4. Try to send.
+   - Expected: nothing is sent and the draft stays.
+5. Remove the attachment and attach a PNG under 256 KiB, then send.
+   - Expected: the message and image send together.
 
 ## Notes
 
-- Downscaling affects only the provider-native perception representation. When
-  the scratch budget permits, file operations use the original bytes.
-- The byte caps and provider representation are covered by
-  `image-attachment.test.ts` and `input-resource-router.test.ts`; the operating
-  system drop gesture remains manual.
-- 2026-07-30: Manually verified in local Grida Desktop with an oversized
-  raster; it produced a thumbnail and remained perceivable without a provider
-  size error. The checked-in high-resolution asset above makes future runs
-  deterministic without modifying the engine-owned image fixture snapshot.
+- The previous chat downscaled a large raster for the provider and kept the
+  original in scratch. Native chat refuses it instead.
+- The Main test refuses a PNG one byte over the limit before any request.

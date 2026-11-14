@@ -18,6 +18,9 @@
         "openai/gpt-5.6-luna": {
           "status": "listed"
         },
+        "openai/gpt-6.1-terra": {
+          "status": "listed"
+        },
         "openai/gpt-6-astra": {
           "status": "listed"
         },

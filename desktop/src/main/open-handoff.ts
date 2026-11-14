@@ -64,13 +64,17 @@ export namespace open_handoff {
   /**
    * Classify command-line arguments into opens (Windows/Linux file
    * associations + `grida://` deep links). Content-based, not
-   * position-based: the exec path, app dir (`.`), and flags simply don't
-   * classify, so callers can pass the whole `argv` / `second-instance`
-   * `commandLine` without trimming. Order is preserved.
+   * position-based. Long options before `--` cannot open documents, even
+   * when an option value ends in a supported suffix. Order is preserved.
    */
   export function fromArgv(argv: readonly string[]): Open[] {
     const opens: Open[] = [];
+    let options = true;
     for (const arg of argv) {
+      if (options && arg.startsWith("--")) {
+        if (arg === "--") options = false;
+        continue;
+      }
       if (DEEP_LINK_SCHEMES.some((scheme) => arg.startsWith(`${scheme}://`)))
         opens.push({ kind: "url", url: arg });
       else if (isSupportedFile(arg) || isCanvasBundle(arg))

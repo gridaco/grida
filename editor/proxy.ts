@@ -132,14 +132,14 @@ export async function proxy(req: NextRequest) {
   }
   // #endregion maintenance mode
 
-  // GRIDA-SEC-004 — Desktop agent sidecar trust boundary.
+  // GRIDA-SEC-004 — Desktop services sidecar trust boundary.
   //
   // Every `/desktop/*` response carries a strict CSP that blocks
   // third-party scripts (analytics, sentry, marketing tags) from
   // running inside the desktop renderer. Without this, an XSS in a
   // future third-party include — or in user-generated content rendered
   // through grida.co — could call `window.grida.*` and reach the
-  // agent sidecar. Headers are scoped to `/desktop/*`; the rest of grida.co
+  // services sidecar. Headers are scoped to `/desktop/*`; the rest of grida.co
   // is unaffected — the per-request work below runs only when
   // `isDesktop` holds, so non-desktop requests pay only one pathname
   // compare on this proxy.
@@ -160,7 +160,7 @@ export async function proxy(req: NextRequest) {
   // nonce.
   //
   // The other GRIDA-SEC-004 layers (path-scoped preload,
-  // `contextIsolation: true`, agent sidecar Basic Auth, agent sidecar Referer check)
+  // `contextIsolation: true`, services sidecar Basic Auth, services sidecar Referer check)
   // remain load-bearing; CSP is one layer, not the only boundary.
   const desktopHeaders = await prepareDesktopHeaders(req);
 

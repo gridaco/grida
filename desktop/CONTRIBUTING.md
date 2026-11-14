@@ -17,7 +17,7 @@ Before you start, ensure you have the following installed on your Mac:
   [Installation instructions](https://brew.sh/)
 
 - **Node.js**  
-  We recommend using Node.js 18 or later. Install via Homebrew or [nvm](https://github.com/nvm-sh/nvm).
+  Use the version pinned in the repository's `.nvmrc`. Install via Homebrew or [nvm](https://github.com/nvm-sh/nvm).
 
 - **pnpm**
   This project uses pnpm for package management.
@@ -142,23 +142,17 @@ convert icon.png -define icon:auto-resize=256,128,64,48,32,16 icon.ico
 
 ## Building for each platform
 
-**Mac** (runs only on mac device)
+Install the repository's pinned Rust toolchain and a native linker on the
+build machine. Build one architecture at a time so Forge can run the installed
+agent before it makes the installer.
 
-```bash
-pnpm make --arch="x64,arm64,universal"
+```sh
+pnpm --dir desktop make
 ```
 
-**Windows** (recommeded to run windows device)
-
-```bash
-pnpm make --arch="x64,arm64"
-```
-
-**Linux**
-
-```bash
-pnpm make --platform=linux --arch="x64,arm64"
-```
+Run the command on macOS or Linux x64 or arm64, or on Windows x64. See
+[Distributions](./README.md#distributions) for packaging with prebuilt native
+artifacts.
 
 ## Releasing
 

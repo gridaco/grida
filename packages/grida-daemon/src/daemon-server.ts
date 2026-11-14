@@ -4,9 +4,8 @@
  * GRIDA-SEC-004 — the authenticated perimeter is identical in listening and
  * socketless host-delivered modes; socket ownership cannot bypass middleware.
  *
- * The architecture blueprint (docs/wg/ai/grida/architecture.md) makes
- * this the one class host adapters and the CLI construct, start, deliver
- * Requests through, and stop. The exposed contract is intentionally tiny:
+ * TypeScript hosts construct, start, and stop this server. They can deliver
+ * requests through its listener or the same perimeter through `fetch()`.
  *
  *   - `constructor(opts)` — wire config + the static tenant list.
  *   - `start()`           — build the Hono app and, by default, bind a
@@ -19,8 +18,8 @@
  *
  * The daemon owns the perimeter and its capability stores (files,
  * recents, workspaces, secrets store); everything else is a tenant
- * (issue #927) mounted through the `DaemonTenant` seam — the Grida AI
- * agent is one such tenant (`@grida/agent/server`), not the owner. The
+ * mounted through the `DaemonTenant` seam — the media tenant
+ * (`@grida/ai-host/media-server`) is one such tenant, not the owner. The
  * public surface — `constructor / start / fetch / stop` — does not change
  * when internals move.
  */
@@ -55,11 +54,13 @@ export type DaemonServerOptions = {
   provider_home?: string;
   /**
    * GRIDA-SEC-004 — host-injected managed root for the auto-create flow
-   * (`POST /workspaces/create`). The desktop supervisor passes `~/Documents/Grida Projects`;
-   * CLI/dev leave it unset (auto-create then refuses). Forwarded to
-   * {@link ServerOptions} by the `...opts` spread below.
+   * (`POST /workspaces/create`). The desktop supervisor passes
+   * `~/Documents/Grida Projects`. Without a managed root, auto-create refuses.
    */
   projects_root?: string;
+  workspace_catalog?: string;
+  /** Trusted native profile exclusions, forwarded to the file and workspace routes. */
+  protected_file_roots?: ServerOptions["protected_file_roots"];
   /**
    * Host-injected dedicated root for durable binary media. This is distinct
    * from the daemon's secret/session `user_data_path` and from workspaces.
@@ -73,8 +74,8 @@ export type DaemonServerOptions = {
   port?: number;
   /**
    * Capability tenants to mount behind the perimeter — a static, typed
-   * list the composer supplies (`@grida/agent/server` composes the agent
-   * tenant). An empty list is a valid, bare daemon.
+   * list the composer supplies (`@grida/ai-host/media-server` composes the
+   * media tenant). An empty list is a valid, bare daemon.
    */
   tenants?: readonly DaemonTenant[];
 };
@@ -333,10 +334,9 @@ export class DaemonServer {
   /**
    * Stop the daemon. Order matters:
    *   1. Refuse new Requests and close the socket when one is present.
-   *   2. Drain in-flight tenant work — e.g. the agent tenant aborts each
-   *      upstream model call. Done BEFORE tenant cleanup so any recorder
-   *      reacting to the abort can finalize its partial assistant message
-   *      against an open SQLite handle.
+   *   2. Drain in-flight tenant work — e.g. the media tenant aborts each
+   *      upstream provider call. Done BEFORE tenant cleanup so work reacting
+   *      to the abort still finds its tenant stores open.
    *   3. Abort direct Request handlers, cancel their returned Response bodies,
    *      and wait for both to settle.
    *   4. Close tenant + daemon per-launch state via the BuiltServer

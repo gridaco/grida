@@ -203,6 +203,11 @@ export namespace models {
       outputLimit: number;
       /** Cost per 1M tokens in USD. */
       cost: ModelCostPerMillion;
+      /**
+       * Providers whose binding of this model accepts a reasoning level.
+       * Optional so custom models and older snapshots remain readable.
+       */
+      readonly reasoningProviders?: readonly string[];
     }
 
     /** A bundled text-model spec. Unlike the snapshot-compatible base shape,
@@ -240,6 +245,7 @@ export namespace models {
               outputMultiplier: 1.5,
             },
           },
+          reasoningProviders: ["grida", "openai", "openrouter", "vercel"],
         },
         "openai/gpt-5.5-pro": {
           id: "openai/gpt-5.5-pro",
@@ -263,6 +269,7 @@ export namespace models {
             input: 30,
             output: 180,
           },
+          reasoningProviders: ["grida", "openai", "openrouter", "vercel"],
         },
         "openai/gpt-5.6-sol": {
           id: "openai/gpt-5.6-sol",
@@ -293,6 +300,7 @@ export namespace models {
               outputMultiplier: 1.5,
             },
           },
+          reasoningProviders: ["grida", "openai", "openrouter", "vercel"],
         },
         "openai/gpt-5.6-terra": {
           id: "openai/gpt-5.6-terra",
@@ -323,6 +331,7 @@ export namespace models {
               outputMultiplier: 1.5,
             },
           },
+          reasoningProviders: ["grida", "openai", "openrouter", "vercel"],
         },
         "openai/gpt-5.6-luna": {
           id: "openai/gpt-5.6-luna",
@@ -353,6 +362,38 @@ export namespace models {
               outputMultiplier: 1.5,
             },
           },
+          reasoningProviders: ["grida", "openai", "openrouter", "vercel"],
+        },
+        "openai/gpt-6.1-terra": {
+          id: "openai/gpt-6.1-terra",
+          label: "GPT-6.1 Terra",
+          release: {
+            date: "2026-10-26",
+            basis: "model",
+            source_url: "https://developers.openai.com/api/docs/changelog",
+          },
+          multimodal: true,
+          imageInputMimes: [
+            "image/png",
+            "image/jpeg",
+            "image/webp",
+            "image/gif",
+          ],
+          tool_call: true,
+          contextWindow: 1050000,
+          outputLimit: 128000,
+          cost: {
+            input: 1,
+            output: 5,
+            cacheRead: 0.05,
+            cacheWrite: 1.25,
+            longContext: {
+              inputTokensAbove: 272000,
+              inputMultiplier: 2,
+              outputMultiplier: 1.5,
+            },
+          },
+          reasoningProviders: ["grida", "openai", "openrouter", "vercel"],
         },
         "openai/gpt-6-astra": {
           id: "openai/gpt-6-astra",
@@ -383,6 +424,7 @@ export namespace models {
               outputMultiplier: 1.5,
             },
           },
+          reasoningProviders: ["grida", "openai", "openrouter", "vercel"],
         },
         "anthropic/claude-sonnet-5": {
           id: "anthropic/claude-sonnet-5",
@@ -410,6 +452,7 @@ export namespace models {
             cacheWrite: 2.5,
           },
           short_label: "Sonnet 5",
+          reasoningProviders: ["anthropic", "grida", "openrouter", "vercel"],
         },
         "anthropic/claude-fable-5.1": {
           id: "anthropic/claude-fable-5.1",
@@ -437,6 +480,7 @@ export namespace models {
             cacheWrite: 12.5,
           },
           short_label: "Fable 5.1",
+          reasoningProviders: ["anthropic", "grida", "openrouter", "vercel"],
         },
         "anthropic/claude-fable-5": {
           id: "anthropic/claude-fable-5",
@@ -464,6 +508,7 @@ export namespace models {
             cacheWrite: 12.5,
           },
           short_label: "Fable 5",
+          reasoningProviders: ["anthropic", "grida", "openrouter", "vercel"],
         },
         "anthropic/claude-opus-5": {
           id: "anthropic/claude-opus-5",
@@ -491,6 +536,7 @@ export namespace models {
             cacheWrite: 6.25,
           },
           short_label: "Opus 5",
+          reasoningProviders: ["anthropic", "grida", "openrouter", "vercel"],
         },
         "anthropic/claude-opus-4.8": {
           id: "anthropic/claude-opus-4.8",
@@ -518,6 +564,7 @@ export namespace models {
             cacheWrite: 6.25,
           },
           short_label: "Opus 4.8",
+          reasoningProviders: ["anthropic", "grida", "openrouter", "vercel"],
         },
         "google/gemini-3.8-flash": {
           id: "google/gemini-3.8-flash",
@@ -543,6 +590,7 @@ export namespace models {
             output: 7.5,
             cacheRead: 0.15,
           },
+          reasoningProviders: ["google", "grida", "openrouter", "vercel"],
         },
         "google/gemini-3.7-flash": {
           id: "google/gemini-3.7-flash",
@@ -568,6 +616,7 @@ export namespace models {
             output: 7.5,
             cacheRead: 0.15,
           },
+          reasoningProviders: ["google", "grida", "openrouter", "vercel"],
         },
         "google/gemini-3.1-pro-preview": {
           id: "google/gemini-3.1-pro-preview",
@@ -599,6 +648,7 @@ export namespace models {
             },
           },
           short_label: "Gemini 3.1 Pro",
+          reasoningProviders: ["google", "grida", "openrouter", "vercel"],
         },
       } /* generated:facts:text.catalog:end */ as const satisfies Record<
         string,

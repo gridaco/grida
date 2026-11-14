@@ -1,0 +1,157 @@
+import { readFileSync } from "node:fs";
+import { describe, expect, it, vi } from "vitest";
+import { ProviderHttp } from "./http";
+import { probeEndpointModels } from "./probe";
+import { ImageClient, VideoClient } from "@grida/ai";
+
+describe("ProviderHttp", () => {
+  it("endpoint discovery uses request, never download", async () => {
+    const request = vi.fn<typeof globalThis.fetch>(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/api/tags")) {
+        return new Response(
+          JSON.stringify({
+            models: [{ name: "local-model", capabilities: ["tools"] }],
+          }),
+          { status: 200 }
+        );
+      }
+      if (url.endsWith("/api/ps")) {
+        return new Response(
+          JSON.stringify({
+            models: [{ name: "local-model", context_length: 4096 }],
+          }),
+          { status: 200 }
+        );
+      }
+      return new Response("not found", { status: 404 });
+    });
+    const download = vi.fn<typeof globalThis.fetch>();
+    const http = new ProviderHttp({ request, download });
+
+    const result = await probeEndpointModels(
+      "http://localhost:11434/v1",
+      http.request
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      source: "ollama",
+      models: [{ id: "local-model", tool_call: true, contextWindow: 4096 }],
+    });
+    expect(request.mock.calls.map(([input]) => String(input))).toEqual([
+      "http://localhost:11434/api/tags",
+      "http://localhost:11434/v1/models",
+      "http://localhost:11434/api/ps",
+    ]);
+    expect(download).not.toHaveBeenCalled();
+  });
+
+  it("bounds transport concurrency while enriching a 64-model Ollama listing", async () => {
+    const modelIds = Array.from({ length: 64 }, (_, index) => `model-${index}`);
+    let activeShowRequests = 0;
+    let maxActiveShowRequests = 0;
+    let showRequests = 0;
+    const showModels: string[] = [];
+    const request = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith("/api/tags")) {
+        return new Response(
+          JSON.stringify({ models: modelIds.map((name) => ({ name })) }),
+          { status: 200 }
+        );
+      }
+      if (url.endsWith("/v1/models")) {
+        return new Response("not found", { status: 404 });
+      }
+      if (url.endsWith("/api/ps")) {
+        return new Response(JSON.stringify({ models: [] }), { status: 200 });
+      }
+      if (url.endsWith("/api/show")) {
+        const body = JSON.parse(String(init?.body)) as { model: string };
+        showModels.push(body.model);
+        showRequests++;
+        activeShowRequests++;
+        maxActiveShowRequests = Math.max(
+          maxActiveShowRequests,
+          activeShowRequests
+        );
+        // Hold each request for one event-loop turn so an accidental
+        // Promise.all(models) burst is observable deterministically.
+        await new Promise<void>((resolve) => setTimeout(resolve, 1));
+        activeShowRequests--;
+        return new Response(
+          JSON.stringify({
+            model_info: { "test.context_length": 32_768 },
+          }),
+          { status: 200 }
+        );
+      }
+      throw new Error(`unexpected provider request: ${url}`);
+    });
+    const download = vi.fn<typeof globalThis.fetch>();
+    const http = new ProviderHttp({ request, download });
+
+    const result = await probeEndpointModels(
+      "http://localhost:11434/v1",
+      http.request
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.models).toHaveLength(64);
+    expect(result.models.every((model) => model.contextWindow === 32_768)).toBe(
+      true
+    );
+    expect(showRequests).toBe(64);
+    expect([...showModels].sort()).toEqual([...modelIds].sort());
+    expect(maxActiveShowRequests).toBeLessThanOrEqual(8);
+    expect(download).not.toHaveBeenCalled();
+  });
+
+  it("OpenRouter and Vercel AI Gateway media SDK calls use request", async () => {
+    const urls: string[] = [];
+    const request: typeof globalThis.fetch = async (input) => {
+      urls.push(String(input));
+      throw new Error("transport sentinel");
+    };
+    const download = vi.fn<typeof globalThis.fetch>();
+    const http = new ProviderHttp({ request, download });
+
+    const images = new ImageClient({
+      keys: { get: () => "synthetic-key" },
+      http,
+    });
+    for (const provider of ["openrouter", "vercel"] as const) {
+      const operation = await images.resolve({
+        model_id: "openai/gpt-image-2",
+        provider,
+      });
+      await operation.generate({ prompt: "image" }).catch(() => undefined);
+    }
+    const video = await new VideoClient({
+      keys: { get: () => "synthetic-key" },
+      http,
+    }).resolve({ model_id: "google/veo-3.1", provider: "vercel" });
+    await video.generate({ prompt: "video" }).catch(() => undefined);
+
+    expect(urls).toEqual([
+      "https://openrouter.ai/api/v1/images",
+      "https://ai-gateway.vercel.sh/v3/ai/image-model",
+      "https://ai-gateway.vercel.sh/v3/ai/video-model",
+    ]);
+    expect(download).not.toHaveBeenCalled();
+  });
+
+  it("stays out of the neutral client API", () => {
+    // These are capability boundaries, not merely call-site conventions. A
+    // future import would hand network execution to code outside the provider
+    // layer and must be an explicit contract review.
+    const foreignSurfaces = ["../index.ts"];
+
+    for (const path of foreignSurfaces) {
+      const source = readFileSync(new URL(path, import.meta.url), "utf8");
+      expect(source).not.toMatch(/ProviderHttp|providers\/http/);
+    }
+  });
+});
