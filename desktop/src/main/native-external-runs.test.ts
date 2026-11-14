@@ -153,8 +153,13 @@ const linuxProcess = () =>
   );
 afterEach(() => vi.unstubAllGlobals());
 
+// These waits observe real child processes starting and settling, which can
+// take seconds on a loaded machine.
+const PROCESS_WAIT = { timeout: 15_000, interval: 25 };
+
 describe.skipIf(process.platform === "win32")(
   "Main-owned external ACP runs",
+  { timeout: 60_000 },
   () => {
     it("admits only an explicit native Linux launcher option before the separator", () => {
       const option = "--native-external-acp-profile=/private/reviewed.canvas";
@@ -273,11 +278,13 @@ describe.skipIf(process.platform === "win32")(
         });
         const stopped = randomUUID();
         await ipc.start(event, stopped, "hold");
-        await vi.waitFor(async () =>
-          expect((await ipc.status(event))?.run).toMatchObject({
-            runId: stopped,
-            disposition: "running",
-          })
+        await vi.waitFor(
+          async () =>
+            expect((await ipc.status(event))?.run).toMatchObject({
+              runId: stopped,
+              disposition: "running",
+            }),
+          PROCESS_WAIT
         );
         expect(await ipc.stop(event, stopped)).toMatchObject({
           disposition: "cancelled",
@@ -285,11 +292,13 @@ describe.skipIf(process.platform === "win32")(
         });
         const id = randomUUID();
         await ipc.start(event, id, "hold");
-        await vi.waitFor(async () =>
-          expect((await ipc.status(event))?.run).toMatchObject({
-            runId: id,
-            disposition: "running",
-          })
+        await vi.waitFor(
+          async () =>
+            expect((await ipc.status(event))?.run).toMatchObject({
+              runId: id,
+              disposition: "running",
+            }),
+          PROCESS_WAIT
         );
         await catalog.forget(workspace.id);
         expect(await catalog.find(workspace.id)).toBeNull();
@@ -322,8 +331,10 @@ describe.skipIf(process.platform === "win32")(
           runId: id,
           disposition: "starting",
         });
-        await vi.waitFor(async () =>
-          expect((await owner!.observe(id)).disposition).toBe("succeeded")
+        await vi.waitFor(
+          async () =>
+            expect((await owner!.observe(id)).disposition).toBe("succeeded"),
+          PROCESS_WAIT
         );
         const original = await owner.observe(id);
         expect(original).toEqual({
@@ -365,8 +376,10 @@ describe.skipIf(process.platform === "win32")(
         expect(test.launches()).toHaveLength(1);
         const next = randomUUID();
         await owner.start(next, "bad echo", current);
-        await vi.waitFor(async () =>
-          expect((await owner!.observe(next)).disposition).toBe("succeeded")
+        await vi.waitFor(
+          async () =>
+            expect((await owner!.observe(next)).disposition).toBe("succeeded"),
+          PROCESS_WAIT
         );
         expect(await owner.observe(id)).toEqual(original);
         expect(test.launches()).toHaveLength(2);
@@ -384,8 +397,10 @@ describe.skipIf(process.platform === "win32")(
         owner = await NativeExternalRuns.open(test.options);
         const id = randomUUID();
         await owner.start(id, "hold", current);
-        await vi.waitFor(async () =>
-          expect((await owner!.observe(id)).disposition).toBe("running")
+        await vi.waitFor(
+          async () =>
+            expect((await owner!.observe(id)).disposition).toBe("running"),
+          PROCESS_WAIT
         );
         expect((await owner.start(id, "hold", current)).disposition).toBe(
           "running"
@@ -406,8 +421,10 @@ describe.skipIf(process.platform === "win32")(
         });
         const next = randomUUID();
         await owner.start(next, "hold", current);
-        await vi.waitFor(async () =>
-          expect((await owner!.observe(next)).disposition).toBe("running")
+        await vi.waitFor(
+          async () =>
+            expect((await owner!.observe(next)).disposition).toBe("running"),
+          PROCESS_WAIT
         );
         await owner.close();
         expect(await owner.observe(next)).toMatchObject({
@@ -432,8 +449,10 @@ describe.skipIf(process.platform === "win32")(
         owner = await NativeExternalRuns.open(test.options);
         const id = randomUUID();
         await owner.start(id, "uncertain", current);
-        await vi.waitFor(async () =>
-          expect((await owner!.observe(id)).disposition).toBe("uncertain")
+        await vi.waitFor(
+          async () =>
+            expect((await owner!.observe(id)).disposition).toBe("uncertain"),
+          PROCESS_WAIT
         );
         await expect(owner.close()).rejects.toThrow(
           "native_external_shutdown_unverified"
