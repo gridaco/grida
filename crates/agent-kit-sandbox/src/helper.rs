@@ -9,7 +9,9 @@ use std::io::{Read, Write};
 use std::os::fd::{AsFd, AsRawFd, FromRawFd, IntoRawFd};
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::OpenOptionsExt;
-use std::os::unix::process::{CommandExt, ExitStatusExt};
+#[cfg(target_os = "linux")]
+use std::os::unix::process::CommandExt;
+use std::os::unix::process::ExitStatusExt;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex, mpsc};
@@ -117,6 +119,8 @@ struct Terminal {
 struct Primary {
     relay: File,
     interrupt: File,
+    /// Given to the payload as its stdio and controlling terminal.
+    secondary: Option<File>,
 }
 
 /// The launched payload, as the helper may still signal it.
@@ -200,7 +204,7 @@ impl Payload {
         }
     }
 
-    fn reap(&self, child: &mut Child) -> std::io::Result<std::process::ExitStatus> {
+    fn reap(&self, child: &mut Launched) -> std::io::Result<std::process::ExitStatus> {
         *self
             .unreaped
             .lock()
@@ -239,62 +243,38 @@ fn supervise(mut status: File, spec: Spec) -> bool {
             }
             Mode::Terminal => {
                 let terminal = open_terminal()?;
-                command
-                    .stdin(Stdio::from(terminal.secondary.try_clone()?))
-                    .stdout(Stdio::from(terminal.secondary.try_clone()?))
-                    .stderr(Stdio::from(terminal.secondary.try_clone()?));
-                // Between fork and exec only async-signal-safe calls run.
-                // Stdio is already the terminal, so it becomes the new
-                // session's controlling terminal.
-                // The child cannot format an error, so it names the failing
-                // call on a close-on-exec copy of the helper's stderr.
-                let diagnostics =
-                    unsafe { libc::fcntl(libc::STDERR_FILENO, libc::F_DUPFD_CLOEXEC, 3) };
-                eprintln!("DIAGNOSTIC: diagnostics fd {diagnostics}");
-                unsafe {
-                    command.pre_exec(move || {
-                        let fail = |message: &[u8]| {
-                            let error = std::io::Error::last_os_error();
-                            if diagnostics >= 0 {
-                                libc::write(diagnostics, message.as_ptr().cast(), message.len());
-                            }
-                            Err(error)
-                        };
-                        if libc::setsid() < 0 {
-                            return fail(b"agent-kit-sandbox: terminal payload setsid failed\n");
-                        }
-                        if libc::ioctl(0, libc::TIOCSCTTY as _, 0 as libc::c_int) < 0 {
-                            return fail(b"agent-kit-sandbox: terminal payload TIOCSCTTY failed\n");
-                        }
-                        let probe = b"DIAGNOSTIC: terminal claimed, executing\n";
-                        libc::write(diagnostics, probe.as_ptr().cast(), probe.len());
-                        Ok(())
-                    });
-                }
                 let interrupt = terminal.primary.try_clone()?;
-                // Only the command's copies of the secondary end remain.
                 Ok((
                     Some(Primary {
                         relay: terminal.primary,
                         interrupt,
+                        secondary: Some(terminal.secondary),
                     }),
                     None,
                 ))
             }
         }
     })();
-    let (primary, null) = match prepared {
+    let (mut primary, null) = match prepared {
         Ok(prepared) => prepared,
         Err(error) => return setup_failed(&mut status, "stdio", &error),
     };
-    let mut child = match command.spawn() {
+    let secondary = primary
+        .as_mut()
+        .and_then(|primary| primary.secondary.take());
+    let launched = match &secondary {
+        Some(terminal) => spawn_terminal(&spec, terminal).map(Launched::Forked),
+        None => command.spawn().map(Launched::Spawned),
+    };
+    let mut child = match launched {
         Ok(child) => child,
         Err(error) => return setup_failed(&mut status, "spawn", &error),
     };
-    // The command's copies of the secondary end close with it, so the
+    // Only the payload's copies of the secondary end remain, so the
     // terminal's output ends once the payload's processes close theirs.
+    drop(secondary);
     drop(command);
-    let pid = child.id() as i32;
+    let pid = child.id();
     let (relay, primary) = primary.map_or((None, None), |primary| {
         (Some(primary.relay), Some(primary.interrupt))
     });
@@ -418,6 +398,143 @@ fn ignore_interrupts() -> std::io::Result<()> {
         }
     }
     Ok(())
+}
+
+/// A payload the helper started and must reap.
+enum Launched {
+    Spawned(Child),
+    /// A terminal payload, forked by the helper itself. On Linux the standard
+    /// library reports exec failures over a socket pair, which the syscall
+    /// filter denies, so it cannot start a payload that needs setup between
+    /// fork and exec.
+    Forked(i32),
+}
+
+impl Launched {
+    fn id(&self) -> i32 {
+        match self {
+            Self::Spawned(child) => child.id() as i32,
+            Self::Forked(pid) => *pid,
+        }
+    }
+
+    #[allow(unsafe_code)]
+    fn wait(&mut self) -> std::io::Result<std::process::ExitStatus> {
+        let pid = match self {
+            Self::Spawned(child) => return child.wait(),
+            Self::Forked(pid) => *pid,
+        };
+        loop {
+            let mut status = 0;
+            if unsafe { libc::waitpid(pid, &mut status, 0) } == pid {
+                return Ok(std::process::ExitStatus::from_raw(status));
+            }
+            let error = std::io::Error::last_os_error();
+            if error.kind() != std::io::ErrorKind::Interrupted {
+                return Err(error);
+            }
+        }
+    }
+}
+
+/// Start a terminal payload as a new session whose stdio and controlling
+/// terminal are `terminal`. The child reports a failed step and its errno
+/// over a close-on-exec pipe; an empty pipe means exec succeeded.
+#[allow(unsafe_code)]
+fn spawn_terminal(spec: &Spec, terminal: &File) -> std::io::Result<i32> {
+    use std::ffi::CString;
+    const STEPS: [&str; 5] = ["setsid", "stdio", "TIOCSCTTY", "chdir", "execve"];
+    let c_string = |bytes: &[u8]| {
+        CString::new(bytes).map_err(|_| std::io::Error::from(std::io::ErrorKind::InvalidInput))
+    };
+    let program = c_string(spec.executable.as_os_str().as_bytes())?;
+    let cwd = c_string(spec.cwd.as_os_str().as_bytes())?;
+    let mut arguments = vec![program.clone()];
+    for argument in &spec.arguments {
+        arguments.push(c_string(argument.as_bytes())?);
+    }
+    let mut environment = Vec::with_capacity(spec.environment.len());
+    for (name, value) in &spec.environment {
+        environment.push(c_string(format!("{name}={value}").as_bytes())?);
+    }
+    let pointers = |strings: &[CString]| {
+        strings
+            .iter()
+            .map(|string| string.as_ptr())
+            .chain(std::iter::once(std::ptr::null()))
+            .collect::<Vec<_>>()
+    };
+    let argv = pointers(&arguments);
+    let envp = pointers(&environment);
+    let mut report = [0; 2];
+    if unsafe { libc::pipe(report.as_mut_ptr()) } != 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    let [read_end, write_end] = report;
+    let reader = unsafe { File::from_raw_fd(read_end) };
+    let writer = unsafe { File::from_raw_fd(write_end) };
+    for fd in report {
+        if unsafe { libc::fcntl(fd, libc::F_SETFD, libc::FD_CLOEXEC) } < 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+    }
+    let secondary = terminal.as_raw_fd();
+    let pid = unsafe { libc::fork() };
+    if pid < 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    if pid == 0 {
+        // Between fork and exec only async-signal-safe calls run.
+        unsafe {
+            let fail = |step: u8| -> ! {
+                let errno = std::io::Error::last_os_error()
+                    .raw_os_error()
+                    .unwrap_or(libc::EINVAL)
+                    .to_be_bytes();
+                let frame = [step, errno[0], errno[1], errno[2], errno[3]];
+                libc::write(write_end, frame.as_ptr().cast(), frame.len());
+                libc::_exit(127)
+            };
+            // Start from the default signal state, as a spawned process does;
+            // the helper's runtime ignores SIGPIPE, which exec would keep.
+            let mut empty = std::mem::zeroed::<libc::sigset_t>();
+            libc::sigemptyset(&mut empty);
+            libc::pthread_sigmask(libc::SIG_SETMASK, &empty, std::ptr::null_mut());
+            libc::signal(libc::SIGPIPE, libc::SIG_DFL);
+            if libc::setsid() < 0 {
+                fail(0);
+            }
+            for target in 0..3 {
+                if libc::dup2(secondary, target) < 0 {
+                    fail(1);
+                }
+            }
+            if libc::ioctl(0, libc::TIOCSCTTY as _, 0 as libc::c_int) < 0 {
+                fail(2);
+            }
+            if libc::chdir(cwd.as_ptr()) < 0 {
+                fail(3);
+            }
+            libc::execve(program.as_ptr(), argv.as_ptr(), envp.as_ptr());
+            fail(4)
+        }
+    }
+    drop(writer);
+    let mut frame = Vec::new();
+    let read = (&reader).take(5).read_to_end(&mut frame);
+    if matches!(read, Ok(0)) {
+        return Ok(pid);
+    }
+    let mut failed = Launched::Forked(pid);
+    let _ = failed.wait();
+    Err(match frame.as_slice() {
+        [step, a, b, c, d] => {
+            let error = std::io::Error::from_raw_os_error(i32::from_be_bytes([*a, *b, *c, *d]));
+            let step = STEPS.get(usize::from(*step)).copied().unwrap_or("unknown");
+            std::io::Error::new(error.kind(), format!("{step}: {error}"))
+        }
+        _ => std::io::Error::other("terminal payload start was not confirmed"),
+    })
 }
 
 #[allow(unsafe_code)]
