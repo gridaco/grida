@@ -56,6 +56,11 @@ bounded host-owned lifetime. Abrupt process loss cannot promise that cleanup ran
 A completion check and explicit user Stop have different authority. Additional
 verification uses the same task limits and controls. A completion hook cannot
 overrule Stop, resume a paused task, or create an unbounded continuation loop.
+Its view of the proposal is bounded independently of turn length: the outcome
+status, a prefix of the answer, summary counts, a bounded sample of evidence
+with its total, and an identity for the complete candidate. Accumulated
+diagnostics stay with the settled outcome, so a long verification loop does not
+grow the event it reviews.
 
 ## Selection and execution
 

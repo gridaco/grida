@@ -346,6 +346,28 @@ fn proposal(evidence: Vec<OperationId>) -> TurnOutcome {
     }
 }
 
+/// A proposal carrying the master account a lifecycle completion event reads.
+fn answered(evidence: Vec<OperationId>) -> TurnOutcome {
+    let account = json!({
+        "text": "Finished.",
+        "steps": 1,
+        "unresolved": [],
+        "tool_activity": {"succeeded": evidence.len(), "failed": 0, "cancelled": 0, "unresolved": 0},
+        "inference_usage": {"observations": [], "unreported_attempts": []},
+    });
+    TurnOutcome {
+        account: Some(
+            agent_kit_core::Envelope::new(
+                agent_kit_core::SchemaId::new("grida.agent.account").unwrap(),
+                1,
+                serde_json::to_vec(&account).unwrap(),
+            )
+            .unwrap(),
+        ),
+        ..proposal(evidence)
+    }
+}
+
 async fn suspend(turn: &mut Turn) {
     let view = turn.view();
     assert!(matches!(
@@ -944,7 +966,7 @@ async fn lifecycle_interruption_preserves_unknown_outcomes_without_replaying_aft
         let occurrence = HookOccurrence::new(
             &turn.view(),
             HookMoment::BeforeCompletion {
-                proposal: proposal(vec![effect.clone()]),
+                proposal: CompletionProposal::new(&answered(vec![effect.clone()])).unwrap(),
             },
         );
         let worker = tokio::spawn({

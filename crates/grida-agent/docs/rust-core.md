@@ -906,7 +906,7 @@ documents the profile fields, the handler input and replies, and inspection.
 | `before_input`      | At the master's decision boundary, with the retained user message                                |
 | `before_tool`       | After ordinary admission of the exact operation and before its attempt; authority is revalidated |
 | `after_tool`        | After the recorded outcome; the actual effect is preserved                                       |
-| `before_completion` | At the completion boundary, with the proposed outcome                                            |
+| `before_completion` | At the completion boundary, with a bounded summary of the proposed outcome                       |
 
 The master owns the captured selection, event dispatch, and result
 interpretation. The host owns discovery, review, executables, confinement, and
@@ -917,7 +917,11 @@ its hook identity with the invocation.
 
 A `required` hook can deny its governed action. A failing `after_tool` check
 blocks only later dependent work or completion. A `before_completion` handler
-may instead request another model step within the original task allowance. An
+may instead request another model step within the original task allowance. Its
+event carries the proposal's status, answer prefix, step and tool counts,
+fingerprint, and a fixed number of named evidence operations with their total.
+It omits the accumulated hook results and usage, so its size does not depend on
+how many steps the turn has taken. An
 `observe` hook retains diagnostics and may contribute attributed context, but
 cannot reject an action or require another step. Hook output is labeled
 contextual data with its source and revision; it grants no access and never

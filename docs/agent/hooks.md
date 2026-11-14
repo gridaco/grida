@@ -71,7 +71,10 @@ badge.
 
 A check can allow or deny the step and add short context that names its
 source. A completion check can ask for more verification within the task's
-original allowance. It cannot override Stop, resume a paused task, or extend
+original allowance. A completion check reads a short summary of the proposed
+result on standard input: the first 4 KiB of the final answer, step and tool
+counts, and some of the recorded operations with their total. The summary stays
+the same size however long the task runs. It cannot override Stop, resume a paused task, or extend
 the allowance. Grida offers no check that runs when a task ends or is
 interrupted.
 

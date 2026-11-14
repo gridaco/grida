@@ -1614,6 +1614,57 @@ async fn completion_hooks_can_request_only_bounded_additional_work() {
     endpoint.done().await;
 }
 
+/// The handler process reads the bounded completion proposal on stdin: the
+/// answer and counts, never the accumulated account.
+const READ_COMPLETION_EVENT: &str = r#"IFS= read -r event
+case "$event" in
+  *'"account"'*) printf '%s' '{"decision":"deny","reason":"The event repeated the account."}' ;;
+  *'"proposal":{"fingerprint":'*'"text":"Checked the bounded answer."'*'"evidence_total":'*) printf '%s' '{"decision":"allow"}' ;;
+  *) printf '%s' '{"decision":"deny","reason":"The bounded proposal was missing."}' ;;
+esac"#;
+
+#[tokio::test]
+#[ignore = "requires a provisioned native sandbox helper"]
+async fn a_completion_hook_process_reads_the_bounded_proposal() {
+    let fixture = Fixture::new(true);
+    lifecycle_hooks(
+        &fixture,
+        &[("bounded", "before_completion", "required", None, "")],
+    );
+    let executable = Path::new("/bin/sh").canonicalize().unwrap();
+    let digest: [u8; 32] = Sha256::digest(fs::read(&executable).unwrap()).into();
+    let mut profile: Value = serde_json::from_slice(&fs::read(&fixture.profile).unwrap()).unwrap();
+    profile["hooks"][0]["executable"] = json!({"path":executable,"sha256":digest});
+    profile["hooks"][0]["arguments"] = json!(["-c", READ_COMPLETION_EVENT]);
+    fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
+    let mut endpoint = Endpoint::start(vec![Reply::Finished("Checked the bounded answer.")]).await;
+    let output = timeout(
+        WAIT,
+        fixture
+            .process(&endpoint.url, "run")
+            .arg("--cwd")
+            .arg(&fixture.primary)
+            .args(["--prompt", "Answer briefly."])
+            .output(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    let records = records(&output.stdout);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{records:?} {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result = &records[1]["account"]["lifecycle_hooks"][0];
+    assert_eq!(result["id"], "bounded", "{records:?}");
+    assert_eq!(result["status"], "allowed", "{records:?}");
+    endpoint.request().await;
+    assert!(endpoint.requests.try_recv().is_err());
+    endpoint.done().await;
+}
+
 #[tokio::test]
 #[ignore = "requires a provisioned native sandbox helper"]
 async fn registered_hook_changes_cannot_replace_a_paused_turns_captured_policy() {

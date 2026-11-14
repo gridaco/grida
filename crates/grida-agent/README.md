@@ -284,7 +284,40 @@ A handler reads one bounded JSON object on stdin:
 selection. `moment.event` names the event. Session start carries the control
 revision; input carries the retained user message; tool events carry the exact
 operation and validated invocation, with the recorded outcome for `after_tool`;
-completion carries the proposed outcome. Events are limited to 64 KiB. A handler
+completion carries a bounded summary of the proposed outcome:
+
+```json
+{
+  "event": "before_completion",
+  "proposal": {
+    "fingerprint": "<64 hex digits>",
+    "status": "succeeded",
+    "steps": 2,
+    "text": "Updated the export and verified the manifest.",
+    "text_truncated": false,
+    "tool_activity": {
+      "succeeded": 1,
+      "failed": 0,
+      "cancelled": 0,
+      "unresolved": 0
+    },
+    "evidence": [
+      "operation_<64 hex digits>",
+      "operation_<64 hex digits>",
+      "operation_<64 hex digits>"
+    ],
+    "evidence_total": 3
+  }
+}
+```
+
+`text` holds the first 4 KiB of the final answer, cut at a character boundary;
+`text_truncated` reports whether more followed. `evidence` names at most 32 of
+the proposal's operation identifiers in identifier order and `evidence_total`
+counts all of them. `fingerprint` identifies the complete proposal, so each new
+candidate after a requested step is a distinct occurrence. Earlier hook results,
+usage and other accumulated account history are not repeated, so the completion
+event does not grow with the turn. Events are limited to 64 KiB. A handler
 must exit zero and print one of these JSON replies on stdout:
 
 ```json

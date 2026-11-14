@@ -1638,6 +1638,26 @@ async fn step_limit_bounds_repeated_tool_calls_and_records_a_failed_account() {
 struct ContinueHook {
     definition: ToolDefinition,
     calls: AtomicUsize,
+    /// Serialized size of each received event, in call order.
+    event_bytes: Mutex<Vec<usize>>,
+}
+
+impl ContinueHook {
+    fn new() -> Arc<Self> {
+        Arc::new(Self {
+            definition: ToolDefinition {
+                id: ToolId::new("continue_hook").unwrap(),
+                version: 1,
+                description: "Ask for one more verification pass.".into(),
+                input: InputFormat::Json(serde_json::json!({"type":"object"})),
+                max_input_bytes: lifecycle_hooks::MAX_EVENT_BYTES,
+                max_output_bytes: 1024,
+                recovery: RecoveryKind::Unavailable,
+            },
+            calls: AtomicUsize::new(0),
+            event_bytes: Mutex::new(Vec::new()),
+        })
+    }
 }
 
 impl Tool for ContinueHook {
@@ -1654,9 +1674,15 @@ impl Tool for ContinueHook {
             .map_err(|_| Error::new(ErrorKind::InvalidInput, "hook_envelope"))
     }
 
-    fn invoke(&self, _: Invocation, _: InvocationContext) -> BoxFuture<'_, ToolOutcome> {
+    fn invoke(&self, invocation: Invocation, _: InvocationContext) -> BoxFuture<'_, ToolOutcome> {
         Box::pin(async move {
             self.calls.fetch_add(1, Ordering::SeqCst);
+            if let ToolArguments::Json(value) = invocation.arguments() {
+                self.event_bytes
+                    .lock()
+                    .unwrap()
+                    .push(serde_json::to_vec(value).unwrap().len());
+            }
             ToolOutcome {
                 status: OutcomeStatus::Succeeded,
                 content: Vec::new(),
@@ -1688,18 +1714,7 @@ impl approval_review::Reviewer for NeverApproves {
 async fn a_completion_hook_continuation_stops_at_the_effective_step_limit() {
     let fixture = Fixture::new(Script::Answer);
     let store = fixture.store();
-    let handler = Arc::new(ContinueHook {
-        definition: ToolDefinition {
-            id: ToolId::new("continue_hook").unwrap(),
-            version: 1,
-            description: "Ask for one more verification pass.".into(),
-            input: InputFormat::Json(serde_json::json!({"type":"object"})),
-            max_input_bytes: 64 * 1024,
-            max_output_bytes: 1024,
-            recovery: RecoveryKind::Unavailable,
-        },
-        calls: AtomicUsize::new(0),
-    });
+    let handler = ContinueHook::new();
     let hook = lifecycle_hooks::LifecycleHook {
         id: BindingId::new("verify").unwrap(),
         source: "trusted-user".into(),
@@ -1738,6 +1753,70 @@ async fn a_completion_hook_continuation_stops_at_the_effective_step_limit() {
     assert_eq!(account.failure.unwrap().code, "lifecycle_hook_step_limit");
     assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 2);
     assert_eq!(handler.calls.load(Ordering::SeqCst), 2);
+    store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
+}
+
+/// A required completion hook that keeps asking for verification sees an
+/// event whose size stops growing once its named evidence is full. With usage
+/// reported on every step, an event carrying the whole account crossed the
+/// event limit before this many steps.
+#[tokio::test]
+async fn a_completion_hook_event_stays_bounded_across_a_long_continuation() {
+    const STEPS: u32 = 64;
+    let mut fixture = Fixture::new(Script::UsageAnswer);
+    fixture.max_operations = 4 * STEPS as usize;
+    let store = fixture.store();
+    let handler = ContinueHook::new();
+    let hook = lifecycle_hooks::LifecycleHook {
+        id: BindingId::new("verify").unwrap(),
+        source: "trusted-user".into(),
+        revision: agent_kit_core::Fingerprint::of(&("verify", "reviewed")).unwrap(),
+        event: lifecycle_hooks::HookEvent::BeforeCompletion,
+        tool: None,
+        mode: CheckMode::Required,
+        handler: handler.definition().id.clone(),
+    };
+    let mut inventory = Inventory::new();
+    inventory.insert(handler.clone()).unwrap();
+    let claim = fixture.claim(&store).await;
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    let MasterOutcome::Settled(receipt) = fixture
+        .master(STEPS, "Answer")
+        .with_lifecycle_hooks(
+            lifecycle_hooks::LifecycleHooks::new(vec![hook.clone()]).unwrap(),
+            inventory
+                .snapshot(std::slice::from_ref(&hook.handler))
+                .unwrap(),
+            BTreeMap::from([(hook.id.clone(), fixture.grants())]),
+        )
+        .run(opened.turn, input())
+        .await
+        .unwrap()
+    else {
+        panic!("expected a settled turn");
+    };
+    let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
+    let sizes = handler.event_bytes.lock().unwrap().clone();
+    assert_eq!(account.steps, STEPS);
+    assert_eq!(account.failure.unwrap().code, "lifecycle_hook_step_limit");
+    assert!(
+        account
+            .lifecycle_hooks
+            .iter()
+            .all(|result| result.reason.as_deref() != Some("hook_event_limit"))
+    );
+    assert_eq!(handler.calls.load(Ordering::SeqCst), STEPS as usize);
+    assert_eq!(sizes.len(), STEPS as usize);
+    // Named evidence grows until it reaches its fixed count. After that only
+    // the decimal width of the step and evidence counters may change.
+    let saturated = &sizes[lifecycle_hooks::MAX_PROPOSAL_EVIDENCE..];
+    let (smallest, largest) = (
+        saturated.iter().min().unwrap(),
+        saturated.iter().max().unwrap(),
+    );
+    assert!(largest - smallest <= 16, "{sizes:?}");
+    assert_eq!(sizes.iter().max(), Some(largest), "{sizes:?}");
+    assert!(*largest < lifecycle_hooks::MAX_EVENT_BYTES / 8, "{sizes:?}");
     store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
 }
 

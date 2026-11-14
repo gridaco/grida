@@ -16,6 +16,10 @@ use std::collections::{BTreeMap, BTreeSet};
 pub const MAX_HOOKS: usize = 8;
 pub const MAX_EVENT_BYTES: usize = 64 * 1024;
 pub const MAX_CONTEXT_BYTES: usize = 4 * 1024;
+/// Leading bytes of the proposed answer a completion event carries.
+pub const MAX_PROPOSAL_TEXT_BYTES: usize = 4 * 1024;
+/// Evidence identifiers a completion event names; the rest are counted.
+pub const MAX_PROPOSAL_EVIDENCE: usize = 32;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -73,8 +77,75 @@ pub enum HookMoment {
         outcome: ToolOutcome,
     },
     BeforeCompletion {
-        proposal: TurnOutcome,
+        proposal: CompletionProposal,
     },
+}
+
+/// The bounded review form of a proposed successful outcome. Its size does
+/// not depend on how many steps, operations or hook results the turn holds:
+/// accumulated diagnostics and usage stay in the account, and evidence is
+/// named up to a fixed count. `fingerprint` identifies the complete proposal,
+/// so each distinct candidate is a distinct occurrence.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CompletionProposal {
+    pub fingerprint: Fingerprint,
+    pub status: OutcomeStatus,
+    pub steps: u32,
+    /// The leading bytes of the final answer, cut at a character boundary.
+    pub text: String,
+    pub text_truncated: bool,
+    pub tool_activity: crate::ToolActivity,
+    /// The lowest evidence identifiers in identifier order, at most
+    /// [`MAX_PROPOSAL_EVIDENCE`].
+    pub evidence: Vec<OperationId>,
+    /// The number of distinct operations the proposal cites as evidence.
+    pub evidence_total: usize,
+}
+
+impl CompletionProposal {
+    /// Summarize a master-built outcome; one without its account is refused.
+    pub fn new(outcome: &TurnOutcome) -> Result<Self> {
+        let account = crate::read_account(outcome.account.as_ref().ok_or_else(invalid)?)?;
+        let text = account.text.as_str();
+        let end = text.floor_char_boundary(MAX_PROPOSAL_TEXT_BYTES.min(text.len()));
+        let evidence = outcome.evidence.iter().collect::<BTreeSet<_>>();
+        Ok(Self {
+            fingerprint: Fingerprint::of(outcome)?,
+            status: outcome.status,
+            steps: account.steps,
+            text: text[..end].into(),
+            text_truncated: end < text.len(),
+            tool_activity: account.tool_activity,
+            evidence: evidence
+                .iter()
+                .take(MAX_PROPOSAL_EVIDENCE)
+                .map(|id| (*id).clone())
+                .collect(),
+            evidence_total: evidence.len(),
+        })
+    }
+
+    /// The named evidence is settled in this turn, and the total cannot
+    /// exceed the operations the turn has settled.
+    fn is_recorded_in(&self, view: &TurnView) -> bool {
+        let settled = |id: &OperationId| {
+            view.operation(id)
+                .is_some_and(|record| record.outcome().is_some())
+        };
+        self.status == OutcomeStatus::Succeeded
+            && self.text.len() <= MAX_PROPOSAL_TEXT_BYTES
+            && self.evidence.len() == self.evidence_total.min(MAX_PROPOSAL_EVIDENCE)
+            && self.evidence.is_sorted_by(|left, right| left < right)
+            && self.evidence.iter().all(settled)
+            && self.evidence_total
+                <= view
+                    .state
+                    .operations()
+                    .values()
+                    .filter(|record| record.outcome().is_some())
+                    .count()
+    }
 }
 
 impl HookMoment {
@@ -128,7 +199,7 @@ impl HookOccurrence {
             HookMoment::BeforeInput {message} => message.role == Role::User && view.state.history().records().iter().any(|record| matches!(record, HistoryRecord::Message(existing) if existing == message)),
             HookMoment::BeforeTool {operation,invocation} => view.operation(operation).is_some_and(|target| target.outcome().is_none() && target.attempts.is_empty() && matches!(&target.record.input,OperationInput::Tool(expected) if expected == invocation)),
             HookMoment::AfterTool {operation,invocation,outcome} => view.operation(operation).is_some_and(|target| matches!(&target.record.input,OperationInput::Tool(expected) if expected == invocation) && matches!(target.outcome(),Some(OperationOutcome::Tool(expected)) if expected == outcome)),
-            HookMoment::BeforeCompletion {proposal} => proposal.status == OutcomeStatus::Succeeded && proposal.evidence.iter().all(|id| view.operation(id).is_some_and(|record| record.outcome().is_some())),
+            HookMoment::BeforeCompletion {proposal} => proposal.is_recorded_in(view),
         };
         if !valid {
             return Err(invalid());
@@ -601,5 +672,194 @@ fn project_reply(
             Some("hook_invalid_reply".into()),
             None,
         ),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use agent_kit_core::AttemptId;
+    use agent_kit_core::inference::{MeasurementKind, UsageObservation};
+
+    const STEPS: usize = 200;
+
+    fn longest(prefix: &str, index: usize) -> String {
+        format!("{prefix}{index:0>width$}", width = 256 - prefix.len())
+    }
+
+    /// The account a turn at the step guard accumulates: one inference and
+    /// one hook operation per step, every hook result and usage observation.
+    fn guard_outcome(text: &str, evidence: Vec<OperationId>) -> TurnOutcome {
+        let hook = BindingId::new("verify").unwrap();
+        let revision = Fingerprint::of(&"reviewed").unwrap();
+        let account = crate::Account {
+            text: text.into(),
+            steps: STEPS as u32,
+            unresolved: Vec::new(),
+            tool_activity: crate::ToolActivity {
+                succeeded: STEPS,
+                ..Default::default()
+            },
+            stop_reason: None,
+            failure: None,
+            inference_failure: None,
+            inference_usage: crate::usage::InferenceUsage {
+                observations: (0..2 * STEPS)
+                    .map(|index| UsageObservation {
+                        attempt: AttemptId::new(longest("attempt_", index)).unwrap(),
+                        source: "provider".into(),
+                        category: "input_tokens".into(),
+                        unit: "tokens".into(),
+                        revision: 2,
+                        quantity: 4096,
+                        certainty: MeasurementKind::Exact,
+                        final_value: true,
+                    })
+                    .collect(),
+                unreported_attempts: Vec::new(),
+            },
+            independent_review: None,
+            goal: None,
+            completion_checks: Vec::new(),
+            lifecycle_hooks: evidence
+                .iter()
+                .take(STEPS)
+                .map(|operation| HookResult {
+                    id: hook.clone(),
+                    revision,
+                    event: HookEvent::BeforeCompletion,
+                    operation: Some(operation.clone()),
+                    status: CheckStatus::Allowed,
+                    reason: None,
+                })
+                .collect(),
+        };
+        TurnOutcome {
+            status: OutcomeStatus::Succeeded,
+            account: Some(crate::encode(crate::ACCOUNT_SCHEMA, &account).unwrap()),
+            evidence,
+        }
+    }
+
+    fn event_bytes(session: &str, hooks: &LifecycleHooks, proposal: CompletionProposal) -> usize {
+        let invocation = HookInvocation {
+            hook: hooks
+                .definitions()
+                .iter()
+                .find(|hook| hook.event == HookEvent::BeforeCompletion)
+                .unwrap()
+                .clone(),
+            selection: hooks.clone(),
+            occurrence: HookOccurrence {
+                version: 1,
+                session: SessionId::new(session).unwrap(),
+                turn: TurnId::new(session).unwrap(),
+                moment: HookMoment::BeforeCompletion { proposal },
+            },
+        };
+        // `execute` measures the invocation arguments as this JSON value.
+        serde_json::to_vec(&serde_json::to_value(&invocation).unwrap())
+            .unwrap()
+            .len()
+    }
+
+    #[test]
+    fn a_completion_event_at_the_step_guard_stays_within_the_event_limit() {
+        // Largest legal shape: eight hooks with maximal identifiers and
+        // control-character sources, a long control-character answer, and
+        // maximal evidence identifiers. Every string escapes at its worst.
+        let source = "\u{1}".repeat(256);
+        let hooks = LifecycleHooks::new(
+            (0..MAX_HOOKS)
+                .map(|index| {
+                    let completion = index + 1 == MAX_HOOKS;
+                    LifecycleHook {
+                        id: BindingId::new(longest("hook_", index)).unwrap(),
+                        source: source.clone(),
+                        revision: Fingerprint::of(&index).unwrap(),
+                        event: if completion {
+                            HookEvent::BeforeCompletion
+                        } else {
+                            HookEvent::BeforeTool
+                        },
+                        tool: (!completion).then(|| ToolId::new(longest("tool_", index)).unwrap()),
+                        mode: CheckMode::Required,
+                        handler: ToolId::new(longest("handler_", index)).unwrap(),
+                    }
+                })
+                .collect(),
+        )
+        .unwrap();
+        let evidence = (0..2 * STEPS)
+            .map(|index| OperationId::new(longest("operation_", index)).unwrap())
+            .collect::<Vec<_>>();
+        let outcome = guard_outcome(&"\u{1}".repeat(64 * 1024), evidence);
+        assert!(
+            serde_json::to_vec(&outcome).unwrap().len() > MAX_EVENT_BYTES,
+            "the unbounded proposal must exceed the limit for this to prove anything"
+        );
+        let proposal = CompletionProposal::new(&outcome).unwrap();
+        assert_eq!(proposal.steps, STEPS as u32);
+        assert_eq!(proposal.text.len(), MAX_PROPOSAL_TEXT_BYTES);
+        assert!(proposal.text_truncated);
+        assert_eq!(proposal.evidence.len(), MAX_PROPOSAL_EVIDENCE);
+        assert_eq!(proposal.evidence_total, 2 * STEPS);
+        let bytes = event_bytes(&longest("session_", 0), &hooks, proposal);
+        assert!(bytes < MAX_EVENT_BYTES, "{bytes}");
+    }
+
+    #[test]
+    fn a_completion_event_does_not_grow_with_turn_length() {
+        let hooks = LifecycleHooks::new(vec![LifecycleHook {
+            id: BindingId::new("verify").unwrap(),
+            source: "trusted-user".into(),
+            revision: Fingerprint::of(&"reviewed").unwrap(),
+            event: HookEvent::BeforeCompletion,
+            tool: None,
+            mode: CheckMode::Required,
+            handler: ToolId::new("lifecycle_hook/verify").unwrap(),
+        }])
+        .unwrap();
+        // Runtime-minted identifiers have this shape.
+        let minted = |index: usize| {
+            OperationId::new(format!(
+                "operation_{}",
+                Fingerprint::of(&index).unwrap().to_hex()
+            ))
+            .unwrap()
+        };
+        let short = guard_outcome(
+            "Done.",
+            (0..2 * MAX_PROPOSAL_EVIDENCE).map(minted).collect(),
+        );
+        let long = guard_outcome("Done.", (0..2 * STEPS).map(minted).collect());
+        let short = event_bytes("session", &hooks, CompletionProposal::new(&short).unwrap());
+        let long = event_bytes("session", &hooks, CompletionProposal::new(&long).unwrap());
+        assert!(long.abs_diff(short) <= 4, "{short} {long}");
+        assert!(long < MAX_EVENT_BYTES / 8, "{long}");
+    }
+
+    #[test]
+    fn the_proposal_fingerprint_is_deterministic_and_distinguishes_candidates() {
+        let evidence = (0..4)
+            .map(|index| OperationId::new(format!("operation_{index}")).unwrap())
+            .collect::<Vec<_>>();
+        let first = guard_outcome("Done.", evidence.clone());
+        let again = CompletionProposal::new(&first).unwrap();
+        assert_eq!(CompletionProposal::new(&first).unwrap(), again);
+        let mut changed = first.clone();
+        crate::update_account(&mut changed, |account| {
+            account.lifecycle_hooks.pop();
+        })
+        .unwrap();
+        let changed = CompletionProposal::new(&changed).unwrap();
+        // The bounded fields agree; only the complete candidate differs.
+        assert_eq!(changed.evidence, again.evidence);
+        assert_ne!(changed.fingerprint, again.fingerprint);
+        let unaccounted = TurnOutcome {
+            account: None,
+            ..first
+        };
+        assert!(CompletionProposal::new(&unaccounted).is_err());
     }
 }

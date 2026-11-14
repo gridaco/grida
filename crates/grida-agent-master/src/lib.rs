@@ -1388,7 +1388,7 @@ impl Master {
                     HookOccurrence::new(
                         basis,
                         HookMoment::BeforeCompletion {
-                            proposal: outcome.clone(),
+                            proposal: lifecycle_hooks::CompletionProposal::new(&outcome)?,
                         },
                     ),
                     &execution.tools,
