@@ -159,7 +159,6 @@ const PROCESS_WAIT = { timeout: 15_000, interval: 25 };
 
 describe.skipIf(process.platform === "win32")(
   "Main-owned external ACP runs",
-  { timeout: 60_000 },
   () => {
     it("admits only an explicit native Linux launcher option before the separator", () => {
       const option = "--native-external-acp-profile=/private/reviewed.canvas";
@@ -560,5 +559,6 @@ describe.skipIf(process.platform === "win32")(
         test.close();
       }
     });
-  }
+  },
+  60_000
 );
