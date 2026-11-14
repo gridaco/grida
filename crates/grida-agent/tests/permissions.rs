@@ -45,9 +45,24 @@ struct Fixture {
     database: PathBuf,
 }
 
+/// Fixture directories outside the system's shared temporary directory, which
+/// a read-write command may write: the host keeps a command temporary parent
+/// there, and fixtures must not reach each other through it. Linux's default
+/// temporary directory is that shared directory.
+fn outside_shared_temporary() -> TempDir {
+    let default = std::env::temp_dir().canonicalize().unwrap();
+    let shared = Path::new("/tmp").canonicalize().ok();
+    let root = if shared.is_some_and(|shared| default.starts_with(shared)) {
+        Path::new("/var/tmp").canonicalize().unwrap()
+    } else {
+        default
+    };
+    tempfile::tempdir_in(root).unwrap()
+}
+
 impl Fixture {
     fn new() -> Self {
-        let base = tempfile::tempdir().unwrap();
+        let base = outside_shared_temporary();
         let root = base.path().canonicalize().unwrap();
         for name in ["default", "additional", "protected", "temporary", "state"] {
             let path = root.join(name);
@@ -78,6 +93,15 @@ impl Fixture {
         write: bool,
         shell: Option<&Path>,
     ) -> Arc<PermissionProfile> {
+        Arc::new(self.try_profile(command, write, shell).unwrap())
+    }
+
+    fn try_profile(
+        &self,
+        command: bool,
+        write: bool,
+        shell: Option<&Path>,
+    ) -> agent_kit_core::Result<PermissionProfile> {
         let protected = vec![
             self.protected.clone(),
             self.database.parent().unwrap().to_owned(),
@@ -98,51 +122,48 @@ impl Fixture {
             &ProtectedRoots::new(protected.clone()).unwrap(),
         )
         .unwrap();
-        Arc::new(
-            PermissionProfile::new(
-                binding("workspace-permissions"),
-                Arc::new(workspace),
-                [
-                    (
-                        binding("default"),
-                        DirectoryAccess {
-                            write: if write {
-                                AccessRule::Allow
-                            } else {
-                                AccessRule::Deny
-                            },
-                            read: AccessRule::Allow,
-                            command_read: if command {
-                                AccessRule::Allow
-                            } else {
-                                AccessRule::Deny
-                            },
-                            command_read_write: if command && write {
-                                AccessRule::Allow
-                            } else {
-                                AccessRule::Deny
-                            },
+        PermissionProfile::new(
+            binding("workspace-permissions"),
+            Arc::new(workspace),
+            [
+                (
+                    binding("default"),
+                    DirectoryAccess {
+                        write: if write {
+                            AccessRule::Allow
+                        } else {
+                            AccessRule::Deny
                         },
-                    ),
-                    (
-                        binding("additional"),
-                        DirectoryAccess {
-                            write: AccessRule::Deny,
-                            read: AccessRule::Ask,
-                            command_read: AccessRule::Deny,
-                            command_read_write: if command {
-                                AccessRule::Ask
-                            } else {
-                                AccessRule::Deny
-                            },
+                        read: AccessRule::Allow,
+                        command_read: if command {
+                            AccessRule::Allow
+                        } else {
+                            AccessRule::Deny
                         },
-                    ),
-                ]
-                .into(),
-                protected,
-                command.then(|| self.command_profile(shell)),
-            )
-            .unwrap(),
+                        command_read_write: if command && write {
+                            AccessRule::Allow
+                        } else {
+                            AccessRule::Deny
+                        },
+                    },
+                ),
+                (
+                    binding("additional"),
+                    DirectoryAccess {
+                        write: AccessRule::Deny,
+                        read: AccessRule::Ask,
+                        command_read: AccessRule::Deny,
+                        command_read_write: if command {
+                            AccessRule::Ask
+                        } else {
+                            AccessRule::Deny
+                        },
+                    },
+                ),
+            ]
+            .into(),
+            protected,
+            command.then(|| self.command_profile(shell)),
         )
     }
 
@@ -659,6 +680,20 @@ async fn commands_write_the_project_and_shared_temp_but_not_existing_metadata() 
     let _ = fs::remove_file(&scratch);
     assert_eq!(reread.status, OutcomeStatus::Succeeded, "{reread:?}");
     assert!(text(&reread).contains("staged"), "{reread:?}");
+}
+
+#[test]
+#[ignore = "requires native confinement outside the test runner's sandbox"]
+fn command_temporary_parent_in_the_shared_temporary_directory_is_refused_by_name() {
+    let mut fixture = Fixture::new();
+    // Linux's default temporary location: a read-write command may write it,
+    // so the sandbox would refuse every such command's launch.
+    let shared = tempfile::tempdir_in("/tmp").unwrap();
+    fixture.temporary = shared.path().canonicalize().unwrap();
+    let error = fixture.try_profile(true, true, None).err().unwrap();
+    assert_eq!(error.code, "command_temporary_parent_shared");
+    // Without read-write commands nothing writes the shared directory.
+    assert!(fixture.try_profile(false, true, None).is_ok());
 }
 
 #[tokio::test]

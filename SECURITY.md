@@ -552,7 +552,9 @@ command and removes it after a verified end, since bubblewrap can only carve
 out a path that exists. A command can therefore initialize a new repository,
 and the next command cannot change it.
 A command that may write the project may also write the shared `/tmp`, as the
-policy's workspace-write level allows; the host's stores never live there.
+policy's workspace-write level allows; the host's stores never live there,
+and a profile allowing such commands is refused unless its private temporary
+parent lies outside `/tmp` (Desktop keeps it in `/var/tmp` on Linux).
 A protected path inside a granted location is carved out of it; one
 that contains a location granting what it denies still refuses the scope. Platform services
 toolchains need (system information, the user database, the per-user cache

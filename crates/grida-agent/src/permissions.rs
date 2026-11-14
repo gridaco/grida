@@ -199,6 +199,28 @@ impl PermissionProfile {
         {
             return Err(problem(ErrorKind::Unsupported, "command_profile_required"));
         }
+        // A read-write command may write the shared temporary directory, and
+        // the sandbox refuses every launch whose private temporary parent lies
+        // within a writable location. Refuse that layout here, by name, rather
+        // than as each command's undisclosed preparation refusal. Linux's
+        // default temporary directory is the shared one.
+        if let Some(command) = &command
+            && directories
+                .values()
+                .any(|rule| rule.command_read_write != AccessRule::Deny)
+            && shared_temporary_directory().is_some_and(|shared| {
+                let parent = command
+                    .temporary_parent
+                    .canonicalize()
+                    .unwrap_or_else(|_| command.temporary_parent.clone());
+                parent.starts_with(&shared) || shared.starts_with(&parent)
+            })
+        {
+            return Err(problem(
+                ErrorKind::InvalidInput,
+                "command_temporary_parent_shared",
+            ));
+        }
         let workspace_identity = workspace.permission_identity(&protected)?;
         let command_identity = command.as_ref().map(|command| {
             (

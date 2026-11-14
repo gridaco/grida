@@ -4,7 +4,11 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { NativeHookLaunchProfile } from "./native-agent-hooks";
-import { pinExecutable, requirePrivateDirectory } from "./native-agent-hooks";
+import {
+  commandTemporaryRoot,
+  pinExecutable,
+  requirePrivateDirectory,
+} from "./native-agent-hooks";
 
 type Pin = Readonly<{ path: string; sha256: number[] }>;
 
@@ -72,7 +76,7 @@ export namespace NativeCommandProfiles {
       }
     }
     const temporaryParent = path.join(
-      await fs.realpath(os.tmpdir()),
+      await commandTemporaryRoot(),
       `grida-agent-commands-${createHash("sha256").update(workspace).digest("hex").slice(0, 24)}`
     );
     if (

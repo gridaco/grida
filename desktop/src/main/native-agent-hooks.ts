@@ -212,7 +212,7 @@ export class NativeAgentHooks {
       runtimePaths.add(hook.executable.path);
     }
     const temporaryParent = path.join(
-      await fs.realpath(os.tmpdir()),
+      await commandTemporaryRoot(),
       `grida-agent-hooks-${digest([this.directory, this.workspace]).slice(0, 24)}`
     );
     if (overlaps(temporaryParent, this.workspace))
@@ -426,6 +426,22 @@ async function boundedFile(
     await handle.close();
   }
 }
+/**
+ * Where private command temporary parents live: the user's temporary
+ * directory, kept outside the system's shared `/tmp`. A read-write command may
+ * write `/tmp`, and the sandbox refuses a launch whose temporary parent lies
+ * within a writable location. Linux's default temporary directory is `/tmp`,
+ * so there the parents live in `/var/tmp`.
+ */
+async function commandTemporaryRoot(): Promise<string> {
+  const root = await fs.realpath(os.tmpdir());
+  const shared = await fs.realpath("/tmp").catch(() => undefined);
+  if (!shared || !overlaps(root, shared)) return root;
+  const fallback = await fs.realpath("/var/tmp");
+  if (overlaps(fallback, shared))
+    throw new Error("native_command_temporary_root_unavailable");
+  return fallback;
+}
 async function privateDirectory(location: string): Promise<void> {
   const stat = await fs.lstat(location);
   if (
@@ -528,4 +544,8 @@ function protocol(): Error {
 }
 
 /** Shared with the native command profile: same pinning and privacy rules. */
-export { pin as pinExecutable, privateDirectory as requirePrivateDirectory };
+export {
+  commandTemporaryRoot,
+  pin as pinExecutable,
+  privateDirectory as requirePrivateDirectory,
+};

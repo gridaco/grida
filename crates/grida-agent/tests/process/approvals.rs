@@ -24,9 +24,24 @@ pub(super) struct Fixture {
     pub(super) profile: PathBuf,
 }
 
+/// Fixture directories outside the system's shared temporary directory, which
+/// a read-write command may write: the host keeps a command temporary parent
+/// there, and fixtures must not reach each other through it. Linux's default
+/// temporary directory is that shared directory.
+fn outside_shared_temporary() -> TempDir {
+    let default = std::env::temp_dir().canonicalize().unwrap();
+    let shared = Path::new("/tmp").canonicalize().ok();
+    let root = if shared.is_some_and(|shared| default.starts_with(shared)) {
+        Path::new("/var/tmp").canonicalize().unwrap()
+    } else {
+        default
+    };
+    tempfile::tempdir_in(root).unwrap()
+}
+
 impl Fixture {
     pub(super) fn new(command: bool) -> Self {
-        let base = tempfile::tempdir().unwrap();
+        let base = outside_shared_temporary();
         let root = base.path().canonicalize().unwrap();
         let state = root.join("state");
         let primary = root.join("primary");

@@ -698,7 +698,10 @@ use the primary when `directory` is omitted. Supply a named directory ID to
 target another root. Each root's rules apply independently. Native
 commands additionally require a trusted `command` installation with `helper`
 (a canonical `path` and a 32-byte `sha256` array), `runtimePaths`, and a
-private `temporaryParent`. Linux also requires `bubblewrap` with its own path
+private `temporaryParent`. A read-write command may also write the shared
+`/tmp`, so when any root allows `commandReadWrite` the `temporaryParent` must
+lie outside it (`command_temporary_parent_shared`); Linux's default temporary
+directory is `/tmp`. Linux also requires `bubblewrap` with its own path
 and digest. Installed executables, host state, credential homes, and the launch
 profile have additional protections. This launch path supports macOS and Linux.
 
