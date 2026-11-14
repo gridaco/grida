@@ -609,8 +609,11 @@ function PanelTabContent({
 }) {
   return (
     <div
+      // A panel fills the editor region as a column, so content that sizes
+      // itself with flex (a chat pane and its composer) gets a definite
+      // height instead of growing past the region.
       className={cn(
-        "absolute inset-0",
+        "absolute inset-0 flex min-h-0 flex-col overflow-hidden",
         !active && "invisible pointer-events-none"
       )}
       aria-hidden={!active}
