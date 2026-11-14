@@ -891,7 +891,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   guarded(IPC_CHANNELS.CHATGPT_STATUS, () => chatgptOAuth.status());
   guarded(IPC_CHANNELS.CHATGPT_SIGN_OUT, () => chatgptOAuth.signOut());
 
-  // issue #974 — custom endpoints are network authority, not just config.
+  // Custom endpoints are network authority, not just config.
   // Renderer writes/probes therefore cross a guarded native confirmation
   // before main mints an exact-origin grant for the sidecar transport.
   guarded(
@@ -1288,7 +1288,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     killTerminal(event.sender, id);
   });
 
-  // issue #805 — workspace file-change watcher. The watch root is the
+  // Workspace file-change watcher. The watch root is the
   // workspace root resolved host-side from the sidecar registry; the
   // renderer only names a workspace id (never a raw path), exactly like
   // TERMINAL_CREATE and WORKSPACE_TRASH_ENTRY. The watcher host binds each

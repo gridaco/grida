@@ -337,7 +337,7 @@ ipcRenderer.on(
 );
 
 /**
- * Workspace file-change fanout (issue #805). Same payload-only discipline
+ * Workspace file-change fanout. Same payload-only discipline
  * as the terminal fanout: one module-level `ipcRenderer.on` routes each
  * pushed batch to the renderer-supplied handler by subscription id; the
  * Electron event object never crosses the contextBridge (GRIDA-SEC-004).
@@ -412,7 +412,7 @@ const bridge: DesktopBridge = {
       // Human-interactive terminal pane (GRIDA-SEC-004) — distinct from
       // `shell` above and from the agent's sandboxed `exec_command`.
       terminal: true,
-      // Workspace file-change watcher (issue #805).
+      // Workspace file-change watcher.
       workspace_watch: true,
     },
   },
@@ -995,9 +995,10 @@ const bridge: DesktopBridge = {
         relPath,
         "bytes"
       ),
-    // #924 — the streamable media `src` for the read-only viewer. Pure string
-    // build: a `grida-workspace://` URL the main-process protocol handler
-    // resolves by proxying to the sidecar's streamed `/workspaces/file` route.
+    // The streamable media `src` for the read-only viewer, so large media is
+    // not inlined as base64. Pure string build: a `grida-workspace://` URL
+    // the main-process protocol handler resolves by proxying to the
+    // sidecar's streamed `/workspaces/file` route.
     // No credentials cross into the renderer (GRIDA-SEC-004). Constant host +
     // both ids in the path so host canonicalization can't lowercase the id;
     // keep in lockstep with `main/workspace-media-protocol.ts`.

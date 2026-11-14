@@ -297,7 +297,7 @@ export namespace secrets {
     return BYOK_PROVIDER_METADATA;
   }
 
-  // Provider ids here are BYOK ids OR configured endpoint ids (#806) —
+  // Provider ids here are BYOK ids OR configured endpoint ids —
   // a keyed gateway stores its key under its endpoint id through these
   // same helpers. The agent host validates membership; unknown ids 400.
 
@@ -359,7 +359,7 @@ export namespace secrets {
 /* ─────────────────────── providers namespace ─────────────────── */
 
 /**
- * Endpoint provider config (issue #806) — user-configured OpenAI-
+ * Endpoint provider config — user-configured OpenAI-
  * compatible endpoints (Ollama preset, self-hosted gateways). Plain
  * readable config, unlike `secrets`: the renderer may list configs back.
  * A keyed gateway stores its key via the `secrets` namespace under the
@@ -525,7 +525,7 @@ export namespace chatgpt {
 /* ─────────────────────── images namespace ───────────────────── */
 
 /**
- * BYOK image generation (#908). Desktop-only: the request resolves the user's
+ * BYOK image generation. Desktop-only: the request resolves the user's
  * connected provider key inside the services sidecar and returns base64 image
  * bytes — the key never crosses the bridge (GRIDA-SEC-004). Feature-detect
  * with {@link isSupported}; old binaries lack the surface.
@@ -547,7 +547,7 @@ export namespace images {
 /* ─────────────────────── video namespace ────────────────────── */
 
 /**
- * BYOK video generation (#908). Same posture as {@link images}: the request
+ * BYOK video generation. Same posture as {@link images}: the request
  * resolves the user's key in the sidecar and returns base64 video bytes — no
  * provider URL or key crosses the bridge (GRIDA-SEC-004). Feature-detect with
  * {@link isSupported}.
@@ -929,7 +929,7 @@ export namespace workspaces {
     );
   }
   /**
-   * Streamable media `src` for the read-only image/video viewer (#924), or
+   * Streamable media `src` for the read-only image/video viewer, or
    * `undefined` when the host lacks the streaming capability. The viewer falls
    * back to {@link readFileBytes}. Synchronous
    * passthrough; see the bridge contract for the URL shape. Returns `undefined`
@@ -946,7 +946,7 @@ export namespace workspaces {
    * Atomic write via tmpfile + rename inside the workspace. Creates
    * parent directories.
    *
-   * `expectedMtime` is the optimistic-concurrency token (issue #805):
+   * `expectedMtime` is the optimistic-concurrency token:
    * pass the mtime last observed for this file (from `readFile` or a
    * prior `writeFile`) and the host rejects — instead of silently
    * clobbering — when the file on disk has advanced past it. The
@@ -989,7 +989,7 @@ export namespace workspaces {
   }
   /**
    * True when this desktop binary can watch the workspace for external
-   * file changes (issue #805). Additive on protocol 1 — older binaries
+   * file changes. Additive on protocol 1 — older binaries
    * lack the channel, so the workbench falls back to pull/manual refresh.
    * Gate any `subscribeChanges` call on this.
    */
