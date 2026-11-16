@@ -672,6 +672,14 @@ Queue can wake retained waiting work, and Resume Task checks captured settings
 and current authority before reacquiring a suspended turn. A credential change
 blocks dispatch under an earlier captured authority.
 
+After a snapshot reports the current turn as `suspended`, a client may send
+Resume immediately. The native host waits a bounded time for that exact turn's
+retiring worker to release its slot; clients do not need to wait for an earlier
+prompt RPC to finish merely to avoid that handoff race. Keep the original
+request identity and observed revisions, epoch and journal position: concurrent
+changes still refuse the stale claim. A worker that does not retire within the
+bound remains busy rather than being replaced.
+
 An attached snapshot can include `retryNotBeforeMs`, a Unix time in
 milliseconds for the current turn's retained provider retry. It is the earliest
 dispatch time, subject to the same authority and task controls as the original

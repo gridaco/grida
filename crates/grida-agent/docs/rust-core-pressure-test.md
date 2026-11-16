@@ -521,21 +521,29 @@ outcome. Registering a question differs from awaiting its answer. These
 distinctions require an intentional suspension receipt as well as a terminal
 receipt from the driver.
 
-| Interaction                                     | Required result                                                                                                                           |
-| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| User pauses active work                         | Admit no new task effects, account for existing work, preserve the continuation, and release the worker after verified suspension.        |
-| User resumes                                    | Claim the same logical turn with a fresh epoch when its remaining conditions permit.                                                      |
-| Question tool returns immediately               | Commit the question and return its registration receipt. Independent work can continue.                                                   |
-| Question requires an answer before further work | Preserve the pending interaction and optionally suspend the worker. No open inference request is needed.                                  |
-| An answer races with suspension                 | Commit the correlated answer once and make it visible to the current or resumed owner.                                                    |
-| Answer arrives during explicit Pause            | Retain the answer while preserving the user's pause.                                                                                      |
-| User edits an earlier message                   | Cut at the selected boundary, preserve original later history and effects, supersede affected waits, and continue from the revised input. |
+| Interaction                                     | Required result                                                                                                                              |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| User pauses active work                         | Admit no new task effects, account for existing work, preserve the continuation, and release the worker after verified suspension.           |
+| User resumes                                    | Wait for the exact suspended turn's retiring host worker, then claim that logical turn with a fresh epoch under the original observed basis. |
+| Question tool returns immediately               | Commit the question and return its registration receipt. Independent work can continue.                                                      |
+| Question requires an answer before further work | Preserve the pending interaction and optionally suspend the worker. No open inference request is needed.                                     |
+| An answer races with suspension                 | Commit the correlated answer once and make it visible to the current or resumed owner.                                                       |
+| Answer arrives during explicit Pause            | Retain the answer while preserving the user's pause.                                                                                         |
+| User edits an earlier message                   | Cut at the selected boundary, preserve original later history and effects, supersede affected waits, and continue from the revised input.    |
 
 The live `wait` convenience remains useful. `request_input` supplies registration
 without waiting, and `try_suspend` supplies durable worker release. A resumed
 driver reconstructs its continuation from history, operation outcomes, and any
 additional checkpoint. It does not deserialize a language stack or keep a model
 request open during human think time.
+
+The [host lifecycle cases](../src/host/lifecycle.rs) must exercise the interval
+between durable suspension and worker-slot retirement with a controlled
+notification barrier. They retain running/foreign/unadmitted owner refusals,
+shutdown/deletion fences and stale session/control/epoch/position refusal. The
+[built protocol case](../tests/process/lifecycle.rs) resumes immediately from
+the observed suspended snapshot on its first request and checks the resumption
+note supplied to the model; it does not hide retirement behind client retries.
 
 Both interaction styles are needed: an awaited question blocks the dependent
 work, while an immediate-return question lets independent work continue.

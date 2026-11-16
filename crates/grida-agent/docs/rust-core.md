@@ -1118,6 +1118,16 @@ fresh writer epoch after its pause and readiness conditions permit execution.
 The suspended logical turn retains its active session position. Suspension
 alone never selects the next queued request.
 
+The native host may briefly retain its worker slot after the store records a
+verified suspension. An explicit Resume of that same admitted turn waits for
+the worker to release the slot before registering its successor. Classification
+reads the concrete store while holding the host work-table lock, so a newer
+worker cannot be mistaken for the retiring owner. The notification wait releases
+that lock and uses the existing bounded handoff deadline. Running, foreign or
+unadmitted workers retain their ordinary refusal. The resumed claim still uses
+the client's original session/control revisions, epoch and journal position;
+waiting neither refreshes its basis nor overrides shutdown, deletion or capacity.
+
 A `ControlRequest` has a stable change identity, the session, the expected
 session revision, and one `SessionControl`. Repeating identical content returns
 the original receipt even after the revision has advanced. Defined controls

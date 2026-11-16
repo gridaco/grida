@@ -124,8 +124,10 @@ jobs:
         run: |
           artifacts="$RUNNER_TEMP/grida-desktop-native"
           node --input-type=module - "$artifacts" "$TARGET_ARCH" <<'NODE'
+          import fs from "node:fs";
           import { buildNativeAgentArtifacts } from "./scripts/native-agent-package.mjs";
           const [artifacts, arch] = process.argv.slice(2);
+          fs.mkdirSync(artifacts, { mode: 0o700 });
           buildNativeAgentArtifacts(artifacts, process.platform, arch);
           NODE
           printf 'GRIDA_DESKTOP_NATIVE_ARTIFACTS=%s\n' "$artifacts" >> "$GITHUB_ENV"
