@@ -31,6 +31,7 @@ pub struct Preparation {
 }
 
 impl Preparation {
+    #[cfg(any(test, target_os = "macos", target_os = "linux"))]
     pub(crate) fn description(&self) -> String {
         let scale = if (self.width, self.height) != (self.source_width, self.source_height) {
             format!(
