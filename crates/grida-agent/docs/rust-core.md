@@ -477,6 +477,13 @@ through an artifact reference. Publication uses the destination's grant and the
 concrete publication tool's write semantics. Scratch writes retain validation
 and confinement.
 
+On macOS and Linux, each open scratch scope holds one exclusive owner lock.
+Dropping the owner explicitly releases that lock, including when a process
+between fork and exec retains the old file description. A live owner still
+refuses a second opener; closing an old inherited descriptor cannot release a
+new owner's lock. Scratch retirement uses the same lock guard and pinned-file
+identity checks.
+
 Directory enumeration is bounded and can be incremental. An eager filesystem
 hydration pass or complete workspace index is not a prerequisite for a valid
 read or write. Optional indexes report coverage and freshness, while direct

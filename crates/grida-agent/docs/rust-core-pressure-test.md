@@ -484,6 +484,13 @@ Cleanup must not remove files while descriptors that depend on them remain in
 history. The contract makes dependency holds and rematerialization explicit and
 supports attachment-only work without a project.
 
+Scratch ownership regressions must prove that a live owner excludes another
+writer, dropping that owner permits reopening despite an inherited old file
+description, and closing the old descriptor cannot release the new owner's
+lock. The [scratch unit cases](../src/scratch.rs) verify those lifetimes
+deterministically; the [scratch integration cases](../tests/scratch.rs) retain
+the independent original and edited working copy through reopen.
+
 For “add text to this PNG,” the minimum path is an accepted input asset, an
 independent scratch working copy, an edited result, inspection, and publication
 to an accessible result location. Project directories remain untouched unless

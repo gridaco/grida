@@ -302,7 +302,19 @@ mod native {
         base: Directory,
         scope: Directory,
         files: Directory,
-        lock: File,
+        lock: OwnerLock,
+    }
+
+    struct OwnerLock {
+        file: File,
+    }
+
+    impl Drop for OwnerLock {
+        fn drop(&mut self) {
+            // A child between fork and exec may retain this file description.
+            // Closing the owner's handle must still release its ownership.
+            let _ = self.file.unlock();
+        }
     }
 
     struct Directory {
@@ -735,7 +747,7 @@ mod native {
             let current = self.scope.read("owner.lock")?.ok_or_else(invalid_storage)?;
             if !same(
                 &current.metadata().map_err(io_failure)?,
-                &self.lock.metadata().map_err(io_failure)?,
+                &self.lock.file.metadata().map_err(io_failure)?,
             ) {
                 return Err(invalid_storage());
             }
@@ -831,7 +843,7 @@ mod native {
             check_acl(&self.path)
         }
 
-        fn lock(&self, existing_only: bool) -> Result<File> {
+        fn lock(&self, existing_only: bool) -> Result<OwnerLock> {
             let flags = OFlags::RDWR | file_flags();
             let file: File = if existing_only {
                 unix::openat(&self.file, "owner.lock", flags, Mode::empty())
@@ -863,7 +875,7 @@ mod native {
                 }
                 fs::TryLockError::Error(error) => io_failure(error),
             })?;
-            Ok(file)
+            Ok(OwnerLock { file })
         }
 
         fn read(&self, name: &str) -> Result<Option<File>> {
@@ -1232,5 +1244,38 @@ mod native {
 
     fn io_failure(_: impl std::fmt::Display) -> Error {
         Error::new(ErrorKind::Unavailable, "scratch_storage_unavailable")
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use std::os::unix::fs::PermissionsExt;
+
+        #[test]
+        fn closing_a_scope_releases_an_inherited_owner_lock() {
+            let directory = tempfile::tempdir().unwrap();
+            let base = directory.path().canonicalize().unwrap();
+            fs::set_permissions(&base, fs::Permissions::from_mode(0o700)).unwrap();
+            let owner = SessionId::new("owner").unwrap();
+            let limits = ScratchLimits {
+                max_assets: 4,
+                max_asset_bytes: 64,
+                max_source_bytes: 128,
+                max_work_bytes: 128,
+            };
+            let protected = ProtectedRoots::new(vec![]).unwrap();
+            let open = || Scope::open(&base, owner.clone(), limits, &protected, false);
+            let original = open().unwrap();
+            // A child between fork and exec holds this same file description.
+            let inherited = original.sources.lock.file.try_clone().unwrap();
+            assert_eq!(open().err().unwrap().code, "scratch_owner_in_use");
+            drop(original);
+
+            let reopened = open().unwrap();
+            drop(inherited);
+            assert_eq!(open().err().unwrap().code, "scratch_owner_in_use");
+            drop(reopened);
+            assert!(open().is_ok());
+        }
     }
 }
