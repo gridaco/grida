@@ -436,8 +436,17 @@ pub(crate) fn read_profile(path: &Path) -> Result<Vec<u8>> {
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "linux")))]
-fn read_profile(_: &Path) -> Result<Vec<u8>> {
+pub(crate) fn read_profile(_: &Path) -> Result<Vec<u8>> {
     Err(unsupported())
+}
+
+#[cfg(all(test, not(any(target_os = "macos", target_os = "linux"))))]
+#[test]
+fn profile_reads_require_a_supported_platform() {
+    let profile = tempfile::NamedTempFile::new().unwrap();
+    let error = read_profile(profile.path()).unwrap_err();
+    assert_eq!(error.kind, ErrorKind::Unsupported);
+    assert_eq!(error.code, "permission_profile_platform_unsupported");
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "linux")))]

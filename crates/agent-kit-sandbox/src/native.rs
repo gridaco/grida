@@ -799,10 +799,10 @@ impl Prepared {
         #[cfg(target_os = "linux")]
         let launchers = {
             let mut launchers = launchers;
-            if self.support.backend == Backend::Bubblewrap {
-                if let Some(bubblewrap) = &self.bubblewrap {
-                    launchers.push(bubblewrap.executable.sha256);
-                }
+            if self.support.backend == Backend::Bubblewrap
+                && let Some(bubblewrap) = &self.bubblewrap
+            {
+                launchers.push(bubblewrap.executable.sha256);
             }
             launchers
         };

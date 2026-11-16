@@ -1,7 +1,7 @@
 {
   "format": 1,
   "generator": "cargo-about 0.8.2",
-  "cargo_lock_sha256": "820579de8a77b3afcf2ae4233947392a0acb3c59a49b44736617d41e5b1508d1",
+  "cargo_lock_sha256": "c54c03c7a966e60c29031c7c55d8dd074edda9ef008312cc41b29fa051aaa7d8",
   "targets": [
     "x86_64-apple-darwin",
     "aarch64-apple-darwin",
@@ -188,6 +188,18 @@
       "repository": "https://github.com/smol-rs/blocking"
     },
     {
+      "name": "bytemuck",
+      "version": "1.25.2",
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "repository": "https://github.com/Lokathor/bytemuck"
+    },
+    {
+      "name": "byteorder-lite",
+      "version": "0.1.0",
+      "license": "Unlicense OR MIT",
+      "repository": "https://github.com/image-rs/byteorder-lite"
+    },
+    {
       "name": "bytes",
       "version": "1.12.1",
       "license": "MIT",
@@ -258,6 +270,12 @@
       "version": "0.5.4",
       "license": "Apache-2.0 OR MIT",
       "repository": "https://github.com/RustCrypto/utils"
+    },
+    {
+      "name": "color_quant",
+      "version": "1.1.0",
+      "license": "MIT",
+      "repository": "https://github.com/image-rs/color_quant.git"
     },
     {
       "name": "concurrent-queue",
@@ -620,6 +638,12 @@
       "repository": "https://github.com/rust-random/getrandom"
     },
     {
+      "name": "gif",
+      "version": "0.14.2",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/image-rs/image-gif"
+    },
+    {
       "name": "hashbrown",
       "version": "0.17.1",
       "license": "MIT OR Apache-2.0",
@@ -776,6 +800,18 @@
       "repository": "https://github.com/servo/rust-url/"
     },
     {
+      "name": "image-webp",
+      "version": "0.2.4",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/image-rs/image-webp"
+    },
+    {
+      "name": "image",
+      "version": "0.25.10",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/image-rs/image"
+    },
+    {
       "name": "indexmap",
       "version": "2.14.2",
       "license": "Apache-2.0 OR MIT",
@@ -876,6 +912,12 @@
       "version": "1.2.3",
       "license": "MIT",
       "repository": "https://github.com/tokio-rs/mio"
+    },
+    {
+      "name": "moxcms",
+      "version": "0.8.1",
+      "license": "BSD-3-Clause OR Apache-2.0",
+      "repository": "https://github.com/awxkee/moxcms.git"
     },
     {
       "name": "num-bigint",
@@ -1050,6 +1092,18 @@
       "version": "1.0.107",
       "license": "MIT OR Apache-2.0",
       "repository": "https://github.com/dtolnay/proc-macro2"
+    },
+    {
+      "name": "pxfm",
+      "version": "0.1.30",
+      "license": "BSD-3-Clause OR Apache-2.0",
+      "repository": "https://github.com/awxkee/pxfm"
+    },
+    {
+      "name": "quick-error",
+      "version": "2.0.1",
+      "license": "MIT OR Apache-2.0",
+      "repository": "http://github.com/tailhook/quick-error"
     },
     {
       "name": "quote",
@@ -1676,6 +1730,12 @@
       "repository": "https://github.com/seanmonstar/want"
     },
     {
+      "name": "weezl",
+      "version": "0.1.12",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/image-rs/weezl"
+    },
+    {
       "name": "winapi",
       "version": "0.3.9",
       "license": "MIT OR Apache-2.0",
@@ -1830,6 +1890,18 @@
       "version": "1.0.23",
       "license": "MIT",
       "repository": "https://github.com/dtolnay/zmij"
+    },
+    {
+      "name": "zune-core",
+      "version": "0.5.3",
+      "license": "MIT OR Apache-2.0 OR Zlib",
+      "repository": "https://github.com/etemesi254/zune-image"
+    },
+    {
+      "name": "zune-jpeg",
+      "version": "0.5.15",
+      "license": "MIT OR Apache-2.0 OR Zlib",
+      "repository": "https://github.com/etemesi254/zune-image/tree/dev/crates/zune-jpeg"
     },
     {
       "name": "zvariant_derive",

@@ -26,11 +26,27 @@ pub use wire::{Identity, Logout, Organization, OrganizationsPage, Status};
 
 /// Refuse a path whose extended access control list grants any access. On
 /// macOS an "allow" entry fails, a deny-only list passes, and a path that
-/// cannot be queried fails closed. Elsewhere private-file checks rely on the
-/// mode bits, so this always passes. The path's final link is not followed.
+/// cannot be queried fails closed. On other Unix platforms private-file checks
+/// rely on the mode bits, so this passes. Non-Unix platforms refuse the check
+/// until an ACL verifier is available. The path's final link is not followed.
 #[cfg(unix)]
 pub fn refuse_granting_acl(path: &std::path::Path) -> Result<()> {
     native::acl(path)
+}
+
+#[cfg(not(unix))]
+pub fn refuse_granting_acl(_: &std::path::Path) -> Result<()> {
+    Err(Error::new("unsupported_platform"))
+}
+
+#[cfg(all(test, not(unix)))]
+#[test]
+fn granting_acl_checks_require_a_supported_platform() {
+    let file = tempfile::NamedTempFile::new().unwrap();
+    assert_eq!(
+        refuse_granting_acl(file.path()).unwrap_err().code(),
+        "unsupported_platform"
+    );
 }
 
 /// Public failures carry only a fixed code. Native/parser/HTTP diagnostics and

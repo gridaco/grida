@@ -255,8 +255,22 @@ pub(crate) fn check_private_directory(path: &Path) -> Result<()> {
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+pub(crate) fn check_private_directory(_: &Path) -> Result<()> {
+    Err(unsupported())
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
 fn unsupported() -> Error {
     Error::new(ErrorKind::Unsupported, "scratch_platform_unsupported")
+}
+
+#[cfg(all(test, not(any(target_os = "macos", target_os = "linux"))))]
+#[test]
+fn private_directory_validation_requires_a_supported_platform() {
+    let directory = tempfile::tempdir().unwrap();
+    let error = check_private_directory(directory.path()).unwrap_err();
+    assert_eq!(error.kind, ErrorKind::Unsupported);
+    assert_eq!(error.code, "scratch_platform_unsupported");
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
