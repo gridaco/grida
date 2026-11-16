@@ -50,6 +50,20 @@ describe("parseQuestions", () => {
 });
 
 describe("QuestionSurvey — answer building", () => {
+  it("distinguishes a native choice, matching written text, and a skip", () => {
+    const survey = QuestionSurvey.from(SINGLE);
+    expect(survey.singleAnswer()).toBeNull();
+    expect(survey.togglePick(0, "Cool").singleAnswer()).toEqual({
+      kind: "choice",
+      index: 1,
+    });
+    expect(survey.setWriteIn(0, "Cool").singleAnswer()).toEqual({
+      kind: "text",
+      text: "Cool",
+    });
+    expect(survey.skipCurrent().singleAnswer()).toEqual({ kind: "skipped" });
+  });
+
   it("single-select: a pick is the answer", () => {
     const s = QuestionSurvey.from(SINGLE).togglePick(0, "Warm");
     expect(s.answersFor(0)).toEqual(["Warm"]);

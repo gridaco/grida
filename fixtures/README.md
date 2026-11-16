@@ -9,6 +9,9 @@ Ownership map after the engine split (the Rust engine lives in
 - `test-canvas/`, `test-markdown/` — dotcanvas / markdown fixtures
 - `test-cli/` — human-authored workflow prompts for exercising the Grida CLI
   with an external harness; inputs are fixed, generated outputs are not
+- `test-agent/` — practical missions (seed projects, prompts, checks) that
+  verify the Grida agent harness end to end, run headlessly by
+  `scripts/agent-missions/run.mjs`
 
 ## FROZEN SNAPSHOTS — canon lives in the engine repo
 

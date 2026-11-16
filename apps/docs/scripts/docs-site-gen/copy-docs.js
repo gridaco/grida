@@ -20,7 +20,7 @@ function copyAll({ sources_optional = false } = {}) {
     overwrite: true,
     filter: (src) => {
       const base = path.basename(src);
-      return base !== ".DS_Store";
+      return base !== ".DS_Store" && !base.endsWith(".plan.md");
     },
   });
   // Then the docs authored in other repos, fetched at their pinned commits

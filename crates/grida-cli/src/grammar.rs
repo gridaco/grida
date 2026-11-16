@@ -1,6 +1,8 @@
 // GRIDA-SEC-010 / GRIDA-SEC-013 / GRIDA-SEC-014 — arguments cannot introduce implicit authority.
 use std::collections::HashSet;
+use std::path::PathBuf;
 
+use agent_kit_core::{ModelId, SessionId};
 use clap::{Arg, ArgAction, ArgMatches, Command as ClapCommand, parser::ValueSource};
 use unicode_general_category::{GeneralCategory, get_general_category};
 
@@ -44,6 +46,38 @@ pub struct Options {
 pub struct Invocation {
     pub options: Options,
     pub command: Command,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AgentCommand {
+    pub state_dir: PathBuf,
+    pub model: ModelId,
+    pub max_output_tokens: u64,
+    pub selector: Option<Selector>,
+    pub action: AgentAction,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AgentAction {
+    Run {
+        cwd: PathBuf,
+        session: Option<SessionId>,
+        prompt: Option<String>,
+        input_png: Option<PathBuf>,
+        input_file: Option<PathBuf>,
+        skills: Vec<grida_agent::skills::SkillReference>,
+        questions: bool,
+        deadline_ms: u64,
+    },
+    ServeStdio,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExternalAgentCommand {
+    pub state_dir: PathBuf,
+    pub profile: PathBuf,
+    pub prompt: Option<String>,
+    pub deadline_ms: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -108,6 +142,8 @@ pub enum Command {
     /// `grida fx …`: Grida FX's command line. The npm launcher hands it to `@grida/fx` before
     /// this executable runs; its arguments belong to FX and are not read here.
     Fx,
+    Agent(AgentCommand),
+    AgentExternal(ExternalAgentCommand),
     AuthLogin {
         storage: Option<Storage>,
         no_browser: bool,
@@ -176,6 +212,8 @@ const BOOLEANS: &[&str] = &[
     "available",
     "local-image",
     "key-stdin",
+    "stdio",
+    "questions",
 ];
 const STRINGS: &[&str] = &[
     "storage",
@@ -193,13 +231,21 @@ const STRINGS: &[&str] = &[
     "input",
     "prompt",
     "prompt-file",
+    "input-png",
+    "input-file",
     "text",
     "text-file",
     "image",
     "voice",
     "out",
+    "state-dir",
+    "profile",
+    "cwd",
+    "session",
+    "deadline-ms",
+    "max-output-tokens",
 ];
-const REPEATED: &[&str] = &["reference", "param"];
+const REPEATED: &[&str] = &["reference", "param", "skill"];
 const REQUEST_FLAGS: &[&str] = &[
     "prompt",
     "prompt-file",
@@ -358,6 +404,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Failure> {
         "ai providers",
         "ai voices",
         "ai rigging",
+        "agent",
     ]
     .contains(&topic.as_str())
     {
@@ -365,6 +412,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Failure> {
         return invocation(Command::Help(Topic::parse(&topic)?));
     }
     let command = match topic.as_str() {
+        "agent run" | "agent serve" => Command::Agent(parse_agent(&tokens, topic == "agent run")?),
+        "agent run-external" => Command::AgentExternal(parse_external_agent(&tokens)?),
         "ai rigging list" => {
             tokens.allowed(true, &["provider", "feature"])?;
             Command::RiggingList {
@@ -508,6 +557,109 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Failure> {
         },
     };
     invocation(command)
+}
+
+fn parse_agent(tokens: &Tokens, run: bool) -> Result<AgentCommand, Failure> {
+    let mut allowed = vec![
+        "provider",
+        "state-dir",
+        "model",
+        "max-output-tokens",
+        "org",
+        "org-id",
+        "no-input",
+    ];
+    if run {
+        allowed.extend([
+            "cwd",
+            "session",
+            "prompt",
+            "input-png",
+            "input-file",
+            "skill",
+            "questions",
+            "deadline-ms",
+        ]);
+    } else {
+        allowed.push("stdio");
+    }
+    tokens.allowed(false, &allowed)?;
+    if tokens.required("provider")? != "gg" || (!run && !tokens.flag("stdio")) {
+        return Err(Failure::usage());
+    }
+    if tokens.seen("input-png") && tokens.seen("input-file") {
+        return Err(Failure::usage());
+    }
+    let absolute = |name| {
+        let value = PathBuf::from(tokens.required(name)?);
+        value
+            .is_absolute()
+            .then_some(value)
+            .ok_or_else(Failure::usage)
+    };
+    let integer = |name, default, maximum| {
+        let value = tokens
+            .value(name)
+            .unwrap_or(default)
+            .parse::<u64>()
+            .map_err(|_| Failure::usage())?;
+        (value > 0 && value <= maximum)
+            .then_some(value)
+            .ok_or_else(Failure::usage)
+    };
+    Ok(AgentCommand {
+        state_dir: absolute("state-dir")?,
+        model: ModelId::new(tokens.required("model")?).map_err(|_| Failure::usage())?,
+        max_output_tokens: integer("max-output-tokens", "4096", 65_536)?,
+        selector: tokens.organization()?,
+        action: if run {
+            AgentAction::Run {
+                cwd: absolute("cwd")?,
+                session: tokens
+                    .value("session")
+                    .map(SessionId::new)
+                    .transpose()
+                    .map_err(|_| Failure::usage())?,
+                prompt: tokens.value("prompt").map(str::to_owned),
+                input_png: tokens.value("input-png").map(PathBuf::from),
+                input_file: tokens.value("input-file").map(PathBuf::from),
+                skills: tokens
+                    .values("skill")
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(grida_agent::skills::SkillReference::named)
+                    .collect::<agent_kit_core::Result<_>>()
+                    .map_err(|_| Failure::usage())?,
+                questions: tokens.flag("questions"),
+                deadline_ms: integer("deadline-ms", "120000", 600_000)?,
+            }
+        } else {
+            AgentAction::ServeStdio
+        },
+    })
+}
+
+fn parse_external_agent(tokens: &Tokens) -> Result<ExternalAgentCommand, Failure> {
+    tokens.allowed(
+        false,
+        &["state-dir", "profile", "prompt", "deadline-ms", "no-input"],
+    )?;
+    let state_dir = PathBuf::from(tokens.required("state-dir")?);
+    let profile = PathBuf::from(tokens.required("profile")?);
+    let deadline_ms = tokens
+        .value("deadline-ms")
+        .unwrap_or("120000")
+        .parse::<u64>()
+        .map_err(|_| Failure::usage())?;
+    if !state_dir.is_absolute() || !profile.is_absolute() || !(1..=600_000).contains(&deadline_ms) {
+        return Err(Failure::usage());
+    }
+    Ok(ExternalAgentCommand {
+        state_dir,
+        profile,
+        prompt: tokens.value("prompt").map(str::to_owned),
+        deadline_ms,
+    })
 }
 
 fn parse_rigging(tokens: &Tokens, run: bool) -> Result<Command, Failure> {
@@ -712,6 +864,16 @@ fn has_control_or_format(value: &str) -> bool {
 mod tests {
     use super::*;
 
+    // Absolute on each platform, as the agent's directories must be.
+    #[cfg(windows)]
+    const STATE_DIR: &str = "--state-dir=C:\\state";
+    #[cfg(not(windows))]
+    const STATE_DIR: &str = "--state-dir=/state";
+    #[cfg(windows)]
+    const CWD: &str = "--cwd=C:\\workspace";
+    #[cfg(not(windows))]
+    const CWD: &str = "--cwd=/workspace";
+
     fn args(values: &[&str]) -> Vec<String> {
         values.iter().map(|value| (*value).to_owned()).collect()
     }
@@ -779,6 +941,120 @@ mod tests {
             parsed(&["help", "ai", "providers", "configure", "tripo"]).command,
             Command::Help(Topic::ProvidersConfigure)
         );
+    }
+
+    #[test]
+    fn agent_run_accepts_one_headless_attachment() {
+        let arguments = [
+            "agent",
+            "run",
+            "--provider=gg",
+            "--model=openai/gpt-5.6-sol",
+            STATE_DIR,
+            CWD,
+            "--input-png=example.png",
+        ];
+        let Command::Agent(AgentCommand {
+            action: AgentAction::Run { input_png, .. },
+            ..
+        }) = parsed(&arguments).command
+        else {
+            panic!("expected agent run");
+        };
+        assert_eq!(input_png, Some(PathBuf::from("example.png")));
+        let mut file_arguments = arguments.to_vec();
+        file_arguments.pop();
+        file_arguments.push("--input-file=document.pdf");
+        let Command::Agent(AgentCommand {
+            action: AgentAction::Run { input_file, .. },
+            ..
+        }) = parsed(&file_arguments).command
+        else {
+            panic!("expected agent run");
+        };
+        assert_eq!(input_file, Some(PathBuf::from("document.pdf")));
+        let mut duplicate = arguments.to_vec();
+        duplicate.push("--input-png=other.png");
+        assert!(parse(&args(&duplicate)).is_err());
+        let mut conflicting = arguments.to_vec();
+        conflicting.push("--input-file=document.pdf");
+        assert!(parse(&args(&conflicting)).is_err());
+        assert!(
+            parse(&args(&[
+                "agent",
+                "serve",
+                "--provider=gg",
+                "--model=openai/gpt-5.6-sol",
+                STATE_DIR,
+                "--stdio",
+                "--input-png=example.png",
+            ]))
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn agent_run_accepts_repeated_named_skill_references() {
+        let invocation = parsed(&[
+            "agent",
+            "run",
+            "--provider=gg",
+            "--model=fixture",
+            STATE_DIR,
+            CWD,
+            "--skill=slides",
+            "--skill=svg",
+        ]);
+        let Command::Agent(AgentCommand {
+            action: AgentAction::Run { skills, .. },
+            ..
+        }) = invocation.command
+        else {
+            panic!("expected agent run");
+        };
+        assert_eq!(
+            skills.iter().map(|skill| skill.name()).collect::<Vec<_>>(),
+            ["slides", "svg"]
+        );
+        assert_eq!(
+            parse(&args(&[
+                "agent",
+                "run",
+                "--provider=gg",
+                "--model=fixture",
+                STATE_DIR,
+                CWD,
+                "--skill=../outside",
+            ]))
+            .unwrap_err(),
+            Failure::usage()
+        );
+    }
+
+    #[test]
+    fn external_agent_uses_an_explicit_private_profile_instead_of_gateway_options() {
+        let root = std::env::temp_dir();
+        let state = root.join("external-state");
+        let profile = root.join("external-acp.json");
+        let state_flag = format!("--state-dir={}", state.display());
+        let profile_flag = format!("--profile={}", profile.display());
+        let base = ["agent", "run-external", &state_flag, &profile_flag];
+        assert_eq!(
+            parsed(&base).command,
+            Command::AgentExternal(ExternalAgentCommand {
+                state_dir: state,
+                profile,
+                prompt: None,
+                deadline_ms: 120_000,
+            })
+        );
+        for unsupported in ["--provider=gg", "--org-id=5", "--json", "--deadline-ms=0"] {
+            let mut rejected = base.to_vec();
+            rejected.push(unsupported);
+            assert_eq!(parse(&args(&rejected)).unwrap_err(), Failure::usage());
+        }
+        let relative = ["agent", "run-external", &state_flag, "--profile=peer.json"];
+        assert_eq!(parse(&args(&relative)).unwrap_err(), Failure::usage());
     }
 
     #[test]

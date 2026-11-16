@@ -135,13 +135,13 @@ is unavailable on a buffered-only host, but text and small media still render.
 
 ## What lives where
 
-| Concern                              | Where                                            |
-| ------------------------------------ | ------------------------------------------------ |
-| Privileged scheme registration       | Electron main (`desktop/src/`)                   |
-| Resource route (buffered + streamed) | host perimeter — `@grida/agent` (`AgentSidecar`) |
-| Path containment (single source)     | the workspace filesystem layer in `@grida/agent` |
-| CSP scheme admission                 | the `/desktop/*` CSP                             |
-| Transport selection + viewers        | renderer (`editor/scaffolds/desktop/`)           |
+| Concern                              | Where                                                |
+| ------------------------------------ | ---------------------------------------------------- |
+| Privileged scheme registration       | Electron main (`desktop/src/`)                       |
+| Resource route (buffered + streamed) | host perimeter — `@grida/daemon` (`ServicesSidecar`) |
+| Path containment (single source)     | the workspace filesystem layer in `@grida/daemon`    |
+| CSP scheme admission                 | the `/desktop/*` CSP                                 |
+| Transport selection + viewers        | renderer (`editor/scaffolds/desktop/`)               |
 
 ## What can change
 
@@ -151,10 +151,6 @@ is unavailable on a buffered-only host, but text and small media still render.
 - **Range on the buffered fallback.** A buffered-only host could gain partial
   reads without a privileged scheme if one ever needs seekable media without
   one — at the cost of staying fully buffered per range.
-- **Containment as a package edge.** The workspace filesystem layer is a host
-  capability that today lives inside the agent package; promoting it to its own
-  package would make the single-source containment boundary a compilable package
-  edge rather than a convention. See the [god class](./index.md#god-class) note.
 
 ## See also
 

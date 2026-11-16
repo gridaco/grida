@@ -7,7 +7,7 @@
  * Its load-bearing behaviors: the root is exactly the opened directory (no
  * git-root expansion — always respect what the user opened), a path-stable id
  * (same dir → same id across launches), and independent coexistence of
- * multiple opened roots — the per-root scopes the future srt fs-policy unions
+ * multiple opened roots — the per-root scopes a filesystem policy unions
  * together.
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -75,38 +75,6 @@ describe("Workspaces", () => {
     const c = new WorkspaceRegistry(userDataDir);
     expect(await c.findById(first.id)).not.toBeNull();
   });
-
-  it("ad-hoc files coexist with workspaces in the sandbox fs scope union", async () => {
-    // Two opened workspaces (no git → each is its own root). They must
-    // coexist independently: both appear in the roots snapshot the
-    // fs-policy reads, and each scopes containment to itself.
-    const w1 = path.join(baseDir, "ws-one");
-    const w2 = path.join(baseDir, "ws-two");
-    await fs.mkdir(w1);
-    await fs.mkdir(w2);
-    const w1Real = await fs.realpath(w1);
-    const w2Real = await fs.realpath(w2);
-
-    const registry = new WorkspaceRegistry(userDataDir);
-    await registry.open(w1);
-    await registry.open(w2);
-    await registry.list(); // warm the sync containsPath path
-
-    const roots = registry.rootsSnapshot();
-    expect(roots).toContain(w1Real);
-    expect(roots).toContain(w2Real);
-
-    // Each workspace contains its own tree; neither contains the other
-    // nor an unrelated ad-hoc path outside both.
-    expect(registry.containsPath(path.join(w1Real, "a.txt"))).toBe(true);
-    expect(registry.containsPath(path.join(w2Real, "b.txt"))).toBe(true);
-    expect(registry.containsPath(path.join(baseDir, "loose-adhoc.txt"))).toBe(
-      false
-    );
-  });
-
-  // Phase B+ coverage target once host sandbox policy compilation lands:
-  // srt fs-policy unions workspace roots, ad-hoc docIds, and userData.
 
   describe("createProject (auto-create)", () => {
     let projectsRoot: string;

@@ -43,6 +43,7 @@ import type {
   ChatCompletionChunk,
   ChatCompletionRequest,
   ChatCompletionResponse,
+  GatewayBillingReceipt,
   WireFinishReason,
   WireResponseToolCall,
   WireUsage,
@@ -258,17 +259,30 @@ function parseToolArguments(args: string): unknown {
 // Encode: V3 results → OpenAI wire
 // ---------------------------------------------------------------------------
 
-export function encodeUsage(usage: LanguageModelV3Usage): WireUsage {
-  const prompt = usage.inputTokens.total ?? 0;
-  const completion = usage.outputTokens.total ?? 0;
+export function encodeUsage(
+  usage: LanguageModelV3Usage
+): WireUsage | undefined {
+  const { total: prompt, cacheRead } = usage.inputTokens;
+  const { total: completion, reasoning } = usage.outputTokens;
+  if (
+    [prompt, completion, cacheRead, reasoning].every(
+      (count) => count === undefined
+    )
+  ) {
+    return undefined;
+  }
   return {
-    prompt_tokens: prompt,
-    completion_tokens: completion,
-    total_tokens: prompt + completion,
-    prompt_tokens_details: { cached_tokens: usage.inputTokens.cacheRead ?? 0 },
-    completion_tokens_details: {
-      reasoning_tokens: usage.outputTokens.reasoning ?? 0,
-    },
+    ...(prompt !== undefined ? { prompt_tokens: prompt } : {}),
+    ...(completion !== undefined ? { completion_tokens: completion } : {}),
+    ...(prompt !== undefined && completion !== undefined
+      ? { total_tokens: prompt + completion }
+      : {}),
+    ...(cacheRead !== undefined
+      ? { prompt_tokens_details: { cached_tokens: cacheRead } }
+      : {}),
+    ...(reasoning !== undefined
+      ? { completion_tokens_details: { reasoning_tokens: reasoning } }
+      : {}),
   };
 }
 
@@ -318,6 +332,7 @@ export function encodeCompletion(
     }
   }
 
+  const usage = encodeUsage(result.usage);
   return {
     id: chunkId(),
     object: "chat.completion",
@@ -335,7 +350,7 @@ export function encodeCompletion(
         finish_reason: encodeFinishReason(result.finishReason),
       },
     ],
-    usage: encodeUsage(result.usage),
+    ...(usage !== undefined ? { usage } : {}),
   };
 }
 
@@ -359,7 +374,7 @@ function chunkId(): string {
  */
 export function streamEncoder(
   modelId: string,
-  opts: { includeUsage: boolean }
+  opts: { includeUsage: boolean; gatewayRequestId?: string }
 ): TransformStream<LanguageModelV3StreamPart, Uint8Array> {
   const textEncoder = new TextEncoder();
   const id = chunkId();
@@ -370,6 +385,7 @@ export function streamEncoder(
   let finish: {
     reason: LanguageModelV3FinishReason;
     usage: LanguageModelV3Usage;
+    billing?: GatewayBillingReceipt;
   } | null = null;
   const toolIndexById = new Map<string, number>();
 
@@ -463,7 +479,11 @@ export function streamEncoder(
           break;
         }
         case "finish":
-          finish = { reason: part.finishReason, usage: part.usage };
+          finish = {
+            reason: part.finishReason,
+            usage: part.usage,
+            billing: gatewayBillingReceipt(part, opts.gatewayRequestId),
+          };
           break;
         case "error": {
           errored = true;
@@ -496,6 +516,7 @@ export function streamEncoder(
             object: "chat.completion.chunk",
             created,
             model: modelId,
+            ...(finish.billing && { grida_billing: finish.billing }),
             choices: [
               {
                 index: 0,
@@ -505,7 +526,8 @@ export function streamEncoder(
             ],
           } satisfies ChatCompletionChunk)
         );
-        if (opts.includeUsage) {
+        const usage = opts.includeUsage ? encodeUsage(finish.usage) : undefined;
+        if (usage !== undefined) {
           controller.enqueue(
             frame({
               id,
@@ -513,7 +535,7 @@ export function streamEncoder(
               created,
               model: modelId,
               choices: [],
-              usage: encodeUsage(finish.usage),
+              usage,
             })
           );
         }
@@ -521,4 +543,32 @@ export function streamEncoder(
       controller.enqueue(textEncoder.encode("data: [DONE]\n\n"));
     },
   });
+}
+
+function gatewayBillingReceipt(
+  part: Extract<LanguageModelV3StreamPart, { type: "finish" }>,
+  requestId: string | undefined
+): GatewayBillingReceipt | undefined {
+  const observation = part.providerMetadata?.gg;
+  if (!requestId || observation?.requestId !== requestId) return;
+  const amount = observation.chargedMills;
+  if (
+    observation.billingStatus === "settled" &&
+    typeof amount === "string" &&
+    amount.length <= 64 &&
+    /^\d+(?:\.\d+)?$/.test(amount)
+  ) {
+    return {
+      version: 1,
+      request_id: requestId,
+      status: "settled",
+      charged_mills: amount,
+    };
+  }
+  return {
+    version: 1,
+    request_id: requestId,
+    status: "pending",
+    charged_mills: null,
+  };
 }

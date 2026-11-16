@@ -12,9 +12,8 @@ automatable: false
 covered_by:
   - editor/lib/desktop/gg-session.test.ts
   - editor/app/(api)/(public)/api/v1/ai/chat/completions/route.test.ts
-  - packages/grida-ai-agent/src/providers/gg-resolution.test.ts
-  - packages/grida-ai-agent/src/providers/gg.test.ts
-  - packages/grida-ai-agent/src/http/routes/gg-auth.test.ts
+  - desktop/src/main/native-gateway-connection.test.ts
+  - packages/grida-ai-host/src/http/routes/gg-auth.test.ts
 ---
 
 ## Behavior

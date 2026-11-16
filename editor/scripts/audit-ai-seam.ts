@@ -41,7 +41,6 @@ const ALLOWLIST = [
   "lib/ai/gg-three-d.ts",
   "lib/ai/gg-three-d-http.ts",
   "lib/ai/__tests__/gg-three-d.test.ts",
-  "grida-canvas-hosted/ai/agent/server-agent.ts",
   "app/(api)/private/ai/models/openai/route.ts",
   // Contract tests for the hosted OpenAI-compat endpoint (GRIDA-SEC-006):
   // value-import `@ai-sdk/openai-compatible` as the wire-contract driver

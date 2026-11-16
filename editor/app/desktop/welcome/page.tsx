@@ -4,37 +4,26 @@
  * Desktop welcome window — the reference-first artwork studio front door.
  *
  * Composer-first and outcome-first: describe what you want, or gather references
- * from the gallery — then Grida AUTO-CREATES a fresh, EMPTY project for you (a
- * plain folder under `~/Documents/Grida Projects`) and hands your prompt to that
- * project's agent as its first turn via {@link welcome_handoff}. No workspace
- * picker, no folder dialog to get started: the newcomer never has to choose a
- * folder. "Open folder…" and the recents list stay for opening work that
- * already exists (files stay visible — a named tree, not hidden). Submitting an
- * otherwise empty composer simply enters the selected/default workspace without
- * starting an agent turn.
+ * from the gallery, and the workspace opens with that request as the first turn
+ * of a new native chat (see {@link welcome_message}). The composer targets the
+ * DEFAULT workspace — the managed root `~/Documents/Grida Projects`, always
+ * registered — unless the top-left picker aims it at an existing project.
+ * "Open folder…" and the recents list stay for opening work that already
+ * exists. Submitting an otherwise empty composer simply enters the
+ * selected/default workspace without starting a turn.
  *
- * The home NEVER mints a per-session folder and NEVER dirties the user's
- * workspace. Starting a session roots the agent at the DEFAULT workspace — the
- * managed root itself (`~/Documents/Grida Projects`), always registered — and the agent
- * takes the wheel: whether the workspace becomes a board, a slides deck, or a
- * tree of files is the AGENT's choice on turn one (guided by the advertised
- * skills), and produced files land where the agent decides. The system provides
- * MINIMALLY — the default workspace + a per-session scratch dir. (The old flow
- * minted `~/Documents/Grida Projects/<prompt>` folders per session and pre-picked where
- * to work; that's the legacy this replaces.)
+ * The home NEVER mints a per-session folder: the agent roots at the workspace
+ * and decides on turn one whether it becomes a board, a deck or a tree of
+ * files (guided by its skills), writing only what it decides.
  *
  * A reference card opens related Library ideas; its Add action drops that
  * reference into the composer's tray. A slides template is selected directly
  * (references multi-select; a template is single-select, like choosing one
- * Keynote theme). Neither action starts work on its own. The user can add a
- * prompt, then start ONE session. References fold into the first-turn prompt as
- * plain URLs; a picked template's unzipped `.canvas` bundle rides the handoff
- * into the session's SCRATCH dir — agent-only reference, like an attachment (WG
- * `scratch.md`), never the user's workspace — and the prompt tells the agent to
- * read it from scratch and build the adapted deck. Every start opens the MAIN
- * workbench (`/desktop/workspace`) — the full surface with the file tree,
- * tool-approval, and auto-accept — whose agent pane consumes the handoff and
- * auto-sends when there's a prompt.
+ * Keynote theme). Neither action starts work on its own. References fold into
+ * the first message as plain URLs. A picked template is copied into the
+ * workspace as its own deck, and the first message names that copy so the
+ * agent adapts it. The model picker offers the native connections a new chat
+ * can choose before its workspace opens; the opened workspace selects it.
  */
 
 import {
@@ -44,29 +33,30 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { XIcon } from "lucide-react";
 import { cn } from "@app/ui/lib/utils";
 import {
   getDesktopBridge,
+  useDesktopBridge,
   workspaces as workspacesNs,
   type Workspace,
 } from "@/lib/desktop/bridge";
-import {
-  welcome_handoff,
-  type ScratchSeedFile,
-  type WelcomeHandoff,
-} from "@/lib/desktop/welcome-handoff";
+import { welcome_message } from "@/lib/desktop/welcome-message";
 import { dotcanvas } from "dotcanvas";
 import { TitleBar } from "@/scaffolds/desktop/chrome/title-bar";
-import { AgentComposerInput } from "@/scaffolds/desktop/shared/agent-composer-input";
+import { AgentComposer } from "@/scaffolds/desktop/shared/agent-composer";
+import { HomeComposer } from "@/scaffolds/desktop/home/home-composer";
+import { NativeAttachmentCard } from "@/scaffolds/desktop/workbench/native-attachment-card";
+import { useWorkspaceFileMentions } from "@/scaffolds/desktop/shared/use-workspace-file-mentions";
+import { WorkspaceCanvasCreation } from "@/scaffolds/desktop/workbench/workspace-canvas-creation";
 import {
-  DesktopModelPicker,
-  useModelPickerState,
-} from "@/scaffolds/desktop/shared/model-picker";
-import { useEndpointProviders } from "@/scaffolds/desktop/shared/registered-models";
-import type { ComposerCatalog } from "@/kits/composer";
+  ComposerDropArea,
+  type ComposerCatalog,
+  type ComposerTransfer,
+} from "@/kits/composer";
 import {
   LibraryExplorerView,
   type LibraryExplorerViewHandle,
@@ -77,7 +67,7 @@ import { SlidesTemplateGallery } from "@/scaffolds/desktop/home/slides-template-
 // `import type` is erased at build — it does NOT pull the loader (and its
 // fflate/dotcanvas deps) into the home chunk; the gallery's dynamic `import()`
 // stays the sole code-split boundary. The home only holds the picked template
-// object and reads its `files` (the unzipped bundle) to seed the session scratch.
+// object and copies its `files` (the unzipped bundle) into the workspace.
 import type { SlidesTemplate } from "@/lib/slides-templates";
 import { RecentProjectsCommand } from "@/scaffolds/desktop/home/recent-projects-command";
 import { WorkspacePicker } from "@/scaffolds/desktop/home/workspace-picker";
@@ -86,9 +76,9 @@ import {
   type ApplicationPresetId,
 } from "@/scaffolds/desktop/home/application-preset";
 import { PresetRail } from "@/scaffolds/desktop/home/preset-rail";
-import { PresetChip } from "@/scaffolds/desktop/home/preset-chip";
-import type { AgentDesignSearch } from "@grida/agent/tools/design-search";
+import type { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
 import { last_workspace } from "@/lib/desktop/last-workspace";
+import { NativeChatController } from "@/lib/agent-chat/native-chat-controller";
 
 const NOOP = () => {};
 const WELCOME_LIBRARY_SOURCE = { kind: "browse" } as const;
@@ -157,63 +147,73 @@ function StartupRestoreScreen() {
   );
 }
 
-/** The home composer targets no existing workspace (a fresh project is created
- *  on submit), so there are no `@` file refs or `/` skills to offer. A constant
- *  — not `useWorkspaceComposerCatalog("")`, which would fire doomed bridge
- *  readdirs per mount just to yield this same empty shape. */
-const EMPTY_CATALOG: ComposerCatalog = { commands: [], mentions: [] };
-
-/** Fold picked references into the first-turn prompt as plain context. The
- *  workspace starts empty — there is no seeded document to place references in
- *  anymore — so the agent receives them as URLs and decides what to make of
- *  them (a moodboard board, style refs for a deck, …). Returns `text` unchanged
- *  when nothing is picked. */
-function composePromptWithRefs(
-  text: string,
-  refs: AgentDesignSearch.DesignSearchResult[]
-): string {
-  if (refs.length === 0) return text;
-  const list = refs
-    .map((r) => `- ${r.title || "reference"}: ${r.url}`)
-    .join("\n");
-  const lead = text || "Use these visual references as the starting point.";
-  return `${lead}\n\nReferences:\n${list}`;
-}
-
 function WelcomeSurface({
   initialWorkspaceId,
 }: {
   initialWorkspaceId: string | null;
 }) {
   const router = useRouter();
+  const bridge = useDesktopBridge();
+  const [composer] = useState(() => new HomeComposer());
+  const staged = useSyncExternalStore(
+    composer.subscribe,
+    composer.read,
+    composer.read
+  );
+  useEffect(() => {
+    void composer.restore();
+  }, [composer]);
+  const filePicker = useRef<HTMLInputElement>(null);
+  const imagePicker = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLDivElement>(null);
   // The home's single page-scroll container — everything (composer, gallery)
   // scrolls together inside it; the gallery virtualizes against it.
   const scrollRef = useRef<HTMLDivElement>(null);
   const libraryRef = useRef<LibraryExplorerViewHandle>(null);
-  const [busy, setBusy] = useState(false);
+  const [openingFolder, setBusy] = useState(false);
+  const busy = openingFolder || staged.busy;
   const [error, setError] = useState<string | null>(null);
-  // The active `application_preset` (SPIKE). Mutated by the icon rail and the
-  // composer's mode chip; re-themes the one shared home (placeholder now; the
-  // gallery's visual references and the handoff seed are the next seams).
+  // Presets supply explicit user intent and select the surrounding gallery.
   const [preset, setPreset] = useState<ApplicationPresetId>(
     ApplicationPreset.DEFAULT
   );
-  // The composer placeholder is the active preset's representative example.
-  // It swaps when the mode changes, but does not rotate.
-  const presetPlaceholder = ApplicationPreset.byId(preset).placeholder;
+  const presetSpec = ApplicationPreset.byId(preset);
+  const PresetIcon = presetSpec.icon;
   // Recent-projects quick switcher (⌃R, VS Code's "Open Recent"). Keeps the
   // home minimal — no persistent recents list.
   const [commandOpen, setCommandOpen] = useState(false);
-  // The composer's target: null = create a NEW project under the managed root
-  // (the default, shown as "Default workspace"), or an existing workspace to
-  // send the prompt into instead. Owned here; the top-left WorkspacePicker
-  // mutates it and the composer's `start` reads it.
+  // Null targets the managed default workspace; an explicit choice is honored
+  // for text, references and templates alike.
   const [target, setTarget] = useState<Workspace | null>(null);
+  const composerDraft = useMemo(
+    () => composer.draftFor(target?.id ?? "default"),
+    [composer, target?.id]
+  );
   const pendingInitialWorkspaceId = useRef(initialWorkspaceId);
+  const [defaultWorkspace, setDefaultWorkspace] = useState<Workspace | null>(
+    null
+  );
+  useEffect(() => {
+    let active = true;
+    void workspacesNs
+      .getDefault()
+      .then((workspace) => {
+        if (active) setDefaultWorkspace(workspace);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+  const mentions = useWorkspaceFileMentions((target ?? defaultWorkspace)?.id);
+  const catalog = useMemo<ComposerCatalog>(
+    () => ({ commands: [], mentions }),
+    [mentions]
+  );
   // References the user has gathered from the gallery (multi-select). They seed
   // ONE fresh board on submit; a click in the gallery toggles membership here.
   const [pickedRefs, setPickedRefs] = useState<
-    AgentDesignSearch.DesignSearchResult[]
+    chat_vocabulary.DesignReference[]
   >([]);
   const selectedRefIds = useMemo(
     () => new Set(pickedRefs.map((p) => p.id)),
@@ -335,184 +335,130 @@ function WelcomeSurface({
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const ids = await Promise.all(
-        workspaces.map(async (w) => {
-          try {
-            const entries = await workspacesNs.readdir(w.id);
-            return entries.some(
-              (e) => e.rel_path === dotcanvas.MANIFEST_FILENAME
-            )
-              ? w.id
-              : null;
-          } catch {
-            return null;
-          }
-        })
-      );
-      if (!cancelled) {
-        setCanvasIds(new Set(ids.filter((x): x is string => x !== null)));
+      const ids = new Set<string>();
+      // The native reader has finite workers. Leave room for open editors
+      // while checking every remembered workspace.
+      for (let index = 0; index < workspaces.length; index += 2) {
+        if (cancelled) return;
+        await Promise.all(
+          workspaces.slice(index, index + 2).map(async (w) => {
+            try {
+              const entries = await workspacesNs.readdir(w.id);
+              if (
+                entries.some((e) => e.rel_path === dotcanvas.MANIFEST_FILENAME)
+              )
+                ids.add(w.id);
+            } catch {
+              // Unavailable folders remain available as ordinary workspace rows.
+            }
+          })
+        );
       }
+      if (!cancelled) setCanvasIds(ids);
     })();
     return () => {
       cancelled = true;
     };
   }, [workspaces]);
 
-  // Configured endpoint providers (issue #806): registered local models
-  // join the welcome composer's picker too.
-  const endpoints = useEndpointProviders();
-
-  // Model selection for the composer. No sessions here (the welcome page never
-  // loads a chat), so this just holds the user's pick; it rides the handoff so
-  // the session's first turn runs on the chosen model.
-  const {
-    model_id: modelId,
-    provider_id: modelProviderId,
-    setSelection: setModelSelection,
-    is_user_pick: isUserPick,
-  } = useModelPickerState({
-    current_id: null,
-    binding_epoch: 0,
-    sessions: [],
-    endpoints,
-  });
-
-  // Stash the (possibly empty) prompt + model + scratch seed for a workspace's
-  // agent and become the workspace window. Shared by the default-workspace and
-  // existing-target paths; an empty prompt lands primed but doesn't auto-send a
-  // turn. `scratchSeed` (a picked template's unzipped bundle) rides into the
-  // session scratch on the first turn — agent-only, never the workspace.
-  const handoffAndGo = useCallback(
-    (
-      workspace: Workspace,
-      prompt: string,
-      scratchSeed?: ScratchSeedFile[],
-      templateContext?: WelcomeHandoff["template_context"]
-    ) => {
-      welcome_handoff.set(workspace.id, {
-        prompt,
-        // Carry the model only when the user deliberately picked one. An
-        // untouched default — or a GG upgrade that hasn't resolved yet — is
-        // left off so the workspace resolves its own (GG-aware) default;
-        // otherwise a fast submit before the async session settles would
-        // seed the workspace with the hosted default as a false explicit
-        // pick, and keyless users would hit `auth_required` (#942).
-        ...(isUserPick
-          ? {
-              model_id: modelId,
-              ...(modelProviderId ? { provider_id: modelProviderId } : {}),
-            }
-          : {}),
-        ...(scratchSeed && scratchSeed.length > 0
-          ? { scratch_seed: scratchSeed }
-          : {}),
-        ...(templateContext ? { template_context: templateContext } : {}),
-      });
-      router.push(workspaceWorkbenchHref(workspace));
-    },
-    [modelId, modelProviderId, isUserPick, router]
+  // Native connection choices for the first chat. Only choices that do not
+  // depend on a workspace are offered here; the opened workspace selects the
+  // chosen one as a new connection. `null` keeps the workspace default.
+  const modelSelection = useMemo(
+    () => new NativeChatController.ModelSelection(),
+    []
   );
+  const {
+    profiles,
+    profileId,
+    error: profileReadError,
+  } = useSyncExternalStore(
+    modelSelection.subscribe,
+    modelSelection.read,
+    modelSelection.read
+  );
+  useEffect(() => {
+    composer.initializeEffort(profiles?.newChatDefault?.effort);
+  }, [composer, profiles?.newChatDefault?.effort]);
+  const readProfiles = useCallback(() => {
+    const list = getDesktopBridge()?.nativeChat?.welcomeProfiles;
+    if (!list) return;
+    void modelSelection.refresh(list);
+  }, [modelSelection]);
+  useEffect(() => {
+    readProfiles();
+    // Settings can add a provider key or endpoint in another window.
+    window.addEventListener("focus", readProfiles);
+    return () => {
+      window.removeEventListener("focus", readProfiles);
+      modelSelection.release();
+    };
+  }, [readProfiles, modelSelection]);
 
-  // Start a session in the DEFAULT workspace (`~/Documents/Grida Projects`). We NEVER mint
-  // a per-session folder — that littered the managed root and pre-picked where to
-  // work; the agent roots at the default workspace and takes the wheel, writing
-  // only what it decides. Optional `scratchSeed` (a picked template's unzipped
-  // bundle) rides the handoff into the session scratch — agent-only reference,
-  // never the user's workspace.
-  const startFresh = useCallback(
-    async (opts: {
-      prompt: string;
-      scratchSeed?: ScratchSeedFile[];
-      templateContext?: WelcomeHandoff["template_context"];
-    }) => {
-      const bridge = getDesktopBridge();
-      if (!bridge) {
-        setError("Desktop bridge not available.");
-        return;
+  // Open a workspace and, when there is one, leave the first message for its
+  // chat. An empty message enters the workspace without starting a turn.
+  const start = useCallback(
+    async (text: string) => {
+      const template = pickedTemplate;
+      if (
+        (text.trim() ||
+          template ||
+          pickedRefs.length ||
+          composer.read().attachment) &&
+        !getDesktopBridge()?.nativeChat
+      ) {
+        setError("Chat isn't available in this version of Grida Desktop.");
+        throw new Error("Chat unavailable");
       }
+      setError(null);
       try {
-        setBusy(true);
-        setError(null);
-        const ws = await workspacesNs.getDefault();
-        if (!ws) {
-          setError("No default workspace available on this host.");
-          setBusy(false);
-          return;
-        }
-        // Opens the MAIN workbench (`/desktop/workspace`) — the full surface with
-        // the file tree, tool-approval bar, and auto-accept picker; its agent pane
-        // consumes the handoff and auto-sends the prompt as turn one.
-        handoffAndGo(ws, opts.prompt, opts.scratchSeed, opts.templateContext);
+        await composer.submit(
+          {
+            text,
+            prompt: ApplicationPreset.prompt(preset, text),
+            profileId,
+            target,
+            references: template ? [] : pickedRefs,
+            ...(template && {
+              copyTemplate: async (workspaceId: string) => ({
+                title: template.title,
+                slides: template.pages.length,
+                path: await WorkspaceCanvasCreation.copy(workspaceId, template),
+              }),
+            }),
+          },
+          {
+            defaultWorkspace: workspacesNs.getDefault,
+            stash: welcome_message.stash,
+            open: (workspace) => router.push(workspaceWorkbenchHref(workspace)),
+          }
+        );
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Couldn't start a session."
         );
-        setBusy(false); // navigation unmounts on success; only reset on failure
+        throw err;
       }
     },
-    [handoffAndGo]
-  );
-
-  // The one "start" path, shared by the composer's send and the reference
-  // tray's Start button. Picked references (if any) fold into the first-turn
-  // prompt as context and always start a FRESH project — they take precedence
-  // over the target picker, since they're only meaningful for a new start. An
-  // otherwise empty submit simply enters the selected/default workspace without
-  // starting an agent turn (see test/desktop-welcome-empty-submit.md).
-  const start = useCallback(
-    (text: string) => {
-      const t = text.trim();
-      if (busy) return;
-      // A picked template starts a session in the default workspace. Its unzipped
-      // `.canvas` bundle rides into the session SCRATCH (agent-only), and the
-      // template itself rides as a `user_template_selection` CONTEXT part (a chip
-      // in the transcript, a `<user_template_selection>` block for the model) —
-      // NOT fabricated into the message. The user's raw text `t` is the only ask
-      // (empty ⇒ a context-only send; the agent-pane fires it anyway).
-      if (pickedTemplate) {
-        void startFresh({
-          prompt: t,
-          scratchSeed: pickedTemplate.files,
-          templateContext: {
-            name: pickedTemplate.name,
-            title: pickedTemplate.title,
-            slides: pickedTemplate.pages.length,
-            system: pickedTemplate.system,
-          },
-        });
-        return;
-      }
-      if (pickedRefs.length > 0) {
-        void startFresh({ prompt: composePromptWithRefs(t, pickedRefs) });
-        return;
-      }
-      // Send into an existing opened workspace, or enter it without a turn when
-      // the composer is empty. The default-workspace path follows the same rule.
-      if (target) handoffAndGo(target, t);
-      else void startFresh({ prompt: t });
-    },
-    [busy, pickedTemplate, pickedRefs, target, handoffAndGo, startFresh]
+    [pickedTemplate, pickedRefs, target, profileId, router, composer, preset]
   );
 
   // A Library card's Add action toggles it in the composer's tray (multi-select)
   // instead of starting a board on its own — the user gathers several, then
   // starts one board from all of them via the composer / the tray's Start button.
-  const togglePick = useCallback(
-    (pin: AgentDesignSearch.DesignSearchResult) => {
-      setPickedRefs((cur) =>
-        cur.some((p) => p.id === pin.id)
-          ? cur.filter((p) => p.id !== pin.id)
-          : [...cur, pin]
-      );
-    },
-    []
-  );
+  const togglePick = useCallback((pin: chat_vocabulary.DesignReference) => {
+    setPickedRefs((cur) =>
+      cur.some((p) => p.id === pin.id)
+        ? cur.filter((p) => p.id !== pin.id)
+        : [...cur, pin]
+    );
+  }, []);
 
   // Picking a slides template SELECTS it into the composer (single-select), like
   // attaching a reference — it does NOT start a session on its own. Clicking the
-  // already-picked one clears it. The start (composer send / Enter) attaches it
-  // as a `user_template_selection` context part + seeds the deck's bundle into
-  // scratch, handing it to the agent to adapt; see `start`.
+  // already-picked one clears it. The start (composer send / Enter) copies the
+  // deck into the workspace and names the copy in the first message; see
+  // `start`.
   const togglePickTemplate = useCallback((template: SlidesTemplate) => {
     setPickedTemplate((cur) => (cur?.name === template.name ? null : template));
   }, []);
@@ -526,13 +472,8 @@ function WelcomeSurface({
     try {
       setBusy(true);
       setError(null);
-      // `createDirectory` surfaces the macOS "New Folder" button; macOS-only,
-      // safely ignored on Windows/Linux.
-      const paths = await bridge.dialog.open({
-        properties: ["openDirectory", "createDirectory"],
-      });
-      if (!paths || paths.length === 0) return;
-      const ws = await workspacesNs.openFolder(paths[0]);
+      const ws = await workspacesNs.chooseFolder();
+      if (!ws) return;
       await refreshWorkspaces();
       setTarget(ws); // aim the composer at the just-opened project
     } catch (err) {
@@ -542,8 +483,15 @@ function WelcomeSurface({
     }
   }, [refreshWorkspaces]);
 
+  // The whole Home window accepts external files/folders through the same
+  // intake as the editor. The shared drop zone consumes each gesture once.
+  const transferAttachment = (event: ComposerTransfer.Event) => {
+    if (!busy) composer.transfer(event);
+  };
+
   return (
-    <div
+    <ComposerDropArea
+      onTransfer={transferAttachment}
       data-testid="desktop-welcome"
       // The desktop shell locks <body> to h-svh/overflow-hidden, so the home
       // owns its layout: one scroll pane with the composer hero on top and the
@@ -683,50 +631,171 @@ function WelcomeSurface({
                       ))}
                     </div>
                   )}
-                  <AgentComposerInput
-                    catalog={EMPTY_CATALOG}
-                    // Docked: lift the input on its own shadow so it floats over
-                    // the gallery — there's no card wrapper doing it anymore.
-                    className={docked ? "shadow-xl" : undefined}
+                  <AgentComposer
+                    draft={composerDraft}
+                    submissionScope={composerDraft.key}
+                    catalog={catalog}
+                    className={cn("@container", docked && "shadow-xl")}
                     onSubmit={start}
+                    awaitSubmission
+                    submitting={staged.busy}
+                    canSubmit={!busy}
                     isStreaming={false}
                     onStop={NOOP}
-                    // Welcome uses the reference tray ("Start from an idea"), not
-                    // composer attachments — its `start` ignores files/uploads, so
-                    // hide the "+" rather than offer a dead control.
-                    attach={false}
                     allowEmptySubmit
                     emptySubmitLabel={
-                      pickedTemplate || pickedRefs.length > 0
+                      pickedTemplate ||
+                      pickedRefs.length > 0 ||
+                      staged.attachment
                         ? "Start"
                         : "Open workspace"
                     }
                     autofocus
-                    placeholder={
-                      pickedTemplate
-                        ? `Adapt the "${pickedTemplate.title}" template — describe your deck…`
-                        : pickedRefs.length > 0
-                          ? "Describe what to make from these references…"
-                          : target
-                            ? `Ask Grida to design something in ${target.name}…`
-                            : presetPlaceholder
+                    onAttachmentTransfer={transferAttachment}
+                    attachments={
+                      staged.attachment && (
+                        <NativeAttachmentCard
+                          name={staged.attachment.file.name}
+                          size={
+                            staged.attachment.kind === "directory"
+                              ? undefined
+                              : staged.attachment.file.size
+                          }
+                          png={staged.attachment.file.type === "image/png"}
+                          mimeType={
+                            staged.attachment.kind === "directory"
+                              ? "inode/directory"
+                              : staged.attachment.file.type
+                          }
+                          preview={
+                            staged.attachment.kind === "file" &&
+                            /^image\/(png|jpeg|webp|gif)$/.test(
+                              staged.attachment.file.type
+                            )
+                              ? staged.attachment.file
+                              : null
+                          }
+                          onRemove={composer.removeAttachment}
+                        />
+                      )
                     }
-                    toolbarStart={
-                      <PresetChip value={preset} onChange={setPreset} />
+                    actions={{
+                      files: {
+                        disabled: busy || staged.goal,
+                        onSelect: () => filePicker.current?.click(),
+                      },
+                      image: {
+                        disabled: busy || staged.goal,
+                        onSelect: () => imagePicker.current?.click(),
+                      },
+                      library: {
+                        disabled: busy || staged.goal,
+                        onSelect: () => {
+                          galleryRef.current?.scrollIntoView({
+                            behavior: "smooth",
+                            block: "start",
+                          });
+                          galleryRef.current?.focus({ preventScroll: true });
+                        },
+                      },
+                      plan: {
+                        offered: !!bridge?.nativeChat?.submitInRegime,
+                        active: staged.plan,
+                        disabled: busy,
+                        onChange: composer.selectPlan,
+                      },
+                      goal: {
+                        offered: !!bridge?.nativeChat?.startGoal,
+                        active: staged.goal,
+                        disabled: busy || !!staged.attachment,
+                        removeDisabled: busy,
+                        onChange: composer.selectGoal,
+                      },
+                    }}
+                    commands={[
+                      ...(bridge?.nativeChat?.submitInRegime
+                        ? [
+                            {
+                              id: "plan" as const,
+                              run: () => composer.selectPlan(true),
+                            },
+                          ]
+                        : []),
+                      ...(bridge?.nativeChat?.startGoal
+                        ? [
+                            {
+                              id: "goal" as const,
+                              run: () => composer.selectGoal(true),
+                            },
+                          ]
+                        : []),
+                    ]}
+                    intents={
+                      presetSpec.art
+                        ? [
+                            {
+                              id: preset,
+                              label: presetSpec.label,
+                              icon: <PresetIcon />,
+                              disabled: busy,
+                              onRemove: () =>
+                                setPreset(ApplicationPreset.DEFAULT),
+                            },
+                          ]
+                        : []
                     }
-                    toolbarEnd={
-                      <DesktopModelPicker
-                        value={{
-                          model_id: modelId,
-                          ...(modelProviderId
-                            ? { provider_id: modelProviderId }
-                            : {}),
-                        }}
-                        onValueChange={setModelSelection}
-                        endpoints={endpoints}
-                      />
-                    }
+                    model={{
+                      profiles: {
+                        active: profileId,
+                        choices: profiles?.choices ?? [],
+                        saved: profiles?.saved ?? [],
+                      },
+                      busy,
+                      onSelect: (selection) => modelSelection.choose(selection),
+                      onRefresh: readProfiles,
+                      refreshError: profileReadError,
+                      effort: staged.effort,
+                      onEffort: composer.selectEffort,
+                      goal: staged.goal,
+                    }}
                   />
+                  <input
+                    ref={filePicker}
+                    type="file"
+                    className="hidden"
+                    aria-label="Attach file"
+                    onChange={(event) => {
+                      const file = event.currentTarget.files?.[0];
+                      if (file)
+                        composer.transfer({
+                          resources: [{ kind: "file", file }],
+                        });
+                      event.currentTarget.value = "";
+                    }}
+                  />
+                  <input
+                    ref={imagePicker}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    className="hidden"
+                    aria-label="Attach image"
+                    onChange={(event) => {
+                      const file = event.currentTarget.files?.[0];
+                      if (file)
+                        composer.transfer({
+                          resources: [{ kind: "file", file }],
+                        });
+                      event.currentTarget.value = "";
+                    }}
+                  />
+                  {staged.notice && (
+                    <p
+                      role="status"
+                      className="px-1 text-xs text-muted-foreground"
+                    >
+                      {staged.notice}
+                    </p>
+                  )}
                   {/* Kept inside the composer so a submit error is visible even when
                   the composer is floating (docked). */}
                   {error && (
@@ -752,7 +821,7 @@ function WelcomeSurface({
               of the single page scroll (the reference gallery virtualizes
               against it). The "Ideas" label is universal — it heads whichever
               gallery renders. */}
-            <div>
+            <div ref={galleryRef} tabIndex={-1}>
               <h2 className="mb-3 text-sm font-medium text-muted-foreground">
                 Start from an idea
               </h2>
@@ -785,6 +854,6 @@ function WelcomeSurface({
         canvasIds={canvasIds}
         onOpenFolder={onOpen}
       />
-    </div>
+    </ComposerDropArea>
   );
 }

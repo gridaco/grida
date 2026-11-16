@@ -13,7 +13,8 @@
  * environment override is the replacement seam for a Grida registration.
  */
 
-import type { ChatGptProviderConfig } from "@grida/agent/server";
+import { CHATGPT_SUBSCRIPTION_DEFAULT_MODEL_ID } from "@grida/ai-host";
+import type { ChatGptProviderConfig } from "@grida/ai-host/chatgpt-host";
 
 export const CHATGPT_CALLBACK_PATH = "/auth/callback" as const;
 export const CHATGPT_CALLBACK_PORTS = [1455, 1457] as const;
@@ -52,18 +53,7 @@ export const CHATGPT_SUBSCRIPTION_CONFIG: ChatGptProviderConfig = {
   },
   responses_url: CHATGPT_RESPONSES_URL,
   originator: "grida",
-  default_model_id: "openai/gpt-5.6-sol",
-  // Mirrors `TIER_MODEL_IDS` from the catalogue. It is a SEPARATE table
-  // because the subscription serves its own model set — a catalogue tier
-  // model the subscription does not offer is the only reason these may
-  // diverge. Pinned by `chatgpt-configuration.test.ts`; drift here is
-  // silent and expensive (background titler/compactor run on `nano`).
-  tier_model_ids: {
-    nano: "openai/gpt-5.6-luna",
-    mini: "openai/gpt-5.6-terra",
-    pro: "openai/gpt-5.6-sol",
-    max: "openai/gpt-5.6-sol",
-  },
+  default_model_id: CHATGPT_SUBSCRIPTION_DEFAULT_MODEL_ID,
 };
 
 export type ChatGptAuthorizationExpectation = Readonly<{

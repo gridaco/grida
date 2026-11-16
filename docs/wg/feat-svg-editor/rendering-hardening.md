@@ -114,7 +114,7 @@ A survey of how the platform and peer editors solve this —
 allowlist sanitization, the spec-mandated secure static image mode,
 sandboxed frames, and parse-into-model architectures — is maintained
 separately as
-[`research/untrusted-svg-rendering.md`](../research/untrusted-svg-rendering.md).
+[`research/untrusted-svg-rendering.md`](https://github.com/gridaco/nothing/blob/main/docs/wg/research/untrusted-svg-rendering.md).
 Its conclusion in this document's terms: neutralizing the live
 projection is the only strategy that keeps both the verbatim model
 and the obligations above. The per-strategy verdicts are argued in
@@ -310,7 +310,7 @@ creating it.
   this document's obligation: paste is load-equivalent in trust, the
   model does not police content, and the honest boundary is the
   rendering surface. This specification is that boundary's contract.
-- [`research/untrusted-svg-rendering.md`](../research/untrusted-svg-rendering.md)
+- [`research/untrusted-svg-rendering.md`](https://github.com/gridaco/nothing/blob/main/docs/wg/research/untrusted-svg-rendering.md)
   — the upstream survey (platform guarantees, peer sanitizers, CSP
   semantics) this specification draws on.
 - [`element-ir.md`](./element-ir.md) — the model-side architecture;

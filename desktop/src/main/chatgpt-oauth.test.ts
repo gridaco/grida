@@ -1,4 +1,4 @@
-// GRIDA-SEC-008 — main/sidecar OAuth orchestration and safe-status contract.
+// GRIDA-SEC-008 — Main-owned OAuth orchestration and safe-status contract.
 import fs from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -6,7 +6,10 @@ import {
   CHATGPT_CALLBACK_URIS,
   CHATGPT_SUBSCRIPTION_CONFIG,
 } from "../chatgpt-configuration";
-import { ChatGptOAuthCoordinator } from "./chatgpt-oauth";
+import {
+  ChatGptOAuthCoordinator,
+  unavailableChatGptOAuth,
+} from "./chatgpt-oauth";
 import type { OAuthLoopbackCallback } from "./oauth-loopback-callback";
 
 const readyStatus = {
@@ -26,7 +29,7 @@ const signedOutStatus = {
 
 describe("ChatGptOAuthCoordinator", () => {
   let callback: FakeCallback;
-  let requests: Array<{ path: string; body: Record<string, unknown> }>;
+  let requests: Array<{ op: string; body: Record<string, unknown> }>;
   let openExternal: ReturnType<typeof vi.fn<(url: string) => Promise<void>>>;
   let status: Record<string, unknown> = readyStatus;
 
@@ -46,9 +49,9 @@ describe("ChatGptOAuthCoordinator", () => {
     expect(openExternal).toHaveBeenCalledWith(
       expect.stringMatching(/^https:\/\/auth\.openai\.com\/oauth\/authorize\?/)
     );
-    expect(requests.map((request) => request.path)).toEqual([
-      "/auth/chatgpt/start",
-      "/auth/chatgpt/complete",
+    expect(requests.map((request) => request.op)).toEqual([
+      "start",
+      "complete",
     ]);
     expect(requests[0]?.body).toEqual({
       redirect_uri: CHATGPT_CALLBACK_URIS[0],
@@ -62,7 +65,7 @@ describe("ChatGptOAuthCoordinator", () => {
     expect(JSON.stringify(result)).not.toContain("access-token-must-not-cross");
   });
 
-  it("refuses an unexpected authorization authority and cancels the sidecar attempt", async () => {
+  it("refuses an unexpected authorization authority and cancels the host attempt", async () => {
     const coordinator = createCoordinator({
       authorization_url:
         "https://auth.openai.com.attacker.example/oauth/authorize",
@@ -71,10 +74,7 @@ describe("ChatGptOAuthCoordinator", () => {
       /unexpected authorization URL/
     );
     expect(openExternal).not.toHaveBeenCalled();
-    expect(requests.map((request) => request.path)).toEqual([
-      "/auth/chatgpt/start",
-      "/auth/chatgpt/cancel",
-    ]);
+    expect(requests.map((request) => request.op)).toEqual(["start", "cancel"]);
     expect(callback.attempt.cancel).toHaveBeenCalled();
   });
 
@@ -89,10 +89,7 @@ describe("ChatGptOAuthCoordinator", () => {
       /incomplete authorization URL/
     );
     expect(openExternal).not.toHaveBeenCalled();
-    expect(requests.map((request) => request.path)).toEqual([
-      "/auth/chatgpt/start",
-      "/auth/chatgpt/cancel",
-    ]);
+    expect(requests.map((request) => request.op)).toEqual(["start", "cancel"]);
   });
 
   it("cancels a connect that is still binding without creating server-side state", async () => {
@@ -109,7 +106,7 @@ describe("ChatGptOAuthCoordinator", () => {
     expect(callback.attempt.cancel).toHaveBeenCalled();
   });
 
-  it("cancels both listener and exact sidecar attempt while the browser is open", async () => {
+  it("cancels both listener and exact host attempt while the browser is open", async () => {
     const browserOpened = deferred<void>();
     openExternal.mockImplementation(async () => {
       browserOpened.resolve();
@@ -120,10 +117,37 @@ describe("ChatGptOAuthCoordinator", () => {
 
     await coordinator.cancel();
     await expect(connecting).resolves.toEqual({ outcome: "cancelled" });
-    expect(requests.map((request) => request.path)).toEqual([
-      "/auth/chatgpt/start",
-      "/auth/chatgpt/cancel",
-    ]);
+    expect(requests.map((request) => request.op)).toEqual(["start", "cancel"]);
+  });
+
+  it("joins the exact pending OAuth cancellation when the owner closes", async () => {
+    const browserOpened = deferred<void>();
+    const cancel = deferred<void>();
+    openExternal.mockImplementation(async () => browserOpened.resolve());
+    const coordinator = createCoordinator({ cancel_gate: cancel.promise });
+    const connecting = coordinator.connect();
+    await browserOpened.promise;
+    const closed = coordinator.close();
+    expect(coordinator.close()).toBe(closed);
+    const complete = vi.fn<() => void>();
+    void closed.then(complete, complete);
+    try {
+      await expect(coordinator.connect()).rejects.toThrow(
+        "ChatGPT sign-in host is closed"
+      );
+      expect(callback.attempt.cancel).toHaveBeenCalled();
+      expect(requests.filter(({ op }) => op === "cancel")).toEqual([
+        {
+          op: "cancel",
+          body: { attempt_id: "attempt_0123456789abcdef" },
+        },
+      ]);
+      expect(complete).not.toHaveBeenCalled();
+    } finally {
+      cancel.resolve();
+      await closed;
+    }
+    await expect(connecting).resolves.toEqual({ outcome: "cancelled" });
   });
 
   it("does not classify an unrelated failure from cancellation text", async () => {
@@ -135,10 +159,7 @@ describe("ChatGptOAuthCoordinator", () => {
     await expect(coordinator.connect()).rejects.toThrow(
       "ChatGPT sign-in was cancelled"
     );
-    expect(requests.map((request) => request.path)).toEqual([
-      "/auth/chatgpt/start",
-      "/auth/chatgpt/cancel",
-    ]);
+    expect(requests.map((request) => request.op)).toEqual(["start", "cancel"]);
   });
 
   it("reconstructs status and signs out without forwarding unknown fields", async () => {
@@ -147,11 +168,35 @@ describe("ChatGptOAuthCoordinator", () => {
 
     status = signedOutStatus;
     expect(await coordinator.signOut()).toEqual(signedOutStatus);
-    expect(requests.map((request) => request.path)).toEqual([
-      "/auth/chatgpt/status",
-      "/auth/chatgpt/sign-out",
-      "/auth/chatgpt/status",
+    expect(requests.map((request) => request.op)).toEqual([
+      "status",
+      "sign_out",
+      "status",
     ]);
+  });
+
+  it("forwards only a safe owner error code, never its message", async () => {
+    const coordinator = new ChatGptOAuthCoordinator({
+      callback,
+      open_external: openExternal,
+      ceremony: {
+        start: async () => null,
+        complete: async () => null,
+        cancel: async () => true,
+        status: async () => {
+          throw Object.assign(new Error("refresh-token-must-not-cross"), {
+            code: "chatgpt_token_refresh_failed",
+          });
+        },
+        signOut: async () => undefined,
+      },
+    });
+    const failure = await coordinator.status().catch((error: Error) => error);
+    expect(failure).toEqual(
+      new Error(
+        "ChatGPT provider request failed (chatgpt_token_refresh_failed)"
+      )
+    );
   });
 
   it("still signs out when exact-attempt cancellation transiently fails", async () => {
@@ -160,63 +205,60 @@ describe("ChatGptOAuthCoordinator", () => {
       browserOpened.resolve();
     });
     status = signedOutStatus;
-    const coordinator = createCoordinator({ cancel_status: 503 });
+    const coordinator = createCoordinator({ cancel_failure: true });
     const connecting = coordinator.connect();
     await browserOpened.promise;
 
     await expect(coordinator.signOut()).resolves.toEqual(signedOutStatus);
     await expect(connecting).resolves.toEqual({ outcome: "cancelled" });
-    const paths = requests.map((request) => request.path);
-    expect(paths).toContain("/auth/chatgpt/cancel");
-    expect(paths).toContain("/auth/chatgpt/sign-out");
-    expect(paths.indexOf("/auth/chatgpt/sign-out")).toBeGreaterThan(
-      paths.indexOf("/auth/chatgpt/cancel")
-    );
+    const ops = requests.map((request) => request.op);
+    expect(ops).toContain("cancel");
+    expect(ops).toContain("sign_out");
+    expect(ops.indexOf("sign_out")).toBeGreaterThan(ops.indexOf("cancel"));
   });
 
   function createCoordinator(
-    options: { authorization_url?: string; cancel_status?: number } = {}
+    options: {
+      authorization_url?: string;
+      cancel_failure?: boolean;
+      cancel_gate?: Promise<void>;
+    } = {}
   ): ChatGptOAuthCoordinator {
     return new ChatGptOAuthCoordinator({
       callback,
       open_external: openExternal,
-      sidecar_fetch: async (path, init) => {
-        const body = JSON.parse(String(init?.body ?? "{}")) as Record<
-          string,
-          unknown
-        >;
-        requests.push({ path, body });
-        switch (path) {
-          case "/auth/chatgpt/start":
-            return Response.json({
-              attempt_id: "attempt_0123456789abcdef",
-              state: "state_0123456789abcdef",
-              authorization_url:
-                options.authorization_url ?? authorizationUrl(),
+      ceremony: {
+        start: async (redirect_uri) => {
+          requests.push({ op: "start", body: { redirect_uri } });
+          return {
+            attempt_id: "attempt_0123456789abcdef",
+            state: "state_0123456789abcdef",
+            authorization_url: options.authorization_url ?? authorizationUrl(),
+          };
+        },
+        complete: async (input) => {
+          requests.push({ op: "complete", body: input });
+          return {
+            ...readyStatus,
+            access_token: "access-token-must-not-cross",
+          };
+        },
+        cancel: async (attempt_id) => {
+          requests.push({ op: "cancel", body: { attempt_id } });
+          await options.cancel_gate;
+          if (options.cancel_failure)
+            throw Object.assign(new Error("credential owner detail"), {
+              code: "temporarily_unavailable",
             });
-          case "/auth/chatgpt/complete":
-            return Response.json({
-              ...readyStatus,
-              access_token: "access-token-must-not-cross",
-            });
-          case "/auth/chatgpt/cancel":
-            if (options.cancel_status) {
-              return Response.json(
-                { code: "temporarily_unavailable" },
-                { status: options.cancel_status }
-              );
-            }
-            return Response.json({ ok: true, cancelled: true });
-          case "/auth/chatgpt/status":
-            return Response.json({
-              ...status,
-              refresh_token: "refresh-token-must-not-cross",
-            });
-          case "/auth/chatgpt/sign-out":
-            return Response.json({ ok: true });
-          default:
-            return Response.json({ code: "not_found" }, { status: 404 });
-        }
+          return true;
+        },
+        status: async () => {
+          requests.push({ op: "status", body: {} });
+          return { ...status, refresh_token: "refresh-token-must-not-cross" };
+        },
+        signOut: async () => {
+          requests.push({ op: "sign_out", body: {} });
+        },
       },
     });
   }
@@ -244,6 +286,39 @@ describe("ChatGPT IPC registration", () => {
     expect(source).toMatch(
       /guarded\(\s*IPC_CHANNELS\.CHATGPT_CONNECT,\s*\(\)\s*=>\s*chatgptOAuth\.connect\(\)\s*\)/
     );
+  });
+
+  it("reports ChatGPT as not configured without a native subscription owner", async () => {
+    const source = fs.readFileSync(
+      new URL("./ipc-handlers.ts", import.meta.url),
+      "utf8"
+    );
+    expect(source).toMatch(
+      /options\.native_chatgpt_oauth\s*\?\?\s*unavailableChatGptOAuth/
+    );
+    expect(source).not.toContain("createChatGptOAuthCoordinator");
+    const fetch = vi.spyOn(globalThis, "fetch");
+    try {
+      const unavailable = {
+        configured: false,
+        signed_in: false,
+        ready: false,
+        signing_in: false,
+      };
+      await expect(unavailableChatGptOAuth.status()).resolves.toEqual(
+        unavailable
+      );
+      await expect(unavailableChatGptOAuth.signOut()).resolves.toEqual(
+        unavailable
+      );
+      await expect(unavailableChatGptOAuth.cancel()).resolves.toBeUndefined();
+      await expect(unavailableChatGptOAuth.connect()).rejects.toThrow(
+        "ChatGPT sign-in is not available"
+      );
+      expect(fetch).not.toHaveBeenCalled();
+    } finally {
+      fetch.mockRestore();
+    }
   });
 });
 

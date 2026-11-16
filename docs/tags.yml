@@ -161,6 +161,11 @@ ai:
   permalink: /ai
   description: Assistant tools, model-facing operations, and AI UX.
 
+agent-system:
+  label: Agent system
+  permalink: /agent-system
+  description: The Grida Agent — sessions, tools, permissions, providers, hosts, and their client contracts.
+
 library:
   label: Library
   permalink: /library

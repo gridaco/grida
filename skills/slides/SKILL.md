@@ -85,25 +85,22 @@ deck stays uniform. Start each from this shape:
 
 ## Starting from a template
 
-When the user picks a template from the gallery, a `<user_template_selection>`
-block on the first turn names it (title, slide count, visual system), and its
-unzipped `.canvas` bundle (the manifest `.canvas.json` + slide SVGs) is placed in
-your **scratch dir** — a reference, like an attachment, NOT part of the user's
-workspace. Treat it as the STARTING POINT, not a fixed result:
+When the person starts from a gallery template, Desktop copies the template's
+`.canvas` bundle (the manifest `.canvas.json` + slide SVGs) into the workspace
+before the first message, and that message names the copy, its title and its
+slide count. The copy is the person's new deck: treat it as the STARTING POINT,
+not a fixed result:
 
-- List your scratch dir and `read_file` the `.canvas.json` + slide SVGs there
-  first. The template defines the deck's **visual system** — palette, type,
-  layout, margins, footer, accents. Hold it: reuse those so every slide you write
-  reads as a sibling, not a stray.
-- Build the adapted deck in the **workspace** as a NEW `<name>.canvas/` folder
-  (that's where the user's document lives — scratch is throwaway; and the
-  `.canvas` folder suffix is what makes it a deck — see Working pattern). Write
-  the slide SVGs + `.canvas.json` INSIDE it, replacing the placeholder copy with
-  the user's content and adding / reordering / removing slides (update
-  `documents`) to fit. Keep the frame (`1920×1080` viewBox, safe margins) and the
-  conventions above.
-- Don't discard the template's design and start from nothing unless the user asks
-  for a different look — keeping that design is the whole point of the pick.
+- `read_file` the copy's `.canvas.json` and slide SVGs first. The template
+  defines the deck's **visual system** — palette, type, layout, margins,
+  footer, accents. Hold it: reuse those so every slide you write reads as a
+  sibling, not a stray.
+- Edit that deck in place: replace the placeholder copy with the person's
+  content and add / reorder / remove slides (update `documents`) to fit. Keep
+  the frame (`1920×1080` viewBox, safe margins) and the conventions above.
+- Don't discard the template's design and start from nothing unless the person
+  asks for a different look — keeping that design is the whole point of the
+  pick.
 
 ## See also
 

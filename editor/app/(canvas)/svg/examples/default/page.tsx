@@ -21,7 +21,6 @@ import { useOpacityDigitsHotkeys } from "../../_components/use-opacity-digits";
 import { fragment } from "../../_components/fragment";
 import SAMPLE_SVG from "../../_fixtures/artwork";
 import { SvgRouteShell, useSvgDocStore } from "../../_storage";
-import { useSvgAgentHydrated } from "../../_ai/provider";
 
 // v4: persistence moved from the `_meta/index.json` sidecar to a `.canvas`
 // bundle (.canvas.json + <id>.svg) via dotcanvas. Old data is dropped.
@@ -87,7 +86,11 @@ function SvgEditorDevPageBody() {
   const activeDoc = docs.find((d) => d.id === activeId);
   // Defer canvas paint until the store has hydrated, so the seed fixture
   // doesn't flash before persisted content loads in.
-  const hydrated = useSvgAgentHydrated();
+  const hydrated = useSyncExternalStore(
+    store.subscribe,
+    store.isHydrated,
+    store.isHydrated
+  );
 
   // Host-owned digit → opacity shortcut (1–9 / 0 / 0 0) + toast. svg-editor
   // ships the `set_opacity` command but not this binding — see the hook.

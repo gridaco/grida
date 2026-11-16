@@ -8,7 +8,7 @@
  * bytes. Provider URLs never cross the GG or renderer boundary.
  */
 import { z } from "zod";
-import type { MusicGenerateResult } from "@grida/agent";
+import type { MusicGenerateResult } from "@grida/ai-host";
 import { verifyGgToken } from "@/lib/auth/gg-token";
 import ai from "@/lib/ai";
 import { methods } from "@/lib/ai/server";

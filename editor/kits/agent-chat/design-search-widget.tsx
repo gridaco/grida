@@ -1,19 +1,19 @@
 /**
  * Transcript record for `design_search` (the gather+curate step). The live pick
- * interaction is a session-global card pinned above the composer
- * (`design-search-card.tsx`); here we render only the PASSIVE record: while
+ * interaction is pinned above the composer by the chat surface; here we render
+ * only the PASSIVE record: while
  * pending, a "gathering" line; once answered, the references the user picked as
  * thumbnails. Library pins are URLs, so thumbnails render straight from `url`.
  */
 
 import { getToolName } from "ai";
 import { Loader2Icon } from "lucide-react";
-import { AgentDesignSearch } from "@grida/agent/tools/design-search";
+import { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
 import { FullscreenImagePreview } from "@/kits/image-preview";
-import type { ToolCallEntry } from "@/lib/agent-chat";
+import type { ToolCallEntry } from "@/lib/agent-chat/types";
 
 export function isDesignSearchEntry(entry: ToolCallEntry): boolean {
-  return getToolName(entry) === AgentDesignSearch.TOOL_NAME;
+  return getToolName(entry) === chat_vocabulary.TOOL_NAMES.design_search;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -26,7 +26,7 @@ function str(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
-type Pin = AgentDesignSearch.DesignSearchResult;
+type Pin = chat_vocabulary.DesignReference;
 
 function pickedPins(entry: ToolCallEntry): Pin[] {
   const out = asRecord("output" in entry ? entry.output : undefined);
@@ -42,11 +42,11 @@ function pickedPins(entry: ToolCallEntry): Pin[] {
 }
 
 export function DesignSearchContent({ entry }: { entry: ToolCallEntry }) {
-  const initialQuery = AgentDesignSearch.initialSearchQuery(
+  const initialQuery = chat_vocabulary.initialSearchQuery(
     "input" in entry ? entry.input : undefined
   );
 
-  // Pending — the pick card above the composer is handling it.
+  // Pending — the picker above the composer is handling it.
   if (entry.state === "input-streaming" || entry.state === "input-available") {
     return (
       <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground">

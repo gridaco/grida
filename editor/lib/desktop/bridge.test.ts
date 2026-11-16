@@ -5,10 +5,11 @@ import {
   DESKTOP_BRIDGE_PROTOCOL,
   DesktopBridgeMissingError,
   account,
-  ai,
+  app,
   getDesktopBridge,
   getDesktopBridgeStatus,
   modelGeneration,
+  providers,
   rigging,
   secrets,
 } from "./bridge";
@@ -26,6 +27,73 @@ afterEach(() => {
 });
 
 describe("desktop bridge client contract", () => {
+  it("uses the optional consent query and detected-model update without falling back to Save", async () => {
+    const authorization = vi
+      .fn<
+        NonNullable<
+          NonNullable<DesktopBridge["providers"]>["endpoint_authorization"]
+        >
+      >()
+      .mockResolvedValue(true);
+    const update = vi
+      .fn<
+        NonNullable<
+          NonNullable<DesktopBridge["providers"]>["update_endpoint_models"]
+        >
+      >()
+      .mockResolvedValue(undefined);
+    const save =
+      vi.fn<NonNullable<DesktopBridge["providers"]>["set_endpoint"]>();
+    installBridge({
+      grida: {
+        protocol: DESKTOP_BRIDGE_PROTOCOL,
+        providers: {
+          endpoint_authorization: authorization,
+          update_endpoint_models: update,
+          set_endpoint: save,
+        },
+      },
+    });
+    expect(providers.supportsEndpointConsent()).toBe(true);
+    await expect(
+      providers.endpointAuthorization("ollama", "http://localhost:11434/v1")
+    ).resolves.toBe(true);
+    const facts = {
+      id: "ollama",
+      base_url: "http://localhost:11434/v1",
+      models: [{ id: "local-model" }],
+    };
+    await providers.updateEndpointModels(facts);
+    expect(authorization).toHaveBeenCalledExactlyOnceWith(
+      facts.id,
+      facts.base_url
+    );
+    expect(update).toHaveBeenCalledExactlyOnceWith(facts);
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("refuses new consent operations on a legacy host instead of invoking its modal Save", async () => {
+    const save =
+      vi.fn<NonNullable<DesktopBridge["providers"]>["set_endpoint"]>();
+    installBridge({
+      grida: {
+        protocol: DESKTOP_BRIDGE_PROTOCOL,
+        providers: { set_endpoint: save },
+      },
+    });
+    expect(providers.supportsEndpointConsent()).toBe(false);
+    await expect(
+      providers.endpointAuthorization("ollama", "http://localhost:11434/v1")
+    ).rejects.toBeInstanceOf(DesktopBridgeMissingError);
+    await expect(
+      providers.updateEndpointModels({
+        id: "ollama",
+        base_url: "http://localhost:11434/v1",
+        models: [],
+      })
+    ).rejects.toBeInstanceOf(DesktopBridgeMissingError);
+    expect(save).not.toHaveBeenCalled();
+  });
   it("rejects a missing or unsupported bridge protocol", () => {
     installBridge({});
     expect(getDesktopBridge()).toBeNull();
@@ -64,6 +132,27 @@ describe("desktop bridge client contract", () => {
     expect(signOut).toHaveBeenCalledOnce();
   });
 
+  it("opens Settings through the optional native window action without route arguments", async () => {
+    const open = vi.fn<() => Promise<void>>().mockResolvedValue();
+    installBridge({
+      grida: {
+        protocol: DESKTOP_BRIDGE_PROTOCOL,
+        window: { open_settings: open },
+      },
+    });
+    await app.openSettings();
+    expect(open).toHaveBeenCalledExactlyOnceWith();
+  });
+
+  it("refuses Settings window requests on older native hosts", async () => {
+    installBridge({
+      grida: { protocol: DESKTOP_BRIDGE_PROTOCOL, window: {} },
+    });
+    await expect(app.openSettings()).rejects.toBeInstanceOf(
+      DesktopBridgeMissingError
+    );
+  });
+
   it("fails closed when the native account controller is absent", async () => {
     installBridge({
       grida: {
@@ -74,122 +163,6 @@ describe("desktop bridge client contract", () => {
     await expect(account.signOut()).rejects.toBeInstanceOf(
       DesktopBridgeMissingError
     );
-  });
-
-  it("fails closed when an old host omits base64 scratch capability", () => {
-    installBridge({
-      grida: {
-        protocol: DESKTOP_BRIDGE_PROTOCOL,
-        app: { version: "999.0.0", platform: "darwin" },
-        caps: { native: {} },
-        agent: {
-          attach_directory:
-            vi.fn<NonNullable<DesktopBridge["agent"]["attach_directory"]>>(),
-        },
-      } as unknown as DesktopBridge,
-    });
-
-    expect(ai.supportsScratchSeedBase64(getDesktopBridge())).toBe(false);
-    expect(ai.supportsScratchBinaryTools(getDesktopBridge())).toBe(false);
-  });
-
-  it("accepts base64 scratch seeds only from an explicit host capability", () => {
-    installBridge({
-      grida: {
-        protocol: DESKTOP_BRIDGE_PROTOCOL,
-        app: { version: "0.0.0", platform: "darwin" },
-        caps: {
-          native: {},
-          agent: {
-            scratch_seed_base64: true,
-            scratch_binary_tools: true,
-          },
-        },
-      } as unknown as DesktopBridge,
-    });
-
-    expect(ai.supportsScratchSeedBase64(getDesktopBridge())).toBe(true);
-    expect(ai.supportsScratchBinaryTools(getDesktopBridge())).toBe(true);
-  });
-
-  it("refuses base64 scratch seeds before calling an old host", async () => {
-    const run = vi.fn<DesktopBridge["agent"]["run"]>();
-    installBridge({
-      grida: {
-        protocol: DESKTOP_BRIDGE_PROTOCOL,
-        app: { version: "999.0.0", platform: "darwin" },
-        caps: { native: {} },
-        agent: { run },
-      } as unknown as DesktopBridge,
-    });
-
-    await expect(
-      ai.startAgentRun(
-        {
-          messages: [],
-          scratch_seed: [{ path: "brief.pdf", base64: "AAAA" }],
-        },
-        () => {}
-      )
-    ).rejects.toThrow("base64 scratch seeds are not supported");
-    expect(run).not.toHaveBeenCalled();
-  });
-
-  it("keeps text scratch seeds compatible with an old host", async () => {
-    const run = vi.fn<DesktopBridge["agent"]["run"]>().mockResolvedValue({
-      stream_id: "stream-1",
-      session_id: "session-1",
-      done: Promise.resolve(),
-    });
-    installBridge({
-      grida: {
-        protocol: DESKTOP_BRIDGE_PROTOCOL,
-        app: { version: "0.0.7", platform: "darwin" },
-        caps: { native: {} },
-        agent: { run },
-      } as unknown as DesktopBridge,
-    });
-
-    await expect(
-      ai.startAgentRun(
-        {
-          messages: [],
-          scratch_seed: [{ path: "template.canvas", text: "{}" }],
-        },
-        () => {}
-      )
-    ).resolves.toMatchObject({
-      streamId: "stream-1",
-      sessionId: "session-1",
-    });
-    expect(run).toHaveBeenCalledOnce();
-  });
-
-  it("forwards base64 scratch seeds when the host advertises the capability", async () => {
-    const run = vi.fn<DesktopBridge["agent"]["run"]>().mockResolvedValue({
-      stream_id: "stream-1",
-      session_id: "session-1",
-      done: Promise.resolve(),
-    });
-    installBridge({
-      grida: {
-        protocol: DESKTOP_BRIDGE_PROTOCOL,
-        app: { version: "0.0.8", platform: "darwin" },
-        caps: {
-          native: {},
-          agent: { scratch_seed_base64: true },
-        },
-        agent: { run },
-      } as unknown as DesktopBridge,
-    });
-    const opts = {
-      messages: [],
-      scratch_seed: [{ path: "brief.pdf", base64: "AAAA" }],
-    };
-
-    await ai.startAgentRun(opts, () => {});
-
-    expect(run).toHaveBeenCalledWith(opts, expect.any(Function));
   });
 
   it("uses producer-owned BYOK provider metadata for settings", () => {

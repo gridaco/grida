@@ -1,4 +1,4 @@
-[![@grida/tree-view](https://github.com/user-attachments/assets/0e5856f8-edca-43ec-8384-c3809d8a1ba9)](<[target-destination-url](https://grida.co/packages/@grida/tree-view)>)
+[![@grida/tree-view](https://github.com/user-attachments/assets/0e5856f8-edca-43ec-8384-c3809d8a1ba9)](https://grida.co/packages/@grida/tree-view)
 
 # @grida/tree-view
 

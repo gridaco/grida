@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { IMAGE_ATTACHMENT_POLICY } from "@/lib/agent-chat";
+import { IMAGE_ATTACHMENT_POLICY } from "@/lib/agent-chat/image-attachment";
 
 type LibraryActions = typeof import("@/app/(library)/library/actions");
 

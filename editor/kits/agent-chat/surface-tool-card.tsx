@@ -1,6 +1,6 @@
 import { cn } from "@app/ui/lib/utils";
 import { ToolOutput } from "@app/ui/ai-elements/tool";
-import type { ToolCallEntry } from "@/lib/agent-chat";
+import type { ToolCallEntry } from "@/lib/agent-chat/types";
 import { SurfaceToolCall } from "./surface-tool";
 
 export function isSurfaceToolEntry(entry: ToolCallEntry): boolean {

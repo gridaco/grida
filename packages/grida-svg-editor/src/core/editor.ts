@@ -3322,6 +3322,12 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     serialize_node(id: NodeId): string {
       return doc.serialize_node(id);
     },
+    /** The exact flat text target that `commands.set_text` can replace. */
+    read_selected_text(): { id: NodeId; tag: string; text: string } | null {
+      const [id] = selection;
+      if (selection.length !== 1 || !doc.is_text_edit_target(id)) return null;
+      return { id, tag: doc.tag_of(id)!, text: doc.text_of(id) };
+    },
     reset,
 
     // lifecycle

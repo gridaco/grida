@@ -51,11 +51,11 @@
 
 .grida-ai-response-markdown [data-streamdown="unordered-list"],
 .grida-ai-response-markdown [data-streamdown="ordered-list"] {
-  @apply my-1 space-y-0 pl-3 leading-4;
+  @apply my-1 space-y-0.5 pl-4 leading-6;
 }
 
 .grida-ai-response-markdown [data-streamdown="list-item"] {
-  @apply my-0 pl-0 leading-4;
+  @apply my-0 pl-0 leading-6;
 }
 
 .grida-ai-response-markdown [data-streamdown="list-item"] > p {
@@ -90,11 +90,23 @@
 }
 
 .grida-ai-response-markdown [data-streamdown="code-block"] {
+  --chat-code-header-height: calc(var(--spacing) * 7);
   @apply gap-0 rounded-md border-border/60 bg-transparent p-0;
 }
 
 .grida-ai-response-markdown [data-streamdown="code-block-header"] {
-  @apply h-7 px-2;
+  height: var(--chat-code-header-height);
+  @apply px-2;
+}
+
+/* Streamdown overlays actions with a negative margin. Match our compact
+   header so the copy button stays inside the code block's paint containment. */
+.grida-ai-response-markdown
+  [data-streamdown="code-block-header"]
+  + div:has(> [data-streamdown="code-block-actions"]) {
+  height: var(--chat-code-header-height);
+  margin-top: calc(-1 * var(--chat-code-header-height));
+  @apply top-0 px-1;
 }
 
 .grida-ai-response-markdown [data-streamdown="code-block-header"] span {
@@ -110,7 +122,11 @@
 }
 
 .grida-ai-response-markdown [data-streamdown="code-block-copy-button"] {
-  @apply p-1;
+  @apply p-0.5;
+}
+
+.grida-ai-response-markdown [data-streamdown="code-block-copy-button"] svg {
+  @apply size-3;
 }
 
 .grida-ai-response-markdown [data-streamdown="table-wrapper"] {

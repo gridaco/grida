@@ -44,5 +44,5 @@ stage:
 
 ## See also
 
-- [`--root`](../--root)
+- [`--root`](./--root)
 - [`concepts/variants`](https://grida.co/docs/concepts/variants)

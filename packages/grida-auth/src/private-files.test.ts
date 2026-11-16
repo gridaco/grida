@@ -157,6 +157,37 @@ describe.skipIf(process.platform === "win32")("privateFiles", () => {
     }
   );
 
+  it.skipIf(process.platform !== "darwin")(
+    "refuses an ancestor's ACL grant before creating anything beneath it",
+    async () => {
+      const f = await fixture();
+      await privateFiles.directory(f.directory);
+      await promisify(execFile)("/bin/chmod", [
+        "+a",
+        "everyone allow list",
+        f.directory,
+      ]);
+      const nested = path.join(f.directory, "nested", "deeper");
+      await expect(privateFiles.directory(nested)).rejects.toMatchObject({
+        code: "custody_failed",
+      });
+      await expect(
+        fs.stat(path.join(f.directory, "nested"))
+      ).rejects.toMatchObject({ code: "ENOENT" });
+      // An existing private path is refused too when any ancestor has a grant.
+      await promisify(execFile)("/bin/chmod", ["-N", f.directory]);
+      await privateFiles.directory(nested);
+      await promisify(execFile)("/bin/chmod", [
+        "+a",
+        "everyone allow list",
+        f.directory,
+      ]);
+      await expect(privateFiles.directory(nested)).rejects.toMatchObject({
+        code: "custody_failed",
+      });
+    }
+  );
+
   it("fails closed on Windows before creating a profile", async () => {
     const f = await fixture();
     vi.spyOn(process, "platform", "get").mockReturnValue("win32");

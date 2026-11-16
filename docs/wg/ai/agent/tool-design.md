@@ -53,9 +53,9 @@ differs from an ordinary API's in two ways that shape the discipline:
   a model or hand it your release notes. It takes the surface literally,
   fills every argument you expose, and forms habits on what it sees.
 - **Changing the surface is costly — most costly where the model is most
-  fluent.** A name the model was trained on, it calls well; rename it and
-  quality drops, which is why the
-  [locked fundamental set](./tools.md#locked-fundamental-tools) is locked.
+  fluent.** Familiar names and schemas can influence tool use. The master
+  chooses a [product tool profile](./tools.md#tool-profiles) and
+  evaluates its behavior with the selected models.
   For a tool the model never trained on, the cost is narrower — keeping
   live and resumed sessions consistent with the calls already in their
   transcripts — but it points the same way: a shape is easier to grow
@@ -197,16 +197,16 @@ depends as much on good failures as on good successes.
   different recoveries. Collapsing them into one opaque error throws that
   signal away.
 
-This is the same envelope every tool returns (see
-[Tools / result envelope](./tools.md#tool-result-envelope)); the design
-obligation is to populate it with something _actionable_.
+The [result contract](./tools.md#tool-result-envelope) preserves outcome meaning
+across adapters. The concrete tool and its model-facing projection supply
+actionable detail.
 
 ## Tool, connector, or skill
 
 Not every capability should be a tool. Three surfaces extend what an agent
 can do, and they answer three different questions. The
 surface-selection matrix is canonical in
-[Skills / decision matrix](./skills.md); this is the _design reasoning_
+[Master / context and tool design](./master.md#context-and-tool-design); this is the _design reasoning_
 behind it.
 
 - A **tool** is a capability you **own and shape**. It is part of the
@@ -221,7 +221,7 @@ behind it.
   not control its surface.
 - A **skill** is **not a capability at all** — it is procedural knowledge,
   a recipe for _using_ capabilities, loaded on demand and free until
-  invoked (see [Skills](./skills.md)). Reach for a skill when the thing is
+  invoked (see [Master / context and tool design](./master.md#context-and-tool-design)). Reach for a skill when the thing is
   a procedure (prose, deletable without breaking the agent), not a new
   callable.
 

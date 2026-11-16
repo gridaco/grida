@@ -1,31 +1,27 @@
 /**
- * App-side library search for the agent's `design_search` pick card. The tool is
- * human-input: the card (kit) calls this to fetch the result gallery the user
- * picks from. It runs in the renderer because the library client needs the
- * editor's session, which the agent sidecar deliberately lacks (GRIDA-SEC).
+ * App-side Library pages for the Desktop reference gallery, the embedded
+ * Library explorer and the chat attachment picker. They run in the renderer
+ * because the Library client needs the editor's session.
  *
  * Full-corpus for now; scoping to a curated "good" collection is deferred (it
  * needs a DB migration, sequenced last). Library pins stay URLs — nothing is
- * downloaded; a picked pin's url is fed straight into image-to-image.
+ * downloaded.
  */
 
 import { browse, search, similar } from "@/app/(library)/library/actions";
-import type { AgentDesignSearch } from "@grida/agent/tools/design-search";
-import { IMAGE_ATTACHMENT_POLICY } from "@/lib/agent-chat";
+import type { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
+import { IMAGE_ATTACHMENT_POLICY } from "@/lib/agent-chat/image-attachment";
 import type {
   LibraryExplorerPage,
   LibraryExplorerSource,
 } from "@/kits/library-explorer";
 
-/** A first-party Library pin carries the source MIME in addition to the agent
- *  tool's provider-neutral result shape. Composer attachments need it to build
- *  an honest provider-native file part without guessing from the URL. */
-export type DesignLibraryPin = AgentDesignSearch.DesignSearchResult & {
+/** A first-party Library pin carries the source MIME in addition to the
+ *  provider-neutral reference shape, so attachments need not guess it from
+ *  the URL. */
+export type DesignLibraryPin = chat_vocabulary.DesignReference & {
   mime: string;
 };
-
-/** Host-fixed result count — not an agent knob (TOOL-DESIGN doctrine). */
-const MAX_RESULTS = 24;
 
 /** Page size for the paginated (infinite-scroll) picker surface. */
 export const DESIGN_SEARCH_PAGE = 30;
@@ -37,7 +33,7 @@ function toPin(o: {
   url: string;
   width: number;
   height: number;
-}): AgentDesignSearch.DesignSearchResult {
+}): chat_vocabulary.DesignReference {
   return {
     id: o.id,
     title: o.title ?? o.alt ?? "Untitled",
@@ -57,15 +53,6 @@ function toLibraryPin(o: {
   mimetype: string;
 }): DesignLibraryPin {
   return { ...toPin(o), mime: o.mimetype };
-}
-
-/** Run the library search; throw on failure (the card shows an error state).
- *  One-shot (first {@link MAX_RESULTS}) — the compact ai-sidebar pick card. */
-export async function resolveDesignSearch(
-  query: string
-): Promise<AgentDesignSearch.DesignSearchResult[]> {
-  const { data } = await search({ text: query, range: [0, MAX_RESULTS - 1] });
-  return data.map(toPin);
 }
 
 export type DesignLibraryPage = {

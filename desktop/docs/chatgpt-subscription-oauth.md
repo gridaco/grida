@@ -1,8 +1,9 @@
 # ChatGPT subscription OAuth binding
 
 This document binds the native ChatGPT model-provider contract to Grida
-Desktop. It is not ACP and it does not start Codex app-server: AgentSidecar
-continues to own Grida's model loop, sessions, tools, and approvals.
+Desktop. Grida owns the model loop, sessions, tools, and approvals in its Rust
+executable, which Desktop controls over private ACP stdio. ChatGPT supplies
+model inference.
 
 The implementation is experimental because OpenAI client registration and
 the stable legal/support contract are external release gates. Desktop keeps
@@ -11,7 +12,7 @@ registration can replace the current public native-client identity without
 changing provider, callback, or renderer code.
 
 > **GRIDA-SEC-008 — ChatGPT subscription OAuth credential boundary.** The
-> callback, guarded bridge, sidecar credential manager, and exact provider
+> callback, guarded bridge, credential manager, and exact provider
 > destinations are one active local security boundary. “Active” does not mean
 > OpenAI has approved or supports the experimental integration.
 
@@ -28,8 +29,7 @@ changing provider, callback, or renderer code.
 - public Codex native OAuth client id
   `app_EMoamEEZ73f0CkXaXp7hrann`, replaceable with
   `GRIDA_CHATGPT_OAUTH_CLIENT_ID`;
-- the default and tier choices from the agent package's closed subscription
-  model set.
+- the generated default model from `data/ai/chatgpt-subscription.json`.
 
 The client id is public native-app identity, not a secret. Desktop accepts no
 client secret. It must not be described as Grida-owned or OpenAI-approved.
@@ -39,16 +39,65 @@ The authorization query also pins
 `codex_cli_simplified_flow=true`, and `originator=grida`. Inference sends
 `originator: grida`.
 
-The current closed model compatibility projection consists of
-`openai/gpt-5.6-sol`, `openai/gpt-5.6-terra`,
-`openai/gpt-5.6-luna`, `openai/gpt-5.5`, and `openai/gpt-5.4`. It mirrors the
-observed Zed/Codex-compatible surface, not authenticated discovery; it may
-drift, and an account can refuse a listed model.
+The current closed model compatibility projection offers **GPT-6.1 Sol** as
+its default, plus GPT-6 Astra, GPT-6.1 Terra, GPT-6 Luna, GPT-6 Sol and the
+compatible GPT-5.6 Sol, Terra and Luna models. Access depends on the person's
+ChatGPT plan and workspace. This is a subscription compatibility projection;
+public API availability does not establish subscription entitlement.
 
-The main-owned provider network grant admits exact `auth.openai.com` and
-`chatgpt.com` HTTPS origins only on the credential-bearing provider lane.
-Neither joins the credential-free asset-download lane, and lookalike
-subdomains are refused.
+Membership and the default are authored once in
+[`data/ai/chatgpt-subscription.json`](../../data/ai/chatgpt-subscription.json),
+with the dedicated
+[`subscription schema`](../../data/ai/schemas/chatgpt-subscription.schema.json).
+The standard AI catalogue generator writes both the marked TypeScript
+projection in `packages/grida-ai-host/src/protocol/chatgpt.ts` and the native
+`crates/grida-agent/data/chatgpt-subscription-models.json` asset. Follow the
+[catalogue update workflow](../../data/ai/README.md), regenerate the projections
+and check for drift; do not hand-edit a consumer's model list or default.
+Runtime consumers use these bundled generated projections.
+
+A Main-only provider network grant admits exact `auth.openai.com` and
+`chatgpt.com` HTTPS origins only on the credential-bearing provider lane. It is
+never published to the retained media sidecar. Neither origin joins the
+credential-free asset-download lane, and lookalike subdomains are refused.
+
+## Model selection
+
+Ordinary macOS and Linux Desktop exposes the closed subscription model list in
+the Welcome and workspace model pickers when its Main-owned subscription host
+reports a ready connection. A fresh chat with no persisted or explicit choice
+prefers that connection. An explicit choice takes precedence; connecting
+ChatGPT never reassigns an existing chat's provider or funding.
+
+Each choice records the subscription provider and exact model. Main resolves
+the selection through the existing OAuth host, captures that model under the
+current opaque account and sign-in lineage, and supplies only the captured
+scope and model to the native agent. Saved subscription selections are bound
+to that lineage. Reconnecting requires a new explicit selection; another
+account cannot inherit the previous selection or reopen its chat authority.
+Token rotation within the same connection preserves the lineage.
+
+GPT-5.5 and GPT-5.4 are withdrawn subscription choices. Their saved receipts
+remain readable and are presented as unavailable. Selection and dispatch
+refuse the withdrawn model until the person chooses a replacement explicitly;
+the default recommendation does not replace that saved choice.
+
+The picker projects readiness and compatibility, not OAuth material or
+account-discovered offerings. Refresh rechecks that projection. Text, tools,
+supported reasoning settings, attached images and image-tool results use the
+restricted Responses adapter. Provider-native compaction and authenticated model
+discovery remain unavailable; Grida's own context compaction uses summary
+inference. These are provider and product-host capabilities; the reusable agent
+core receives the existing provider contracts.
+
+Ultra is an independent harness capability available on this connection. Its
+bounded reviewer uses the parent's captured subscription model, opaque scope
+and Main-owned provider broker. It receives no OAuth material and cannot
+select another account or route. The restricted Responses adapter continues
+to omit unsupported output-token fields; inference-step bounds do not imply
+a provider-token, subscription-quota or monetary ceiling. The model's reasoning
+settings remain separate capabilities. Parent cancellation, sign-out and host
+shutdown retain ownership of child work.
 
 ## Ceremony
 
@@ -56,9 +105,8 @@ subdomains are refused.
    redirect, code, or provider parameters.
 2. Electron main binds the configured callback port on both `127.0.0.1` and
    `::1` when available. It emits the registered `http://localhost` URI.
-3. Main POSTs that URI to the authenticated sidecar-private
-   `/auth/chatgpt/start` route.
-4. AgentSidecar generates state plus PKCE verifier/challenge, retains the
+3. Main passes that URI to the credential owner's `start` call.
+4. The owner generates state plus PKCE verifier/challenge, retains the
    verifier in one launch-scoped attempt, and returns the authorization URL.
 5. Main reconstructs and validates the fixed authorization authority,
    pathname, client id, redirect URI, response type, state, and S256 challenge
@@ -67,19 +115,18 @@ subdomains are refused.
    It compares state in constant time. An invalid state does not consume the
    listener; a valid callback is atomically claimed, closing both listeners to
    replays.
-7. Main forwards the code, state, and attempt id directly to the sidecar's
-   `/auth/chatgpt/complete` route. The callback's abort signal is attached to
-   that request.
-8. The sidecar exchanges the code through the host-routed provider transport
+7. Main forwards the code, state, and attempt id directly to the owner's
+   `complete` call. A callback already aborted does not reach the owner.
+8. The owner exchanges the code through the host-routed provider transport
    and durably stores the refreshable credential.
 9. Only after completion returns a ready, secret-free account status does the
    callback render its success page and the IPC invocation resolve.
 
-The callback and sidecar attempt share a ten-minute lifetime so normal browser
+The callback and credential attempt share a ten-minute lifetime so normal browser
 login and MFA remain possible. Every timeout, cancellation, completion error,
 main shutdown, and successful terminal response closes the listeners.
 
-The profile sends state and PKCE S256, but no OIDC nonce. The sidecar does not
+The profile sends state and PKCE S256, but no OIDC nonce. The credential owner does not
 independently verify JWT signature, JWKS, issuer, or audience. It parses
 bounded account/display claims only from the response returned by the exact
 TLS-authenticated token endpoint. Trust therefore comes from the pinned token
@@ -96,8 +143,9 @@ endpoint and platform TLS trust path, not a second JWT-verification layer.
 
 Every result is `ChatGptSubscriptionStatus`: booleans, optional expiry, and
 bounded account display fields. Main explicitly reconstructs that DTO rather
-than forwarding arbitrary sidecar JSON, so a future accidental token field
-cannot cross the bridge.
+than forwarding the owner's result object, so a future accidental token field
+cannot cross the bridge. Owner failures reach the renderer only as a safe
+error code.
 
 There is no renderer route for OAuth start/complete and no bridge method that
 accepts an authorization URL, code, state, verifier, token, or redirect URI.
@@ -107,9 +155,9 @@ sender guard.
 ## Cancellation and sign-out
 
 The coordinator records cancellation even while the callback is still
-binding, so an early Cancel click cannot be lost. Once the sidecar has returned
+binding, so an early Cancel click cannot be lost. Once the owner has returned
 an attempt id, cancellation closes the callback and invalidates that exact
-server attempt.
+attempt.
 
 The credential manager also binds in-flight exchange persistence to the
 attempt generation. Cancelling after the valid callback was claimed but before
@@ -117,15 +165,26 @@ the token response is stored must leave the account signed out. Sign-out
 invalidates pending exchange/refresh generations before removing the durable
 record, so a late network completion cannot resurrect it.
 
-Application shutdown closes the callback before stopping AgentSidecar.
+Application shutdown closes the callback and cancels its exact attempt. The
+subscription owner also drains its workspace processes and accepted
+credential work within a bounded wait. Subscription sign-out withdraws those
+workspaces before another can open. Grida account sign-out preserves the
+separate subscription record.
 
 ## Storage and process boundary
 
-The refreshable record lives in AgentSidecar's daemon-owned `AuthStore`, in the
-owner-only `auth.json` file. The renderer cannot read it. Electron main sees
-the authorization code while completing the native ceremony and transiently
-sees credential-bearing provider request headers in the existing native
-network service, but it never persists or logs either.
+The credential owner uses the daemon's `AuthStore` and its owner-only
+`auth.json` file. It runs in-process in Electron main and exposes the ceremony
+as direct start, complete, cancel, status and sign-out calls with bounded
+inputs; there is no HTTP route. The renderer, the retained sidecar and the
+Rust executable receive no OAuth tokens. The native model request passes through the private
+provider broker, which injects credentials on the exact route.
+
+The disposable profile defaults to Gateway. It can select ChatGPT explicitly with
+`--native-chat-provider=chatgpt` alongside `--native-chat` on a supported
+development or Insiders profile. That fixed launch uses the reviewed default
+subscription model. Ordinary Desktop uses the model-selection flow above;
+the experimental account and service availability constraints apply to both.
 
 The implementation never reads `~/.codex/auth.json` or another application's
 credential store.
@@ -144,10 +203,24 @@ The focused offline contract covers:
   persistence;
 - token-claim parsing only after the exact token endpoint response, without
   claiming nonce/JWT signature/JWKS verification;
-- exact provider-lane network grants with no asset-lane grant.
+- exact provider-lane network grants, held Main-only and never published to
+  the sidecar, with no asset-lane grant.
 
 A live-account smoke remains manual because it opens the system browser,
 requires the user's ChatGPT account, and may consume plan quota.
+
+### Executed native fixtures
+
+On 2026-11-15, the macOS arm64 native-resource suite in
+`desktop/src/main/native-subscription-profiles.test.ts` passed four cases for
+ordinary Desktop composition using synthetic Responses. It exercised the
+closed catalog without refresh or inference, exact selected-model and High
+reasoning dispatch, token rotation, saved-chat restart, changed-lineage refusal
+and sign-out withdrawal. An Ultra case executed a separate reviewer and
+collected its finding over the same captured model and OAuth route, excluded
+parent conversation from the child, and kept unsupported output-token fields
+absent. These fixtures establish composed host and native-process behavior;
+they do not establish a live subscription request or the Desktop UI flow.
 
 ### Executed live smoke
 

@@ -26,12 +26,7 @@ import {
   type ReactNode,
 } from "react";
 import { isFileUIPart, isTextUIPart, type FileUIPart } from "ai";
-import {
-  CONTEXT_MARKERS,
-  USER_DIRECTORY_REFERENCES,
-  USER_FILE_ATTACHMENTS,
-  USER_TEMPLATE_SELECTION,
-} from "@grida/agent";
+import { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
 import { cn } from "@app/ui/lib/utils";
 import { cjk } from "@streamdown/cjk";
 import { code } from "@streamdown/code";
@@ -46,15 +41,14 @@ import {
   FilePenLineIcon,
   FilePlus2Icon,
   FolderTreeIcon,
-  GitBranchIcon,
+  FolderIcon,
   ImageIcon,
   ImagesIcon,
-  LayoutTemplateIcon,
   ListTodoIcon,
   MessageCircleQuestionIcon,
   PaperclipIcon,
   PanelsTopLeftIcon,
-  RotateCcwIcon,
+  PencilIcon,
   SearchIcon,
   SparklesIcon,
   SquareTerminalIcon,
@@ -75,7 +69,7 @@ import { Task, TaskContent, TaskTrigger } from "@app/ui/ai-elements/task";
 // Message/tool types stay in the shared `@/lib/agent-chat` seam (the
 // bridge transport + session helpers use them too); `toolDisplay` is
 // this renderer's own label/summary formatting, colocated in the kit.
-import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat";
+import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat/types";
 import { toolDisplay, type ToolDisplayDescription } from "./tool-display";
 import {
   formatElapsed,
@@ -92,6 +86,10 @@ import {
 } from "./design-search-widget";
 import { groupMessageParts } from "./group-parts";
 import { AnsweredQuestionSummary, isQuestionEntry } from "./question-card";
+import { workspace_links } from "./workspace-links";
+import { FullscreenImagePreview } from "@/kits/image-preview";
+import { AttachmentImagePreview } from "./attachment-image-preview";
+import { ChatMessageEditor, type ChatMessageEdit } from "./message-editor";
 import {
   hasOpenTabsResult,
   isSurfaceToolEntry,
@@ -100,18 +98,24 @@ import {
 
 export type { ChatMessage, ToolCallEntry };
 
+/** The size and line height of chat messages, user and agent alike. */
+const CHAT_TEXT = "text-[15px] leading-6";
+
 const markdown = {
-  className: "grida-ai-response-markdown space-y-2 text-[13px] leading-6",
+  // Markdown uses the shared chat reading size; see CHAT_TEXT.
+  className: `grida-ai-response-markdown space-y-2 ${CHAT_TEXT}`,
   controls: {
     code: { copy: true, download: false },
     table: { copy: true, download: false, fullscreen: false },
   },
   plugins: { cjk, code, math, mermaid },
+  rehypePlugins: workspace_links.rehypePlugins,
+  components: workspace_links.components,
 } as const;
 
 /**
- * Shared class string for the hover/focus-revealed action rows (copy /
- * rewind / branch). The `pointer-events-none` while hidden is the important
+ * Shared class string for the hover/focus-revealed action rows. The
+ * `pointer-events-none` while hidden is the important
  * part: an `opacity-0` button is still hit-testable, so without it a tooltip
  * could open over actions the user can't even see. Gating pointer-events on
  * the same `group-hover` / `focus-within` states as opacity keeps
@@ -124,23 +128,36 @@ const revealOnHoverActions =
   "focus-within:opacity-100 focus-within:pointer-events-auto";
 
 export type ChatMessageActions = {
-  /** Soft-truncate the conversation to this user message (RFC `rewinding`). */
-  onRewind?: (messageId: string) => void;
-  /** Fork a new session at this user message (RFC `fork`). */
-  onFork?: (messageId: string) => void;
+  /** Open an editor for this user message. */
+  onEdit?: (messageId: string) => void;
   /** Disable the actions (e.g. while a run is in flight). */
   disabled?: boolean;
+  /** When the message was sent, in UTC milliseconds. Shown with the actions. */
+  sentAtMs?: number;
+  /** A short, always-visible label after the actions, e.g. how it was sent. */
+  note?: ReactNode;
+  /**
+   * Show no actions under an assistant message, e.g. commentary inside a turn
+   * whose final answer carries them.
+   */
+  hidden?: boolean;
 };
 
 export function ChatMessageView({
   message,
   isStreaming,
   actions,
+  edit,
+  loadAttachmentPreview,
 }: {
   message: ChatMessage;
   isStreaming?: boolean;
-  /** Per-turn affordances rendered under user bubbles. Omit to hide. */
+  /** Per-turn affordances under a message. User bubbles show copy without them. */
   actions?: ChatMessageActions;
+  /** Replaces the user bubble in place without borrowing the composer draft. */
+  edit?: ChatMessageEdit;
+  /** Read-only retained PNG display, supplied by the owning host. */
+  loadAttachmentPreview?: AttachmentImagePreview.Loader;
 }) {
   // A compaction summary (synthetic assistant turn carrying a
   // `data-compaction` part) renders as a divider with an expandable
@@ -157,152 +174,75 @@ export function ChatMessageView({
       .filter(isTextUIPart)
       .map((part) => part.text)
       .join("");
-    // Provider-native image parts the user pasted/dropped. Rendered as
-    // thumbnails in the bubble so the sent message mirrors what the model
-    // perceived; an operable scratch twin, when present, is a separate context
-    // part.
+    const hasText = text.trim().length > 0;
+    // Perceived images and host-supplied resources stay outside the prose
+    // bubble. Neither their labels nor their previews become copyable text.
     const images = message.parts.filter(
       (part): part is FileUIPart =>
         isFileUIPart(part) && part.mediaType.startsWith("image/")
     );
-    // Registered context tokens (WG `compositor.md` §templating) the host
-    // attached on the user's behalf — e.g. a picked template. Rendered as a chip
-    // (the USER view) so the context is visible WITHOUT being fabricated into the
-    // user's prose. Same array live + DB-rebuilt (reads `message.parts`).
     const contexts = message.parts.filter(
       (part) =>
         typeof (part as { type?: unknown }).type === "string" &&
-        (part as { type: string }).type in CONTEXT_MARKERS
+        (part as { type: string }).type in chat_vocabulary.CONTEXT_MARKERS
     );
     return (
       <Message from="user">
-        <MessageContent className="text-[13px]">
-          <CollapsibleBubbleBody>
-            {contexts.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {contexts.map((rawPart, index) => {
-                  // `data-*` context part — read past the closed UIMessagePart
-                  // union; the filter above already gated `type` to CONTEXT_MARKERS.
-                  const part = rawPart as {
-                    type: string;
-                    data?: Record<string, unknown>;
-                  };
-                  const isTemplate = part.type === USER_TEMPLATE_SELECTION;
-                  const isFiles = part.type === USER_FILE_ATTACHMENTS;
-                  const isDirectories = part.type === USER_DIRECTORY_REFERENCES;
-                  const d = part.data ?? {};
-                  const title =
-                    typeof d.title === "string" ? d.title : undefined;
-                  const slides =
-                    typeof d.slides === "number" ? d.slides : undefined;
-                  // Uploaded-file marker: name the chip by the file(s) in scratch.
-                  const fileNames = (
-                    Array.isArray(d.files) ? d.files : []
-                  ).flatMap((f) =>
-                    f && typeof (f as { name?: unknown }).name === "string"
-                      ? [(f as { name: string }).name]
-                      : []
-                  );
-                  const directoryNames = (
-                    Array.isArray(d.directories) ? d.directories : []
-                  ).flatMap((directory) =>
-                    directory &&
-                    typeof (directory as { name?: unknown }).name === "string"
-                      ? [(directory as { name: string }).name]
-                      : []
-                  );
-                  const Icon = isTemplate
-                    ? LayoutTemplateIcon
-                    : isDirectories
-                      ? FolderTreeIcon
-                      : PaperclipIcon;
-                  const label =
-                    isTemplate && title
-                      ? `${title} template`
-                      : isFiles
-                        ? fileNames.length === 1
-                          ? fileNames[0]
-                          : `${fileNames.length} files`
-                        : isDirectories
-                          ? directoryNames.length === 1
-                            ? directoryNames[0]
-                            : `${directoryNames.length} folders`
-                          : CONTEXT_MARKERS[part.type];
-                  return (
-                    // Index key: a sent user message's parts are immutable and
-                    // never reorder (same reasoning as the images below).
-                    <span
-                      key={index}
-                      className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs shadow-sm"
-                    >
-                      <Icon className="size-3.5 text-muted-foreground" />
-                      <span className="font-medium">{label}</span>
-                      {isTemplate && slides !== undefined && (
-                        <span className="text-muted-foreground">
-                          · {slides} slides
-                        </span>
-                      )}
-                      {isDirectories && (
-                        <span className="text-muted-foreground">
-                          · read only
-                        </span>
-                      )}
-                    </span>
-                  );
-                })}
-              </div>
-            )}
-            {images.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {images.map((image, index) => (
-                  // Index key: a sent user message's attachments are immutable
-                  // and never reorder, so the index is stable — and it avoids
-                  // putting a multi-MB data-URL into the key (which React keeps
-                  // + compares).
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    key={index}
-                    src={image.url}
-                    alt={image.filename ?? ""}
-                    loading="lazy"
-                    decoding="async"
-                    className="max-h-48 max-w-full rounded-md border object-contain"
-                  />
-                ))}
-              </div>
-            )}
-            {text.length > 0 && (
-              <MessageResponse plugins={markdown.plugins}>
-                {text}
-              </MessageResponse>
-            )}
-          </CollapsibleBubbleBody>
-        </MessageContent>
+        <UserMessageAttachments
+          contexts={contexts}
+          images={images}
+          loadAttachmentPreview={loadAttachmentPreview}
+        />
+        {edit ? (
+          <ChatMessageEditor edit={edit} />
+        ) : (
+          hasText && (
+            <MessageContent
+              className={CHAT_TEXT}
+              role="group"
+              aria-label="Message text"
+            >
+              <CollapsibleBubbleBody>
+                <MessageResponse
+                  plugins={markdown.plugins}
+                  rehypePlugins={markdown.rehypePlugins}
+                  components={markdown.components}
+                >
+                  {text}
+                </MessageResponse>
+              </CollapsibleBubbleBody>
+            </MessageContent>
+          )
+        )}
         {/* Subtle until hover so the transcript stays clean; right-aligned
             to sit under the user bubble. Copy is always available (a pure
-            clipboard action, never disabled); rewind/fork appear only
+            clipboard action, never disabled). History controls appear only
             when the host wires them. */}
-        <MessageActions className={`ml-auto ${revealOnHoverActions}`}>
-          <CopyMessageAction text={text} />
-          {actions?.onRewind && (
-            <MessageAction
-              tooltip="Rewind to here"
-              disabled={actions.disabled}
-              onClick={() => actions.onRewind?.(message.id)}
-            >
-              <RotateCcwIcon />
-            </MessageAction>
+        {!edit &&
+          (hasText || actions?.sentAtMs !== undefined || actions?.note) && (
+            <div className="ml-auto flex items-center gap-2">
+              <MessageActions className={revealOnHoverActions}>
+                {actions?.sentAtMs !== undefined && (
+                  <MessageTime at={actions.sentAtMs} />
+                )}
+                {hasText && <CopyMessageAction text={text} />}
+                {hasText && actions?.onEdit && (
+                  <MessageAction
+                    tooltip="Edit and resubmit"
+                    disabled={actions.disabled}
+                    onClick={() => actions.onEdit?.(message.id)}
+                  >
+                    <PencilIcon />
+                  </MessageAction>
+                )}
+              </MessageActions>
+              {actions?.note && (
+                <span className="text-muted-foreground flex items-center gap-1 text-xs [&_svg]:size-3.5">
+                  {actions.note}
+                </span>
+              )}
+            </div>
           )}
-          {actions?.onFork && (
-            <MessageAction
-              tooltip="Fork from here"
-              disabled={actions.disabled}
-              onClick={() => actions.onFork?.(message.id)}
-            >
-              <GitBranchIcon />
-            </MessageAction>
-          )}
-        </MessageActions>
       </Message>
     );
   }
@@ -322,7 +262,7 @@ export function ChatMessageView({
     .join("\n\n");
   return (
     <Message from="assistant" className="w-full max-w-none">
-      <MessageContent className="w-full max-w-full text-[13px]">
+      <MessageContent className={`w-full max-w-full ${CHAT_TEXT}`}>
         {groups.map((group) => {
           if (group.type === "text") {
             return (
@@ -331,6 +271,8 @@ export function ChatMessageView({
                 className={markdown.className}
                 controls={markdown.controls}
                 plugins={markdown.plugins}
+                rehypePlugins={markdown.rehypePlugins}
+                components={markdown.components}
               >
                 {group.text}
               </MessageResponse>
@@ -345,12 +287,227 @@ export function ChatMessageView({
       {/* Copy mirrors the user-bubble affordance but left-aligned under the
           assistant response. Shown only once the turn has settled with real
           text — never over a half-streamed or tool-only (text-less) turn. */}
-      {!isStreaming && responseText.trim().length > 0 && (
+      {!isStreaming && !actions?.hidden && responseText.trim().length > 0 && (
         <MessageActions className={revealOnHoverActions}>
+          {actions?.sentAtMs !== undefined && (
+            <MessageTime at={actions.sentAtMs} />
+          )}
           <CopyMessageAction text={responseText} />
         </MessageActions>
       )}
     </Message>
+  );
+}
+
+/** Display supplied previews or an exact host-minted read capability, never a path. */
+function UserMessageAttachments({
+  contexts,
+  images,
+  loadAttachmentPreview,
+}: {
+  contexts: ChatMessage["parts"];
+  images: FileUIPart[];
+  loadAttachmentPreview?: AttachmentImagePreview.Loader;
+}) {
+  const otherContexts = contexts.flatMap((part, contextIndex) => {
+    const type = (part as { type: string }).type;
+    const label = chat_vocabulary.CONTEXT_MARKERS[type];
+    return type !== chat_vocabulary.CONTEXT_PARTS.files && label
+      ? [{ label, contextIndex }]
+      : [];
+  });
+  const files = contexts.flatMap((rawPart, contextIndex) => {
+    const part = rawPart as { type: string; data?: { files?: unknown } };
+    if (part.type !== chat_vocabulary.CONTEXT_PARTS.files) return [];
+    return (Array.isArray(part.data?.files) ? part.data.files : []).flatMap(
+      (file) => {
+        if (!file || typeof file.name !== "string" || !file.name) return [];
+        const directory = file.kind === "directory";
+        const image =
+          !directory &&
+          ["image/png", "image/jpeg", "image/webp", "image/gif"].includes(
+            file.mimeType
+          );
+        const previewId =
+          !directory &&
+          image &&
+          typeof file.previewId === "string" &&
+          file.previewId.length > 0 &&
+          file.previewId.length <= 256
+            ? file.previewId
+            : undefined;
+        const poster =
+          !directory &&
+          typeof file.poster === "string" &&
+          file.poster.length <= 48 * 1024 &&
+          /^data:image\/(?:jpeg|png);base64,[A-Za-z0-9+/]+={0,2}$/.test(
+            file.poster
+          )
+            ? file.poster
+            : undefined;
+        return [
+          {
+            name: file.name,
+            contextIndex,
+            directory,
+            image,
+            poster,
+            previewId,
+            caption: directory
+              ? "Folder"
+              : typeof file.caption === "string"
+                ? file.caption
+                : image
+                  ? "Preview unavailable"
+                  : "File",
+          },
+        ];
+      }
+    );
+  });
+  const items = [...files, ...otherContexts].sort(
+    (first, second) => first.contextIndex - second.contextIndex
+  );
+  if (items.length === 0 && images.length === 0) return null;
+  return (
+    <ul
+      aria-label="Message attachments"
+      className="ml-auto flex max-w-full flex-wrap justify-end gap-2"
+    >
+      {items.map((item, index) => {
+        if ("label" in item)
+          return (
+            <li key={`context-${index}`} className="max-w-full min-w-0">
+              <span className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs shadow-sm">
+                <PaperclipIcon className="size-3.5 text-muted-foreground" />
+                {item.label}
+              </span>
+            </li>
+          );
+        const file = item;
+        return (
+          // Accepted message parts never reorder. Avoid keeping preview bytes in keys.
+          <li key={`file-${index}`} className="max-w-full min-w-0">
+            {file.previewId && loadAttachmentPreview ? (
+              <AttachmentImagePreview.View
+                previewId={file.previewId}
+                loader={loadAttachmentPreview}
+                name={file.name}
+              />
+            ) : file.image && file.poster ? (
+              <AttachmentImagePreview.Image
+                source={file.poster}
+                name={file.name}
+                downloadName={`${file.name}.preview.${file.poster.startsWith("data:image/png") ? "png" : "jpg"}`}
+              />
+            ) : (
+              <figure className="m-0 w-52 max-w-full overflow-hidden rounded-lg border bg-background">
+                {file.poster ? (
+                  <FullscreenImagePreview
+                    src={file.poster}
+                    alt={file.name}
+                    title={`Preview ${file.name}`}
+                    downloadName={`${file.name}.preview.${file.poster.startsWith("data:image/png") ? "png" : "jpg"}`}
+                    className="w-full"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={file.poster}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      className="h-36 w-full bg-muted/30 object-contain"
+                    />
+                  </FullscreenImagePreview>
+                ) : null}
+                <figcaption className="flex min-w-0 items-center gap-2 p-2 text-xs">
+                  {!file.poster &&
+                    (file.directory ? (
+                      <FolderIcon className="size-5 shrink-0 text-muted-foreground" />
+                    ) : file.image ? (
+                      <ImageIcon className="size-5 shrink-0 text-muted-foreground" />
+                    ) : (
+                      <PaperclipIcon className="size-5 shrink-0 text-muted-foreground" />
+                    ))}
+                  <span className="flex min-w-0 flex-col gap-0.5">
+                    <span className="truncate font-medium" title={file.name}>
+                      {file.name}
+                    </span>
+                    {file.caption && (
+                      <span className="truncate text-muted-foreground">
+                        {file.caption}
+                      </span>
+                    )}
+                  </span>
+                </figcaption>
+              </figure>
+            )}
+          </li>
+        );
+      })}
+      {images.map((image, index) => {
+        const source = attachmentImageSource(image.url);
+        return (
+          <li key={`image-${index}`} className="max-w-full min-w-0">
+            <figure className="m-0 flex max-w-full flex-col gap-1">
+              {source ? (
+                <AttachmentImagePreview.Image
+                  source={source}
+                  name={image.filename ?? "Attached image"}
+                  downloadName={image.filename}
+                />
+              ) : (
+                <span className="flex h-36 w-52 max-w-full flex-col items-center justify-center gap-2 rounded-lg border bg-muted/30 text-xs text-muted-foreground">
+                  <ImageIcon className="size-6" />
+                  Preview unavailable
+                </span>
+              )}
+              {!source && (
+                <figcaption className="truncate text-xs text-muted-foreground">
+                  {image.filename ?? "Attached image"}
+                </figcaption>
+              )}
+            </figure>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** Only explicit image sources; file/custom schemes cannot become display grants. */
+function attachmentImageSource(value: string): string | null {
+  try {
+    const source = new URL(value);
+    if (source.protocol === "data:")
+      return /^data:image\/(?:png|jpeg|webp|gif|avif|bmp);base64,[A-Za-z0-9+/]+={0,2}$/.test(
+        value
+      )
+        ? value
+        : null;
+    if (source.protocol === "blob:") return value;
+    return (source.protocol === "https:" || source.protocol === "http:") &&
+      !source.username &&
+      !source.password
+      ? value
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The local time a message was sent, shown with its hover actions. */
+function MessageTime({ at }: { at: number }) {
+  return (
+    <time
+      dateTime={new Date(at).toISOString()}
+      className="text-muted-foreground px-1 text-xs tabular-nums"
+    >
+      {new Date(at).toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit",
+      })}
+    </time>
   );
 }
 
@@ -393,8 +550,8 @@ function CollapsibleBubbleBody({ children }: { children: ReactNode }) {
       setOverflowing(el.scrollHeight > BUBBLE_COLLAPSE_THRESHOLD_PX);
     measure();
     if (typeof ResizeObserver === "undefined") return;
-    // Re-measure on reflow — a late-loading image or a window resize can flip
-    // a bubble across the threshold after the first paint.
+    // Re-measure text wrapping after a resize or font change. Attachment
+    // previews live outside the measured bubble.
     const observer = new ResizeObserver(measure);
     observer.observe(el);
     return () => observer.disconnect();
@@ -487,22 +644,6 @@ function findCompactionSummary(
 }
 
 /**
- * Horizontal divider with centered content — the section break that marks a
- * compaction in the transcript. Shared by the in-flight indicator
- * ({@link CompactingIndicator}) and the settled notice
- * ({@link CompactionNotice}) so the two states sit on one consistent line.
- */
-function CompactionDivider({ children }: { children: ReactNode }) {
-  return (
-    <div className="my-3 flex w-full items-center gap-3 px-1 text-muted-foreground">
-      <span aria-hidden className="h-px flex-1 bg-border" />
-      {children}
-      <span aria-hidden className="h-px flex-1 bg-border" />
-    </div>
-  );
-}
-
-/**
  * How long an in-flight indicator runs bare before the elapsed-time counter
  * appears, in milliseconds. Below this only the shimmering label shows; at or
  * past it the "· {time}" counter is revealed.
@@ -510,9 +651,8 @@ function CompactionDivider({ children }: { children: ReactNode }) {
 const ELAPSED_REVEAL_AFTER_MS = 3000;
 
 /**
- * A shimmering label trailed by a live elapsed-time counter — the shared body
- * of the transcript's in-flight indicators ({@link CompactingIndicator},
- * {@link PendingTurnIndicator}) so they tick identically.
+ * A shimmering label trailed by a live elapsed-time counter — the body of the
+ * transcript's in-flight indicator ({@link PendingTurnIndicator}).
  *
  * The counter stays hidden for the first {@link ELAPSED_REVEAL_AFTER_MS}: a fast
  * operation settles before a timer grows, and only a wait long enough to feel
@@ -538,22 +678,6 @@ function ShimmerWithElapsed({ label }: { label: string }) {
 }
 
 /**
- * In-flight compaction (RFC `session / compaction`). A divider whose centered
- * label shimmers while the summarizer runs, trailed by a live elapsed-time
- * counter so a slow summarize reads as progress, not a hang. The host renders
- * this at the tail of the conversation while a manual `/compact` is awaiting;
- * once the summary message hydrates it is replaced by the settled
- * {@link CompactionNotice}.
- */
-export function CompactingIndicator() {
-  return (
-    <CompactionDivider>
-      <ShimmerWithElapsed label="Compacting conversation" />
-    </CompactionDivider>
-  );
-}
-
-/**
  * Pre-first-token indicator — the dead-air window between a send and the first
  * streamed chunk. The AI-SDK reducer doesn't create the assistant message until
  * the first content chunk arrives, so the per-turn "Thinking" shimmer that lives
@@ -573,27 +697,12 @@ export function PendingTurnIndicator() {
   );
 }
 
-/**
- * Transient confirmation that a fork happened (RFC `session / fork`). Forking
- * switches to a copy that looks identical to the source, so without this the
- * action reads as a no-op. A surface renders it while
- * `useSessionFork().justForked` is true; it auto-dismisses there.
- */
-export function ForkedNotice() {
-  return (
-    <div className="flex items-center gap-2 border-t bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-      <span className="flex-1">
-        Forked into a new session — you&apos;re now in a copy.
-      </span>
-    </div>
-  );
-}
-
 // The settled compaction affordance (RFC `session / compaction`: "the user
 // sees a one-line affordance"). A divider reading "Conversation compacted";
 // clicking the label expands the summary the model now sees in place of the
 // hidden turns.
-function CompactionNotice({
+/** A divider where earlier context was summarized, with the summary inside. */
+export function CompactionNotice({
   summary,
   auto,
 }: {
@@ -619,7 +728,8 @@ function CompactionNotice({
 
 // A lone tool call renders as a single `Task` row; a run of consecutive
 // calls nests those rows inside one summary `Task`.
-function ToolCallGroupView({ entries }: { entries: ToolCallEntry[] }) {
+/** Tool calls as cards; consecutive calls collapse into one summary row. */
+export function ToolCallGroupView({ entries }: { entries: ToolCallEntry[] }) {
   if (entries.length === 1) {
     return <ToolCallView entry={entries[0]} />;
   }
@@ -664,8 +774,8 @@ function approvalOf(entry: ToolCallEntry) {
 
 function ToolCallView({ entry }: { entry: ToolCallEntry }) {
   // The `question` tool's INTERACTIVE prompt is session-global (pinned above the
-  // composer by the surface — see `findPendingQuestion` / `QuestionCard`). In
-  // the transcript it's only a passive record of what was asked / answered.
+  // composer by the surface as `QuestionPrompt`). In the transcript it's only a
+  // passive record of what was asked / answered.
   if (isQuestionEntry(entry)) {
     return <QuestionToolView entry={entry} />;
   }
@@ -726,7 +836,7 @@ function ToolCallView({ entry }: { entry: ToolCallEntry }) {
 }
 
 // The `question` tool's PASSIVE transcript record. The interactive prompt is
-// session-global (the surface pins `QuestionCard` above its composer), so here
+// session-global (the surface pins `QuestionPrompt` above its composer), so here
 // we only show what was asked — a one-line header — and, once answered, the
 // read-only echo of the answer. While the run is paused on the user the header
 // points them at the prompt; `input-streaming` (partial input) shows nothing.
@@ -823,6 +933,7 @@ function iconForAction(action: ToolDisplayDescription["action"]): LucideIcon {
     case "plan":
       return ListTodoIcon;
     case "command":
+    case "process":
       return SquareTerminalIcon;
     case "question":
       return MessageCircleQuestionIcon;

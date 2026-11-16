@@ -109,6 +109,61 @@ describe("DesktopMediaHost", () => {
     );
   });
 
+  it("keeps a retained item when its picker is cancelled or its window changes", async () => {
+    const item = await new MediaStore(mediaRoot).save({
+      file_name: "sound-effect.mp3",
+      media_type: "audio/mpeg",
+      bytes: Uint8Array.of(1, 2, 3),
+    });
+    const destination = path.join(root, "copy.mp3");
+    const host = createHost();
+    let current = true;
+    const requireCurrent = () => {
+      if (!current) throw new Error("scope changed");
+    };
+    const choose =
+      vi.fn<(name: string, extension: string) => Promise<string | null>>();
+    choose.mockResolvedValueOnce(null);
+    choose.mockImplementationOnce(async () => {
+      current = false;
+      return destination;
+    });
+    await expect(host.saveCopy(item.id, choose, requireCurrent)).resolves.toBe(
+      "cancelled"
+    );
+    await expect(host.saveCopy(item.id, choose, requireCurrent)).resolves.toBe(
+      "failed"
+    );
+    expect(choose).toHaveBeenCalledWith("sound-effect.mp3", ".mp3");
+    await expect(fs.stat(destination)).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+    await expect(host.read(item.id)).resolves.toMatchObject({ item });
+  });
+
+  it("opens only one save chooser and validates the retained ID before opening it", async () => {
+    const item = await new MediaStore(mediaRoot).save({
+      file_name: "image-1.png",
+      media_type: "image/png",
+      bytes: Uint8Array.of(1),
+    });
+    const host = createHost();
+    const picker = Promise.withResolvers<string | null>();
+    const choose = vi.fn<() => Promise<string | null>>(() => picker.promise);
+    const requireCurrent = () => {};
+    await expect(
+      host.saveCopy("../../image-1.png", choose, requireCurrent)
+    ).resolves.toBe("failed");
+    expect(choose).not.toHaveBeenCalled();
+    const first = host.saveCopy(item.id, choose, requireCurrent);
+    await vi.waitFor(() => expect(choose).toHaveBeenCalledTimes(1));
+    await expect(host.saveCopy(item.id, choose, requireCurrent)).resolves.toBe(
+      "failed"
+    );
+    picker.resolve(null);
+    await expect(first).resolves.toBe("cancelled");
+  });
+
   it("does not leak native paths through failures", async () => {
     const secretPath = path.join(mediaRoot, "private-model.glb");
     const host = createHost({

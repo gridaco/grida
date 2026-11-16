@@ -11,7 +11,7 @@ const IMAGE_EXTENSION: Record<string, string> = {
 /** Transfers one source image out of the app without involving its viewport. */
 export class ImageTransfer {
   constructor(
-    private readonly src: string,
+    private readonly src: string | Blob,
     private readonly suggestedName?: string
   ) {}
 
@@ -33,6 +33,7 @@ export class ImageTransfer {
   }
 
   private async sourceBlob(): Promise<Blob> {
+    if (this.src instanceof Blob) return this.src;
     const response = await fetch(this.src);
     if (!response.ok) throw new Error("Couldn't load image");
     return response.blob();

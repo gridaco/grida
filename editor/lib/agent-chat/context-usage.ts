@@ -7,8 +7,10 @@
  *
  * ## Two numbers, two meanings
  *
- * The ring **%** is an estimate of the current transcript's context
- * footprint. The desktop client does not have the exact prompt that the
+ * When the host records the provider-reported size of the latest model call,
+ * the ring **%** uses it: the exact prompt (instructions, tool definitions,
+ * history) plus the reply. Otherwise the ring **%** is an estimate of the
+ * current transcript's context footprint. The desktop client does not have the exact prompt that the
  * runtime will send next: hidden system prompt, skill blocks, tool schemas,
  * provider framing, and server-side compaction state all live outside this
  * UI message list. Until the runtime exposes a prompt-token preflight value,
@@ -223,6 +225,11 @@ export type ContextUsage = {
   usage: MessageUsage | undefined;
   /** Provider-reported tokens consumed by the latest settled assistant turn. */
   turnUsageTokens: number;
+  /**
+   * Whether `usedTokens` comes from the provider's reported context size
+   * rather than an estimate of the visible transcript.
+   */
+  measured: boolean;
 };
 
 /**
@@ -233,16 +240,39 @@ export type ContextUsage = {
  */
 export function computeContextUsage(
   messages: readonly MessageLike[],
-  contextWindow: number | undefined
+  contextWindow: number | undefined,
+  /**
+   * The context size the provider reported for the latest model call, when
+   * the host records it. It replaces the estimate: it includes the hidden
+   * instructions, tool definitions and tool results the visible transcript
+   * omits, which the breakdown counts as other.
+   */
+  measuredTokens?: number
 ): ContextUsage {
   const usage = lastAssistantUsage(messages);
   const turnUsageTokens = usage ? usageTokenTotal(usage) : 0;
-  const breakdown = estimateContextBreakdown(messages);
-  const usedTokens =
-    breakdown.user + breakdown.assistant + breakdown.tools + breakdown.other;
+  const estimated = estimateContextBreakdown(messages);
+  const visible =
+    estimated.user + estimated.assistant + estimated.tools + estimated.other;
+  const measured = measuredTokens !== undefined && measuredTokens > 0;
+  const usedTokens = measured ? Math.max(measuredTokens, visible) : visible;
+  const breakdown = measured
+    ? {
+        ...estimated,
+        other: estimated.other + (usedTokens - visible),
+      }
+    : estimated;
   const maxTokens = contextWindow ?? 0;
   // Clamp to the documented [0, 1] contract; estimates can still exceed a
   // catalog window for stale model metadata or oversized local transcripts.
   const percent = maxTokens > 0 ? Math.min(1, usedTokens / maxTokens) : 0;
-  return { usedTokens, maxTokens, percent, breakdown, usage, turnUsageTokens };
+  return {
+    usedTokens,
+    maxTokens,
+    percent,
+    breakdown,
+    usage,
+    turnUsageTokens,
+    measured,
+  };
 }

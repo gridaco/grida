@@ -26,6 +26,7 @@ export namespace apiAudit {
   const TEST_FILE = /(?:\.(?:test|spec)\.[cm]?[jt]sx?$|\.d\.ts$)/;
   const LEGACY = {
     "gg.chat": ["/api/v1/ai/chat/completions", "POST", "gg"],
+    "gg.chat.capped": ["/api/v1/ai/chat/completions/capped", "POST", "gg"],
     "gg.models": ["/api/v1/ai/models", "GET", "gg"],
     "gg.images": ["/api/v1/ai/images/generations", "POST", "gg"],
     "gg.videos": ["/api/v1/ai/videos/generations", "POST", "gg"],
@@ -393,7 +394,7 @@ export namespace apiAudit {
           report(
             "legacy-exception",
             registryFile,
-            `${id}: legacy exceptions are fixed to six existing operations.`
+            `${id}: legacy exceptions are fixed to seven existing operations.`
           );
         }
       } else if (definition.binding === "gg-operations") {

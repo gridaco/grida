@@ -15,7 +15,7 @@
 
 /**
  * The minimal read surface a `.canvas` reader needs. Structurally satisfied by
- * `AgentFs.Backend` (so the desktop can pass its workspace backend unchanged)
+ * a host's file backend (so a host can pass its workspace backend unchanged)
  * and by a trivial `Map`-backed object in tests. Paths are POSIX and
  * root-relative; `..`-escape and absolute paths are out of scope for V1.
  */

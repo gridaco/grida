@@ -1,6 +1,7 @@
 // GRIDA-SEC-004 / GRIDA-SEC-008 — renderer-safe bridge contract pins.
 import { describe, expect, expectTypeOf, it } from "vitest";
 import type {
+  ProbedEndpointModel,
   RigCheckRequest,
   RigCheckResult,
   RiggingGenerateRequest,
@@ -14,13 +15,48 @@ import type {
   TextToSpeechListVoicesResult,
   ThreeDGenerateRequest,
   ThreeDGenerateResult,
-} from "@grida/agent";
+} from "@grida/ai-host";
 import type { MediaItem } from "@grida/daemon";
 import type {
   ChatGptConnectResult,
   DesktopBridge,
   DesktopMediaReadResult,
 } from "./index";
+
+describe("DesktopBridge native Settings", () => {
+  it("offers an optional argument-free Settings action for protocol-1 hosts", () => {
+    type OpenSettings = DesktopBridge["window"]["open_settings"];
+    expectTypeOf<OpenSettings>().toEqualTypeOf<
+      (() => Promise<void>) | undefined
+    >();
+    expectTypeOf<Parameters<NonNullable<OpenSettings>>>().toEqualTypeOf<[]>();
+    const older: Pick<DesktopBridge["window"], "open_settings"> = {};
+    expect(older.open_settings).toBeUndefined();
+  });
+});
+
+describe("DesktopBridge endpoint consent", () => {
+  it("keeps consent inspection and model-only refresh optional on older hosts", () => {
+    type Providers = NonNullable<DesktopBridge["providers"]>;
+    expectTypeOf<Providers["endpoint_authorization"]>().toEqualTypeOf<
+      ((id: string, baseUrl: string) => Promise<boolean>) | undefined
+    >();
+    expectTypeOf<Providers["update_endpoint_models"]>().toEqualTypeOf<
+      | ((update: {
+          id: string;
+          base_url: string;
+          models: ProbedEndpointModel[];
+        }) => Promise<void>)
+      | undefined
+    >();
+    const older: Pick<
+      Providers,
+      "endpoint_authorization" | "update_endpoint_models"
+    > = {};
+    expect(older.endpoint_authorization).toBeUndefined();
+    expect(older.update_endpoint_models).toBeUndefined();
+  });
+});
 
 describe("DesktopBridge ChatGPT connect result", () => {
   it("preserves status on success and exposes cancellation as a closed outcome", () => {

@@ -22,6 +22,7 @@ The most actively maintained docs areas are:
   WG clusters (canvas, format, research, and most feat-\*) moved to the engine repo:
   `https://github.com/gridaco/nothing/tree/main/docs/wg` — author engine specs there, not here.**
 - `docs/reference/**` — reference docs (glossary, specs, stable technical references)
+- `docs/agent/**` — cross-surface agent product features and user documentation
 - `docs/editor/**` — editor user and feature docs
 - `docs/forms/**` — forms docs
 - `docs/platform/**` — platform/product docs

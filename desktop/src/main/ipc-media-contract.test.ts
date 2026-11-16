@@ -12,6 +12,7 @@ describe("durable media IPC registration", () => {
     for (const channel of [
       "MEDIA_LIST",
       "MEDIA_READ",
+      "MEDIA_SAVE_COPY",
       "MEDIA_REVEAL",
       "MEDIA_OPEN_FOLDER",
     ]) {

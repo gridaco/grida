@@ -7,7 +7,13 @@ import {
   type Rectangle,
 } from "electron";
 import path from "node:path";
+import {
+  NATIVE_DOCUMENT_ARGUMENT,
+  NATIVE_DOCUMENT_CHAT_ARGUMENT,
+  NATIVE_WORKSPACE_CHAT_ARGUMENT,
+} from "./bridge/contract";
 import { attachNavigationEvents } from "./main/ipc-handlers";
+import { NativeDesktopProfile } from "./main/native-desktop-profile";
 import { RUNTIME_APP_ICON } from "./branding";
 import { IS_DEV } from "./env";
 
@@ -454,7 +460,12 @@ function buildDesktopArguments({
   app: App;
   extra?: string[];
 }): string[] {
-  return [`--grida-version=${app.getVersion()}`, ...extra];
+  const workspaceChat = NativeDesktopProfile.ordinaryChat();
+  return [
+    `--grida-version=${app.getVersion()}`,
+    ...(workspaceChat ? [`--${NATIVE_WORKSPACE_CHAT_ARGUMENT}=1`] : []),
+    ...extra,
+  ];
 }
 
 /**
@@ -480,8 +491,7 @@ export function open_welcome_window({
 /**
  * Opens a per-document window for the supplied `docId`. Recipe 4
  * mechanics: each open document is its own BrowserWindow with its
- * own renderer process, addressed by `docId` (not by absolute path —
- * the agent server owns the path registry).
+ * own renderer process, addressed by the host's opaque `docId`.
  *
  * Lands on the shared `/desktop/file` window in single-file (docId) mode; the
  * same route serves `.canvas` decks in bundle (`?id=`) mode (see
@@ -491,15 +501,29 @@ export function open_document_window({
   app,
   base_url: baseUrl,
   doc_id: docId,
+  native = false,
+  native_chat: nativeChat = false,
 }: {
   app: App;
   base_url: string;
   doc_id: string;
+  native?: boolean;
+  native_chat?: boolean;
 }) {
   return create_desktop_window({
     base_url: baseUrl,
     urlPath: `/desktop/file?docId=${encodeURIComponent(docId)}`,
-    additionalArguments: buildDesktopArguments({ app }),
+    additionalArguments: buildDesktopArguments({
+      app,
+      extra: native
+        ? [
+            `--${NATIVE_DOCUMENT_ARGUMENT}=${docId}`,
+            ...(nativeChat
+              ? [`--${NATIVE_DOCUMENT_CHAT_ARGUMENT}=${docId}`]
+              : []),
+          ]
+        : [],
+    }),
   });
 }
 
@@ -545,6 +569,7 @@ export function open_workspace_window({
   base_url: baseUrl,
   workspace_id: workspaceId,
   session_id: sessionId,
+  profile_id: profileId,
 }: {
   app: App;
   base_url: string;
@@ -556,11 +581,18 @@ export function open_workspace_window({
    * listener yet; the agent pane reads the param once on mount.
    */
   session_id?: string;
+  /** Saved native model connection that owns the requested session. */
+  profile_id?: string;
 }) {
-  const session = sessionId ? `&session=${encodeURIComponent(sessionId)}` : "";
+  const query = new URLSearchParams({ id: workspaceId });
+  if (sessionId) query.set("session", sessionId);
+  const profile =
+    sessionId && profileId
+      ? `#chat-profile=${encodeURIComponent(profileId)}`
+      : "";
   return create_desktop_window({
     base_url: baseUrl,
-    urlPath: `/desktop/workspace?id=${encodeURIComponent(workspaceId)}${session}`,
+    urlPath: `/desktop/workspace?${query}${profile}`,
     additionalArguments: buildDesktopArguments({ app }),
   });
 }

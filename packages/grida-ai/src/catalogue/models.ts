@@ -203,6 +203,11 @@ export namespace models {
       outputLimit: number;
       /** Cost per 1M tokens in USD. */
       cost: ModelCostPerMillion;
+      /**
+       * Providers whose binding of this model accepts a reasoning level.
+       * Optional so custom models and older snapshots remain readable.
+       */
+      readonly reasoningProviders?: readonly string[];
     }
 
     /** A bundled text-model spec. Unlike the snapshot-compatible base shape,
@@ -240,6 +245,7 @@ export namespace models {
               outputMultiplier: 1.5,
             },
           },
+          reasoningProviders: ["grida", "openai", "openrouter", "vercel"],
         },
         "openai/gpt-5.5-pro": {
           id: "openai/gpt-5.5-pro",
@@ -263,6 +269,7 @@ export namespace models {
             input: 30,
             output: 180,
           },
+          reasoningProviders: ["grida", "openai", "openrouter", "vercel"],
         },
         "openai/gpt-5.6-sol": {
           id: "openai/gpt-5.6-sol",
@@ -293,6 +300,7 @@ export namespace models {
               outputMultiplier: 1.5,
             },
           },
+          reasoningProviders: ["grida", "openai", "openrouter", "vercel"],
         },
         "openai/gpt-5.6-terra": {
           id: "openai/gpt-5.6-terra",
@@ -323,6 +331,7 @@ export namespace models {
               outputMultiplier: 1.5,
             },
           },
+          reasoningProviders: ["grida", "openai", "openrouter", "vercel"],
         },
         "openai/gpt-5.6-luna": {
           id: "openai/gpt-5.6-luna",
@@ -353,6 +362,38 @@ export namespace models {
               outputMultiplier: 1.5,
             },
           },
+          reasoningProviders: ["grida", "openai", "openrouter", "vercel"],
+        },
+        "openai/gpt-6.1-terra": {
+          id: "openai/gpt-6.1-terra",
+          label: "GPT-6.1 Terra",
+          release: {
+            date: "2026-10-26",
+            basis: "model",
+            source_url: "https://developers.openai.com/api/docs/changelog",
+          },
+          multimodal: true,
+          imageInputMimes: [
+            "image/png",
+            "image/jpeg",
+            "image/webp",
+            "image/gif",
+          ],
+          tool_call: true,
+          contextWindow: 1050000,
+          outputLimit: 128000,
+          cost: {
+            input: 1,
+            output: 5,
+            cacheRead: 0.05,
+            cacheWrite: 1.25,
+            longContext: {
+              inputTokensAbove: 272000,
+              inputMultiplier: 2,
+              outputMultiplier: 1.5,
+            },
+          },
+          reasoningProviders: ["grida", "openai", "openrouter", "vercel"],
         },
         "openai/gpt-6-astra": {
           id: "openai/gpt-6-astra",
@@ -383,6 +424,7 @@ export namespace models {
               outputMultiplier: 1.5,
             },
           },
+          reasoningProviders: ["grida", "openai", "openrouter", "vercel"],
         },
         "anthropic/claude-sonnet-5": {
           id: "anthropic/claude-sonnet-5",
@@ -410,6 +452,7 @@ export namespace models {
             cacheWrite: 2.5,
           },
           short_label: "Sonnet 5",
+          reasoningProviders: ["anthropic", "grida", "openrouter", "vercel"],
         },
         "anthropic/claude-fable-5.1": {
           id: "anthropic/claude-fable-5.1",
@@ -437,6 +480,7 @@ export namespace models {
             cacheWrite: 12.5,
           },
           short_label: "Fable 5.1",
+          reasoningProviders: ["anthropic", "grida", "openrouter", "vercel"],
         },
         "anthropic/claude-fable-5": {
           id: "anthropic/claude-fable-5",
@@ -464,6 +508,7 @@ export namespace models {
             cacheWrite: 12.5,
           },
           short_label: "Fable 5",
+          reasoningProviders: ["anthropic", "grida", "openrouter", "vercel"],
         },
         "anthropic/claude-opus-5": {
           id: "anthropic/claude-opus-5",
@@ -491,6 +536,7 @@ export namespace models {
             cacheWrite: 6.25,
           },
           short_label: "Opus 5",
+          reasoningProviders: ["anthropic", "grida", "openrouter", "vercel"],
         },
         "anthropic/claude-opus-4.8": {
           id: "anthropic/claude-opus-4.8",
@@ -518,6 +564,7 @@ export namespace models {
             cacheWrite: 6.25,
           },
           short_label: "Opus 4.8",
+          reasoningProviders: ["anthropic", "grida", "openrouter", "vercel"],
         },
         "google/gemini-3.8-flash": {
           id: "google/gemini-3.8-flash",
@@ -543,6 +590,7 @@ export namespace models {
             output: 7.5,
             cacheRead: 0.15,
           },
+          reasoningProviders: ["google", "grida", "openrouter", "vercel"],
         },
         "google/gemini-3.7-flash": {
           id: "google/gemini-3.7-flash",
@@ -568,6 +616,7 @@ export namespace models {
             output: 7.5,
             cacheRead: 0.15,
           },
+          reasoningProviders: ["google", "grida", "openrouter", "vercel"],
         },
         "google/gemini-3.1-pro-preview": {
           id: "google/gemini-3.1-pro-preview",
@@ -599,6 +648,217 @@ export namespace models {
             },
           },
           short_label: "Gemini 3.1 Pro",
+          reasoningProviders: ["google", "grida", "openrouter", "vercel"],
+        },
+        "openai/gpt-6.1-sol": {
+          id: "openai/gpt-6.1-sol",
+          label: "GPT-6.1 Sol",
+          release: {
+            date: "2026-09-29",
+            basis: "model",
+            source_url: "https://openai.com/index/devday-2026-recap/",
+          },
+          multimodal: true,
+          imageInputMimes: [
+            "image/png",
+            "image/jpeg",
+            "image/webp",
+            "image/gif",
+          ],
+          tool_call: true,
+          contextWindow: 1050000,
+          outputLimit: 128000,
+          cost: {
+            input: 2,
+            output: 10,
+            cacheRead: 0.1,
+            cacheWrite: 2.5,
+            longContext: {
+              inputTokensAbove: 272000,
+              inputMultiplier: 2,
+              outputMultiplier: 1.5,
+            },
+          },
+          reasoningProviders: ["grida", "openai", "openrouter", "vercel"],
+        },
+        "openai/gpt-6-sol": {
+          id: "openai/gpt-6-sol",
+          label: "GPT-6 Sol",
+          release: {
+            date: "2026-09-22",
+            basis: "model",
+            source_url:
+              "https://openai.com/index/introducing-gpt-6-sol-and-luna/",
+          },
+          multimodal: true,
+          imageInputMimes: [
+            "image/png",
+            "image/jpeg",
+            "image/webp",
+            "image/gif",
+          ],
+          tool_call: true,
+          contextWindow: 1050000,
+          outputLimit: 128000,
+          cost: {
+            input: 2,
+            output: 10,
+            cacheRead: 0.2,
+            cacheWrite: 2.5,
+            longContext: {
+              inputTokensAbove: 272000,
+              inputMultiplier: 2,
+              outputMultiplier: 1.5,
+            },
+          },
+          reasoningProviders: ["grida", "openai", "openrouter", "vercel"],
+        },
+        "openai/gpt-6-luna": {
+          id: "openai/gpt-6-luna",
+          label: "GPT-6 Luna",
+          release: {
+            date: "2026-09-22",
+            basis: "model",
+            source_url:
+              "https://openai.com/index/introducing-gpt-6-sol-and-luna/",
+          },
+          multimodal: true,
+          imageInputMimes: [
+            "image/png",
+            "image/jpeg",
+            "image/webp",
+            "image/gif",
+          ],
+          tool_call: true,
+          contextWindow: 1050000,
+          outputLimit: 128000,
+          cost: {
+            input: 0.1,
+            output: 0.5,
+            cacheRead: 0.01,
+            cacheWrite: 0.125,
+            longContext: {
+              inputTokensAbove: 272000,
+              inputMultiplier: 2,
+              outputMultiplier: 1.5,
+            },
+          },
+          reasoningProviders: ["grida", "openai", "openrouter", "vercel"],
+        },
+        "anthropic/claude-opus-5.5": {
+          id: "anthropic/claude-opus-5.5",
+          label: "Claude Opus 5.5",
+          release: {
+            date: "2026-09-22",
+            basis: "model",
+            source_url:
+              "https://platform.claude.com/docs/en/models/opus-5-5/overview",
+          },
+          multimodal: true,
+          imageInputMimes: [
+            "image/jpeg",
+            "image/png",
+            "image/gif",
+            "image/webp",
+          ],
+          tool_call: true,
+          contextWindow: 1000000,
+          outputLimit: 128000,
+          cost: {
+            input: 4,
+            output: 20,
+            cacheRead: 0.2,
+            cacheWrite: 5,
+          },
+          short_label: "Opus 5.5",
+          reasoningProviders: ["anthropic", "grida", "openrouter", "vercel"],
+        },
+        "anthropic/claude-sonnet-5.5": {
+          id: "anthropic/claude-sonnet-5.5",
+          label: "Claude Sonnet 5.5",
+          release: {
+            date: "2026-09-28",
+            basis: "model",
+            source_url:
+              "https://platform.claude.com/docs/en/models/sonnet-5-5/overview",
+          },
+          multimodal: true,
+          imageInputMimes: [
+            "image/jpeg",
+            "image/png",
+            "image/gif",
+            "image/webp",
+          ],
+          tool_call: true,
+          contextWindow: 1000000,
+          outputLimit: 128000,
+          cost: {
+            input: 2,
+            output: 10,
+            cacheRead: 0.1,
+            cacheWrite: 2.5,
+          },
+          short_label: "Sonnet 5.5",
+          reasoningProviders: ["anthropic", "grida", "openrouter", "vercel"],
+        },
+        "anthropic/claude-haiku-5.5": {
+          id: "anthropic/claude-haiku-5.5",
+          label: "Claude Haiku 5.5",
+          release: {
+            date: "2026-10-07",
+            basis: "model",
+            source_url:
+              "https://platform.claude.com/docs/en/models/haiku-5-5/overview",
+          },
+          multimodal: true,
+          imageInputMimes: [
+            "image/jpeg",
+            "image/png",
+            "image/gif",
+            "image/webp",
+          ],
+          tool_call: true,
+          contextWindow: 1000000,
+          outputLimit: 128000,
+          cost: {
+            input: 0.1,
+            output: 0.5,
+            cacheRead: 0.01,
+            cacheWrite: 0.125,
+            longContext: {
+              inputTokensAbove: 100000,
+              inputMultiplier: 5,
+              outputMultiplier: 5,
+            },
+          },
+          short_label: "Haiku 5.5",
+          reasoningProviders: ["anthropic", "grida", "openrouter", "vercel"],
+        },
+        "google/gemini-4-argon": {
+          id: "google/gemini-4-argon",
+          label: "Gemini 4 Argon",
+          release: {
+            date: "2026-10-13",
+            basis: "model",
+            source_url: "https://ai.google.dev/gemini-api/docs/changelog",
+          },
+          multimodal: true,
+          imageInputMimes: [
+            "image/png",
+            "image/jpeg",
+            "image/webp",
+            "image/heic",
+            "image/heif",
+          ],
+          tool_call: true,
+          contextWindow: 1048576,
+          outputLimit: 65536,
+          cost: {
+            input: 4,
+            output: 20,
+            cacheRead: 0.2,
+          },
+          reasoningProviders: ["google", "grida", "openrouter", "vercel"],
         },
       } /* generated:facts:text.catalog:end */ as const satisfies Record<
         string,
@@ -641,7 +901,7 @@ export namespace models {
 
     // ── models.text.registry ──────────────────────────────────────────
     //
-    // The open-registry seam (issue #806): spec resolution over the
+    // The open-registry seam: spec resolution over the
     // static catalogue PLUS caller-supplied user-registered models (local
     // Ollama models, self-hosted OpenAI-compatible gateways). Pure data —
     // the caller owns where the custom list comes from (agent-host config,

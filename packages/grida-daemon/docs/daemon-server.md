@@ -43,16 +43,23 @@ Hosts must provide:
 - optionally, `provider_home` for shared native provider custody (GRIDA-SEC-014).
   Omission isolates provider keys under `user_data_path`; the daemon does not
   discover Grida home itself.
+- optionally, `protected_file_roots` for fixed absolute host-owned exclusions
+  from file and workspace grants, including catalog-backed workspace reads.
+  These add to the provider credential root and deny ancestor, descendant, and
+  canonical alias overlap, including before a protected subtree exists. Rejected
+  workspace admission does not change the persisted workspace list; saved grants
+  are rechecked when used.
 - optionally, `media_root` for a dedicated durable binary-media store kept
   separate from secret/session state and workspaces.
 - `http_access` for CORS and Referer policy.
 - `tenants` — the static, typed list of capability tenants to mount
   (an empty list is a valid, bare daemon).
 
-Everything AI is a tenant (#927): a `DaemonTenant` registers its route
-groups against `DaemonServices` and reports its capability flags, a
-`drain` (abort in-flight work), and a `cleanup` (close tenant stores).
-The daemon depends on nothing tenant-specific.
+Everything AI is a tenant: a `DaemonTenant` (today, the media tenant from
+`@grida/ai-host/media-server`) registers its route groups against
+`DaemonServices` and reports its capability flags, a `drain` (abort in-flight
+work), and a `cleanup` (close tenant stores). The daemon depends on nothing
+tenant-specific.
 
 The public lifecycle surface is intentionally small. Internals such as stores
 and route registrars stay private so GUI, CLI, and future hosts all use the

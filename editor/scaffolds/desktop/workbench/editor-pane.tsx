@@ -1,35 +1,39 @@
 /**
- * Workspace editor region: a persistent title bar over the focused document.
+ * Workspace editor region: a persistent title bar over the focused tab.
  *
  * Open, active, and close state lives in `workspace-workbench.tsx`; this
- * component owns only transient per-tab dirty state for the title bar.
+ * component owns only transient per-file dirty state for the title bar. Tabs
+ * are keyed through `WorkbenchTab`: a file tab shows its viewer and file
+ * menu; a panel tab shows the content its owner placed in `WorkbenchPanels`.
  */
 "use client";
 
 import {
-  type ReactNode,
   useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
-import { ImagesIcon, PanelRightIcon, XIcon } from "lucide-react";
+import { PanelBottomIcon, PanelRightIcon, XIcon } from "lucide-react";
 import { Toggle } from "@app/ui/components/toggle";
 import { cn } from "@app/ui/lib/utils";
 import { getDesktopBridge, type Workspace } from "@/lib/desktop/bridge";
 import { DESKTOP_WINDOW_CONTROLS_RIGHT_INSET } from "@/scaffolds/desktop/chrome/title-bar";
 import { EditorPaneTab } from "./editor-pane-tab";
-import { EditorPaneDesignSearch } from "./editor-pane-design-search";
 import { EditorPaneStart } from "./editor-pane-start";
 import { EditorTabPreview } from "./editor-tab-preview";
-import { isVirtualTab, type DesignSearchSession } from "./design-search-tab";
 import { TabNativeDragRegion } from "./tab-native-drag-region";
 import { TabPreviewController } from "./tab-preview-controller";
 import type { WorkspaceCanvasCreation } from "./workspace-canvas-creation";
 import { useWorkspaceChanges } from "./workspace-changes";
 import { WorkspaceFileIcon } from "./workspace-file-icon";
 import { WorkspaceTabThumbnail } from "./workspace-tab-thumbnail";
+import { WorkbenchTab } from "./workbench-tab";
+import { WorkbenchPanelTab } from "./workbench-panel-tab";
+import type { WorkbenchPanel, WorkbenchPanels } from "./workbench-panels";
+import type { WorkspaceSvgText } from "./workspace-svg-text";
 import { FileContextMenu } from "./workbench-file-context-menu";
 import {
   isWorkspaceWorkbenchCommand,
@@ -40,10 +44,14 @@ import {
 
 export type EditorPaneProps = {
   workspace: Workspace;
+  svgText?: WorkspaceSvgText;
+  /** Content of the open panel tabs. */
+  panels: WorkbenchPanels;
+  /** Tab keys (`WorkbenchTab`) in strip order. */
   openTabs: readonly string[];
-  activeRelPath: string | null;
-  onSelectTab: (relPath: string) => void;
-  onCloseTab: (relPath: string) => void;
+  activeTab: string | null;
+  onSelectTab: (tab: string) => void;
+  onCloseTab: (tab: string) => void;
   onReopenClosedTab: () => void;
   /** Show the workspace-local faux Start tab while the real group is empty. */
   showStart: boolean;
@@ -52,21 +60,21 @@ export type EditorPaneProps = {
   treeVisible: boolean;
   onToggleTree: () => void;
   hasBottomPane?: boolean;
+  utilitiesVisible?: boolean;
+  onToggleUtilities?: () => void;
   className?: string;
   onSaved?: () => void;
   /** Called after a tab's "Move to Trash" succeeds (drops the tab +
    * refreshes the tree). Same handler the file tree uses. */
   onFileTrashed?: (relPath: string) => void;
-  /** The live `design_search` pick, when one is open as the virtual picker tab
-   * ({@link DESIGN_SEARCH_TAB_ID}). Lifted from the agent pane; null when no
-   * pick is pending. */
-  designSearch?: DesignSearchSession | null;
 };
 
 export function EditorPane({
   workspace,
+  svgText,
+  panels,
   openTabs,
-  activeRelPath,
+  activeTab,
   onSelectTab,
   onCloseTab,
   onReopenClosedTab,
@@ -76,10 +84,11 @@ export function EditorPane({
   treeVisible,
   onToggleTree,
   hasBottomPane = false,
+  utilitiesVisible = false,
+  onToggleUtilities,
   className,
   onSaved,
   onFileTrashed,
-  designSearch,
 }: EditorPaneProps) {
   const [dirtyPaths, setDirtyPaths] = useState<Set<string>>(() => new Set());
 
@@ -95,31 +104,38 @@ export function EditorPane({
   }, []);
 
   const handleClose = useCallback(
-    (relPath: string) => {
-      if (dirtyPaths.has(relPath)) {
+    (tab: string) => {
+      const relPath = WorkbenchTab.relPath(tab);
+      if (relPath !== null && dirtyPaths.has(relPath)) {
         const name = relPath.split("/").pop() ?? relPath;
         const ok = window.confirm(
           `"${name}" has unsaved changes. Close anyway?`
         );
         if (!ok) return;
       }
-      setDirtyPaths((prev) => {
-        if (!prev.has(relPath)) return prev;
-        const next = new Set(prev);
-        next.delete(relPath);
-        return next;
-      });
-      onCloseTab(relPath);
+      if (relPath !== null)
+        setDirtyPaths((prev) => {
+          if (!prev.has(relPath)) return prev;
+          const next = new Set(prev);
+          next.delete(relPath);
+          return next;
+        });
+      onCloseTab(tab);
     },
     [dirtyPaths, onCloseTab]
+  );
+  const shownPanels = useSyncExternalStore(
+    panels.subscribe,
+    panels.getSnapshot,
+    panels.getSnapshot
   );
 
   const dispatchWorkspaceCommand = useCallback(
     (command: WorkspaceWorkbenchCommand) => {
       switch (command) {
         case "workspace.tabs.close-active": {
-          if (activeRelPath) {
-            handleClose(activeRelPath);
+          if (activeTab) {
+            handleClose(activeTab);
             return;
           }
           void getDesktopBridge()?.window.close();
@@ -131,8 +147,8 @@ export function EditorPane({
         }
         case "workspace.tabs.select-next":
         case "workspace.tabs.select-previous": {
-          if (!activeRelPath || openTabs.length < 2) return;
-          const idx = openTabs.indexOf(activeRelPath);
+          if (!activeTab || openTabs.length < 2) return;
+          const idx = openTabs.indexOf(activeTab);
           if (idx < 0) return;
           const delta = command === "workspace.tabs.select-next" ? 1 : -1;
           const nextIdx = (idx + delta + openTabs.length) % openTabs.length;
@@ -144,7 +160,7 @@ export function EditorPane({
         }
       }
     },
-    [activeRelPath, openTabs, onSelectTab, handleClose, onReopenClosedTab]
+    [activeTab, openTabs, onSelectTab, handleClose, onReopenClosedTab]
   );
 
   useEffect(() => {
@@ -180,13 +196,16 @@ export function EditorPane({
       <EditorTitleBar
         workspace={workspace}
         tabs={openTabs}
-        activeRelPath={activeRelPath}
+        panels={shownPanels}
+        activeTab={activeTab}
         dirtyPaths={dirtyPaths}
         onSelect={onSelectTab}
         onClose={handleClose}
         showStart={showStart}
         treeVisible={treeVisible}
         onToggleTree={onToggleTree}
+        utilitiesVisible={utilitiesVisible}
+        onToggleUtilities={onToggleUtilities}
         onFileTrashed={onFileTrashed}
       />
       <div className="min-h-0 flex-1">
@@ -206,39 +225,23 @@ export function EditorPane({
                   onCreateCanvas={onCreateCanvas}
                 />
               ) : (
-                openTabs.map((relPath) => {
-                  // A virtual tab has no file body — render its bespoke
-                  // surface, kept mounted-but-hidden when inactive like a file
-                  // tab so its fetched results survive a tab switch.
-                  if (isVirtualTab(relPath)) {
-                    const active = relPath === activeRelPath;
-                    return (
-                      <div
-                        key={`${workspace.id}:${relPath}`}
-                        className={cn(
-                          "absolute inset-0",
-                          !active && "invisible pointer-events-none"
-                        )}
-                        aria-hidden={!active}
-                      >
-                        {designSearch ? (
-                          <EditorPaneDesignSearch session={designSearch} />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
-                            No references to pick.
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-                  return (
+                openTabs.map((tab) => {
+                  const target = WorkbenchTab.parse(tab);
+                  return target.kind === "file" ? (
                     <EditorPaneTab
-                      key={`${workspace.id}:${relPath}`}
+                      key={`${workspace.id}:${tab}`}
                       workspace={workspace}
-                      relPath={relPath}
-                      active={relPath === activeRelPath}
+                      svgText={svgText}
+                      relPath={target.relPath}
+                      active={tab === activeTab}
                       onDirtyChange={onTabDirtyChange}
                       onSaved={onSaved}
+                    />
+                  ) : (
+                    <PanelTabContent
+                      key={tab}
+                      panel={shownPanels.get(target.id)}
+                      active={tab === activeTab}
                     />
                   );
                 })
@@ -254,24 +257,30 @@ export function EditorPane({
 function EditorTitleBar({
   workspace,
   tabs,
-  activeRelPath,
+  panels,
+  activeTab,
   dirtyPaths,
   onSelect,
   onClose,
   showStart,
   treeVisible,
   onToggleTree,
+  utilitiesVisible,
+  onToggleUtilities,
   onFileTrashed,
 }: {
   workspace: Workspace;
   tabs: readonly string[];
-  activeRelPath: string | null;
+  panels: ReadonlyMap<string, WorkbenchPanel>;
+  activeTab: string | null;
   dirtyPaths: Set<string>;
-  onSelect: (relPath: string) => void;
-  onClose: (relPath: string) => void;
+  onSelect: (tab: string) => void;
+  onClose: (tab: string) => void;
   showStart: boolean;
   treeVisible: boolean;
   onToggleTree: () => void;
+  utilitiesVisible: boolean;
+  onToggleUtilities?: () => void;
   onFileTrashed?: (relPath: string) => void;
 }) {
   const railRef = useRef<HTMLDivElement | null>(null);
@@ -281,10 +290,14 @@ function EditorTitleBar({
   const [previewRevision, setPreviewRevision] = useState(0);
 
   useEffect(() => {
+    // Files have semantic thumbnails; a panel may supply informational content.
     previewController.reconcile(
-      tabs.filter((relPath) => !isVirtualTab(relPath))
+      tabs.filter((tab) => {
+        const target = WorkbenchTab.parse(tab);
+        return target.kind === "file" || !!panels.get(target.id)?.preview;
+      })
     );
-  }, [previewController, tabs]);
+  }, [previewController, tabs, panels]);
 
   useEffect(() => {
     const dismiss = () => previewController.dismiss();
@@ -355,35 +368,38 @@ function EditorTitleBar({
         }
       >
         {showStart && <StartTabItem />}
-        {tabs.map((relPath) => {
-          const virtual = isVirtualTab(relPath);
-          return (
+        {tabs.map((tab) => {
+          const target = WorkbenchTab.parse(tab);
+          return target.kind === "file" ? (
             <TabItem
-              key={relPath}
+              key={tab}
               workspace={workspace}
-              relPath={relPath}
-              virtual={virtual}
-              label={virtual ? "Pick references" : undefined}
-              active={relPath === activeRelPath}
-              dirty={dirtyPaths.has(relPath)}
-              icon={
-                virtual ? (
-                  <ImagesIcon className="size-3.5 shrink-0" />
-                ) : (
-                  <WorkspaceFileIcon
-                    relPath={relPath}
-                    className="size-3.5 shrink-0"
-                  />
-                )
-              }
-              onSelect={() => onSelect(relPath)}
-              onClose={() => onClose(relPath)}
+              tabKey={tab}
+              relPath={target.relPath}
+              active={tab === activeTab}
+              dirty={dirtyPaths.has(target.relPath)}
+              onSelect={() => onSelect(tab)}
+              onClose={() => onClose(tab)}
               onTrashed={
-                onFileTrashed && !virtual
-                  ? () => onFileTrashed(relPath)
-                  : undefined
+                onFileTrashed ? () => onFileTrashed(target.relPath) : undefined
               }
               previewController={previewController}
+            />
+          ) : (
+            <PanelTabItem
+              key={tab}
+              tabKey={tab}
+              panel={panels.get(target.id)}
+              previewController={previewController}
+              active={tab === activeTab}
+              onSelect={() => {
+                previewController.dismiss();
+                onSelect(tab);
+              }}
+              onClose={() => {
+                previewController.dismiss();
+                onClose(tab);
+              }}
             />
           );
         })}
@@ -409,10 +425,10 @@ function EditorTitleBar({
             style={{ display: "none" }}
           />
         )}
-        {tabs.map((relPath) => (
+        {tabs.map((tab) => (
           <div
-            key={relPath}
-            data-tab-native-drag-region-exclusion={relPath}
+            key={tab}
+            data-tab-native-drag-region-exclusion={tab}
             className="desktop-no-drag absolute"
             style={{ display: "none" }}
           />
@@ -425,7 +441,33 @@ function EditorTitleBar({
         dirtyPaths={dirtyPaths}
         revision={previewRevision}
         thumbnailCache={thumbnailCache}
+        panels={panels}
       />
+      {onToggleUtilities && (
+        <Toggle
+          type="button"
+          size="sm"
+          pressed={utilitiesVisible}
+          className="desktop-no-drag mr-1 size-7 min-w-7 shrink-0 p-0 [&_svg:not([class*='size-'])]:size-3.5"
+          onPressedChange={onToggleUtilities}
+          aria-label={
+            utilitiesVisible
+              ? "Hide workspace utilities"
+              : "Show workspace utilities"
+          }
+          title={
+            utilitiesVisible
+              ? "Hide workspace utilities"
+              : "Show workspace utilities"
+          }
+        >
+          <PanelBottomIcon
+            className={cn(
+              !utilitiesVisible && "fill-muted text-muted-foreground"
+            )}
+          />
+        </Toggle>
+      )}
       {!treeVisible && (
         <WorkspaceExplorerToggleButton
           open={false}
@@ -482,34 +524,27 @@ export function WorkspaceExplorerToggleButton({
 
 function TabItem({
   workspace,
+  tabKey,
   relPath,
-  virtual,
-  label,
   active,
   dirty,
-  icon,
   onSelect,
   onClose,
   onTrashed,
   previewController,
 }: {
   workspace: Workspace;
+  tabKey: string;
   relPath: string;
-  /** A non-file tab (e.g. the design-search picker): no filename label, no file
-   *  context menu. */
-  virtual?: boolean;
-  /** Display label override (for virtual tabs that aren't a file path). */
-  label?: string;
   active: boolean;
   dirty: boolean;
-  icon?: ReactNode;
   onSelect: () => void;
   onClose: () => void;
   onTrashed?: () => void;
   previewController: TabPreviewController;
 }) {
   const tabRef = useRef<HTMLDivElement | null>(null);
-  const name = label ?? relPath.split("/").pop() ?? relPath;
+  const name = relPath.split("/").pop() ?? relPath;
 
   useEffect(() => {
     if (!active) return;
@@ -525,21 +560,16 @@ function TabItem({
       role="tab"
       tabIndex={0}
       aria-selected={active}
-      data-tab-native-drag-region-target={relPath}
-      title={virtual ? name : undefined}
-      onPointerEnter={(event) => {
-        if (!virtual) {
-          previewController.pointerEnter(
-            { relPath, anchor: event.currentTarget },
-            event.pointerType
-          );
-        }
-      }}
-      onPointerLeave={(event) => {
-        if (!virtual) {
-          previewController.pointerLeave(relPath, event.pointerType);
-        }
-      }}
+      data-tab-native-drag-region-target={tabKey}
+      onPointerEnter={(event) =>
+        previewController.pointerEnter(
+          { tabKey, anchor: event.currentTarget },
+          event.pointerType
+        )
+      }
+      onPointerLeave={(event) =>
+        previewController.pointerLeave(tabKey, event.pointerType)
+      }
       onClick={() => {
         previewController.dismiss();
         onSelect();
@@ -566,7 +596,7 @@ function TabItem({
         "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
       )}
     >
-      {icon}
+      <WorkspaceFileIcon relPath={relPath} className="size-3.5 shrink-0" />
       <span className="max-w-[180px] truncate">{name}</span>
       <button
         type="button"
@@ -596,8 +626,6 @@ function TabItem({
     </div>
   );
 
-  // A virtual tab isn't a real file — no Reveal/Copy-path/Trash menu.
-  if (virtual) return tab;
   return (
     <FileContextMenu
       workspace={workspace}
@@ -609,5 +637,77 @@ function TabItem({
     >
       {tab}
     </FileContextMenu>
+  );
+}
+
+/** A panel's content, kept mounted while another tab is in front. */
+function PanelTabContent({
+  panel,
+  active,
+}: {
+  panel: WorkbenchPanel | undefined;
+  active: boolean;
+}) {
+  return (
+    <div
+      // A panel fills the editor region as a column, so content that sizes
+      // itself with flex (a chat pane and its composer) gets a definite
+      // height instead of growing past the region.
+      className={cn(
+        "absolute inset-0 flex min-h-0 flex-col overflow-hidden",
+        !active && "invisible pointer-events-none"
+      )}
+      aria-hidden={!active}
+    >
+      {panel?.content}
+    </div>
+  );
+}
+
+/** A panel's strip tab, with its owner's optional informational preview. */
+function PanelTabItem({
+  tabKey,
+  panel,
+  active,
+  onSelect,
+  onClose,
+  previewController,
+}: {
+  tabKey: string;
+  panel: WorkbenchPanel | undefined;
+  active: boolean;
+  onSelect: () => void;
+  onClose: () => void;
+  previewController: TabPreviewController;
+}) {
+  const tabRef = useRef<HTMLDivElement | null>(null);
+  const title = panel?.title ?? "";
+
+  useEffect(() => {
+    if (!active) return;
+    tabRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [active]);
+
+  return (
+    <WorkbenchPanelTab
+      ref={tabRef}
+      title={title}
+      icon={panel?.icon}
+      active={active}
+      onSelect={onSelect}
+      onClose={onClose}
+      data-tab-native-drag-region-target={tabKey}
+      onPointerEnter={(event) => {
+        if (panel?.preview)
+          previewController.pointerEnter(
+            { tabKey, anchor: event.currentTarget },
+            event.pointerType
+          );
+        else previewController.dismiss();
+      }}
+      onPointerLeave={(event) =>
+        previewController.pointerLeave(tabKey, event.pointerType)
+      }
+    />
   );
 }

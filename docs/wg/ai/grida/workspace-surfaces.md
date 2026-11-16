@@ -76,11 +76,10 @@ An interactive host acts on the request only when the target:
 The operation is idempotent. Opening an artifact that is already open
 activates the existing surface instead of creating a duplicate.
 
-The daemon acknowledges the request without waiting for the renderer. The
-result says whether the request was emitted to an interactive run or handled
-as a non-interactive no-op; it does not claim that a particular window
-finished opening the artifact. Renderer detachment, version skew, or a
-rejected target therefore cannot pause model continuation.
+The host acknowledges dispatch without waiting for the editor to render the
+artifact. The result records dispatch, known unavailability, or an unconfirmed
+request. Presentation uncertainty remains visible in the turn's account while
+the model can continue artifact work.
 
 `surface_open` does not:
 
@@ -93,14 +92,11 @@ rejected target therefore cannot pause model continuation.
 
 ### `surface_list_open`
 
-`surface_list_open` reports the surface snapshot supplied by the host when
-the current turn started. The snapshot contains the artifact paths then
-represented by the host and identifies the active path.
-
-It reports presentation state only. It is not a workspace file listing
-and does not grant access to any artifact. The agent does not need to call
-it before `surface_open`, because opening is idempotent. The snapshot is not
-updated or reconciled after a `surface_open` request within the same turn.
+`surface_list_open` reports the open artifacts and active path within the
+captured editor. A live capability reads the current view at invocation. An
+integration with a turn-start snapshot identifies that behavior in its tool
+definition. Both report presentation state. Access to file contents follows
+separate permissions. Opening is idempotent and requires no prior listing.
 
 ## Interactive and non-interactive hosts
 
@@ -109,10 +105,9 @@ agent.
 
 In an interactive host:
 
-- the run carries the host's surface snapshot;
-- `surface_open` is acknowledged by the daemon and observed by the renderer
-  as a best-effort, idempotent UI action;
-- `surface_list_open` reports the turn-start snapshot.
+- the run captures the editor that can fulfill its surface requests;
+- `surface_open` is a best-effort, idempotent request to that editor;
+- `surface_list_open` reports the view available through that binding.
 
 In a non-interactive host:
 
@@ -173,9 +168,9 @@ user asks to view them or the task clearly changes its primary artifact.
 
 ## User authority
 
-An explicit `surface_open` call activates its target. Navigation by the
-user always supersedes that request. The agent does not repeatedly pull
-the user back to an artifact they have left.
+The editor can activate a requested target while the original view remains
+current. User navigation supersedes a pending request. Further openings are
+reserved for an intentional change of primary artifact or a user request.
 
 Opening is separate from creating, branching, and referencing:
 

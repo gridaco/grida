@@ -11,7 +11,7 @@ updated: 2026-09-12
 automatable: false
 covered_by:
   - editor/scaffolds/desktop/3d-gen/model-generation-form.test.ts
-  - packages/grida-ai-agent/src/http/routes/model-generation.test.ts
+  - packages/grida-ai-host/src/http/routes/model-generation.test.ts
 ---
 
 ## Behavior

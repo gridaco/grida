@@ -142,11 +142,11 @@ type Tile = {
 };
 
 /**
- * Desktop image generation playground (#908). A clean, full-bleed gallery: a
+ * Desktop image generation playground. A clean, full-bleed gallery: a
  * hairline grid that's always visible (even empty), a minimal header, and a
  * single floating prompt composer. Each submit prepends a shimmering cell that
  * fills in when its image resolves — one at a time. Generation runs in the
- * agent sidecar against the user's connected provider key; the key never
+ * services sidecar against the user's connected provider key; the key never
  * reaches this renderer (GRIDA-SEC-004).
  */
 export function DesktopImagePlayground({

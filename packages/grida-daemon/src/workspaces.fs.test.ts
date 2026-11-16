@@ -172,7 +172,7 @@ describe("workspaceFs", () => {
     ).rejects.toMatchObject({ code: "ENOENT" });
   });
 
-  describe("writeFile optimistic-concurrency guard (issue #805)", () => {
+  describe("writeFile optimistic-concurrency guard", () => {
     it("writes without a precondition (last-writer-wins)", async () => {
       const res = await workspaceFs.writeFile(
         fixture.workspace,

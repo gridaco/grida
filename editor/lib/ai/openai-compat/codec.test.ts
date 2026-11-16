@@ -33,6 +33,19 @@ const USAGE: LanguageModelV3Usage = {
   },
   outputTokens: { total: 20, text: 15, reasoning: 5 },
 };
+const UNKNOWN_USAGE: LanguageModelV3Usage = {
+  inputTokens: {
+    total: undefined,
+    noCache: undefined,
+    cacheRead: undefined,
+    cacheWrite: undefined,
+  },
+  outputTokens: { total: undefined, text: undefined, reasoning: undefined },
+};
+const PARTIAL_USAGE: LanguageModelV3Usage = {
+  inputTokens: { ...UNKNOWN_USAGE.inputTokens, cacheRead: 0 },
+  outputTokens: { ...UNKNOWN_USAGE.outputTokens, total: 7 },
+};
 
 function request(
   partial: Partial<ChatCompletionRequest>
@@ -323,7 +336,29 @@ describe("encodeCompletion / encodeUsage / encodeFinishReason", () => {
     expect(encodeFinishReason({ unified: "error", raw: undefined })).toBe(
       "stop"
     );
-    expect(encodeUsage(USAGE).total_tokens).toBe(120);
+    expect(encodeUsage(USAGE)?.total_tokens).toBe(120);
+  });
+
+  it("omits unknown categories while retaining a reported zero", () => {
+    expect(encodeUsage(UNKNOWN_USAGE)).toBeUndefined();
+    expect(encodeUsage(PARTIAL_USAGE)).toStrictEqual({
+      completion_tokens: 7,
+      prompt_tokens_details: { cached_tokens: 0 },
+    });
+    const result = {
+      content: [{ type: "text" as const, text: "done" }],
+      finishReason: { unified: "stop" as const, raw: "stop" },
+      warnings: [],
+    };
+    expect(
+      encodeCompletion("m", { ...result, usage: UNKNOWN_USAGE })
+    ).not.toHaveProperty("usage");
+    expect(
+      encodeCompletion("m", { ...result, usage: PARTIAL_USAGE }).usage
+    ).toStrictEqual({
+      completion_tokens: 7,
+      prompt_tokens_details: { cached_tokens: 0 },
+    });
   });
 });
 
@@ -404,6 +439,29 @@ describe("streamEncoder", () => {
     expect(
       frames.some((f) => (f as { usage?: unknown }).usage !== undefined)
     ).toBe(false);
+  });
+
+  it("finishes without a usage frame when no counts were reported", async () => {
+    const { frames, done } = await encodeStream([
+      { ...FINISH, usage: UNKNOWN_USAGE },
+    ]);
+    expect(done).toBe(true);
+    expect(frames).toHaveLength(1);
+    expect(frames[0]).toMatchObject({ choices: [{ finish_reason: "stop" }] });
+    expect(frames[0]).not.toHaveProperty("usage");
+  });
+
+  it("publishes only known categories in the trailing usage frame", async () => {
+    const { frames, done } = await encodeStream([
+      { ...FINISH, usage: PARTIAL_USAGE },
+    ]);
+    expect(done).toBe(true);
+    expect(frames).toHaveLength(2);
+    expect(frames[1]).toMatchObject({ choices: [] });
+    expect((frames[1] as { usage: unknown }).usage).toStrictEqual({
+      completion_tokens: 7,
+      prompt_tokens_details: { cached_tokens: 0 },
+    });
   });
 
   it("encodes streamed tool calls with id+name on the first frame", async () => {

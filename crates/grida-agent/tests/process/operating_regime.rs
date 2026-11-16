@@ -1,0 +1,278 @@
+use super::lifecycle::{
+    prompt_request, queue_basis, session_snapshot, task_basis, terminate_shared_server,
+    wait_for_snapshot,
+};
+use super::*;
+
+async fn start_mode(state: &Path, endpoint: &str, mode: &str) -> (Child, SharedSocket) {
+    let mut command = executable();
+    command
+        .args([
+            "serve",
+            "--listen",
+            "ws://127.0.0.1:0/acp",
+            "--server-token-env",
+            "GRIDA_AGENT_FIXTURE_SERVER_TOKEN",
+            "--mode",
+            mode,
+        ])
+        .env("GRIDA_AGENT_FIXTURE_SERVER_TOKEN", SERVER_TOKEN);
+    configured(&mut command, state, endpoint);
+    let (child, url) = spawn_shared_server(command).await;
+    let mut socket = connect_shared(&url, Some(SERVER_TOKEN), None, None)
+        .await
+        .unwrap();
+    assert_eq!(
+        ws_rpc(&mut socket, 1, "initialize", extension_initialize()).await["result"]["protocolVersion"],
+        1
+    );
+    (child, socket)
+}
+
+fn offered(request: &Value, tool: &str) -> bool {
+    request["tools"]
+        .as_array()
+        .is_some_and(|tools| tools.iter().any(|entry| entry["function"]["name"] == tool))
+}
+
+#[tokio::test]
+async fn plan_launch_can_observe_and_stop_retained_act_but_refuses_to_resume_it() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint = Endpoint::start(vec![Reply::Hold("Act started.")]).await;
+    let (first, mut socket) = start_mode(&state, &endpoint.url, "act").await;
+    let created = ws_rpc(
+        &mut socket,
+        2,
+        "session/new",
+        json!({"cwd":workspace.path(),"mcpServers":[]}),
+    )
+    .await;
+    let session = created["result"]["sessionId"].as_str().unwrap();
+    let accepted = ws_rpc(
+        &mut socket,
+        3,
+        "_co.grida/session/submit",
+        prompt_request(session, "act-task", "Perform the task."),
+    )
+    .await;
+    assert_eq!(accepted["result"]["disposition"], "claimed");
+    endpoint.request().await;
+    let running = session_snapshot(&mut socket, session).await;
+    let pause = ws_rpc(
+        &mut socket,
+        4,
+        "_co.grida/session/pause",
+        task_basis(&running, session, "pause-act"),
+    )
+    .await;
+    assert!(pause.get("error").is_none(), "{pause}");
+    wait_for_snapshot(&mut socket, session, |snapshot| {
+        snapshot["current"]["disposition"] == "suspended"
+    })
+    .await;
+    drop(socket);
+    terminate_shared_server(first).await;
+
+    let (second, mut socket) = start_mode(&state, &endpoint.url, "plan").await;
+    let loaded = ws_rpc(
+        &mut socket,
+        2,
+        "session/load",
+        json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]}),
+    )
+    .await;
+    assert!(loaded.get("error").is_none(), "{loaded}");
+    let mut forbidden = prompt_request(session, "act-on-plan", "Start action.");
+    forbidden["operatingRegime"] = "act".into();
+    let denied = ws_rpc(&mut socket, 8, "_co.grida/session/enqueue", forbidden).await;
+    assert!(
+        denied["error"]
+            .to_string()
+            .contains("act_unavailable_on_plan_host")
+    );
+    let before = session_snapshot(&mut socket, session).await;
+    let refused = ws_rpc(
+        &mut socket,
+        3,
+        "_co.grida/session/resume",
+        json!({
+            "task":task_basis(&before,session,"resume-act-from-plan"),
+            "expectedEpoch":before["current"]["epoch"],
+            "expectedJournalPosition":before["current"]["journalPosition"],
+        }),
+    )
+    .await;
+    assert!(
+        refused["error"]
+            .to_string()
+            .contains("retained_act_requires_act")
+    );
+    let after = session_snapshot(&mut socket, session).await;
+    assert_eq!(after["current"], before["current"]);
+    let stopped = ws_rpc(
+        &mut socket,
+        4,
+        "_co.grida/session/stop",
+        task_basis(&after, session, "stop-act-from-plan"),
+    )
+    .await;
+    assert!(stopped.get("error").is_none(), "{stopped}");
+    let settled = wait_for_snapshot(&mut socket, session, |snapshot| {
+        snapshot["current"].is_null()
+    })
+    .await;
+    assert_eq!(settled["latest"]["status"], "cancelled");
+    assert!(endpoint.requests.try_recv().is_err());
+    drop(socket);
+    terminate_shared_server(second).await;
+    endpoint.done().await;
+}
+
+async fn start_with_profile(
+    fixture: &super::approvals::Fixture,
+    endpoint: &str,
+) -> (Child, SharedSocket) {
+    let mut command = executable();
+    command
+        .args([
+            "serve",
+            "--listen",
+            "ws://127.0.0.1:0/acp",
+            "--server-token-env",
+            "GRIDA_AGENT_FIXTURE_SERVER_TOKEN",
+        ])
+        .env("GRIDA_AGENT_FIXTURE_SERVER_TOKEN", SERVER_TOKEN);
+    configured(&mut command, &fixture.state, endpoint);
+    command.arg("--permission-profile").arg(&fixture.profile);
+    let (child, url) = spawn_shared_server(command).await;
+    let mut socket = connect_shared(&url, Some(SERVER_TOKEN), None, None)
+        .await
+        .unwrap();
+    assert_eq!(
+        ws_rpc(&mut socket, 1, "initialize", extension_initialize()).await["result"]["protocolVersion"],
+        1
+    );
+    (child, socket)
+}
+
+/// Plan withholds file changes even when the launch profile lets Act write the
+/// primary folder, and a retained Plan input keeps that limit through a queue
+/// edit after restart.
+#[tokio::test]
+async fn plan_withholds_file_writes_under_a_write_capable_profile_through_a_queue_edit_after_restart()
+ {
+    let fixture = super::approvals::Fixture::new(false);
+    let mut profile: Value =
+        serde_json::from_slice(&std::fs::read(&fixture.profile).unwrap()).unwrap();
+    profile["directories"][0]["write"] = json!("allow");
+    std::fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
+    let writes = |request: &Value| offered(request, "write_file") || offered(request, "edit_file");
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Finished("Proposed change."),
+        Reply::Hold("Acting."),
+        Reply::Finished("Revised proposal."),
+    ])
+    .await;
+    let (first, mut socket) = start_with_profile(&fixture, &endpoint.url).await;
+    let created = ws_rpc(
+        &mut socket,
+        2,
+        "session/new",
+        json!({"cwd":fixture.primary,"mcpServers":[]}),
+    )
+    .await;
+    let session = created["result"]["sessionId"].as_str().unwrap();
+    let mut plan = prompt_request(session, "first-plan", "Propose the change.");
+    plan["operatingRegime"] = "plan".into();
+    assert_eq!(
+        ws_rpc(&mut socket, 3, "_co.grida/session/submit", plan).await["result"]["disposition"],
+        "claimed"
+    );
+    let request = endpoint.request().await;
+    assert!(request["messages"].to_string().contains("Plan is active"));
+    assert!(offered(&request, "read_file"));
+    assert!(!writes(&request), "Plan must not offer file writes");
+    wait_for_snapshot(&mut socket, session, |snapshot| {
+        snapshot["current"].is_null()
+    })
+    .await;
+
+    let mut act = prompt_request(session, "then-act", "Change the note.");
+    act["operatingRegime"] = "act".into();
+    assert_eq!(
+        ws_rpc(&mut socket, 4, "_co.grida/session/submit", act).await["result"]["disposition"],
+        "claimed"
+    );
+    let request = endpoint.request().await;
+    assert!(writes(&request), "Act offers the profile's file writes");
+    let mut queued = prompt_request(session, "queued-plan", "Propose another change.");
+    queued["operatingRegime"] = "plan".into();
+    assert_eq!(
+        ws_rpc(&mut socket, 5, "_co.grida/session/enqueue", queued).await["result"]["disposition"],
+        "queued"
+    );
+    let snapshot = session_snapshot(&mut socket, session).await;
+    let stopped = ws_rpc(
+        &mut socket,
+        6,
+        "_co.grida/session/stop",
+        task_basis(&snapshot, session, "stop-act"),
+    )
+    .await;
+    assert!(stopped.get("error").is_none(), "{stopped}");
+    wait_for_snapshot(&mut socket, session, |snapshot| {
+        snapshot["current"].is_null() && snapshot["admissionPaused"] == true
+    })
+    .await;
+    drop(socket);
+    terminate_shared_server(first).await;
+
+    let (second, mut socket) = start_with_profile(&fixture, &endpoint.url).await;
+    let loaded = ws_rpc(
+        &mut socket,
+        2,
+        "session/load",
+        json!({"sessionId":session,"cwd":fixture.primary,"mcpServers":[]}),
+    )
+    .await;
+    assert!(loaded.get("error").is_none(), "{loaded}");
+    let snapshot = session_snapshot(&mut socket, session).await;
+    let edited = ws_rpc(
+        &mut socket,
+        3,
+        "_co.grida/session/replace",
+        json!({
+            "queue":queue_basis(&snapshot, session, "edit-plan"),
+            "inputId":"queued-plan","replacementInputId":"revised-plan",
+            "prompt":[{"type":"text","text":"Propose a smaller change."}],
+        }),
+    )
+    .await;
+    assert!(edited.get("error").is_none(), "{edited}");
+    let snapshot = session_snapshot(&mut socket, session).await;
+    assert_eq!(snapshot["queue"][0]["settings"]["operatingRegime"], "plan");
+    let resumed = ws_rpc(
+        &mut socket,
+        4,
+        "_co.grida/session/resume-queue",
+        queue_basis(&snapshot, session, "run-revised-plan"),
+    )
+    .await;
+    assert!(resumed.get("error").is_none(), "{resumed}");
+    let request = endpoint.request().await;
+    assert!(request["messages"].to_string().contains("Plan is active"));
+    assert!(offered(&request, "read_file"));
+    assert!(
+        !writes(&request),
+        "A retained Plan input must not offer file writes"
+    );
+    wait_for_snapshot(&mut socket, session, |snapshot| {
+        snapshot["current"].is_null() && snapshot["queuedInputs"] == 0
+    })
+    .await;
+    drop(socket);
+    terminate_shared_server(second).await;
+    endpoint.done().await;
+}

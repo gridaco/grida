@@ -8,7 +8,11 @@
 import path from "node:path";
 import type { MediaItem } from "@grida/daemon";
 import { MediaStore } from "@grida/daemon/server";
-import type { DesktopMediaReadResult } from "../bridge/contract";
+import type {
+  DesktopMediaReadResult,
+  DesktopMediaSaveCopyResult,
+} from "@grida/desktop-bridge";
+import { RetainedFileExport } from "./retained-file-export";
 
 const RECENT_MEDIA_LIMIT = 20;
 const MAX_PENDING_MEDIA_READS = 2;
@@ -26,6 +30,7 @@ export class DesktopMediaHost {
   private readonly openNativeFolder: DesktopMediaHostOptions["openFolder"];
   private readTail: Promise<void> = Promise.resolve();
   private pendingReads = 0;
+  private savingCopy = false;
 
   constructor(options: DesktopMediaHostOptions) {
     this.root = path.resolve(options.root);
@@ -41,7 +46,45 @@ export class DesktopMediaHost {
     );
   }
 
-  read(id: string): Promise<DesktopMediaReadResult> {
+  async read(id: string): Promise<DesktopMediaReadResult> {
+    const { item, bytes } = await this.readRetained(id);
+    return { item, bytes: Uint8Array.from(bytes).buffer };
+  }
+
+  async saveCopy(
+    id: string,
+    chooseDestination: (
+      fileName: string,
+      extension: string
+    ) => Promise<string | null>,
+    requireCurrent: () => void
+  ): Promise<DesktopMediaSaveCopyResult> {
+    if (this.savingCopy) return "failed";
+    this.savingCopy = true;
+    try {
+      requireCurrent();
+      const { item, bytes } = await this.readRetained(id);
+      const extension = RetainedFileExport.extension(item.file_name);
+      if (!extension) return "failed";
+      requireCurrent();
+      const destination = await chooseDestination(item.file_name, extension);
+      requireCurrent();
+      if (destination === null) return "cancelled";
+      await RetainedFileExport.publish(
+        destination,
+        extension,
+        bytes,
+        requireCurrent
+      );
+      return "saved";
+    } catch {
+      return "failed";
+    } finally {
+      this.savingCopy = false;
+    }
+  }
+
+  private readRetained(id: string): ReturnType<MediaStore["read"]> {
     // Keep one active read plus one queued UI selection. This prevents rapid
     // Recent A → B navigation from falsely rejecting B while still bounding a
     // compromised renderer's queued whole-file work.
@@ -50,13 +93,7 @@ export class DesktopMediaHost {
     }
     this.pendingReads += 1;
     const operation = this.readTail.then(() =>
-      this.guard("media-read-failed", async () => {
-        const result = await this.store.read(id);
-        return {
-          item: result.item,
-          bytes: Uint8Array.from(result.bytes).buffer,
-        };
-      })
+      this.guard("media-read-failed", () => this.store.read(id))
     );
     this.readTail = operation.then(
       () => undefined,

@@ -1,235 +1,174 @@
 ---
-title: Scratch
-description: The per-session, system-managed, ephemeral filesystem area where an agent does working I/O and where produced files land by default — distinct from the durable workspace. The scratch contract (host-owned and per-session; ephemeral with durability only by promotion; the default output sink; reachable without per-operation approval yet inside sandbox containment; not the workspace), its lifecycle, and what hosts are free to vary.
+title: Scratch Storage
+description: Host-managed working storage for staged inputs, temporary outputs, and recoverable agent work, separate from authored project files.
 keywords:
   [
     agent-system,
     scratch,
     workspace,
+    attachment,
     artifact,
-    promotion,
-    ephemeral,
+    retention,
     filesystem,
-    output,
-    sandbox,
-    session,
   ]
 format: md
-tags:
-  - internal
-  - wg
-  - agent-system
+tags: [internal, wg, agent-system]
 ---
 
-# Scratch
+# Scratch Storage
 
-An agent produces files that are **not** edits to the user's project — a
-generated image, a downloaded asset, a converted document, an intermediate of
-some computation. Those files need somewhere to land. Writing them into the
-user's project is wrong: that project is the user's durable property, and a
-throwaway render does not belong in it. **Scratch** is the answer — a
-per-session, system-managed, ephemeral area that serves as the agent's working
-space and the default home for what it produces.
+Scratch is host-managed working storage for an agent session. It holds
+materialized inputs, intermediate files, and new outputs while the task is in
+progress. It can exist without an open project. Workspace membership and
+filesystem access are defined in [Workspaces](./workspace.md).
 
-This page specifies what scratch is, the contract that governs it, and the line
-between scratch and the **workspace** that the whole concept exists to draw. It
-gives a name to a thing the guide has already leaned on informally (the
-stage-to-[`scratch`](./vision.md) perception path, the
-[`binary`](./binary.md) archive-extraction scratch-space).
-
-The keywords **MUST**, **MUST NOT**, **SHOULD**, **MAY** are used as in
-[RFC 2119](https://datatracker.ietf.org/doc/html/rfc2119).
+An attachment remains part of the conversation as content or a reference.
+Materializing its bytes for a file-oriented tool is a separate operation.
+Scratch provides that working location without implicitly adding files to the
+user's authored directories.
 
 ## What scratch is
 
-Scratch is a filesystem area with four defining properties:
+Scratch has a host-assigned scope, an execution owner, storage limits, and a
+declared retention policy. A path is one possible representation of that scope.
+A remote mount or scoped file handle can provide the same contract.
 
-- **Per-session.** Each conversation has its own scratch; one session's working
-  files are not another's.
-- **System-managed.** The host creates and owns it. The agent does not choose
-  where it is — it is _told_.
-- **Ephemeral.** It is throwaway, with a bounded lifetime. It is a bench, not an
-  archive.
-- **The default output sink.** A file the agent produces lands here unless the
-  agent is directed elsewhere.
-
-## Scratch and the workspace
-
-An agent reaches two filesystem surfaces, and conflating them is the failure
-this concept exists to prevent:
-
-- The **workspace** is the user's opened project — durable, authored, the thing
-  edits change. It is the root the agent's filesystem is anchored to (see
-  [directory-rooted execution](./foundations.md)).
-- **Scratch** is per-session and ephemeral — the agent's working space and the
-  sink for what it produces.
-
-**Authoring goes to the workspace; producing goes to scratch.** A file in
-scratch is not part of the user's project; it becomes durable only when the
-agent **promotes** it — moves it into the workspace or another durable location.
-This keeps produced-but-maybe-throwaway output out of the user's files by
-default, and makes "keep this" an explicit act rather than an accident of where
-a tool happened to write.
-
-Scratch is also **not** a durable user-asset store. Where a host keeps a user's
-saved generations, uploads, or library is a separate concern; scratch is the
-transient bench in front of it.
+Scratch is working storage. Retained source assets and published results have
+their own identities and availability contracts. They may share a storage
+backend while retaining separate ownership and lifetimes.
 
 ## Vocabulary
 
-- **Scratch** — the per-session ephemeral working area defined here.
-- **Workspace** — the durable user project the agent's filesystem is rooted at.
-  The sibling surface scratch is defined against.
-- **Artifact** — a file the agent produced (a generation, a download, a
-  conversion, an intermediate).
-- **Promotion** — moving an artifact out of scratch into a durable location.
-  The only way an artifact survives the session.
+| Term                     | Meaning                                                                                                                    |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| Input asset              | The original submitted content with provenance and declared retrieval lifetime.                                            |
+| Working copy             | A materialization that tools may read or modify under the scratch grant.                                                   |
+| Intermediate             | A temporary file used to produce or verify a result.                                                                       |
+| Published artifact       | A result retained at a destination with an explicit access and lifetime contract.                                          |
+| Publication or promotion | An explicit operation that makes a result available at that destination. It may copy, move, or create a durable reference. |
+
+These identities stay distinguishable. Editing a working copy preserves the
+meaning of the original upload. Publication records which result was selected
+according to the concrete publication tool's contract.
 
 ## The scratch contract
 
-Five invariants govern scratch. A conforming implementation MUST honor all five.
+### S1 — Host-owned scope
 
-### S1 — Host-owned and per-session
+The host allocates the scope and binds it to the session or explicitly selected
+owner. Independent sessions and subagents receive independent scopes unless a
+shared capability is deliberately granted. Knowing a path does not grant access.
+Raw executors receive only the scratch authority they need, alongside their
+other explicit grants. The shared scratch parent remains outside that authority.
 
-The host MUST create and own a scratch area **per session**, and the agent MUST
-be _told_ its location rather than choosing it. The agent has no say in where
-scratch lives; it receives a handle the same way it receives its working root.
+### S2 — Declared retention and recoverability
 
-A consequence: scratch isolation is structural. One session cannot reach
-another's working files because each is handed only its own.
+Scratch has bounded retention, and its availability is explicit. A host may
+retain it across pauses and process restarts. Required working files are held
+until their consumers release them or a valid reconstruction path exists.
+Holds and renewals have declared limits governed by that retention policy.
 
-Giving the model only one path is not sufficient when an ambient-path tool
-(such as a shell or interpreter) runs inside a host that can see the shared
-scratch parent. That tool's execution boundary MUST deny the shared parent and
-grant back only the current session's subtree, or provide an equivalent
-capability-safe mount/handle. Session isolation is an enforced authority fact,
-not prompt secrecy or cwd validation.
+When recovery depends on input bytes, retain the original asset or another
+byte-equivalent source. When it depends on modified intermediate state, retain
+that state or the information needed to reproduce it safely. A path descriptor
+alone cannot establish that the content is still available.
 
-### S2 — Ephemeral; durability only by promotion
+Expiration or loss produces an unavailable state. Recovery obtains the same
+content or requests an explicit new decision. It cannot silently substitute a
+new upload or repeat a paid operation.
 
-Scratch MUST have a **bounded lifetime** and the agent MUST NOT rely on it as
-durable storage. A produced file survives the session only if it is **promoted**
-(S-vocabulary) — moved into the workspace or another durable location. An agent
-that "saves" something by leaving it in scratch has not saved it.
+### S3 — Working outputs stay separate from project edits
 
-This is what lets the host reclaim scratch freely: nothing of lasting value is
-ever _only_ in scratch, because lasting value is defined as having been promoted
-out of it.
+Materialized uploads, extracted archives, previews, and newly generated outputs
+use scratch unless the task selects another destination. An authorized edit to
+an existing workspace file retains that explicit target.
 
-### S3 — The default output sink
+Using scratch requires no project to be open. Producing or inspecting a result
+there does not implicitly publish it into a project directory.
 
-A tool that **produces a file** MUST write it to scratch by default; it MAY
-write elsewhere only when explicitly directed (by the user, or by an agent
-acting on the user's instruction). Produced files share one well-known home
-rather than each tool inventing a location, so the agent always knows where its
-output went and the user always knows where to look.
+### S4 — Normal authority and integrity checks apply
 
-### S4 — Reachable without friction, inside containment
+The host can pre-authorize routine work within the scratch scope. Operations
+still enforce path containment, size limits, current authority, and the native
+executor's restrictions. Concrete file tools own content checks and write behavior. Pre-authorization does not waive these
+checks or authorize a write to another scope.
 
-The agent MUST be able to read, move, copy, and [perceive](./vision.md) files in
-scratch **without per-operation user approval** — scratch is a pre-authorized
-working area, not a series of prompts. At the same time, scratch MUST remain
-inside the session's **sandbox containment**: it is a sanctioned place to write,
-not an escape from the capability surface. Free movement _within_ scratch; no
-movement _out of_ the sandbox.
+Generated names and uploaded filenames are bounded data. Materialization handles
+collisions without overwriting unrelated files. A retry uses stable input identity
+and returns or reconciles the existing materialization.
 
-The tension these two halves resolve is the practical one: a default output sink
-the agent must beg permission to use every time is not a default sink, but an
-unbounded writable area is a hole in the sandbox. Scratch is the bounded,
-pre-authorized middle.
+### S5 — Cleanup preserves live dependencies
 
-### S5 — Scratch is not the workspace
+Cleanup accounts for active executors, pending reads, publication, and resumable
+work. An expiring session or closed view does not make an in-use file disposable.
+A retention hold can be released after settlement or safe transfer of ownership.
+If a declared hard retention limit expires first, the host records the dependency
+as unavailable before reclaiming it so continuation can request recovery.
+New dependent work is blocked, and active writing executors must quiesce or
+release the resource before deletion.
 
-Writing to scratch MUST NOT be treated as editing the user's project. The
-authority, review, and preservation safeguards that govern workspace mutation
-do not apply to scratch. Perceiving or producing a scratch file grants no
-authority over a workspace file. The edit operation's own current-content match
-still applies wherever that operation is used; it is intrinsic conflict
-detection, not a workspace-authorization rule.
+The host validates its cleanup root and does not follow untrusted links into
+another scope. Cleanup failures and expired content remain observable.
 
 ## Input staging
 
-An attachment-routing policy MAY select a route that gives tool operability to
-byte-backed input with no authorized live reference. Once selected, the host
-MUST materialize a working copy in scratch or select an explicit fallback
-allowed by the routing result. This is ingress staging, not promotion: the
-resulting descriptor names the host-owned scratch copy and grants no authority
-over any source path. A provider-native representation of the same attachment
-MAY coexist for immediate perception; the
-[compositor's routing policy](./compositor.md#resource-routing-policy) owns that
-choice and its fallbacks.
+A routing policy chooses how an attachment reaches the model and tools. An image
+can be sent as provider-native content while a byte-exact working copy is staged
+for editing. An ordinary file can be represented by a scoped descriptor. An
+existing authorized workspace reference can remain a reference.
 
-The host MUST admit staged inputs against the turn's aggregate byte, file, and
-path budgets before materialization. The staged copy has scratch's ephemeral
-lifetime; if durable replay depends on those bytes, the host MUST retain or
-rematerialize them outside scratch rather than treating the descriptor as
-durable storage.
+The representations retain a shared input identity. Resizing an image for model
+perception does not redefine the original bytes used by file tools. Staging
+admits aggregate byte, file-count, and path limits before copying or allocating
+working storage. It publishes descriptors only after the corresponding staged
+content is ready. Partially failed staging removes only files owned by that request.
 
-## Lifecycle
+Durable submission acceptance includes a viable content lifetime or a recorded
+rematerialization source. A message reference alone cannot make a temporary
+upload recoverable.
 
-- **Creation** is on demand — at session start or first use. An idle session
-  need not have allocated anything.
-- **Cleanup** is bounded: a host MAY reclaim scratch on session end, on a
-  retention window, or on a coarser sweep. The invariant is only that the
-  lifetime is bounded and that S2 holds — nothing of value is lost, because
-  value lives outside scratch by promotion.
-- **Cleanup authority** is verified before traversal. A predictable shared
-  base MUST fail closed when it is a symlink, is owned by another local
-  principal, or can be replaced through an unsafe parent. A sweep MUST NOT
-  follow session-entry symlinks into another tree; it removes the link itself.
-- **Promotion** is explicit and agent-driven: there is no implicit "scratch is
-  saved" step. To keep an artifact, the agent moves it.
+The [compositor contract](./compositor.md#resource-routing-policy) owns input
+routing. Messages retain the attachment relationship, the host resolves bytes,
+and file-oriented tools receive scoped working references.
+
+## Publication
+
+Publishing a result selects a source and destination under the destination's
+grant. The destination may be an authored workspace file, a retained artifact
+store, or a user-selected export location. The concrete publication tool owns
+write semantics, any content preconditions, and the meaning of its result.
+
+Publication does not require deleting the working copy. A failed export leaves
+the source outcome and remaining availability clear. The host can retain a
+preview or download for a stated period without promising permanent storage.
+
+## Example — annotate an uploaded PNG
+
+1. Accept the PNG and preserve its attachment identity and original bytes for
+   the promised lifetime.
+2. Materialize a working copy in the session's scratch scope when the image
+   executor requires a file path.
+3. Produce the annotated PNG in scratch and inspect the result.
+4. Return an accessible result with its retention information.
+5. Copy it into an authored project directory only when that destination is
+   selected. Record publication separately.
+6. Release working files when no active or recoverable work depends on them.
 
 ## Bindings
 
-These vary legitimately between hosts; a conformant scratch fixes the contract
-above and leaves these open. The recommended lean is given; the alternative is
-conformant.
-
-| Binding          | The choice                                                           | Lean                                                         |
-| ---------------- | -------------------------------------------------------------------- | ------------------------------------------------------------ |
-| Location         | Under the host data area, an OS temp area, or a per-session mount    | Host's call — invisible to the agent, which is told a handle |
-| Cleanup policy   | On session end, a retention window, or an external sweep             | Bounded; tie to session lifetime unless retention is needed  |
-| Reach mechanism  | A writable root the agent is told about, an allowlist, or a mount    | Pre-authorize so S4 holds without prompts                    |
-| Surface exposure | A full structured-filesystem scope, or only shell + perception reach | Enough that the agent can read / move / copy / perceive (S4) |
-
-## Implementor checklist
-
-A conforming implementation MUST:
-
-- Create a scratch area per session, host-owned, and tell the agent its location
-  rather than letting it choose (S1).
-- Bound scratch's lifetime and never make it the only home of durable value;
-  durability is by promotion (S2).
-- Make scratch the default destination for tools that produce files (S3).
-- Let the agent read, move, copy, and perceive within scratch without
-  per-operation approval, while keeping scratch inside sandbox containment (S4).
-- Keep scratch writes outside workspace mutation authority and review
-  safeguards, while retaining each operation's intrinsic validation (S5).
-
-## What this guide does not specify
-
-- **The exact path.** Where scratch physically lives is a binding; the agent
-  sees a handle, not a path policy.
-- **The cleanup timing.** Session-end, a TTL, or an external sweep — all
-  conformant, subject to "bounded."
-- **Durable user-asset storage.** Where promoted artifacts, saved generations,
-  or a user library live is a separate concern.
-- **The produce-file tools.** Image / video generation, downloads, and
-  conversions are specified elsewhere; this page only fixes where their output
-  lands.
+| Binding     | Host choice                                                                                   |
+| ----------- | --------------------------------------------------------------------------------------------- |
+| Storage     | Local directory, remote mount, object-backed materialization, or another scoped file service. |
+| Allocation  | At session creation or on first use.                                                          |
+| Limits      | File count, bytes, individual sizes, and retention bounds.                                    |
+| Recovery    | Retain working bytes, reconstruct from retained inputs, or report unavailable.                |
+| Exposure    | Structured file operations, granted native execution, or both.                                |
+| Publication | Copy, move, or retained reference under the publication tool's contract.                      |
 
 ## See also
 
-- [Visual perception](./vision.md) — the stage-to-scratch lowering path and
-  scratch as a source the agent perceives.
-- [Binary file handling](./binary.md) — the scratch-space pattern for archive
-  extraction; the same working-area concept applied to attachments.
-- [Foundations](./foundations.md) — directory-rooted execution; the workspace
-  root scratch is defined against.
-- [Runtime Environments](./environments.md) — how the filesystem surface
-  (including scratch) differs across web, cloud sandbox, and computer.
-- [Session Lifecycle](./session.md) / [Persistency](./persistency.md) — the
-  session whose lifetime scratch tracks.
-- [Tools](./tools.md) — the produce-file and filesystem tools that write to and
-  move within scratch.
+- [Workspaces](./workspace.md)
+- [Files, workspaces, and scratch components](./components.md#files-workspaces-and-scratch)
+- [Input routing](./compositor.md#resource-routing-policy)
+- [Visual perception](./vision.md)
+- [Binary file handling](./binary.md)

@@ -7,7 +7,7 @@ tags: [welcome, workspace, composer, navigation]
 status: untested
 severity: medium
 date: 2026-07-23
-updated: 2026-07-23
+updated: 2026-11-16
 automatable: false
 covered_by: []
 ---
@@ -19,6 +19,10 @@ prompt or selected reference context, submitting should open the currently
 selected workspace without creating or sending an agent turn. This keeps the
 front door useful for people who want to browse or edit existing work before
 asking the agent for anything.
+
+Choosing Slides or Images alone does not start work on an empty submission.
+Plan, Goal and effort also do not invent a request when there is no text or
+selected context. An actual attachment counts as selected context.
 
 A non-empty prompt keeps its existing behavior: it opens the workspace and
 sends that prompt as the first turn. Selected references or a template also
@@ -41,3 +45,7 @@ keep their context-start behavior even when the text field is empty.
    submit.
    - Expected: the submission starts with that selected context rather than
      behaving as a plain workspace open.
+
+6. Return to Home, select Slides or Images, and leave the composer empty with no
+   references, template or attachment.
+   - Expected: **Open workspace** opens the selected destination without a turn.

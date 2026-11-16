@@ -1,0 +1,568 @@
+//! GRIDA-SEC-007 process coverage for captured, scoped skill references.
+
+use super::lifecycle::{session_snapshot, task_basis, terminate_shared_server, wait_for_snapshot};
+use super::*;
+
+fn write_skill(workspace: &Path, body: &str) {
+    let directory = workspace.join(".agents/skills/slides");
+    std::fs::create_dir_all(&directory).unwrap();
+    std::fs::write(directory.join("SKILL.md"), format!(
+        "---\nname: slides\ndescription: Plan a local deck.\nallowed-tools: shell\nmetadata:\n  also_in_load: [../../../secret]\n---\n{body}"
+    )).unwrap();
+}
+
+async fn client(url: &str) -> SharedSocket {
+    let mut socket = connect_shared(url, Some(SERVER_TOKEN), None, None)
+        .await
+        .unwrap();
+    let mut capabilities = extension_initialize();
+    capabilities["clientCapabilities"]["_meta"]["co.grida/session/skills"] = 1.into();
+    let reply = ws_rpc(&mut socket, 1, "initialize", capabilities).await;
+    assert_eq!(
+        reply["result"]["agentCapabilities"]["_meta"]["co.grida/session/skills"],
+        1
+    );
+    socket
+}
+
+async fn catalog(socket: &mut SharedSocket, session: &str) -> Value {
+    let response = ws_rpc(
+        socket,
+        100,
+        "_co.grida/session/skills",
+        json!({"sessionId":session}),
+    )
+    .await;
+    assert!(response.get("result").is_some(), "{response}");
+    response["result"]["skills"].clone()
+}
+
+fn selected(catalog: &Value, name: &str) -> Value {
+    catalog
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|entry| entry["name"] == name)
+        .unwrap()
+        .clone()
+}
+
+fn prompt(session: &str, input: &str, uri: &Value) -> Value {
+    json!({
+        "sessionId":session, "inputId":input,
+        "prompt":[{"type":"text","text":"Plan the deck"},
+                  {"type":"resource_link","uri":uri,"name":"slides"}],
+    })
+}
+
+#[tokio::test]
+async fn headless_selected_skills_apply_without_granting_tool_capabilities() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    write_skill(workspace.path(), "Use the explicit local slide workflow.");
+    std::fs::write(
+        workspace.path().join("AGENTS.md"),
+        "Use this project guidance.",
+    )
+    .unwrap();
+    let mut endpoint = Endpoint::start(vec![Reply::Finished("Planned.")]).await;
+
+    let mut absent = executable();
+    absent.arg("run");
+    configured(&mut absent, &state, &endpoint.url);
+    absent
+        .arg("--cwd")
+        .arg(workspace.path())
+        .args(["--prompt", "Plan it", "--skill", "missing"]);
+    let failed = timeout(WAIT, absent.output()).await.unwrap().unwrap();
+    assert!(!failed.status.success());
+    assert!(String::from_utf8_lossy(&failed.stderr).contains("selected_skill_unavailable"));
+    assert!(endpoint.requests.try_recv().is_err());
+
+    let mut command = executable();
+    command.arg("run");
+    configured(&mut command, &state, &endpoint.url);
+    command
+        .arg("--cwd")
+        .arg(workspace.path())
+        .args(["--prompt", "Plan it", "--skill", "slides", "--skill", "svg"]);
+    let output = timeout(WAIT, command.output()).await.unwrap().unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let request = endpoint.request().await;
+    let messages = request["messages"].to_string();
+    assert!(messages.contains("Use the explicit local slide workflow."));
+    assert!(messages.contains("Host-supplied workspace-relative skill directory"));
+    assert!(messages.contains(".agents/skills/slides"));
+    assert!(messages.contains("Use this project guidance."));
+    assert!(messages.contains("live render of what you wrote"));
+    assert!(!messages.contains("also_in_load"));
+    assert!(!messages.contains("Build a Grida slides deck"));
+    // Without workspace tools the turn lists no skills to read on its own.
+    assert!(!messages.contains("## Skills"));
+    assert!(request.get("tools").is_none());
+    endpoint.done().await;
+}
+
+#[tokio::test]
+async fn selected_project_skill_supporting_files_use_existing_read_authority() {
+    use std::os::unix::fs::symlink;
+    let fixture = super::approvals::Fixture::new(false);
+    write_skill(
+        &fixture.primary,
+        "Read references/example.txt for the selected workflow.",
+    );
+    let references = fixture.primary.join(".agents/skills/slides/references");
+    std::fs::create_dir(&references).unwrap();
+    std::fs::write(references.join("example.txt"), "AUTHORIZED SUPPORTING FILE").unwrap();
+    let private = fixture
+        .profile
+        .parent()
+        .unwrap()
+        .join("private-reference.txt");
+    std::fs::write(&private, "PRIVATE SUPPORTING FILE").unwrap();
+    symlink(private, references.join("linked.txt")).unwrap();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Choose(Box::new(|request| {
+            let messages = request["messages"].to_string();
+            assert!(messages.contains(".agents/skills/slides"));
+            assert!(!messages.contains("AUTHORIZED SUPPORTING FILE"));
+            Reply::Tool(
+                "read_file",
+                r#"{"path":".agents/skills/slides/references/example.txt"}"#,
+            )
+        })),
+        Reply::Choose(Box::new(|request| {
+            assert!(
+                request["messages"]
+                    .to_string()
+                    .contains("AUTHORIZED SUPPORTING FILE")
+            );
+            Reply::Tool(
+                "read_file",
+                r#"{"path":".agents/skills/slides/references/linked.txt"}"#,
+            )
+        })),
+        Reply::Choose(Box::new(|request| {
+            assert!(
+                !request["messages"]
+                    .to_string()
+                    .contains("PRIVATE SUPPORTING FILE")
+            );
+            Reply::Tool(
+                "read_file",
+                r#"{"path":".agents/skills/slides/../../../../private-reference.txt"}"#,
+            )
+        })),
+        Reply::Choose(Box::new(|request| {
+            let messages = request["messages"].to_string();
+            assert!(!messages.contains("PRIVATE SUPPORTING FILE"));
+            assert!(
+                messages.contains("file_relative_path_invalid"),
+                "{messages}"
+            );
+            Reply::Finished("Applied the reviewed supporting text.")
+        })),
+    ])
+    .await;
+    let output = timeout(
+        WAIT,
+        fixture
+            .process(&endpoint.url, "run")
+            .arg("--cwd")
+            .arg(&fixture.primary)
+            .args([
+                "--skill",
+                "slides",
+                "--prompt",
+                "Use the selected workflow.",
+            ])
+            .output(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    for _ in 0..4 {
+        endpoint.request().await;
+    }
+    endpoint.done().await;
+}
+
+fn offered(request: &Value, name: &str) -> bool {
+    request["tools"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .any(|tool| tool["function"]["name"] == name)
+}
+
+#[tokio::test]
+async fn listed_skills_are_read_by_the_model_without_a_selection() {
+    let fixture = super::approvals::Fixture::new(false);
+    let mut profile: Value =
+        serde_json::from_slice(&std::fs::read(&fixture.profile).unwrap()).unwrap();
+    profile["directories"][0]["write"] = json!("allow");
+    std::fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
+    let directory = fixture.primary.join(".agents/skills/deck-notes");
+    std::fs::create_dir_all(&directory).unwrap();
+    std::fs::write(
+        directory.join("SKILL.md"),
+        "---\nname: deck-notes\ndescription: Add speaker notes to a deck.\n---\nWORKSPACE NOTES WORKFLOW\n",
+    )
+    .unwrap();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Choose(Box::new(|request| {
+            let messages = request["messages"].to_string();
+            assert!(messages.contains("## Skills"), "{messages}");
+            assert!(messages.contains("- slides: Build a Grida slides deck"));
+            assert!(messages.contains("(bundled; read with `read_skill`)"));
+            assert!(messages.contains(
+                "- deck-notes: Add speaker notes to a deck. (workspace; read `.agents/skills/deck-notes/SKILL.md`)"
+            ));
+            // Only names and descriptions are listed, never a skill's text.
+            assert!(!messages.contains("Today this is Grida's only slide format"));
+            assert!(!messages.contains("WORKSPACE NOTES WORKFLOW"));
+            assert!(offered(request, "read_skill"));
+            Reply::Tool("read_skill", r#"{"name":"slides"}"#)
+        })),
+        Reply::Choose(Box::new(|request| {
+            let messages = request["messages"].to_string();
+            assert!(messages.contains("Today this is Grida's only slide format"));
+            Reply::Tool("read_skill", r#"{"name":"deck-notes"}"#)
+        })),
+        Reply::Choose(Box::new(|request| {
+            let messages = request["messages"].to_string();
+            // A workspace skill is not served by the bundled reader.
+            assert!(messages.contains("skill_not_listed"), "{messages}");
+            Reply::Tool(
+                "read_file",
+                r#"{"path":".agents/skills/deck-notes/SKILL.md"}"#,
+            )
+        })),
+        Reply::Choose(Box::new(|request| {
+            assert!(
+                request["messages"]
+                    .to_string()
+                    .contains("WORKSPACE NOTES WORKFLOW")
+            );
+            // Follow the slides skill: one SVG slide, then the manifest.
+            Reply::Tool(
+                "write_file",
+                r##"{"path":"Tides.canvas/001.svg","content":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1920 1080\" width=\"1920\" height=\"1080\"><title>Cover</title><rect width=\"1920\" height=\"1080\" fill=\"#0b1220\"/></svg>"}"##,
+            )
+        })),
+        Reply::Tool(
+            "write_file",
+            r#"{"path":"Tides.canvas/.canvas.json","content":"{\"editor\":\"slides\",\"files\":[\"*.svg\"],\"documents\":[{\"src\":\"001.svg\",\"id\":\"cover\"}]}"}"#,
+        ),
+        Reply::Finished("Followed the slides and notes skills."),
+    ])
+    .await;
+    let output = timeout(
+        WAIT,
+        fixture
+            .process(&endpoint.url, "run")
+            .arg("--cwd")
+            .arg(&fixture.primary)
+            .args(["--prompt", "Make a three-slide deck about tides."])
+            .output(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    for _ in 0..6 {
+        endpoint.request().await;
+    }
+    endpoint.done().await;
+    let deck = fixture.primary.join("Tides.canvas");
+    let manifest: Value =
+        serde_json::from_slice(&std::fs::read(deck.join(".canvas.json")).unwrap()).unwrap();
+    assert_eq!(manifest["editor"], "slides");
+    assert_eq!(manifest["documents"][0]["src"], "001.svg");
+    assert!(
+        std::fs::read_to_string(deck.join("001.svg"))
+            .unwrap()
+            .contains("<title>Cover</title>")
+    );
+}
+
+#[tokio::test]
+async fn a_workspace_whose_skills_cannot_be_listed_still_accepts_messages() {
+    use std::os::unix::fs::PermissionsExt;
+    for case in ["unreadable", "too-many"] {
+        let fixture = super::approvals::Fixture::new(false);
+        let skills = fixture.primary.join(".agents/skills");
+        let locked = skills.join("locked");
+        match case {
+            "unreadable" => {
+                std::fs::create_dir_all(&locked).unwrap();
+                std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).unwrap();
+                if std::fs::read_dir(&locked).is_ok() {
+                    // Permissions do not refuse this user; nothing to test.
+                    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o700))
+                        .unwrap();
+                    continue;
+                }
+            }
+            _ => {
+                for index in 0..=128 {
+                    let directory = skills.join(format!("w{index}"));
+                    std::fs::create_dir_all(&directory).unwrap();
+                    std::fs::write(
+                        directory.join("SKILL.md"),
+                        format!("---\nname: w{index}\ndescription: Workspace skill.\n---\nBody\n"),
+                    )
+                    .unwrap();
+                }
+            }
+        }
+        let mut endpoint = Endpoint::start(vec![Reply::Choose(Box::new(|request| {
+            let messages = request["messages"].to_string();
+            assert!(messages.contains("## Skills"), "{messages}");
+            assert!(messages.contains("- slides: Build a Grida slides deck"));
+            assert!(messages.contains("skills could not be listed for this request"));
+            assert!(!messages.contains("- w0:"));
+            assert!(offered(request, "read_skill"));
+            Reply::Finished("Listed the bundled skills.")
+        }))])
+        .await;
+        let output = timeout(
+            WAIT,
+            fixture
+                .process(&endpoint.url, "run")
+                .arg("--cwd")
+                .arg(&fixture.primary)
+                .args(["--prompt", "What skills can you use?"])
+                .output(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        assert!(
+            output.status.success(),
+            "{case}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        endpoint.request().await;
+        endpoint.done().await;
+        if case == "unreadable" {
+            std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o700)).unwrap();
+        }
+    }
+}
+
+#[tokio::test]
+async fn queue_retains_selected_guidance_and_new_acceptance_rejects_a_stale_reference() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let temporary = TempDir::new().unwrap();
+    let base = temporary.path().canonicalize().unwrap();
+    let state = base.join("state");
+    let workspace = TempDir::new().unwrap();
+    let guide = workspace.path().join("AGENTS.md");
+    write_skill(workspace.path(), "Original selected workflow.");
+    std::fs::write(&guide, "Original project guidance.").unwrap();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Hold("Earlier work"),
+        Reply::Finished("Queued selection was applied."),
+        Reply::Finished("Updated selection was applied."),
+    ])
+    .await;
+    let private = base.join("private");
+    std::fs::create_dir(&private).unwrap();
+    std::fs::set_permissions(&private, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let profile = private.join("permission.json");
+    std::fs::write(&profile, serde_json::to_vec(&json!({
+        "version":1,"workspace":"project","revision":"owner-selection","primary":"primary",
+        "directories":[{"id":"primary","name":"Primary","path":workspace.path().canonicalize().unwrap(),"generation":"first","read":"allow"}],
+    })).unwrap()).unwrap();
+    std::fs::set_permissions(&profile, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut ungranted = client(&url).await;
+    let created = ws_rpc(
+        &mut ungranted,
+        2,
+        "session/new",
+        json!({"cwd":workspace.path(),"mcpServers":[]}),
+    )
+    .await;
+    let ungranted_id = created["result"]["sessionId"].as_str().unwrap();
+    assert_eq!(
+        selected(&catalog(&mut ungranted, ungranted_id).await, "slides")["source"],
+        "bundled"
+    );
+    drop(ungranted);
+    terminate_shared_server(host).await;
+
+    let (host, url) =
+        shared_server_with_profile(&state, &endpoint.url, TEST_CREDENTIAL, Some(&profile)).await;
+    let mut socket = client(&url).await;
+    let unknown = ws_rpc(
+        &mut socket,
+        90,
+        "_co.grida/session/skills",
+        json!({"sessionId":"unattached"}),
+    )
+    .await;
+    assert_eq!(unknown["error"]["data"], "session_setup_required");
+    let created = ws_rpc(
+        &mut socket,
+        2,
+        "session/new",
+        json!({"cwd":workspace.path(),"mcpServers":[]}),
+    )
+    .await;
+    let session = created["result"]["sessionId"].as_str().unwrap();
+    let old = selected(&catalog(&mut socket, session).await, "slides");
+    assert_eq!(old["source"], "project_agents");
+    assert!(!old.to_string().contains(workspace.path().to_str().unwrap()));
+    assert!(!old.to_string().contains("Original selected workflow."));
+
+    let started = ws_rpc(
+        &mut socket,
+        3,
+        "_co.grida/session/submit",
+        super::lifecycle::prompt_request(session, "prior", "Start earlier work"),
+    )
+    .await;
+    assert!(started.get("result").is_some(), "{started}");
+    endpoint.request().await;
+    let queued = prompt(session, "selected", &old["uri"]);
+    let accepted = ws_rpc(&mut socket, 4, "_co.grida/session/enqueue", queued.clone()).await;
+    assert_eq!(accepted["result"]["disposition"], "queued", "{accepted}");
+    write_skill(workspace.path(), "Updated selected workflow.");
+    std::fs::write(&guide, "Updated project guidance.").unwrap();
+
+    let stale = ws_rpc(
+        &mut socket,
+        5,
+        "_co.grida/session/enqueue",
+        prompt(session, "stale", &old["uri"]),
+    )
+    .await;
+    assert_eq!(stale["error"]["data"], "selected_skill_changed");
+    let retry = ws_rpc(&mut socket, 6, "_co.grida/session/enqueue", queued).await;
+    assert_eq!(retry["result"], accepted["result"]);
+    let current = session_snapshot(&mut socket, session).await;
+    let stopped = ws_rpc(
+        &mut socket,
+        7,
+        "_co.grida/session/stop",
+        task_basis(&current, session, "stop-earlier"),
+    )
+    .await;
+    assert!(stopped.get("result").is_some(), "{stopped}");
+    wait_for_snapshot(&mut socket, session, |snapshot| {
+        snapshot["current"].is_null()
+    })
+    .await;
+    drop(socket);
+    terminate_shared_server(host).await;
+
+    let retained_guidance = {
+        use agent_kit_core::{ChangeId, SessionId};
+        let store =
+            grida_agent::host::open_store(&state.join(grida_agent::host::DATABASE_FILE)).unwrap();
+        let retained = store
+            .input(
+                SessionId::new(session).unwrap(),
+                ChangeId::new("selected").unwrap(),
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        let payload: Value = serde_json::from_slice(retained.input.payload.bytes()).unwrap();
+        payload["guidance"].clone()
+    };
+    let (host, url) =
+        shared_server_with_profile(&state, &endpoint.url, TEST_CREDENTIAL, Some(&profile)).await;
+    let mut socket = client(&url).await;
+    let loaded = ws_rpc(
+        &mut socket,
+        2,
+        "session/load",
+        json!({
+            "sessionId":session,"cwd":workspace.path(),"mcpServers":[],
+        }),
+    )
+    .await;
+    assert!(loaded.get("result").is_some(), "{loaded}");
+    let input = ws_rpc(
+        &mut socket,
+        3,
+        "_co.grida/session/input",
+        json!({
+            "sessionId":session,"inputId":"selected",
+        }),
+    )
+    .await;
+    assert_eq!(input["result"]["settings"]["skills"][0], old);
+    assert_eq!(input["result"]["prompt"][1]["uri"], old["uri"]);
+    assert!(input["result"]["settings"]["projectInstructionRevision"].is_string());
+    let current = session_snapshot(&mut socket, session).await;
+    let resumed = ws_rpc(&mut socket, 4, "_co.grida/session/resume-queue", json!({
+        "sessionId":session,"requestId":"resume-selected","expectedSessionRevision":current["sessionRevision"],
+    })).await;
+    assert!(resumed.get("result").is_some(), "{resumed}");
+    let request = endpoint.request().await;
+    let supplied = request["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|message| {
+            message["content"].as_str()?.strip_prefix(
+                "Workspace and explicitly selected skill guidance for the next request\n\n",
+            )
+        })
+        .next()
+        .unwrap();
+    assert_eq!(
+        serde_json::from_str::<Value>(supplied).unwrap(),
+        retained_guidance
+    );
+    let request = request.to_string();
+    assert!(request.contains("Original selected workflow."));
+    assert!(request.contains("Original project guidance."));
+    assert!(request.contains("Host-supplied workspace-relative skill directory"));
+    assert!(request.contains(".agents/skills/slides"));
+    assert!(!request.contains("Updated selected workflow."));
+    wait_for_snapshot(&mut socket, session, |snapshot| {
+        snapshot["current"].is_null()
+    })
+    .await;
+
+    let latest = selected(&catalog(&mut socket, session).await, "slides");
+    assert_ne!(latest["revision"], old["revision"]);
+    let next = ws_rpc(
+        &mut socket,
+        5,
+        "session/prompt",
+        json!({
+            "sessionId":session, "prompt":prompt(session,"next",&latest["uri"])["prompt"],
+        }),
+    )
+    .await;
+    assert!(next.get("result").is_some(), "{next}");
+    let request = endpoint.request().await.to_string();
+    assert!(request.contains("Updated selected workflow."));
+    assert!(request.contains("Updated project guidance."));
+    assert!(!request.contains("Original selected workflow."));
+    drop(socket);
+    terminate_shared_server(host).await;
+    endpoint.done().await;
+}

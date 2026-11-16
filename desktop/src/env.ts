@@ -17,7 +17,7 @@ export const IS_DEV = !app.isPackaged;
 export const EDITOR_BASE_URL =
   IS_INSIDERS || IS_DEV ? "http://localhost:3000" : "https://grida.co";
 
-// GRIDA-SEC-005 / #955 — the custom URL scheme THIS build registers as its
+// GRIDA-SEC-005 — the custom URL scheme THIS build registers as its
 // `…://auth/callback` deep-link handler. Local builds (dev + insiders, which
 // target the localhost editor) use `grida-dev`; production uses `grida`. Split
 // so a dev machine that ALSO runs the packaged production Grida (which owns

@@ -23,77 +23,7 @@
  * are authenticated but unbilled, exactly like every other text
  * surface under that carve-out.
  */
-import type { LanguageModelV3 } from "@ai-sdk/provider";
-import { verifyGgToken } from "@/lib/auth/gg-token";
-import { grida, gridaProviderOptions } from "@/lib/ai/server";
-import {
-  decodeRequest,
-  encodeCompletion,
-  streamEncoder,
-} from "@/lib/ai/openai-compat/codec";
-import {
-  fromUnknownError,
-  modelNotFound,
-  parseJsonRequest,
-  rateLimited,
-} from "@/lib/ai/openai-compat/errors";
-import { isHostedTextModel } from "@/lib/ai/openai-compat/hosted-models";
-import { allowAiRequest } from "@/lib/ai/openai-compat/limits";
-import { chatCompletionRequestSchema } from "@/lib/ai/openai-compat/wire";
+import { NativeChatRoute } from "@/lib/ai/native-chat-route";
 
 export const maxDuration = 300;
-
-const NO_STORE = { "cache-control": "no-store" } as const;
-
-export async function POST(request: Request) {
-  try {
-    const claims = await verifyGgToken(request);
-
-    const rl = await allowAiRequest("chat", claims.sub);
-    if (!rl.success) return rateLimited(rl.retryAfterSeconds);
-
-    const p = await parseJsonRequest(request, chatCompletionRequestSchema);
-    if (!p.ok) return p.res;
-    const req = p.data;
-
-    // Preserve the product model allowlist before GG dispatch. Unlisted IDs
-    // return the native model-not-found response without a paid submission.
-    if (!(await isHostedTextModel(req.model))) return modelNotFound(req.model);
-
-    const decoded = decodeRequest(req);
-    const model = grida.languageModel(req.model) as LanguageModelV3;
-    const callOptions = {
-      ...decoded.callOptions,
-      providerOptions: gridaProviderOptions({
-        organizationId: claims.org,
-        feature: "v1/ai/chat",
-        awaitIngest: false,
-      }),
-    };
-
-    if (!decoded.stream) {
-      const result = await model.doGenerate(callOptions);
-      return Response.json(encodeCompletion(req.model, result), {
-        headers: NO_STORE,
-      });
-    }
-
-    // GG admission completes inside doStream before any SSE bytes are written.
-    // A blocked organization still receives the native error response.
-    const { stream } = await model.doStream(callOptions);
-    return new Response(
-      stream.pipeThrough(
-        streamEncoder(req.model, { includeUsage: decoded.includeUsage })
-      ),
-      {
-        headers: {
-          "content-type": "text/event-stream; charset=utf-8",
-          "cache-control": "no-store",
-          "x-accel-buffering": "no",
-        },
-      }
-    );
-  } catch (err) {
-    return fromUnknownError(err, "v1/ai/chat");
-  }
-}
+export const POST = NativeChatRoute.ordinary;

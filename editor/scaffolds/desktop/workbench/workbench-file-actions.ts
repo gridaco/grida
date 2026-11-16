@@ -6,7 +6,7 @@
  *
  * Each action takes the workspace and a workspace-relative path. The
  * absolute path is built by joining `workspace.root` with `relPath`
- * using a forward slash — this matches the agent sidecar's path emission
+ * using a forward slash — this matches the services sidecar's path emission
  * (workspace fs surface always speaks POSIX `relPath`, regardless of
  * host platform). For macOS / Linux the resulting string is a plain
  * absolute path; for Windows, Electron's `shell.showItemInFolder`
@@ -25,7 +25,7 @@ import {
 
 /**
  * Join a workspace root with a workspace-relative path. Always uses
- * `/` because the agent sidecar's fs surface emits POSIX relpaths and
+ * `/` because the services sidecar's fs surface emits POSIX relpaths and
  * Electron's native APIs accept mixed separators on Windows.
  */
 export function absolutePathFor(workspace: Workspace, relPath: string): string {

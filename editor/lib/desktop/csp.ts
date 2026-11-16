@@ -23,7 +23,7 @@ const DESKTOP_CSP_PREFIX = `default-src 'self'; script-src 'self' 'nonce-`;
 
 //   connect-src allows:
 //   - 'self'              — grida.co (prod) / localhost:3000 (dev)
-//   - http://127.0.0.1:*  — the agent sidecar
+//   - http://127.0.0.1:*  — the services sidecar
 //   - localhost/ws(s)     — Next.js dev HMR ONLY; gated out of prod so a
 //                          renderer/XSS bug can't probe arbitrary local services
 const DESKTOP_CSP_CONNECT_SRC = IS_DEV
@@ -70,8 +70,8 @@ const LIBRARY_IMG_ORIGINS =
 function imgSrcDirective(
   libraryImgOrigins: string | readonly string[]
 ): string {
-  // `grida-workspace:` is the privileged streaming scheme for workspace media
-  // (#924): the main process serves it by proxying to the sidecar's
+  // `grida-workspace:` is the privileged streaming scheme for workspace media:
+  // the main process serves it by proxying to the sidecar's
   // `/workspaces/file` route (Range-capable, no 1 MiB base64 cap). It's a local
   // privileged origin, NOT an external host.
   const base = "img-src 'self' data: blob: grida-workspace:";
@@ -92,7 +92,7 @@ function imgSrcDirective(
  * Build the desktop CSP header for a given per-request nonce. The contract test
  * pins the directive set so a new renderer-loaded resource type (e.g. another
  * media modality) can't silently fall back to `default-src` and break at
- * runtime — the way video did before `media-src` was added (#908).
+ * runtime — the way video did before `media-src` was added.
  *
  * `libraryImgOrigins` defaults to the selected first-party Library origins; the
  * contract test passes an explicit value to pin both the allow (library host)
@@ -111,9 +111,9 @@ export function buildDesktopCsp(
     // separate change.
     `style-src 'self' 'unsafe-inline'; ` +
     `${imgSrcDirective(libraryImgOrigins)}; ` +
-    // media-src for BYOK video (#908): clips are downloaded by the sidecar and
+    // media-src for BYOK video: clips are downloaded by the sidecar and
     // handed to the renderer as base64 `data:`/`blob:` — never streamed from an
-    // external origin (no provider hosts added). `grida-workspace:` (#924)
+    // external origin (no provider hosts added). `grida-workspace:`
     // additionally streams local workspace media.
     `media-src 'self' data: blob: grida-workspace:; ` +
     `font-src 'self' data:; ` +

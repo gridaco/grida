@@ -32,6 +32,11 @@ import path from "node:path";
 import { atomicWrite } from "./storage/atomic-write";
 import { ProtectedRoots } from "./protected-roots";
 import { containsPath } from "./path-contains";
+import {
+  directoryIdentity,
+  sameDirectoryIdentity,
+  type WorkspaceDirectoryIdentity,
+} from "./workspaces/directory-identity";
 
 export type Workspace = {
   /** sha256(realRoot).slice(0,16) — stable across launches. */
@@ -57,9 +62,17 @@ export type Workspace = {
 
 const FILE_NAME = "workspaces.json";
 const MAX_ENTRIES = 100;
+type StoredWorkspace = Workspace & {
+  directory_identity?: WorkspaceDirectoryIdentity;
+};
+
+function workspaceView(entry: StoredWorkspace): Workspace {
+  const { id, root, name, opened_at, pinned } = entry;
+  return { id, root, name, opened_at, pinned };
+}
 
 export class WorkspaceRegistry {
-  private entries: Workspace[] = [];
+  private entries: StoredWorkspace[] = [];
   private loaded = false;
   private readonly file_path: string;
   /**
@@ -82,7 +95,8 @@ export class WorkspaceRegistry {
   constructor(
     userDataPath: string,
     projectsRoot?: string,
-    protectedRoots: readonly string[] = []
+    protectedRoots: readonly string[] = [],
+    private readonly options: { captureDirectoryIdentity?: true } = {}
   ) {
     this.protectedRoots = new ProtectedRoots(protectedRoots);
     this.file_path = path.join(userDataPath, FILE_NAME);
@@ -103,7 +117,7 @@ export class WorkspaceRegistry {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
         this.entries = parsed.filter(
-          (e): e is Workspace =>
+          (e): e is StoredWorkspace =>
             e !== null &&
             typeof e === "object" &&
             typeof e.id === "string" &&
@@ -129,13 +143,24 @@ export class WorkspaceRegistry {
    *
    * Throws if the path doesn't exist or isn't a directory.
    */
-  async open(rootPath: string): Promise<Workspace> {
+  async open(
+    rootPath: string,
+    expectedIdentity?: WorkspaceDirectoryIdentity
+  ): Promise<Workspace> {
     const real = await fs.realpath(rootPath);
     this.assertAllowed(real);
-    const stat = await fs.stat(real);
+    const stat = await fs.lstat(real, { bigint: true });
     if (!stat.isDirectory()) {
       throw new Error(`workspace path is not a directory: ${rootPath}`);
     }
+    const identity = this.options.captureDirectoryIdentity
+      ? directoryIdentity(stat)
+      : undefined;
+    if (
+      expectedIdentity &&
+      (!identity || !sameDirectoryIdentity(expectedIdentity, identity))
+    )
+      throw new Error("workspace_directory_changed");
     // The workspace root is exactly what the user opened — never expand to a
     // containing git repo. Always respect what the user opened, as-is.
     const resolvedRoot = real;
@@ -148,7 +173,7 @@ export class WorkspaceRegistry {
     await this.ensureLoaded();
     const now = Date.now();
     const idx = this.entries.findIndex((e) => e.id === id);
-    let entry: Workspace;
+    let entry: StoredWorkspace;
     if (idx >= 0) {
       entry = { ...this.entries[idx], opened_at: now };
       this.entries.splice(idx, 1);
@@ -161,10 +186,11 @@ export class WorkspaceRegistry {
         pinned: false,
       };
     }
+    if (identity) entry.directory_identity = identity;
     this.entries.unshift(entry);
     this.trim();
     await this.persist();
-    return entry;
+    return workspaceView(entry);
   }
 
   /**
@@ -197,6 +223,11 @@ export class WorkspaceRegistry {
     this.assertAllowed(this.projects_root);
     await fs.mkdir(this.projects_root, { recursive: true });
     const realRoot = await fs.realpath(this.projects_root);
+    if (
+      this.options.captureDirectoryIdentity &&
+      realRoot !== this.projects_root
+    )
+      throw new Error("workspace_directory_changed");
 
     const slug = slugifyProjectName(opts.name);
     const dir = await this.mintProjectDir(realRoot, slug);
@@ -204,7 +235,7 @@ export class WorkspaceRegistry {
     // Containment assert (the one new trust check): the minted dir's realpath
     // MUST be STRICTLY under the managed root (`containsPath` also accepts
     // root-equals-root, which here would mean the mint escaped). Same shared
-    // discipline as the shell runner's root gates and the scratch assert;
+    // discipline as the media store's containment asserts;
     // catches a symlinked root or any residual escape.
     const realDir = await fs.realpath(dir);
     if (!containsPath(realRoot, realDir) || realDir === realRoot) {
@@ -276,6 +307,27 @@ export class WorkspaceRegistry {
       try {
         this.assertAllowed(this.projects_root);
         await fs.mkdir(this.projects_root, { recursive: true });
+        if (this.options.captureDirectoryIdentity) {
+          const realRoot = await fs.realpath(this.projects_root);
+          if (realRoot !== this.projects_root) return null;
+          await this.ensureLoaded();
+          const previous = this.entries.find((e) => e.root === realRoot);
+          if (previous) {
+            const stat = await fs.lstat(realRoot, { bigint: true });
+            if (
+              !stat.isDirectory() ||
+              !previous.directory_identity ||
+              !sameDirectoryIdentity(
+                previous.directory_identity,
+                directoryIdentity(stat)
+              )
+            )
+              return null;
+            this.default_root = realRoot;
+            this.default_ensured = true;
+            return { ...workspaceView(previous), is_default: true };
+          }
+        }
         // `open` realpaths + registers + persists (single-sourced id/name rules).
         const ws = await this.open(this.projects_root);
         this.default_root = ws.root;
@@ -287,7 +339,9 @@ export class WorkspaceRegistry {
       }
     }
     const ws = this.entries.find((e) => e.root === this.default_root);
-    return ws && this.allowed(ws.root) ? { ...ws, is_default: true } : null;
+    return ws && this.allowed(ws.root)
+      ? { ...workspaceView(ws), is_default: true }
+      : null;
   }
 
   /**
@@ -301,7 +355,7 @@ export class WorkspaceRegistry {
     return this.entries
       .filter((e) => this.allowed(e.root))
       .map((e) => ({
-        ...e,
+        ...workspaceView(e),
         is_default: this.default_root != null && e.root === this.default_root,
       }));
   }
@@ -312,20 +366,21 @@ export class WorkspaceRegistry {
    */
   async findById(id: string): Promise<Workspace | null> {
     await this.ensureLoaded();
-    return (
-      this.entries.find((e) => e.id === id && this.allowed(e.root)) ?? null
-    );
+    const entry = this.entries.find((e) => e.id === id && this.allowed(e.root));
+    return entry ? workspaceView(entry) : null;
   }
 
   /**
-   * Lookup by canonical root path. Used by the agent runner to find
-   * the workspace the route handler already resolved by id.
+   * Lookup by canonical root path. Returns `null` when no allowed
+   * workspace is registered at that root — a host reopening a folder it
+   * remembers by path re-resolves the entry here before trusting it.
    */
   async findByRoot(root: string): Promise<Workspace | null> {
     await this.ensureLoaded();
-    return (
-      this.entries.find((e) => e.root === root && this.allowed(e.root)) ?? null
+    const entry = this.entries.find(
+      (e) => e.root === root && this.allowed(e.root)
     );
+    return entry ? workspaceView(entry) : null;
   }
 
   async pin(id: string, pinned: boolean): Promise<void> {
@@ -341,33 +396,6 @@ export class WorkspaceRegistry {
     const before = this.entries.length;
     this.entries = this.entries.filter((e) => e.id !== id);
     if (this.entries.length !== before) await this.persist();
-  }
-
-  /**
-   * Sync check: is `absPath` under any currently-registered workspace?
-   * Used by the shell runner to validate that a child process's cwd
-   * sits inside an opened workspace. Compares using
-   * `path` semantics — caller must pass an already-`realpath`'d
-   * absolute path for a robust check (otherwise symlinks slip through).
-   */
-  containsPath(absPath: string): boolean {
-    // Caller guarantees loaded — this is a sync check used in routes
-    // where the list has already been touched on this request.
-    for (const w of this.entries) {
-      if (!this.allowed(w.root)) continue;
-      // Use `path.sep`-terminated prefix match to avoid false positives
-      // like `/Users/x/docs2` matching workspace `/Users/x/docs`.
-      const prefix = w.root.endsWith(path.sep) ? w.root : w.root + path.sep;
-      if (absPath === w.root || absPath.startsWith(prefix)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /** Snapshot of currently-registered workspace roots. */
-  rootsSnapshot(): readonly string[] {
-    return this.entries.filter((e) => this.allowed(e.root)).map((e) => e.root);
   }
 
   /**

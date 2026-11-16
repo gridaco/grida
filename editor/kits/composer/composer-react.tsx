@@ -1,13 +1,17 @@
 "use client";
 
+import type { JSONContent } from "@tiptap/core";
+
 import { cn } from "@app/ui/lib/utils";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import {
   createContext,
   type HTMLAttributes,
   type PropsWithChildren,
+  type RefObject,
   useContext,
   useEffect,
+  useLayoutEffect,
   useId,
   useMemo,
   useRef,
@@ -36,9 +40,14 @@ type ComposerContextValue = {
   setEditor: (editor: Editor | null) => void;
   snapshot: ComposerSnapshot;
   triggerMenuId: string;
+  commandSelection: RefObject<
+    ((command: ComposerCommand) => boolean) | undefined
+  >;
 };
 
 export type ComposerController = {
+  /** Whether the editor is mounted and can accept document operations. */
+  ready: boolean;
   snapshot: ComposerViewSnapshot;
   trigger: ComposerTrigger | null;
   triggerIndex: number;
@@ -46,9 +55,17 @@ export type ComposerController = {
   removeAttachment: ComposerCore["removeAttachment"];
   setContexts: ComposerCore["setContexts"];
   clear: () => void;
+  /** The editor's document, or null when it is empty. */
+  readDocument: () => unknown | null;
+  /** Restore a saved document into an empty editor. False when not applied. */
+  restoreDocument: (doc: unknown) => boolean;
+  appendText: (text: string, maxBytes: number) => boolean;
+  /** Put the caret at the end of the draft. False before the editor exists. */
+  focus: () => boolean;
   insertFileReference: (reference: ComposerFileReference) => boolean;
   setTriggerIndex: (index: number) => void;
   moveTriggerIndex: (delta: number) => void;
+  dismissTrigger: () => void;
   selectTriggerItem: (index: number) => boolean;
   submit: (
     input: Parameters<ComposerCore["createMessage"]>[0]
@@ -65,9 +82,14 @@ const ComposerContext = createContext<ComposerContextValue | null>(null);
 export function ComposerProvider({
   catalog,
   children,
+  onCommandSelect,
 }: PropsWithChildren<{
   catalog: ComposerCatalog;
+  /** Return true to handle an explicit command selection without inserting a chip. */
+  onCommandSelect?: (command: ComposerCommand) => boolean;
 }>) {
+  const commandSelection = useRef(onCommandSelect);
+  commandSelection.current = onCommandSelect;
   const core = useRef<ComposerCore | null>(null);
   if (!core.current) {
     core.current = new ComposerCore(catalog);
@@ -97,6 +119,7 @@ export function ComposerProvider({
       setEditor,
       snapshot,
       triggerMenuId,
+      commandSelection,
     }),
     [coreValue, editor, setEditor, snapshot, triggerMenuId]
   );
@@ -109,10 +132,11 @@ export function ComposerProvider({
 }
 
 export function useComposer() {
-  const { core, editor, snapshot } = useComposerInternals();
+  const { core, editor, snapshot, commandSelection } = useComposerInternals();
 
   return useMemo<ComposerController>(
     () => ({
+      ready: editor !== null,
       snapshot: toViewSnapshot(snapshot),
       trigger: snapshot.trigger,
       triggerIndex: snapshot.triggerIndex,
@@ -122,6 +146,27 @@ export function useComposer() {
       clear() {
         editor?.commands.clearContent(true);
         core.clear();
+      },
+      readDocument() {
+        return editor && !editor.isEmpty ? editor.getJSON() : null;
+      },
+      restoreDocument(doc) {
+        if (!editor || !editor.isEmpty) return false;
+        try {
+          editor.commands.setContent(doc as JSONContent, true);
+          // Continue typing at the end of the restored text.
+          editor.commands.setTextSelection(editor.state.doc.content.size);
+        } catch {
+          return false;
+        }
+        ComposerTiptap.syncCore(core, editor);
+        return true;
+      },
+      appendText(text, maxBytes) {
+        return !!editor && ComposerTiptap.appendText(editor, text, maxBytes);
+      },
+      focus() {
+        return !!editor && editor.commands.focus("end");
       },
       insertFileReference(reference) {
         if (!editor) return false;
@@ -134,10 +179,17 @@ export function useComposer() {
       moveTriggerIndex(delta) {
         core.moveTriggerIndex(delta);
       },
+      dismissTrigger() {
+        core.dismissTrigger();
+      },
       selectTriggerItem(index) {
-        if (!editor || !snapshot.trigger) return false;
-        ComposerTiptap.selectTriggerItem(editor, snapshot.trigger, index);
-        return true;
+        if (!editor) return false;
+        return ComposerTiptap.selectTriggerItem(
+          editor,
+          core,
+          index,
+          commandSelection.current
+        );
       },
       submit(input) {
         if (editor) {
@@ -146,7 +198,7 @@ export function useComposer() {
         return core.createMessage(input);
       },
     }),
-    [core, editor, snapshot]
+    [core, editor, snapshot, commandSelection]
   );
 }
 
@@ -168,10 +220,13 @@ export function ComposerContent({
   onTransfer,
   onFiles,
   onDirectories,
+  readOnly = false,
   ...props
 }: Omit<HTMLAttributes<HTMLDivElement>, "onSubmit"> & {
   placeholder?: string;
   autofocus?: boolean;
+  /** Keep the mounted document visible while its submission is being confirmed. */
+  readOnly?: boolean;
   editorClassName?: string;
   triggerMenuId?: string;
   onSubmitRequest?: () => void;
@@ -203,6 +258,7 @@ export function ComposerContent({
 }) {
   const {
     core,
+    commandSelection,
     setEditor,
     snapshot,
     triggerMenuId: defaultTriggerMenuId,
@@ -223,6 +279,7 @@ export function ComposerContent({
   );
   const editor = useEditor({
     immediatelyRender: false,
+    editable: !readOnly,
     extensions,
     editorProps: {
       attributes: {
@@ -242,6 +299,7 @@ export function ComposerContent({
           submit() {
             onSubmitRequest?.();
           },
+          onCommandSelect: commandSelection.current,
         });
       },
       handlePaste(_view, event) {
@@ -295,6 +353,12 @@ export function ComposerContent({
       setEditor(null);
     },
   });
+
+  // Tiptap keeps the current editable flag when updating options on a mounted
+  // editor. Apply read-only changes explicitly before another input event.
+  useLayoutEffect(() => {
+    editor?.setEditable(!readOnly);
+  }, [editor, readOnly]);
 
   // Keep the placeholder reactive. `useEditor` builds the editor once, so a
   // changed `placeholder` prop never reconfigures the Placeholder extension on

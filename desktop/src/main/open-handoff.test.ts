@@ -59,6 +59,21 @@ describe("open_handoff.fromArgv", () => {
     ).toEqual([{ kind: "file", path: "/Users/u/intro-deck.canvas" }]);
   });
 
+  it("keeps a long option value separate from positional document paths", () => {
+    expect(
+      open_handoff.fromArgv([
+        "/exec/path",
+        "--native-chat-mcp-root=/Users/u/intro-deck.canvas",
+        "/Users/u/intro-deck.canvas",
+        "--",
+        "--literal.svg",
+      ])
+    ).toEqual([
+      { kind: "file", path: "/Users/u/intro-deck.canvas" },
+      { kind: "file", path: "--literal.svg" },
+    ]);
+  });
+
   it("returns [] when nothing classifies", () => {
     expect(open_handoff.fromArgv(["/exec/path", "--flag", "."])).toEqual([]);
   });

@@ -7,6 +7,7 @@ import {
   Box,
   Bone,
   ChevronRight,
+  Download,
   FolderOpen,
   FolderSearch,
   ImageIcon,
@@ -93,6 +94,10 @@ export function DesktopMediaTools({
   const [recentsLoading, setRecentsLoading] = useState(librarySupported);
   const [libraryError, setLibraryError] = useState<string | null>(null);
   const [nativeAction, setNativeAction] = useState<string | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState<{
+    mediaId: string;
+    result: "saved" | "failed";
+  } | null>(null);
   const [storedSelection, setStoredSelection] = useState<StoredSelection>(
     initialMediaId
       ? { kind: "loading", mediaId: initialMediaId }
@@ -253,6 +258,21 @@ export function DesktopMediaTools({
       await mediaLibrary.openFolder();
     } catch {
       setLibraryError("Could not open the media folder.");
+    } finally {
+      setNativeAction(null);
+    }
+  };
+
+  // Keep the retained selection through export failures (see test/desktop-media-save-copy.md).
+  const saveCopy = async (item: MediaItem) => {
+    if (nativeAction) return;
+    setNativeAction("save-copy");
+    setCopyFeedback(null);
+    try {
+      const result = await mediaLibrary.saveCopy(item.id);
+      if (result !== "cancelled") setCopyFeedback({ mediaId: item.id, result });
+    } catch {
+      setCopyFeedback({ mediaId: item.id, result: "failed" });
     } finally {
       setNativeAction(null);
     }
@@ -421,6 +441,21 @@ export function DesktopMediaTools({
           <SidebarFooter className="border-t" aria-live="polite">
             {librarySupported && (
               <SidebarMenu>
+                {storedPreview && mediaLibrary.canSaveCopy() && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      disabled={generationBusy || nativeAction !== null}
+                      onClick={() => void saveCopy(storedPreview.item)}
+                    >
+                      {nativeAction === "save-copy" ? (
+                        <Loader2 className="animate-spin" aria-hidden />
+                      ) : (
+                        <Download aria-hidden />
+                      )}
+                      <span>Save a copy</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     disabled={generationBusy || nativeAction !== null}
@@ -444,6 +479,24 @@ export function DesktopMediaTools({
                 {libraryError}
               </p>
             )}
+            {copyFeedback &&
+              copyFeedback.mediaId === storedPreview?.item.id &&
+              (copyFeedback.result === "failed" ? (
+                <p
+                  className="px-2 py-1 text-[11px] text-destructive"
+                  role="alert"
+                >
+                  Couldn’t save a copy. Choose another destination and try
+                  again.
+                </p>
+              ) : (
+                <p
+                  className="px-2 py-1 text-[11px] text-muted-foreground"
+                  role="status"
+                >
+                  Copy saved.
+                </p>
+              ))}
           </SidebarFooter>
         )}
       </Sidebar>

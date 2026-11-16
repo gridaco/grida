@@ -1,0 +1,139 @@
+//! GRIDA-SEC-004 — explicit enforcement posture and private helper setup frames.
+
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+use std::path::PathBuf;
+
+pub const HELPER_FLAG: &str = "--agent-kit-sandbox-helper-v4";
+pub const MAX_FRAME_BYTES: usize = 256 * 1024;
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Launch {
+    pub enforcement: Enforcement,
+    pub roots: Vec<PathIdentity>,
+    pub private_temp: PathBuf,
+    pub task: Task,
+    #[cfg(target_os = "linux")]
+    pub host_namespaces: [u64; 5],
+}
+
+/// Required in every frame: missing or unknown posture must fail closed.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Enforcement {
+    Confined,
+    Unconfined,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum Task {
+    Probe,
+    Command {
+        executable: PathBuf,
+        arguments: Vec<String>,
+        cwd: PathBuf,
+        environment: BTreeMap<String, String>,
+        mode: Mode,
+    },
+}
+
+/// How the helper connects the payload to the owner.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Mode {
+    /// Inherited stdio. The payload shares the helper's process group.
+    Finite,
+    /// A session whose payload has closed stdin and one merged output pipe.
+    Pipe,
+    /// A session whose payload leads its own session on a pseudo-terminal.
+    Terminal,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PathIdentity {
+    pub path: PathBuf,
+    pub device: u64,
+    pub inode: u64,
+}
+
+impl PathIdentity {
+    pub fn matches(&self) -> bool {
+        use std::os::unix::fs::MetadataExt;
+        std::fs::symlink_metadata(&self.path).is_ok_and(|metadata| {
+            metadata.dev() == self.device
+                && metadata.ino() == self.inode
+                && !metadata.file_type().is_symlink()
+        })
+    }
+}
+
+pub const STATUS_READY: u8 = b'R';
+pub const STATUS_SETUP_FAILED: u8 = b'F';
+pub const STATUS_EXIT: u8 = b'E';
+pub const STATUS_SIGNAL: u8 = b'S';
+/// A session helper sends this after the exit report once it has signalled
+/// the payload's own process group while the payload was still unreaped.
+pub const STATUS_GROUP_ENDED: u8 = b'K';
+/// A session helper sends this in place of [`STATUS_GROUP_ENDED`] when it
+/// could not confirm that every process of the payload's session ended.
+pub const STATUS_GROUP_UNVERIFIED: u8 = b'U';
+
+/// Owner to helper: deliver an interrupt to a session payload.
+pub const CONTROL_INTERRUPT: u8 = b'I';
+/// Owner to helper: end the payload. End of stream and any other byte mean
+/// the owner is gone, and the helper ends everything it launched.
+pub const CONTROL_STOP: u8 = b'T';
+
+#[cfg(target_os = "linux")]
+pub fn namespaces() -> std::io::Result<[u64; 5]> {
+    use std::os::unix::fs::MetadataExt;
+    let mut result = [0; 5];
+    for (index, namespace) in ["user", "mnt", "pid", "ipc", "net"].iter().enumerate() {
+        result[index] = std::fs::metadata(format!("/proc/self/ns/{namespace}"))?.ino();
+    }
+    Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_launch_requires_an_explicit_known_enforcement_posture() {
+        let launch = Launch {
+            enforcement: Enforcement::Unconfined,
+            roots: vec![],
+            private_temp: "/tmp/fixture".into(),
+            task: Task::Probe,
+            #[cfg(target_os = "linux")]
+            host_namespaces: [1; 5],
+        };
+        let mut encoded = serde_json::to_value(launch).unwrap();
+        assert_eq!(encoded["enforcement"], "unconfined");
+        assert!(serde_json::from_value::<Launch>(encoded.clone()).is_ok());
+        encoded["enforcement"] = "fallback".into();
+        assert!(serde_json::from_value::<Launch>(encoded.clone()).is_err());
+        encoded.as_object_mut().unwrap().remove("enforcement");
+        assert!(serde_json::from_value::<Launch>(encoded).is_err());
+    }
+
+    #[test]
+    fn the_launch_mode_is_a_required_part_of_the_command() {
+        let task = Task::Command {
+            executable: "/bin/sh".into(),
+            arguments: vec![],
+            cwd: "/".into(),
+            environment: BTreeMap::new(),
+            mode: Mode::Terminal,
+        };
+        let encoded = serde_json::to_string(&task).unwrap();
+        assert!(encoded.contains(r#""mode":"terminal""#), "{encoded}");
+        let without_mode = encoded.replace(r#","mode":"terminal""#, "");
+        assert!(serde_json::from_str::<Task>(&without_mode).is_err());
+        let unknown = encoded.replace("terminal", "shell");
+        assert!(serde_json::from_str::<Task>(&unknown).is_err());
+    }
+}

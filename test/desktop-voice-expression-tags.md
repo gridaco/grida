@@ -11,7 +11,7 @@ updated: 2026-09-04
 automatable: false
 covered_by:
   - editor/scaffolds/desktop/audio-gen/speech-prompt.test.ts
-  - packages/grida-ai-agent/src/http/routes/text-to-speech.test.ts
+  - packages/grida-ai-host/src/http/routes/text-to-speech.test.ts
 ---
 
 ## Behavior

@@ -9,6 +9,7 @@ import {
 } from "electron";
 import path from "node:path";
 import { URL } from "node:url";
+import type { RecentStore } from "@grida/daemon/server";
 import {
   IPC_CHANNELS,
   type ConfirmOptions,
@@ -19,20 +20,15 @@ import {
 } from "../bridge/contract";
 import { EDITOR_BASE_URL } from "../env";
 import { isSafeExternalUrl } from "../window";
-import { agentSidecarClient } from "./agent-sidecar-client";
+import { servicesSidecarClient } from "./services-sidecar-client";
 import {
-  approveAgentProviderEndpoint,
-  describeAgentProviderEndpoint,
-  getAgentSidecarInfo,
-  revokeAgentProviderEndpoint,
-  withTemporaryAgentProviderEndpoint,
-} from "./agent-sidecar-supervisor";
-import { AgentProviderEndpointMutation } from "./agent-provider-endpoint-mutation";
-import {
-  isValidEndpointProviderId,
-  validateEndpointProviderConfig,
-  type EndpointProviderConfig,
-} from "@grida/agent";
+  agentProviderEndpointSettings,
+  getServicesSidecarInfo,
+} from "./services-sidecar-supervisor";
+import type {
+  EndpointProviderConfig,
+  ProbedEndpointModel,
+} from "@grida/ai-host";
 import { dirtyState } from "./dirty-state";
 import {
   allHostAppIds,
@@ -52,11 +48,28 @@ import {
   unsubscribeWorkspaceChanges,
 } from "./workspace-watcher-host";
 import { trashWorkspaceEntry } from "./workspace-files";
-import { createChatGptOAuthCoordinator } from "./chatgpt-oauth";
+import {
+  unavailableChatGptOAuth,
+  type ChatGptOAuthCoordinator,
+} from "./chatgpt-oauth";
+import type { NativeAgentHooks } from "./native-agent-hooks";
 import { ipc_admission, type DesktopIpcRole } from "./ipc-admission";
 import { ipc_sender } from "./ipc-sender";
 import { DesktopMediaHost } from "./media-host";
 import { DesktopMediaRoot } from "./media-root";
+import {
+  NativeChatIpc,
+  type ActiveNativeChat,
+  type NativeChatNestedDeckOwner,
+} from "./native-chat-ipc";
+import type { NativeDocumentFiles } from "./native-document-files";
+import type { WorkspaceMediaGrant } from "./workspace-media-registry";
+import { NativeExternalRunIpc } from "./native-external-run-ipc";
+import type { NativeExternalRuns } from "./native-external-runs";
+import { takeNativeNotificationFocus } from "./agent-notifications";
+import { NativeArchiveIpc } from "./native-archive-ipc";
+import type { NativeArchives } from "./native-archives";
+import type { NativeChatSelections } from "./native-chat-selections";
 
 // `new URL(EDITOR_BASE_URL).origin` is needed per IPC invoke; parse the
 // build-time constant once at module init rather than per call.
@@ -68,25 +81,40 @@ const EDITOR_ORIGIN = (() => {
   }
 })();
 
-const providerEndpointMutations =
-  new AgentProviderEndpointMutation.Coordinator();
-const chatgptOAuth = createChatGptOAuthCoordinator({
-  sidecar_fetch: (path, init) => agentSidecarClient.fetch(path, init),
-  open_external: async (url) => {
-    await shell.openExternal(url);
-  },
-});
-const mediaHost = new DesktopMediaHost({
-  root: DesktopMediaRoot.current,
-  reveal: (nativePath) => shell.showItemInFolder(nativePath),
-  openFolder: async (nativePath) => {
-    const error = await shell.openPath(nativePath);
-    if (error) throw new Error("native folder open failed");
-  },
-});
-
 type RegisterIpcHandlersOptions = {
   resolve_ipc_role: (window: BrowserWindow) => DesktopIpcRole | null;
+  open_settings: () => void;
+  archives?: NativeArchives;
+  global_hooks?: NativeAgentHooks;
+  recent_files?: Pick<RecentStore, "list" | "touch" | "pin" | "forget">;
+  document_files?: NativeDocumentFiles;
+  resolve_document_window?: (id: string) => BrowserWindow | undefined;
+  resolve_native_chat?: (
+    window: BrowserWindow,
+    workspaceId: string,
+    profileId?: string
+  ) => ActiveNativeChat | null;
+  /** Present when this main process has selected native chat mode. */
+  ensure_native_chat?: (workspaceId: string) => Promise<void>;
+  native_chat_disabled?: boolean;
+  native_chat_selections?: NativeChatSelections;
+  forget_native_workspace?: (workspaceId: string) => Promise<void>;
+  resolve_native_deck?: (workspaceId: string) => Promise<WorkspaceMediaGrant>;
+  native_nested_deck_chat?: NativeChatNestedDeckOwner;
+  native_document_chat?: Pick<
+    import("./native-chat-ipc").NativeChatDocumentOwner,
+    "current" | "ensure" | "close"
+  >;
+  native_external_agent?: NativeExternalRuns;
+  native_chat_profiles?: import("./native-chat-ipc").NativeChatProfileOwner;
+  publish_workspace_surfaces?: (
+    event: IpcMainInvokeEvent,
+    snapshot: unknown
+  ) => Promise<boolean>;
+  native_chatgpt_oauth?: Pick<
+    ChatGptOAuthCoordinator,
+    "connect" | "cancel" | "status" | "signOut"
+  >;
   on_onboarding_complete?: (input: {
     window: BrowserWindow;
     workspace_id?: string;
@@ -97,6 +125,125 @@ type RegisterIpcHandlersOptions = {
 };
 
 export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
+  const mediaHost = new DesktopMediaHost({
+    root: DesktopMediaRoot.current(),
+    reveal: (nativePath) => shell.showItemInFolder(nativePath),
+    openFolder: async (nativePath) => {
+      const error = await shell.openPath(nativePath);
+      if (error) throw new Error("native folder open failed");
+    },
+  });
+  const recentFiles = options.recent_files ?? servicesSidecarClient.recent;
+  const admittedWindow = (sender: WebContents) => {
+    const window = BrowserWindow.fromWebContents(sender);
+    return window && options.resolve_ipc_role(window) === "main"
+      ? window
+      : null;
+  };
+  const nativeChat = new NativeChatIpc(
+    EDITOR_ORIGIN,
+    (sender, workspaceId, profileId) => {
+      const window = admittedWindow(sender);
+      return window
+        ? (options.resolve_native_chat?.(window, workspaceId, profileId) ??
+            null)
+        : null;
+    },
+    options.ensure_native_chat && {
+      admits: (sender) => admittedWindow(sender) !== null,
+      ensure: options.ensure_native_chat,
+    },
+    async (sender, title, ownedChildren) => {
+      const window = admittedWindow(sender);
+      if (!window) return false;
+      const chat = title ? `“${title}”` : "This chat";
+      const children = ownedChildren
+        ? ` This also deletes ${ownedChildren} named ${ownedChildren === 1 ? "subagent" : "subagents"} and their private data.`
+        : "";
+      const result = await dialog.showMessageBox(window, {
+        type: "warning",
+        message: "Delete this saved chat?",
+        detail: `${chat} and its private attachments and working copies will be permanently removed.${children} Project files and independent forks stay available.`,
+        buttons: ["Cancel", "Delete chat"],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true,
+      });
+      return result.response === 1;
+    },
+    async (sender) => {
+      const window = admittedWindow(sender);
+      if (!window) throw new Error("native_chat_artifact_unavailable");
+      const result = await dialog.showSaveDialog(window, {
+        title: "Save cropped PNG",
+        defaultPath: "cropped.png",
+        filters: [{ name: "PNG image", extensions: ["png"] }],
+      });
+      return result.canceled || !result.filePath ? null : result.filePath;
+    },
+    options.native_chat_profiles,
+    options.resolve_native_deck,
+    options.native_chat_disabled,
+    options.native_document_chat && {
+      ...options.native_document_chat,
+      identity: (sender, docId, owner) => {
+        const files = options.document_files;
+        const window = admittedWindow(sender);
+        const check = () => {
+          owner.check();
+          if (!window || options.resolve_document_window?.(docId) !== window)
+            throw new Error("native_chat_scope_changed");
+        };
+        check();
+        if (!files) throw new Error("native_chat_unavailable");
+        return files.chatIdentity(docId, { signal: owner.signal, check });
+      },
+    },
+    options.native_nested_deck_chat,
+    {
+      choose: async (sender) => {
+        const window = admittedWindow(sender);
+        if (!window) throw new Error("native_chat_scope_changed");
+        const result = await dialog.showOpenDialog(window, {
+          title: "Choose a lifecycle check definition",
+          properties: ["openFile"],
+          filters: [{ name: "Lifecycle check", extensions: ["json"] }],
+        });
+        return result.canceled || result.filePaths.length !== 1
+          ? null
+          : result.filePaths[0];
+      },
+      confirm: async (sender, hook, workspace, action) => {
+        const window = admittedWindow(sender);
+        if (!window) return false;
+        const result = await dialog.showMessageBox(window, {
+          type: "warning",
+          message:
+            action === "install"
+              ? `Trust lifecycle check “${hook.id}”?`
+              : `Remove lifecycle check “${hook.id}”?`,
+          detail: `${hook.event}${hook.tool ? ` · ${hook.tool}` : ""}\n${hook.executable}\nArguments: ${JSON.stringify(hook.arguments)}\nWorkspace: ${workspace}\nRead-only access; no network. Workspace-enabled child work inherits these checks; text-only reviewers do not gain execution access. Timeout: ${hook.timeoutMs} ms. ${hook.mode === "required" ? "A failure blocks dependent work." : "Failures are recorded without changing the original result."}\n\nThe change applies after restarting Desktop. Running work keeps its current checks.`,
+          buttons: [
+            "Cancel",
+            action === "install" ? "Trust and save check" : "Remove check",
+          ],
+          defaultId: 0,
+          cancelId: 0,
+          noLink: true,
+        });
+        return result.response === 1;
+      },
+    },
+    options.native_chat_selections
+  );
+  const externalAgent = new NativeExternalRunIpc(
+    EDITOR_ORIGIN,
+    (sender) => admittedWindow(sender) !== null,
+    () => {
+      const owner = options.native_external_agent;
+      return owner?.accepting ? owner : undefined;
+    }
+  );
   /**
    * GRIDA-SEC-004 / GRIDA-SEC-005 — every native IPC invoke must pass both
    * structural URL admission and the controller-owned window/role capability
@@ -113,44 +260,766 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       const window = BrowserWindow.fromWebContents(event.sender);
       const role = window ? options.resolve_ipc_role(window) : null;
       const pathname = ipc_sender.pathname(senderUrl);
+      const docId = ipc_sender.documentId(senderUrl);
+      const selectedDocument = docId !== null;
+      const nestedDeck = ipc_sender.nestedDeck(senderUrl) !== null;
       if (
         !ipc_sender.isAllowed(senderUrl, EDITOR_ORIGIN) ||
         !role ||
         !pathname ||
-        !ipc_admission.allows({ role, channel, pathname })
+        !ipc_admission.allows({
+          role,
+          channel,
+          pathname,
+          selectedDocument,
+          nestedDeck,
+        })
       ) {
         console.warn(
           `[grida] IPC ${channel} denied: sender=${ipc_sender.diagnostic(senderUrl)}`
         );
         throw new Error(`IPC ${channel} denied`);
       }
-      return handler(event, ...(args as A));
+      const invoke = () => handler(event, ...(args as A));
+      if (
+        pathname === "/desktop/file" &&
+        channel.startsWith("grida:native-chat:")
+      ) {
+        if (docId) {
+          if (!window || options.resolve_document_window?.(docId) !== window)
+            throw new Error("native_chat_scope_changed");
+          return nativeChat.documentRequest(event, invoke);
+        }
+        return nativeChat.deckRequest(event, invoke);
+      }
+      return invoke();
     });
   }
 
+  const archives = new NativeArchiveIpc(
+    options.archives,
+    (sender) => admittedWindow(sender) !== null
+  );
+  guarded(IPC_CHANNELS.ARCHIVES_LIST, (event, cursor: unknown) =>
+    archives.list(event, cursor)
+  );
+  guarded(
+    IPC_CHANNELS.ARCHIVES_UNARCHIVE,
+    (event, id: unknown, revision: unknown) =>
+      archives.unarchive(event, id, revision)
+  );
+
   guarded(IPC_CHANNELS.AGENT_SERVER_INFO, () => {
-    const info = getAgentSidecarInfo();
-    if (!info) throw new Error("agent sidecar not ready");
+    const info = getServicesSidecarInfo();
+    if (!info) throw new Error("services sidecar not ready");
     return info;
   });
+
+  guarded(IPC_CHANNELS.DOCUMENT_READ, (event, id: unknown) =>
+    documentRequest(event, id, (files, docId, owner) =>
+      files.read(docId, owner)
+    )
+  );
+  guarded(IPC_CHANNELS.DOCUMENT_WRITE, (event, id: unknown, content: unknown) =>
+    documentRequest(event, id, (files, docId, owner) =>
+      files.write(docId, content, owner)
+    )
+  );
+
+  function documentRequest<T>(
+    event: IpcMainInvokeEvent,
+    id: unknown,
+    run: (
+      files: NativeDocumentFiles,
+      id: string,
+      owner: { signal: AbortSignal; check: () => void }
+    ) => Promise<T>
+  ): Promise<T> {
+    const files = options.document_files;
+    const unavailable = "The selected document is unavailable.";
+    if (!files || typeof id !== "string") throw new Error(unavailable);
+    return windowRequest(
+      event,
+      unavailable,
+      (signal, check) => run(files, id, { signal, check }),
+      (window, url) =>
+        options.resolve_document_window?.(id) === window &&
+        ipc_sender.isDocument(url, id)
+    );
+  }
+
+  guarded(IPC_CHANNELS.NATIVE_EXTERNAL_STATUS, (event) =>
+    externalAgent.status(event)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_EXTERNAL_START,
+    (event, id: unknown, text: unknown) => externalAgent.start(event, id, text)
+  );
+  guarded(IPC_CHANNELS.NATIVE_EXTERNAL_STOP, (event, id: unknown) =>
+    externalAgent.stop(event, id)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_TAKE_NOTIFICATION_FOCUS,
+    (event, ...args: unknown[]) => {
+      if (args.length)
+        throw new Error("native_chat_notification_focus_invalid");
+      return takeNativeNotificationFocus(event);
+    }
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_STATUS, (event, start?: boolean) =>
+    nativeChat.status(event, start)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_LIST, (event, cursor?: string | null) =>
+    nativeChat.list(event, cursor)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_PROFILES, (event) =>
+    nativeChat.profiles(event)
+  );
+  guarded(IPC_CHANNELS.WELCOME_CHAT_PROFILES, (event, ...args: unknown[]) => {
+    if (args.length) throw new Error("native_chat_profiles_invalid");
+    return nativeChat.welcomeProfiles(event);
+  });
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_SELECT_PROFILE,
+    (event, selection: unknown) => nativeChat.selectProfile(event, selection)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_LIST_ARCHIVED,
+    (event, cursor?: string | null) => nativeChat.list(event, cursor, true)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_CATALOG_ENTRY, (event, id: string) =>
+    nativeChat.catalogEntry(event, id)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_ORGANIZE,
+    (event, id: string, change: unknown) =>
+      nativeChat.organize(event, id, change)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_DELETE,
+    (event, id: string, observationId: unknown, catalogRevision: unknown) =>
+      nativeChat.deleteSavedChat(event, id, observationId, catalogRevision)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_COMMANDS, (event, id: string) =>
+    nativeChat.commands(event, id)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_RUN_COMMAND,
+    (event, id: string, command: unknown, requestId: unknown) =>
+      nativeChat.runCommand(event, id, command, requestId)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_PREPARE_REVISION,
+    (event, id: string, observationId: unknown, messageId: unknown) =>
+      nativeChat.prepareRevision(event, id, observationId, messageId)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_REVISE,
+    (event, id: string, input: unknown) => nativeChat.revise(event, id, input)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_CREATE, (event) => nativeChat.create(event));
+  guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PERMISSION_MODE, (event) =>
+    nativeChat.acceptsPermissionMode(event)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_REVIEW_PERMISSION_MODE,
+    (event, attachmentId: string, revision: unknown, requestId: unknown) =>
+      nativeChat.reviewPermissionMode(event, attachmentId, revision, requestId)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_PERMISSION_MODE,
+    (event, attachmentId: string) =>
+      nativeChat.permissionMode(event, attachmentId)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_SET_PERMISSION_MODE,
+    (
+      event,
+      attachmentId: string,
+      revision: unknown,
+      requestId: unknown,
+      mode: unknown,
+      review: unknown
+    ) =>
+      nativeChat.setPermissionMode(
+        event,
+        attachmentId,
+        revision,
+        requestId,
+        mode,
+        review
+      )
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_SELECTION, (event, target: unknown) =>
+    nativeChat.selection(event, target)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_UPDATE_SELECTION,
+    (
+      event,
+      target: unknown,
+      revision: unknown,
+      operationId: unknown,
+      choice: unknown
+    ) =>
+      nativeChat.updateSelection(event, target, revision, operationId, choice)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_CREATE_FROM_DRAFT,
+    (event, draftId: unknown) => nativeChat.createFromDraft(event, draftId)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_SUBAGENT_ACTIVITY,
+    (event, id: string, afterChildId: unknown) =>
+      nativeChat.subagentActivity(event, id, afterChildId)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_SUBAGENT_CONVERSATION,
+    (event, id: string, childId: unknown, before: unknown) =>
+      nativeChat.subagentConversation(event, id, childId, before)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_LIST_SUBAGENTS,
+    (event, id: string, afterChildId: unknown) =>
+      nativeChat.listSubagents(event, id, afterChildId)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_INSPECT_SUBAGENT,
+    (event, id: string, childId: unknown, inputId: unknown) =>
+      nativeChat.inspectSubagent(event, id, childId, inputId)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_CREATE_SUBAGENT,
+    (event, id: string, input: unknown) =>
+      nativeChat.createSubagent(event, id, input)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_ASSIGN_SUBAGENT,
+    (event, id: string, input: unknown) =>
+      nativeChat.assignSubagent(event, id, input)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_STOP_SUBAGENT,
+    (event, id: string, stopObservationId: unknown, requestId: unknown) =>
+      nativeChat.stopSubagent(event, id, stopObservationId, requestId)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_CONTROL_SUBAGENT_TURN,
+    (
+      event,
+      id: string,
+      observationId: unknown,
+      requestId: unknown,
+      control: unknown
+    ) =>
+      nativeChat.controlSubagentTurn(
+        event,
+        id,
+        observationId,
+        requestId,
+        control
+      )
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_LOAD, (event, id: string) =>
+    nativeChat.load(event, id)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_CONTROL_SUBAGENT_CHILD,
+    (
+      event,
+      id: string,
+      observationId: unknown,
+      requestId: unknown,
+      control: unknown
+    ) =>
+      nativeChat.controlSubagentChild(
+        event,
+        id,
+        observationId,
+        requestId,
+        control
+      )
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_OPEN_SIDE, (event, id: string) =>
+    nativeChat.openSideChat(event, id)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_CLOSE_SIDE, (event, id: string) =>
+    nativeChat.closeSideChat(event, id)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_DETACH, (event, id: string) =>
+    nativeChat.detach(event, id)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_PUBLISH_EDITOR_SURFACES,
+    (event, attachmentId: string, snapshot: unknown, revision?: unknown) =>
+      nativeChat.publishEditorSurfaces(event, attachmentId, snapshot, revision)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_SUBMIT,
+    (
+      event,
+      id: string,
+      input: string,
+      text: string,
+      regime?: unknown,
+      effort?: unknown,
+      svgTargetId?: unknown,
+      selectionRevision?: unknown
+    ) =>
+      nativeChat.submit(
+        event,
+        id,
+        input,
+        text,
+        regime,
+        effort,
+        svgTargetId,
+        selectionRevision
+      )
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT_RESULT,
+    (event, attachmentId: string, callId: unknown, result: unknown) =>
+      nativeChat.replyEditorSvgText(event, attachmentId, callId, result)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_ENQUEUE,
+    (
+      event,
+      id: string,
+      input: string,
+      text: string,
+      regime?: unknown,
+      effort?: unknown,
+      svgTargetId?: unknown,
+      selectionRevision?: unknown
+    ) =>
+      nativeChat.enqueue(
+        event,
+        id,
+        input,
+        text,
+        regime,
+        effort,
+        svgTargetId,
+        selectionRevision
+      )
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_EFFORT, (event) =>
+    nativeChat.acceptsEffort(event)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_GOAL_EFFORT, (event) =>
+    nativeChat.acceptsGoalEffort(event)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_BACKGROUND_PROCESSES, (event) =>
+    nativeChat.acceptsBackgroundProcesses(event)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_BACKGROUND_PROCESSES, (event, id: string) =>
+    nativeChat.backgroundProcesses(event, id)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_STOP_BACKGROUND_PROCESSES,
+    (event, id: string, processIds?: unknown) =>
+      nativeChat.stopBackgroundProcesses(event, id, processIds)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PNG, (event) =>
+    nativeChat.acceptsPng(event)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_LIBRARY_SELECTION, (event) =>
+    nativeChat.acceptsLibrarySelection(event)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_SUBMIT_LIBRARY_SELECTION,
+    (
+      event,
+      id: string,
+      input: string,
+      text: string,
+      regime?: unknown,
+      effort?: unknown,
+      selectionRevision?: unknown
+    ) =>
+      nativeChat.submitWithLibrarySelection(
+        event,
+        id,
+        input,
+        text,
+        regime,
+        effort,
+        selectionRevision
+      )
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_FILE, (event) =>
+    nativeChat.acceptsFile(event)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_HOOKS, (event, attachmentId?: string) =>
+    nativeChat.inspectHooks(event, attachmentId)
+  );
+  // Workspace import/removal was retired; executable definitions come only
+  // from the global config.toml source and its Settings trust review.
+  guarded(IPC_CHANNELS.NATIVE_CHAT_IMPORT_HOOK, () => {
+    throw new Error("native_hooks_config_toml_only");
+  });
+  guarded(IPC_CHANNELS.NATIVE_CHAT_REMOVE_HOOK, () => {
+    throw new Error("native_hooks_config_toml_only");
+  });
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_SUBMIT_IMAGE,
+    (event, id: string, input: unknown) =>
+      nativeChat.submitImage(event, id, input)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_SUBMIT_FILE,
+    (event, id: string, input: unknown) =>
+      nativeChat.submitFile(event, id, input)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_SELECTED_IMAGE, (event) =>
+    nativeChat.acceptsSelectedImage(event)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_SUBMIT_SELECTED_IMAGE,
+    (event, id: string, input: unknown) =>
+      nativeChat.submitSelectedImage(event, id, input)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_FILE_REFERENCE, (event) =>
+    nativeChat.acceptsFileReference(event)
+  );
+  // GRIDA-SEC-004: the input's path comes from the preload, which resolves it
+  // from the person's File; Main resolves and refuses it independently.
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_SUBMIT_FILE_REFERENCE,
+    (event, id: string, input: unknown) =>
+      nativeChat.submitFileReference(event, id, input)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_INPUT_RECEIPT,
+    (event, id: string, input: string) =>
+      nativeChat.inputReceipt(event, id, input)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_OBSERVE, (event, id: string) =>
+    nativeChat.observe(event, id)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_TURN_SUMMARY,
+    (
+      event,
+      id: string,
+      observation: string,
+      refreshGatewayAttempt?: unknown,
+      childBillingAfter?: unknown
+    ) =>
+      nativeChat.turnSummary(
+        event,
+        id,
+        observation,
+        refreshGatewayAttempt,
+        childBillingAfter
+      )
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_READ_ATTACHMENT_PREVIEW,
+    (event, id: string, preview: unknown) =>
+      nativeChat.readAttachmentPreview(event, id, preview)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_READ_ARTIFACT,
+    (event, id: string, observation: string, artifact: unknown) =>
+      nativeChat.readArtifact(event, id, observation, artifact)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_SAVE_ARTIFACT,
+    (event, id: string, observation: string, artifact: unknown) =>
+      nativeChat.saveArtifact(event, id, observation, artifact)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_QUEUED_TEXT_REPLACEMENT, (event) =>
+    nativeChat.acceptsQueuedTextReplacement(event)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_QUEUE,
+    (event, id: string, observation: string, offset: number) =>
+      nativeChat.queue(event, id, observation, offset)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_QUEUED_TEXT,
+    (event, id: string, observation: string, inputId: string) =>
+      nativeChat.queuedText(event, id, observation, inputId)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_QUEUED_MESSAGE,
+    (event, id: string, observation: string, inputId: string) =>
+      nativeChat.queuedMessage(event, id, observation, inputId)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_READ_QUEUED_ATTACHMENT_PREVIEW,
+    (
+      event,
+      id: string,
+      observation: string,
+      inputId: string,
+      previewId: unknown
+    ) =>
+      nativeChat.readQueuedAttachmentPreview(
+        event,
+        id,
+        observation,
+        inputId,
+        previewId
+      )
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_EDIT_QUEUE,
+    (event, id: string, change: unknown) =>
+      nativeChat.editQueue(event, id, change)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_STEER, (event, id: string, input: unknown) =>
+    nativeChat.steer(event, id, input)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_GOAL,
+    (event, id: string, observation: string) =>
+      nativeChat.goal(event, id, observation)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_START_GOAL,
+    (event, id: string, inputId: string, request: unknown) =>
+      nativeChat.startGoal(event, id, inputId, request)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_CONTROL_GOAL,
+    (event, id: string, change: unknown) =>
+      nativeChat.controlGoal(event, id, change)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_APPROVALS,
+    (event, id: string, observation: string) =>
+      nativeChat.approvals(event, id, observation)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_ANSWER_APPROVAL,
+    (event, id: string, review: string, decision: unknown) =>
+      nativeChat.answerApproval(event, id, review, decision)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_QUESTIONS,
+    (event, id: string, observation: string) =>
+      nativeChat.questions(event, id, observation)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_ANSWER_QUESTION,
+    (event, id: string, review: string, answer: unknown) =>
+      nativeChat.answerQuestion(event, id, review, answer)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_LIBRARY_SELECTIONS,
+    (event, id: string, observation: string) =>
+      nativeChat.librarySelections(event, id, observation)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_ANSWER_LIBRARY_SELECTION,
+    (event, id: string, review: string, answer: unknown) =>
+      nativeChat.answerLibrarySelection(event, id, review, answer)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_TRANSCRIPT, (event, id: string) =>
+    nativeChat.transcript(event, id)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_TRANSCRIPT_PAGE,
+    (event, id: string, before?: unknown) =>
+      nativeChat.transcriptPage(event, id, before)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_CONTROL,
+    (event, id: string, control: unknown) =>
+      nativeChat.control(event, id, control)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_SUBSCRIBE,
+    (event, id: string, subscription: string) =>
+      nativeChat.subscribe(event, id, subscription)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_UNSUBSCRIBE, (event, subscription: string) =>
+    nativeChat.unsubscribe(event, subscription)
+  );
 
   // GRIDA-SEC-004 — onboarding never receives AGENT_SERVER_INFO. These
   // handlers keep the daemon bearer and the chosen absolute path on the
   // trusted side of the bridge, returning only the user-facing Workspace DTO.
   guarded(IPC_CHANNELS.ONBOARDING_WORKSPACE_DEFAULT, async () => {
-    const workspaces = await agentSidecarClient.listWorkspaces();
+    const workspaces = await servicesSidecarClient.listWorkspaces();
     return workspaces.find((workspace) => workspace.is_default) ?? null;
   });
-  guarded(IPC_CHANNELS.ONBOARDING_WORKSPACE_CHOOSE, async (event) => {
+  async function chooseWorkspace(event: IpcMainInvokeEvent) {
     const window = BrowserWindow.fromWebContents(event.sender);
-    if (!window) throw new Error("onboarding window is unavailable");
-    const result = await dialog.showOpenDialog(window, {
-      properties: ["openDirectory", "createDirectory"],
-    });
-    if (result.canceled || result.filePaths.length === 0) return null;
-    return await agentSidecarClient.openWorkspace(result.filePaths[0]);
+    const { sender, senderFrame: frame } = event;
+    const role = window && options.resolve_ipc_role(window);
+    if (!window || !role || !frame || frame !== sender.mainFrame)
+      throw new Error("workspace_picker_unavailable");
+    let current = true;
+    const revoke = ipc_sender.watchNavigation(sender, () => (current = false));
+    try {
+      const result = await dialog.showOpenDialog(window, {
+        properties: ["openDirectory", "createDirectory"],
+      });
+      if (
+        !current ||
+        sender.isDestroyed() ||
+        frame !== sender.mainFrame ||
+        options.resolve_ipc_role(window) !== role ||
+        !ipc_sender.isAllowed(frame.url, EDITOR_ORIGIN) ||
+        result.canceled ||
+        result.filePaths.length !== 1
+      )
+        return null;
+      return await servicesSidecarClient.openWorkspace(result.filePaths[0]);
+    } finally {
+      revoke();
+    }
+  }
+  guarded(IPC_CHANNELS.ONBOARDING_WORKSPACE_CHOOSE, chooseWorkspace);
+  guarded(IPC_CHANNELS.WORKSPACE_LIST, () =>
+    servicesSidecarClient.listWorkspaces()
+  );
+  guarded(
+    IPC_CHANNELS.WORKSPACE_PUBLISH_EDITOR_SURFACES,
+    (event, snapshot: unknown) =>
+      options.publish_workspace_surfaces?.(event, snapshot) ?? false
+  );
+  guarded(IPC_CHANNELS.WORKSPACE_CHOOSE, chooseWorkspace);
+  guarded(IPC_CHANNELS.WORKSPACE_REOPEN, (_event, root: unknown) => {
+    if (typeof root !== "string" || !root || Buffer.byteLength(root) > 4096)
+      throw new Error("workspace_root_invalid");
+    return servicesSidecarClient.reopenWorkspace(root);
   });
+  guarded(IPC_CHANNELS.WORKSPACE_CREATE, (_event, name: unknown) => {
+    if (
+      name !== undefined &&
+      (typeof name !== "string" || Buffer.byteLength(name) > 4096)
+    )
+      throw new Error("workspace_name_invalid");
+    return servicesSidecarClient.createWorkspace(name);
+  });
+  guarded(
+    IPC_CHANNELS.WORKSPACE_PIN,
+    (_event, id: unknown, pinned: unknown) => {
+      if (!workspaceIdValue(id) || typeof pinned !== "boolean")
+        throw new Error("workspace_pin_invalid");
+      return servicesSidecarClient.pinWorkspace(id, pinned);
+    }
+  );
+  guarded(IPC_CHANNELS.WORKSPACE_FORGET, async (_event, id: unknown) => {
+    if (!workspaceIdValue(id)) throw new Error("workspace_id_invalid");
+    const forget =
+      options.forget_native_workspace ?? servicesSidecarClient.forgetWorkspace;
+    const forgotten = forget(id);
+    nativeChat.revokeWorkspace(id);
+    try {
+      await forgotten;
+    } finally {
+      nativeChat.revokeWorkspace(id);
+    }
+  });
+  guarded(
+    IPC_CHANNELS.WORKSPACE_READ,
+    async (event, id: unknown, relative: unknown, kind: unknown) => {
+      if (
+        !workspaceIdValue(id) ||
+        typeof relative !== "string" ||
+        Buffer.byteLength(relative) > 4096 ||
+        (kind !== "text" && kind !== "bytes" && kind !== "directory")
+      )
+        throw new Error("workspace_read_invalid");
+      return await windowRequest(
+        event,
+        "workspace_read_unavailable",
+        async (signal) =>
+          kind === "directory"
+            ? await servicesSidecarClient.readWorkspaceDirectory(
+                id,
+                relative,
+                signal
+              )
+            : await servicesSidecarClient.readWorkspaceFile(
+                id,
+                relative,
+                kind,
+                signal
+              )
+      );
+    }
+  );
+  guarded(
+    IPC_CHANNELS.WORKSPACE_WRITE,
+    async (
+      event,
+      id: unknown,
+      relative: unknown,
+      content: unknown,
+      expectedMtime: unknown
+    ) => {
+      if (
+        !workspaceIdValue(id) ||
+        typeof relative !== "string" ||
+        Buffer.byteLength(relative) > 4096 ||
+        typeof content !== "string" ||
+        (expectedMtime !== undefined &&
+          (typeof expectedMtime !== "number" ||
+            !Number.isFinite(expectedMtime)))
+      )
+        throw new Error("workspace_write_invalid");
+      return await windowRequest(
+        event,
+        "workspace_write_unavailable",
+        (signal, check) =>
+          servicesSidecarClient.writeWorkspaceFile(
+            id,
+            relative,
+            content,
+            expectedMtime,
+            signal,
+            check
+          )
+      );
+    }
+  );
 
+  async function windowRequest<T>(
+    event: IpcMainInvokeEvent,
+    unavailable: string,
+    run: (signal: AbortSignal, check: () => void) => Promise<T>,
+    owner?: (window: BrowserWindow, frameUrl: string) => boolean
+  ): Promise<T> {
+    const { sender, senderFrame: frame } = event;
+    const window = BrowserWindow.fromWebContents(sender);
+    const controller = new AbortController();
+    const check = () => {
+      if (
+        controller.signal.aborted ||
+        !window ||
+        !frame ||
+        sender.isDestroyed() ||
+        frame !== sender.mainFrame ||
+        options.resolve_ipc_role(window) !== "main" ||
+        !ipc_sender.isAllowed(frame.url, EDITOR_ORIGIN) ||
+        (owner && !owner(window, frame.url))
+      )
+        throw new Error(unavailable);
+    };
+    check();
+    const unwatch = ipc_sender.watchNavigation(sender, () =>
+      controller.abort()
+    );
+    try {
+      const result = await run(controller.signal, check);
+      check();
+      return result;
+    } finally {
+      unwatch();
+    }
+  }
+
+  // Only the native subscription owner offers ChatGPT sign-in. Other launches
+  // report it as not configured instead of reaching a retired sidecar route.
+  const chatgptOAuth = options.native_chatgpt_oauth ?? unavailableChatGptOAuth;
   guarded(IPC_CHANNELS.CHATGPT_CONNECT, () => chatgptOAuth.connect());
   guarded(IPC_CHANNELS.CHATGPT_CANCEL, async () => {
     await chatgptOAuth.cancel();
@@ -158,51 +1027,52 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   guarded(IPC_CHANNELS.CHATGPT_STATUS, () => chatgptOAuth.status());
   guarded(IPC_CHANNELS.CHATGPT_SIGN_OUT, () => chatgptOAuth.signOut());
 
-  // issue #974 — custom endpoints are network authority, not just config.
-  // Renderer writes/probes therefore cross a guarded native confirmation
-  // before main mints an exact-origin grant for the sidecar transport.
+  // Connect/Save is the explicit consent action. Background reads/metadata
+  // consume the matching Main receipt and never mint network authority.
+  function endpointRequest<T>(
+    event: IpcMainInvokeEvent,
+    run: (check: () => void) => Promise<T>
+  ): Promise<T> {
+    return windowRequest(
+      event,
+      "provider endpoint request denied",
+      (_signal, check) => run(check),
+      (_window, url) => ipc_sender.pathname(url) === "/desktop/settings"
+    );
+  }
   guarded(
     IPC_CHANNELS.PROVIDER_ENDPOINT_SET,
-    async (event, input: EndpointProviderConfig) => {
-      const validated = validateEndpointProviderConfig(input);
-      if (!validated.ok) throw new Error(validated.error);
-      const config = validated.config;
-      await providerEndpointMutations.run(config.id, async () => {
-        const endpoint = await describeAgentProviderEndpoint(config.base_url);
-        await confirmProviderOrigin(event, endpoint.origin, endpoint.route);
-        // Persist first: config writes perform no provider egress. Only after
-        // the authenticated sidecar accepts the config does main publish its
-        // grant. The per-id coordinator keeps this SET atomic with DELETE and
-        // replacement SET ceremonies for the same endpoint.
-        await agentSidecarClient.setProviderEndpoint(config);
-        await approveAgentProviderEndpoint(config.id, config.base_url);
-      });
-    }
+    (event, input: EndpointProviderConfig) =>
+      endpointRequest(event, (check) =>
+        agentProviderEndpointSettings().set(input, check)
+      )
   );
-
-  guarded(IPC_CHANNELS.PROVIDER_ENDPOINT_DELETE, async (_event, id: string) => {
-    if (!isValidEndpointProviderId(id)) {
-      throw new Error("provider endpoint id is invalid");
-    }
-    await providerEndpointMutations.run(id, async () => {
-      await AgentProviderEndpointMutation.remove({
-        revokeAuthority: async () => await revokeAgentProviderEndpoint(id),
-        deleteConfiguration: async () =>
-          await agentSidecarClient.deleteProviderEndpoint(id),
-      });
-    });
-  });
-
+  guarded(IPC_CHANNELS.PROVIDER_ENDPOINT_DELETE, (event, id: string) =>
+    endpointRequest(event, (check) =>
+      agentProviderEndpointSettings().remove(id, check)
+    )
+  );
+  guarded(IPC_CHANNELS.PROVIDER_ENDPOINT_PROBE, (event, baseUrl: string) =>
+    endpointRequest(event, (check) =>
+      agentProviderEndpointSettings().probe(baseUrl, check)
+    )
+  );
   guarded(
-    IPC_CHANNELS.PROVIDER_ENDPOINT_PROBE,
-    async (event, baseUrl: string) => {
-      const endpoint = await describeAgentProviderEndpoint(baseUrl);
-      await confirmProviderOrigin(event, endpoint.origin, endpoint.route);
-      return await withTemporaryAgentProviderEndpoint(
-        baseUrl,
-        async () => await agentSidecarClient.probeProviderEndpoint(baseUrl)
-      );
-    }
+    IPC_CHANNELS.PROVIDER_ENDPOINT_AUTHORIZATION,
+    (event, id: string, baseUrl: string) =>
+      endpointRequest(event, () =>
+        agentProviderEndpointSettings().authorization(id, baseUrl)
+      )
+  );
+  guarded(
+    IPC_CHANNELS.PROVIDER_ENDPOINT_UPDATE_MODELS,
+    (
+      event,
+      update: { id: string; base_url: string; models: ProbedEndpointModel[] }
+    ) =>
+      endpointRequest(event, (check) =>
+        agentProviderEndpointSettings().updateModels(update, check)
+      )
   );
 
   guarded(IPC_CHANNELS.WINDOW_SET_DOCUMENT_EDITED, (event, edited: boolean) => {
@@ -228,6 +1098,84 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
 
   guarded(IPC_CHANNELS.WINDOW_CLOSE, (event) => {
     BrowserWindow.fromWebContents(event.sender)?.close();
+  });
+
+  const globalHooksOwner = (
+    event: IpcMainInvokeEvent,
+    args: readonly unknown[] = []
+  ) => {
+    if (
+      !event.senderFrame ||
+      event.senderFrame !== event.sender.mainFrame ||
+      event.sender.isDestroyed() ||
+      args.length ||
+      ipc_sender.pathname(event.senderFrame.url) !== "/desktop/settings" ||
+      !admittedWindow(event.sender)
+    )
+      throw new Error("native_hooks_settings_denied");
+    if (!options.global_hooks) throw new Error("native_hooks_unavailable");
+    return options.global_hooks;
+  };
+  guarded(IPC_CHANNELS.GLOBAL_HOOKS_INSPECT, (event, ...args: unknown[]) =>
+    globalHooksOwner(event, args).configuration()
+  );
+  guarded(IPC_CHANNELS.GLOBAL_HOOKS_RELOAD, (event, ...args: unknown[]) =>
+    globalHooksOwner(event, args).configuration()
+  );
+  guarded(
+    IPC_CHANNELS.GLOBAL_HOOKS_OPEN_CONFIG,
+    async (event, ...args: unknown[]) => {
+      const owner = globalHooksOwner(event, args);
+      const file = await owner.ensureConfig();
+      globalHooksOwner(event);
+      if (await shell.openPath(file))
+        throw new Error("native_hooks_open_config_failed");
+    }
+  );
+  guarded(
+    IPC_CHANNELS.GLOBAL_HOOKS_REVIEW,
+    async (event, id: unknown, revision: unknown, ...args: unknown[]) => {
+      const owner = globalHooksOwner(event, args);
+      if (
+        typeof id !== "string" ||
+        id.length > 256 ||
+        typeof revision !== "string" ||
+        !/^[a-f0-9]{64}$/.test(revision)
+      )
+        throw new Error("native_hook_review_invalid");
+      const review = await owner.reviewConfigured(id, revision);
+      const window = admittedWindow(event.sender);
+      if (!window) throw new Error("native_hooks_settings_denied");
+      const hook = review.definition;
+      const result = await dialog.showMessageBox(window, {
+        type: "warning",
+        message: `Trust global hook “${hook.id}”?`,
+        detail: `${hook.event}${hook.tool ? ` · ${hook.tool}` : ""}\n${hook.executable}\nArguments: ${JSON.stringify(hook.arguments)}\nApplies to every workspace, within each task's read-only scope; no network. Timeout: ${hook.timeoutMs} ms. ${hook.mode === "required" ? "Failure blocks dependent work." : "Failures are recorded."} New connections use the trusted definition; existing work retains its captured hooks.`,
+        buttons: ["Cancel", "Trust hook"],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true,
+      });
+      globalHooksOwner(event);
+      if (result.response !== 1) return null;
+      await owner.trust(review);
+      globalHooksOwner(event);
+      return owner.configuration();
+    }
+  );
+
+  guarded(IPC_CHANNELS.WINDOW_OPEN_SETTINGS, (event, ...args: unknown[]) => {
+    // Only the admitted top-level Desktop document can request this fixed
+    // native action; subframes cannot borrow their window's admission.
+    if (
+      event.sender.isDestroyed() ||
+      !event.senderFrame ||
+      event.senderFrame !== event.sender.mainFrame ||
+      args.length !== 0
+    ) {
+      throw new Error("settings window request denied");
+    }
+    options.open_settings();
   });
 
   guarded(
@@ -345,11 +1293,111 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     }
   );
 
+  // GRIDA-SEC-004 — recents stores path metadata. Opening a file has its
+  // own trusted native admission.
+  function guardedRecent<A extends unknown[], R>(
+    channel: IpcChannel,
+    operation: (...args: A) => Promise<R>
+  ): void {
+    guarded(channel, async ({ sender, senderFrame: frame }, ...args: A) => {
+      const url = frame?.url;
+      let revoked = false;
+      const requireCurrent = () => {
+        if (
+          revoked ||
+          !frame ||
+          sender.isDestroyed() ||
+          frame !== sender.mainFrame ||
+          frame.url !== url ||
+          !admittedWindow(sender)
+        ) {
+          throw new Error("recent_files_unavailable");
+        }
+      };
+      requireCurrent();
+      const unwatch = ipc_sender.watchNavigation(sender, () => {
+        revoked = true;
+      });
+      try {
+        const result = await operation(...args);
+        requireCurrent();
+        return result;
+      } catch {
+        throw new Error("recent_files_unavailable");
+      } finally {
+        unwatch();
+      }
+    });
+  }
+  function recentPath(value: unknown): string {
+    if (
+      typeof value !== "string" ||
+      !path.isAbsolute(value) ||
+      value.includes("\0") ||
+      Buffer.byteLength(value, "utf8") > 4096
+    ) {
+      throw new Error("recent_file_path_invalid");
+    }
+    return value;
+  }
+  guardedRecent(IPC_CHANNELS.RECENT_LIST, () => recentFiles.list());
+  guardedRecent(IPC_CHANNELS.RECENT_TOUCH, (filePath: unknown) =>
+    recentFiles.touch(recentPath(filePath))
+  );
+  guardedRecent(
+    IPC_CHANNELS.RECENT_PIN,
+    (filePath: unknown, pinned: unknown) => {
+      if (typeof pinned !== "boolean")
+        throw new Error("recent_file_pin_invalid");
+      return recentFiles.pin(recentPath(filePath), pinned);
+    }
+  );
+  guardedRecent(IPC_CHANNELS.RECENT_FORGET, (filePath: unknown) =>
+    recentFiles.forget(recentPath(filePath))
+  );
+
   // GRIDA-SEC-004 — durable media operations are path-free and admitted only
   // from the exact main-role `/desktop/tools` surface. `DesktopMediaHost`
   // resolves opaque ids and keeps every native path on this side of IPC.
   guarded(IPC_CHANNELS.MEDIA_LIST, () => mediaHost.list());
   guarded(IPC_CHANNELS.MEDIA_READ, (_event, id: string) => mediaHost.read(id));
+  guarded(IPC_CHANNELS.MEDIA_SAVE_COPY, (event, id: unknown) => {
+    const { sender, senderFrame: frame } = event;
+    const window = admittedWindow(sender);
+    if (!window || !frame || typeof id !== "string")
+      throw new Error("media-save-copy-unavailable");
+    let revoked = false;
+    const requireCurrent = () => {
+      if (
+        revoked ||
+        sender.isDestroyed() ||
+        sender.isLoadingMainFrame() ||
+        frame !== sender.mainFrame ||
+        admittedWindow(sender) !== window ||
+        !ipc_sender.isAllowed(frame.url, EDITOR_ORIGIN) ||
+        ipc_sender.pathname(frame.url) !== "/desktop/tools"
+      )
+        throw new Error("media-save-copy-unavailable");
+    };
+    requireCurrent();
+    const unwatch = ipc_sender.watchNavigation(sender, () => {
+      revoked = true;
+    });
+    return mediaHost
+      .saveCopy(
+        id,
+        async (fileName, extension) => {
+          const result = await dialog.showSaveDialog(window, {
+            title: "Save a copy",
+            defaultPath: fileName,
+            filters: [{ name: "Media file", extensions: [extension.slice(1)] }],
+          });
+          return result.canceled || !result.filePath ? null : result.filePath;
+        },
+        requireCurrent
+      )
+      .finally(unwatch);
+  });
   guarded(IPC_CHANNELS.MEDIA_REVEAL, async (_event, id: string) => {
     await mediaHost.reveal(id);
   });
@@ -455,7 +1503,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     killTerminal(event.sender, id);
   });
 
-  // issue #805 — workspace file-change watcher. The watch root is the
+  // Workspace file-change watcher. The watch root is the
   // workspace root resolved host-side from the sidecar registry; the
   // renderer only names a workspace id (never a raw path), exactly like
   // TERMINAL_CREATE and WORKSPACE_TRASH_ENTRY. The watcher host binds each
@@ -477,40 +1525,14 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   });
 }
 
-/** Close any active native-provider callback before Electron exits. */
-export function closeChatGptOAuth(): void {
-  chatgptOAuth.close();
-}
-
-async function confirmProviderOrigin(
-  event: IpcMainInvokeEvent,
-  origin: string,
-  route: string
-): Promise<void> {
-  const window = BrowserWindow.fromWebContents(event.sender);
-  const options = {
-    type: "warning" as const,
-    message: "Allow this AI provider endpoint?",
-    detail:
-      `${origin}\n${route}\n\nGrida will let the agent sidecar contact only this origin ` +
-      "for provider requests until the app closes.",
-    buttons: ["Allow", "Cancel"],
-    defaultId: 1,
-    cancelId: 1,
-    noLink: true,
-  };
-  const result = window
-    ? await dialog.showMessageBox(window, options)
-    : await dialog.showMessageBox(options);
-  if (result.response !== 0)
-    throw new Error("provider endpoint was not approved");
-}
-
 async function findWorkspaceOrThrow(workspaceId: string) {
-  const workspaces = await agentSidecarClient.listWorkspaces();
-  const workspace = workspaces.find((item) => item.id === workspaceId);
+  const workspace = await servicesSidecarClient.findWorkspace(workspaceId);
   if (!workspace) throw new Error(`workspace not found: ${workspaceId}`);
   return workspace;
+}
+
+function workspaceIdValue(id: unknown): id is string {
+  return typeof id === "string" && /^[a-f0-9]{16}$/.test(id);
 }
 
 function parsePreferredApps(raw: readonly unknown[]): HostAppId[] {

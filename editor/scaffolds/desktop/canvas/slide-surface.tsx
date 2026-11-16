@@ -13,6 +13,7 @@
 import { useEffect, useRef } from "react";
 import { useSvgEditor } from "@grida/svg-editor/react";
 import { keynote } from "@grida/svg-editor/presets";
+import type { DocumentSurfaceHost } from "../file/document-surface-host";
 import { useWorkspaceFileSave } from "../workbench/use-workspace-file-save";
 import type { WorkspaceFileReloadGuard } from "../workbench/workspace-file-reload-guard";
 import {
@@ -28,6 +29,7 @@ export function SlideSurface({
   resourceRevision = 0,
   active = true,
   onSaved,
+  liveText,
   prepareContentForEditor,
   prepareContentForWrite,
 }: {
@@ -39,6 +41,7 @@ export function SlideSurface({
   /** Gates Cmd+S — false when this deck is a hidden workbench tab. */
   active?: boolean;
   onSaved?: () => void;
+  liveText?: { host: DocumentSurfaceHost; path: string };
   prepareContentForEditor?: (
     diskContent: string
   ) =>
@@ -49,6 +52,13 @@ export function SlideSurface({
 }) {
   const editor = useSvgEditor();
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const liveHost = liveText?.host;
+  const livePath = liveText?.path;
+
+  useEffect(() => {
+    if (active && liveHost && livePath)
+      return liveHost.bindEditor(editor, livePath);
+  }, [active, editor, liveHost, livePath]);
 
   useEffect(() => {
     const container = containerRef.current;

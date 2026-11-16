@@ -122,6 +122,6 @@ Full slide semantics (presenter mode, slide indices in UI, theme maps) are out o
 
 ## See Also
 
-- [WG:SVG](../feat-svg)
-- [WG:Vector Network](../feat-vector-network)
-- [WG:CSS](../feat-css)
+- [WG:SVG](https://github.com/gridaco/nothing/tree/main/docs/wg/feat-svg)
+- [WG:Vector Network](https://github.com/gridaco/nothing/tree/main/docs/wg/feat-vector-network)
+- [WG:CSS](https://github.com/gridaco/nothing/tree/main/docs/wg/feat-css)

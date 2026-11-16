@@ -1,8 +1,10 @@
 # `@/kits/agent-chat`
 
 Render-only chat transcript renderer for Grida's agent surfaces. Given a single
-AI SDK `UIMessage` (settled or mid-stream) it renders one turn — user bubble or
-assistant response — including text (Markdown via Streamdown) and tool calls.
+`UIMessage`-shaped turn (settled or mid-stream) it renders one turn — user
+bubble or assistant response — including text (Markdown via Streamdown) and
+tool calls. The native Desktop chat maps its messages and tool activity onto
+these parts through `native_message_parts` and `native_tool_parts`.
 
 ```tsx
 import { ChatMessageView } from "@/kits/agent-chat";
@@ -19,6 +21,11 @@ messages.map((m, i) => (
 ## What it renders
 
 - **Text** parts → `MessageResponse` (Streamdown Markdown).
+- **User attachments** → a separate row outside the text bubble. Raster images
+  show only a natural-aspect, bounded thumbnail that opens fullscreen; their
+  filename stays in accessible and download metadata. Videos, ordinary files
+  and folders keep individual named cards. A folder carries no access grant or
+  invented content size. Missing image previews keep a named fallback.
 - **Reasoning** parts → not rendered. Chain-of-thought tokens are internal
   transport/session data, not transcript content. While reasoning is the only
   streamed content, the existing compact `Thinking` indicator remains visible.
@@ -32,65 +39,62 @@ messages.map((m, i) => (
   transcript card — see below.
 
 Transcript-level indicators (rendered by the surface around the turn list, not
-per message): `PendingTurnIndicator` (pre-first-token), `CompactingIndicator`
-(in-flight compaction), `ForkedNotice`.
+per message): `PendingTurnIndicator` (pre-first-token) and `CompactionNotice`
+(where earlier context was summarized).
+
+Only prose enters the user bubble's height measurement, collapse control,
+copy action and edit flow. Attachment-only messages do not create an empty
+bubble; their time and status note can still be shown.
+
+Sent-message editing is controlled through `ChatMessageView.edit`. It replaces
+the user bubble with a multiline editor and Cancel/Send actions in place; the
+composer keeps its independent draft. The consumer supplies the text and
+callbacks, submission state, optional read-only retry state and any explanation
+of resubmission effects. The kit owns no history or transport. Escape cancels
+an unlocked edit; Enter sends and Shift+Enter inserts a line break. Pending sends show a spinner and
+lock the editor, and a read-only retry can retain its submitted text.
+
+File context entries can supply a bounded inline `poster` and `caption`.
+An exact raster `mimeType` distinguishes image thumbnails from video posters.
+For retained PNG, JPEG, WebP and GIF originals, entries instead carry an opaque `previewId`; the host supplies
+`loadAttachmentPreview(previewId): Promise<Blob>` to `ChatMessageView`. Its
+thumbnail read starts when visible, shares one bounded original read with fullscreen,
+and releases its object URL on cleanup. A rejected or retired capability keeps
+the named fallback. The kit never resolves a filesystem path or discovers a
+preview URL. Ordinary image FileUIParts use their explicit raster data, blob or
+HTTP(S) source; file and custom schemes are not display capabilities.
 
 ## The agent's question (session-global)
 
 The locked `question` tool **asks** — the run pauses on a human. The kit models
 this like a supervised-approval bar, NOT a tool card: the surface finds the one
-open question and pins the form above its composer.
+open question and pins `QuestionPrompt` above its composer.
 
-```tsx
-const pending = findPendingQuestion(messages);
-{
-  pending && <QuestionCard entry={pending} onAnswer={onAnswerQuestion} />;
-}
-```
-
-`QuestionCard` owns its in-progress form selections (the same kind of transient
-UI state as the collapsibles); the **committed** answer leaves through `onAnswer`
-— the surface owns the `Chat` and calls `addToolResult`. The kit never touches
-the transport. `AnsweredQuestionSummary` is the read-only echo the transcript
-shows once answered.
-
-## Library reference picker
-
-`design_search` is another session-global human-input tool. The model supplies
-an initial Library query; `DesignSearchPickCard` lets the user refine it and
-retain selections across searches before committing one result. The
-framework-agnostic `DesignSearchExplorer` owns the query revision and selected
-pins so delayed search responses and multi-query selection are testable without
-React. Workbench surfaces may render the same explorer in a dedicated tab.
+`QuestionPrompt` owns its in-progress form selections (the same kind of
+transient UI state as the collapsibles); the **committed** answer leaves through
+`onSubmit` with the React-free `QuestionSurvey`, and the surface delivers it to
+the agent. The kit never touches the transport. `AnsweredQuestionSummary` is the
+read-only echo the transcript shows once answered.
 
 ## Contract (kit rules)
 
 - **Render-only / consumer-stateless**: you pass `message` + `isStreaming`; the kit
-  owns only transient UI state (collapsibles' open/close, a `QuestionCard`'s
+  owns only transient UI state (collapsibles' open/close, a `QuestionPrompt`'s
   in-progress selections). No global stores, no IPC, no route imports; committed
-  outcomes leave through callbacks (`onAnswer`).
+  outcomes leave through callbacks (`onSubmit`).
 - **Public API** (`index.ts`):
-  - `ChatMessageView` + the transcript indicators (`PendingTurnIndicator`,
-    `CompactingIndicator`, `ForkedNotice`).
-  - The session-global question prompt: `findPendingQuestion`, `QuestionCard`,
-    `AnsweredQuestionSummary`, and the `AnswerQuestionHandler` /
-    `QuestionAnswerOutput` types.
-  - The session-global Library prompt: `findPendingDesignSearch`,
-    `DesignSearchPickCard`, `DesignSearchExplorer`, and the
-    `PickReferencesHandler` / `FetchReferences` types.
-  - The `ChatMessage` / `ToolCallEntry` types. `toolDisplay` (label/summary
-    formatting) is internal.
-- Shared message/tool types live in `@/lib/agent-chat` (the bridge transport +
-  session helpers use them too); the kit imports them type-only.
+  - `ChatMessageView`, `ToolCallGroupView` and the transcript indicators
+    (`PendingTurnIndicator`, `CompactionNotice`).
+  - The session-global question prompt: `QuestionPrompt`,
+    `AnsweredQuestionSummary`, and the `QuestionAnswerOutput` type.
+  - `workspace_links`, the Markdown link handling for workspace paths.
+  - The `ChatMessage` / `ChatMessageActions` / `ToolCallEntry` types.
+    `toolDisplay` (label/summary formatting) is internal.
+- Shared message/tool types live in `@/lib/agent-chat/types`; the kit imports
+  them type-only. Tool and context-part names come from
+  `@/lib/agent-chat/chat-vocabulary`.
 
-## Provenance
+## Consumers
 
-Promoted out of the desktop scaffolds (was render-mis-filed there):
-
-- `message.tsx` ← `scaffolds/desktop/ai-sidebar/chat-message.tsx`
-- `tool-display.ts` / `tool-display.test.ts` ← `lib/agent-chat/`
-
-Consumers (each also pins `QuestionCard` above its composer): the desktop AI
-sidebar (`scaffolds/desktop/ai-sidebar/`), the workbench agent pane
-(`scaffolds/desktop/workbench/agent-pane.tsx`), and the
-`/ui/components/ai-chat` demo.
+The native Desktop chat (`scaffolds/desktop/workbench/native-agent-pane.tsx` and
+`native-turn-activity.tsx`).

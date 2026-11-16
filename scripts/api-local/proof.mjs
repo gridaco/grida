@@ -55,6 +55,7 @@ const copiedFiles = [
   "lib/ai/openai-compat/errors.ts",
   "lib/ai/openai-compat/hosted-models.ts",
   "lib/ai/gateway-product.ts",
+  "lib/ai/gateway-spending.ts",
   "lib/platform/product-billing.ts",
   "lib/ai/openai-compat/wire.ts",
   "lib/desktop/csp.ts",

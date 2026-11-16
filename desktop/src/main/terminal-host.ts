@@ -5,7 +5,7 @@
  * (`bridge.terminal.*`). This is RCE-by-design surfaced to the
  * renderer, accepted under the VSCode trust model: the human runs
  * commands as themselves, with their own privileges — deliberately NOT
- * under the agent's `srt` sandbox, and never wired into the agent's
+ * under agent confinement, and never wired into the agent's
  * tool surface. What keeps the surface safe is that only the desktop's
  * privileged renderer can reach it:
  *

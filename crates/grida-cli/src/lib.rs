@@ -2,6 +2,7 @@
 // GRIDA-SEC-010 / GRIDA-SEC-013 / GRIDA-SEC-014 — explicit grammar precedes credential custody.
 
 pub mod account;
+pub mod agent;
 #[cfg(feature = "conformance")]
 pub mod conformance;
 pub mod credentials;

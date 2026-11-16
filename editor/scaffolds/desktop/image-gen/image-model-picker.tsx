@@ -12,7 +12,7 @@ import { MediaModelPickerTrigger } from "../shared/media-model-picker-trigger";
 import { MediaModelAvailability } from "../shared/media-model-availability";
 
 /**
- * Provider-hidden image-model picker (#908). Lists only the curated
+ * Provider-hidden image-model picker. Lists only the curated
  * (`listed: true`) models by their friendly label. Provider-limited models
  * name their required key; the agent host resolves the connected provider.
  */

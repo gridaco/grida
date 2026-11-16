@@ -3,16 +3,20 @@ id: TC-DESKTOP-WORKBENCH-004
 title: Workspace tabs show delayed semantic previews
 module: desktop
 area: workbench
-tags: [workspace, tabs, tab-preview, thumbnail, canvas, media]
+tags: [workspace, tabs, tab-preview, thumbnail, canvas, media, chat]
 status: untested
 severity: medium
 date: 2026-07-23
-updated: 2026-07-23
+updated: 2026-11-16
 automatable: false
 covered_by:
   - editor/scaffolds/desktop/workbench/tab-preview-controller.test.ts
   - editor/scaffolds/desktop/workbench/tab-preview-position.test.ts
   - editor/scaffolds/desktop/workbench/workspace-tab-thumbnail.test.ts
+  - editor/scaffolds/desktop/workbench/chat-tab-preview.test.ts
+  - editor/scaffolds/desktop/workbench/editor-tab-chat-preview.test.tsx
+  - editor/scaffolds/desktop/workbench/side-chat-tab-placement.test.tsx
+  - editor/app/(dev)/ui/components/composer/desktop-demo.browser.tsx
 ---
 
 ## Behavior
@@ -25,6 +29,16 @@ cover (falling back to the first slide or a fitted board overview), an SVG or
 raster image, or a still video frame. Text-like and unavailable files degrade
 to a compact metadata-only card rather than showing a placeholder or broken
 preview.
+
+A side-chat tab shares the same hover delay and preview viewport. Its card
+identifies the chat and shows its latest visible user and Grida messages, with
+bounded plain text and a three-line limit per excerpt. Markdown formatting is
+flattened and role labels are not shown. The user excerpt
+appears in a right-aligned chat bubble, while the reply stays unframed. An attachment-only
+message uses its filename, and an empty chat says there are no messages yet.
+While open, the card follows the chat's existing transcript without selecting
+the tab, starting an agent or reading older history. Closing the preview releases
+its transcript subscription.
 
 The preview is lazy and non-interactive. Sweeping across the tab strip should
 not flash cards, hovering must not trigger document writes, and the card must
@@ -71,6 +85,8 @@ file preview.
 12. Focus a tab with the keyboard.
     - Expected: focus remains normal tab navigation and does not open or pin a
       hover preview. Enter/Space still selects the tab.
+    - Focus an inactive chat tab's Close control and press Enter: that tab closes
+      without selecting it first or changing the remaining selected chat.
 13. Horizontally scroll the tab strip, then preview a partially visible end tab
     in a narrow window.
     - Expected: scrolling continues when a gap between tabs passes under the
@@ -84,3 +100,13 @@ file preview.
 15. Close every real file tab, then hover Quick Start. If available, also open
     the Pick references virtual tab.
     - Expected: neither faux/virtual tab receives a file thumbnail.
+16. Open two side chats, send a question in each, and return to a file tab.
+    Hover each side-chat tab, then move directly between file and chat tabs.
+    - Expected: the same card switches between file and chat previews. The chat
+      stays inactive and shows its own latest user text in a chat bubble and
+      its latest reply unframed, with Markdown flattened and long messages
+      clipped neatly. No new work starts on hover.
+17. Keep a side-chat preview open while its response streams, then leave the
+    strip and close that side chat while its preview is pending or visible.
+    - Expected: the preview follows the visible text while open, disappears on
+      leave or close, and never shows that chat's messages in a sibling tab.

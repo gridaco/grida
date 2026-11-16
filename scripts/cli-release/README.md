@@ -130,7 +130,10 @@ resolution or publication step. Measure complete release builds rather than
 extrapolating from a local host fixture.
 
 For local development, `native-fixture.mjs --binary /absolute/grida --out /absolute/out`
-packs the real host executable with inert foreign image headers. The report marks
+packs the real host executable with inert foreign image headers. Build that
+executable with `cargo build --locked --profile fixture -p grida-cli --bin grida`
+(`target/fixture/grida`): a Linux debug build embeds debug info and exceeds the
+package's executable bound. The report marks
 the fixture targets and publication refuses them. Tests exercise a fresh owned
 npm registry with exactly one archive, verify that all eight binaries install,
 and execute the host binary through the real launcher and npm command shim.

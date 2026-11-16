@@ -10,7 +10,7 @@ import {
   mediaPrompt,
   mediaReferences,
 } from "./tool-media";
-import type { ToolCallEntry } from "@/lib/agent-chat";
+import type { ToolCallEntry } from "@/lib/agent-chat/types";
 
 /** A completed tool result entry (mirrors the AI SDK UIMessage tool part). */
 function result(

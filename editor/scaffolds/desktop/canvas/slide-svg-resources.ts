@@ -68,7 +68,7 @@ const IMAGE_MIME: Record<string, string> = {
 const SVG_XLINK_NS = "http://www.w3.org/1999/xlink";
 
 /**
- * Desktop slides workaround for gridaco/grida#960.
+ * Desktop slides workaround.
  *
  * `@grida/svg-editor` currently receives SVG text, not a document URL, so a
  * bundle-relative image href has no natural browser base. This host projection
@@ -112,7 +112,7 @@ export async function materializeSlideSvgResources(
         restores.set(materialized, escapeXmlAttribute(href));
         attr.set(materialized);
       } catch {
-        // Per #960 this is a render projection, not document validation. A
+        // This is a render projection, not document validation. A
         // missing/oversized/binary asset should leave only that image broken.
         // Its path remains a dependency so a later `added` event can recover.
       }

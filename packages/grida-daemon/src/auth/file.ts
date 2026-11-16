@@ -351,6 +351,13 @@ export class AuthStore {
     return all[providerId];
   }
 
+  /** Native OAuth execution uses the same disk authority as credential mutations. */
+  async getStoredOAuth(providerId: string): Promise<OAuthEntry | undefined> {
+    const all = await this.readDisk();
+    const entry = Object.hasOwn(all, providerId) ? all[providerId] : undefined;
+    return entry?.type === "oauth" ? entry : undefined;
+  }
+
   /**
    * Windows compatibility only. Strict disk reads never turn corrupt custody
    * into an absent provider or import the legacy test environment override.

@@ -61,6 +61,10 @@ lint-supabase-db url="postgresql://postgres:postgres@127.0.0.1:54322/postgres" l
           'NF >= 7 && $3 ~ lvls { print "  [" $3 "] " $1 ": " $7 }' \
       | sort -u
 
+# Run Grida Desktop locally (starts Supabase and the editor dev server as needed)
+desktop:
+    scripts/desktop-local/run.sh
+
 # Dev setup
 dev packages:
     pnpm dev:packages

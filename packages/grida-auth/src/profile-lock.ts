@@ -10,6 +10,23 @@ import { privateFiles } from "./private-files";
 
 /** Internal lock for a local private profile directory. Never unlink the DB. */
 export class ProfileLock {
+  private static readonly admissionKey = Symbol.for(
+    "grida.auth.profile-lock.admission.v1"
+  );
+
+  /** Only call inside an acquired lock. Reject synchronous reentry across package copies. */
+  static runAdmission(action: () => boolean): boolean {
+    const key = ProfileLock.admissionKey;
+    if (Reflect.has(globalThis, key))
+      throw new AuthClient.Failure("custody_failed");
+    Object.defineProperty(globalThis, key, { value: true, configurable: true });
+    try {
+      return action();
+    } finally {
+      Reflect.deleteProperty(globalThis, key);
+    }
+  }
+
   // POSIX fcntl locks can be released by closing another descriptor for the
   // same inode. Serialize every open/close of our lock file within this process.
   private static queue(): Map<string, Promise<void>> {
@@ -30,6 +47,7 @@ export class ProfileLock {
   ): Promise<T> {
     const timeout = options.timeoutMs ?? 30_000;
     if (
+      Reflect.has(globalThis, ProfileLock.admissionKey) ||
       !isMainThread ||
       !Number.isFinite(timeout) ||
       timeout < 0 ||

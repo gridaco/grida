@@ -62,12 +62,6 @@ import { v4 } from "uuid";
 import { HelpFab } from "@/scaffolds/globals/editor-help-fab";
 import { Badge } from "@app/ui/components/badge";
 import { PlaygroundToolbar } from "./uxhost-toolbar";
-import {
-  Tabs,
-  SidebarTabsContent,
-  SidebarTabsList,
-  SidebarTabsTrigger,
-} from "@/components/ui-editor/sidebar-tabs";
 import { useHotkeys } from "react-hotkeys-hook";
 import { toast } from "sonner";
 import { useEditorHotKeys } from "@/grida-canvas-react/viewport/hotkeys";
@@ -109,8 +103,6 @@ import { CursorChat } from "@/components/multiplayer/cursor-chat";
 import { distro } from "../distro";
 import { WithSize } from "@/grida-canvas-react/viewport/size";
 import { useDPR } from "@/grida-canvas-react/viewport/hooks/use-dpr";
-import { AgentPanel } from "@/grida-canvas-hosted/ai/scaffold";
-import { AgentChatProvider } from "@/grida-canvas-hosted/ai/scaffold/chat-provider";
 import { StarterKitOrgIdProvider } from "@/grida-canvas-react-starter-kit/starterkit-host/org-id-provider";
 import { PlaygroundMenuContent } from "./uxhost-menu";
 import { Library } from "../library/library";
@@ -213,9 +205,6 @@ function useUILayout() {
   const [lastVisibleVariant, setLastVisibleVariant] = useState<
     "full" | "minimal"
   >("full");
-  const [rightSidebarTab, setRightSidebarTab] = useState<"inspect" | "agent">(
-    "inspect"
-  );
 
   const ui = useMemo(() => distro.ui.LAYOUT_VARIANTS[uiVariant], [uiVariant]);
 
@@ -243,10 +232,8 @@ function useUILayout() {
   return {
     ui,
     uiVariant,
-    rightSidebarTab,
     toggleVisibility,
     toggleMinimal,
-    setRightSidebarTab,
   };
 }
 
@@ -594,13 +581,7 @@ function Consumer({
   onSaved: () => void;
   filekey: string;
 }) {
-  const {
-    ui,
-    toggleVisibility,
-    toggleMinimal,
-    rightSidebarTab,
-    setRightSidebarTab,
-  } = useUILayout();
+  const { ui, toggleVisibility, toggleMinimal } = useUILayout();
   const instance = useCurrentEditor();
   const opfs = usePlaygroundOPFS(filekey);
   const debug = useEditorState(instance, (state) => state.debug);
@@ -704,7 +685,7 @@ function Consumer({
   );
 
   return (
-    <AgentChatProvider>
+    <>
       <PreviewProvider>
         <FloatingWindowHost>
           <FloatingWindowBounds>
@@ -754,11 +735,7 @@ function Consumer({
                     </EditorSurfaceContextMenu>
                   </EditorSurfaceDropzone>
                   {should_show_sidebar_right && (
-                    <SidebarRight
-                      variant={sidebar_right_variant}
-                      tab={rightSidebarTab}
-                      setTab={setRightSidebarTab}
-                    />
+                    <SidebarRight variant={sidebar_right_variant} />
                   )}
                 </div>
                 <FloatingWindowRoot
@@ -795,11 +772,9 @@ function Consumer({
         </FloatingWindowHost>
       </PreviewProvider>
 
-      {ui.help_fab && rightSidebarTab !== "agent" && (
-        <HelpFab className="absolute right-4 bottom-4" />
-      )}
+      {ui.help_fab && <HelpFab className="absolute right-4 bottom-4" />}
       {/* <CommandPalette /> */}
-    </AgentChatProvider>
+    </>
   );
 }
 
@@ -995,15 +970,10 @@ function PresenseAvatars() {
 
 function SidebarRight({
   variant = "sidebar",
-  tab,
-  setTab,
 }: {
   variant?: "sidebar" | "floating";
-  tab: "inspect" | "agent";
-  setTab: (tab: "inspect" | "agent") => void;
 }) {
   const should_show_artboards_list = useArtboardListCondition();
-  const AGENT_PANEL_WIDTH = "540px";
 
   return (
     <aside
@@ -1012,7 +982,7 @@ function SidebarRight({
       className="relative data-[variant=floating]:absolute data-[variant=floating]:right-0"
       style={
         {
-          "--sidebar-width": tab === "inspect" ? "240px" : AGENT_PANEL_WIDTH,
+          "--sidebar-width": "240px",
         } as React.CSSProperties
       }
     >
@@ -1043,19 +1013,6 @@ function SidebarRight({
               <PreviewButton />
             </div>
           </header>
-          <Tabs
-            value={tab}
-            onValueChange={(v) => setTab(v as "inspect" | "agent")}
-          >
-            <SidebarTabsList className="h-auto bg-transparent px-2 pb-2">
-              <SidebarTabsTrigger value="inspect" size="xs">
-                Inspect
-              </SidebarTabsTrigger>
-              <SidebarTabsTrigger value="agent" size="xs">
-                Agent
-              </SidebarTabsTrigger>
-            </SidebarTabsList>
-          </Tabs>
         </SidebarHeader>
         <hr />
         {should_show_artboards_list ? (
@@ -1075,26 +1032,14 @@ function SidebarRight({
             </DialogPrimitive.Root>
           </>
         ) : (
-          <SidebarContent
-            className={cn("gap-0", tab === "agent" && "overflow-hidden")}
-          >
-            <Tabs
-              value={tab}
-              className={cn(tab === "agent" && "flex flex-col h-full")}
-            >
-              <SidebarTabsContent value="inspect">
-                <Selection
-                  empty={
-                    <div className="mt-4 mb-10">
-                      <DocumentProperties />
-                    </div>
-                  }
-                />
-              </SidebarTabsContent>
-              <SidebarTabsContent value="agent" className="min-h-0">
-                <AgentPanel className="h-full flex-1 min-h-0" />
-              </SidebarTabsContent>
-            </Tabs>
+          <SidebarContent className="gap-0">
+            <Selection
+              empty={
+                <div className="mt-4 mb-10">
+                  <DocumentProperties />
+                </div>
+              }
+            />
           </SidebarContent>
         )}
       </Sidebar>

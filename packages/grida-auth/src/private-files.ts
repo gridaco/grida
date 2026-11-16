@@ -48,11 +48,12 @@ export namespace privateFiles {
       fail();
   }
 
-  async function acl(filename: string) {
-    if (process.platform !== "darwin") return;
+  async function acl(...filenames: string[]) {
+    if (process.platform !== "darwin" || filenames.length === 0) return;
     // macOS ACL grants are independent of POSIX mode bits. Deny entries are
     // harmless; reject all additional allow entries, including inherited ones.
-    const { stdout } = await execute("/bin/ls", ["-lde", filename], {
+    // One listing covers every path given: a grant on any of them refuses.
+    const { stdout } = await execute("/bin/ls", ["-lde", ...filenames], {
       env: { LC_ALL: "C", LANG: "C" },
       timeout: 2000,
       maxBuffer: 65_536,
@@ -66,8 +67,18 @@ export namespace privateFiles {
       location(value);
       const segments = value.split(path.sep).filter(Boolean);
       let current = path.parse(value).root;
+      // ACL checks are batched into one listing, but an existing ancestor is
+      // always verified before anything is created beneath it.
+      const unverified: string[] = [];
+      const verify = () => acl(...unverified.splice(0));
       for (let index = 0; index < segments.length; index++) {
         current = path.join(current, segments[index]!);
+        try {
+          await fs.lstat(current);
+        } catch (error) {
+          if (!missing(error)) throw error;
+          await verify();
+        }
         try {
           await fs.mkdir(current, { mode: 0o700 });
         } catch (error) {
@@ -87,9 +98,10 @@ export namespace privateFiles {
           )
             fail();
         }
-        await acl(current);
+        unverified.push(current);
       }
       if (segments.length === 0) fail();
+      await verify();
       return value;
     } catch {
       return fail();

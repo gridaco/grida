@@ -1,6 +1,7 @@
 // GRIDA-SEC-014 — one private TOML authority, atomic mutations, irreversible import fence.
 import path from "node:path";
 import { lstat } from "node:fs/promises";
+import { types } from "node:util";
 import { isMainThread } from "node:worker_threads";
 import { parse, stringify } from "smol-toml";
 import { AuthClient } from "./auth-client";
@@ -40,6 +41,35 @@ export class ProviderCredentialStore {
     return this.run(
       async (document) => document.providers[provider]?.api_key ?? null
     );
+  }
+
+  /**
+   * Invoke a synchronous admission action under custody only if the exact saved
+   * key matches the caller's captured value. Absence, mismatch, or an action
+   * returning false yields false. The action receives no key and must not
+   * reenter custody. A rejection can occur after the action has run.
+   */
+  async admit(
+    provider: string,
+    expectedKey: string,
+    action: () => boolean
+  ): Promise<boolean> {
+    ProviderDocument.provider(provider);
+    ProviderDocument.key(expectedKey);
+    if (typeof action !== "function" || types.isAsyncFunction(action))
+      throw new ProviderCredentialStore.Failure("invalid_input");
+    return this.run(async (document) => {
+      if (document.providers[provider]?.api_key !== expectedKey) return false;
+      let admitted: unknown;
+      try {
+        admitted = ProfileLock.runAdmission(action);
+        if (types.isPromise(admitted)) void admitted.catch(() => {});
+      } catch {
+        throw new ProviderCredentialStore.Failure("admission_failed");
+      }
+      if (typeof admitted === "boolean") return admitted;
+      throw new ProviderCredentialStore.Failure("admission_failed");
+    });
   }
 
   /** Sorted presence only; no credential values, lengths, prefixes, or fingerprints. */
@@ -248,6 +278,7 @@ export namespace ProviderCredentialStore {
     | "unsupported_version"
     | "storage_failed"
     | "store_busy"
+    | "admission_failed"
     | "migration_failed"
     | "migration_pending"
     | "unsupported_platform";

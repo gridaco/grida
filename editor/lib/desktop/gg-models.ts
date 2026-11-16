@@ -2,7 +2,7 @@
 
 // GRIDA-SEC-004 — renderer reads the host's secret-free, bounded GG snapshot.
 import { useEffect, useState } from "react";
-import type { GGModelsView } from "@grida/agent";
+import type { GGModelsView } from "@grida/ai-host";
 import { providers, useDesktopBridge } from "./bridge";
 
 export type CurrentGGModel = GGModelsView["models"][number];

@@ -36,9 +36,11 @@ import { EditorPaneBinaryFile } from "./editor-pane-binary-file";
 import { DesktopCanvasBundleShell } from "../canvas/canvas-bundle-shell";
 import { ImageViewer, VideoViewer } from "./editor-pane-viewers";
 import { WorkspaceFileKind } from "./workspace-file-kind";
+import type { WorkspaceSvgText } from "./workspace-svg-text";
 
 export type EditorPaneTabProps = {
   workspace: Workspace;
+  svgText?: WorkspaceSvgText;
   relPath: string;
   active: boolean;
   /** Parent collects dirty state across all open tabs for the tab
@@ -50,6 +52,7 @@ export type EditorPaneTabProps = {
 
 export function EditorPaneTab({
   workspace,
+  svgText,
   relPath,
   active,
   onDirtyChange,
@@ -97,6 +100,7 @@ export function EditorPaneTab({
         <ModeBody
           mode={mode}
           workspace={workspace}
+          svgText={svgText}
           relPath={relPath}
           active={active}
           onDirtyChange={reportDirty}
@@ -112,6 +116,7 @@ export function EditorPaneTab({
 function ModeBody({
   mode,
   workspace,
+  svgText,
   relPath,
   active,
   onDirtyChange,
@@ -119,6 +124,7 @@ function ModeBody({
 }: {
   mode: WorkspaceFileKind.Kind;
   workspace: Workspace;
+  svgText?: WorkspaceSvgText;
   relPath: string;
   active: boolean;
   onDirtyChange: (dirty: boolean) => void;
@@ -130,6 +136,7 @@ function ModeBody({
       return (
         <EditorPaneSvgEditor
           workspaceId={workspaceId}
+          svgText={svgText}
           relPath={relPath}
           active={active}
           onDirtyChange={onDirtyChange}

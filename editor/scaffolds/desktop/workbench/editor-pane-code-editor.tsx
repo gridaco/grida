@@ -9,7 +9,7 @@
  * exactly — no IR, no normalization. That's why a source editor, not a
  * rich-text model, backs `.md` here.
  *
- * The save / dirty / conflict machinery is the same #805 model the SVG editor
+ * The save / dirty / conflict machinery is the same model the SVG editor
  * runs (it's editor-agnostic): a monotonic doc `version` vs `savedVersion`
  * drives the dirty badge; Cmd+S is gated on `active`; `writeFile` carries an
  * `mtime` precondition whose rejection raises the Keep / Reload / Overwrite
@@ -268,7 +268,7 @@ function Surface({
     setSaveError(null);
     try {
       const r = await workspacesNs.readFile(workspaceId, relPath);
-      // Echo suppression (#805): our own save re-fires a watcher event; if disk
+      // Echo suppression: our own save re-fires a watcher event; if disk
       // hasn't advanced past our token there's nothing new to take, and a
       // setValue would needlessly reset cursor / history.
       if (r.mtime === lastMtimeRef.current) return;

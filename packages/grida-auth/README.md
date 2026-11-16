@@ -457,7 +457,22 @@ schema, exact ID/key bounds, failures, publication, locking and crash recovery;
 its [synthetic fixtures](fixtures/providers-v1/README.md) are reusable by ports.
 `ProviderCredentialStore.Failure` exposes only its stable code and fixed message.
 Public diagnostics never include parser bodies, filesystem paths or key values.
-The key returned by read and the input to set are deliberately secret-bearing.
+The key returned by read and the key inputs to set and admit are secret-bearing.
+
+`admit(provider, expectedKey, action)` lets a trusted caller synchronously start
+one action while the current saved key equals its captured value. The comparison
+preserves exact key bytes, including whitespace. A missing or different key
+returns false without invoking the action. A match invokes the action once with
+no arguments and returns its boolean result after releasing the shared lock.
+An action that returns false must leave the external operation unstarted.
+The action must never reenter credential custody. It can start downstream work
+synchronously and retain its promise outside the action for use after release.
+The store rejects an asynchronous action or non-boolean result and never waits
+for downstream work. An action exception yields the fixed `admission_failed`
+error. A lock release failure yields `storage_failed` even if the action has
+already started an external effect. A caller that needs to classify that effect
+tracks initiation separately. Matching observed values cannot reveal intervening
+changes that restore the original key or establish provider-side validity.
 
 ### One-time import
 

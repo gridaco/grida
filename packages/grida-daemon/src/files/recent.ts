@@ -20,12 +20,11 @@
  * the same atomic write pattern as `io.ts`. Cheap because the file
  * is small (50 entries × small JSON objects).
  *
- * No global locking — within a single agent host process the mutations
- * are sequenced on the JS event loop. Two agent host instances against
- * the same userData would race; hosts should enforce one DaemonServer per
- * profile until a file lock lands.
+ * The owning store serializes reads and mutations through atomic
+ * publication. Hosts sharing a data directory must share one store owner.
  */
 
+import { constants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { atomicWrite } from "../storage/atomic-write";
@@ -38,13 +37,18 @@ export type RecentEntry = {
 
 const MAX_ENTRIES = 50;
 const FILE_NAME = "recent.json";
+const MAX_PRIVATE_FILE_BYTES = 2 * 1024 * 1024;
 
 export class RecentStore {
   private entries: RecentEntry[] = [];
   private loaded = false;
+  private tail = Promise.resolve();
   private readonly file_path: string;
 
-  constructor(userDataPath: string) {
+  constructor(
+    userDataPath: string,
+    private readonly options: { privateFile?: true } = {}
+  ) {
     this.file_path = path.join(userDataPath, FILE_NAME);
   }
 
@@ -57,35 +61,78 @@ export class RecentStore {
    */
   private async ensureLoaded(): Promise<void> {
     if (this.loaded) return;
-    this.loaded = true;
+    const raw = await this.read().catch((error: unknown) => {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw error;
+    });
     try {
-      const raw = await fs.readFile(this.file_path, "utf8");
-      const parsed = JSON.parse(raw);
+      const parsed: unknown = raw === null ? null : JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        this.entries = parsed.filter(
-          (e): e is RecentEntry =>
-            e !== null &&
-            typeof e === "object" &&
-            typeof e.path === "string" &&
-            typeof e.pinned === "boolean" &&
-            typeof e.opened_at === "number"
-        );
+        this.entries = parsed
+          .filter(
+            (e): e is RecentEntry =>
+              e !== null &&
+              typeof e === "object" &&
+              typeof e.path === "string" &&
+              typeof e.pinned === "boolean" &&
+              typeof e.opened_at === "number"
+          )
+          .map(({ path, pinned, opened_at }) => ({ path, pinned, opened_at }));
       }
     } catch {
-      // ENOENT or malformed JSON — start empty. Not an error.
+      // A malformed recent list starts empty.
       this.entries = [];
+    }
+    this.loaded = true;
+  }
+
+  private async read(): Promise<string> {
+    if (!this.options.privateFile) return fs.readFile(this.file_path, "utf8");
+    const file = await fs.open(
+      this.file_path,
+      constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK
+    );
+    try {
+      const stat = await file.stat();
+      if (
+        !stat.isFile() ||
+        stat.uid !== process.geteuid?.() ||
+        stat.nlink !== 1 ||
+        (stat.mode & 0o7777) !== 0o600 ||
+        stat.size > MAX_PRIVATE_FILE_BYTES
+      ) {
+        throw new Error("recent_file_unavailable");
+      }
+      const bytes = Buffer.alloc(stat.size + 1);
+      const { bytesRead } = await file.read(bytes);
+      if (bytesRead !== stat.size) throw new Error("recent_file_unavailable");
+      return bytes.toString("utf8", 0, bytesRead);
+    } finally {
+      await file.close();
     }
   }
 
-  private async persist(): Promise<void> {
-    await atomicWrite(this.file_path, JSON.stringify(this.entries));
+  private async persist(entries: RecentEntry[]): Promise<void> {
+    await atomicWrite(this.file_path, JSON.stringify(entries));
+    this.entries = entries;
+  }
+
+  private serialize<T>(operation: () => T | Promise<T>): Promise<T> {
+    const result = this.tail.then(async () => {
+      await this.ensureLoaded();
+      return operation();
+    });
+    this.tail = result.then(
+      () => undefined,
+      () => undefined
+    );
+    return result;
   }
 
   /** Most-recent first. Pinned entries are NOT special-ordered here —
    * the client can group them visually if it wants. */
-  async list(): Promise<RecentEntry[]> {
-    await this.ensureLoaded();
-    return this.entries.slice();
+  list(): Promise<RecentEntry[]> {
+    return this.serialize(() => this.entries.map((entry) => ({ ...entry })));
   }
 
   /**
@@ -94,35 +141,34 @@ export class RecentStore {
    * existed. Trims to `MAX_ENTRIES`, evicting un-pinned entries
    * first (pinned items are guaranteed to survive).
    */
-  async touch(filePath: string): Promise<void> {
-    await this.ensureLoaded();
-    const now = Date.now();
-    const idx = this.entries.findIndex((e) => e.path === filePath);
-    let entry: RecentEntry;
-    if (idx >= 0) {
-      entry = { ...this.entries[idx], opened_at: now };
-      this.entries.splice(idx, 1);
-    } else {
-      entry = { path: filePath, pinned: false, opened_at: now };
-    }
-    this.entries.unshift(entry);
-    this.trim();
-    await this.persist();
+  touch(filePath: string): Promise<void> {
+    return this.serialize(() => {
+      const pinned =
+        this.entries.find((entry) => entry.path === filePath)?.pinned ?? false;
+      return this.persist(
+        this.trim([
+          { path: filePath, pinned, opened_at: Date.now() },
+          ...this.entries.filter((entry) => entry.path !== filePath),
+        ])
+      );
+    });
   }
 
-  async pin(filePath: string, pinned: boolean): Promise<void> {
-    await this.ensureLoaded();
-    const idx = this.entries.findIndex((e) => e.path === filePath);
-    if (idx < 0) return; // pinning a not-yet-seen path is a no-op
-    this.entries[idx] = { ...this.entries[idx], pinned };
-    await this.persist();
+  pin(filePath: string, pinned: boolean): Promise<void> {
+    return this.serialize(() => {
+      const index = this.entries.findIndex((entry) => entry.path === filePath);
+      if (index < 0 || this.entries[index]!.pinned === pinned) return;
+      const next = this.entries.slice();
+      next[index] = { ...next[index]!, pinned };
+      return this.persist(next);
+    });
   }
 
-  async forget(filePath: string): Promise<void> {
-    await this.ensureLoaded();
-    const before = this.entries.length;
-    this.entries = this.entries.filter((e) => e.path !== filePath);
-    if (this.entries.length !== before) await this.persist();
+  forget(filePath: string): Promise<void> {
+    return this.serialize(() => {
+      const next = this.entries.filter((entry) => entry.path !== filePath);
+      if (next.length !== this.entries.length) return this.persist(next);
+    });
   }
 
   /**
@@ -130,16 +176,16 @@ export class RecentStore {
    * among un-pinned, keep the most-recently-opened. (Array is
    * already most-recent-first thanks to `touch` semantics.)
    */
-  private trim(): void {
-    if (this.entries.length <= MAX_ENTRIES) return;
-    const pinned = this.entries.filter((e) => e.pinned);
-    const unpinned = this.entries.filter((e) => !e.pinned);
+  private trim(entries: RecentEntry[]): RecentEntry[] {
+    if (entries.length <= MAX_ENTRIES) return entries;
+    const pinned = entries.filter((entry) => entry.pinned);
+    const unpinned = entries.filter((entry) => !entry.pinned);
     const room = Math.max(0, MAX_ENTRIES - pinned.length);
     const keptUnpinned = unpinned.slice(0, room);
     // Re-order: stable insertion order is "MRU within each group",
     // but visually we want one mixed list. We restore the original
     // most-recent-first by sorting on openedAt.
-    this.entries = [...pinned, ...keptUnpinned].sort(
+    return [...pinned, ...keptUnpinned].sort(
       (a, b) => b.opened_at - a.opened_at
     );
   }

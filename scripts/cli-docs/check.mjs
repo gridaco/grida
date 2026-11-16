@@ -306,8 +306,8 @@ export const CliDocs = {
       }
       assert.equal(
         active.size,
-        7,
-        "The public CLI guide has seven owning pages"
+        8,
+        "The public CLI guide has eight owning pages"
       );
 
       // Root and translated entry pages link to the one canonical English guide.

@@ -100,6 +100,10 @@ Restart the editor dev server after changing these variables. Sign in with
 **`insider@grida.co` / `password`**; this seeded user owns the `local`
 organization and is the default persona for normal feature work.
 
+To run Grida Desktop against this setup, use `just desktop`. It starts local
+Supabase and the editor dev server when they are not running, then the
+development app, and stops what it started when Desktop quits.
+
 [`supabase/README.md`](./supabase/README.md) is the local-backend runbook.
 [`supabase/seed.md`](./supabase/seed.md) documents the other seeded personas
 for multi-tenant and no-organization testing.

@@ -1,5 +1,5 @@
 import { isTextUIPart, isToolUIPart } from "ai";
-import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat";
+import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat/types";
 
 /**
  * One contiguous render unit walked out of a message's `parts`.

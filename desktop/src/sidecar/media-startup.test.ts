@@ -13,9 +13,13 @@ import { describe, expect, it, vi } from "vitest";
 // Only the Electron fetch adapter is replaced. The real host validates grants
 // and carries requests/responses over the same bounded channel as Desktop.
 vi.mock("electron", () => ({ net: {}, session: {} }));
-import { AgentNetworkHost } from "../main/agent-network-host";
-import { AgentNetworkAuthority } from "../main/agent-network-authority";
-import { AgentDaemonSocketHost } from "../main/agent-daemon-socket-host";
+import { ProviderNetworkHost } from "../main/provider-network-host";
+import { ProviderNetworkAuthority } from "../main/provider-network-authority";
+import { ServicesSidecarSocketHost } from "../main/services-sidecar-socket-host";
+import { DesktopMediaHost } from "../main/media-host";
+import { NativeWorkspaceCatalog } from "../main/native-workspace-catalog";
+import { SidecarSandboxPolicy } from "../main/sidecar-sandbox-policy";
+import { RetainedServiceSandbox } from "../main/retained-service-sandbox";
 
 const desktop = fileURLToPath(new URL("../..", import.meta.url));
 const fixture = fileURLToPath(new URL("./testing/", import.meta.url));
@@ -36,6 +40,165 @@ const ggToken = "synthetic-scoped-gg-token";
 const audio = Buffer.from([0x49, 0x44, 0x33, 0x04]);
 
 describe("built Desktop media startup", () => {
+  it.runIf(process.platform === "darwin")(
+    "serves workspace files through the confined read-only catalog consumer",
+    async () => {
+      const root = await fs.realpath(
+        await fs.mkdtemp(path.join(os.tmpdir(), "grida-catalog-sidecar-"))
+      );
+      const browserData = path.join(root, "browser");
+      const userData = path.join(root, "state");
+      const mediaRoot = path.join(root, "media");
+      const workspace = path.join(root, "workspace");
+      const output = path.join(root, "build");
+      let sidecar: Sidecar | undefined;
+      try {
+        for (const directory of [browserData, userData, mediaRoot, workspace])
+          await fs.mkdir(directory, { mode: 0o700 });
+        const catalog = new NativeWorkspaceCatalog({
+          browserData,
+          projectsRoot: path.join(root, "projects"),
+          protectedPaths: [userData, mediaRoot],
+        });
+        const env = { HOME: root, TMPDIR: root };
+        await runBuild(root, output, env);
+        await fs.symlink(
+          path.join(desktop, "node_modules"),
+          path.join(root, "node_modules"),
+          "dir"
+        );
+        const runtime = await sidecarRuntime();
+        expect(runtime.electron).toBe(true);
+        const project = await catalog.openSelected(workspace);
+        const policy = SidecarSandboxPolicy.build({
+          userData,
+          mediaRoot,
+          desktopStateRoot: browserData,
+          workspaceCatalogRoot: path.dirname(catalog.directory),
+          home: root,
+        });
+        const sandbox = new RetainedServiceSandbox({
+          network: {
+            allowedDomains: policy.network.allowed_domains,
+            deniedDomains: policy.network.denied_domains,
+            allowLocalBinding: policy.network.allow_local_binding,
+          },
+          filesystem: {
+            denyRead: policy.filesystem.deny_read,
+            allowRead: policy.filesystem.allow_read,
+            allowWrite: policy.filesystem.allow_write,
+            denyWrite: policy.filesystem.deny_write,
+          },
+        });
+        const proof = path.join(root, "probe.cjs");
+        await fs.writeFile(
+          proof,
+          `
+          const assert = require("node:assert/strict");
+          const fs = require("node:fs");
+          const [catalog, sibling] = process.argv.slice(2);
+          fs.writeFileSync(sibling, "allowed");
+          assert.ok(fs.readFileSync(catalog).length > 0);
+          assert.throws(() => fs.writeFileSync(catalog, "denied"), {code:"EPERM"});
+          assert.throws(() => fs.renameSync(sibling, catalog), {code:"EPERM"});
+        `
+        );
+        const confined = async (executable: string, argv: string[]) =>
+          sandbox.prepare(executable, argv);
+        const probe = await confined(process.execPath, [
+          proof,
+          path.join(catalog.directory, "workspaces.json"),
+          path.join(root, "probe-control"),
+        ]);
+        const checked = RetainedServiceSandbox.start(probe, env);
+        checked.stderr?.pipe(process.stderr);
+        const deadline = setTimeout(() => checked.kill("SIGKILL"), 10_000);
+        try {
+          expect(
+            await new Promise((resolve, reject) => {
+              checked.once("error", reject);
+              checked.once("close", resolve);
+            })
+          ).toBe(0);
+        } finally {
+          clearTimeout(deadline);
+        }
+        sidecar = await Sidecar.start({
+          root,
+          output,
+          userData,
+          mediaRoot,
+          env,
+          runtime,
+          generation: 1,
+          nativeChat: true,
+          workspaceCatalog: { directory: catalog.directory, confined },
+          fetchProvider: async (url, init) => {
+            expect(url).toBe(
+              "https://api.elevenlabs.io/v1/sound-generation?output_format=mp3_44100_128"
+            );
+            expect(init.method).toBe("POST");
+            expect(new Headers(init.headers).get("xi-api-key")).toBe(key);
+            return new Response(audio, {
+              headers: { "content-type": "audio/mpeg" },
+            });
+          },
+        });
+        await fs.writeFile(path.join(root, "allow-custody"), "enabled", {
+          mode: 0o600,
+        });
+        expect(
+          (
+            await sidecar.post("/secrets/set", {
+              provider_id: "elevenlabs",
+              key,
+            })
+          ).status
+        ).toBe(200);
+        const generated = await sidecar.post("/audio/sound-effects/generate", {
+          model_id: "eleven_text_to_sound_v2",
+          prompt: "A door closes",
+        });
+        expect(generated.status).toBe(200);
+        const result = await generated.json();
+        await expectReceipt(mediaRoot, result.stored_media);
+        expect((await sidecar.get("/sessions")).status).toBe(404);
+        expect(
+          (await sidecar.post("/workspaces/open", { path: workspace })).status
+        ).toBe(404);
+        const file = { workspace_id: project.id, rel_path: "draft.txt" };
+        expect(
+          (
+            await sidecar.post("/workspaces/writefile", {
+              ...file,
+              content: "edited",
+            })
+          ).status
+        ).toBe(200);
+        const read = await sidecar.post("/workspaces/readfile", file);
+        expect(await read.json()).toMatchObject({
+          content: "edited",
+          mtime: expect.any(Number),
+        });
+        await catalog.forget(project.id);
+        expect((await sidecar.post("/workspaces/readfile", file)).status).toBe(
+          404
+        );
+        expect(
+          await fs.readFile(path.join(workspace, "draft.txt"), "utf8")
+        ).toBe("edited");
+        expect(await fs.readdir(userData)).not.toContain("workspaces.json");
+      } finally {
+        try {
+          await sidecar?.stop();
+        } finally {
+          await fs.rm(root, { recursive: true, force: true });
+        }
+      }
+    },
+    120_000
+  );
+
   it("serves media through real private channels without agent startup or ambient networking", async () => {
     const root = await fs.mkdtemp(
       path.join(os.tmpdir(), "grida-media-startup-")
@@ -58,7 +221,7 @@ describe("built Desktop media startup", () => {
         TEMP: temporary,
       };
       await runBuild(root, output, env);
-      // Vite intentionally leaves the existing Hono/undici runtime dependencies
+      // Vite intentionally leaves the existing Hono runtime dependencies
       // external. This is a startup proof, not an independent distribution proof.
       await fs.symlink(
         path.join(desktop, "node_modules"),
@@ -161,8 +324,6 @@ describe("built Desktop media startup", () => {
       expect(await handshake.json()).toEqual(
         expect.objectContaining({
           capabilities: expect.objectContaining({
-            agent: false,
-            sessions: false,
             providers: false,
             secrets: true,
             images: true,
@@ -172,7 +333,6 @@ describe("built Desktop media startup", () => {
             sound_effects: true,
             text_to_speech: true,
             gg: true,
-            shell: false,
           }),
         })
       );
@@ -224,6 +384,8 @@ describe("built Desktop media startup", () => {
         })
       );
       await expectReceipt(mediaRoot, generated.stored_media);
+      await expectExportRetry(root, mediaRoot, generated.stored_media);
+      expect(verified).toEqual(["sfx"]);
       expect(
         (
           await active.post("/auth/gg/set", {
@@ -320,11 +482,36 @@ describe("built Desktop media startup", () => {
         runtime,
         fetchProvider,
         generation: 2,
+        nativeChat: true,
       });
-      expect((await active.post("/handshake")).status).toBe(200);
+      const retained = await active.post("/handshake");
+      expect(retained.status).toBe(200);
+      expect((await retained.json()).capabilities).toMatchObject({
+        recent: false,
+        providers: true,
+      });
+      expect((await active.post("/recent/list")).status).toBe(404);
       await fs.writeFile(path.join(root, "allow-custody"), "enabled", {
         mode: 0o600,
       });
+      const config = {
+        id: "local_fixture",
+        base_url: "http://127.0.0.1:11434/v1",
+        models: [{ id: "fixture-model" }],
+      };
+      expect(
+        (await active.post("/providers/endpoints/set", { config })).status
+      ).toBe(200);
+      expect(
+        await (await active.post("/providers/endpoints/list")).json()
+      ).toEqual([config]);
+      expect(
+        await (
+          await active.post("/secrets/has", { provider_id: config.id })
+        ).json()
+      ).toEqual({ has: false });
+      expect((await active.get("/sessions")).status).toBe(404);
+      expect((await active.post("/agent/run")).status).toBe(404);
       expect(
         await (
           await active.post("/secrets/has", { provider_id: "elevenlabs" })
@@ -342,6 +529,30 @@ describe("built Desktop media startup", () => {
         ).status
       ).toBe(401);
       expect(verified).toEqual(["sfx", "music"]);
+      // The generated bytes still reach the open preview when the managed
+      // library cannot publish a receipt. Preserve earlier retained entries.
+      const items = path.join(mediaRoot, "items");
+      const parked = path.join(mediaRoot, "retained-items");
+      await fs.rename(items, parked);
+      try {
+        await fs.writeFile(items, "occupied library location", { mode: 0o600 });
+        const response = await active.post("/audio/sound-effects/generate", {
+          model_id: "eleven_text_to_sound_v2",
+          prompt: "A door closes",
+        });
+        expect(response.status).toBe(200);
+        const live = await response.json();
+        expect(live.audio).toEqual(generated.audio);
+        expect(live).not.toHaveProperty("stored_media");
+        expect(await fs.readFile(items, "utf8")).toBe(
+          "occupied library location"
+        );
+      } finally {
+        await fs.rm(items, { force: true });
+        await fs.rename(parked, items);
+      }
+      expect(verified).toEqual(["sfx", "music", "sfx"]);
+      await expectReceipt(mediaRoot, generated.stored_media);
       await active.stop();
       active = undefined;
       for (const generation of [1, 2]) {
@@ -372,12 +583,20 @@ type StartOptions = {
   runtime: { executable: string; electron: boolean };
   fetchProvider: (url: string, init: RequestInit) => Promise<Response>;
   generation: number;
+  nativeChat?: boolean;
+  workspaceCatalog?: {
+    directory: string;
+    confined: (
+      executable: string,
+      argv: string[]
+    ) => Promise<RetainedServiceSandbox.Plan>;
+  };
 };
 
 class Sidecar {
   private readonly errors: Error[] = [];
-  private readonly network: AgentNetworkHost;
-  private readonly sockets: AgentDaemonSocketHost;
+  private readonly network: ProviderNetworkHost;
+  private readonly sockets: ServicesSidecarSocketHost;
   private readonly exit: Promise<{
     code: number | null;
     signal: string | null;
@@ -391,51 +610,69 @@ class Sidecar {
   ) {
     this.exit = new Promise((resolve, reject) => {
       child.once("error", reject);
-      child.once("exit", (code, signal) => resolve({ code, signal }));
+      child.once("close", (code, signal) => resolve({ code, signal }));
     });
     void this.exit.catch(() => undefined);
     child.stderr!.on("data", (chunk) => {
       this.stderr = (this.stderr + String(chunk)).slice(-64 * 1024);
     });
     const fatal = (error: Error) => this.errors.push(error);
-    this.network = new AgentNetworkHost(
+    this.network = new ProviderNetworkHost(
       child.stdout!,
       child.stdin!,
-      new AgentNetworkAuthority(origin),
+      new ProviderNetworkAuthority(origin),
       { fetch: fetchProvider },
       fatal
     );
-    this.sockets = new AgentDaemonSocketHost(child, fatal);
+    this.sockets = new ServicesSidecarSocketHost(child, fatal);
   }
   static async start(options: StartOptions): Promise<Sidecar> {
     await fs.rm(path.join(options.root, "allow-custody"), { force: true });
-    const child = spawn(
-      options.runtime.executable,
-      [
-        "--require",
-        path.join(fixture, "media-startup-guard.cjs"),
-        path.join(options.output, "sidecar.cjs"),
-        "--agent=disabled",
-        `--user-data=${options.userData}`,
-        `--media-root=${options.mediaRoot}`,
-        `--editor-base-url=${origin}`,
-      ],
-      {
-        cwd: options.root,
-        env: {
-          ...options.env,
-          ELECTRON_RUN_AS_NODE: "1",
-          GRIDA_MEDIA_STARTUP_ROOT: options.root,
-          GRIDA_MEDIA_STARTUP_STATE: options.userData,
-          GRIDA_MEDIA_STARTUP_REPORT: path.join(
-            options.root,
-            `guard-${options.generation}.json`
-          ),
-        },
-        stdio: ["pipe", "pipe", "pipe", "ipc"],
-      }
-    );
-    const sidecar = new Sidecar(child, options.fetchProvider);
+    const argv = [
+      "--require",
+      path.join(fixture, "media-startup-guard.cjs"),
+      path.join(options.output, "sidecar.cjs"),
+      options.nativeChat ? "--agent=native-chat" : "--agent=disabled",
+      `--user-data=${options.userData}`,
+      `--media-root=${options.mediaRoot}`,
+      `--editor-base-url=${origin}`,
+      ...(options.workspaceCatalog
+        ? [
+            "--sandbox-enforced=1",
+            `--workspace-catalog=${options.workspaceCatalog.directory}`,
+          ]
+        : []),
+    ];
+    const launch = options.workspaceCatalog
+      ? await options.workspaceCatalog.confined(
+          options.runtime.executable,
+          argv
+        )
+      : undefined;
+    const environment = {
+      ...options.env,
+      ELECTRON_RUN_AS_NODE: "1",
+      GRIDA_MEDIA_STARTUP_ROOT: options.root,
+      GRIDA_MEDIA_STARTUP_STATE: options.userData,
+      GRIDA_MEDIA_STARTUP_REPORT: path.join(
+        options.root,
+        `guard-${options.generation}.json`
+      ),
+    };
+    const child = launch
+      ? RetainedServiceSandbox.start(launch, environment)
+      : spawn(options.runtime.executable, argv, {
+          cwd: options.root,
+          env: environment,
+          stdio: ["pipe", "pipe", "pipe", "ipc"],
+        });
+    return await Sidecar.initialize(child, options.fetchProvider);
+  }
+  private static async initialize(
+    child: ChildProcess,
+    fetchProvider: StartOptions["fetchProvider"]
+  ) {
+    const sidecar = new Sidecar(child, fetchProvider);
     let startupTimer: ReturnType<typeof setTimeout>;
     const deadline = new Promise<never>((_resolve, reject) => {
       startupTimer = setTimeout(
@@ -504,10 +741,10 @@ class Sidecar {
     if (this.stopped) return;
     this.stopped = true;
     this.sockets.close();
-    this.network.close();
-    const timer = setTimeout(() => this.child.kill("SIGKILL"), 5_000);
-    this.child.kill("SIGTERM");
+    const timer = setTimeout(() => this.child.kill("SIGKILL"), 10_000);
     try {
+      this.network.close();
+      this.child.kill("SIGTERM");
       const status = await this.exit;
       if (assertClean) {
         assert.deepEqual(status, { code: 0, signal: null });
@@ -519,8 +756,25 @@ class Sidecar {
           /SQLite|scratch|skills-root|forbidden imports|forbidden network/
         );
       }
+    } catch (error) {
+      this.network.close();
+      this.child.kill("SIGTERM");
+      await this.exit;
+      throw error;
     } finally {
+      this.network.close();
       clearTimeout(timer);
+    }
+  }
+
+  async terminate(): Promise<void> {
+    this.stopped = true;
+    this.sockets.close();
+    this.child.kill("SIGKILL");
+    try {
+      assert.deepEqual(await this.exit, { code: null, signal: "SIGKILL" });
+    } finally {
+      this.network.close();
     }
   }
 }
@@ -573,4 +827,48 @@ async function expectReceipt(
     path.join(root, "items", item.id, "content", item.file_name)
   );
   expect(bytes).toEqual(audio);
+}
+
+async function expectExportRetry(
+  root: string,
+  mediaRoot: string,
+  item: { id: string; file_name: string }
+) {
+  const occupied = path.join(root, "occupied.mp3");
+  const destination = path.join(root, "saved.mp3");
+  const sentinel = Buffer.from("existing user file");
+  await fs.writeFile(occupied, sentinel, { mode: 0o600 });
+
+  const openMedia = () =>
+    new DesktopMediaHost({
+      root: mediaRoot,
+      reveal: () => undefined,
+      openFolder: () => undefined,
+    });
+  const requireCurrent = () => undefined;
+  type ChooseDestination = Parameters<DesktopMediaHost["saveCopy"]>[1];
+  const chooseOccupied = vi.fn<ChooseDestination>().mockResolvedValue(occupied);
+  await expect(
+    openMedia().saveCopy(item.id, chooseOccupied, requireCurrent)
+  ).resolves.toBe("failed");
+  expect(chooseOccupied).toHaveBeenCalledExactlyOnceWith(
+    "sound-effect.mp3",
+    ".mp3"
+  );
+  expect(await fs.readFile(occupied)).toEqual(sentinel);
+
+  const reopened = openMedia();
+  await expect(reopened.list()).resolves.toContainEqual(item);
+  const chooseDestination = vi
+    .fn<ChooseDestination>()
+    .mockResolvedValue(destination);
+  await expect(
+    reopened.saveCopy(item.id, chooseDestination, requireCurrent)
+  ).resolves.toBe("saved");
+  expect(chooseDestination).toHaveBeenCalledExactlyOnceWith(
+    "sound-effect.mp3",
+    ".mp3"
+  );
+  expect(await fs.readFile(destination)).toEqual(audio);
+  expect(await fs.readFile(occupied)).toEqual(sentinel);
 }

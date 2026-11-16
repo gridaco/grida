@@ -129,10 +129,6 @@
         "lib/ai/gg-three-d.ts",
         "lib/ai/gg-three-d-http.ts",
         "lib/ai/__tests__/gg-three-d.test.ts",
-        // The canvas agent constructs an OpenAI `tools.webSearch` factory
-        // (not a billed provider call). Keeping it inside the allowlist
-        // avoids a special-case eslint comment per tool.
-        "grida-canvas-hosted/ai/agent/server-agent.ts",
         // Metadata endpoint — lists OpenAI's available models for the
         // model selector UI. Not a billed inference call.
         "app/(api)/private/ai/models/openai/route.ts",

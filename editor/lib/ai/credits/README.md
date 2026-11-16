@@ -181,9 +181,8 @@ Everything else is path-stable.
 
 ## Non-Goals
 
-- **Streaming SSE envelopes** (the canvas agent route at
-  `/private/ai/chat/route.ts`). Folding `balanceCents` into a trailing
-  SSE event is a separate task.
+- **Streaming SSE envelopes**. A streaming caller needs its own integration
+  for balance updates.
 - **Subscription / auto-reload UI** (the billing settings page). That
   surface is owned by the shared Platform billing console. The editor keeps
   its balance indicator and exact organization billing handoff.

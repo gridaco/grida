@@ -2,24 +2,16 @@
 // GRIDA-SEC-004 / GRIDA-SEC-006 / GRIDA-SEC-008 — host authority forwarding.
 // GRIDA-GG: desktop — scoped custody receives the same host origin and transport.
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { DaemonServer, ShellExecutor } from "@grida/daemon/server";
-import type { createMediaDaemon } from "@grida/agent/media-server";
-import type { createAgentDaemon } from "@grida/agent/server";
+import type { DaemonServer } from "@grida/daemon/server";
+import type { createMediaDaemon } from "@grida/ai-host/media-server";
 import { DesktopDaemon } from "./daemon";
-import { CHATGPT_SUBSCRIPTION_CONFIG } from "../chatgpt-configuration";
 
 const mocks = vi.hoisted(() => ({
   media: vi.fn<typeof createMediaDaemon>(),
-  agent: vi.fn<typeof createAgentDaemon>(),
-  agentImports: 0,
 }));
-vi.mock("@grida/agent/media-server", () => ({
+vi.mock("@grida/ai-host/media-server", () => ({
   createMediaDaemon: mocks.media,
 }));
-vi.mock("@grida/agent/server", () => {
-  mocks.agentImports++;
-  return { createAgentDaemon: mocks.agent };
-});
 
 const transport = {
   request: vi.fn<typeof fetch>(),
@@ -38,7 +30,6 @@ const common = {
 describe("Desktop daemon composition", () => {
   beforeEach(() => {
     mocks.media.mockClear();
-    mocks.agent.mockClear();
   });
 
   it("selects media before importing chat and preserves the host perimeter", async () => {
@@ -47,8 +38,6 @@ describe("Desktop daemon composition", () => {
     expect(await DesktopDaemon.create({ ...common, agent: false })).toBe(
       server
     );
-    expect(mocks.agentImports).toBe(0);
-    expect(mocks.agent).not.toHaveBeenCalled();
     expect(mocks.media).toHaveBeenCalledWith({
       password: common.password,
       user_data_path: common.user_data_path,
@@ -64,46 +53,73 @@ describe("Desktop daemon composition", () => {
     });
   });
 
-  it("forwards full agent authorities and existing Desktop capabilities", async () => {
-    const shell = vi.fn<ShellExecutor>();
+  it("preserves host-owned root exclusions when chat is disabled", async () => {
+    const protected_file_roots = [
+      "/retained-service",
+      "/synthetic/native-chat",
+    ];
     await DesktopDaemon.create({
       ...common,
-      agent: {
-        scratch_base: "/synthetic/scratch",
-        skills_root: "/synthetic/skills",
-        sandbox_enforced: true,
-        shell_executor: shell,
-      },
+      agent: false,
+      protected_file_roots,
     });
+    expect(mocks.media).toHaveBeenCalledWith(
+      expect.objectContaining({ protected_file_roots })
+    );
+  });
+
+  it("refuses startup without both host provider operations", async () => {
+    for (const provider_http of [undefined, { request: transport.request }]) {
+      await expect(
+        DesktopDaemon.create({
+          ...common,
+          agent: false,
+          provider_http: provider_http as typeof transport,
+        })
+      ).rejects.toThrow("desktop_provider_transport_required");
+    }
     expect(mocks.media).not.toHaveBeenCalled();
-    expect(mocks.agent).toHaveBeenCalledWith(
+  });
+
+  it("leaves recents to Main only when native chat owns the profile", async () => {
+    await DesktopDaemon.create({ ...common, agent: "native-chat" });
+    expect(mocks.media).toHaveBeenCalledWith(
       expect.objectContaining({
-        scratch_base: "/synthetic/scratch",
-        skills_root: "/synthetic/skills",
-        sandbox_enforced: true,
-        shell_executor: shell,
-        interactive: true,
-        library: true,
-        external_agent_execution: "disabled",
-        chatgpt: CHATGPT_SUBSCRIPTION_CONFIG,
-        provider_http: transport,
-        gg_base_url: common.editor_base_url,
+        capabilities: { recent: false },
+        endpoint_settings: true,
       })
     );
   });
 
-  it("withholds finite-command authority without the host sandbox attestation", async () => {
+  it("preserves ordinary service owners when native chat uses a separate store", async () => {
+    const protected_file_roots = [
+      "/synthetic/browser/chats",
+      "/synthetic/workspace-catalog",
+    ];
     await DesktopDaemon.create({
       ...common,
-      agent: {
-        scratch_base: "/synthetic/scratch",
-        sandbox_enforced: false,
-        shell_executor: vi.fn<ShellExecutor>(),
-      },
+      agent: "native-chat",
+      ordinary_native_chat_services: true,
+      protected_file_roots,
     });
-    expect(mocks.agent.mock.calls[0][0].shell_executor).toBeUndefined();
-    expect(mocks.agent.mock.calls[0][0].external_agent_execution).toBe(
-      "disabled"
+    expect(mocks.media).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        user_data_path: common.user_data_path,
+        provider_home: common.provider_home,
+        media_root: common.media_root,
+        projects_root: common.projects_root,
+        capabilities: { recent: true },
+        endpoint_settings: true,
+        protected_file_roots,
+      })
     );
+    await expect(
+      DesktopDaemon.create({
+        ...common,
+        agent: "native-chat",
+        ordinary_native_chat_services: true,
+        workspace_catalog: "/synthetic/new-catalog",
+      })
+    ).rejects.toThrow("ordinary_native_chat_services_invalid");
   });
 });

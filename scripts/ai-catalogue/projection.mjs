@@ -1,4 +1,5 @@
 // Project public facts into the interfaces implemented by this client release.
+// GRIDA-SEC-008 — subscription compatibility stays explicit and finite.
 // These field names describe client compatibility, not another authored model list.
 const fields = {
   "text.catalog": [
@@ -300,7 +301,14 @@ export function projectFacts(source, presets) {
         if (!original || original.id !== id)
           throw Error(`Unknown public model: ${family}:${id}`);
         const card = pick(original, keys);
-        if (family === "text.catalog") card.cost = textCost(original);
+        if (family === "text.catalog") {
+          card.cost = textCost(original);
+          // Reasoning is a fact of each provider binding, not of the model alone.
+          card.reasoning_providers = Object.entries(original.providers ?? {})
+            .filter(([, binding]) => binding?.capabilities?.reasoning === true)
+            .map(([provider]) => provider)
+            .sort();
+        }
         if (family === "image.models" || family === "video.models")
           card.providers = mediaProviders(original, family);
         if (family === "embedding.models") {
@@ -312,4 +320,50 @@ export function projectFacts(source, presets) {
     );
   }
   return result;
+}
+
+/** Explicit subscription compatibility; API catalogue membership grants no access. */
+export function projectChatGptSubscription(source, profile) {
+  const validIds = (ids) =>
+    Array.isArray(ids) &&
+    ids.every(
+      (id) => typeof id === "string" && /^openai\/[A-Za-z0-9_.-]+$/.test(id)
+    ) &&
+    new Set(ids).size === ids.length;
+  if (
+    !profile ||
+    !validIds(profile.model_ids) ||
+    profile.model_ids.length === 0 ||
+    !validIds(profile.retired_model_ids) ||
+    !profile.model_ids.includes(profile.default_model_id) ||
+    profile.retired_model_ids.some((id) => profile.model_ids.includes(id))
+  )
+    throw Error("Invalid ChatGPT subscription membership or default");
+  const wireModels = Object.fromEntries(
+    profile.model_ids.map((id) => {
+      const model = source["text.catalog"]?.[id];
+      const binding = model?.providers?.openai;
+      if (
+        model?.id !== id ||
+        binding?.provider !== "openai" ||
+        typeof binding.id !== "string" ||
+        !/^[A-Za-z0-9_.-]+$/.test(binding.id) ||
+        binding.capabilities?.tools !== true ||
+        binding.capabilities?.reasoning !== true ||
+        binding.capabilities?.streaming !== true
+      )
+        throw Error(
+          `Missing compatible public OpenAI binding for subscription model: ${id}`
+        );
+      return [id, binding.id];
+    })
+  );
+  if (new Set(Object.values(wireModels)).size !== profile.model_ids.length)
+    throw Error("Duplicate ChatGPT subscription wire binding");
+  return {
+    default_model_id: profile.default_model_id,
+    model_ids: [...profile.model_ids],
+    retired_model_ids: [...profile.retired_model_ids],
+    wire_models: wireModels,
+  };
 }

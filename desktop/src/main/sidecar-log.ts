@@ -1,5 +1,5 @@
 /**
- * Persistent file log for the agent sidecar (the observability half of the
+ * Persistent file log for the services sidecar (the observability half of the
  * approval-resume incident fix — see `docs` in the incident plan).
  *
  * The supervisor pipes the sidecar's stdout/stderr to the Electron main

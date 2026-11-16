@@ -4,17 +4,16 @@ title: Paste a clipboard image into the agent composer
 module: desktop
 area: agent-chat
 tags: [agent-chat, composer, image, paste, multimodal, vision]
-status: untested
+status: deprecated
 severity: high
 date: 2026-06-07
-updated: 2026-07-30
+updated: 2026-11-13
 automatable: false
 covered_by:
   - editor/kits/composer/composer-transfer.test.ts
   - editor/lib/agent-chat/image-attachment.test.ts
-  - editor/lib/agent-chat/input-resource-router.test.ts
-  - packages/grida-ai-agent/src/http/routes/agent.test.ts
-  - packages/grida-ai-agent/src/runtime/runtime.live.test.ts
+  - desktop/src/main/native-agent-images.test.ts
+  - crates/grida-agent/tests/process/images.rs
 ---
 
 ## Behavior
@@ -57,18 +56,9 @@ instead.
 
 ## Notes
 
-- Encoding/policy: `editor/lib/agent-chat/image-attachment.ts`
-  (`encodeImageFile`, downscale to ~1568px / ~5 MB, PNG→JPEG ladder).
 - Paste/drop enters through `ComposerContent.onTransfer`; `ComposerTransfer`
-  preserves the gesture provenance and original browser files. The desktop
-  wiring and chip render are in
-  `editor/scaffolds/desktop/shared/agent-composer-input.tsx`.
-- The model→image round-trip (incl. multi-turn + resume) is automated against a
-  real model in `packages/grida-ai-agent/src/runtime/runtime.live.test.ts`
-  (gated `GRIDA_LIVE_AGENT=1`); this TC covers the UI gesture that test can't.
-- Dual routing, raw-byte preservation, scratch budgeting, and provider-only
-  fallback are automated in `input-resource-policy.test.ts` and
-  `input-resource-router.test.ts`; the clipboard gesture and rendered chip
-  remain manual.
-- A server-side size guard rejects inline images >~8 MB before persistence
-  (`run-input.ts` `normalizeWireParts`).
+  preserves the gesture provenance and original browser files.
+- Native image intake and restart recovery are automated in
+  `crates/grida-agent/tests/process/images.rs`.
+
+- Retired with the previous chat. Native Desktop chat accepts one PNG or file of at most 256 KiB per message; see TC-DESKTOP-AGENT-CHAT-021 for pasting or dropping it and TC-DESKTOP-AGENT-CHAT-009 for an oversize file. The covered_by tests exercise the previous chat.

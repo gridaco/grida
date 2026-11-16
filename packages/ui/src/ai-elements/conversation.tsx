@@ -9,6 +9,9 @@ import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 
 export type ConversationProps = ComponentProps<typeof StickToBottom>;
 
+/** The conversation's scroll state, for content that needs its scroll element. */
+export const useConversationContext = useStickToBottomContext;
+
 export const Conversation = ({ className, ...props }: ConversationProps) => (
   <StickToBottom
     className={cn("relative flex-1 overflow-y-hidden", className)}

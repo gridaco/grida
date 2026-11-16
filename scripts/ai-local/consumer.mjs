@@ -164,7 +164,7 @@ const safeFailure = (error) => {
 
 await check("host packages and private SDK adapters unavailable", async () => {
   for (const name of [
-    "@grida/agent",
+    "@grida/ai-host",
     "@grida/daemon",
     "@grida/auth",
     "@grida/account",

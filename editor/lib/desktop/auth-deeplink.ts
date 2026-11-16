@@ -11,7 +11,7 @@
  * route and the flow module import ONE constant instead of duplicating the
  * literal and risking drift across the contract.
  *
- * Scheme is per-environment (#955): the dev editor (`next dev`) returns to
+ * Scheme is per-environment: the dev editor (`next dev`) returns to
  * `grida-dev://` — the scheme the dev/insiders desktop builds register — while
  * production returns to `grida://`, so a dev machine running BOTH builds never
  * has them fight over one scheme in the OS handler registry. This mirrors the

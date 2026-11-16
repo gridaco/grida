@@ -1,5 +1,5 @@
 /**
- * Workspace external-change fan-out (issue #805).
+ * Workspace external-change fan-out.
  *
  * One `workspaces.subscribe_changes` subscription per open workspace,
  * shared by every consumer in the workbench — the file tree (surgical

@@ -62,6 +62,7 @@ generation and rigging) are grouped under `grida ai`.
 | Configure your own provider keys       | [Providers](./providers.md) |
 | Discover models and accepted inputs    | [Models](./models.md)       |
 | Generate media and chain local files   | [Generate](./generate.md)   |
+| Run a Gateway-backed agent task        | [Agent](./agent.md)         |
 | Plan and run FX workflows              | [FX](./fx.md)               |
 
 ```sh

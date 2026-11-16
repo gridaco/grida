@@ -81,6 +81,7 @@ export class DesktopEntryWindow {
   #window: BrowserWindow | null = null;
   #role: DesktopEntryRole = "booting";
   #startupMainPath: string;
+  #shuttingDown = false;
   #hasPresentedMain = false;
   #transitioning = false;
   #admissionBlocked = false;
@@ -113,6 +114,12 @@ export class DesktopEntryWindow {
     );
   }
 
+  /** Revoke renderer admission after the cancelable window-close phase. */
+  beginShutdown(): void {
+    this.#shuttingDown = true;
+    this.#admissionBlocked = true;
+  }
+
   /**
    * Resolve the native IPC capability role of one exact BrowserWindow.
    *
@@ -139,6 +146,7 @@ export class DesktopEntryWindow {
    * then show exactly the derived role. No main-sized auth flash is possible.
    */
   open(): Promise<void> {
+    if (this.#shuttingDown) return Promise.resolve();
     this.#ensureWindow();
     const authControlRevision = this.#authControlNavigationRevision;
     const authControlPath =
@@ -192,6 +200,7 @@ export class DesktopEntryWindow {
     source: BrowserWindow,
     path: DesktopAuthControlPath
   ): Promise<void> {
+    if (this.#shuttingDown) return Promise.resolve();
     const sourceIsEntry = source === this.#liveWindow();
     if (sourceIsEntry && this.#expectedEntryAuthPaths?.includes(path)) {
       return Promise.resolve();
@@ -444,7 +453,7 @@ export class DesktopEntryWindow {
    * immediately closed instead of escaping the admission gate.
    */
   registerSecondary(window: BrowserWindow): boolean {
-    if (window === this.#liveWindow()) return true;
+    if (window === this.#liveWindow()) return !this.#shuttingDown;
     if (!this.isMain) {
       window.close();
       this.focus();
@@ -459,7 +468,12 @@ export class DesktopEntryWindow {
 
   focus(): void {
     const window = this.#liveWindow();
-    if (!window || this.#transitioning || this.#canonicalNavigationRequired) {
+    if (
+      !window ||
+      this.#shuttingDown ||
+      this.#transitioning ||
+      this.#canonicalNavigationRequired
+    ) {
       return;
     }
     if (window.isMinimized()) window.restore();
@@ -480,6 +494,7 @@ export class DesktopEntryWindow {
     auth_control_path?: DesktopAuthControlPath;
     force_navigation?: boolean;
   }): Promise<void> {
+    if (this.#shuttingDown) return;
     const account = await this.#options.account.status();
     if (this.#isAuthControlSuperseded(authControlRevision)) return;
     const role = await this.#roleForAccount(account);
@@ -666,7 +681,9 @@ export class DesktopEntryWindow {
   }
 
   #isAuthControlSuperseded(revision: number): boolean {
-    return revision !== this.#authControlNavigationRevision;
+    return (
+      this.#shuttingDown || revision !== this.#authControlNavigationRevision
+    );
   }
 
   #clearPendingAuthControlNavigation(revision: number): void {
@@ -765,7 +782,8 @@ export class DesktopEntryWindow {
     focus: boolean
   ): void {
     this.#transitioning = false;
-    if (role === "booting" || window.isDestroyed()) return;
+    if (this.#shuttingDown || role === "booting" || window.isDestroyed())
+      return;
     try {
       this.#applyPresentation(window, role);
     } catch {

@@ -1,6 +1,6 @@
-import { AgentSurface } from "@grida/agent/surface";
+import { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
 import { getToolName } from "ai";
-import type { ToolCallEntry } from "@/lib/agent-chat";
+import type { ToolCallEntry } from "@/lib/agent-chat/types";
 
 export type SurfaceToolData =
   | {
@@ -28,7 +28,7 @@ export class SurfaceToolCall {
     const input = record(entry.input);
     const output = record(entry.output);
 
-    if (toolName === AgentSurface.TOOL_NAMES.surface_open) {
+    if (toolName === chat_vocabulary.TOOL_NAMES.surface_open) {
       return new SurfaceToolCall({
         kind: "open",
         path: stringValue(input.path) ?? stringValue(output.path),
@@ -36,7 +36,7 @@ export class SurfaceToolCall {
       });
     }
 
-    if (toolName === AgentSurface.TOOL_NAMES.surface_list_open) {
+    if (toolName === chat_vocabulary.TOOL_NAMES.surface_list_open) {
       return new SurfaceToolCall({
         kind: "list",
         active: stringValue(output.active) ?? null,

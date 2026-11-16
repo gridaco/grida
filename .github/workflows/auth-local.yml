@@ -133,7 +133,8 @@ jobs:
         run: pnpm --filter @grida/auth exec vitest run src/keyring.test.ts
       # Synthetic profiles are temporary; do not upload credential artifacts.
   auth:
-    runs-on: ubuntu-latest
+    # Keep the browser fixture on an OS supported by the pinned Playwright.
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     defaults:
       run:

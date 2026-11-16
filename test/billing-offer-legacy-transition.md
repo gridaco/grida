@@ -10,8 +10,6 @@ date: 2026-07-31
 updated: 2026-07-31
 automatable: false
 covered_by: []
-former_covered_by:
-  - editor/lib/billing/offers.test.ts
 ---
 
 > Platform billing owns shared financial acceptance. This record retains its

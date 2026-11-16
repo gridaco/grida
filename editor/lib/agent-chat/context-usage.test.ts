@@ -242,3 +242,32 @@ describe("computeContextUsage", () => {
     expect(u.turnUsageTokens).toBe(1300);
   });
 });
+
+describe("computeContextUsage with a measured context", () => {
+  const messages = [
+    { role: "user", parts: [{ type: "text", text: "a".repeat(400) }] },
+    { role: "assistant", parts: [{ type: "text", text: "b".repeat(800) }] },
+  ];
+
+  it("uses the provider-reported size, counting hidden context as other", () => {
+    const usage = computeContextUsage(messages, 100_000, 25_000);
+    expect(usage.usedTokens).toBe(25_000);
+    expect(usage.percent).toBeCloseTo(0.25);
+    expect(usage.breakdown.user).toBe(100);
+    expect(usage.breakdown.assistant).toBe(200);
+    // Instructions, tool definitions and tool results the transcript omits.
+    expect(usage.breakdown.other).toBe(25_000 - 300);
+    expect(usage.measured).toBe(true);
+  });
+
+  it("falls back to the visible estimate without a measurement", () => {
+    const usage = computeContextUsage(messages, 100_000);
+    expect(usage.usedTokens).toBe(300);
+    expect(usage.breakdown.other).toBe(0);
+    expect(usage.measured).toBe(false);
+  });
+
+  it("never reports less than the visible transcript", () => {
+    expect(computeContextUsage(messages, 100_000, 10).usedTokens).toBe(300);
+  });
+});

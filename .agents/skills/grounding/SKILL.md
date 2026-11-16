@@ -62,7 +62,7 @@ retired legacy pages are historical. Follow `docs/AGENTS.md` for that boundary.
 Some directories are git-tracked but dead — a bare `rg` from repo root
 returns obsolete hits that look like confirmation: `docs/_history/`,
 `.ref/`. (The legacy editor trees `.legacy/` and `packages/.legacy/` were
-retired May 2026 in #759; recover from the
+retired May 2026; recover from the
 `snapshot/legacy-with-2023-grida-code-editor-at-202505` branch.) `rg` already skips gitignored build dirs
 (`node_modules/`, `.next/`, …); don't waste flags there.
 Scope positively, or exclude the dead trees:

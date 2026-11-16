@@ -1,20 +1,7 @@
 /**
- * `application_preset` — the home's mode registry (data only; UI lives in the
- * sibling `preset-rail.tsx` and `preset-chip.tsx`).
- *
- * SPIKE (see PR discussion): the desktop home is a SINGLE shared surface
- * (composer + reference gallery). "Images / Videos / Slides" are NOT separate
- * routes or workspaces — they're presets that re-theme the one home:
- *
- *   - the icon rail on the left mutates the active preset,
- *   - the composer stamps a mode CHIP for it (except neutral `general`),
- *   - the placeholder advertises what the mode makes,
- *   - (next seam) the gallery filters its visual references by the mode, and
- *     the preset rides the `welcome_handoff` so the created project's first
- *     turn already knows the outcome the user was aiming at.
- *
- * We're "overselling" a mode switch as if it were a destination — the rail
- * items act as the mutator, nothing structural changes underneath.
+ * Home output intents and gallery choices. The shared composer displays the
+ * selected intent; prompt lowering makes that choice explicit to the agent.
+ * These are ordinary user instructions, not a separate agent or skill protocol.
  */
 
 import type { ComponentType } from "react";
@@ -48,8 +35,6 @@ export interface ApplicationPresetSpec {
    * the composer stamps no chip for it. The three modes carry it.
    */
   art?: string;
-  /** Composer placeholder — the mode's representative example. */
-  placeholder: string;
   /**
    * Marks a mode as not-yet-available: the rail shows it dimmed + non-clickable
    * with a "coming soon" hint, and it can't be selected as the active preset.
@@ -68,7 +53,6 @@ export namespace ApplicationPreset {
       icon: HouseIcon,
       description:
         "Start anywhere. Describe an idea or drop a reference — Grida drafts the first version for you.",
-      placeholder: "Describe an image to create, or start from a reference…",
     },
     {
       id: "slides",
@@ -77,7 +61,6 @@ export namespace ApplicationPreset {
       description:
         "Go from a topic to a full, editable deck. Structured slides in seconds.",
       art: "/assets/desktop-home/presets/slides.svg",
-      placeholder: "e.g., Create a 12-slide minimalist product launch deck.",
     },
     {
       id: "image",
@@ -86,7 +69,6 @@ export namespace ApplicationPreset {
       description:
         "Generate product shots, logos, and illustrations from a single sentence.",
       art: "/assets/desktop-home/presets/image.svg",
-      placeholder: "e.g., A studio product photo of a ceramic mug on marble.",
     },
     {
       id: "video",
@@ -95,12 +77,22 @@ export namespace ApplicationPreset {
       description:
         "Turn a prompt into short looping motion — logo reveals, pans, and animations.",
       art: "/assets/desktop-home/presets/video.svg",
-      placeholder: "e.g., A 5-second looping animation of falling confetti.",
       comingSoon: true,
     },
   ];
 
   export function byId(id: ApplicationPresetId): ApplicationPresetSpec {
     return list.find((p) => p.id === id) ?? list[0];
+  }
+
+  /** Preserve the user's words and make the selected output explicit. */
+  export function prompt(id: ApplicationPresetId, text: string): string {
+    const intent =
+      id === "slides"
+        ? "Create an editable slide deck."
+        : id === "image"
+          ? "Create an image."
+          : "";
+    return [intent, text.trim()].filter(Boolean).join("\n\n");
   }
 }

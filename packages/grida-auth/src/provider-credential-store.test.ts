@@ -1,9 +1,10 @@
 // GRIDA-SEC-014 — public provider custody contract in disposable private homes.
-import { execFile } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import * as fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { promisify } from "node:util";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProviderCredentialStore } from "./providers";
@@ -162,6 +163,139 @@ describe.skipIf(!["darwin", "linux"].includes(process.platform))(
       await expect(
         f.store.set("example", "é".repeat(8193))
       ).rejects.toMatchObject({ code: "invalid_input" });
+    });
+
+    it("admits one action without key arguments only when the exact saved value matches", async () => {
+      const { home, store } = await fixture();
+      const writer = new ProviderCredentialStore({ home });
+      const action = vi.fn<() => boolean>(() => true);
+      const captured = " synthetic-key ";
+      await expect(store.admit("example", captured, action)).resolves.toBe(
+        false
+      );
+      await writer.set("example", captured);
+      await expect(
+        store.admit("example", captured.trim(), action)
+      ).resolves.toBe(false);
+      await expect(store.admit("example", captured, action)).resolves.toBe(
+        true
+      );
+      await expect(store.admit("example", captured, () => false)).resolves.toBe(
+        false
+      );
+      await writer.set("example", "synthetic-rotated");
+      await expect(store.admit("example", captured, action)).resolves.toBe(
+        false
+      );
+      await writer.remove("example");
+      await expect(
+        store.admit("example", "synthetic-rotated", action)
+      ).resolves.toBe(false);
+      expect(action.mock.calls).toEqual([[]]);
+    });
+
+    it("excludes another process during admission and releases before downstream completion", async () => {
+      const { directory, home, store } = await fixture();
+      const captured = "synthetic-key";
+      await store.set("example", captured);
+      const tryWriterLock = () =>
+        spawnSync(
+          process.execPath,
+          [
+            "-e",
+            `const { DatabaseSync } = require('node:sqlite');
+             const db = new DatabaseSync(process.argv[1], { timeout: 0 });
+             try { db.exec('BEGIN IMMEDIATE'); db.exec('ROLLBACK'); }
+             catch (error) { if ((error.errcode & 255) !== 5) throw error;
+               process.exitCode = 7; }
+             finally { db.close(); }`,
+            path.join(directory, "profile.lock.sqlite"),
+          ],
+          { timeout: 3_000 }
+        ).status;
+      let finish!: () => void;
+      let downstream: Promise<void> | undefined;
+      let competingWriter: number | null = null;
+      let reentry: Promise<unknown> | undefined;
+      await expect(
+        store.admit("example", captured, () => {
+          competingWriter = tryWriterLock();
+          downstream = new Promise<void>((resolve) => {
+            finish = resolve;
+          });
+          reentry = new ProviderCredentialStore({ home })
+            .set("example", "synthetic-reentrant")
+            .catch((error: unknown) => error);
+          return true;
+        })
+      ).resolves.toBe(true);
+      expect(competingWriter).toBe(7);
+      expect(await reentry).toMatchObject({ code: "storage_failed" });
+      expect(await store.read("example")).toBe(captured);
+      expect(tryWriterLock()).toBe(0);
+      finish();
+      await downstream;
+    }, 10_000);
+
+    it("rejects asynchronous actions and reports fixed action failures without leaking details", async () => {
+      const { store } = await fixture();
+      const captured = "synthetic-key";
+      await store.set("example", captured);
+      let asyncCalled = false;
+      const asyncAction = async () => {
+        asyncCalled = true;
+        return true;
+      };
+      await expect(
+        store.admit(
+          "example",
+          captured,
+          asyncAction as unknown as () => boolean
+        )
+      ).rejects.toMatchObject({ code: "invalid_input" });
+      expect(asyncCalled).toBe(false);
+      const returnedPromise = () =>
+        Promise.reject(new Error("synthetic-error"));
+      for (const action of [
+        () => {
+          throw new Error(captured);
+        },
+        returnedPromise as unknown as () => boolean,
+      ]) {
+        const failure = await store
+          .admit("example", captured, action)
+          .catch((error: unknown) => error);
+        expect(failure).toMatchObject({
+          code: "admission_failed",
+          message: "Grida provider credentials failed (admission_failed)",
+        });
+        expect(failure).not.toHaveProperty("cause");
+      }
+      expect(await store.read("example")).toBe(captured);
+    });
+
+    it("reports release failure even after a matching admission action ran", async () => {
+      const { store } = await fixture();
+      const captured = "synthetic-key";
+      await store.set("example", captured);
+      const action = vi.fn<() => boolean>(() => true);
+      const exec = DatabaseSync.prototype.exec;
+      vi.spyOn(DatabaseSync.prototype, "exec").mockImplementation(function (
+        this: DatabaseSync,
+        sql: string
+      ) {
+        if (sql === "ROLLBACK") throw new Error("synthetic-storage-detail");
+        return exec.call(this, sql);
+      });
+      await expect(
+        store.admit("example", captured, action)
+      ).rejects.toMatchObject({
+        code: "storage_failed",
+        message: "Grida provider credentials failed (storage_failed)",
+      });
+      expect(action).toHaveBeenCalledOnce();
+      vi.restoreAllMocks();
+      expect(await store.read("example")).toBe(captured);
     });
 
     it.each(["empty", "escaping", "tombstone"])(

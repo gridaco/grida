@@ -1,7 +1,6 @@
 /* eslint-disable jest/no-standalone-expect */
 /**
- * Contract pins — streamed media route `GET /workspaces/file` (#924,
- * GRIDA-SEC-004).
+ * Contract pins — streamed media route `GET /workspaces/file` (GRIDA-SEC-004).
  *
  * The desktop media viewer streams workspace images/videos through this route
  * (proxied by the `grida-workspace://` privileged scheme) instead of inlining
@@ -29,7 +28,7 @@ import {
 
 const symlinkIt = process.platform === "win32" ? it.skip : it;
 
-describe("GET /workspaces/file (#924)", () => {
+describe("GET /workspaces/file", () => {
   let fixture: DaemonFixture;
   let app: Hono;
 
@@ -175,8 +174,8 @@ describe("GET /workspaces/file (#924)", () => {
 
   it("is NOT subject to the buffered resource cap — streams a large file", async () => {
     // A file past the base64 route's explicit ceiling streams fine because
-    // this path has constant memory. This is the transport distinction #924
-    // established: the buffered reader remains bounded; streaming does not.
+    // this path has constant memory. This is the transport distinction the route
+    // exists for: the buffered reader remains bounded; streaming does not.
     const big = Buffer.alloc(
       MAX_BUFFERED_WORKSPACE_RESOURCE_BYTES + 4096,
       0x61

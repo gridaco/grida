@@ -6,7 +6,9 @@
  */
 import { execSync } from "node:child_process";
 import {
+  cpSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -60,8 +62,21 @@ describe("refig publish smoke", () => {
 
     const tmp = mkdtempSync(join(tmpdir(), "refig-pack-"));
     try {
+      // Pack a staged copy. The package's prepack rewrites its manifest, and
+      // the workspace's own manifest must never change while other tasks read it.
+      const stage = join(tmp, "stage");
+      mkdirSync(stage);
+      for (const entry of [
+        "package.json",
+        "dist",
+        "scripts",
+        "README.md",
+        "LICENSE",
+      ])
+        if (existsSync(join(pkgDir, entry)))
+          cpSync(join(pkgDir, entry), join(stage, entry), { recursive: true });
       execSync(`npm pack --pack-destination "${tmp}"`, {
-        cwd: pkgDir,
+        cwd: stage,
         stdio: "pipe",
       });
       const tgz = readdirSync(tmp).find((f) => f.endsWith(".tgz"));

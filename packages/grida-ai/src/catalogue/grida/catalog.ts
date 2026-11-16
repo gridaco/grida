@@ -198,19 +198,27 @@ export namespace catalog {
       text: {
         members: {
           "openai/gpt-5.5": { status: "listed", legacy: true },
-          "openai/gpt-5.5-pro": { status: "listed" },
-          "openai/gpt-5.6-sol": { status: "listed" },
-          "openai/gpt-5.6-terra": { status: "listed" },
-          "openai/gpt-5.6-luna": { status: "listed" },
+          "openai/gpt-5.5-pro": { status: "listed", legacy: true },
+          "openai/gpt-5.6-sol": { status: "listed", legacy: true },
+          "openai/gpt-5.6-terra": { status: "listed", legacy: true },
+          "openai/gpt-5.6-luna": { status: "listed", legacy: true },
+          "openai/gpt-6.1-terra": { status: "listed" },
           "openai/gpt-6-astra": { status: "listed" },
-          "anthropic/claude-sonnet-5": { status: "listed" },
+          "anthropic/claude-sonnet-5": { status: "listed", legacy: true },
           "anthropic/claude-fable-5.1": { status: "listed" },
           "anthropic/claude-fable-5": { status: "listed", legacy: true },
-          "anthropic/claude-opus-5": { status: "listed" },
+          "anthropic/claude-opus-5": { status: "listed", legacy: true },
           "anthropic/claude-opus-4.8": { status: "listed", legacy: true },
           "google/gemini-3.8-flash": { status: "listed" },
           "google/gemini-3.7-flash": { status: "listed", legacy: true },
-          "google/gemini-3.1-pro-preview": { status: "listed" },
+          "google/gemini-3.1-pro-preview": { status: "listed", legacy: true },
+          "openai/gpt-6.1-sol": { status: "listed" },
+          "openai/gpt-6-sol": { status: "listed" },
+          "openai/gpt-6-luna": { status: "listed" },
+          "anthropic/claude-opus-5.5": { status: "listed" },
+          "anthropic/claude-sonnet-5.5": { status: "listed" },
+          "anthropic/claude-haiku-5.5": { status: "listed" },
+          "google/gemini-4-argon": { status: "listed" },
         },
         ...preferences["text"],
       },
@@ -1430,6 +1438,18 @@ export namespace catalog {
       if (v.deprecated !== undefined) {
         if (typeof v.deprecated !== "boolean") return undefined;
         spec.deprecated = v.deprecated;
+      }
+      if (v.reasoningProviders !== undefined) {
+        if (
+          !Array.isArray(v.reasoningProviders) ||
+          v.reasoningProviders.length > 16 ||
+          !v.reasoningProviders.every(
+            (provider) =>
+              typeof provider === "string" && /^[a-z0-9-]{1,32}$/.test(provider)
+          )
+        )
+          return undefined;
+        return { ...spec, reasoningProviders: [...v.reasoningProviders] };
       }
       return spec;
     }

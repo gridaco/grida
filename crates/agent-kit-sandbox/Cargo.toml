@@ -1,0 +1,29 @@
+[package]
+name = "agent-kit-sandbox"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+agent-kit-core = { path = "../agent-kit-core" }
+
+[target.'cfg(any(target_os = "macos", target_os = "linux"))'.dependencies]
+libc = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json.workspace = true
+sha2 = "0.11"
+tempfile = "3"
+tokio = { version = "1", features = [
+  "rt",
+  "time",
+  "net",
+  "process",
+  "io-util",
+  "macros",
+  "sync",
+] }
+
+[lints]
+workspace = true

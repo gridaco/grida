@@ -1,6 +1,6 @@
 ---
 title: ACP Integration
-description: The Agent Client Protocol (https://agentclientprotocol.com/) as the default outward wire of any conforming agent system. The mapping between this guide's internal shapes and ACP's wire vocabulary; method-by-method correspondence; where the protocol and the guide diverge and how the adapter handles each seam.
+description: An ACP-first client boundary with custom presentation, explicit capabilities, and durable execution semantics.
 keywords:
   [
     agent-system,
@@ -8,334 +8,117 @@ keywords:
     agent-client-protocol,
     json-rpc,
     editor-integration,
-    transports,
-    interop,
+    interoperability,
   ]
 format: md
-tags:
-  - internal
-  - wg
-  - agent-system
+tags: [internal, wg, agent-system]
 ---
 
 # ACP Integration
 
-The [Agent Client Protocol](https://agentclientprotocol.com/) is to
-agents what LSP is to language tooling: one JSON-RPC vocabulary so
-an editor and an agent speak without either knowing the other's
-implementation. It exists because the fragmentation it removes —
-every editor reimplements every agent's integration; every agent
-reimplements every editor's surface — is the same fragmentation LSP
-solved.
+The client boundary uses the Agent Client Protocol for shared agent
+interactions and negotiated extensions for additional behavior. A host adapter
+translates that protocol into the [component contracts](./components.md).
+The [master](./master.md) owns strategy and product policy. Clients own their
+presentation of the resulting content and state.
 
-This guide adopts ACP as the **default outward transport** for any
-conforming agent system. Internally the core emits AI SDK v6 chunks
-([`foundations / streaming substrate`](./foundations.md#streaming-substrate-ai-sdk-v6));
-ACP wraps the chunks for delivery to an external client. A host
-that does not need editor interop MAY skip the adapter; a host that
-does adopts it without re-shaping the core.
+ACP adoption does not select a provider or delegate the native agent's strategy
+to another agent. Consuming an external whole-agent backend is a separate
+[integration choice](./acp-provider.md).
 
-## What ACP is
+## Version and scope
 
-- **JSON-RPC 2.0** over **stdio** by default; HTTP, WebSocket, or
-  SSE for remote agents.
-- **Two roles:** the **client** (the editor / IDE / outer host) and
-  the **agent** (the AI backend). The client launches and supervises
-  the agent as a subprocess, then drives it through JSON-RPC.
-- **Capability negotiation** at `initialize` time. Each side
-  declares what it can do (loadSession, resumeSession, filesystem
-  read/write, terminals, MCP transports). Neither side assumes; both
-  check.
-- **Distributed authority.** The client typically owns the
-  filesystem and the terminal; the agent owns the model loop and
-  the conversation state. Either side MAY publish capabilities the
-  other consumes.
-- **Wire naming convention** is **camelCase for JSON property keys
-  and snake_case for discriminator values** — opposite this guide's
-  internal convention. See [Naming seam](#naming-seam).
+The reviewed specification labels v1 Latest and v2 Draft. Implementations name
+their supported version and negotiate optional features. Supporting a version
+does not imply supporting every experiment. [ACP versions](https://agentclientprotocol.com/protocol/v2/migration).
 
-## How the agent system maps to ACP
+The client protocol stays outside the neutral component vocabulary. Provider
+streams, internal history, and durable journals may have different shapes.
+The adapter performs an authorized projection of their meaning.
 
-The agent system core hosts the **agent side** of ACP. The host
-process ships an ACP transport that translates between this guide's
-internal shapes and ACP messages.
+## Custom presentation
 
-```text
-┌─ ACP client (editor) ─────────────────────────────────────────────┐
-│  initialize / session/new / session/prompt / session/cancel       │
-│         responds to: session/update, session/request_permission,  │
-│                       fs/* requests, terminal/* requests          │
-└─────────────────────────┬─────────────────────────────────────────┘
-                          │  JSON-RPC over stdio (default) /
-                          │  HTTP / WebSocket / SSE (remote)
-                          ▼
-┌─ ACP adapter (in the host) ───────────────────────────────────────┐
-│  - dispatches incoming JSON-RPC to core APIs                      │
-│  - translates AI-SDK-v6 chunks → session/update notifications     │
-│  - translates watchdog `ask` → session/request_permission         │
-│  - bridges fs/terminal client-provided capabilities back to       │
-│    the core's runtime when negotiated                             │
-└─────────────────────────┬─────────────────────────────────────────┘
-                          │  internal API (snake_case)
-                          ▼
-┌─ Agent system core ───────────────────────────────────────────────┐
-│  session, message, part / locked tools / loop / runtime           │
-└───────────────────────────────────────────────────────────────────┘
-```
+Standard messages carry streamed text and thoughts, media and resource content,
+tool progress, and plans. Clients choose layout, grouping, tool cards, preview
+styles, and reveal behavior. Specialized views keep usable ordinary content
+for clients without their renderer. [Content](https://agentclientprotocol.com/protocol/v1/content),
+[tool calls](https://agentclientprotocol.com/protocol/v1/tool-calls).
 
-## Method mapping
-
-| ACP method                            | Guide equivalent                                          | Notes                                                                                                                                                                                                                                 |
-| ------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `initialize`                          | Capability handshake                                      | Adapter declares which capabilities the core supports.                                                                                                                                                                                |
-| `authenticate`                        | Provider credential resolution                            | Adapter forwards to the host's credential store. Out of guide scope.                                                                                                                                                                  |
-| `session/new`                         | Create a `chat_sessions` row                              | Adapter creates the row, returns its `id` as ACP's `sessionId`.                                                                                                                                                                       |
-| `session/load`                        | Replay messages as `session/update` notifications         | The adapter walks DB rows and re-emits each as the corresponding ACP update type.                                                                                                                                                     |
-| `session/resume`                      | Attach to a session without replay                        | Maps to opening an existing session row; the chat panel hydrates from DB on its own.                                                                                                                                                  |
-| `session/close`                       | Mark the adapter handle inactive; the session row stays   | The DB row persists; only the in-memory handle goes.                                                                                                                                                                                  |
-| `session/prompt`                      | A new user message + a fresh turn through the loop        | Body parts (`text`, `resource`) map to compositor parts. See [`compositor`](./compositor.md#the-user-message-shape).                                                                                                                  |
-| `session/cancel`                      | Internal `abort(session_id)`                              | Adapter calls the core's abort; the run-state machine handles the rest.                                                                                                                                                               |
-| `session/set_mode`                    | Plan/build agent swap (opinionated pattern)               | The host MAY route ACP modes onto the per-message `agent` override; see [`subagents / plan-build`](./subagents.md#plan--build-mode). If the host has no mode concept, advertise no modes at `initialize` and never receive this call. |
-| `session/request_permission`          | Watchdog `ask`                                            | Adapter wraps the watchdog hook; user reply lands as a session-scoped permission rule.                                                                                                                                                |
-| `session/update` (notification)       | AI SDK v6 chunks                                          | Adapter translates per-chunk; see [Update mapping](#update-mapping).                                                                                                                                                                  |
-| `fs/read_text_file` (agent → client)  | Locked tool `read` when fs delegation is negotiated       | Client-provided filesystem capability; the runtime calls back into the client.                                                                                                                                                        |
-| `fs/write_text_file` (agent → client) | Locked tool `write` when fs delegation is negotiated      | Same.                                                                                                                                                                                                                                 |
-| `terminal/*` (agent → client)         | Locked tool `bash` when terminal delegation is negotiated | Client owns the shell; agent drives it via the terminal/\* methods.                                                                                                                                                                   |
-
-## Update mapping
-
-ACP's `session/update` notification is a discriminated union over a
-`sessionUpdate` field. The adapter translates AI SDK v6 chunks 1:1
-where possible:
-
-| AI SDK v6 chunk type                                             | ACP `sessionUpdate`                                     | Notes                                                                           |
-| ---------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `text-start` / `text-delta` / `text-end`                         | `agent_message_chunk`                                   | Each delta becomes one ACP update with the partial text content block.          |
-| `reasoning-start` / `reasoning-delta` / `reasoning-end`          | `agent_thought_chunk` (where supported)                 | When the client cannot render thought, the adapter drops or coalesces.          |
-| `tool-input-start` / `tool-input-delta` / `tool-input-available` | `tool_call`                                             | First chunk emits the `tool_call` with `status: "pending"`, then `in_progress`. |
-| `tool-output-available`                                          | `tool_call_update` (status `completed`)                 | Carries the tool's output content blocks.                                       |
-| `tool-output-error`                                              | `tool_call_update` (status `failed`)                    | Carries the error text in a content block.                                      |
-| `file` / `source-url` / `source-document`                        | content blocks inside `agent_message_chunk`             | Mapped per ACP's content block taxonomy.                                        |
-| `finish-step` / `finish`                                         | terminates the `session/prompt` reply with `stopReason` | Mapped: `end_turn`, `max_tokens`, `cancelled`, `refusal`.                       |
-
-The adapter is a **translator**, not a buffer. It does not introduce
-its own state — every update it emits is sourced from one chunk or
-a finalize event the core already produced.
-
-## Tool kind mapping
-
-ACP tags every tool call with a `kind` from a small enum (`read`,
-`edit`, `delete`, `move`, `search`, `execute`, `think`, `fetch`,
-`other`). The kind drives client UI — icon, inline diff renderer,
-terminal pane.
-
-| Locked tool   | ACP `kind`                                                |
-| ------------- | --------------------------------------------------------- |
-| `read`        | `read`                                                    |
-| `write`       | `edit`                                                    |
-| `edit`        | `edit`                                                    |
-| `glob`        | `search`                                                  |
-| `grep`        | `search`                                                  |
-| `bash`        | `execute`                                                 |
-| `todo`        | `other`                                                   |
-| `task`        | `other`                                                   |
-| `question`    | `other`                                                   |
-| `web_search`  | `fetch`                                                   |
-| `web_fetch`   | `fetch`                                                   |
-| `skill`       | `think`                                                   |
-| `tool_search` | `search`                                                  |
-| MCP tools     | `kind` from the MCP server's declaration; default `other` |
-
-The `kind` taxonomy is small on purpose. Implementors that want
-richer UI hints stash them in ACP's `_meta` field; clients that
-understand the host's meta render fancier.
+Optional display hints can use schema-supported metadata. Additional operations
+require negotiated extension methods and explicit results. An ignored display
+hint cannot establish execution, permission, or successful presentation.
+Incoming content and metadata remain untrusted. [Extensibility](https://agentclientprotocol.com/protocol/v1/extensibility).
 
 ## Capability matrix
 
-The adapter advertises these on `initialize`:
+Capabilities declare supported exchanges. Advertise an optional interaction
+only when its complete behavior is available through the selected host.
 
-| ACP capability                     | Required when                                                                                |
-| ---------------------------------- | -------------------------------------------------------------------------------------------- |
-| `loadSession`                      | Persistence is on (default).                                                                 |
-| `sessionCapabilities.resume`       | The implementor ships an in-flight stream registry. Required for renderer-disconnect resume. |
-| `sessionCapabilities.close`        | Always.                                                                                      |
-| `mcpCapabilities.http`             | The core's MCP layer supports remote HTTP MCP servers.                                       |
-| `mcpCapabilities.sse`              | The core's MCP layer supports remote SSE MCP servers.                                        |
-| `promptCapabilities.image`         | The provider supports multi-modal image input.                                               |
-| `promptCapabilities.audio`         | Audio attachments supported.                                                                 |
-| `promptCapabilities.resource_link` | Always; file references are core to this guide.                                              |
+| Surface                              | Contract                                                                                                 |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| Conversation and tools               | Standard content and progress, with client-owned presentation.                                           |
+| Plans and slash commands             | Standard updates, with master-owned meaning and invocation behavior.                                     |
+| Session options                      | Standard selectors where applicable. Persistent defaults keep their separate scope and activation rules. |
+| Questions and permissions            | Supported request/response forms, correlated with retained engine interactions.                          |
+| Reusable subagents                   | Standard observation where supported. Additional child controls require their own advertised semantics.  |
+| Durable work                         | Explicit acceptance, control, retention, and recovery guarantees beyond baseline protocol delivery.      |
+| Client filesystem and editor actions | Supported callbacks plus host-granted access to a specific resource and operation.                       |
 
-The client advertises in return:
+ACP's subagent draft permits child cancellation and restricts direct child
+prompt, steering, configuration, and resume. Richer child controls are
+therefore negotiated extensions, each with its own advertised semantics, until
+an upstream revision defines them.
+[Subagent draft](https://agentclientprotocol.com/rfds/subagents).
 
-| Client capability  | What it means for the adapter                                                       |
-| ------------------ | ----------------------------------------------------------------------------------- |
-| `fs.readTextFile`  | The client provides `fs/read_text_file`. The core's `read` tool MAY delegate to it. |
-| `fs.writeTextFile` | Same for `write` / `edit`.                                                          |
-| `terminal`         | The client provides `terminal/*`. The `bash` tool MAY delegate.                     |
+## Tool kind mapping
 
-Delegation is **opt-in per host**. A local daemon with its own
-sandboxed filesystem ignores the client's offers. An
-editor-embedded host delegates so the editor's write-tracking and
-approval UI is the single source of truth. Both modes are
-conformant.
+Tool kind is a presentation classification. Map the actual operation to the
+nearest standard category, such as read, edit, search, execute, or fetch. Use
+the general category when no narrower kind fits. A kind, title, or tool name
+confers no authority. The operation's declared scope and host grants determine
+whether execution is permitted.
 
-## Where ACP and the guide diverge
+## Filesystem authority
 
-Three seams where the protocol's shape and the guide's shape do not
-line up 1:1.
+A host may execute filesystem tools itself or delegate supported operations
+to its client. The session selects that binding explicitly. A client's advertised
+filesystem support alone does not select it or grant arbitrary access. Both
+bindings preserve resource identity, conflict checks, and the host's authority
+rules. [Filesystem protocol](https://agentclientprotocol.com/protocol/v1/file-system).
 
-### Filesystem authority
+## Stream resume semantics
 
-The guide assumes the agent runtime owns the filesystem capability
-([`foundations / locked tools`](./foundations.md#locked-fundamental-tools)).
-ACP allows the client to own it instead. The adapter handles either:
+Loading or resuming a protocol session, reconnecting an observer, and resuming
+paused execution are distinct operations. The selected ACP version determines
+its history replay and prompt lifecycle. A durable implementation states its
+additional retention, identity, acceptance, and execution guarantees explicitly.
 
-- **Host-owned fs (default):** core's `read` / `write` / `edit`
-  execute locally. The adapter emits `tool_call` /
-  `tool_call_update` notifications so the client can render
-  progress, but does not call `fs/read_text_file` /
-  `fs/write_text_file`.
-- **Client-delegated fs:** the adapter routes core's `read` /
-  `write` / `edit` through `fs/read_text_file` /
-  `fs/write_text_file`. The watchdog still runs; capability scopes
-  still apply. The client's response becomes the tool's output.
+V1 prompt responses report the finished prompt turn. The v2 draft separates
+prompt acceptance from foreground state and permits messages without durable
+retention. Neither contract substitutes for verified engine suspension or
+settlement. [V1 prompt lifecycle](https://agentclientprotocol.com/protocol/v1/prompt-turn),
+[v2 session semantics](https://agentclientprotocol.com/protocol/v2/session-setup).
 
-The decision is per-session at `initialize` based on the client's
-declared capabilities.
-
-### Permission UX
-
-ACP's `session/request_permission` is **synchronous** — the agent
-waits for the client's response with a chosen `optionId`. The
-guide's watchdog is more general: a config policy with no human in
-the loop. The adapter bridges:
-
-- A watchdog `ask` is emitted as `session/request_permission` with
-  the standard option kinds (`allow_once`, `allow_always`,
-  `reject_once`, `reject_always`).
-- A watchdog `allow` / `deny` outcome is emitted as nothing — the
-  client never sees the policy decision.
-- The client's reply is recorded as a session-scoped permission
-  rule if `allow_always` / `reject_always` (see
-  [`session / permission scopes`](./session.md#permission-scopes)).
-
-### Stream resume semantics
-
-ACP's `session/load` replays the conversation history as
-`session/update` notifications before returning. The guide's
-resume endpoint (see
-[`session / resume across renderer disconnect`](./session.md#resume-across-renderer-disconnect))
-replays the **live in-flight chunk log** of an in-flight run.
-These are different operations:
-
-- `session/load`: rehydrate a finished session by re-emitting every
-  past message as an update. The adapter walks the DB rows.
-- `session/resume`: rejoin a session without replay. The adapter
-  hands the client whatever the in-memory registry has — the
-  in-flight chunk log if a run is happening, nothing if it isn't.
-
-The guide's resume and ACP's resume agree on shape (no replay);
-ACP's load adds the past-replay path.
+An adapter can retain an open protocol interaction while releasing the engine
+worker. Reconnection redelivers retained interactions under a supported recovery
+contract. It cannot replay an old connection's request identifier as new authority.
+Standard cancellation and resumable pause retain separate meanings.
 
 ## Naming seam
 
-Two conventions to reconcile:
+ACP owns wire names. Internal records keep the component vocabulary. Extensions
+use their reserved names and a namespace controlled by their author. Adapters
+validate the translation and reject unsupported operations explicitly.
 
-- This guide: snake_case fields, snake_case function names,
-  PascalCase type names, kebab-case for path variables.
-- ACP wire: **camelCase** for JSON property keys (`sessionId`,
-  `toolCallId`, `optionId`), **snake_case** for discriminator values
-  (`agent_message_chunk`, `tool_call_update`).
+## Transport
 
-The adapter **owns the translation**. Field rename at the wire
-boundary:
+ACP standardizes a bidirectional JSON-RPC exchange over stdio. A custom binding
+must preserve protocol semantics and document connection establishment. The
+reviewed remote transport remains under specification. Transport selection
+adds no access rights. [Transports](https://agentclientprotocol.com/protocol/v1/transports).
 
-```text
-internal (guide)        ACP wire
-─────────────────────  ─────────────────
-session_id          ↔  sessionId
-tool_call_id        ↔  toolCallId
-provider_id         ↔  providerId
-model_id            ↔  modelId
-parent_message_id   ↔  parentMessageId
-started_at          ↔  startedAt
-error_text          ↔  errorText
-```
-
-The adapter MUST NOT leak snake_case keys to the wire; the core
-MUST NOT receive camelCase keys. One rename table, applied at the
-seam, keeps both sides clean.
-
-## What ACP does not cover
-
-The protocol is intentionally narrower than this guide. Where ACP
-is silent and the guide speaks:
-
-- **Compaction.** ACP has no notion of summarizing history. The
-  agent does it internally; the client sees the effect on the next
-  turn's output. See [`session / compaction`](./session.md#compaction).
-- **Skills and project instructions.** ACP does not standardize
-  system-prompt assembly. Skills, AGENTS.md, memory — all internal
-  to the agent. See [`skills`](./skills.md).
-- **Subagents.** ACP does not define recursive agent-to-agent
-  calls. The `task` tool runs subagents inside the host; the client
-  sees one `tool_call` per spawn. Inspectable subagents
-  ([`subagents / inspectability`](./subagents.md#inspectability))
-  MAY be modeled as separate sessions exposed via ACP — the
-  adapter chooses.
-- **Per-role token tracking and cost.** ACP's recently-stabilized
-  Session Usage and Context Status RFD adds usage; pricing remains
-  out of scope on both sides.
-- **Memory.** Out of scope; built on top
-  ([`ux / memory`](./ux.md#memory)).
-- **Watchdog policy.** ACP has the wire
-  (`session/request_permission`) but no policy model. The guide's
-  watchdog hook is the policy seat; the adapter wires it.
-
-These are not gaps in ACP — they are concerns ACP leaves to the
-agent. The guide fills them in.
-
-## What ACP adds for the guide
-
-- **One adapter, many editors.** Wire an ACP transport once and
-  any ACP-compliant client (Zed, IDE plugins, third-party tools)
-  can drive the agent.
-- **Inspection / debug clients for free.** An ACP-aware test
-  client can record JSON-RPC traffic — a complementary format to
-  the canonical inspection format
-  ([`debugging`](./debugging.md#export-formats)).
-- **Cross-host portability.** A code agent that ships as an ACP
-  server is usable from any host that speaks ACP, not just the
-  host it shipped with.
-- **A standard for delegated filesystem.** ACP's `fs/*` and
-  `terminal/*` give the guide a clean answer for "what if the
-  editor wants to own the filesystem?"
-
-## Anti-goals
-
-- **ACP is not the only outward transport.** A host that ships a
-  CLI or a local daemon MAY not need ACP at all — the AI SDK v6 chunk
-  stream over the host's own transport (HTTP+SSE, IPC, in-memory)
-  is fully conformant.
-- **ACP is not a replacement for AI SDK chunks internally.** The
-  core's stream shape stays AI SDK v6
-  ([`foundations`](./foundations.md#streaming-substrate-ai-sdk-v6)).
-  ACP wraps; it does not replace.
-- **Adopting ACP does not adopt all of its RFD surface.** Adopt
-  the stable methods listed above; RFD-in-flight pieces (fork,
-  multi-workspace roots, telemetry) land when both ACP and this
-  guide stabilize the corresponding mechanism.
-
-## See also
-
-- [Agent Client Protocol — official site](https://agentclientprotocol.com/)
-- [Local Daemon](./daemon.md) — the discoverable local server the
-  ACP adapter attaches to as a local-process client.
-- [Foundations](./foundations.md) — the AI SDK v6 chunk shape ACP
-  wraps.
-- [Session Lifecycle](./session.md) — what `session/new` / `load`
-  / `resume` / `close` map onto.
-- [Tools](./tools.md) — the locked tools the `kind` taxonomy maps
-  to.
-- [Debugging](./debugging.md) — the canonical inspection format
-  ACP supplements.
+A host may also offer an authenticated local shared-service binding that
+carries the same vocabulary to independent clients. The native host's
+baseline, negotiated extensions, client compatibility checks, and shared-service
+binding are defined in its
+[client protocol binding](https://github.com/gridaco/grida/blob/main/crates/grida-agent/docs/rust-client-protocol.md).

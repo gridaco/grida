@@ -16,25 +16,15 @@
 
 import { useSyncExternalStore } from "react";
 import {
-  AGENT_MODES,
-  asAgentMode,
   BYOK_PROVIDER_IDS,
   BYOK_PROVIDER_METADATA,
-  AGENT_TIERS,
-  AGENT_SESSION_AGENT,
   OLLAMA_ENDPOINT_PRESET,
   mergeProbedModels,
   resolveEndpointModel,
   resolveEndpointModels,
-  type AgentMode,
-  type AgentUIMessageChunk,
-  type AgentRunOptions,
   type ByokProviderId,
   type ProviderId,
-  type ChatMessageWithParts,
   type ChatGptSubscriptionStatus,
-  type ChatSessionRow,
-  type CreateSessionOptions,
   type EndpointModelEntry,
   type EndpointModelOverrides,
   type EndpointModelSpec,
@@ -62,19 +52,16 @@ import {
   type ModelGenerationGenerateResult,
   type VideoGenerateRequest,
   type VideoGenerateResult,
-  type PatchSessionOptions,
-  type RewindResult,
-  type SessionListFilter,
-  type SessionListPage,
-  type SessionStatus,
-} from "@grida/agent";
+} from "@grida/ai-host";
 import type {
   DesktopBridge,
   ChatGptConnectResult,
   DesktopMediaReadResult,
+  DesktopMediaSaveCopyResult,
   DesktopHostAppId,
   DesktopHostAppInfo,
   MediaItem,
+  NativeEditorSurfaceSnapshot,
   NavigationState,
   Workspace,
   WorkspaceChangeEvent,
@@ -90,12 +77,8 @@ import {
 } from "@grida/desktop-bridge";
 
 export {
-  AGENT_MODES,
-  asAgentMode,
   BYOK_PROVIDER_IDS,
   BYOK_PROVIDER_METADATA,
-  AGENT_TIERS,
-  AGENT_SESSION_AGENT,
   OLLAMA_ENDPOINT_PRESET,
   mergeProbedModels,
   resolveEndpointModel,
@@ -105,7 +88,6 @@ export {
   type EndpointModelSpec,
   type EndpointProviderConfig,
   type ProbedEndpointModel,
-  type ImageGenProvider,
   type ImageGenerateRequest,
   type ImageGenerateResult,
   type MusicGenerateRequest,
@@ -125,32 +107,17 @@ export {
   type RiggingGenerateResult,
   type ModelGenerationGenerateRequest,
   type ModelGenerationGenerateResult,
-  type VideoGenProvider,
   type VideoGenerateRequest,
   type VideoGenerateResult,
-  type AgentMode,
-  type AgentUIMessageChunk,
-  type AgentRunOptions,
   type ByokProviderId,
   type ByokProviderMetadata,
   type ProviderId,
-  type ChatMessageRow,
-  type ChatMessageWithParts,
   type ChatGptSubscriptionAccount,
   type ChatGptSubscriptionStatus,
-  type ChatModel,
-  type ChatPartRow,
-  type ChatSessionRow,
-  type CreateSessionOptions,
-  type PatchSessionOptions,
-  type SessionListFilter,
-  type SessionListPage,
-  type SessionStatus,
-} from "@grida/agent";
+} from "@grida/ai-host";
 
 export type {
   ChatGptConnectResult,
-  DesktopAgentCapabilities,
   DesktopBridge,
   DesktopCapabilities,
   DesktopNativeCapabilities,
@@ -330,7 +297,7 @@ export namespace secrets {
     return BYOK_PROVIDER_METADATA;
   }
 
-  // Provider ids here are BYOK ids OR configured endpoint ids (#806) —
+  // Provider ids here are BYOK ids OR configured endpoint ids —
   // a keyed gateway stores its key under its endpoint id through these
   // same helpers. The agent host validates membership; unknown ids 400.
 
@@ -392,7 +359,7 @@ export namespace secrets {
 /* ─────────────────────── providers namespace ─────────────────── */
 
 /**
- * Endpoint provider config (issue #806) — user-configured OpenAI-
+ * Endpoint provider config — user-configured OpenAI-
  * compatible endpoints (Ollama preset, self-hosted gateways). Plain
  * readable config, unlike `secrets`: the renderer may list configs back.
  * A keyed gateway stores its key via the `secrets` namespace under the
@@ -428,6 +395,35 @@ export namespace providers {
     await bridge.set_endpoint(config);
   }
 
+  /** Both capabilities identify hosts whose Connect/Save consent is durable. */
+  export function supportsEndpointConsent(): boolean {
+    const native = getDesktopBridge()?.providers;
+    return (
+      typeof native?.endpoint_authorization === "function" &&
+      typeof native.update_endpoint_models === "function"
+    );
+  }
+
+  export async function endpointAuthorization(
+    id: string,
+    baseUrl: string
+  ): Promise<boolean> {
+    const native = bridgeOrThrow().providers;
+    if (!native?.endpoint_authorization) throw new DesktopBridgeMissingError();
+    return await native.endpoint_authorization(id, baseUrl);
+  }
+
+  /** Discovery cannot authorize a destination or overwrite human settings. */
+  export async function updateEndpointModels(update: {
+    id: string;
+    base_url: string;
+    models: ProbedEndpointModel[];
+  }): Promise<void> {
+    const native = bridgeOrThrow().providers;
+    if (!native?.update_endpoint_models) throw new DesktopBridgeMissingError();
+    await native.update_endpoint_models(update);
+  }
+
   export async function deleteEndpoint(id: string): Promise<void> {
     const bridge = bridgeOrThrow().providers;
     if (!bridge) throw new DesktopBridgeMissingError();
@@ -450,26 +446,9 @@ export namespace providers {
   }
 
   /**
-   * Is the user's `claude` CLI installed where the host can find it (issue
-   * #813 zero-config onboarding)? Cheap host-side filesystem probe — does NOT
-   * verify login (the first real run is the source of truth). On an old binary
-   * that predates the surface, returns `installed: true` so onboarding doesn't
-   * block a user who likely has Claude — the run path stays the real gate.
-   */
-  export async function detectClaude(): Promise<{
-    installed: boolean;
-    path?: string;
-  }> {
-    const bridge = getDesktopBridge()?.providers;
-    if (!bridge?.detect_claude) return { installed: true };
-    return await bridge.detect_claude();
-  }
-
-  /**
    * Reveal `endpoints.json` (the hand-editable config — `overrides` for
    * power users live there) in the OS file manager. Returns `false` when
-   * the surface isn't available (old binary, or the web daemon bridge
-   * which has no native shell) — callers hide the affordance.
+   * the host lacks the capability. Callers hide the affordance.
    */
   export async function revealConfigFile(): Promise<boolean> {
     if (!canRevealConfigFile()) return false;
@@ -575,8 +554,8 @@ export namespace chatgpt {
 /* ─────────────────────── images namespace ───────────────────── */
 
 /**
- * BYOK image generation (#908). Desktop-only: the request resolves the user's
- * connected provider key inside the agent sidecar and returns base64 image
+ * BYOK image generation. Desktop-only: the request resolves the user's
+ * connected provider key inside the services sidecar and returns base64 image
  * bytes — the key never crosses the bridge (GRIDA-SEC-004). Feature-detect
  * with {@link isSupported}; old binaries lack the surface.
  */
@@ -597,7 +576,7 @@ export namespace images {
 /* ─────────────────────── video namespace ────────────────────── */
 
 /**
- * BYOK video generation (#908). Same posture as {@link images}: the request
+ * BYOK video generation. Same posture as {@link images}: the request
  * resolves the user's key in the sidecar and returns base64 video bytes — no
  * provider URL or key crosses the bridge (GRIDA-SEC-004). Feature-detect with
  * {@link isSupported}.
@@ -770,6 +749,10 @@ export namespace mediaLibrary {
     return getDesktopBridge()?.media != null;
   }
 
+  export function canSaveCopy(): boolean {
+    return typeof getDesktopBridge()?.media?.save_copy === "function";
+  }
+
   export async function list(): Promise<MediaItem[]> {
     const bridge = bridgeOrThrow().media;
     if (!bridge) throw new DesktopBridgeMissingError();
@@ -780,6 +763,14 @@ export namespace mediaLibrary {
     const bridge = bridgeOrThrow().media;
     if (!bridge) throw new DesktopBridgeMissingError();
     return await bridge.read(id);
+  }
+
+  export async function saveCopy(
+    id: string
+  ): Promise<DesktopMediaSaveCopyResult> {
+    const bridge = bridgeOrThrow().media;
+    if (!bridge?.save_copy) throw new DesktopBridgeMissingError();
+    return await bridge.save_copy(id);
   }
 
   export async function reveal(id: string): Promise<void> {
@@ -812,6 +803,13 @@ export type DesktopAppInfo = {
  * `window.grida`.
  */
 export namespace app {
+  /** Open or focus the native Settings window, keeping the caller in place. */
+  export async function openSettings(): Promise<void> {
+    const open = bridgeOrThrow().window.open_settings;
+    if (!open) throw new DesktopBridgeMissingError();
+    await open();
+  }
+
   /**
    * Synchronous because `bridge.app.*` is populated at preload-run
    * time (see `desktop/src/preload.ts`). If the bridge isn't installed
@@ -839,258 +837,6 @@ export namespace app {
       default:
         return platform;
     }
-  }
-}
-
-/* ────────────────────────── ai namespace ────────────────────── */
-
-/**
- * The Grida agent runs behind the AgentHost,
- * against BYOK (OpenRouter / Vercel AI Gateway) directly. The renderer sends a
- * `messages` payload (plus optional `workspaceId` / `skills`),
- * receives an AI SDK UI-message stream, and either resolves fs
- * tool calls locally (standalone document window: live `SvgEditor`
- * binding) or just observes them (workspace pane: agent host resolves
- * server-side because it holds the fs + command-execution bindings).
- *
- * Why a callback instead of an async iterator: `ReadableStream` and
- * generator objects don't round-trip cleanly through Electron's
- * `contextBridge` — they get stripped of methods on copy. The bridge
- * accepts a serializable `onChunk` callback that the agent host invokes
- * for each chunk. See `desktop/src/preload.ts`.
- *
- * GRIDA-SEC-004 — the renderer never holds upstream API keys. They live
- * in the agent host's `auth.json`. This namespace is the only surface in
- * the editor tree that touches `bridge.agent`.
- */
-export namespace ai {
-  /**
-   * Whether the current host explicitly accepts base64 scratch seeds.
-   * Protocol 1 predates this capability, so omission must fail closed.
-   */
-  export function supportsScratchSeedBase64(
-    bridge: DesktopBridge | null
-  ): boolean {
-    return bridge?.caps.agent?.scratch_seed_base64 === true;
-  }
-
-  /**
-   * Whether scratch-backed arbitrary bytes have an actual operability tool.
-   * A base64 staging transport alone is insufficient: without this capability
-   * a PDF/archive would become only an inert path in the prompt.
-   */
-  export function supportsScratchBinaryTools(
-    bridge: DesktopBridge | null
-  ): boolean {
-    return bridge?.caps.agent?.scratch_binary_tools === true;
-  }
-
-  /**
-   * Start an agent run. Resolves with `{streamId, done}` as
-   * soon as the SSE connection is established; `onChunk` is invoked
-   * once per `AgentUIMessageChunk` until the stream ends. `done` settles when
-   * the agent host closes the stream (after `finish` or `error`).
-   *
-   * Throws {@link DesktopBridgeMissingError} when invoked outside the
-   * desktop renderer.
-   */
-  export async function startAgentRun(
-    opts: AgentRunOptions,
-    onChunk: (chunk: AgentUIMessageChunk) => void
-  ): Promise<{ streamId: string; sessionId: string; done: Promise<void> }> {
-    const bridge = bridgeOrThrow();
-    if (
-      opts.scratch_seed?.some((entry) => "base64" in entry) &&
-      !supportsScratchSeedBase64(bridge)
-    ) {
-      throw new Error(
-        "agent.run: base64 scratch seeds are not supported by this desktop binary"
-      );
-    }
-    const handle = await bridge.agent.run(opts, onChunk);
-    return {
-      streamId: handle.stream_id,
-      sessionId: handle.session_id,
-      done: handle.done,
-    };
-  }
-
-  /**
-   * Abort an in-flight agent run by session id. Idempotent.
-   */
-  export async function abortAgentRun(sessionId: string): Promise<void> {
-    await bridgeOrThrow().agent.abort(sessionId);
-  }
-
-  /**
-   * Reconnect to an agent run that's still in flight on the agent host.
-   * Used by the chat transport's `reconnectToStream` to resume across
-   * a renderer refresh. The agent host replays its buffered chunk log
-   * from the start, then live-tails.
-   *
-   * Returns `null` when no run exists for `sessionId` (agent host already
-   * finished + GC'd, or never started). The caller's transport
-   * surfaces "no live stream"; the chat panel shows whatever was
-   * hydrated from the DB.
-   */
-  export async function reconnectAgentRun(
-    sessionId: string,
-    lastEventId: number,
-    onChunk: (chunk: AgentUIMessageChunk) => void
-  ): Promise<{
-    streamId: string;
-    sessionId: string;
-    done: Promise<void>;
-  } | null> {
-    const handle = await bridgeOrThrow().agent.reconnect(
-      sessionId,
-      lastEventId,
-      onChunk
-    );
-    return handle
-      ? {
-          streamId: handle.stream_id,
-          sessionId: handle.session_id,
-          done: handle.done,
-        }
-      : null;
-  }
-}
-
-/* ──────────────────── sessions namespace ────────────────────── */
-
-/**
- * Agentic-chat sessions are persisted in the agent host's SQLite DB
- * (`${userData}/sessions.db`). This namespace is a thin client over
- * the bridge session methods. Renderer code reaches for these helpers;
- * never `window.grida.sessions` directly.
- *
- * The shape is agent-agnostic — the `agent` field is a free-form
- * string. Grida Copilot and future agents share the same row type.
- *
- * GRIDA-SEC-004 — sessions hold message bodies and tool I/O; treat
- * them as user data. The DB lives outside the renderer-accessible
- * surface; this namespace only reads/writes via the bridge.
- */
-export namespace sessions {
-  export async function list(
-    filter?: SessionListFilter
-  ): Promise<SessionListPage> {
-    return await bridgeOrThrow().sessions.list(filter);
-  }
-
-  export async function get(id: string): Promise<ChatSessionRow | null> {
-    return await bridgeOrThrow().sessions.get(id);
-  }
-
-  export async function create(
-    opts: CreateSessionOptions
-  ): Promise<ChatSessionRow> {
-    return await bridgeOrThrow().sessions.create(opts);
-  }
-
-  export async function rename(
-    id: string,
-    title: string
-  ): Promise<ChatSessionRow> {
-    return await bridgeOrThrow().sessions.patch(id, { title });
-  }
-
-  export async function archive(id: string): Promise<ChatSessionRow> {
-    return await bridgeOrThrow().sessions.patch(id, { archived: true });
-  }
-
-  export async function unarchive(id: string): Promise<ChatSessionRow> {
-    return await bridgeOrThrow().sessions.patch(id, { archived: false });
-  }
-
-  export async function remove(id: string): Promise<void> {
-    await bridgeOrThrow().sessions.delete(id);
-  }
-
-  export async function listMessages(
-    id: string
-  ): Promise<ChatMessageWithParts[]> {
-    return await bridgeOrThrow().sessions.list_messages(id);
-  }
-
-  /** Soft-truncate the session to a prior message (RFC `session / rewinding`).
-   *  `restore: true` un-rewinds. Rejected (409) while a run is in flight. */
-  export async function rewind(
-    id: string,
-    fromMessageId: string,
-    opts?: { restore?: boolean }
-  ): Promise<RewindResult> {
-    return await bridgeOrThrow().sessions.rewind(id, fromMessageId, opts);
-  }
-
-  /** Fork the session at a message into a new forked session
-   *  (RFC `session / fork`). Returns the new session row. */
-  export async function fork(
-    id: string,
-    fromMessageId: string,
-    metadata?: Record<string, unknown>
-  ): Promise<ChatSessionRow> {
-    return await bridgeOrThrow().sessions.fork(id, fromMessageId, metadata);
-  }
-
-  /** User-fired compaction (RFC `session / compaction`). */
-  export async function compact(id: string): Promise<{
-    compacted: boolean;
-    reason?: string;
-    summaryMessageId?: string;
-  }> {
-    return await bridgeOrThrow().sessions.compact(id);
-  }
-
-  /** Queued sends (RFC `queue`): enqueue a pending user message while a turn
-   *  is in flight. The caller mints the id for its optimistic mirror; the CORE
-   *  fires the row on a clean idle edge (the scheduler drains it). */
-  export async function enqueue(
-    id: string,
-    message: { id?: string; text: string }
-  ): Promise<ChatMessageWithParts> {
-    return await bridgeOrThrow().sessions.enqueue(id, message);
-  }
-
-  /** The pending queue for a session, FIFO by `queued_at`. */
-  export async function listQueued(
-    id: string
-  ): Promise<ChatMessageWithParts[]> {
-    return await bridgeOrThrow().sessions.list_queued(id);
-  }
-
-  /** Cancel (remove) a queued message before it fires. */
-  export async function cancelQueued(
-    id: string,
-    messageId: string
-  ): Promise<void> {
-    await bridgeOrThrow().sessions.cancel_queued(id, messageId);
-  }
-
-  /**
-   * Subscribe to a session's run-state (RFC `session` §Session status). The
-   * current status arrives first, then every idle⇄busy⇄waiting⇄error
-   * transition.
-   * Returns a `subscriptionId` to pass to {@link unsubscribeStatus} on
-   * cleanup, plus a `done` that settles when the subscription ends. This is
-   * the authoritative busy/idle the UI renders from — not the AI-SDK client's
-   * optimistic per-request status.
-   */
-  export async function subscribeStatus(
-    id: string,
-    onStatus: (status: SessionStatus) => void
-  ): Promise<{ subscriptionId: string; done: Promise<void> }> {
-    const { subscription_id, done } =
-      await bridgeOrThrow().sessions.subscribe_status(id, onStatus);
-    return { subscriptionId: subscription_id, done };
-  }
-
-  /** Stop a status subscription started by {@link subscribeStatus}. */
-  export async function unsubscribeStatus(
-    subscriptionId: string
-  ): Promise<void> {
-    await bridgeOrThrow().sessions.unsubscribe_status(subscriptionId);
   }
 }
 
@@ -1129,18 +875,35 @@ export namespace nav {
  *   if (paths?.[0]) await workspaces.openFolder(paths[0]);
  */
 export namespace workspaces {
+  export async function publishEditorSurfaces(
+    snapshot: NativeEditorSurfaceSnapshot
+  ): Promise<boolean> {
+    return (
+      (await getDesktopBridge()?.workspaces.publish_editor_surfaces?.(
+        snapshot
+      )) ?? false
+    );
+  }
+
   export async function list(): Promise<Workspace[]> {
     return await bridgeOrThrow().workspaces.list();
   }
   export async function openFolder(rootPath: string): Promise<Workspace> {
     return await bridgeOrThrow().workspaces.open(rootPath);
   }
+  export async function chooseFolder(): Promise<Workspace | null> {
+    const bridge = bridgeOrThrow();
+    if (bridge.workspaces.choose) return await bridge.workspaces.choose();
+    const paths = await bridge.dialog.open({
+      properties: ["openDirectory", "createDirectory"],
+    });
+    return paths?.[0] ? await openFolder(paths[0]) : null;
+  }
   /**
    * Auto-create a fresh project — mint an EMPTY managed-root folder and
    * register it. No document is seeded: the agent creates whatever the task
    * needs on its first turn. Powers the home's "auto-create, ask nothing" flow:
-   * no OS folder dialog. Rejects when the host wired no managed root (e.g. the
-   * web-daemon dev bridge).
+   * no OS folder dialog. Rejects when the host has no managed root.
    */
   export async function createProject(
     input: WorkspaceCreateInput
@@ -1152,8 +915,7 @@ export namespace workspaces {
    * surfaced by {@link list} with `is_default`. The home roots a fresh session
    * HERE instead of minting a per-session folder (the old auto-create flow
    * littered the managed root and pre-picked where to work). Null on a host with
-   * no managed root (the web-daemon dev bridge), where the caller must fall back
-   * to opening a folder.
+   * no managed root, where the caller falls back to opening a folder.
    */
   export async function getDefault(): Promise<Workspace | null> {
     return (await list()).find((w) => w.is_default) ?? null;
@@ -1203,9 +965,9 @@ export namespace workspaces {
     );
   }
   /**
-   * Streamable media `src` for the read-only image/video viewer (#924), or
-   * `undefined` when the host can't serve a streaming scheme (web-daemon dev
-   * bridge) — the viewer then falls back to {@link readFileBytes}. Synchronous
+   * Streamable media `src` for the read-only image/video viewer, or
+   * `undefined` when the host lacks the streaming capability. The viewer falls
+   * back to {@link readFileBytes}. Synchronous
    * passthrough; see the bridge contract for the URL shape. Returns `undefined`
    * (rather than throwing) when no desktop bridge is present, so the viewer can
    * branch on it directly.
@@ -1220,7 +982,7 @@ export namespace workspaces {
    * Atomic write via tmpfile + rename inside the workspace. Creates
    * parent directories.
    *
-   * `expectedMtime` is the optimistic-concurrency token (issue #805):
+   * `expectedMtime` is the optimistic-concurrency token:
    * pass the mtime last observed for this file (from `readFile` or a
    * prior `writeFile`) and the host rejects — instead of silently
    * clobbering — when the file on disk has advanced past it. The
@@ -1263,7 +1025,7 @@ export namespace workspaces {
   }
   /**
    * True when this desktop binary can watch the workspace for external
-   * file changes (issue #805). Additive on protocol 1 — older binaries
+   * file changes. Additive on protocol 1 — older binaries
    * lack the channel, so the workbench falls back to pull/manual refresh.
    * Gate any `subscribeChanges` call on this.
    */
@@ -1346,7 +1108,7 @@ export namespace workspaces {
 /**
  * GRIDA-SEC-004 — human-interactive terminal (PTY) pane. A real,
  * unsandboxed shell running as the user (VSCode trust model) — NOT the
- * agent's sandboxed `run_command`. The renderer only ever names a
+ * agent's sandboxed `exec_command`. The renderer only ever names a
  * workspace id; the desktop main process resolves the cwd and owns the
  * PTY. This namespace is the only surface in the editor tree that
  * touches `bridge.terminal`.

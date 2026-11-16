@@ -16,7 +16,7 @@
  * GRIDA-SEC-004 — like every page under `/desktop/*`, this surface
  * is gated by `DesktopBridgeGate` (in the desktop layout) so it
  * only renders inside the Electron renderer. The bridge is the
- * authoritative source of "what workspaces exist" — the agent sidecar
+ * authoritative source of "what workspaces exist" — the services sidecar
  * owns `workspaces.json`.
  */
 "use client";

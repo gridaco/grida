@@ -47,9 +47,9 @@ chooses.
 > bitmap is the overlap: handled here as a native-multimodal attachment,
 > reached there by path on demand. For the entry-point handling (the `file-attachment` part,
 > the descriptor fallback, the storage threshold), see
-> [`compositor / attachments`](./compositor.md#attachments-the-long-tail).
+> [`compositor / attachments`](./compositor.md#attachments--the-long-tail).
 > For the broader skill discovery and loading flow, see
-> [`skills`](./skills.md).
+> [Master / context and tool design](./master.md#context-and-tool-design).
 
 ## The three resolution paths
 
@@ -165,7 +165,7 @@ Skill discipline for binary handling:
   not installed; please install via `apt install libreoffice` or
   attach the file as a PDF") rather than retrying blindly.
 
-See [`skills`](./skills.md) for the general skill contract (manifest
+See [skill policy](./master.md#context-and-tool-design) for the general skill contract (manifest
 shape, discovery, body loading).
 
 ## Shell-based conversion
@@ -184,7 +184,7 @@ Shell is the **least preferred** of the three paths because:
   environment (not portable across hosts).
 - It requires `shell.run` in the agent's manifest (a meaningful
   capability grant).
-- It requires the watchdog ([`foundations / watchdog`](./foundations.md#watchdog))
+- It requires the watchdog ([Permission policy](./permissions.md))
   to approve the specific command shape.
 - It produces unstructured stdout the agent has to parse.
 
@@ -200,7 +200,7 @@ flags which formats _typically_ benefit from shell.
 
 ## Scratch space for extraction
 
-> The scratch concept — per-session, ephemeral, host-owned, distinct from the
+> The scratch concept — per-session, retention-bounded, host-owned, distinct from the
 > workspace — is specified in [`scratch`](./scratch.md). This section is its
 > **archive-extraction application**: the location and contract notes below are
 > that page's bindings seen from the extraction use case.
@@ -214,17 +214,18 @@ the host's filesystem MUST provide:
 
 - A **writable, agent-scoped directory** that is inside the
   sandbox's `fs.write` allow-list.
-- A **lifecycle** the agent can rely on: contents live at least for
-  the current session, and the host owns cleanup.
+- A **lifecycle** the agent can rely on: contents remain available while active
+  extraction or retained consumers depend on them, or have an explicit recovery
+  path. The host owns cleanup and declares the retention bounds.
 - **Sandbox-aware**: the directory is bounded by whatever sandbox
   primitive the environment uses
-  ([`environments`](./environments.md), [`srt`](./srt.md)). Writes
+  ([`environments`](./environments.md), [execution authority](./execution-authority.md)). Writes
   outside it fail with the sandbox's usual `EPERM`.
 
 Two reasonable locations, each with trade-offs (the
 [`scratch` bindings](./scratch.md#bindings) seen from the extraction case —
 note neither is workspace-resident: that would violate scratch's
-[S2 / S5](./scratch.md#the-scratch-contract)):
+[scratch contract](./scratch.md#the-scratch-contract)):
 
 | Location                 | Where                                        | Pros                                                          | Cons                                                                               |
 | ------------------------ | -------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
@@ -301,14 +302,11 @@ A conforming implementation SHOULD:
 
 ## See also
 
-- [Compositor / attachments](./compositor.md#attachments-the-long-tail) —
+- [Compositor / attachments](./compositor.md#attachments--the-long-tail) —
   the entry-point handling for any attachment, including the
   storage threshold.
 - [Compositor / templating](./compositor.md#templating-user-view-vs-model-view) —
   the lowering chain that picks one of the three paths.
-- [Skills](./skills.md) — the general contract for skill discovery,
-  loading, and the descriptor-first index. The skill-per-format
-  pattern is the same machinery applied to binary handling.
 - [Tools / bash](./tools.md) — the capability that backs
   shell-based conversion.
 - [Visual perception](./vision.md) — the adjacent problem: perceiving a
