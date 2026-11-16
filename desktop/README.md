@@ -382,8 +382,9 @@ for TypeScript and the native host. Runtime consumers use those bundled
 projections. The catalogue does not use authenticated discovery, and access
 depends on the ChatGPT plan and
 workspace. Withdrawn GPT-5.5 and GPT-5.4 selections appear unavailable and
-require an explicit replacement. Text, tools and reasoning settings are supported;
-subscription image input and provider-native compaction are unavailable.
+require an explicit replacement. Text, tools, reasoning settings, attached images
+and image-viewing tools are supported. Provider-native compaction is unavailable;
+Grida can summarize conversation context through its own compaction workflow.
 
 Ultra is available on every supported native model connection. It extends the
 inference-step allowance and permits one independent reviewer through the

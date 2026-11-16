@@ -83,12 +83,12 @@ refuse the withdrawn model until the person chooses a replacement explicitly;
 the default recommendation does not replace that saved choice.
 
 The picker projects readiness and compatibility, not OAuth material or
-account-discovered offerings. Refresh rechecks that projection. Text, tools
-and supported reasoning settings use the existing restricted Responses
-adapter. Subscription image input, provider-native compaction and
-authenticated model discovery remain unavailable. These are provider and
-product-host capabilities; the reusable agent core receives the existing
-provider contracts.
+account-discovered offerings. Refresh rechecks that projection. Text, tools,
+supported reasoning settings, attached images and image-tool results use the
+restricted Responses adapter. Provider-native compaction and authenticated model
+discovery remain unavailable; Grida's own context compaction uses summary
+inference. These are provider and product-host capabilities; the reusable agent
+core receives the existing provider contracts.
 
 Ultra is an independent harness capability available on this connection. Its
 bounded reviewer uses the parent's captured subscription model, opaque scope
