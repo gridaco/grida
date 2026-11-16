@@ -1,21 +1,29 @@
+//! GRIDA-SEC-004 — explicit enforcement posture and private helper setup frames.
+
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-#[cfg(target_os = "macos")]
-pub const HELPER_FLAG: &str = "--agent-kit-sandbox-helper-v3";
-#[cfg(target_os = "linux")]
-pub const HELPER_FLAG: &str = "--agent-kit-sandbox-helper-v2";
+pub const HELPER_FLAG: &str = "--agent-kit-sandbox-helper-v4";
 pub const MAX_FRAME_BYTES: usize = 256 * 1024;
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Launch {
+    pub enforcement: Enforcement,
     pub roots: Vec<PathIdentity>,
     pub private_temp: PathBuf,
     pub task: Task,
     #[cfg(target_os = "linux")]
     pub host_namespaces: [u64; 5],
+}
+
+/// Required in every frame: missing or unknown posture must fail closed.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Enforcement {
+    Confined,
+    Unconfined,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -92,6 +100,25 @@ pub fn namespaces() -> std::io::Result<[u64; 5]> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_launch_requires_an_explicit_known_enforcement_posture() {
+        let launch = Launch {
+            enforcement: Enforcement::Unconfined,
+            roots: vec![],
+            private_temp: "/tmp/fixture".into(),
+            task: Task::Probe,
+            #[cfg(target_os = "linux")]
+            host_namespaces: [1; 5],
+        };
+        let mut encoded = serde_json::to_value(launch).unwrap();
+        assert_eq!(encoded["enforcement"], "unconfined");
+        assert!(serde_json::from_value::<Launch>(encoded.clone()).is_ok());
+        encoded["enforcement"] = "fallback".into();
+        assert!(serde_json::from_value::<Launch>(encoded.clone()).is_err());
+        encoded.as_object_mut().unwrap().remove("enforcement");
+        assert!(serde_json::from_value::<Launch>(encoded).is_err());
+    }
 
     #[test]
     fn the_launch_mode_is_a_required_part_of_the_command() {

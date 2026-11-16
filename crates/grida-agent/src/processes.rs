@@ -13,7 +13,7 @@ mod output;
 mod tools;
 
 pub use tools::ProcessTools;
-pub(crate) use tools::{AuthorizedProcess, EXEC_COMMAND, ExecArguments, WRITE_STDIN};
+pub(crate) use tools::{AuthorizedProcess, EXEC_COMMAND, ExecArguments, ProcessScope, WRITE_STDIN};
 
 use crate::command::{cleanup_verified, summarize};
 use crate::host::live::{LiveProcesses, LiveUpdate};

@@ -17,16 +17,7 @@ import type {
 import { Button } from "@app/ui/components/button";
 import { readLibraryAttachment } from "@/app/(library)/library/attachment";
 import { encodeLibraryPng } from "@/lib/agent-chat/image-attachment";
-import {
-  PlayIcon,
-  SquareIcon,
-  LibraryIcon,
-  PaperclipIcon,
-  GoalIcon,
-  ListChecksIcon,
-  ImageIcon,
-  XIcon,
-} from "lucide-react";
+import { PlayIcon, SquareIcon, GoalIcon, XIcon } from "lucide-react";
 import {
   Conversation,
   ConversationContent,
@@ -41,9 +32,9 @@ import {
 } from "@/kits/agent-chat";
 import {
   NativeChatController,
-  type NativeChatComposerCommand,
   type NativeChatEditorSurfaces,
   type NativeChatView,
+  type NativeChatInitialComposer,
 } from "@/lib/agent-chat/native-chat-controller";
 import { subscribeToNativeNotificationFocus } from "@/lib/desktop/agent-focus-session";
 import {
@@ -54,11 +45,8 @@ import {
 } from "@/kits/composer";
 import { AgentApprovalPrompt } from "../shared/agent-approval";
 import { AgentLibraryAttachmentPicker } from "../shared/agent-library-attachment-picker";
-import {
-  AgentComposerInput,
-  type ComposerCommandAction,
-} from "../shared/agent-composer-input";
-import { AgentComposerTools } from "../shared/agent-composer-tools";
+import { AgentPermissionConfirmation } from "../shared/agent-permission-confirmation";
+import { AgentComposer } from "../shared/agent-composer";
 import { useWorkspaceFileMentions } from "../shared/use-workspace-file-mentions";
 import { NativeComposerTray } from "./native-composer-tray";
 import { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
@@ -77,23 +65,13 @@ import { NativeTurnActivity } from "./native-turn-activity";
 import { turn_activity } from "@/lib/agent-chat/turn-activity";
 import { native_message_parts } from "@/lib/agent-chat/native-message-parts";
 import { NativeMessageRevisionPanel } from "./native-message-revision-panel";
-import { NativeBackgroundProcesses } from "./native-background-processes";
-import { NativeAgentActivity } from "./native-agent-activity";
+import { NativeSubagentActivityPanel } from "./native-agent-activity";
+import { SubagentPlacement } from "./subagent-placement";
+import type { NativeBackgroundProcessController } from "@/lib/agent-chat/native-background-process-controller";
 
-import { NativeChatHeader, NativeModelPicker } from "./native-chat-controls";
+import { NativeChatHeader } from "./native-chat-controls";
 
 const NO_COMMANDS: ComposerCatalog["commands"] = [];
-const COMMAND_DESCRIPTIONS = {
-  plan: "Plan before making changes",
-  goal: "Work toward a goal with automatic continuation",
-  side: "Show your latest side chat or open one; this chat is unchanged",
-  stop: "Stop all background processes",
-  compact: "Summarize earlier context while keeping the transcript",
-  fork: "Create a separate chat from the latest committed message",
-} satisfies Record<NativeChatComposerCommand, string>;
-/** Commands that take effect when chosen, before anything is sent. */
-const IMMEDIATE_COMMANDS: ReadonlySet<string> =
-  new Set<NativeChatComposerCommand>(["plan", "goal", "side", "stop"]);
 const MAX_DRAFT_BYTES = 512 * 1024;
 const readNoActivity = () => null;
 const subscribeNoActivity = () => () => {};
@@ -120,9 +98,18 @@ const COMPOSER_DRAFTS = new ComposerDrafts();
  */
 export type NativeFirstMessage = Readonly<{
   profileId: string | null;
+  composer?: NativeChatInitialComposer;
   waiting: () => boolean;
   take: () => string | null;
 }>;
+
+type NativeChatPresentation = {
+  subagentPlacement?: SubagentPlacement;
+  /** Lends the selected main chat's existing controller to its workspace. */
+  onProcessesChange?: (
+    processes: NativeBackgroundProcessController | null
+  ) => void;
+};
 
 export function NativeAgentPaneGate({
   bridge,
@@ -132,6 +119,8 @@ export function NativeAgentPaneGate({
   editorSurfaces,
   sideChatPlacement,
   firstMessage,
+  onProcessesChange,
+  subagentPlacement,
 }: {
   bridge: DesktopNativeChat;
   selectionKey?: string;
@@ -142,7 +131,7 @@ export function NativeAgentPaneGate({
   sideChatPlacement: SideChatPlacement;
   /** Sent once as a new chat's first turn when the chat is ready. */
   firstMessage?: NativeFirstMessage;
-}) {
+} & NativeChatPresentation) {
   const [attempt, setAttempt] = useState(0);
   const [messageDropped, setMessageDropped] = useState(false);
   const [selection, setSelection] = useState<{
@@ -242,6 +231,8 @@ export function NativeAgentPaneGate({
       editorSurfaces={editorSurfaces}
       sideChatPlacement={sideChatPlacement}
       firstMessage={firstMessage}
+      onProcessesChange={onProcessesChange}
+      subagentPlacement={subagentPlacement}
     />
   );
 }
@@ -276,6 +267,8 @@ export function NativeAgentPane({
   editorSurfaces,
   sideChatPlacement,
   firstMessage,
+  onProcessesChange,
+  subagentPlacement,
 }: {
   bridge: DesktopNativeChat;
   /** The agent is still starting; the pane shows but does not connect yet. */
@@ -293,7 +286,7 @@ export function NativeAgentPane({
   sideChatPlacement: SideChatPlacement;
   /** Sent once as a new chat's first turn; see {@link NativeAgentPaneGate}. */
   firstMessage?: NativeFirstMessage;
-}) {
+} & NativeChatPresentation) {
   const controller = useMemo(() => {
     const created = new NativeChatController(
       bridge,
@@ -305,6 +298,20 @@ export function NativeAgentPane({
     created.keepDrafts(COMPOSER_DRAFTS, workspaceId ?? "standalone");
     return created;
   }, [bridge, selectionKey, editorSurfaces, workspaceId]);
+  useEffect(() => {
+    const publish = () =>
+      onProcessesChange?.(
+        starting || connectionRequired
+          ? null
+          : controller.read().backgroundProcesses
+      );
+    publish();
+    const unsubscribe = controller.subscribe(publish);
+    return () => {
+      unsubscribe();
+      onProcessesChange?.(null);
+    };
+  }, [controller, onProcessesChange, starting, connectionRequired]);
   const draft = useRef<NativeChatComposer>(null);
   // Side chats show wherever the host places them.
   useEffect(
@@ -322,16 +329,18 @@ export function NativeAgentPane({
         ? new URLSearchParams(window.location.hash.slice(1)).get("chat-profile")
         : null;
     if (starting) return;
-    // A message that could not be sent stays in the composer.
+    // A message that could not be sent stays with this effect's chat. The
+    // controller retains late failures in their original draft before returning.
+    let active = true;
     const keep = (text: string | null) => {
-      if (text) draft.current?.appendText(text, MAX_DRAFT_BYTES);
+      if (active && text) draft.current?.appendText(text, MAX_DRAFT_BYTES);
     };
     const message = firstMessage?.waiting() ? firstMessage : undefined;
-    if (connectionRequired) {
-      controller.connectForSelection();
-      if (message) keep(controller.declineMessage(message.take));
-    } else if (message && !initialSession)
-      void controller.startChat(message.profileId, message.take).then(keep);
+    if (message && !initialSession)
+      void controller
+        .startChat(message.profileId, message.take, message.composer)
+        .then(keep);
+    else if (connectionRequired) controller.connectForSelection();
     else controller.connect(initialSession, profile ?? startupProfileId);
     const stopFocus =
       workspaceId &&
@@ -342,6 +351,7 @@ export function NativeAgentPane({
           void controller.focusChat(sessionId, profileId)
       );
     return () => {
+      active = false;
       if (stopFocus) stopFocus();
       controller.disconnect();
     };
@@ -355,6 +365,10 @@ export function NativeAgentPane({
     connectionRequired,
     starting,
   ]);
+  useEffect(() => {
+    if (!subagentPlacement || starting || connectionRequired) return;
+    return SubagentPlacement.connect(controller, subagentPlacement);
+  }, [controller, subagentPlacement, starting, connectionRequired]);
   return (
     <NativeChatPane
       controller={controller}
@@ -364,6 +378,7 @@ export function NativeAgentPane({
       connectionRequired={connectionRequired}
       connectionNote={connectionNote}
       draftRef={draft}
+      subagentsInTabs={!!subagentPlacement}
       header={(state) => (
         <NativeChatHeader controller={controller} state={state} />
       )}
@@ -438,6 +453,7 @@ function NativeChatPane({
   header,
   autofocus,
   testId = "workspace-native-chat",
+  subagentsInTabs = false,
 }: {
   controller: NativeChatController;
   bridge: DesktopNativeChat;
@@ -450,6 +466,7 @@ function NativeChatPane({
   header: (state: NativeChatView) => ReactNode;
   autofocus?: boolean;
   testId?: string;
+  subagentsInTabs?: boolean;
 }) {
   // Workspace file links in replies open in the workbench, which validates
   // the path against the workspace before opening a tab.
@@ -491,7 +508,7 @@ function NativeChatPane({
   const pngPicker = useRef<HTMLInputElement>(null);
   const filePicker = useRef<HTMLInputElement>(null);
   const [libraryScope, setLibraryScope] = useState<number | null>(null);
-  const [activityOpen, setActivityOpen] = useState(false);
+  const activityOpen = !subagentsInTabs && !!subagentActivity?.open;
   const [libraryRequest, setLibraryRequest] = useState<{
     scope: number;
     selectionId: string;
@@ -621,11 +638,21 @@ function NativeChatPane({
       className="relative flex min-h-0 flex-1 flex-col"
       onTransfer={transferAttachment}
     >
+      <AgentPermissionConfirmation
+        review={state.permissionModeReview}
+        onAnswer={(confirmed) =>
+          controller.answerPermissionModeReview(confirmed)
+        }
+      />
       <div inert={activityOpen} className="flex min-h-0 flex-1 flex-col">
-        <div className="min-w-0 shrink-0 pr-10">{header(state)}</div>
-        {(state.profileError || state.catalogEntryError) && (
+        <div className="min-w-0 shrink-0">{header(state)}</div>
+        {(state.profileError ||
+          state.catalogEntryError ||
+          state.permissionModeError) && (
           <p role="alert" className="px-3 py-1 text-xs text-destructive">
-            {state.profileError ?? state.catalogEntryError}
+            {state.profileError ??
+              state.catalogEntryError ??
+              state.permissionModeError}
           </p>
         )}
         {connectionRequired && !state.scope && (
@@ -925,7 +952,21 @@ function NativeChatPane({
           />
           {/* Draft binding and submissionScope handle chat changes. Keep the
             composer mounted so model reattachment preserves its popovers. */}
-          <AgentComposerInput
+          <AgentComposer
+            access={{
+              mode: state.permissionMode?.mode ?? "restricted",
+              available: state.permissionModeAvailable,
+              uncertain: state.permissionModeUncertain,
+              onRetry: () => void controller.checkPermissionMode(),
+              busy:
+                state.permissionModeBusy ||
+                state.loading ||
+                state.acting ||
+                state.submitting ||
+                state.profileBusy,
+              error: state.permissionModeError,
+              onChange: (mode) => void controller.selectPermissionMode(mode),
+            }}
             draft={controller.composerDraft()}
             editing={
               state.queueDraft
@@ -943,23 +984,10 @@ function NativeChatPane({
             autofocus={autofocus}
             catalog={catalog}
             className="@container"
-            commandActions={controller.composerCommands.map(
-              (command): ComposerCommandAction => ({
-                id: command,
-                title: command,
-                description: COMMAND_DESCRIPTIONS[command],
-                standalone: true,
-                run: () => controller.runComposerCommand(command),
-              })
-            )}
-            onCommandSelect={(command) => {
-              const chosen = controller.composerCommands.find(
-                (listed) => listed === command.id
-              );
-              if (!chosen || !IMMEDIATE_COMMANDS.has(chosen)) return false;
-              void controller.runComposerCommand(chosen).catch(() => {});
-              return true;
-            }}
+            commands={controller.composerCommands.map((id) => ({
+              id,
+              run: () => controller.runComposerCommand(id),
+            }))}
             attachments={
               state.attachmentDraft &&
               !state.attachmentReading && (
@@ -981,6 +1009,7 @@ function NativeChatPane({
               (!state.goalIntent || controller.canStartGoal)
             }
             busy={!!turn}
+            submitting={state.submitting}
             isStreaming={streamingControlsOnly}
             emptyAction={
               resumable || (pausing && !(goalTurn && state.goal?.goal?.paused))
@@ -1006,154 +1035,69 @@ function NativeChatPane({
                         }
                       : undefined
             }
-            placeholder={
-              connectionRequired && !state.scope
-                ? "Choose a model to start chatting…"
-                : state.goalIntent
-                  ? "Describe the goal…"
-                  : state.operatingRegime === "plan"
-                    ? "What would you like to plan?"
-                    : state.attachmentDraft
-                      ? "Add a message to send this attachment…"
-                      : turn || snapshot?.admissionPaused || queued
-                        ? "Queue a follow-up…"
-                        : undefined
-            }
             submissionScope={state.scope}
             draftRef={draft}
             onSubmit={(text) => controller.submit(text, state.scope)}
             onStop={() => void controller.control("stop")}
-            toolbarStart={
-              <AgentComposerTools
-                actions={[
-                  ...(state.fileInput || state.fileReferenceInput
-                    ? [
-                        {
-                          id: "files",
-                          title: "Files",
-                          icon: <PaperclipIcon />,
-                          disabled:
-                            state.goalIntent ||
-                            !(
-                              controller.canAttach("file") ||
-                              controller.canAttach("reference")
-                            ),
-                          onSelect: () => filePicker.current?.click(),
-                        },
-                      ]
-                    : []),
-                  ...(state.imageInput
-                    ? [
-                        {
-                          id: "image",
-                          title: "Image",
-                          icon: <ImageIcon />,
-                          disabled:
-                            state.goalIntent || !controller.canAttach("png"),
-                          onSelect: () => pngPicker.current?.click(),
-                        },
-                      ]
-                    : []),
-                  ...(workspaceId && state.imageInput
-                    ? [
-                        {
-                          id: "library",
-                          title: "Library",
-                          icon: <LibraryIcon />,
-                          disabled: state.acting || state.goalIntent,
-                          onSelect: () => setLibraryScope(state.scope),
-                        },
-                      ]
-                    : []),
-                  ...(bridge.startGoal && controller.offers("goals")
-                    ? [
-                        {
-                          id: "goal",
-                          title: "Goal",
-                          description: "Set a goal to keep pursuing",
-                          icon: <GoalIcon />,
-                          disabled:
-                            state.acting ||
-                            state.goalIntent ||
-                            !controller.canStartGoal,
-                          onSelect: () => controller.selectGoalIntent(true),
-                        },
-                      ]
-                    : []),
-                  ...(bridge.submitInRegime
-                    ? [
-                        {
-                          id: "plan",
-                          title: "Plan mode",
-                          description:
-                            state.operatingRegime === "plan"
-                              ? "Turn plan mode off"
-                              : "Turn plan mode on",
-                          icon: <ListChecksIcon />,
-                          disabled: state.acting,
-                          onSelect: () =>
-                            controller.selectOperatingRegime(
-                              state.operatingRegime === "plan" ? "act" : "plan"
-                            ),
-                        },
-                      ]
-                    : []),
-                ]}
-                intents={[
-                  ...(state.operatingRegime === "plan"
-                    ? [
-                        {
-                          id: "plan",
-                          icon: <ListChecksIcon />,
-                          label: "Plan",
-                          disabled: state.acting,
-                          onRemove: () =>
-                            controller.selectOperatingRegime("act"),
-                        },
-                      ]
-                    : []),
-                  ...(state.goalIntent
-                    ? [
-                        {
-                          id: "goal",
-                          icon: <GoalIcon />,
-                          label: "Goal",
-                          disabled: state.acting,
-                          onRemove: () => controller.selectGoalIntent(false),
-                        },
-                      ]
-                    : []),
-                ]}
-              >
-                {state.backgroundProcesses && (
-                  <NativeBackgroundProcesses
-                    controller={state.backgroundProcesses}
-                  />
-                )}
-              </AgentComposerTools>
-            }
-            toolbarEnd={
-              <>
-                <ContextMeter usage={contextUsage} />
-                <NativeModelPicker
-                  profiles={state.profiles}
-                  defaultUnavailable={connectionRequired}
-                  busy={state.profileBusy || state.acting}
-                  onSelect={
-                    bridge.selectProfile && !controller.fixedSession
-                      ? (selection) => void controller.selectProfile(selection)
-                      : undefined
+            actions={{
+              files:
+                state.fileInput || state.fileReferenceInput
+                  ? {
+                      disabled:
+                        state.goalIntent ||
+                        !(
+                          controller.canAttach("file") ||
+                          controller.canAttach("reference")
+                        ),
+                      onSelect: () => filePicker.current?.click(),
+                    }
+                  : undefined,
+              image: state.imageInput
+                ? {
+                    disabled: state.goalIntent || !controller.canAttach("png"),
+                    onSelect: () => pngPicker.current?.click(),
                   }
-                  onRefresh={() => void controller.readProfiles()}
-                  refreshError={state.profileReadError}
-                  effort={state.effort}
-                  ultraAvailable={controller.ultraAvailability}
-                  ultraOffered={controller.offers("delegation")}
-                  goal={state.goalIntent}
-                  onEffort={(effort) => controller.selectEffort(effort)}
-                />
-              </>
-            }
+                : undefined,
+              library:
+                workspaceId && state.imageInput
+                  ? {
+                      disabled: state.acting || state.goalIntent,
+                      onSelect: () => setLibraryScope(state.scope),
+                    }
+                  : undefined,
+              goal: {
+                active: state.goalIntent,
+                offered: !!bridge.startGoal && controller.offers("goals"),
+                disabled: state.acting || !controller.canStartGoal,
+                removeDisabled: state.acting,
+                onChange: (active) => controller.selectGoalIntent(active),
+              },
+              plan: {
+                active: state.operatingRegime === "plan",
+                offered: !!bridge.submitInRegime,
+                disabled: state.acting,
+                onChange: (active) =>
+                  controller.selectOperatingRegime(active ? "plan" : "act"),
+              },
+            }}
+            modelLeading={<ContextMeter usage={contextUsage} />}
+            model={{
+              profiles: state.profiles,
+              defaultUnavailable: connectionRequired,
+              busy:
+                state.profileBusy || state.acting || state.permissionModeBusy,
+              onSelect:
+                bridge.selectProfile && !controller.fixedSession
+                  ? (selection) => void controller.selectProfile(selection)
+                  : undefined,
+              onRefresh: () => void controller.readProfiles(),
+              refreshError: state.profileReadError,
+              effort: state.effort,
+              ultraAvailable: controller.ultraAvailability,
+              ultraOffered: controller.offers("delegation"),
+              goal: state.goalIntent,
+              onEffort: (effort) => controller.selectEffort(effort),
+            }}
           />
           {workspaceId && state.imageInput && libraryScope === state.scope && (
             <AgentLibraryAttachmentPicker
@@ -1215,11 +1159,9 @@ function NativeChatPane({
             )}
         </div>
       </div>
-      <NativeAgentActivity
-        subagents={state.subagents}
-        processes={state.backgroundProcesses}
-        onOpenChange={setActivityOpen}
-      />
+      {!subagentsInTabs && (
+        <NativeSubagentActivityPanel subagents={state.subagents} />
+      )}
     </ComposerDropArea>
   );
 }

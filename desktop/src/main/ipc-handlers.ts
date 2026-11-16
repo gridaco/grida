@@ -418,6 +418,38 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     (event, id: string, input: unknown) => nativeChat.revise(event, id, input)
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_CREATE, (event) => nativeChat.create(event));
+  guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PERMISSION_MODE, (event) =>
+    nativeChat.acceptsPermissionMode(event)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_REVIEW_PERMISSION_MODE,
+    (event, attachmentId: string, revision: unknown, requestId: unknown) =>
+      nativeChat.reviewPermissionMode(event, attachmentId, revision, requestId)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_PERMISSION_MODE,
+    (event, attachmentId: string) =>
+      nativeChat.permissionMode(event, attachmentId)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_SET_PERMISSION_MODE,
+    (
+      event,
+      attachmentId: string,
+      revision: unknown,
+      requestId: unknown,
+      mode: unknown,
+      review: unknown
+    ) =>
+      nativeChat.setPermissionMode(
+        event,
+        attachmentId,
+        revision,
+        requestId,
+        mode,
+        review
+      )
+  );
   guarded(IPC_CHANNELS.NATIVE_CHAT_SELECTION, (event, target: unknown) =>
     nativeChat.selection(event, target)
   );

@@ -19,6 +19,20 @@ export type NativeChatDraftAttachment = NativeChatAttachment &
   }>;
 
 export type NativeChatOperatingRegime = "act" | "plan";
+/** Full access deliberately removes command filesystem and network confinement. */
+export type NativeChatPermissionMode = "restricted" | "full_access";
+export type NativeChatPermissionReview = Readonly<{
+  reviewId: string;
+  chatTitle: string;
+  workspaceName: string;
+}>;
+export type NativeChatPermissionState = Readonly<{
+  sessionId: string;
+  revision: number;
+  mode: NativeChatPermissionMode;
+  available: readonly NativeChatPermissionMode[];
+}>;
+
 /**
  * Effort for one request, from least to most. `low` through `xhigh` set the
  * model's reasoning; `ultra` also adds the extended harness. `standard` is the
@@ -497,6 +511,10 @@ export type NativeChatActivityOutcome =
 /** One recorded tool call, in the order its message requested it. */
 export type NativeChatActivity = Readonly<{
   callId: string;
+  /** First-publication position within this call's owning turn; never an execution revision. */
+  activityOrder?: number;
+  /** This host could not recover a retained position for this visible fact. */
+  activityOrderIncomplete?: true;
   /** The tool's identifier. */
   title: string;
   kind: NativeChatActivityKind;
@@ -517,6 +535,10 @@ export type NativeChatActivity = Readonly<{
 
 export type NativeChatMessage = Readonly<{
   messageId: string;
+  /** First nonempty public publication, compared only within the same turn. */
+  activityOrder?: number;
+  /** Missing retained order is explicit; clients must not infer it from arrival. */
+  activityOrderIncomplete?: true;
   role: "user" | "assistant";
   text: string;
   /** The turn that committed this message. Absent for inherited history. */
@@ -809,6 +831,9 @@ export type NativeChatTextUpdate = Readonly<{
   turnId: string;
   offsetBytes: number;
   replace: boolean;
+  /** The same first-publication coordinate retained by replayed messages. */
+  activityOrder?: number;
+  activityOrderIncomplete?: true;
 }>;
 
 export type NativeChatActivityUpdate = Readonly<{
@@ -896,6 +921,23 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   removeHook?(id: string, revision: string): Promise<NativeHookInspection>;
   selectProfile?(selection: NativeChatProfileSelection): Promise<void>;
   /** Read saved identity, initializing a new draft from defaults, without a worker. */
+  /** Negotiated native permission selection; absent/false keeps Default. */
+  acceptsPermissionMode?(): Promise<boolean>;
+  permissionMode?(attachmentId: string): Promise<NativeChatPermissionState>;
+  /** Main issues a short-lived intent bound to this exact chat and revision. */
+  reviewPermissionMode?(
+    attachmentId: string,
+    expectedRevision: number,
+    requestId: string
+  ): Promise<NativeChatPermissionReview>;
+  /** The owned app confirmation answers Main's exact intent. Null means cancel. */
+  setPermissionMode?(
+    attachmentId: string,
+    expectedRevision: number,
+    requestId: string,
+    mode: NativeChatPermissionMode,
+    review?: Readonly<{ reviewId: string; confirmed: boolean }>
+  ): Promise<NativeChatPermissionState | null>;
   selection?(
     target: NativeChatSelectionTarget
   ): Promise<NativeChatSelectionState>;

@@ -175,6 +175,7 @@ export class NativeAgentPermissions {
       primary: primary.id,
       directories,
       protectedPaths,
+      ...(command ? { allowFullAccess: true } : {}),
       ...(hooks ? { hooks: hooks.hooks } : {}),
       ...(command ? { command } : hooks ? { command: hooks.command } : {}),
     });

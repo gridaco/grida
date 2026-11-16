@@ -13,6 +13,7 @@ import type {
 } from "@grida/desktop-bridge";
 import type { NativeChatSession } from "./native-agent-chat";
 import { NativeAgentHistory } from "./native-agent-history";
+import { NativeActivityOrder } from "./native-activity-order";
 
 const { object, identity, revision } = NativeAgentHistory;
 const CHILD_PAGE = 32;
@@ -74,7 +75,8 @@ export class NativeSubagentActivity {
     private readonly request: (
       method: string,
       params: unknown
-    ) => Promise<unknown>
+    ) => Promise<unknown>,
+    private readonly activityOrderAvailable: () => boolean = () => false
   ) {}
 
   async activity(
@@ -117,10 +119,17 @@ export class NativeSubagentActivity {
     // Counts may be cached while the catalog page already contains a new child.
     // They describe their own observedAtMs, not an atomic snapshot of these rows.
     const byChild = new Map(children.map((child) => [child.childId, child]));
+    const ordered = this.activityOrderAvailable();
     const events = array(response.events, EVENT_LIMIT).map((value) =>
-      event(value, byChild)
+      event(value, byChild, ordered)
     );
     unique(events.map((entry) => entry.eventId));
+    const orderComplete = ordered ? flag(response.orderComplete) : undefined;
+    if (
+      orderComplete === true &&
+      events.some((entry) => entry.activityOrder === undefined)
+    )
+      throw invalidResponse();
     return Object.freeze({
       children: Object.freeze(children),
       nextAfterChildId: next as string | null,
@@ -128,6 +137,7 @@ export class NativeSubagentActivity {
       observedAtMs: integer(response.observedAtMs),
       events: Object.freeze(events),
       eventsComplete: flag(response.eventsComplete),
+      ...(orderComplete !== undefined && { orderComplete }),
     });
   }
 
@@ -166,7 +176,9 @@ export class NativeSubagentActivity {
       throw invalidResponse();
     const turns = array(response.turns, TURN_LIMIT).map(turnRecord);
     unique(turns.map((turn) => turn.turnId));
-    const messages = array(response.messages, RECORD_LIMIT).map(message);
+    const messages = array(response.messages, RECORD_LIMIT).map((entry) =>
+      message(entry, this.activityOrderAvailable())
+    );
     unique(messages.map((entry) => entry.messageId));
     const knownTurns = new Set(turns.map((turn) => turn.turnId));
     if (
@@ -254,7 +266,8 @@ function summary(value: unknown): NativeSubagentSummary {
 
 function event(
   value: unknown,
-  children: ReadonlyMap<string, NativeSubagentSummary>
+  children: ReadonlyMap<string, NativeSubagentSummary>,
+  ordered: boolean
 ): NativeSubagentLifecycleEvent {
   const row = record(value);
   const childId = id(row.childId),
@@ -267,6 +280,9 @@ function event(
     (kind === "started" && row.status !== undefined)
   )
     throw invalidResponse();
+  const activityOrder = ordered
+    ? NativeActivityOrder.coordinate(row.activityOrder)
+    : undefined;
   return Object.freeze({
     eventId: text(row.eventId, 1024, false),
     childId,
@@ -276,6 +292,7 @@ function event(
     parentTurnId: id(row.parentTurnId),
     inputId: id(row.inputId),
     atMs: integer(row.atMs),
+    ...(activityOrder !== undefined && { activityOrder }),
     ...(row.status !== undefined && { status: choice(row.status, SETTLED) }),
   });
 }
@@ -320,7 +337,10 @@ function turnRecord(value: unknown): NativeSubagentConversationTurn {
   });
 }
 
-function message(value: unknown): NativeSubagentConversationMessage {
+function message(
+  value: unknown,
+  ordered: boolean
+): NativeSubagentConversationMessage {
   const row = record(value);
   const role = choice(row.role, ["user", "assistant"] as const);
   if (
@@ -332,13 +352,18 @@ function message(value: unknown): NativeSubagentConversationMessage {
   const activity =
     row.activity === undefined
       ? undefined
-      : array(row.activity, 16).map(toolActivity);
+      : array(row.activity, 16).map((entry) => toolActivity(entry, ordered));
   if (activity) unique(activity.map((entry) => entry.callId));
   if (role === "user" && activity?.length) throw invalidResponse();
   return Object.freeze({
     messageId: id(row.messageId),
     role,
     text: text(row.text, TEXT_LIMIT),
+    ...NativeActivityOrder.read(
+      row,
+      ordered,
+      typeof row.text === "string" && row.text.length > 0
+    ),
     ...(row.turnId !== undefined && { turnId: id(row.turnId) }),
     ...(row.phase !== undefined && {
       phase: choice(row.phase, ["answer", "progress"] as const),
@@ -349,7 +374,7 @@ function message(value: unknown): NativeSubagentConversationMessage {
   });
 }
 
-function toolActivity(value: unknown): NativeChatActivity {
+function toolActivity(value: unknown, ordered: boolean): NativeChatActivity {
   const row = record(value);
   const kind = choice(row.kind, ACTIVITY_KINDS);
   if (row.source !== undefined && kind !== "integration")
@@ -373,6 +398,7 @@ function toolActivity(value: unknown): NativeChatActivity {
     title: id(row.title),
     kind,
     outcome: choice(row.outcome, ACTIVITY_OUTCOMES),
+    ...NativeActivityOrder.read(row, ordered, true),
     ...(row.source !== undefined && { source: id(row.source) }),
     ...(input !== undefined && { input }),
     ...(output && { output }),

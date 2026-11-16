@@ -20,6 +20,8 @@ const utf8 = new TextEncoder();
 
 type View = Readonly<{
   open: boolean;
+  /** Grows only when a person explicitly asks to present this viewer. */
+  focus: number;
   detail: boolean;
   children: readonly NativeSubagentEntry[];
   next: string | null;
@@ -58,6 +60,7 @@ type PendingChildControl = Readonly<{
 
 const EMPTY: View = Object.freeze({
   open: false,
+  focus: 0,
   detail: false,
   children: [],
   next: null,
@@ -169,7 +172,7 @@ export class NativeSubagentController {
         error: null,
       });
     } else {
-      this.update({ open: true });
+      this.update({ open: true, focus: this.view.focus + 1 });
       void this.list();
     }
   }
@@ -177,7 +180,10 @@ export class NativeSubagentController {
   /** Opens observation without changing the selected parent conversation. */
   show(): void {
     if (this.disposed) return;
-    if (!this.view.open) this.update({ open: true, detail: false });
+    this.update({
+      focus: this.view.focus + 1,
+      ...(!this.view.open && { open: true, detail: false }),
+    });
     void this.list();
   }
 
@@ -186,7 +192,7 @@ export class NativeSubagentController {
     inputId: string | null = null
   ): Promise<void> {
     if (this.disposed) return;
-    this.update({ open: true, detail: true });
+    this.update({ open: true, detail: true, focus: this.view.focus + 1 });
     await this.select(childId, inputId);
   }
 
@@ -342,11 +348,23 @@ export class NativeSubagentController {
             .map((child) => [child.childId, child])
         ).values(),
       ];
+      const previousEvents = new Map(
+        this.view.events.map((event) => [event.eventId, event])
+      );
+      const incomingEvents = pages
+        .flatMap((page) => page.events)
+        .map((event) => {
+          const known = previousEvents.get(event.eventId)?.activityOrder;
+          return known === undefined
+            ? event
+            : { ...event, activityOrder: known };
+        });
       const allEvents = [
         ...new Map(
-          [...this.view.events, ...pages.flatMap((page) => page.events)].map(
-            (event) => [event.eventId, event]
-          )
+          [...this.view.events, ...incomingEvents].map((event) => [
+            event.eventId,
+            event,
+          ])
         ).values(),
       ].sort((a, b) => a.atMs - b.atMs || a.eventId.localeCompare(b.eventId));
       this.eventsTruncated ||=

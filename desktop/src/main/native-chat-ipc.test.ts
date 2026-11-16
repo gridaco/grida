@@ -3340,3 +3340,308 @@ it("uses the verified fixed route's image capability for a default-profile subsc
   await f.ipc.selection(f.first.event, { sessionId: "fixed-chat" });
   expect(await f.ipc.acceptsSelectedImage(f.first.event)).toBe(true);
 });
+
+describe("Full access selection IPC", () => {
+  function permissionSetup() {
+    const f = setup();
+    const modes = new Map<
+      string,
+      { revision: number; mode: "restricted" | "full_access" }
+    >();
+    const receipts = new Map<
+      string,
+      Awaited<ReturnType<NonNullable<typeof f.chat.setPermissionMode>>>
+    >();
+    Object.defineProperty(f.chat, "acceptsPermissionMode", { value: true });
+    f.chat.permissionMode = vi.fn<NonNullable<typeof f.chat.permissionMode>>(
+      async (session) => ({
+        sessionId: session.id,
+        ...(modes.get(session.id) ?? {
+          revision: 0,
+          mode: "restricted" as const,
+        }),
+        available: ["restricted", "full_access"],
+      })
+    );
+    f.chat.setPermissionMode = vi.fn<
+      NonNullable<typeof f.chat.setPermissionMode>
+    >(async (session, revision, request, mode) => {
+      const key = `${session.id}/${request}`;
+      if (receipts.has(key)) return receipts.get(key)!;
+      if ((modes.get(session.id)?.revision ?? 0) !== revision)
+        throw new Error("permission_mode_revision_changed");
+      const next = { revision: revision + 1, mode };
+      modes.set(session.id, next);
+      const state = {
+        sessionId: session.id,
+        ...next,
+        available: ["restricted", "full_access"] as const,
+      };
+      receipts.set(key, state);
+      return state;
+    });
+    f.scopes.set(f.first.sender, {
+      workspaceId: WORKSPACE,
+      workspaceName: "Example project",
+      chat: f.chat,
+    });
+    return f;
+  }
+
+  it("requires an exact app confirmation intent and returns readable chat/project names", async () => {
+    const f = permissionSetup();
+    const first = await f.ipc.create(f.first.event);
+    const second = await f.ipc.create(f.first.event);
+    expect(f.ipc.acceptsPermissionMode(f.first.event)).toBe(true);
+    const id = randomUUID();
+    await expect(
+      f.ipc.setPermissionMode(
+        f.first.event,
+        first.attachmentId,
+        0,
+        id,
+        "full_access"
+      )
+    ).rejects.toThrow("confirmation_required");
+    expect(f.chat.setPermissionMode).not.toHaveBeenCalled();
+    const review = await f.ipc.reviewPermissionMode(
+      f.first.event,
+      first.attachmentId,
+      0,
+      id
+    );
+    expect(review.chatTitle).toBe("New chat");
+    expect(review.workspaceName).toBe("Example project");
+    const result = await f.ipc.setPermissionMode(
+      f.first.event,
+      first.attachmentId,
+      0,
+      id,
+      "full_access",
+      { reviewId: review.reviewId, confirmed: true }
+    );
+    expect(f.chat.setPermissionMode).toHaveBeenCalledExactlyOnceWith(
+      { id: first.sessionId },
+      0,
+      id,
+      "full_access"
+    );
+    expect(result?.mode).toBe("full_access");
+    expect(
+      (await f.ipc.permissionMode(f.first.event, second.attachmentId)).mode
+    ).toBe("restricted");
+    await f.ipc.setPermissionMode(
+      f.first.event,
+      first.attachmentId,
+      1,
+      randomUUID(),
+      "restricted"
+    );
+    expect(f.chat.setPermissionMode).toHaveBeenCalledTimes(2);
+  });
+
+  it("revokes a cancelled intent and refuses foreign or reused confirmation tokens", async () => {
+    const f = permissionSetup();
+    const chat = await f.ipc.create(f.first.event);
+    const id = randomUUID();
+    await expect(
+      f.ipc.reviewPermissionMode(f.second.event, chat.attachmentId, 0, id)
+    ).rejects.toThrow("attachment_unavailable");
+    const review = await f.ipc.reviewPermissionMode(
+      f.first.event,
+      chat.attachmentId,
+      0,
+      id
+    );
+    await expect(
+      f.ipc.setPermissionMode(
+        f.first.event,
+        chat.attachmentId,
+        0,
+        randomUUID(),
+        "full_access",
+        { reviewId: review.reviewId, confirmed: true }
+      )
+    ).rejects.toThrow("review_changed");
+    expect(
+      await f.ipc.setPermissionMode(
+        f.first.event,
+        chat.attachmentId,
+        0,
+        id,
+        "full_access",
+        { reviewId: review.reviewId, confirmed: false }
+      )
+    ).toBeNull();
+    await expect(
+      f.ipc.setPermissionMode(
+        f.first.event,
+        chat.attachmentId,
+        0,
+        id,
+        "full_access",
+        { reviewId: review.reviewId, confirmed: true }
+      )
+    ).rejects.toThrow("review_changed");
+    expect(f.chat.setPermissionMode).not.toHaveBeenCalled();
+  });
+
+  it("revokes pending app confirmation when the frame navigates", async () => {
+    const f = permissionSetup();
+    const chat = await f.ipc.create(f.first.event);
+    const id = randomUUID();
+    const review = await f.ipc.reviewPermissionMode(
+      f.first.event,
+      chat.attachmentId,
+      0,
+      id
+    );
+    f.first.contents.emit("did-start-navigation", { isMainFrame: true });
+    await expect(
+      f.ipc.setPermissionMode(
+        f.first.event,
+        chat.attachmentId,
+        0,
+        id,
+        "full_access",
+        { reviewId: review.reviewId, confirmed: true }
+      )
+    ).rejects.toThrow("attachment_unavailable");
+    expect(f.chat.setPermissionMode).not.toHaveBeenCalled();
+  });
+
+  it("reconciles a lost committed reply with the native exact receipt even after consuming the app intent", async () => {
+    const f = permissionSetup();
+    const chat = await f.ipc.create(f.first.event);
+    const id = randomUUID();
+    const review = await f.ipc.reviewPermissionMode(
+      f.first.event,
+      chat.attachmentId,
+      0,
+      id
+    );
+    const answer = { reviewId: review.reviewId, confirmed: true };
+    const first = await f.ipc.setPermissionMode(
+      f.first.event,
+      chat.attachmentId,
+      0,
+      id,
+      "full_access",
+      answer
+    );
+    const retried = await f.ipc.setPermissionMode(
+      f.first.event,
+      chat.attachmentId,
+      0,
+      id,
+      "full_access",
+      answer
+    );
+    expect(retried).toEqual(first);
+    expect(vi.mocked(f.chat.setPermissionMode!).mock.calls[1]).toEqual(
+      vi.mocked(f.chat.setPermissionMode!).mock.calls[0]
+    );
+  });
+
+  it("refuses a future revision as a shortcut around Full access confirmation", async () => {
+    const f = permissionSetup();
+    const chat = await f.ipc.create(f.first.event);
+    const id = randomUUID();
+    const review = await f.ipc.reviewPermissionMode(
+      f.first.event,
+      chat.attachmentId,
+      0,
+      id
+    );
+    await f.ipc.setPermissionMode(
+      f.first.event,
+      chat.attachmentId,
+      0,
+      id,
+      "full_access",
+      { reviewId: review.reviewId, confirmed: true }
+    );
+    vi.mocked(f.chat.setPermissionMode!).mockClear();
+    await expect(
+      f.ipc.setPermissionMode(
+        f.first.event,
+        chat.attachmentId,
+        2,
+        randomUUID(),
+        "full_access"
+      )
+    ).rejects.toThrow("revision_changed");
+    expect(f.chat.setPermissionMode).not.toHaveBeenCalled();
+  });
+
+  it("requires fresh app confirmation after its review expires", async () => {
+    const f = permissionSetup();
+    const chat = await f.ipc.create(f.first.event);
+    const id = randomUUID();
+    const review = await f.ipc.reviewPermissionMode(
+      f.first.event,
+      chat.attachmentId,
+      0,
+      id
+    );
+    const clock = vi
+      .spyOn(Date, "now")
+      .mockReturnValue(Date.now() + 6 * 60_000);
+    try {
+      await expect(
+        f.ipc.setPermissionMode(
+          f.first.event,
+          chat.attachmentId,
+          0,
+          id,
+          "full_access",
+          { reviewId: review.reviewId, confirmed: true }
+        )
+      ).rejects.toThrow("review_changed");
+      expect(f.chat.setPermissionMode).not.toHaveBeenCalled();
+      const renewed = await f.ipc.reviewPermissionMode(
+        f.first.event,
+        chat.attachmentId,
+        0,
+        id
+      );
+      await f.ipc.setPermissionMode(
+        f.first.event,
+        chat.attachmentId,
+        0,
+        id,
+        "full_access",
+        { reviewId: renewed.reviewId, confirmed: true }
+      );
+      expect(f.chat.setPermissionMode).toHaveBeenCalledOnce();
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it("withholds Full access on older native hosts and rejects invalid selections", async () => {
+    const f = setup();
+    const chat = await f.ipc.create(f.first.event);
+    expect(f.ipc.acceptsPermissionMode(f.first.event)).toBe(false);
+    await expect(
+      f.ipc.setPermissionMode(
+        f.first.event,
+        chat.attachmentId,
+        0,
+        randomUUID(),
+        "full_access"
+      )
+    ).rejects.toThrow("unavailable");
+    const enabled = permissionSetup();
+    const attached = await enabled.ipc.create(enabled.first.event);
+    await expect(
+      enabled.ipc.setPermissionMode(
+        enabled.first.event,
+        attached.attachmentId,
+        0,
+        randomUUID(),
+        "auto_review"
+      )
+    ).rejects.toThrow("invalid");
+  });
+});

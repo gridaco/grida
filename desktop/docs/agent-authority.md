@@ -279,7 +279,26 @@ are never adopted as removable user data by a later launch.
 
 ## Raw execution and extensions
 
-Model commands run through the Rust host and native sandbox helper. The host
+Desktop offers Default and explicitly confirmed Full access for an attached
+project chat. Main stages `allowFullAccess` as a launch capability, not an
+initial selection. Its guarded permission-mode bridge uses an in-app
+confirmation bound to the attached chat before enabling Full access. The Rust
+host retains that chat's choice and captures it with accepted work and worker
+assignments. New chats remain restricted. Changes require an idle chat, an
+empty queue and no running command processes; the existing process list and
+Stop controls remain the owner of those processes.
+
+Full access uses a separate explicit unconfined native scope. It permits
+ordinary-user filesystem, internet and local-network access and intentionally
+relinquishes command/file-tool exclusions for private state and credentials.
+The payload keeps its approved environment without automatic provider-secret
+injection. It uses its own network stack; Grida makes no system-proxy/PAC or
+destination-filtering claim for that traffic. Process supervision and truthful
+cleanup evidence remain. This choice does not widen the retained sidecar,
+provider HTTP service or renderer's raw capabilities. Older hosts without the
+negotiated operation keep Default. Automatic approval review remains separate.
+
+Default model commands run through the Rust host and native sandbox helper. The host
 captures explicit directory permissions, protected paths, trusted executable
 identity, deadlines and bounded output. Plan withholds command execution. A
 profile denies the shared provider credential root (GRIDA-SEC-014) alongside
@@ -300,12 +319,13 @@ unqualified platform into a supported execution environment.
 
 Raw networking follows these postures:
 
-| Workload                                  | Default                                                                                   | Host-route requirement                                                                                                                             |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Shell or script                           | Network denied                                                                            | A designed, granted HTTP capability may use the native service; arbitrary TCP remains unavailable without a conforming enforcer.                   |
-| External ACP agent                        | Withheld in Desktop until its fixed endpoints and client route/trust can both be enforced | A static environment proxy is not advertised as system-PAC compatibility.                                                                          |
-| Local MCP / extension                     | Confined filesystem/process with no egress grant                                          | Exact egress grants are enforced per worker. The user may separately choose a visible, revocable unmanaged-network grant for that extension alone. |
-| Install-time resolver or lifecycle script | Inert acquisition only                                                                    | Any executable install step is a separate confined workload with its own egress grant.                                                             |
+| Workload                                   | Default                                                                                   | Host-route requirement                                                                                                                             |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shell or script under Default              | Network denied                                                                            | A designed, granted HTTP capability may use the native service; arbitrary TCP remains unavailable without a conforming enforcer.                   |
+| Shell or script under explicit Full access | Unconfined ordinary-user networking                                                       | The launched software owns routing and proxy support; no managed network isolation is claimed.                                                     |
+| External ACP agent                         | Withheld in Desktop until its fixed endpoints and client route/trust can both be enforced | A static environment proxy is not advertised as system-PAC compatibility.                                                                          |
+| Local MCP / extension                      | Confined filesystem/process with no egress grant                                          | Exact egress grants are enforced per worker. The user may separately choose a visible, revocable unmanaged-network grant for that extension alone. |
+| Install-time resolver or lifecycle script  | Inert acquisition only                                                                    | Any executable install step is a separate confined workload with its own egress grant.                                                             |
 
 An unmanaged-network extension grant is not called sandboxed networking. It
 means Grida does not intercept that extension's network stack; the extension is

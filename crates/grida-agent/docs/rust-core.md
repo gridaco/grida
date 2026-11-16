@@ -29,7 +29,7 @@ consumer to its normal dependency.
 | [`agent-kit-runtime`](../../agent-kit-runtime/README.md)           | The live turn: admission gate, concurrent scoped operations, waits, suspension, and settlement                                          |
 | [`agent-kit-sessions`](../../agent-kit-sessions/README.md)         | Durable input acceptance, queue and controls, claims, recovery, and the injected turn driver                                            |
 | [`agent-kit-providers`](../../agent-kit-providers/README.md)       | Chat Completions-compatible, Responses, Anthropic Messages, and Gemini adapters over a host-owned streaming transport                   |
-| [`agent-kit-sandbox`](../../agent-kit-sandbox/README.md)           | Native confinement for raw processes: Seatbelt on macOS, bubblewrap with a seccomp helper on Linux                                      |
+| [`agent-kit-sandbox`](../../agent-kit-sandbox/README.md)           | Native process confinement and separately explicit unconfined supervision on macOS/Linux                                                |
 | [`agent-kit-store-sqlite`](../../agent-kit-store-sqlite/README.md) | The SQLite `SessionStore` and `TurnJournal`, with its session catalog, history replay, and session deletion                             |
 | [`grida-agent-master`](../../grida-agent-master/README.md)         | Grida product policy: context selection, effort, goals, questions, subagents, lifecycle hooks, and completion accounts                  |
 | [`grida-agent`](../README.md)                                      | The native executable and host composition: ACP and MCP bindings, configuration, permissions, tools, processes, and credentials         |
@@ -1252,12 +1252,12 @@ claims admit each child from one live source tool operation. Reconciliation read
 the retained destination before attempting a new admission. One source operation
 has one destination; several spawn calls can create separate children.
 
-| Tool                 | Arguments              | Result                                                                          |
-| -------------------- | ---------------------- | ------------------------------------------------------------------------------- |
-| `spawn_agent`        | `name`, `instructions` | An assignment identifying the child session, accepted input and execution turn. |
-| `send_agent_message` | `child`, `text`        | An informational delivery receipt; this starts no idle work.                    |
-| `wait_agent`         | `children`             | Bounded collected terminal assignment results and explicit pending assignments. |
-| `stop_agent`         | `child`                | A control and the observed assignment result, or explicit pending settlement.   |
+| Tool                 | Arguments              | Result                                                                                |
+| -------------------- | ---------------------- | ------------------------------------------------------------------------------------- |
+| `spawn_agent`        | `name`, `instructions` | An assignment identifying the child session, accepted input and execution turn.       |
+| `send_agent_message` | `child`, `text`        | A durable append receipt for the current active assignment; this starts no idle work. |
+| `wait_agent`         | `children`             | Bounded collected terminal assignment results and explicit pending assignments.       |
+| `stop_agent`         | `child`                | A control and the observed assignment result, or explicit pending settlement.         |
 
 A successful tool operation counts as assignment or collection evidence only
 under the captured definition and exact live grant. Collection identifies the
@@ -1265,6 +1265,30 @@ original child, input and turn; a later child result cannot satisfy earlier work
 The master supplies remaining decisions to collect or stop outstanding work
 before successful completion. Exhaustion records incomplete work rather than
 silently claiming completion.
+
+General-worker information delivery appends one user message to the exact
+current child turn through the existing history control contract. It does not
+queue a later assignment. A successful result has the following shape:
+
+```json
+{
+  "delivered": {
+    "child": "subagent/identity",
+    "input": "worker-message/identity",
+    "turn": "worker-turn",
+    "history_position": 5,
+    "status": "appended"
+  }
+}
+```
+
+The position identifies the recorded message, available to the next permitted
+model request; it does not prove model consumption. Fresh delivery requires
+the owned active assignment and live parent authority, and refuses paused,
+cancelled or settled work. The source operation identifies the message, so
+recovery returns the same recorded receipt without appending again or waking
+work. The private ACP `send-message` operation retains its separate reusable-child
+contract: it queues context for the next assignment.
 
 Ordinary Act intake can reserve eight workers with eight generation steps each
 beside the parent's allowance. The captured policy, provider, reasoning,
@@ -1286,6 +1310,11 @@ uncertain resource retirement. An empty process table after reopening is not
 retirement evidence; only retained proof or the absence of any dispatched
 process launch can establish that fact. Ordinary chat process lifetime is
 unchanged.
+Worker guidance identifies the host as the automatic cleanup owner. A worker
+may leave an assignment-required bounded process running at completion and
+reports its session and last observed state without claiming a native retirement
+receipt it has not seen. Work intended to outlive the assignment belongs to the
+parent.
 
 ## Persistent adapter and composition
 
@@ -1441,6 +1470,14 @@ pre-existing paths and reject incompatible ownership, permissions, or link
 substitution before use. Platform adapters supply equivalent access control.
 The sandbox also keeps these host-private locations outside raw-command grants.
 A state directory has one owning process.
+
+The host also owns a private, bounded presentation-order ledger for each turn.
+It retains public message, individual tool-call and child lifecycle identities
+with first-publication positions. This is a client projection concern: it
+changes neither runtime/session schemas nor execution authority. Readers never
+allocate missing historical positions. The
+[client protocol binding](./rust-client-protocol.md#parent-activity-ordering)
+defines the negotiated fields and explicit incomplete-order fallback.
 
 The [native host README](../README.md) documents each
 subcommand's flags, output records, and exit statuses.

@@ -3,8 +3,8 @@
 use crate::command::CommandLimits;
 use crate::goal_verification::ReadVerification;
 use crate::permissions::{
-    AccessRule, CommandProfile, DirectoryAccess, PermissionProfile, ReviewedHookCommand,
-    ReviewedLifecycleHook,
+    AccessRule, CommandProfile, DirectoryAccess, PermissionMode, PermissionProfile,
+    ReviewedHookCommand, ReviewedLifecycleHook,
 };
 use crate::workspace::{DirectorySpec, ProtectedRoots, WorkspaceSnapshot, validate_absolute};
 use agent_kit_core::{BindingId, Error, ErrorKind, Fingerprint, Result};
@@ -44,6 +44,10 @@ struct ProfileFile {
     automatic_read_review: Option<ReadProfile>,
     goal_read_verification: Option<ReadVerification>,
     goal_read_verifications: Option<Vec<ReadVerification>>,
+    #[serde(default)]
+    allow_full_access: bool,
+    #[serde(default)]
+    initial_permission_mode: PermissionMode,
 }
 
 #[derive(Deserialize)]
@@ -207,6 +211,8 @@ pub fn load_permission_profile_excluding(
     if profile.version != 1 || profile.directories.is_empty() || profile.directories.len() > 32 {
         return Err(invalid());
     }
+    let allow_full_access = profile.allow_full_access;
+    let initial_permission_mode = profile.initial_permission_mode;
     let goal_read_verifications = match (
         profile.goal_read_verification,
         profile.goal_read_verifications,
@@ -361,7 +367,9 @@ pub fn load_permission_profile_excluding(
     };
     let profile = profile.with_lifecycle_hooks(hooks, hooks_only)?;
     Ok(Arc::new(
-        profile.with_goal_read_verifications(goal_read_verifications)?,
+        profile
+            .with_goal_read_verifications(goal_read_verifications)?
+            .with_full_access(allow_full_access, initial_permission_mode)?,
     ))
 }
 

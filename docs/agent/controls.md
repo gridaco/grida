@@ -11,6 +11,29 @@ Available in Grida Desktop chat on macOS and Linux. Headless and ACP clients
 pause, steer and queue through the
 [client operations](./clients.md#use-durable-client-operations).
 
+## Start from Home
+
+Home and workspace chats share the composer, its **+** menu, removable **Plan**
+and **Goal** badges, and model and effort picker. Available actions depend on
+what your installed Desktop and selected connection support. Home has no running
+turn or waiting queue to control.
+
+Choose the destination workspace on Home, write a request, and send. The
+workspace opens with a new chat using the model, effort and intents you chose.
+Drop an image, file or folder anywhere on Home to stage it in the composer;
+the shared **Drop to attach** overlay covers the whole Home window.
+An attached image or file travels with the request. If the connection cannot
+accept it, Grida keeps the attachment and request in the composer for you to
+resolve; it does not send the text alone. Reloading before that first send can
+lose the original selected file. Its card then asks you to attach it again;
+remove or replace it before sending.
+
+Home also offers reference galleries and slide templates. References become
+links in the first message. A template is copied into the destination workspace,
+and the message identifies the copy to adapt. **Slides** and **Images** describe
+the requested outcome; they do not change the agent's permissions or make an
+unsupported tool available.
+
 ## Steer the current turn
 
 Send your message while the agent is working. It joins the queue above the
@@ -89,15 +112,14 @@ workspace. Review it, then send a new message to continue.
 ## Stop running processes
 
 A command the agent starts can keep running after its turn, such as a
-development server or a watcher. While any of the chat's processes runs, the
-composer toolbar shows **N running**. Open it to see each process's command,
-its folder and whether it is running or ended. Choose **Stop** on one process,
-or **Stop all**.
+development server or a watcher. The composer has no process badge.
 
-The chat's activity view also has **Processes**. It keeps the host's ended
-entries reachable when no process is running and uses the same list and Stop
-controls. It does not show a live terminal output stream. Closing the view
-does not stop processes.
+In a workspace, the bottom **Workspace utilities** panel has **Terminal** and
+**Processes** tabs. **Processes** shows the selected parent chat's agent
+processes with the same list and Stop controls, including ended entries when
+none are running. The **Terminal** tab keeps your separate interactive shell;
+**Processes** does not show a live terminal output stream. Switching tabs or
+closing the panel does not stop the agent's processes.
 
 Type `/stop` on its own, or choose **stop** in the `/` menu, to stop every
 process of the chat without sending a message. It does not stop the current
@@ -106,21 +128,18 @@ turn; use the composer's main button for that.
 Switching chats or reloading the window leaves the processes running, and the
 list returns when the chat reopens. Closing the window that shows the chat
 stops them, unless another open window also shows that chat. Deleting the
-chat or quitting Desktop stops them too. A side chat lists and stops its own
-processes the same way; they end when it closes.
+chat or quitting Desktop stops them too. Use `/stop` in a side chat to stop
+its own processes. The workspace's Processes tab follows the selected main chat.
 
-## Control a subagent's work
+## Follow a subagent's work
 
-Open **Subagents** in the chat's activity controls, then select a child.
-Available controls apply to that child's observed assignment or waiting queue:
-Pause and Resume continue the same assignment; Steer adds a correction; Stop
-ends the current assignment and holds its queue. Resume Queue starts waiting
-work, and a waiting assignment can be withdrawn. A message supplies context
-for the next assignment without starting idle work.
-
-These controls appear only when the connection supports them and the current
-observation permits the action. They do not replace the parent chat's Stop or
-the separate process controls. Closing the child viewer is observational.
+Click a subagent indicator or named start/finish event in the parent
+transcript. In a workspace, **Subagents** opens as a main content tab. Select
+a child to read its status, recorded activity and conversation. The parent composer remains
+usable. Closing the tab only hides the view, and another indicator click
+opens it again. This view offers no creation, assignment or execution
+controls; give further instructions in the parent chat. Agent process
+controls live separately in the workspace's **Processes** tab.
 [Work with subagents](./subagents.md)
 
 ## Return to background work

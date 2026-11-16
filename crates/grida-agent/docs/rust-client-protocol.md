@@ -794,6 +794,37 @@ receipt. A conflicting answer fails. Continuation checks the current profile
 and resource identities before executing the approved action. One-shot `run`
 returns pending `approvals` with `input_required` and exit code `6`.
 
+### Per-chat permission mode
+
+`co.grida/session/permission-mode` version 1 is available only to a negotiated
+private supervising stdio connection. It grants no authority by itself. The
+launch permission profile must independently enable `allowFullAccess` before
+the supervisor can select that mode.
+
+- `_co.grida/session/permission-mode` takes `{cwd, sessionId}` and returns
+  `{sessionId, revision, mode, available}`. Modes are `restricted` and
+  `full_access`; an unselected chat starts at revision 0 in restricted mode.
+- `_co.grida/session/permission-mode/update` takes
+  `{cwd, sessionId, expectedRevision, requestId, mode}` and returns the state
+  plus `requestId`. An exact retry observes the committed receipt. Conflicting
+  request reuse or revision mismatch refuses the change.
+- `_co.grida/session/permission-mode/ack` takes `{cwd, sessionId, requestId}`
+  and releases an observed change's coordination receipt. Clients retain the
+  exact pending change until its outcome is confirmed, then acknowledge it;
+  the saved mode remains. Outstanding unacknowledged receipts are bounded.
+
+Changes require an idle ordinary parent chat, an empty queue and no running
+command processes. `permission_mode_busy` leaves the choice unchanged. Child
+and side chats cannot select their own broader posture. The host captures
+authority with accepted input and worker assignments; inspection, replay and
+reopening do not change it. Saved Full access is unavailable when the current
+trusted launch does not authorize it.
+
+Desktop presents an in-app confirmation bound to the attached chat before
+enabling Full access. Clients must feature-detect the capability; older hosts
+retain their restricted contract. Permission selection is independent of
+model/effort defaults and starts no provider call.
+
 ### Model-created workers
 
 An opted-in native host can supply general model delegation on ordinary Act
@@ -874,8 +905,9 @@ excludes children.
   a bounded serialized response are returned. `eventsComplete: false` reports
   omitted older retained events or byte-bound trimming for those children; it
   is not a claim that unloaded catalog pages have no events. Clients group
-  events under the owning parent turn rather than infer timing against parent
-  commentary that has no recorded timestamp.
+  events under the owning parent turn and use the separately negotiated
+  activity-order contract below for placement among parent work. Without that
+  evidence, relative ordering remains unknown.
 - `_co.grida/subagent/conversation` takes `childId` and optional opaque `before`
   continuation. It returns `parentSessionId`, `childId`, `name`, `kind`, `view`,
   `messages`, `turns`, `execution`, `older`, `live` and `observedAtMs`. Messages
@@ -903,6 +935,58 @@ restart or eviction; it cannot reconstruct uncommitted output until that
 output is published. `live.truncated` reports a cache or page bound. Completed
 history remains readable after restart. Closing this observation does not stop
 work, and parent deletion retains ownership of child removal.
+
+#### Parent activity ordering
+
+Private clients can negotiate `co.grida/session/activity-order` version 1.
+`activityOrder` is an optional positive JavaScript safe integer comparable only
+within one `turnId` or lifecycle event's `parentTurnId`. It is a product-host
+presentation coordinate, not an execution timestamp or permission grant.
+
+The coordinate describes the first public publication of an assistant text
+message, each individual tool call, or a child start/finish event. Text growth,
+replacement and tool status changes retain the same coordinate. An empty
+tool-only message envelope needs no message coordinate; its calls each have
+their own. A text message remains atomic if a lifecycle event arrives between
+its chunks. Child completion is the recorded settlement, not later collection
+by the parent.
+
+The `_meta["co.grida/session/activity-order"]` slot supplies attribution for
+public message/tool notifications, including standard ACP prompt delivery.
+It carries the known `turnId` and the exact message or call's order metadata.
+Existing live-update and transcript-window metadata also carries these fields.
+A call's position must not be assigned to its containing message. When the
+negotiated host lacks a fact's retained position,
+it instead reports `activityOrderIncomplete: true`; number and incomplete
+marker are mutually exclusive. Child lifecycle events carry their own optional
+`activityOrder`, and activity pages report `orderComplete` for their returned
+events. Child conversation coordinates, when available, belong to the child's
+own turn and cannot be compared with the parent's sequence.
+
+Clients merge individual commentary, calls and lifecycle events before joining
+consecutive tool calls into activity groups. Duplicate or conflicting facts
+cannot establish an order. Missing metadata on older hosts remains valid, but
+clients must label events whose placement is unknown rather than sort them by
+wall clock or local arrival time. Observation never allocates historical
+positions. A later lookup may enrich a previously unknown position only from
+an actually retained record. Incremental updates cannot change a coordinate
+already held by the view or erase it with an incomplete update. A fresh
+authoritative replay can report unavailable ordering evidence; bounded or
+unavailable records remain explicit rather than requiring a second client
+history store.
+
+The host retains at most 4,096 public fact identities per turn in a private
+ledger capped at 2 MiB, with eight ledgers cached in memory. Reaching a bound
+or failing validation/persistence leaves new positions unavailable while
+preserving known lookups. Resume audits include both history and committed
+inference outcomes; a missing causal predecessor disables further allocation
+rather than backfilling the past. Parent settlement closes admission of new
+message, call and child-start positions. An already recorded child start can
+still acquire its matching finish at the actual later publication position;
+this never delays execution or assigns an earlier timestamp-derived position.
+Session retirement removes its own ledgers.
+Recovery and cleanup share a per-pass bound of 256 path entries and 8 MiB;
+unfinished cleanup remains pending.
 
 Lifecycle hook inspection uses the `co.grida/session/hooks` operation below.
 Hook progress and failures have ordinary tool and notice projections, with

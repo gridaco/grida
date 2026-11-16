@@ -178,6 +178,7 @@ impl Host {
         children: Vec<SessionId>,
     ) -> Result<SessionDeleted> {
         self.validate_chat_selection_retirement(&request.session)?;
+        let ordered_children = children.clone();
         let owner = request.session.clone();
         let parent = owner.clone();
         let child_cwd = cwd.clone();
@@ -227,10 +228,20 @@ impl Host {
                 require_resolved_work,
             )
             .await?;
+        for child in ordered_children {
+            self.activity_order
+                .retire(&child)
+                .map_err(|_| problem(ErrorKind::Uncertain, "session_deletion_unverified"))?;
+        }
         self.finish_deletion(receipt).await
     }
 
     async fn finish_deletion(&self, mut receipt: SessionDeleted) -> Result<SessionDeleted> {
+        self.activity_order
+            .retire(&receipt.session)
+            .map_err(|_| problem(ErrorKind::Uncertain, "session_deletion_unverified"))?;
+        self.retire_permission_mode(&receipt.session)
+            .map_err(|_| problem(ErrorKind::Uncertain, "session_deletion_unverified"))?;
         self.retire_chat_selection(&receipt.session)
             .map_err(|_| problem(ErrorKind::Uncertain, "session_deletion_unverified"))?;
         let spending = self.spending.clone();
@@ -274,6 +285,12 @@ impl Host {
         }
         if self.reconcile_chat_selections().await.is_err() {
             eprintln!("grida-agent: retired chat selection cleanup is pending");
+        }
+        if self.reconcile_permission_modes().await.is_err() {
+            eprintln!("grida-agent: retired permission selection cleanup is pending");
+        }
+        if self.activity_order.reconcile().await.is_err() {
+            eprintln!("grida-agent: retired activity ordering cleanup is pending");
         }
         let _ = self
             .owned_control(|host| async move {

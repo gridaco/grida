@@ -28,7 +28,13 @@ import {
   type ReactNode,
   type Ref,
 } from "react";
-import { ArrowUpIcon, CheckIcon, PencilIcon, SquareIcon } from "lucide-react";
+import {
+  ArrowUpIcon,
+  CheckIcon,
+  LoaderCircleIcon,
+  PencilIcon,
+  SquareIcon,
+} from "lucide-react";
 import type { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
 import { ComposerDraftBinding } from "@/lib/agent-chat/composer-draft-binding";
 import { AgentComposerEditSession } from "./agent-composer-edit-session";
@@ -94,6 +100,8 @@ export type AgentComposerInputProps = {
    * acknowledges it. Defaults to `isStreaming` when omitted.
    */
   busy?: boolean;
+  /** An actual host-owned send awaiting acceptance, including a first-message handoff. */
+  submitting?: boolean;
   /** Preserve the draft until the host acknowledges an idle submission. */
   awaitSubmission?: boolean;
   canSubmit?: boolean;
@@ -180,6 +188,7 @@ function AgentComposerInner({
   onSubmit,
   isStreaming,
   busy,
+  submitting = false,
   awaitSubmission = false,
   canSubmit = true,
   submissionScope,
@@ -325,7 +334,7 @@ function AgentComposerInner({
       }
       return;
     }
-    if (!canSubmit) return;
+    if (!canSubmit || submitting) return;
     if (queueSubmitGuard.inFlightFor(submissionScope)) return;
     // No `isStreaming` early-return: submitting while a turn runs queues the
     // message.
@@ -486,7 +495,7 @@ function AgentComposerInner({
         onSubmitRequest={submit}
         readOnly={!!editing && (!!editing.busy || isQueueing)}
         onTransfer={editing ? () => {} : onAttachmentTransfer}
-        placeholder={editing ? "Edit message…" : placeholder}
+        placeholder={placeholder}
         className="px-3 pt-2"
         editorClassName="min-h-9 max-h-48 overflow-y-auto text-[15px] leading-6"
       />
@@ -526,11 +535,33 @@ function AgentComposerInner({
                   (!editing.allowEmpty && !composer.snapshot.text.trim())
                 }
                 onClick={submit}
+                aria-busy={!!editing.busy || isQueueing}
               >
-                <CheckIcon className="size-3.5" />
+                {editing.busy || isQueueing ? (
+                  <LoaderCircleIcon
+                    aria-hidden="true"
+                    className="size-3.5 animate-spin motion-reduce:animate-none"
+                  />
+                ) : (
+                  <CheckIcon className="size-3.5" />
+                )}
                 Save changes
               </Button>
             </div>
+          ) : isQueueing || submitting ? (
+            <Button
+              type="button"
+              size="icon-xs"
+              className="size-7 rounded-full"
+              disabled
+              aria-label="Sending…"
+              aria-busy="true"
+            >
+              <LoaderCircleIcon
+                aria-hidden="true"
+                className="size-4 animate-spin motion-reduce:animate-none"
+              />
+            </Button>
           ) : emptyAction && !isStreaming && !composer.snapshot.text.trim() ? (
             <Button
               type="button"

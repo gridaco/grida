@@ -30,8 +30,13 @@ export function NativeTurnActivity({
   // apart from it.
   const stopped = block.outcome === "cancelled";
   const open = !block.finished || stopped || expanded;
+  const timeline = turn_activity.merge(
+    block.work,
+    subagentEvents,
+    block.turnId
+  );
   const hasWork =
-    (block.work.length > 0 || subagentEvents.length > 0) && !stopped;
+    (timeline.work.length > 0 || timeline.unplaced.length > 0) && !stopped;
   return (
     <div
       data-testid="native-turn-activity"
@@ -67,7 +72,7 @@ export function NativeTurnActivity({
         </div>
       )}
       {open &&
-        block.work.map((item) =>
+        timeline.work.map((item) =>
           item.kind === "commentary" ? (
             <ChatMessageView
               key={item.message.messageId}
@@ -79,6 +84,12 @@ export function NativeTurnActivity({
                 parts: [{ type: "text", text: item.message.text }],
               }}
             />
+          ) : item.kind === "subagent" ? (
+            <SubagentEventRow
+              key={item.key}
+              event={item.event}
+              onOpen={onOpenSubagent}
+            />
           ) : (
             <ToolCallGroupView
               key={item.key}
@@ -86,53 +97,55 @@ export function NativeTurnActivity({
             />
           )
         )}
-      {open && subagentEvents.length > 0 && (
-        <div className="space-y-2" aria-label="Subagent activity">
-          {[...subagentEvents]
-            .sort(
-              (a, b) => a.atMs - b.atMs || a.eventId.localeCompare(b.eventId)
-            )
-            .map((event) => (
-              <button
-                key={event.eventId}
-                type="button"
-                className="flex w-full items-center gap-2 rounded-md py-1 text-left text-xs text-muted-foreground hover:text-foreground"
-                onClick={() => onOpenSubagent?.(event.childId, event.inputId)}
-                disabled={!onOpenSubagent}
-              >
-                <NativeSubagentIdentity
-                  childId={event.childId}
-                  className="size-5"
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="font-medium text-foreground">
-                    {event.name}
-                  </span>{" "}
-                  {event.kind === "started"
-                    ? "started working"
-                    : event.status === "failed"
-                      ? "failed"
-                      : event.status === "cancelled"
-                        ? "stopped"
-                        : event.status === "uncertain"
-                          ? "finished · result uncertain"
-                          : "finished"}
-                </span>
-                <time
-                  className="shrink-0"
-                  dateTime={new Date(event.atMs).toISOString()}
-                  title={new Date(event.atMs).toLocaleString()}
-                >
-                  {new Date(event.atMs).toLocaleTimeString([], {
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}
-                </time>
-              </button>
-            ))}
-        </div>
+      {open && timeline.unplaced.length > 0 && (
+        <section
+          className="space-y-2"
+          aria-label="Subagent events — relative order unavailable"
+        >
+          <p className="text-xs text-muted-foreground">
+            Subagent events — relative order unavailable
+          </p>
+          {timeline.unplaced.map((event) => (
+            <SubagentEventRow
+              key={event.eventId}
+              event={event}
+              onOpen={onOpenSubagent}
+            />
+          ))}
+        </section>
       )}
       {block.answers.map(renderMessage)}
     </div>
+  );
+}
+
+function SubagentEventRow({
+  event,
+  onOpen,
+}: {
+  event: NativeSubagentLifecycleEvent;
+  onOpen?: (childId: string, inputId: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="flex w-full items-center gap-2 rounded-md py-1 text-left text-xs text-muted-foreground hover:text-foreground"
+      onClick={() => onOpen?.(event.childId, event.inputId)}
+      disabled={!onOpen}
+    >
+      <NativeSubagentIdentity childId={event.childId} className="size-5" />
+      <span className="min-w-0 flex-1">
+        <span className="font-medium text-foreground">{event.name}</span>{" "}
+        {event.kind === "started"
+          ? "started working"
+          : event.status === "failed"
+            ? "failed"
+            : event.status === "cancelled"
+              ? "stopped"
+              : event.status === "uncertain"
+                ? "finished · result uncertain"
+                : "finished"}
+      </span>
+    </button>
   );
 }

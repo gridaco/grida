@@ -33,6 +33,11 @@ const OPEN_ATTEMPTS: usize = 3;
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub(super) struct SideSession {
     pub(super) parent: SessionId,
+    #[serde(
+        default,
+        skip_serializing_if = "crate::permissions::PermissionMode::is_restricted"
+    )]
+    pub(super) permission_mode: crate::permissions::PermissionMode,
 }
 
 /// The catalog scope every side session is created in. No workspace listing,
@@ -199,6 +204,7 @@ impl Host {
                         worker: None,
                         side: Some(SideSession {
                             parent: parent.clone(),
+                            permission_mode: host.selected_permission_mode(&source)?,
                         }),
                     },
                 )?,
@@ -328,6 +334,7 @@ impl Host {
         self.store
             .discard(session.clone(), scope()?, cleanup)
             .await?;
+        self.activity_order.retire(&session)?;
         let spending = self.spending.clone();
         let owner = session.clone();
         tokio::task::spawn_blocking(move || spending.retire(&owner))

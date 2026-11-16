@@ -47,7 +47,7 @@ describe("NativeTurnActivity", () => {
     expect(html).not.toContain("read_file");
   });
 
-  it("shows named lifecycle events in chronological order and makes a child-only finished turn expandable", async () => {
+  it("labels legacy unplaced events and makes a child-only finished turn expandable", async () => {
     const fixture = await NativeActivityFixtures.create();
     try {
       const events = [...fixture.data.activity.events].reverse();
@@ -76,6 +76,7 @@ describe("NativeTurnActivity", () => {
       expect(html).toContain("Reviewer");
       expect(html).toContain("started working");
       expect(html).toContain("finished");
+      expect(html).toContain("Subagent events — relative order unavailable");
       expect(html.indexOf("started working")).toBeLessThan(
         html.indexOf("finished")
       );
@@ -97,6 +98,74 @@ describe("NativeTurnActivity", () => {
       );
       expect(collapsed).toContain('aria-expanded="false"');
       expect(collapsed).toContain("Worked");
+    } finally {
+      fixture.dispose();
+    }
+  });
+
+  it("keeps stopped work expanded, places a child stop correctly, and leaves the final answer outside", async () => {
+    const fixture = await NativeActivityFixtures.create();
+    try {
+      const messages: NativeChatMessage[] = [
+        {
+          messageId: "before",
+          role: "assistant",
+          turnId: "parent-turn",
+          text: "Before the child stopped",
+          phase: "progress",
+          activityOrder: 1,
+        },
+        {
+          messageId: "after",
+          role: "assistant",
+          turnId: "parent-turn",
+          text: "After the child stopped",
+          phase: "progress",
+          activityOrder: 3,
+        },
+        {
+          messageId: "answer",
+          role: "assistant",
+          turnId: "parent-turn",
+          text: "Final answer outside activity",
+          phase: "answer",
+          activityOrder: 4,
+        },
+      ];
+      const [block] = turn_activity.group(
+        messages,
+        [{ turnId: "parent-turn", startedAtMs: 0, status: "cancelled" }],
+        null
+      );
+      if (block.kind !== "turn") throw new Error("expected_turn");
+      const html = renderToStaticMarkup(
+        <NativeTurnActivity
+          block={block}
+          renderMessage={(message) => (
+            <p key={message.messageId}>{message.text}</p>
+          )}
+          subagentEvents={[
+            {
+              ...fixture.data.activity.events[1],
+              activityOrder: 2,
+              status: "cancelled",
+            },
+          ]}
+          onOpenSubagent={() => {}}
+        />
+      );
+      expect(html).toContain("You stopped");
+      expect(html).not.toContain("aria-expanded");
+      expect(html).not.toContain("relative order unavailable");
+      expect(html.indexOf("Before the child stopped")).toBeLessThan(
+        html.indexOf('data-child-identity="done-child"')
+      );
+      expect(html.indexOf('data-child-identity="done-child"')).toBeLessThan(
+        html.indexOf("After the child stopped")
+      );
+      expect(html.indexOf("After the child stopped")).toBeLessThan(
+        html.indexOf("Final answer outside activity")
+      );
     } finally {
       fixture.dispose();
     }

@@ -16,7 +16,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { PanelRightIcon, XIcon } from "lucide-react";
+import { PanelBottomIcon, PanelRightIcon, XIcon } from "lucide-react";
 import { Toggle } from "@app/ui/components/toggle";
 import { cn } from "@app/ui/lib/utils";
 import { getDesktopBridge, type Workspace } from "@/lib/desktop/bridge";
@@ -60,6 +60,8 @@ export type EditorPaneProps = {
   treeVisible: boolean;
   onToggleTree: () => void;
   hasBottomPane?: boolean;
+  utilitiesVisible?: boolean;
+  onToggleUtilities?: () => void;
   className?: string;
   onSaved?: () => void;
   /** Called after a tab's "Move to Trash" succeeds (drops the tab +
@@ -82,6 +84,8 @@ export function EditorPane({
   treeVisible,
   onToggleTree,
   hasBottomPane = false,
+  utilitiesVisible = false,
+  onToggleUtilities,
   className,
   onSaved,
   onFileTrashed,
@@ -200,6 +204,8 @@ export function EditorPane({
         showStart={showStart}
         treeVisible={treeVisible}
         onToggleTree={onToggleTree}
+        utilitiesVisible={utilitiesVisible}
+        onToggleUtilities={onToggleUtilities}
         onFileTrashed={onFileTrashed}
       />
       <div className="min-h-0 flex-1">
@@ -259,6 +265,8 @@ function EditorTitleBar({
   showStart,
   treeVisible,
   onToggleTree,
+  utilitiesVisible,
+  onToggleUtilities,
   onFileTrashed,
 }: {
   workspace: Workspace;
@@ -271,6 +279,8 @@ function EditorTitleBar({
   showStart: boolean;
   treeVisible: boolean;
   onToggleTree: () => void;
+  utilitiesVisible: boolean;
+  onToggleUtilities?: () => void;
   onFileTrashed?: (relPath: string) => void;
 }) {
   const railRef = useRef<HTMLDivElement | null>(null);
@@ -433,6 +443,31 @@ function EditorTitleBar({
         thumbnailCache={thumbnailCache}
         panels={panels}
       />
+      {onToggleUtilities && (
+        <Toggle
+          type="button"
+          size="sm"
+          pressed={utilitiesVisible}
+          className="desktop-no-drag mr-1 size-7 min-w-7 shrink-0 p-0 [&_svg:not([class*='size-'])]:size-3.5"
+          onPressedChange={onToggleUtilities}
+          aria-label={
+            utilitiesVisible
+              ? "Hide workspace utilities"
+              : "Show workspace utilities"
+          }
+          title={
+            utilitiesVisible
+              ? "Hide workspace utilities"
+              : "Show workspace utilities"
+          }
+        >
+          <PanelBottomIcon
+            className={cn(
+              !utilitiesVisible && "fill-muted text-muted-foreground"
+            )}
+          />
+        </Toggle>
+      )}
       {!treeVisible && (
         <WorkspaceExplorerToggleButton
           open={false}

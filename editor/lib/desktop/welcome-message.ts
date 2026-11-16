@@ -19,8 +19,16 @@
  * (see test/desktop-welcome-first-message.md).
  */
 
+import type { NativeChatInitialComposer } from "@/lib/agent-chat/native-chat-controller";
+
+const attachments = new Map<
+  string,
+  NonNullable<NativeChatInitialComposer["attachment"]>
+>();
+
 const KEY_PREFIX = "grida.welcome.message.v1.";
 const PROFILE_ID = /^[a-f0-9]{64}$/;
+const attachmentTokens = new Map<string, string>();
 
 function key(workspaceId: string): string {
   return `${KEY_PREFIX}${workspaceId}`;
@@ -35,7 +43,8 @@ export type WelcomeMessage = Readonly<{
    * `null` keeps the workspace's default connection.
    */
   profileId: string | null;
-}>;
+}> &
+  NativeChatInitialComposer;
 
 /** A slides template already copied into the workspace as its own deck. */
 export type WelcomeTemplate = Readonly<{
@@ -89,7 +98,27 @@ export namespace welcome_message {
   ): boolean {
     try {
       if (!storage) return false;
-      storage.setItem(key(workspaceId), JSON.stringify(message));
+      const token = message.attachment ? crypto.randomUUID() : undefined;
+      const { attachment, ...settings } = message;
+      storage.setItem(
+        key(workspaceId),
+        JSON.stringify({
+          ...settings,
+          ...(attachment && {
+            attachment: {
+              token,
+              kind: attachment.kind,
+              name: attachment.file.name,
+            },
+          }),
+        })
+      );
+      const previous = attachmentTokens.get(workspaceId);
+      if (previous) attachments.delete(previous);
+      if (token && attachment) {
+        attachments.set(token, attachment);
+        attachmentTokens.set(workspaceId, token);
+      } else attachmentTokens.delete(workspaceId);
       return true;
     } catch {
       return false;
@@ -119,16 +148,30 @@ export namespace welcome_message {
       | Pick<Storage, "getItem" | "removeItem">
       | undefined = sessionStorageOrUndefined()
   ): string | null {
-    let raw: string | null;
+    return takeMessage(workspaceId, storage)?.text ?? null;
+  }
+
+  /** Consume the complete request, retaining original File custody in this window. */
+  export function takeMessage(
+    workspaceId: string,
+    storage:
+      | Pick<Storage, "getItem" | "removeItem">
+      | undefined = sessionStorageOrUndefined()
+  ): WelcomeMessage | null {
     try {
       if (!storage) return null;
-      raw = storage.getItem(key(workspaceId));
+      const raw = storage.getItem(key(workspaceId));
       storage.removeItem(key(workspaceId));
-    } catch {
-      return null;
-    }
-    try {
-      return parse(raw)?.text ?? null;
+      const message = parse(raw);
+      if (raw) {
+        const value = JSON.parse(raw);
+        if (typeof value?.attachment?.token === "string") {
+          attachments.delete(value.attachment.token);
+          if (attachmentTokens.get(workspaceId) === value.attachment.token)
+            attachmentTokens.delete(workspaceId);
+        }
+      }
+      return message;
     } catch {
       return null;
     }
@@ -146,7 +189,59 @@ function parse(raw: string | null): WelcomeMessage | null {
     (typeof profileId !== "string" || !PROFILE_ID.test(profileId))
   )
     return null;
-  return { text, profileId };
+  const {
+    effort,
+    operatingRegime,
+    goal,
+    attachment,
+    missingAttachment: missing,
+  } = value as Record<string, unknown>;
+  if (
+    effort !== undefined &&
+    !["standard", "low", "medium", "high", "xhigh", "ultra"].includes(
+      effort as string
+    )
+  )
+    return null;
+  if (
+    operatingRegime !== undefined &&
+    operatingRegime !== "act" &&
+    operatingRegime !== "plan"
+  )
+    return null;
+  if (goal !== undefined && typeof goal !== "boolean") return null;
+  let resource: NativeChatInitialComposer["attachment"];
+  let missingAttachment: NativeChatInitialComposer["missingAttachment"];
+  if (missing !== undefined) {
+    if (!missing || typeof missing !== "object") return null;
+    const { kind, name } = missing as Record<string, unknown>;
+    if ((kind !== "file" && kind !== "directory") || typeof name !== "string")
+      return null;
+    missingAttachment = { kind, name };
+  }
+  if (attachment !== undefined) {
+    if (!attachment || typeof attachment !== "object") return null;
+    const { token, kind, name } = attachment as Record<string, unknown>;
+    if (
+      typeof token !== "string" ||
+      (kind !== "file" && kind !== "directory") ||
+      typeof name !== "string"
+    )
+      return null;
+    resource = attachments.get(token);
+    if (!resource) missingAttachment = { kind, name };
+  }
+  return {
+    text,
+    profileId,
+    ...(effort !== undefined && {
+      effort: effort as NativeChatInitialComposer["effort"],
+    }),
+    ...(operatingRegime !== undefined && { operatingRegime }),
+    ...(goal !== undefined && { goal }),
+    ...(resource && { attachment: resource }),
+    ...(missingAttachment && { missingAttachment }),
+  };
 }
 
 function sessionStorageOrUndefined(): Storage | undefined {

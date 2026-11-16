@@ -22,6 +22,7 @@ import { NativeFileReference } from "./native-file-reference";
 import { NativeInputImages } from "./native-input-images";
 import { NativeQueuedMessages } from "./native-queued-messages";
 import { NativeSubagentActivity } from "./native-subagent-activity";
+import { NativeActivityOrder } from "./native-activity-order";
 import { NativeSelectedImages } from "./native-selected-images";
 import {
   NativeEditorSurfaceEndpoints,
@@ -167,6 +168,7 @@ export class NativeAgentProcess {
   private agentEffort = false;
   private historyRevision = false;
   private transcriptWindow = false;
+  private activityOrder = false;
   private modelChange = false;
   private changingModel = false;
   private gatewayBillingEnabled = false;
@@ -189,6 +191,7 @@ export class NativeAgentProcess {
   private editorSurfaceOpen = false;
   private editorSvgText = false;
   private chatSelection = false;
+  private permissionMode = false;
   private readonly commandCapabilities = new Set<string>();
   private observedExit = false;
   private shutdown: Promise<void> | undefined;
@@ -263,6 +266,10 @@ export class NativeAgentProcess {
     return this.connected && this.transcriptWindow;
   }
 
+  get acceptsActivityOrder(): boolean {
+    return this.connected && this.activityOrder;
+  }
+
   get acceptsChildGatewayBilling(): boolean {
     return this.connected && this.childGatewayBilling;
   }
@@ -297,6 +304,10 @@ export class NativeAgentProcess {
 
   get supportsSelectedImage(): boolean {
     return this.connected && this.selectedImage;
+  }
+
+  get acceptsPermissionMode(): boolean {
+    return this.connected && this.permissionMode;
   }
 
   get acceptsSelection(): boolean {
@@ -661,8 +672,10 @@ export class NativeAgentProcess {
                 [NativeQueuedMessages.replaceTextCapability]: 1,
                 [NativeSelectedImages.capability]: 1,
                 [TRANSCRIPT_WINDOW]: 1,
+                [NativeActivityOrder.capability]: 1,
                 [MODEL_CHANGE]: 1,
                 "co.grida/session/selection": 1,
+                "co.grida/session/permission-mode": 1,
                 ...(requestDeletion && {
                   [NativeAgentDeletion.capability]: 1,
                   [NativeAgentDeletion.previewCapability]: 1,
@@ -682,7 +695,11 @@ export class NativeAgentProcess {
       const agentCapabilities = object(response.agentCapabilities);
       const advertised = object(agentCapabilities?._meta);
       processOwner.transcriptWindow = advertised?.[TRANSCRIPT_WINDOW] === 1;
+      processOwner.activityOrder =
+        advertised?.[NativeActivityOrder.capability] === 1;
       processOwner.modelChange = advertised?.[MODEL_CHANGE] === 1;
+      processOwner.permissionMode =
+        advertised?.["co.grida/session/permission-mode"] === 1;
       processOwner.chatSelection =
         advertised?.["co.grida/session/selection"] === 1;
       processOwner.gatewayBillingEnabled =

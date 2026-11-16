@@ -45,7 +45,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--muted-foreground);
+  color: color-mix(in oklab, var(--muted-foreground) 50%, transparent);
 }
 
 .composer-content [data-composer-editor] .composer-text-node {

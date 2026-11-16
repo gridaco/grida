@@ -83,6 +83,23 @@ the transcript exceeds either bound. A replay does not stop the live turn.
 Navigating away releases attachments and subscriptions while accepted work
 stays owned by the native host.
 
+Compatible native hosts supply optional `activityOrder` on exposed messages,
+individual tool calls and child lifecycle events. Positive safe-integer
+coordinates compare only within the owning turn; a child event names that
+parent turn explicitly. Text replacement and tool outcomes retain first-known
+positions. `activityOrderIncomplete: true` identifies a public message or call
+whose retained position is unavailable. Activity pages can separately report
+`orderComplete` for returned child events. Missing fields on older native
+hosts remain valid.
+
+Merge these facts before grouping consecutive tools. The renderer must not
+assign a containing message the call's coordinate, compare child-conversation
+coordinates with a parent turn, or infer missing placement from timestamps or
+poll arrival. An incomplete fact may gain a genuinely retained position later;
+incremental missing updates cannot erase a position already held by the view.
+Fresh authoritative replay may explicitly lack that evidence. These
+presentation coordinates grant no execution or observation authority.
+
 The optional `subagentActivity()` and `subagentConversation()` reads require
 the current parent snapshot's `subagentActivityAvailable` fact. They are
 independent of legacy named-child list, assignment inspection and controls.
@@ -148,6 +165,25 @@ eligibility from a filename or thumbnail, or fall back from `replaceText` to
 `replace`: whole-input replacement would discard the retained parts. A stale,
 foreign, withdrawn or claimed target refuses through the existing observation
 and attachment boundaries. Inspection remains read-only and starts no work.
+
+New hosts optionally expose `acceptsPermissionMode()`, `permissionMode(attachmentId)`
+and `setPermissionMode(attachmentId, expectedRevision, requestId, mode, review)`. Offer
+Full access only when the capability is true and the native state includes
+`full_access` in its available modes. Default (`restricted`) keeps its existing
+filesystem and command-network restrictions. Full access deliberately removes
+command confinement and ordinary approval prompts; OS-user file permissions
+still apply. `reviewPermissionMode` issues a short-lived intent for the exact
+attached chat, revision and request. The owned React confirmation shows the
+native chat title and friendly project name, then answers that intent. Cancel
+returns null and changes nothing. Main rechecks the attachment and the native
+host performs revision admission; a navigated or foreign frame cannot finish
+the grant. This is confirmation in the trusted app UI, not an independent OS
+user-presence proof against a compromised eligible renderer. The native owner persists this per-chat
+choice separately from model/effort defaults; new chats begin restricted.
+Changing access requires accepted work and background processes to finish or
+stop. Stable request IDs bind retries to the original decision. Queries and
+changes start no inference. Older hosts omit methods or return false; keep
+the Default presentation and withhold the selection action.
 
 New hosts optionally expose `selection(target)`, `updateSelection(...)`, and
 `createFromDraft(draftId)`. A target names exactly one saved `sessionId` or

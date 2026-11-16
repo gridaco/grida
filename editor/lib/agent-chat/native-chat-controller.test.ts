@@ -816,6 +816,85 @@ it("streams turn activity live and adopts recorded turns from each page", async 
   controller.disconnect();
 });
 
+it("retains native first-publication positions through live text, replacement, call outcomes and replay", async () => {
+  const { bridge, controller, running, updates } = fixture();
+  running.add("chat-a");
+  let latest: NativeChatTranscriptPage = {
+    view: 1,
+    older: null,
+    messages: [],
+    turns: [],
+  };
+  bridge.transcriptPage = async () => latest;
+  try {
+    await controller.select("chat-a");
+    const live = updates.get("chat-a")!;
+    const chunk = {
+      kind: "text",
+      role: "assistant",
+      messageId: "work",
+      turnId: "turn-chat-a",
+      text: "Read",
+      offsetBytes: 0,
+      replace: false,
+    } as const;
+    live({ ...chunk, activityOrderIncomplete: true });
+    // An exact duplicate may carry the retained coordinate on resubscription.
+    live({ ...chunk, activityOrder: 2 });
+    expect(controller.read().messages[0]).toMatchObject({ activityOrder: 2 });
+    live({ ...chunk, text: "ing", offsetBytes: 4 });
+    live({
+      kind: "activity",
+      messageId: "work",
+      turnId: "turn-chat-a",
+      activity: {
+        callId: "call",
+        title: "read_file",
+        kind: "read",
+        outcome: "running",
+        activityOrder: 4,
+      },
+    });
+    live({ ...chunk, text: "Read again", replace: true });
+    // A changed coordinate is rejected; the visible fact keeps its first one.
+    live({ ...chunk, text: "Read again", replace: true, activityOrder: 99 });
+    live({
+      kind: "activity",
+      messageId: "work",
+      turnId: "turn-chat-a",
+      activity: {
+        callId: "call",
+        title: "read_file",
+        kind: "read",
+        outcome: "succeeded",
+      },
+    });
+    expect(controller.read().messages[0]).toMatchObject({
+      text: "Read again",
+      activityOrder: 2,
+      activity: [{ callId: "call", outcome: "succeeded", activityOrder: 4 }],
+    });
+    expect(
+      controller.read().messages[0].activityOrderIncomplete
+    ).toBeUndefined();
+    latest = {
+      ...latest,
+      messages: [{ ...controller.read().messages[0], phase: "progress" }],
+    };
+    live({ kind: "resync" });
+    await vi.waitFor(() =>
+      expect(controller.read().messages[0]?.phase).toBe("progress")
+    );
+    expect(controller.read().messages).toHaveLength(1);
+    expect(controller.read().messages[0]).toMatchObject({
+      activityOrder: 2,
+      activity: [{ activityOrder: 4 }],
+    });
+  } finally {
+    controller.disconnect();
+  }
+});
+
 it("keeps an earlier page above latest messages that settle during its read", async () => {
   vi.useFakeTimers();
   const { bridge, controller, running } = fixture();
@@ -6367,6 +6446,142 @@ describe("a first message chosen before the chat opened", () => {
     }
   });
 
+  it("applies Home effort and Plan before sending the first input", async () => {
+    const { bridge, controller } = sending();
+    const inRegime = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(
+      async (_action, id, inputId) => ({
+        sessionId: id,
+        inputId,
+        disposition: "claimed",
+        inputPosition: 1,
+        turnId: `turn-${id}`,
+      })
+    );
+    bridge.submitInRegime = inRegime;
+    const message = firstMessage("Plan a poster");
+    try {
+      expect(
+        await controller.startChat(null, message.take, {
+          effort: "high",
+          operatingRegime: "plan",
+        })
+      ).toBeNull();
+      expect(inRegime).toHaveBeenCalledExactlyOnceWith(
+        "submit",
+        "first",
+        expect.any(String),
+        "Plan a poster",
+        "plan",
+        "high"
+      );
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("waits for a Home file before submitting it through the ordinary attachment route", async () => {
+    const { bridge, controller, submit } = sending();
+    bridge.acceptsFile = async () => true;
+    const sendFile = vi.fn<NonNullable<DesktopNativeChat["submitFile"]>>(
+      (id, input) => bridge.submit(id, input.inputId, input.text)
+    );
+    bridge.submitFile = sendFile;
+    const file = new File(["notes"], "notes.txt", { type: "text/plain" });
+    const message = firstMessage("Read these notes");
+    try {
+      expect(
+        await controller.startChat(null, message.take, {
+          attachment: { kind: "file", file },
+        })
+      ).toBeNull();
+      expect(sendFile).toHaveBeenCalledExactlyOnceWith(
+        "first",
+        expect.objectContaining({
+          action: "submit",
+          text: "Read these notes",
+          name: "notes.txt",
+          operatingRegime: "act",
+        })
+      );
+      expect(submit).toHaveBeenCalledOnce();
+      expect(controller.read().attachmentDraft).toBeNull();
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it.each(["plan", "goal"] as const)(
+    "retains an unsupported Home %s intent until explicitly removed",
+    async (intent) => {
+      const { controller, submit } = sending();
+      const message = firstMessage("Make a poster");
+      try {
+        expect(
+          await controller.startChat(
+            null,
+            message.take,
+            intent === "plan" ? { operatingRegime: "plan" } : { goal: true }
+          )
+        ).toBe("Make a poster");
+        expect(submit).not.toHaveBeenCalled();
+        expect(controller.canSubmit).toBe(false);
+        expect(
+          intent === "plan"
+            ? controller.read().operatingRegime
+            : controller.read().goalIntent
+        ).toBe(intent === "plan" ? "plan" : true);
+        if (intent === "plan") controller.selectOperatingRegime("act");
+        else controller.selectGoalIntent(false);
+        expect(controller.canSubmit).toBe(true);
+      } finally {
+        controller.disconnect();
+      }
+    }
+  );
+
+  it("keeps an unsupported Home file in the composer without submitting text alone", async () => {
+    const { controller, submit } = sending();
+    const file = new File(["notes"], "notes.txt", { type: "text/plain" });
+    const message = firstMessage("Read these notes");
+    try {
+      expect(
+        await controller.startChat(null, message.take, {
+          attachment: { kind: "file", file },
+        })
+      ).toBe("Read these notes");
+      expect(submit).not.toHaveBeenCalled();
+      expect(controller.read().attachmentDraft).toMatchObject({
+        name: "notes.txt",
+        error: expect.any(String),
+      });
+      expect(controller.canSubmit).toBe(false);
+      controller.removeAttachment(controller.read().scope);
+      expect(controller.canSubmit).toBe(true);
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("requires reattachment if Home's original File was lost on reload", async () => {
+    const { controller, submit } = sending();
+    const message = firstMessage("Read these notes");
+    try {
+      expect(
+        await controller.startChat(null, message.take, {
+          missingAttachment: { kind: "directory", name: "References" },
+        })
+      ).toBe("Read these notes");
+      expect(submit).not.toHaveBeenCalled();
+      expect(controller.read().attachmentDraft).toMatchObject({
+        name: "References",
+        error: expect.stringMatching(/original attachment/),
+      });
+      expect(controller.canSubmit).toBe(false);
+    } finally {
+      controller.disconnect();
+    }
+  });
+
   it("keeps the default connection without selecting one", async () => {
     const { controller, create, submit, choose } = sending();
     const message = firstMessage("Sketch a logo");
@@ -6439,9 +6654,154 @@ describe("a first message chosen before the chat opened", () => {
       );
       expect(submit).toHaveBeenCalledOnce();
       expect(controller.read().error).toBeTruthy();
+      expect(controller.read().submitting).toBe(false);
     } finally {
       controller.disconnect();
     }
+  });
+
+  it("keeps a rejected first send in its original draft after another chat opens", async () => {
+    const { controller, submit } = sending();
+    const pending =
+      Promise.withResolvers<Awaited<ReturnType<DesktopNativeChat["submit"]>>>();
+    submit.mockReturnValueOnce(pending.promise);
+    const drafts = durableDrafts();
+    controller.keepDrafts(drafts, "workspace");
+    const message = firstMessage("First request\nSecond line");
+    const starting = controller.startChat(null, message.take);
+    try {
+      await vi.waitFor(() => expect(submit).toHaveBeenCalledOnce());
+      expect(controller.read().submitting).toBe(true);
+      await controller.select("chat-b");
+      expect(controller.read().submitting).toBe(false);
+      const other = {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "Unrelated draft" }],
+          },
+        ],
+      };
+      drafts.write("workspace:chat-b", other);
+      pending.reject(new Error("late send failure"));
+      expect(await starting).toBeNull();
+      expect(drafts.read("workspace:first")).toEqual({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "First request" }],
+          },
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "Second line" }],
+          },
+        ],
+      });
+      expect(drafts.read("workspace:chat-b")).toEqual(other);
+      expect(controller.read().selected).toBe("chat-b");
+      expect(controller.read().error).toBeNull();
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("appends a late refused request without replacing newer rich edits in its original draft", async () => {
+    const { controller, submit } = sending();
+    const pending =
+      Promise.withResolvers<Awaited<ReturnType<DesktopNativeChat["submit"]>>>();
+    submit.mockReturnValueOnce(pending.promise);
+    const drafts = durableDrafts();
+    controller.keepDrafts(drafts, "workspace");
+    const starting = controller.startChat(
+      null,
+      firstMessage("First request").take
+    );
+    try {
+      await vi.waitFor(() => expect(submit).toHaveBeenCalledOnce());
+      const newer = {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              { type: "text", text: "Newer edit", marks: [{ type: "bold" }] },
+              {
+                type: "mention",
+                attrs: { id: "file", label: "notes.md", path: "notes.md" },
+              },
+            ],
+          },
+        ],
+      };
+      drafts.write("workspace:first", newer);
+      await controller.select("chat-b");
+      pending.reject(new Error("late send failure"));
+      expect(await starting).toBeNull();
+      expect(drafts.read("workspace:first")).toEqual({
+        ...newer,
+        content: [
+          ...newer.content,
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "First request" }],
+          },
+        ],
+      });
+      expect(drafts.read("workspace:chat-b")).toBeNull();
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("does not duplicate a refused request already retained in the original document", async () => {
+    const { controller, submit } = sending();
+    const pending =
+      Promise.withResolvers<Awaited<ReturnType<DesktopNativeChat["submit"]>>>();
+    submit.mockReturnValueOnce(pending.promise);
+    const drafts = durableDrafts();
+    controller.keepDrafts(drafts, "workspace");
+    const starting = controller.startChat(
+      null,
+      firstMessage("First request").take
+    );
+    try {
+      await vi.waitFor(() => expect(submit).toHaveBeenCalledOnce());
+      const kept = {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "First request" }],
+          },
+        ],
+      };
+      drafts.write("workspace:first", kept);
+      await controller.select("chat-b");
+      pending.reject(new Error("late send failure"));
+      expect(await starting).toBeNull();
+      expect(drafts.read("workspace:first")).toEqual(kept);
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("keeps a rejected first send through pane cleanup instead of returning it to a retired input", async () => {
+    const { controller, submit } = sending();
+    const pending =
+      Promise.withResolvers<Awaited<ReturnType<DesktopNativeChat["submit"]>>>();
+    submit.mockReturnValueOnce(pending.promise);
+    const drafts = durableDrafts();
+    controller.keepDrafts(drafts, "workspace");
+    const starting = controller.startChat(null, firstMessage().take);
+    await vi.waitFor(() => expect(submit).toHaveBeenCalledOnce());
+    controller.disconnect();
+    pending.reject(new Error("late send failure"));
+    expect(await starting).toBeNull();
+    expect(drafts.read("workspace:first")).toMatchObject({
+      content: [{ content: [{ text: "Make a launch poster" }] }],
+    });
   });
 
   it("sends in Act without the new chat's leftover Plan or Goal draft", async () => {
@@ -6941,6 +7301,128 @@ describe("background processes", () => {
     await controller.select("chat-b");
     expect(stop).not.toHaveBeenCalled();
   });
+
+  it.each([true, false])(
+    "retires published observers before a deferred legacy connection restore (available: %s)",
+    async (available) => {
+      const { bridge, transcripts, updates, stop } = processes();
+      const id = "e".repeat(64);
+      const restoring = Promise.withResolvers<void>();
+      const choose = vi.fn<NonNullable<DesktopNativeChat["selectProfile"]>>(
+        () => restoring.promise
+      );
+      bridge.selectProfile = choose;
+      const observe = bridge.observe.bind(bridge);
+      bridge.observe = async (attachmentId) => {
+        const observed = await observe(attachmentId);
+        return {
+          ...observed,
+          snapshot: { ...observed.snapshot, subagentsAvailable: true },
+        };
+      };
+      bridge.listSubagents = async () => ({
+        children: [],
+        nextAfterChildId: null,
+      });
+      bridge.inspectSubagent =
+        vi.fn<NonNullable<DesktopNativeChat["inspectSubagent"]>>();
+      bridge.createSubagent =
+        vi.fn<NonNullable<DesktopNativeChat["createSubagent"]>>();
+      bridge.assignSubagent =
+        vi.fn<NonNullable<DesktopNativeChat["assignSubagent"]>>();
+      const stopSubagent =
+        vi.fn<NonNullable<DesktopNativeChat["stopSubagent"]>>();
+      bridge.stopSubagent = stopSubagent;
+      let stored = JSON.stringify({ selected: "chat-a", sessions: ["chat-a"] });
+      const memory = {
+        getItem: () => stored,
+        setItem: (_key: string, value: string) => {
+          stored = value;
+        },
+      };
+      const controller = new NativeChatController(bridge, memory, "workspace");
+      transcripts.set("chat-a", [
+        { messageId: "retained", role: "assistant", text: "Retained answer." },
+      ]);
+      const published: Pick<
+        ReturnType<NativeChatController["read"]>,
+        "subagents" | "backgroundProcesses"
+      >[] = [];
+      let reconnect = false;
+      const unsubscribe = controller.subscribe(() => {
+        const { subagents, backgroundProcesses } = controller.read();
+        published.push({ subagents, backgroundProcesses });
+        if (reconnect && !subagents && !backgroundProcesses) {
+          reconnect = false;
+          // Reconnection may be requested by a subscriber in the same turn.
+          controller.connect(null, null);
+        }
+      });
+      try {
+        controller.connect(null, null);
+        await vi.waitFor(() => {
+          expect(controller.read().subagents).not.toBeNull();
+          expect(controller.read().backgroundProcesses).not.toBeNull();
+          expect(controller.read().profiles?.modelChanges).toBe(true);
+        });
+        const retiredSubagents = controller.read().subagents!;
+        const retiredProcesses = controller.read().backgroundProcesses!;
+        retiredSubagents.show();
+        const lateUpdate = updates.get("chat-a")!;
+        const retainedMessages = controller.read().messages;
+        stored = JSON.stringify({
+          selected: "chat-a",
+          sessions: ["chat-a"],
+          profileId: id,
+        });
+        published.length = 0;
+        reconnect = true;
+        controller.disconnect();
+        expect(published[0]).toEqual({
+          subagents: null,
+          backgroundProcesses: null,
+        });
+        expect(controller.read().messages).toBe(retainedMessages);
+        expect(controller.read()).toMatchObject({
+          subagents: null,
+          backgroundProcesses: null,
+        });
+        await vi.waitFor(() =>
+          expect(choose).toHaveBeenCalledExactlyOnceWith({ kind: "saved", id })
+        );
+        retiredSubagents.show();
+        lateUpdate({ kind: "processes", processes: [PROCESS] });
+        expect(controller.read()).toMatchObject({
+          subagents: null,
+          backgroundProcesses: null,
+        });
+        if (available) restoring.resolve();
+        else restoring.reject(new Error("native_chat_profile_unavailable"));
+        await vi.waitFor(() => {
+          expect(controller.read().subagents).not.toBeNull();
+          expect(controller.read().backgroundProcesses).not.toBeNull();
+          expect(controller.read().profileBusy).toBe(false);
+        });
+        expect(controller.read().subagents).not.toBe(retiredSubagents);
+        expect(controller.read().backgroundProcesses).not.toBe(
+          retiredProcesses
+        );
+        expect(
+          published.every(
+            (view) =>
+              view.subagents !== retiredSubagents &&
+              view.backgroundProcesses !== retiredProcesses
+          )
+        ).toBe(true);
+        expect(stop).not.toHaveBeenCalled();
+        expect(stopSubagent).not.toHaveBeenCalled();
+      } finally {
+        restoring.resolve();
+        unsubscribe();
+        controller.disconnect();
+      }
+    }
+  );
 });
 
 describe("slash commands", () => {

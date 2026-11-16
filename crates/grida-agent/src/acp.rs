@@ -370,6 +370,7 @@ async fn serve_connection(
                         text,
                         lifecycle,
                         processes,
+                        initialized_host.activity_order.clone(),
                     ))?;
                 }
                 Ok(())
@@ -458,7 +459,9 @@ async fn serve_connection(
                         if let Some(projection::ReplayRequest::Read { request_id, before }) = mode {
                             load_sessions.lock().unwrap().ensure_attached(&id)?;
                             let window = load_host.transcript_window(id.clone(), before, projection::visible_record_bytes).await.map_err(host_error)?;
-                            let mut projection = Projection::new(request.session_id);
+                            let mut projection = Projection::new(request.session_id).with_activity_order(
+                                load_sessions.lock().unwrap().negotiated.contains(projection::ACTIVITY_ORDER)
+                                    .then(|| load_host.activity_order.clone()));
                             projection.correlate_replay(request_id.clone());
                             projection.replay_window(&connection, &load_delivery, window.records, &window.turns).await?;
                             let goal_starts = load_host
@@ -480,7 +483,9 @@ async fn serve_connection(
                             .open_history_replay(id.clone(), request.cwd)
                             .await
                             .map_err(host_error)?;
-                        let mut projection = Projection::new(request.session_id);
+                        let mut projection = Projection::new(request.session_id).with_activity_order(
+                                load_sessions.lock().unwrap().negotiated.contains(projection::ACTIVITY_ORDER)
+                                    .then(|| load_host.activity_order.clone()));
                         while let Some(records) = replay.next().await.map_err(host_error)? {
                             let messages = records
                                 .into_iter()
@@ -582,7 +587,9 @@ async fn serve_connection(
                         let _observation = observation;
                         let cancellation = responder.cancellation();
                         let session = run.session.clone();
-                        let mut projection = Projection::new(request.session_id);
+                        let mut projection = Projection::new(request.session_id).with_activity_order(
+                            sessions.lock().unwrap().negotiated.contains(projection::ACTIVITY_ORDER)
+                                .then(|| host.activity_order.clone()));
                         let result = project_run(
                             &host,
                             &connection,
@@ -634,6 +641,7 @@ async fn project_run(
         mut completion,
         ..
     } = run;
+    projection.set_turn(turn.clone());
     let mut cancelled = false;
     let mut stream_open = true;
     let result = loop {

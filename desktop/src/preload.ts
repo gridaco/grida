@@ -460,6 +460,26 @@ const bridge: DesktopBridge = {
       return location.href === href ? target : null;
     },
     list: (cursor) => nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_LIST, cursor),
+    acceptsPermissionMode: () =>
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PERMISSION_MODE),
+    permissionMode: (attachmentId) =>
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_PERMISSION_MODE, attachmentId),
+    reviewPermissionMode: (attachmentId, revision, requestId) =>
+      nativeChatInvoke(
+        IPC_CHANNELS.NATIVE_CHAT_REVIEW_PERMISSION_MODE,
+        attachmentId,
+        revision,
+        requestId
+      ),
+    setPermissionMode: (attachmentId, revision, requestId, mode, review) =>
+      nativeChatInvoke(
+        IPC_CHANNELS.NATIVE_CHAT_SET_PERMISSION_MODE,
+        attachmentId,
+        revision,
+        requestId,
+        mode,
+        review
+      ),
     selection: (target) =>
       nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_SELECTION, target),
     updateSelection: (target, revision, operationId, choice) =>

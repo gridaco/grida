@@ -179,6 +179,44 @@ async function ready(controller: NativeChatController) {
 }
 
 describe("durable chat selection controller", () => {
+  it.each([false, true])(
+    "keeps pending Send feedback through initial route activation (switch chat: %s)",
+    async (switchChat) => {
+      const f = fixture();
+      const pending =
+        Promise.withResolvers<
+          Awaited<ReturnType<DesktopNativeChat["submit"]>>
+        >();
+      const send = vi.mocked(f.bridge.submitInRegime!);
+      send.mockReturnValueOnce(pending.promise);
+      const controller = f.make();
+      try {
+        controller.connect(null);
+        await ready(controller);
+        const originalScope = controller.read().scope;
+        const sending = controller.submit("First request");
+        expect(controller.read().submitting).toBe(true);
+        await vi.waitFor(() => expect(send).toHaveBeenCalledOnce());
+        expect(controller.read().scope).not.toBe(originalScope);
+        expect(controller.read().submitting).toBe(true);
+        const [, attachmentId, inputId] = send.mock.calls[0];
+        if (switchChat) await controller.select("chat-a");
+        expect(controller.read().submitting).toBe(!switchChat);
+        pending.resolve({
+          sessionId: attachmentId,
+          inputId,
+          disposition: "claimed",
+          inputPosition: 1,
+          turnId: "turn-first",
+        });
+        await sending;
+        expect(controller.read().submitting).toBe(false);
+      } finally {
+        controller.disconnect();
+      }
+    }
+  );
+
   it("restores separate pairs without activating a route or changing defaults", async () => {
     const f = fixture(),
       controller = f.make();
@@ -406,6 +444,47 @@ describe("durable chat selection controller", () => {
       1
     );
     controller.disconnect();
+  });
+
+  it("waits for Home's saved effort before consuming and submitting the message", async () => {
+    const f = fixture(),
+      controller = f.make();
+    const update = f.bridge.updateSelection!;
+    const gate = Promise.withResolvers<void>();
+    f.bridge.updateSelection = vi.fn<typeof update>(
+      async (...args: Parameters<typeof update>) => {
+        await gate.promise;
+        return update(...args);
+      }
+    );
+    const take = vi.fn<() => string>(() => "Plan a poster");
+    const started = controller.startChat(f.b, take, {
+      effort: "low",
+      operatingRegime: "plan",
+    });
+    try {
+      await vi.waitFor(() =>
+        expect(f.bridge.updateSelection).toHaveBeenCalledOnce()
+      );
+      expect(take).not.toHaveBeenCalled();
+      expect(f.bridge.submitInRegime).not.toHaveBeenCalled();
+      gate.resolve();
+      expect(await started).toBeNull();
+      expect(take).toHaveBeenCalledOnce();
+      expect(f.bridge.submitInRegime).toHaveBeenCalledExactlyOnceWith(
+        "submit",
+        "created",
+        "stable-first-input",
+        "Plan a poster",
+        "plan",
+        "low",
+        undefined,
+        1
+      );
+    } finally {
+      gate.resolve();
+      controller.disconnect();
+    }
   });
 
   it.each([false, true])(
@@ -928,6 +1007,207 @@ describe("incomplete draft creation settings recovery", () => {
       releaseMove.resolve();
       unsubscribe();
       f.controller.disconnect();
+    }
+  });
+});
+
+describe("per-chat permission selection controller", () => {
+  function permissions() {
+    const f = fixture();
+    const modes = new Map<
+      string,
+      { revision: number; mode: "restricted" | "full_access" }
+    >();
+    f.bridge.reviewPermissionMode = vi.fn<
+      NonNullable<DesktopNativeChat["reviewPermissionMode"]>
+    >(async () => ({
+      reviewId: "review",
+      chatTitle: "Example chat",
+      workspaceName: "Example project",
+    }));
+    f.bridge.acceptsPermissionMode = vi.fn<
+      NonNullable<DesktopNativeChat["acceptsPermissionMode"]>
+    >(async () => true);
+    f.bridge.permissionMode = vi.fn<
+      NonNullable<DesktopNativeChat["permissionMode"]>
+    >(async (id) => ({
+      sessionId: id,
+      ...(modes.get(id) ?? { revision: 0, mode: "restricted" as const }),
+      available: ["restricted", "full_access"],
+    }));
+    f.bridge.setPermissionMode = vi.fn<
+      NonNullable<DesktopNativeChat["setPermissionMode"]>
+    >(async (id, revision, _request, mode) => {
+      const next = { revision: revision + 1, mode };
+      modes.set(id, next);
+      return {
+        sessionId: id,
+        ...next,
+        available: ["restricted", "full_access"],
+      };
+    });
+    return { ...f, modes };
+  }
+
+  async function choose(controller: NativeChatController, accepted = true) {
+    const changing = controller.selectPermissionMode("full_access");
+    await vi.waitFor(() =>
+      expect(controller.read().permissionModeReview).not.toBeNull()
+    );
+    controller.answerPermissionModeReview(accepted);
+    await changing;
+  }
+
+  it("opens an exact blank chat without inference before choosing Full access and keeps new chats restricted", async () => {
+    const f = permissions();
+    const controller = f.make();
+    try {
+      controller.connect(null);
+      await ready(controller);
+      await vi.waitFor(() =>
+        expect(controller.read().permissionModeAvailable).toBe(true)
+      );
+      const defaults = structuredClone(f.defaults());
+      await choose(controller);
+      expect(controller.read().permissionMode?.mode).toBe("full_access");
+      expect(f.bridge.createFromDraft).toHaveBeenCalledOnce();
+      expect(f.bridge.submit).not.toHaveBeenCalled();
+      expect(f.bridge.submitInRegime).not.toHaveBeenCalled();
+      expect(f.bridge.updateSelection).not.toHaveBeenCalled();
+      expect(f.defaults()).toEqual(defaults);
+      await controller.select("chat-a");
+      await ready(controller);
+      expect(controller.read().permissionMode?.mode).toBe("restricted");
+      await controller.select("created");
+      await ready(controller);
+      expect(controller.read().permissionMode?.mode).toBe("full_access");
+      await controller.select(null);
+      await ready(controller);
+      expect(controller.read().permissionMode).toBeNull();
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("retries an unconfirmed exact selection without changing its authority request", async () => {
+    const f = permissions();
+    const change = vi.mocked(f.bridge.setPermissionMode!);
+    const receipt = {
+      sessionId: "chat-a",
+      revision: 1,
+      mode: "full_access" as const,
+      available: ["restricted", "full_access"] as const,
+    };
+    change.mockImplementationOnce(async () => {
+      f.modes.set("chat-a", { revision: 1, mode: "full_access" });
+      throw new Error("native_agent_request_timeout");
+    });
+    change.mockResolvedValueOnce(receipt);
+    const controller = f.make();
+    try {
+      controller.connect("chat-a");
+      await ready(controller);
+      await choose(controller);
+      expect(controller.read().permissionModeUncertain).toBe(false);
+      await controller.selectPermissionMode("full_access");
+      expect(change).toHaveBeenCalledTimes(2);
+      expect(change.mock.calls[1]).toEqual(change.mock.calls[0]);
+      expect(controller.read().permissionMode?.mode).toBe("full_access");
+      expect(controller.read().permissionModeError).toBeNull();
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("preserves Default on cancellation and explains busy native work", async () => {
+    const f = permissions();
+    const change = vi.mocked(f.bridge.setPermissionMode!);
+    change.mockResolvedValueOnce(null);
+    const controller = f.make();
+    try {
+      controller.connect("chat-a");
+      await ready(controller);
+      await choose(controller, false);
+      expect(controller.read().permissionMode?.mode).toBe("restricted");
+      change.mockRejectedValueOnce(new Error("permission_mode_busy"));
+      await choose(controller);
+      expect(controller.read().permissionMode?.mode).toBe("restricted");
+      expect(controller.read().permissionModeError).toMatch(
+        /accepted work and background processes/
+      );
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("blocks fresh sends after an unknown permission outcome until authoritative access is readable", async () => {
+    const f = permissions();
+    let lost = false;
+    const read = f.bridge.permissionMode!;
+    f.bridge.permissionMode = vi.fn<
+      NonNullable<DesktopNativeChat["permissionMode"]>
+    >(async (id) => {
+      if (lost) throw new Error("native_agent_request_timeout");
+      return read(id);
+    });
+    vi.mocked(f.bridge.setPermissionMode!).mockImplementationOnce(async () => {
+      f.modes.set("chat-a", { revision: 1, mode: "full_access" });
+      lost = true;
+      throw new Error("native_agent_request_timeout");
+    });
+    const controller = f.make();
+    try {
+      controller.connect("chat-a");
+      await ready(controller);
+      await choose(controller);
+      expect(controller.read().permissionModeUncertain).toBe(true);
+      expect(controller.canSubmit).toBe(false);
+      await expect(
+        controller.submit("Do not send while access is unknown")
+      ).rejects.toThrow("not_ready");
+      expect(f.bridge.submitInRegime).not.toHaveBeenCalled();
+      lost = false;
+      await controller.checkPermissionMode();
+      expect(controller.read().permissionModeUncertain).toBe(false);
+      expect(controller.read().permissionMode?.mode).toBe("full_access");
+      expect(controller.canSubmit).toBe(true);
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("asks for a fresh confirmation when a previous uncommitted review expired", async () => {
+    const f = permissions();
+    vi.mocked(f.bridge.setPermissionMode!).mockRejectedValueOnce(
+      new Error("native_chat_permission_mode_review_changed")
+    );
+    const controller = f.make();
+    try {
+      controller.connect("chat-a");
+      await ready(controller);
+      await choose(controller);
+      expect(controller.read().permissionModeError).toMatch(
+        /confirmation expired/
+      );
+      await choose(controller);
+      expect(f.bridge.reviewPermissionMode).toHaveBeenCalledTimes(2);
+      expect(controller.read().permissionMode?.mode).toBe("full_access");
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("keeps permission selection unavailable on older bridges", async () => {
+    const f = fixture();
+    const controller = f.make();
+    try {
+      controller.connect(null);
+      await ready(controller);
+      await controller.selectPermissionMode("full_access");
+      expect(controller.read().permissionModeAvailable).toBe(false);
+      expect(f.bridge.createFromDraft).not.toHaveBeenCalled();
+    } finally {
+      controller.disconnect();
     }
   });
 });

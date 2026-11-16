@@ -1,23 +1,17 @@
 "use client";
 
 import { useRef, useState, useSyncExternalStore } from "react";
-import {
-  PaperclipIcon,
-  GoalIcon,
-  ImageIcon,
-  ListChecksIcon,
-  SquareIcon,
-} from "lucide-react";
+import { SquareIcon } from "lucide-react";
 import { Button } from "@app/ui/components/button";
 import { TooltipProvider } from "@app/ui/components/tooltip";
 import {
   ComposerAttachmentCard,
+  ComposerDropArea,
+  type ComposerTransfer,
   type ComposerController,
 } from "@/kits/composer";
-import { AgentComposerInput } from "@/scaffolds/desktop/shared/agent-composer-input";
-import { AgentComposerTools } from "@/scaffolds/desktop/shared/agent-composer-tools";
+import { AgentComposer } from "@/scaffolds/desktop/shared/agent-composer";
 import { ContextMeter } from "@/scaffolds/desktop/shared/context-meter";
-import { NativeModelPicker } from "@/scaffolds/desktop/workbench/native-chat-controls";
 import { NativeComposerQueue } from "@/scaffolds/desktop/workbench/native-composer-tray";
 import type {
   NativeChatEffort,
@@ -25,6 +19,7 @@ import type {
 } from "@grida/desktop-bridge";
 import { DesktopComposerFixtures as fixtures } from "./desktop-fixtures";
 import { DesktopQueueFixture } from "./desktop-queue-fixture";
+import { DesktopSubmissionFixture } from "./desktop-submission-fixture";
 import { DesktopConversation } from "./desktop-conversation";
 import { DesktopConversationFixtures as conversations } from "./desktop-conversation-fixtures";
 import { DesktopChatTabs } from "./desktop-chat-tabs";
@@ -32,6 +27,7 @@ import { DesktopChatTabs } from "./desktop-chat-tabs";
 /** The production composer and preview surfaces, backed by local fixture state. */
 export function DesktopComposerDemo() {
   const [generation, setGeneration] = useState(0);
+  const [home, setHome] = useState(false);
   const [narrow, setNarrow] = useState(false);
   const [image, setImage] = useState(false);
   const [fileAttachment, setFileAttachment] = useState(false);
@@ -41,13 +37,20 @@ export function DesktopComposerDemo() {
   const [active, setActive] = useState<string | null>(fixtures.profiles.active);
   const [effort, setEffort] = useState<NativeChatEffort>("high");
   const [queue] = useState(() => new DesktopQueueFixture());
+  const [submission] = useState(() => new DesktopSubmissionFixture());
+  const submissionView = useSyncExternalStore(
+    submission.subscribe,
+    submission.read,
+    submission.read
+  );
   const queueView = useSyncExternalStore(
     queue.subscribe,
     queue.read,
     queue.read
   );
-  const busy = queueView.running;
-  const pendingGoal = queueView.queue.items.some((item) => item.goalStart);
+  const busy = !home && queueView.running;
+  const pendingGoal =
+    !home && queueView.queue.items.some((item) => item.goalStart);
   const canStartGoal = !image && !fileAttachment && !pendingGoal;
   const selectGoal = () => {
     if (!canStartGoal) {
@@ -68,6 +71,7 @@ export function DesktopComposerDemo() {
   const draft = useRef<Pick<ComposerController, "appendText" | "focus">>(null);
   const reset = () => {
     setGeneration((value) => value + 1);
+    setHome(false);
     setNarrow(false);
     setImage(false);
     setFileAttachment(false);
@@ -76,11 +80,13 @@ export function DesktopComposerDemo() {
     setModeNotice(null);
     setActive(fixtures.profiles.active);
     setEffort("high");
+    submission.reset();
     queue.reset();
     setScenario("text");
     setMessages(conversations.get("text").messages);
   };
   const submit = async (text: string) => {
+    await submission.wait();
     if (busy) {
       queue.enqueue(
         text,
@@ -120,6 +126,30 @@ export function DesktopComposerDemo() {
     setModeNotice(null);
   };
 
+  const transferAttachment = ({ resources }: ComposerTransfer.Event) => {
+    if (
+      queueView.queueDraft ||
+      submissionView.pending ||
+      resources.length === 0
+    )
+      return;
+    if (resources.length !== 1) {
+      setModeNotice("Attach one file at a time.");
+      return;
+    }
+    if (goal) {
+      setModeNotice("Remove the goal intent to attach a file.");
+      return;
+    }
+    const resource = resources[0];
+    const raster =
+      resource.kind === "file" &&
+      /^image\/(?:png|jpeg|webp|gif)$/.test(resource.file.type);
+    setImage(raster);
+    setFileAttachment(!raster);
+    setModeNotice(null);
+  };
+
   return (
     <TooltipProvider>
       <main
@@ -127,6 +157,21 @@ export function DesktopComposerDemo() {
         className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6"
       >
         <div className="flex flex-wrap items-center gap-4 text-sm">
+          <label className="flex items-center gap-2">
+            Surface
+            <select
+              aria-label="Composer surface"
+              value={home ? "home" : "workspace"}
+              className="h-8 rounded-md border bg-background px-2 text-sm"
+              onChange={(event) => {
+                queue.closeQueueDraft();
+                setHome(event.currentTarget.value === "home");
+              }}
+            >
+              <option value="workspace">Workspace</option>
+              <option value="home">Home</option>
+            </select>
+          </label>
           <label className="flex items-center gap-2">
             Conversation
             <select
@@ -151,6 +196,7 @@ export function DesktopComposerDemo() {
             <input
               type="checkbox"
               checked={busy}
+              disabled={home}
               onChange={(event) => queue.setRunning(event.target.checked)}
             />
             Running turn (send to queue)
@@ -163,6 +209,25 @@ export function DesktopComposerDemo() {
             />
             Narrow composer
           </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={submissionView.hold}
+              disabled={submissionView.pending}
+              onChange={(event) => submission.hold(event.target.checked)}
+            />
+            Hold submission
+          </label>
+          {submissionView.pending && (
+            <>
+              <Button size="sm" variant="outline" onClick={submission.accept}>
+                Accept submission
+              </Button>
+              <Button size="sm" variant="outline" onClick={submission.refuse}>
+                Refuse submission
+              </Button>
+            </>
+          )}
           <Button size="sm" variant="outline" onClick={reset}>
             Reset examples
           </Button>
@@ -173,16 +238,32 @@ export function DesktopComposerDemo() {
           focus the handle and use Space, arrow keys, then Space. Sends stay on
           this page.
         </p>
-        <section
+        <ComposerDropArea
+          data-testid="desktop-composer-surface"
+          role="region"
+          aria-label={home ? "Home composer surface" : "Chat composer surface"}
+          onTransfer={transferAttachment}
           className={`mx-auto flex h-[min(44rem,80vh)] min-h-[32rem] w-full flex-col rounded-xl border bg-background p-3 ${narrow ? "max-w-sm" : "max-w-3xl"}`}
         >
-          <DesktopConversation
-            key={`${generation}-${scenario}`}
-            scenario={scenario}
-            messages={messages}
-            running={busy}
-          />
-          {queueView.steered.length > 0 && (
+          {home ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
+              <h2 className="text-xl font-medium">
+                What would you like to make?
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Home uses the same composer. Pick a model, effort and intent, or
+                attach a reference before starting.
+              </p>
+            </div>
+          ) : (
+            <DesktopConversation
+              key={`${generation}-${scenario}`}
+              scenario={scenario}
+              messages={messages}
+              running={busy}
+            />
+          )}
+          {!home && queueView.steered.length > 0 && (
             <div
               role="status"
               aria-label="Steering preview"
@@ -196,7 +277,7 @@ export function DesktopComposerDemo() {
               </p>
             </div>
           )}
-          {queueView.count > 0 && (
+          {!home && queueView.count > 0 && (
             <div className="mx-2 shrink-0 divide-y overflow-hidden rounded-t-xl border border-b-0 bg-background text-sm">
               <NativeComposerQueue
                 controller={queue}
@@ -218,7 +299,7 @@ export function DesktopComposerDemo() {
               {modeNotice}
             </p>
           )}
-          <AgentComposerInput
+          <AgentComposer
             key={generation}
             editing={
               queueView.queueDraft
@@ -233,24 +314,16 @@ export function DesktopComposerDemo() {
                   }
                 : undefined
             }
-            catalog={fixtures.catalog}
+            catalog={{
+              commands: [],
+              mentions: fixtures.catalog.mentions,
+            }}
             draftRef={draft}
             autofocus={false}
             isStreaming={false}
             busy={busy}
             className="@container"
             canSubmit={!goal || canStartGoal}
-            placeholder={
-              goal
-                ? "Describe the goal…"
-                : plan
-                  ? "What would you like to plan?"
-                  : image || fileAttachment
-                    ? "Add a message to send this attachment…"
-                    : busy || queueView.count > 0
-                      ? "Queue a follow-up…"
-                      : undefined
-            }
             emptyAction={
               busy
                 ? {
@@ -265,27 +338,31 @@ export function DesktopComposerDemo() {
             onSubmit={submit}
             onStop={() => queue.setRunning(false)}
             allowEmptySubmit={image || fileAttachment}
-            onCommandSelect={(command) => {
-              if (command.id === "plan") {
-                setPlan(true);
-                setModeNotice(null);
-                return true;
-              }
-              if (command.id === "goal") {
-                selectGoal();
-                return true;
-              }
-              return false;
-            }}
-            onAttachmentTransfer={(event) => {
-              if (goal) return;
-              if (
-                event.resources.some((resource) => resource.kind === "file")
-              ) {
-                setImage(true);
-                setFileAttachment(false);
-              }
-            }}
+            commands={[
+              {
+                id: "plan",
+                run: () => {
+                  setPlan(true);
+                  setModeNotice(null);
+                },
+              },
+              { id: "goal", run: selectGoal },
+              ...(!home
+                ? [
+                    {
+                      id: "compact" as const,
+                      run: () =>
+                        setModeNotice("Compaction is a local preview here."),
+                    },
+                    {
+                      id: "fork" as const,
+                      run: () =>
+                        setModeNotice("Forking is a local preview here."),
+                    },
+                  ]
+                : []),
+            ]}
+            onAttachmentTransfer={transferAttachment}
             attachments={
               image ? (
                 <ComposerAttachmentCard
@@ -316,76 +393,36 @@ export function DesktopComposerDemo() {
                 />
               ) : null
             }
-            toolbarStart={
-              <AgentComposerTools
-                actions={[
-                  {
-                    id: "files",
-                    title: "Files",
-                    icon: <PaperclipIcon />,
-                    disabled: goal,
-                    onSelect: () => {
-                      setFileAttachment(true);
-                      setImage(false);
-                    },
-                  },
-                  {
-                    id: "image",
-                    title: "Image",
-                    icon: <ImageIcon />,
-                    disabled: goal,
-                    onSelect: () => {
-                      setImage(true);
-                      setFileAttachment(false);
-                    },
-                  },
-                  {
-                    id: "goal",
-                    title: "Goal",
-                    description: "Set a goal to keep pursuing",
-                    icon: <GoalIcon />,
-                    disabled: goal || !canStartGoal,
-                    onSelect: selectGoal,
-                  },
-                  {
-                    id: "plan",
-                    title: "Plan mode",
-                    description: plan
-                      ? "Turn plan mode off"
-                      : "Turn plan mode on",
-                    icon: <ListChecksIcon />,
-                    onSelect: () => setPlan((current) => !current),
-                  },
-                ]}
-                intents={[
-                  ...(plan
-                    ? [
-                        {
-                          id: "plan",
-                          icon: <ListChecksIcon />,
-                          label: "Plan",
-                          onRemove: () => setPlan(false),
-                        },
-                      ]
-                    : []),
-                  ...(goal
-                    ? [
-                        {
-                          id: "goal",
-                          icon: <GoalIcon />,
-                          label: "Goal",
-                          onRemove: () => {
-                            setGoal(false);
-                            setModeNotice(null);
-                          },
-                        },
-                      ]
-                    : []),
-                ]}
-              />
-            }
-            toolbarEnd={
-              <>
+            actions={{
+              files: {
+                disabled: goal,
+                onSelect: () => {
+                  setFileAttachment(true);
+                  setImage(false);
+                },
+              },
+              image: {
+                disabled: goal,
+                onSelect: () => {
+                  setImage(true);
+                  setFileAttachment(false);
+                },
+              },
+              goal: {
+                active: goal,
+                disabled: !canStartGoal,
+                onChange: (enabled) => {
+                  if (enabled) selectGoal();
+                  else {
+                    setGoal(false);
+                    setModeNotice(null);
+                  }
+                },
+              },
+              plan: { active: plan, onChange: setPlan },
+            }}
+            modelLeading={
+              !home && (
                 <ContextMeter
                   usage={{
                     usedTokens: 18000,
@@ -399,24 +436,21 @@ export function DesktopComposerDemo() {
                     },
                   }}
                 />
-                <NativeModelPicker
-                  profiles={{ ...fixtures.profiles, active }}
-                  busy={false}
-                  onSelect={(selection) =>
-                    setActive(
-                      selection.kind === "default" ? null : selection.id
-                    )
-                  }
-                  onRefresh={() => {}}
-                  effort={effort}
-                  onEffort={setEffort}
-                  ultraAvailable
-                  goal={goal}
-                />
-              </>
+              )
             }
+            model={{
+              profiles: { ...fixtures.profiles, active },
+              busy: false,
+              onSelect: (selection) =>
+                setActive(selection.kind === "default" ? null : selection.id),
+              onRefresh: () => {},
+              effort,
+              onEffort: setEffort,
+              ultraAvailable: true,
+              goal,
+            }}
           />
-        </section>
+        </ComposerDropArea>
         <DesktopChatTabs key={generation} messages={messages} />
       </main>
     </TooltipProvider>

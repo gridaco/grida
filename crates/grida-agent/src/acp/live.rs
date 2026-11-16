@@ -15,6 +15,7 @@ pub(super) const CAPABILITY: &str = "co.grida/session/updates";
 pub(super) const LIFECYCLE: &str = "co.grida/session/lifecycle";
 const CHUNK_BYTES: usize = 8 * 1024;
 
+#[allow(clippy::too_many_arguments)]
 pub(super) async fn forward(
     connection: ConnectionTo<Client>,
     delivery: Arc<Delivery>,
@@ -23,6 +24,7 @@ pub(super) async fn forward(
     text_enabled: bool,
     lifecycle_enabled: bool,
     processes: Option<Arc<ProcessSessions>>,
+    ordering: Arc<crate::host::activity_order::State>,
 ) -> Result<()> {
     let stream = async {
         loop {
@@ -39,11 +41,28 @@ pub(super) async fn forward(
                         let (part, remaining) = text.split_at(end);
                         let chunk = ContentChunk::new(part.to_owned().into())
                             .message_id(update.message.as_str());
-                        let metadata = json!({
+                        let mut metadata = json!({
                             "turnId": update.turn,
                             "offsetBytes": offset,
                             "replace": replace,
                         });
+                        if sessions
+                            .lock()
+                            .unwrap()
+                            .negotiated
+                            .contains(super::projection::ACTIVITY_ORDER)
+                        {
+                            metadata.as_object_mut().unwrap().extend(
+                                crate::host::activity_order::metadata(ordering.message(
+                                    &update.session,
+                                    &update.turn,
+                                    &update.message,
+                                ))
+                                .as_object()
+                                .unwrap()
+                                .clone(),
+                            );
+                        }
                         send(
                             &connection,
                             &delivery,
@@ -67,13 +86,30 @@ pub(super) async fn forward(
                         .result
                         .as_ref()
                         .map_or(Outcome::Running, |result| Outcome::Finished(result.status));
-                    let (notification, metadata) = activity_update(
+                    let (notification, mut metadata) = activity_update(
                         &update.message,
                         &update.call,
                         outcome,
                         update.result.as_deref(),
                         json!({"turnId": update.turn}),
                     );
+                    if sessions
+                        .lock()
+                        .unwrap()
+                        .negotiated
+                        .contains(super::projection::ACTIVITY_ORDER)
+                    {
+                        metadata.as_object_mut().unwrap().extend(
+                            crate::host::activity_order::metadata(ordering.call(
+                                &update.session,
+                                &update.turn,
+                                &update.call.id,
+                            ))
+                            .as_object()
+                            .unwrap()
+                            .clone(),
+                        );
+                    }
                     send_update(
                         &connection,
                         &delivery,
@@ -202,12 +238,16 @@ async fn send_update(
             if !state.can_deliver(session) {
                 return Ok(false);
             }
+            let mut meta = [(capability.into(), metadata.clone())]
+                .into_iter()
+                .collect::<agent_client_protocol::v1::schema::Meta>();
+            if metadata.get("activityOrder").is_some()
+                || metadata.get("activityOrderIncomplete").is_some()
+            {
+                meta.insert(super::projection::ACTIVITY_ORDER.into(), metadata);
+            }
             connection.send_notification(
-                SessionNotification::new(session.as_str().to_owned(), update.clone()).meta(
-                    [(capability.into(), metadata)]
-                        .into_iter()
-                        .collect::<agent_client_protocol::v1::schema::Meta>(),
-                ),
+                SessionNotification::new(session.as_str().to_owned(), update.clone()).meta(meta),
             )?;
             Ok(true)
         })

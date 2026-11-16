@@ -247,6 +247,185 @@ fn combined() -> String {
 }
 
 #[tokio::test]
+async fn active_worker_receives_parent_information_in_its_current_assignment() {
+    const NOTE: &str = "CURRENT-ASSIGNMENT-UPDATE: write updated-request into clarified.txt.";
+    let fixture = Fixture::new(false);
+    writable(&fixture);
+    let parent_step = Arc::new(Mutex::new(0));
+    let child_step = Arc::new(Mutex::new(0));
+    let assignment = Arc::new(Mutex::new(None::<Value>));
+    let (worker_seen, worker_ready) = tokio::sync::oneshot::channel();
+    let worker_seen = Arc::new(Mutex::new(Some(worker_seen)));
+    let worker_ready = Arc::new(Mutex::new(Some(worker_ready)));
+    let (release_worker, held_worker) = tokio::sync::oneshot::channel();
+    let release_worker = Arc::new(Mutex::new(Some(release_worker)));
+    let held_worker = Arc::new(Mutex::new(Some(held_worker)));
+    let replies = (0..8)
+        .map(|_| {
+            let parent_step = parent_step.clone();
+            let child_step = child_step.clone();
+            let assignment = assignment.clone();
+            let worker_seen = worker_seen.clone();
+            let worker_ready = worker_ready.clone();
+            let release_worker = release_worker.clone();
+            let held_worker = held_worker.clone();
+            Reply::Choose(Box::new(move |request| {
+                if offered(request, "spawn_agent") {
+                    let mut step = parent_step.lock().unwrap();
+                    let current = *step;
+                    *step += 1;
+                    match current {
+                        0 => tool_reply(
+                            "spawn_agent",
+                            json!({"name":"Clarified unit","instructions":"Inspect the workspace, apply any parent clarification, and save your result."}),
+                        ),
+                        1 => {
+                            let results = tool_results(request);
+                            let captured = results.last().unwrap()["structured"]["assignment"].clone();
+                            assert!(captured["turn"].is_string(), "{results:?}");
+                            let child = captured["child"].clone();
+                            *assignment.lock().unwrap() = Some(captured);
+                            Reply::After(
+                                worker_ready.lock().unwrap().take().unwrap(),
+                                Box::new(tool_reply("send_agent_message", json!({"child":child,"text":NOTE}))),
+                            )
+                        }
+                        2 => {
+                            let results = tool_results(request);
+                            let receipt = results.last().unwrap();
+                            assert_eq!(receipt["status"], "succeeded", "{receipt}");
+                            let captured = assignment.lock().unwrap().clone().unwrap();
+                            let delivered = &receipt["structured"]["delivered"];
+                            assert_eq!(delivered["status"], "appended", "{receipt}");
+                            assert_eq!(delivered["child"], captured["child"], "{receipt}");
+                            assert_eq!(delivered["turn"], captured["turn"], "{receipt}");
+                            assert!(delivered["history_position"].is_u64(), "{receipt}");
+                            // Finish the already-prepared child inference only after
+                            // delivery. Its next request must see the correction.
+                            release_worker.lock().unwrap().take().unwrap().send(()).unwrap();
+                            tool_reply("wait_agent", json!({"children":[captured["child"]]}))
+                        }
+                        3 => {
+                            let results = tool_results(request);
+                            let receipt = results.last().unwrap();
+                            let captured = assignment.lock().unwrap().clone().unwrap();
+                            assert_eq!(receipt["status"], "succeeded", "{receipt}");
+                            assert!(receipt["structured"]["pending"].as_array().unwrap().is_empty(), "{receipt}");
+                            let collected = receipt["structured"]["collected"].as_array().unwrap();
+                            assert_eq!(collected.len(), 1, "{receipt}");
+                            for field in ["child", "input", "turn"] {
+                                assert_eq!(collected[0][field], captured[field], "{receipt}");
+                            }
+                            assert_eq!(collected[0]["status"], "succeeded", "{receipt}");
+                            assert_eq!(collected[0]["resource_status"], "verified", "{receipt}");
+                            tool_reply("read_file", json!({"path":"clarified.txt"}))
+                        }
+                        4 => {
+                            let results = tool_results(request);
+                            assert_eq!(results.last().unwrap()["status"], "succeeded");
+                            assert!(results.last().unwrap()["content"].to_string().contains("updated-request"));
+                            Reply::Finished("The worker applied the clarification within its original assignment.")
+                        }
+                        _ => panic!("unexpected clarification parent step {current}"),
+                    }
+                } else {
+                    let mut step = child_step.lock().unwrap();
+                    let current = *step;
+                    *step += 1;
+                    match current {
+                        0 => {
+                            assert!(!request["messages"].to_string().contains(NOTE));
+                            worker_seen.lock().unwrap().take().unwrap().send(()).unwrap();
+                            Reply::After(
+                                held_worker.lock().unwrap().take().unwrap(),
+                                Box::new(tool_reply("list_files", json!({"path":"."}))),
+                            )
+                        }
+                        1 => {
+                            let messages = request["messages"].as_array().unwrap();
+                            assert_eq!(messages.iter().filter(|message| message["role"] == "user" && message["content"] == NOTE).count(), 1, "{messages:?}");
+                            tool_reply("write_file", json!({"path":"clarified.txt","content":"updated-request"}))
+                        }
+                        2 => {
+                            assert_eq!(tool_results(request).last().unwrap()["status"], "succeeded");
+                            Reply::Finished("Applied the parent clarification and verified the saved result.")
+                        }
+                        _ => panic!("unexpected clarification child step {current}"),
+                    }
+                }
+            }))
+        })
+        .collect();
+    let endpoint = Endpoint::start(replies).await;
+    let child = fixture
+        .process(&endpoint.url, "serve")
+        .args(["--stdio", "--subagents"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut client = PrivateStdio::from_child(child);
+    let mut initialize = extension_initialize();
+    initialize["clientCapabilities"]["_meta"]["co.grida/subagent/activity"] = 1.into();
+    client.request("initialize", initialize).await;
+    let created = client
+        .request(
+            "session/new",
+            json!({"cwd":fixture.primary,"mcpServers":[]}),
+        )
+        .await;
+    let session = created["result"]["sessionId"].as_str().unwrap();
+    let accepted = client.request("_co.grida/session/submit", json!({
+        "sessionId":session,"inputId":"clarification","prompt":[{"type":"text","text":"Delegate a local task and clarify its output while it is active."}]
+    })).await;
+    assert!(accepted.get("error").is_none(), "{accepted}");
+    let settled = timeout(WAIT, async {
+        loop {
+            let snapshot = client
+                .request("_co.grida/session/snapshot", json!({"sessionId":session}))
+                .await;
+            if snapshot["result"]["current"].is_null() && !snapshot["result"]["latest"].is_null() {
+                break snapshot;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(
+        settled["result"]["latest"]["status"], "succeeded",
+        "{settled}"
+    );
+    assert_eq!(*parent_step.lock().unwrap(), 5);
+    assert_eq!(*child_step.lock().unwrap(), 3);
+    assert_eq!(
+        fs::read_to_string(fixture.primary.join("clarified.txt")).unwrap(),
+        "updated-request"
+    );
+    let captured = assignment.lock().unwrap().clone().unwrap();
+    let conversation = client
+        .request(
+            "_co.grida/subagent/conversation",
+            json!({"parentSessionId":session,"childId":captured["child"]}),
+        )
+        .await;
+    assert!(conversation.get("error").is_none(), "{conversation}");
+    assert_eq!(
+        conversation["result"]["messages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|message| message["role"] == "user" && message["text"] == NOTE)
+            .count(),
+        1,
+        "{conversation}"
+    );
+    client.close().await;
+    endpoint.done().await;
+}
+
+#[tokio::test]
 async fn ordinary_reasoning_delegates_five_capable_workers_and_integrates_exact_results() {
     let fixture = Fixture::new(false);
     writable(&fixture);
@@ -683,11 +862,17 @@ async fn completed_worker_retires_its_real_command_before_parent_collection() {
                 let mut step=child_step.lock().unwrap();let current=*step;*step+=1;
                 assert!(offered(request,"exec_command"));
                 match current {
-                    0=>tool_reply("exec_command",json!({
+                    0=> {
+                        let context=request["messages"].to_string();
+                        assert!(context.contains("The native host automatically retires any remaining assignment-owned processes"));
+                        assert!(context.contains("let the host retire it, rather than stopping it only to finish or waiting for it to expire"));
+                        assert!(context.contains("do not claim cleanup you have not observed"));
+                        tool_reply("exec_command",json!({
                         "access":"read_write",
                         "cmd":"printf ready; while :; do printf . >> worker-beat; /bin/sleep 0.05; done",
                         "yield_time_ms":1000,
-                    })),
+                        }))
+                    },
                     1=> {
                         let results=tool_results(request);let result=results.last().unwrap();
                         assert_eq!(result["status"],"succeeded","{result}");
@@ -778,3 +963,6 @@ async fn completed_worker_retires_its_real_command_before_parent_collection() {
     client.close().await;
     endpoint.done().await;
 }
+
+#[path = "delegation/activity_order.rs"]
+mod activity_order;

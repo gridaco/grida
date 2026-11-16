@@ -1444,3 +1444,465 @@ async fn a_session_ends_when_its_owner_process_disappears() {
     }
     let _ = fs::remove_dir_all(workspace.parent().unwrap());
 }
+
+impl Fixture {
+    fn unconfined_scope(&self) -> UnconfinedScope {
+        let scope = self.scope();
+        UnconfinedScope {
+            grants: scope.grants,
+            revision: scope.revision,
+            valid_until: scope.valid_until,
+            temporary_parent: scope.temporary_parent,
+            termination: Termination::ProcessGroup,
+        }
+    }
+
+    fn unconfined(&self) -> Sandbox {
+        Sandbox::new_unconfined(trusted(env!("CARGO_BIN_EXE_agent-kit-sandbox-helper"))).unwrap()
+    }
+}
+
+#[test]
+fn unconfined_preparation_requires_authority_and_refuses_descendant_isolation() {
+    let fixture = Fixture::new();
+    // An ordinary-user posture cannot truthfully be provided by a root host.
+    #[allow(unsafe_code)]
+    if unsafe { libc::geteuid() } == 0 {
+        assert_eq!(
+            Sandbox::new_unconfined(trusted(env!("CARGO_BIN_EXE_agent-kit-sandbox-helper")))
+                .err()
+                .unwrap()
+                .code,
+            "sandbox_ordinary_user_required"
+        );
+        return;
+    }
+    let sandbox = fixture.unconfined();
+    let mut scope = fixture.unconfined_scope();
+    scope.termination = Termination::AllDescendants;
+    assert_eq!(
+        sandbox
+            .prepare_unconfined(fixture.command("exit 0"), scope)
+            .err()
+            .unwrap()
+            .code,
+        "sandbox_descendant_guarantee_unavailable"
+    );
+    let mut scope = fixture.unconfined_scope();
+    scope.grants.grants.clear();
+    assert_eq!(
+        sandbox
+            .prepare_unconfined(fixture.command("exit 0"), scope)
+            .err()
+            .unwrap()
+            .code,
+        "sandbox_scope_ungranted"
+    );
+    let mut scope = fixture.unconfined_scope();
+    scope.valid_until = Instant::now();
+    assert_eq!(
+        sandbox
+            .prepare_unconfined(fixture.command("exit 0"), scope)
+            .err()
+            .unwrap()
+            .code,
+        "sandbox_scope_expired"
+    );
+    let prepared = sandbox
+        .prepare_unconfined(fixture.command("exit 0"), fixture.unconfined_scope())
+        .unwrap();
+    prepared
+        .validate_working_root(&fs::File::open(&fixture.workspace).unwrap())
+        .unwrap();
+    assert!(
+        prepared
+            .validate_working_root(&fs::File::open(&fixture.outside).unwrap())
+            .is_err()
+    );
+    // A different product setting must never reuse a confined action capture.
+    #[cfg(target_os = "macos")]
+    {
+        let confined = fixture
+            .sandbox()
+            .prepare(fixture.command("exit 0"), fixture.scope())
+            .unwrap();
+        assert_ne!(
+            prepared.capture_fingerprint().unwrap(),
+            confined.capture_fingerprint().unwrap()
+        );
+    }
+    #[cfg(target_os = "linux")]
+    assert_eq!(
+        sandbox
+            .prepare(fixture.command("exit 0"), fixture.scope())
+            .err()
+            .unwrap()
+            .code,
+        "sandbox_bubblewrap_missing"
+    );
+}
+
+#[test]
+fn a_helper_with_an_old_setup_protocol_is_refused() {
+    for old in [
+        "--agent-kit-sandbox-helper-v2",
+        "--agent-kit-sandbox-helper-v3",
+    ] {
+        let status = std::process::Command::new(env!("CARGO_BIN_EXE_agent-kit-sandbox-helper"))
+            .args([old, "3"])
+            .status()
+            .unwrap();
+        assert!(!status.success());
+    }
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn a_capture_distinguishes_disk_read_and_protected_path_rules() {
+    let fixture = Fixture::new();
+    let sandbox = fixture.sandbox();
+    let capture = |scope| {
+        sandbox
+            .prepare(fixture.command("exit 0"), scope)
+            .unwrap()
+            .capture_fingerprint()
+            .unwrap()
+    };
+    let scoped = capture(fixture.scope());
+    let mut disk = fixture.scope();
+    disk.disk_read = true;
+    assert_ne!(scoped, capture(disk));
+    let mut protected = fixture.scope();
+    protected.protected.push(ProtectedPath {
+        path: fixture.workspace.join("protected"),
+        access: DeniedAccess::Write,
+    });
+    assert_ne!(scoped, capture(protected));
+}
+
+async fn unconfined_http_fixture() -> (String, tokio::task::JoinHandle<()>) {
+    let listener = tokio::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
+        .await
+        .unwrap();
+    let address = listener.local_addr().unwrap();
+    let server = tokio::spawn(async move {
+        let (mut stream, _) = tokio::time::timeout(Duration::from_secs(10), listener.accept())
+            .await
+            .unwrap()
+            .unwrap();
+        let mut request = [0; 4096];
+        let read = stream.read(&mut request).await.unwrap();
+        assert!(request[..read].starts_with(b"GET / "));
+        stream
+            .write_all(
+                b"HTTP/1.1 200 OK\r\nContent-Length: 12\r\nConnection: close\r\n\r\nnetwork:yes\n",
+            )
+            .await
+            .unwrap();
+    });
+    (format!("http://{address}/"), server)
+}
+
+#[tokio::test]
+#[ignore = "requires native ordinary-user execution without outer confinement"]
+async fn unconfined_finite_process_reaches_files_and_network_with_owned_evidence() {
+    let fixture = Fixture::new();
+    let sandbox = fixture.unconfined();
+    let support = sandbox
+        .probe_unconfined(&fixture.unconfined_scope())
+        .await
+        .unwrap();
+    assert_eq!(
+        support,
+        Support {
+            backend: Backend::Unconfined,
+            termination: Termination::ProcessGroup
+        }
+    );
+    fs::write(fixture.outside.join("canary"), "outside:yes\n").unwrap();
+    let (url, server) = unconfined_http_fixture().await;
+    let spec = fixture.command(&format!(
+        "/bin/cat '{0}/canary'; printf changed > '{0}/written'; /usr/bin/curl --max-time 3 -fsS '{url}'; printf '%s' \"$VISIBLE\"; test -z \"$AGENT_KIT_TEST_SECRET\"; test -d \"$TMPDIR\"", fixture.outside.display()));
+    let evidence = sandbox
+        .prepare_unconfined(spec, fixture.unconfined_scope())
+        .unwrap()
+        .spawn(CancellationToken::new())
+        .unwrap()
+        .finish()
+        .await
+        .unwrap();
+    server.await.unwrap();
+    assert_eq!(evidence.completion, Completion::Exited(0), "{evidence:?}");
+    assert_eq!(
+        evidence.stdout, b"outside:yes\nnetwork:yes\napproved",
+        "{evidence:?}"
+    );
+    assert_eq!(
+        fs::read(fixture.outside.join("written")).unwrap(),
+        b"changed"
+    );
+    assert_eq!(evidence.support.backend, Backend::Unconfined);
+    assert_eq!(
+        evidence.descendants,
+        Descendants::ProcessGroupSignalled,
+        "{evidence:?}"
+    );
+    assert!(evidence.temporary_removed);
+    assert_eq!(fs::read_dir(&fixture.temporary).unwrap().count(), 0);
+}
+
+#[tokio::test]
+#[ignore = "requires native ordinary-user execution without outer confinement"]
+async fn unconfined_terminal_accepts_input_reaches_network_and_retains_interrupt_evidence() {
+    let fixture = Fixture::new();
+    let (url, server) = unconfined_http_fixture().await;
+    let session = fixture.unconfined().prepare_unconfined(fixture.session_command(&format!(
+        "test -t 0 && printf 'tty:yes\\n'; IFS= read -r line; printf '%s' \"$line\" > '{}/typed'; /usr/bin/curl --max-time 3 -fsS '{url}'; printf 'ready\\n'; exec /bin/sleep 100", fixture.outside.display())), fixture.unconfined_scope()).unwrap()
+        .spawn_session(session_options(true), CancellationToken::new()).unwrap();
+    let (output, _) = read_until(&session, Duration::from_secs(5), |output| {
+        contains(output, "tty:yes")
+    })
+    .await;
+    assert!(contains(&output, "tty:yes"));
+    session.write(b"authorized input\n").unwrap();
+    let (output, _) = read_until(&session, Duration::from_secs(5), |output| {
+        contains(output, "ready")
+    })
+    .await;
+    assert!(
+        contains(&output, "network:yes"),
+        "{}",
+        String::from_utf8_lossy(&output)
+    );
+    assert_eq!(
+        fs::read(fixture.outside.join("typed")).unwrap(),
+        b"authorized input"
+    );
+    server.await.unwrap();
+    session.interrupt().unwrap();
+    let (_, ended) = read_until(&session, Duration::from_secs(5), |_| false).await;
+    assert!(ended);
+    let evidence = session.finish().await.unwrap();
+    assert_eq!(
+        evidence.completion,
+        Completion::Signaled(libc::SIGINT),
+        "{evidence:?}"
+    );
+    assert_eq!(evidence.support.backend, Backend::Unconfined);
+    assert_eq!(
+        evidence.descendants,
+        Descendants::ProcessGroupSignalled,
+        "{evidence:?}"
+    );
+    assert!(evidence.temporary_removed);
+}
+
+#[tokio::test]
+#[ignore = "requires native ordinary-user execution without outer confinement"]
+async fn unconfined_stop_cancellation_and_deadlines_keep_cleanup_evidence() {
+    let fixture = Fixture::new();
+    let sandbox = fixture.unconfined();
+    for terminal in [false, true] {
+        let cancellation = CancellationToken::new();
+        let script =
+            "( while :; do printf alive > child; /bin/sleep 0.05; done ) & printf ready; wait";
+        let session = sandbox
+            .prepare_unconfined(fixture.session_command(script), fixture.unconfined_scope())
+            .unwrap()
+            .spawn_session(session_options(terminal), cancellation.clone())
+            .unwrap();
+        let (output, _) = read_until(&session, Duration::from_secs(5), |output| {
+            contains(output, "ready")
+        })
+        .await;
+        assert!(contains(&output, "ready"));
+        if terminal {
+            cancellation.cancel();
+        } else {
+            session.request_stop();
+        }
+        let evidence = session.finish().await.unwrap();
+        assert_eq!(
+            evidence.stopped,
+            Some(StopReason::Requested),
+            "{evidence:?}"
+        );
+        assert_eq!(
+            evidence.descendants,
+            Descendants::ProcessGroupSignalled,
+            "{evidence:?}"
+        );
+        assert!(evidence.temporary_removed);
+        fs::remove_file(fixture.workspace.join("child")).unwrap();
+        tokio::time::sleep(Duration::from_millis(150)).await;
+        assert!(!fixture.workspace.join("child").exists());
+    }
+    let mut spec = fixture.command("printf ready; /bin/sleep 100");
+    spec.timeout = Duration::from_millis(250);
+    let evidence = sandbox
+        .prepare_unconfined(spec, fixture.unconfined_scope())
+        .unwrap()
+        .spawn(CancellationToken::new())
+        .unwrap()
+        .finish()
+        .await
+        .unwrap();
+    assert_eq!(evidence.stopped, Some(StopReason::Deadline), "{evidence:?}");
+    assert_eq!(
+        evidence.descendants,
+        Descendants::ProcessGroupSignalled,
+        "{evidence:?}"
+    );
+    assert!(evidence.temporary_removed);
+    let mut scope = fixture.unconfined_scope();
+    scope.valid_until = Instant::now() + Duration::from_millis(250);
+    let session = sandbox
+        .prepare_unconfined(fixture.session_command("exec /bin/sleep 100"), scope)
+        .unwrap()
+        .spawn_session(session_options(true), CancellationToken::new())
+        .unwrap();
+    let evidence = session.finish().await.unwrap();
+    assert_eq!(evidence.stopped, Some(StopReason::Deadline), "{evidence:?}");
+    assert_eq!(
+        evidence.descendants,
+        Descendants::ProcessGroupSignalled,
+        "{evidence:?}"
+    );
+    assert!(evidence.temporary_removed);
+}
+
+#[tokio::test]
+#[ignore = "requires native ordinary-user execution without outer confinement"]
+async fn unconfined_finite_cancellation_and_output_are_bounded() {
+    let fixture = Fixture::new();
+    let sandbox = fixture.unconfined();
+    let cancellation = CancellationToken::new();
+    let running = sandbox
+        .prepare_unconfined(
+            fixture.command("printf ready > started; /bin/sleep 100"),
+            fixture.unconfined_scope(),
+        )
+        .unwrap()
+        .spawn(cancellation.clone())
+        .unwrap();
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !fixture.workspace.join("started").exists() {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    cancellation.cancel();
+    let evidence = running.finish().await.unwrap();
+    assert_eq!(
+        evidence.stopped,
+        Some(StopReason::Requested),
+        "{evidence:?}"
+    );
+    assert_eq!(
+        evidence.descendants,
+        Descendants::ProcessGroupSignalled,
+        "{evidence:?}"
+    );
+    assert!(evidence.temporary_removed);
+
+    let mut spec = fixture.command("while :; do printf 0123456789; done");
+    spec.max_output_bytes = 1024;
+    let evidence = sandbox
+        .prepare_unconfined(spec, fixture.unconfined_scope())
+        .unwrap()
+        .spawn(CancellationToken::new())
+        .unwrap()
+        .finish()
+        .await
+        .unwrap();
+    assert_eq!(
+        evidence.stopped,
+        Some(StopReason::OutputLimit),
+        "{evidence:?}"
+    );
+    assert!(evidence.output_truncated);
+    assert!(evidence.stdout.len() + evidence.stderr.len() <= 1024);
+    assert_eq!(
+        evidence.descendants,
+        Descendants::ProcessGroupSignalled,
+        "{evidence:?}"
+    );
+    assert!(evidence.temporary_removed);
+}
+
+/// Child of the owner-loss test, deliberately killed without running drops.
+#[tokio::test]
+#[ignore = "requires native ordinary-user execution without outer confinement"]
+async fn unconfined_owner_process() {
+    let Some(report) = std::env::var_os("AGENT_KIT_TEST_UNCONFINED_OWNER") else {
+        return;
+    };
+    let fixture = Fixture::new();
+    let sandbox = fixture.unconfined();
+    let mut scope = fixture.unconfined_scope();
+    scope.valid_until = Instant::now() + Duration::from_secs(60);
+    let mut sessions = Vec::new();
+    for (terminal, name) in [(false, "pipe"), (true, "terminal")] {
+        sessions.push(sandbox.prepare_unconfined(fixture.session_command(&format!(
+            "( while :; do printf alive > {name}-child; /bin/sleep 0.05; done ) & while :; do printf alive > {name}; /bin/sleep 0.05; done")), scope.clone()).unwrap()
+            .spawn_session(session_options(terminal), CancellationToken::new()).unwrap());
+    }
+    let finite = sandbox.prepare_unconfined(fixture.command(
+        "( while :; do printf alive > finite-child; /bin/sleep 0.05; done ) & while :; do printf alive > finite; /bin/sleep 0.05; done"), scope).unwrap()
+        .spawn(CancellationToken::new()).unwrap();
+    fs::write(report, fixture.workspace.to_string_lossy().as_bytes()).unwrap();
+    tokio::time::sleep(Duration::from_secs(60)).await;
+    drop((sessions, finite));
+}
+
+#[tokio::test]
+#[ignore = "requires native ordinary-user execution without outer confinement"]
+async fn unconfined_processes_end_when_their_owner_disappears() {
+    let directory = tempfile::tempdir().unwrap();
+    let report = directory.path().join("workspace");
+    let mut owner = std::process::Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "unconfined_owner_process",
+            "--include-ignored",
+            "--nocapture",
+        ])
+        .env("AGENT_KIT_TEST_UNCONFINED_OWNER", &report)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    let names = [
+        "pipe",
+        "terminal",
+        "pipe-child",
+        "terminal-child",
+        "finite",
+        "finite-child",
+    ];
+    let ready = tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            if let Ok(workspace) = fs::read_to_string(&report) {
+                let workspace = PathBuf::from(workspace);
+                if names.iter().all(|name| workspace.join(name).exists()) {
+                    break workspace;
+                }
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await;
+    owner.kill().unwrap();
+    owner.wait().unwrap();
+    let workspace = ready.expect("owner did not start every process");
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    for name in names {
+        fs::remove_file(workspace.join(name)).unwrap();
+    }
+    tokio::time::sleep(Duration::from_millis(250)).await;
+    for name in names {
+        assert!(!workspace.join(name).exists(), "{name} outlived its owner");
+    }
+    let _ = fs::remove_dir_all(workspace.parent().unwrap());
+}

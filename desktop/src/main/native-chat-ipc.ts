@@ -30,6 +30,8 @@ import type {
   NativeChatControlResult,
   NativeChatObservation,
   NativeChatOperatingRegime,
+  NativeChatPermissionState,
+  NativeChatPermissionReview,
   NativeChatPage,
   NativeChatProfileCatalog,
   NativeChatProfileSelection,
@@ -83,6 +85,8 @@ const TOKEN = /^[a-f0-9-]{36}$/;
 
 export type ActiveNativeChat = Readonly<{
   workspaceId: string;
+  /** Friendly project name supplied by the workspace owner. */
+  workspaceName?: string;
   /** Actual live worker route; reading another chat does not select it. */
   profileId?: string | null;
   directoryIdentity?: WorkspaceDirectoryIdentity;
@@ -168,6 +172,9 @@ export type ActiveNativeChat = Readonly<{
         | "reviewHook"
         | "installHook"
         | "removeHook"
+        | "acceptsPermissionMode"
+        | "permissionMode"
+        | "setPermissionMode"
         | "acceptsSelection"
         | "selectionRequest"
         | "createSelected"
@@ -176,7 +183,15 @@ export type ActiveNativeChat = Readonly<{
     >;
 }>;
 
+type PermissionReview = {
+  reviewId: string;
+  requestId: string;
+  revision: number;
+  expiresAt: number;
+};
+
 type Attachment = {
+  permissionReview?: PermissionReview;
   id: string;
   session: NativeChatSession;
   latestObservation?: NativeChatSnapshot;
@@ -326,6 +341,7 @@ export class NativeChatIpc {
     { frame: WebFrameMain; href: string; state: NativeChatSelections.View }
   >();
   private readonly selectingProfile = new WeakSet<WebContents>();
+  private readonly selectingPermissionMode = new WeakSet<Owner>();
   private readonly svgTextReplies = new NativeEditorSvgTextReplies();
   /** Per window, the sessions it showed for each chat host. */
   private readonly shownSessions = new Map<
@@ -981,6 +997,165 @@ export class NativeChatIpc {
 
   create(event: IpcMainInvokeEvent): Promise<NativeChatAttachment> {
     return this.attach(event, (chat) => chat.create());
+  }
+
+  acceptsPermissionMode(event: IpcMainInvokeEvent): boolean {
+    const chat = this.owner(event).active.chat;
+    return (
+      chat.acceptsPermissionMode === true &&
+      !!chat.permissionMode &&
+      !!chat.setPermissionMode
+    );
+  }
+
+  async permissionMode(
+    event: IpcMainInvokeEvent,
+    attachmentId: string
+  ): Promise<NativeChatPermissionState> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const chat = owner.active.chat;
+    if (
+      !chat.acceptsPermissionMode ||
+      !chat.permissionMode ||
+      attachment.sideOf
+    )
+      throw new Error("native_chat_permission_mode_unavailable");
+    const state = await chat.permissionMode(attachment.session);
+    this.revalidate(owner, attachment);
+    return state;
+  }
+
+  async reviewPermissionMode(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    expectedRevision: unknown,
+    requestId: unknown
+  ): Promise<NativeChatPermissionReview> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const chat = owner.active.chat;
+    if (
+      !chat.acceptsPermissionMode ||
+      !chat.permissionMode ||
+      !chat.setPermissionMode ||
+      attachment.sideOf
+    )
+      throw new Error("native_chat_permission_mode_unavailable");
+    if (
+      !Number.isSafeInteger(expectedRevision) ||
+      (expectedRevision as number) < 0 ||
+      !token(requestId)
+    )
+      throw new Error("native_chat_permission_mode_invalid");
+    const state = await chat.permissionMode(attachment.session);
+    this.revalidate(owner, attachment);
+    if (state.revision !== expectedRevision)
+      throw new Error("permission_mode_revision_changed");
+    if (!state.available.includes("full_access"))
+      throw new Error("native_chat_permission_mode_unavailable");
+    const catalog = await chat.catalogEntry(attachment.session);
+    this.revalidate(owner, attachment);
+    const review = {
+      reviewId: randomUUID(),
+      requestId,
+      revision: expectedRevision as number,
+      expiresAt: Date.now() + 5 * 60_000,
+    };
+    attachment.permissionReview = review;
+    return {
+      reviewId: review.reviewId,
+      chatTitle: catalog.title?.trim() || "New chat",
+      workspaceName: owner.active.workspaceName || "This project",
+    };
+  }
+
+  async setPermissionMode(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    expectedRevision: unknown,
+    requestId: unknown,
+    mode: unknown,
+    answer?: unknown
+  ): Promise<NativeChatPermissionState | null> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const chat = owner.active.chat;
+    if (
+      !chat.acceptsPermissionMode ||
+      !chat.permissionMode ||
+      !chat.setPermissionMode ||
+      attachment.sideOf
+    )
+      throw new Error("native_chat_permission_mode_unavailable");
+    if (
+      !Number.isSafeInteger(expectedRevision) ||
+      (expectedRevision as number) < 0 ||
+      !token(requestId) ||
+      (mode !== "restricted" && mode !== "full_access")
+    )
+      throw new Error("native_chat_permission_mode_invalid");
+    const response = answer as
+      | { reviewId?: unknown; confirmed?: unknown }
+      | undefined;
+    if (
+      response !== undefined &&
+      (!response ||
+        typeof response !== "object" ||
+        Array.isArray(response) ||
+        Object.keys(response).length !== 2 ||
+        !token(response.reviewId) ||
+        typeof response.confirmed !== "boolean")
+    )
+      throw new Error("native_chat_permission_mode_invalid");
+    const review = attachment.permissionReview;
+    const reviewed =
+      response &&
+      review &&
+      response.reviewId === review.reviewId &&
+      review.requestId === requestId &&
+      review.revision === expectedRevision &&
+      Date.now() < review.expiresAt;
+    if (response?.confirmed === false) {
+      if (!reviewed)
+        throw new Error("native_chat_permission_mode_review_changed");
+      attachment.permissionReview = undefined;
+      return null;
+    }
+    if (this.selectingPermissionMode.has(owner))
+      throw new Error("native_chat_permission_mode_busy");
+    this.selectingPermissionMode.add(owner);
+    try {
+      const state = await chat.permissionMode(attachment.session);
+      this.revalidate(owner, attachment);
+      if ((expectedRevision as number) > state.revision)
+        throw new Error("permission_mode_revision_changed");
+      if (!state.available.includes(mode))
+        throw new Error("native_chat_permission_mode_unavailable");
+      // A lost response can leave the app holding a consumed review token.
+      // Already-Full retries still need the native exact request/revision proof;
+      // they do not authorize a fresh transition from restricted access.
+      if (
+        response &&
+        !reviewed &&
+        !(mode === "full_access" && state.mode === "full_access")
+      )
+        throw new Error("native_chat_permission_mode_review_changed");
+      if (
+        mode === "full_access" &&
+        state.mode !== "full_access" &&
+        (!reviewed || response?.confirmed !== true)
+      )
+        throw new Error("native_chat_permission_mode_confirmation_required");
+      const result = await chat.setPermissionMode(
+        attachment.session,
+        expectedRevision as number,
+        requestId,
+        mode
+      );
+      this.revalidate(owner, attachment);
+      attachment.permissionReview = undefined;
+      return result;
+    } finally {
+      this.selectingPermissionMode.delete(owner);
+    }
   }
 
   async selection(event: IpcMainInvokeEvent, value: unknown) {

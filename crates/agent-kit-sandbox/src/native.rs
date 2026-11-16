@@ -203,7 +203,7 @@ fn check_executable(bound: &Bound, executable: &TrustedExecutable, file: File) -
 pub(super) struct Installation {
     helper: Arc<Trusted>,
     #[cfg(target_os = "linux")]
-    bubblewrap: Arc<Trusted>,
+    bubblewrap: Option<Arc<Trusted>>,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -235,7 +235,7 @@ impl ProcessBinding {
 pub(super) struct Prepared {
     helper: Arc<Trusted>,
     #[cfg(target_os = "linux")]
-    bubblewrap: Arc<Trusted>,
+    bubblewrap: Option<Arc<Trusted>>,
     locations: Vec<Location>,
     temporary_parent: Bound,
     process: Option<ProcessBinding>,
@@ -256,6 +256,21 @@ pub(super) struct Prepared {
 
 impl Installation {
     pub(super) fn new(installation: crate::Installation) -> Result<Self> {
+        Self::construct(installation, true)
+    }
+
+    pub(super) fn new_unconfined(helper: TrustedExecutable) -> Result<Self> {
+        ordinary_user()?;
+        Self::construct(
+            crate::Installation {
+                helper,
+                bubblewrap: None,
+            },
+            false,
+        )
+    }
+
+    fn construct(installation: crate::Installation, confined: bool) -> Result<Self> {
         #[cfg(target_os = "linux")]
         {
             let release = fs::read_to_string("/proc/sys/kernel/osrelease")
@@ -280,11 +295,18 @@ impl Installation {
             }
         }
         let helper = Arc::new(Trusted::new(installation.helper)?);
+        #[cfg(target_os = "macos")]
+        let _ = confined;
         #[cfg(target_os = "linux")]
-        let bubblewrap =
-            Arc::new(Trusted::new(installation.bubblewrap.ok_or_else(|| {
-                refused(ErrorKind::Unavailable, "sandbox_bubblewrap_missing")
-            })?)?);
+        let bubblewrap = if confined {
+            Some(Arc::new(Trusted::new(
+                installation
+                    .bubblewrap
+                    .ok_or_else(|| refused(ErrorKind::Unavailable, "sandbox_bubblewrap_missing"))?,
+            )?))
+        } else {
+            None
+        };
         Ok(Self {
             helper,
             #[cfg(target_os = "linux")]
@@ -293,7 +315,11 @@ impl Installation {
     }
 
     pub(super) async fn probe(&self, scope: &ExecutionScope) -> Result<Support> {
-        let prepared = self.capture(scope, None)?;
+        let prepared = self.capture(scope, None, false)?;
+        Self::probe_prepared(prepared).await
+    }
+
+    async fn probe_prepared(prepared: Prepared) -> Result<Support> {
         // A command's capture fingerprint needs the same identities. Report a
         // filesystem that cannot provide them before any command is admitted.
         for location in &prepared.locations {
@@ -322,11 +348,50 @@ impl Installation {
     }
 
     pub(super) fn prepare(&self, spec: ProcessSpec, scope: &ExecutionScope) -> Result<Prepared> {
-        self.capture(scope, Some(spec))
+        self.capture(scope, Some(spec), false)
     }
 
-    fn capture(&self, scope: &ExecutionScope, spec: Option<ProcessSpec>) -> Result<Prepared> {
-        let support = support(scope.termination)?;
+    pub(super) async fn probe_unconfined(&self, scope: &UnconfinedScope) -> Result<Support> {
+        let prepared = self.capture(&unconfined_scope(scope), None, true)?;
+        Self::probe_prepared(prepared).await
+    }
+
+    pub(super) fn prepare_unconfined(
+        &self,
+        spec: ProcessSpec,
+        scope: &UnconfinedScope,
+    ) -> Result<Prepared> {
+        self.capture(&unconfined_scope(scope), Some(spec), true)
+    }
+
+    fn capture(
+        &self,
+        scope: &ExecutionScope,
+        spec: Option<ProcessSpec>,
+        unconfined: bool,
+    ) -> Result<Prepared> {
+        let support = if unconfined {
+            ordinary_user()?;
+            if scope.termination == Termination::AllDescendants {
+                return Err(refused(
+                    ErrorKind::Unsupported,
+                    "sandbox_descendant_guarantee_unavailable",
+                ));
+            }
+            Support {
+                backend: Backend::Unconfined,
+                termination: Termination::ProcessGroup,
+            }
+        } else {
+            #[cfg(target_os = "linux")]
+            if self.bubblewrap.is_none() {
+                return Err(refused(
+                    ErrorKind::Unavailable,
+                    "sandbox_bubblewrap_missing",
+                ));
+            }
+            support(scope.termination)?
+        };
         if scope.valid_until <= Instant::now() {
             return Err(refused(ErrorKind::InvalidState, "sandbox_scope_expired"));
         }
@@ -392,9 +457,10 @@ impl Installation {
                     && !locations
                         .iter()
                         .any(|location| location.bound.includes(executable.path())))
-                || !locations
-                    .iter()
-                    .any(|location| location.bound.includes(cwd.path()))
+                || (!unconfined
+                    && !locations
+                        .iter()
+                        .any(|location| location.bound.includes(cwd.path())))
             {
                 return Err(refused(
                     ErrorKind::InvalidInput,
@@ -432,7 +498,11 @@ impl Installation {
                 location.destination = location.bound.path().to_owned();
             }
         }
-        let protected = self.check_locations(&locations, scope)?;
+        let protected = if unconfined {
+            vec![]
+        } else {
+            self.check_locations(&locations, scope)?
+        };
         let mut roots = Vec::new();
         for location in &locations {
             roots.push(location.bound.identity.clone());
@@ -448,6 +518,11 @@ impl Installation {
             roots.extend(process.bounds().map(|bound| bound.identity.clone()));
         }
         let launch = Launch {
+            enforcement: if unconfined {
+                wire::Enforcement::Unconfined
+            } else {
+                wire::Enforcement::Confined
+            },
             roots,
             private_temp: temporary.path().to_owned(),
             task,
@@ -458,7 +533,7 @@ impl Installation {
         let mut prepared = Prepared {
             helper: Arc::clone(&self.helper),
             #[cfg(target_os = "linux")]
-            bubblewrap: Arc::clone(&self.bubblewrap),
+            bubblewrap: self.bubblewrap.clone(),
             locations,
             temporary_parent,
             process,
@@ -488,7 +563,9 @@ impl Installation {
         #[cfg(target_os = "macos")]
         launchers.push(Path::new("/usr/bin/sandbox-exec"));
         #[cfg(target_os = "linux")]
-        launchers.push(self.bubblewrap.bound.path());
+        if let Some(bubblewrap) = &self.bubblewrap {
+            launchers.push(bubblewrap.bound.path());
+        }
         if locations.iter().any(|location| {
             location.access == Access::Write
                 && launchers
@@ -524,6 +601,39 @@ impl Installation {
             carved.push((path, protected.access));
         }
         Ok(carved)
+    }
+}
+
+/// A private conversion shares command validation without pretending that
+/// unconfined authority carries enforceable path grants or protected paths.
+fn unconfined_scope(scope: &UnconfinedScope) -> ExecutionScope {
+    ExecutionScope {
+        grants: scope.grants.clone(),
+        revision: scope.revision.clone(),
+        valid_until: scope.valid_until,
+        read: vec![],
+        write: vec![],
+        runtime: vec![],
+        protected: vec![],
+        temporary_parent: scope.temporary_parent.clone(),
+        termination: scope.termination,
+        disk_read: true,
+    }
+}
+
+#[allow(unsafe_code)]
+fn ordinary_user() -> Result<()> {
+    if unsafe {
+        libc::geteuid() == 0
+            || libc::geteuid() != libc::getuid()
+            || libc::getegid() != libc::getgid()
+    } {
+        Err(refused(
+            ErrorKind::Unsupported,
+            "sandbox_ordinary_user_required",
+        ))
+    } else {
+        Ok(())
     }
 }
 
@@ -685,15 +795,39 @@ impl Prepared {
             Termination::ProcessGroup => "process_group",
             Termination::AllDescendants => "all_descendants",
         };
-        #[cfg(target_os = "macos")]
-        let launchers = [self.helper.executable.sha256];
+        let launchers = vec![self.helper.executable.sha256];
         #[cfg(target_os = "linux")]
-        let launchers = [
-            self.helper.executable.sha256,
-            self.bubblewrap.executable.sha256,
-        ];
+        let launchers = {
+            let mut launchers = launchers;
+            if self.support.backend == Backend::Bubblewrap {
+                if let Some(bubblewrap) = &self.bubblewrap {
+                    launchers.push(bubblewrap.executable.sha256);
+                }
+            }
+            launchers
+        };
+        let posture = match self.support.backend {
+            Backend::Seatbelt => "seatbelt",
+            Backend::Bubblewrap => "bubblewrap",
+            Backend::Unconfined => "unconfined",
+        };
         Fingerprint::of(&(
             semantic_input,
+            posture,
+            self.disk_read,
+            &self
+                .protected
+                .iter()
+                .map(|(path, access)| {
+                    (
+                        path,
+                        match access {
+                            DeniedAccess::ReadWrite => "read_write",
+                            DeniedAccess::Write => "write",
+                        },
+                    )
+                })
+                .collect::<Vec<_>>(),
             roots,
             process,
             termination,
@@ -714,13 +848,18 @@ impl Prepared {
             .metadata()
             .map_err(|_| refused(ErrorKind::Unavailable, "sandbox_working_root_unavailable"))?;
         if metadata.is_dir()
-            && self.locations.iter().any(|location| {
-                location.access != Access::Runtime
-                    && location.bound.path() != self.temporary.path()
-                    && location.bound.identity.device == metadata.dev()
-                    && location.bound.identity.inode == metadata.ino()
-                    && location.bound.includes(cwd)
-            })
+            && ((self.support.backend == Backend::Unconfined
+                && self.process.as_ref().is_some_and(|process| {
+                    process.cwd.identity.device == metadata.dev()
+                        && process.cwd.identity.inode == metadata.ino()
+                }))
+                || self.locations.iter().any(|location| {
+                    location.access != Access::Runtime
+                        && location.bound.path() != self.temporary.path()
+                        && location.bound.identity.device == metadata.dev()
+                        && location.bound.identity.inode == metadata.ino()
+                        && location.bound.includes(cwd)
+                }))
         {
             Ok(())
         } else {
@@ -790,8 +929,16 @@ impl Prepared {
             return Err(refused(ErrorKind::InvalidState, "sandbox_admission_closed"));
         }
         self.helper.check()?;
+        if self.support.backend == Backend::Unconfined {
+            ordinary_user()?;
+        }
         #[cfg(target_os = "linux")]
-        self.bubblewrap.check()?;
+        if self.support.backend == Backend::Bubblewrap {
+            self.bubblewrap
+                .as_ref()
+                .ok_or_else(|| refused(ErrorKind::Unavailable, "sandbox_bubblewrap_missing"))?
+                .check()?;
+        }
         if self
             .locations
             .iter()

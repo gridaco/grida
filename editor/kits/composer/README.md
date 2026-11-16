@@ -147,6 +147,13 @@ scratch-backed input, a path reference, or is rejected. File pickers and
 Library browsing remain caller-owned UI and should enter the caller's same
 policy with their own honest source.
 
+`ComposerDropArea` wraps the entire intended target: the full Home viewport or
+an individual chat pane. It supplies the same `ComposerDropOverlay` and transfer
+intake for all consumers. Drops outside the editor enter the surface callback;
+drops handled by the editor are not forwarded a second time. Internal image,
+text and link drags keep their existing behavior. Keep the overlay presentation
+in the kit so refinements apply to every surface.
+
 The older `onFiles(files)` and `onDirectories(directories)` callbacks remain as
 compatibility projections. They are invoked only when `onTransfer` is omitted,
 because calling both would materialize one gesture twice.

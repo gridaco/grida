@@ -16,12 +16,14 @@ import { cn } from "@app/ui/lib/utils";
 import { useDesktopBridge, type Workspace } from "@/lib/desktop/bridge";
 import type { WorkspaceSurfaceHost } from "./workspace-surface-host";
 import type { SideChatPlacement } from "./side-chat-placement";
+import type { SubagentPlacement } from "./subagent-placement";
 import { welcome_message } from "@/lib/desktop/welcome-message";
 import {
   NativeAgentPaneGate,
   type NativeFirstMessage,
 } from "./native-agent-pane";
 import { NativeExternalAgentPanel } from "./native-external-agent-panel";
+import type { NativeBackgroundProcessController } from "@/lib/agent-chat/native-background-process-controller";
 
 export type AgentPaneProps = {
   workspace: Workspace;
@@ -29,6 +31,10 @@ export type AgentPaneProps = {
   surfaceHost: WorkspaceSurfaceHost;
   /** Where the chat's side chat is shown in this workbench. */
   sideChatPlacement: SideChatPlacement;
+  subagentPlacement?: SubagentPlacement;
+  onProcessesChange?: (
+    processes: NativeBackgroundProcessController | null
+  ) => void;
   className?: string;
 };
 
@@ -36,6 +42,8 @@ export function AgentPane({
   workspace,
   surfaceHost,
   sideChatPlacement,
+  subagentPlacement,
+  onProcessesChange,
   className,
 }: AgentPaneProps) {
   const bridge = useDesktopBridge();
@@ -49,6 +57,7 @@ export function AgentPane({
     return message
       ? {
           profileId: message.profileId,
+          composer: message,
           waiting: () => welcome_message.peek(workspaceId) !== null,
           take: () => welcome_message.take(workspaceId),
         }
@@ -91,7 +100,9 @@ export function AgentPane({
           initialSession={initialSession}
           editorSurfaces={surfaceHost}
           sideChatPlacement={sideChatPlacement}
+          subagentPlacement={subagentPlacement}
           firstMessage={firstMessage}
+          onProcessesChange={onProcessesChange}
         />
       )}
     </div>

@@ -136,6 +136,10 @@ pub(crate) struct LifecycleEvent {
     at_ms: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     status: Option<OutcomeStatus>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    activity_order: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    activity_order_incomplete: Option<bool>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -148,6 +152,8 @@ pub(crate) struct ActivityPage {
     observed_at_ms: u64,
     events: Vec<LifecycleEvent>,
     events_complete: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    order_complete: Option<bool>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -174,6 +180,10 @@ pub(crate) struct TranscriptMessage {
     truncated: bool,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     live: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    activity_order: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    activity_order_incomplete: Option<bool>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -222,6 +232,7 @@ impl Host {
         &self,
         parent: SessionId,
         after: Option<SessionId>,
+        ordered: bool,
     ) -> Result<ActivityPage> {
         self.require_activity_parent(&parent).await?;
         // The catalog checks the anchor's scope even when a cached status
@@ -263,6 +274,8 @@ impl Host {
                         input_id: input.clone(),
                         at_ms: turn.started_ms,
                         status: None,
+                        activity_order: None,
+                        activity_order_incomplete: None,
                     });
                     if let Some(at_ms) = turn.settled_ms {
                         events.push(LifecycleEvent {
@@ -275,12 +288,24 @@ impl Host {
                             input_id: input,
                             at_ms,
                             status: turn.status,
+                            activity_order: None,
+                            activity_order_incomplete: None,
                         });
                     }
                 }
             }
             children.push(child);
         }
+        if ordered {
+            for event in &mut events {
+                event.activity_order =
+                    self.activity_order
+                        .event(&parent, &event.parent_turn_id, &event.event_id);
+                event.activity_order_incomplete = event.activity_order.is_none().then_some(true);
+            }
+        }
+        let order_complete =
+            ordered.then(|| events.iter().all(|event| event.activity_order.is_some()));
         events.sort_by(|a, b| (a.at_ms, &a.event_id).cmp(&(b.at_ms, &b.event_id)));
         let mut result = ActivityPage {
             parent_session_id: parent,
@@ -290,6 +315,7 @@ impl Host {
             observed_at_ms,
             events,
             events_complete,
+            order_complete,
         };
         while serde_json::to_vec(&result)
             .map_err(|_| problem(ErrorKind::InvalidState, "subagent_activity_encoding"))?
@@ -380,6 +406,7 @@ impl Host {
         parent: SessionId,
         child: SessionId,
         before: Option<String>,
+        ordered: bool,
     ) -> Result<ConversationPage> {
         self.require_activity_parent(&parent).await?;
         let view = self.store.inspect(child.clone()).await?;
@@ -445,6 +472,8 @@ impl Host {
                         activity: Vec::new(),
                         truncated: current_text.truncated,
                         live: true,
+                        activity_order: None,
+                        activity_order_incomplete: None,
                     });
                 }
             }
@@ -459,6 +488,31 @@ impl Host {
                 })
             })
             .transpose()?;
+        if ordered {
+            for message in &mut messages {
+                if !message.text.is_empty() {
+                    message.activity_order = message.turn_id.as_ref().and_then(|turn| {
+                        self.activity_order
+                            .message(&child, turn, &message.message_id)
+                    });
+                    message.activity_order_incomplete =
+                        message.activity_order.is_none().then_some(true);
+                }
+                for activity in &mut message.activity {
+                    let order = message.turn_id.as_ref().and_then(|turn| {
+                        activity
+                            .get("callId")
+                            .and_then(Value::as_str)
+                            .and_then(|id| agent_kit_core::ToolCallId::new(id).ok())
+                            .and_then(|id| self.activity_order.call(&child, turn, &id))
+                    });
+                    activity
+                        .as_object_mut()
+                        .unwrap()
+                        .extend(activity_order::metadata(order).as_object().unwrap().clone());
+                }
+            }
+        }
         let result = ConversationPage {
             parent_session_id: parent,
             child_id: child,
@@ -670,7 +724,7 @@ fn project_messages(
             Some(TranscriptMessage {
             message_id: message.id.clone(), role: message.role, text, turn_id: record.turn.clone(),
             phase: (message.role == Role::Assistant).then_some(if answers.contains(&message.id) || message.phase == Some(MessagePhase::Answer) { "answer" } else { "progress" }),
-            activity, truncated, live: false,
+            activity, truncated, live: false, activity_order: None, activity_order_incomplete: None,
         })
     }).collect()
 }
@@ -917,7 +971,10 @@ mod tests {
         let mut after = None;
         let mut ids = BTreeSet::new();
         loop {
-            let page = host.subagent_activity(parent.clone(), after).await.unwrap();
+            let page = host
+                .subagent_activity(parent.clone(), after, false)
+                .await
+                .unwrap();
             assert_eq!(page.counts.active, COUNT_LIMIT);
             assert_eq!(page.counts.done, 0);
             assert!(!page.counts.complete);
@@ -944,12 +1001,12 @@ mod tests {
             .await
             .unwrap();
         assert!(
-            host.subagent_activity(parent.clone(), Some(foreign_child.clone()))
+            host.subagent_activity(parent.clone(), Some(foreign_child.clone()), false)
                 .await
                 .is_err()
         );
         assert_eq!(
-            host.subagent_conversation(parent, foreign_child, None)
+            host.subagent_conversation(parent, foreign_child, None, false)
                 .await
                 .unwrap_err()
                 .code,

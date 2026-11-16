@@ -85,6 +85,7 @@ pub struct FileTools {
     capture_image: Option<Arc<ImageCapture>>,
     capture_reference: Option<Arc<ImageCapture>>,
     image_view: ImageView,
+    full_access: bool,
     settings: Option<Arc<SettingsAuthority>>,
     workers: Arc<Semaphore>,
     /// Mutations are serialized so an edit always reads what it replaces.
@@ -120,6 +121,7 @@ impl FileTools {
             capture_image,
             capture_reference,
             image_view: ImageView::LegacyPng,
+            full_access: false,
             settings: None,
             workers: Arc::new(Semaphore::new(WORKERS)),
             mutations: std::sync::Mutex::new(()),
@@ -135,6 +137,11 @@ impl FileTools {
 
     pub(crate) fn with_image_view(mut self, image_view: ImageView) -> Self {
         self.image_view = image_view;
+        self
+    }
+
+    pub(crate) fn with_full_access(mut self, full_access: bool) -> Self {
+        self.full_access = full_access;
         self
     }
 
@@ -242,7 +249,11 @@ impl FileTool {
                 );
                 (
                     "write_file",
-                    "Create a UTF-8 text file, or replace a whole existing one, at a relative path. Missing folders are created. Prefer edit_file for targeted changes. Version-control and agent metadata folders are read-only.",
+                    if scope.full_access {
+                        "Create or replace one bounded UTF-8 text file at a relative path. Missing folders are created. Prefer edit_file for targeted changes. Full access permits the filesystem directory ID for paths relative to /, including metadata and settings files."
+                    } else {
+                        "Create a UTF-8 text file, or replace a whole existing one, at a relative path. Missing folders are created. Prefer edit_file for targeted changes. Version-control and agent metadata folders are read-only."
+                    },
                     vec!["path", "content"],
                 )
             }

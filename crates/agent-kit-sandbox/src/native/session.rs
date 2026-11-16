@@ -505,7 +505,9 @@ pub(super) async fn supervise(
     let (completion, group_ended) = parse_report(&report);
     let descendants = match (completion, prepared.support.backend) {
         (Completion::SetupFailed, _) if reaped => Descendants::NoPayload,
-        (_, Backend::Seatbelt) if group_ended && process_group_signalled && reaped => {
+        (_, Backend::Seatbelt | Backend::Unconfined)
+            if group_ended && process_group_signalled && reaped =>
+        {
             Descendants::ProcessGroupSignalled
         }
         (Completion::Exited(_) | Completion::Signaled(_), Backend::Bubblewrap)

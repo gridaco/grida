@@ -34,7 +34,10 @@ One parent turn can create up to eight workers, each with up to eight model
 requests. This reserves a separate bounded allowance of 64 child requests
 beside the parent's work allowance; it is not a token or monetary spending
 limit. Waiting observes the assigned work and returns its recorded result.
-Sending information does not restart an idle child. The main agent must
+Information sent to an active worker joins its current assignment and becomes
+available to its next model request. The receipt confirms that the information
+was recorded, not that the model has read or acted on it. Sending refuses paused
+or finished work and never restarts an idle child. The main agent must
 collect the assignments' results before reporting successful completion.
 General workers belong to the parent turn that creates them and receive one
 bounded assignment. The model cannot reuse them for follow-up work; its
@@ -43,8 +46,10 @@ parent turn. A new assignment requires a new worker, while earlier child
 conversations remain available to inspect. The main chat's Stop also stops its
 owned workers.
 
-Processes a worker starts belong to its assignment. They are stopped before
-its successful result is collected; work intended to keep running must be
+Processes a worker starts belong to its assignment. The native host
+automatically stops any remaining processes before its successful result is
+collected. A worker can leave a bounded process running when the assignment
+requires it and report its session and last observed state; work intended to keep running must be
 started by the main agent. Waiting observes this cleanup rather than causing
 it. A missing or unverified cleanup record remains explicit uncertainty,
 including after restart. The assignment's result and resource retirement are
@@ -57,18 +62,33 @@ without acquiring an additional general-worker allowance.
 
 ## Open subagent activity
 
-In a supported Grida Desktop build on macOS or Linux, open **Subagents** from
-the chat's activity controls. The view belongs to the selected parent chat.
-**Active** includes ready, queued, running, paused and uncertain work; **Done**
-keeps completed, failed and stopped work when no assignment is still waiting.
-A manually created named child can receive another assignment if its allowance
-permits it.
+In a supported Grida Desktop build on macOS or Linux, click the subagent
+indicator in the parent transcript or a named start/finish event. In a
+workspace, this opens **Subagents** in the main content tabs, beside your
+documents. Requesting it again brings the same tab forward. A standalone file
+window shows it within the chat instead.
+
+The view belongs to the selected parent chat. **Active** includes ready,
+queued, running, paused and uncertain work; **Done** keeps completed, failed
+and stopped work when no assignment is still waiting.
+
+The view is read-only. It shows subagent status, activity and conversations;
+creation, assignment, steering and other execution controls belong to the main
+agent. Give further instructions in the parent chat.
 
 Select a child to read its conversation and activity. **Back** returns to the
-list, keeping the parent chat and its unsent draft in place. The child's name
+list in the same tab. The parent chat and composer remain visible and usable,
+with the unsent draft intact. The child's name
 and visual identity match its links in the parent's activity. Start and finish
-events belong to the parent turn that sponsored the assignment; reading an
-event or reopening a child starts no model request.
+events belong to the parent turn that sponsored the assignment. On compatible
+native builds, they appear between the parent's commentary and tool activity
+where the host recorded them, rather than collecting at the bottom. Placement
+stays consistent during live updates and after reopening. Reading an event or
+reopening a child starts no model request.
+
+Older history or an unavailable ordering record can leave the relative
+position unknown. Those events stay in **Subagent events — relative order
+unavailable**.
 
 The child view shows its captured model and reasoning effort when retained.
 Those facts describe the child's work, even if you have since selected a
@@ -84,13 +104,16 @@ use **Show more** to reach older children, including older children working on
 a new assignment. Parent lifecycle activity covers the children loaded by the
 view and identifies bounded or incomplete history. The view keeps a bounded
 window of loaded children; **Newest subagents** returns to the newest page
-after older paging has moved earlier rows out of that window. Older Desktop builds can expose
-assignment/result inspection and supported controls without the richer live
-conversation; the view explains that limitation.
+after older paging has moved earlier rows out of that window. Older connections
+can expose assignment/result inspection without the richer live conversation;
+the view explains that limitation and remains read-only.
 
-Closing this view stops neither the child nor its background processes. Child
-controls address that child's work. The main chat's Stop and the **Processes**
-view's Stop controls have different targets.
+Closing the tab hides the view; a transcript indicator can open it again.
+It stops neither the child nor its background processes. Switching parent chats
+withdraws the previous chat's view. Live updates do not bring an inactive tab
+forward. The main chat's Stop and the **Processes** tab's Stop controls have different
+targets. **Processes** is in the workspace's bottom **Workspace utilities**
+panel beside **Terminal**, separate from the Subagents view.
 
 ## See independent reviews
 
@@ -114,32 +137,10 @@ provider token limits are separate from this review allowance.
 
 Deleting a chat also deletes its subagents.
 
-## Give a named subagent assignments
+## Named subagents in private clients
 
-On a supported Desktop connection, the Subagents view offers creation and
-assignment controls when the parent has the required allowance. A private ACP
-client connected to a source-built host started with `--subagents` can use the
-same named-child operations.
-[Assign work to a named subagent](./clients.md#assign-work-to-a-named-subagent)
-
-1. Finish an **Act** turn in the parent chat, then create a subagent with a
-   name and an allowance of one to eight assignments.
-2. Assign work to it. For example, ask a researcher to compare two approaches
-   and explain which assumptions matter. Each assignment is text-only and has
-   no workspace tools, so include the context you want it to use.
-3. Inspect the subagent for its current or latest assignment and result. To
-   give a follow-up, assign more work to the same subagent; it keeps the
-   context of its own earlier work. Follow-ups wait in order and use the
-   remaining allowance.
-
-Pause holds the current assignment, Steer adds a correction to it, and Resume
-continues the same work. Stop ends the current assignment and holds the
-subagent's queue; Resume Queue starts the next waiting assignment, and a
-waiting assignment can be withdrawn.
-
-Send a message to leave context for the subagent's next assignment. An idle
-subagent stays idle, a running one keeps its current assignment, and a message
-uses no allowance.
-
-A named subagent cannot be closed on its own. It stays with the parent chat
-until that chat is deleted.
+A private ACP client connected to a source-built host started with
+`--subagents` can create named children and submit bounded text assignments.
+These client operations are separate from Desktop's read-only Subagents view.
+See [Assign work to a named subagent](./clients.md#assign-work-to-a-named-subagent)
+for the client contract and its controls.

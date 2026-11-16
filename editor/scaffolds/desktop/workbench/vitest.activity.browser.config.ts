@@ -17,9 +17,17 @@ export default defineConfig(async () => {
     define: { "process.env.__NEXT_IMAGE_OPTS": "undefined" },
     optimizeDeps: {
       include: [
+        "@tiptap/react",
+        "cmdk",
+        "@tiptap/extension-placeholder",
+        "@tiptap/core",
+        "@tiptap/starter-kit",
         "react",
         "react-dom",
         "react-dom/client",
+        "react-resizable-panels",
+        "@xterm/xterm",
+        "@xterm/addon-fit",
         "react/jsx-runtime",
         "react/jsx-dev-runtime",
         "lucide-react",
@@ -37,6 +45,7 @@ export default defineConfig(async () => {
       ],
     },
     resolve: {
+      dedupe: ["react", "react-dom"],
       alias: {
         "@": editorRoot,
         "server-only": fileURLToPath(
@@ -46,7 +55,11 @@ export default defineConfig(async () => {
     },
     test: {
       include: [
+        "scaffolds/desktop/workbench/native-permission-mode.browser.tsx",
         "scaffolds/desktop/workbench/native-agent-activity.browser.tsx",
+        "scaffolds/desktop/workbench/native-activity-timeline.browser.tsx",
+        "scaffolds/desktop/workbench/workspace-utilities.browser.tsx",
+        "scaffolds/desktop/workbench/subagent-tab-placement.browser.tsx",
       ],
       browser: {
         enabled: true,

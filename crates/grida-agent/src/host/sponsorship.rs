@@ -1035,6 +1035,7 @@ impl Host {
         let ClaimOutcome::Acquired(claim) = claimed else {
             return Ok(None);
         };
+        let activity_parent = self.order_admission(&claim, &prepared.messages).await;
         if let Some(permissions) = permission_scope {
             permissions.bind_claim(claim.lease.binding().clone())?;
         }
@@ -1052,6 +1053,7 @@ impl Host {
                 master: Box::new(master),
                 input: prepared.messages,
                 command: hook_command,
+                activity_parent,
             },
             acceptance: None,
         }))

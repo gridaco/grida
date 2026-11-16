@@ -14,6 +14,7 @@ import { NativeInputImages } from "./native-input-images";
 import { NativeQueuedMessages } from "./native-queued-messages";
 import { NativeSelectedImages } from "./native-selected-images";
 import { NativeSubagentActivity } from "./native-subagent-activity";
+import { NativeActivityOrder } from "./native-activity-order";
 
 function state() {
   const root = fs.mkdtempSync(
@@ -62,6 +63,7 @@ lines.on('line', line => {
     requested = request.params.clientCapabilities._meta;
     const offered = ${JSON.stringify(capabilities ?? null)};
     const meta = offered ? {...requested,...offered} : {'co.grida/session/history':1};
+    if (offered?.['${NativeActivityOrder.capability}'] === undefined) delete meta['${NativeActivityOrder.capability}'];
     for (const key of Object.keys(meta)) if (meta[key] === null) delete meta[key];
     send({id:request.id,result:{protocolVersion:${initializationVersion},agentInfo:{name:'grida-agent'},agentCapabilities:{_meta:meta,promptCapabilities:{image:${imageInput}}}}});
     return;
@@ -80,6 +82,207 @@ lines.on('close', () => fs.writeFileSync(${JSON.stringify(receipt)}, 'eof'));
 }
 
 describe.skipIf(process.platform === "win32")("Native agent process", () => {
+  it("preserves retained message and individual call order across live chunks, replay and older pages", async () => {
+    const test = fixture(
+      `
+      if (request.method === 'session/new') { send({id:request.id,result:{sessionId:'chat'}}); return; }
+      if (request.method !== 'session/load') throw Error('unexpected fixture method');
+      const window='${TRANSCRIPT_WINDOW}',ordered='${NativeActivityOrder.capability}';
+      const read=request.params._meta?.[window];
+      if (!read) {
+        send({method:'session/update',params:{sessionId:'chat',_meta:{[ordered]:{turnId:'legacy-turn',activityOrder:11}},update:{sessionUpdate:'agent_message_chunk',messageId:'legacy-read',content:{type:'text',text:'Uniform metadata survives.'}}}});
+        send({id:request.id,result:{}}); return;
+      }
+      const meta=(fact,extra={},turnId='turn')=>({[window]:{requestId:read.requestId,turnId,...fact,...extra},[ordered]:{turnId,...fact}});
+      const text=(messageId,content,fact,extra={},turnId='turn')=>send({method:'session/update',params:{sessionId:'chat',_meta:meta(fact,extra,turnId),update:{sessionUpdate:'agent_message_chunk',messageId,content:{type:'text',text:content}}}});
+      if (read.before) {
+        text('older','Earlier turn',{activityOrder:1},{phase:'answer'},'older-turn');
+        send({id:request.id,result:{_meta:{[window]:{requestId:read.requestId,view:1,older:null,turns:[{turnId:'older-turn',status:'succeeded',startedAtMs:1,settledAtMs:2}]}}}}); return;
+      }
+      const live=(update,extra,fact)=>send({method:'session/update',params:{sessionId:'chat',_meta:{'co.grida/session/updates':{turnId:'live-turn',...extra,...fact},[ordered]:{turnId:'live-turn',...fact}},update}});
+      live({sessionUpdate:'agent_message_chunk',messageId:'live-message',content:{type:'text',text:'Later'}},{offsetBytes:0,replace:false},{activityOrder:8});
+      live({sessionUpdate:'tool_call',toolCallId:'live-call',title:'read_file',kind:'read',status:'completed'},{messageId:'live-container',activity:'read',outcome:'succeeded'},{activityOrder:4});
+      live({sessionUpdate:'agent_message_chunk',messageId:'live-message',content:{type:'text',text:' grows'}},{offsetBytes:5,replace:false},{activityOrder:8});
+      send({method:'session/update',params:{sessionId:'chat',_meta:meta({activityOrder:1}),update:{sessionUpdate:'user_message_chunk',messageId:'request',content:{type:'resource_link',name:'report.txt',uri:'file:///workspace/report.txt',mimeType:'text/plain',size:4}}}});
+      text('work','First ',{activityOrder:2},{phase:'progress'});
+      text('work','message.',{activityOrder:2},{phase:'progress'});
+      send({method:'session/update',params:{sessionId:'chat',_meta:meta({activityOrder:4},{messageId:'work',activity:'read',outcome:'succeeded'}),update:{sessionUpdate:'tool_call',toolCallId:'call',title:'read_file',kind:'read',status:'completed'}}});
+      text('tool-only','',{});
+      send({method:'session/update',params:{sessionId:'chat',_meta:meta({activityOrder:5},{messageId:'tool-only',activity:'search',outcome:'succeeded'}),update:{sessionUpdate:'tool_call',toolCallId:'search',title:'search_files',kind:'search',status:'completed'}}});
+      text('enriched','Unknown ',{activityOrderIncomplete:true},{phase:'progress'});
+      text('enriched','then retained ',{activityOrder:6},{phase:'progress'});
+      text('enriched','still retained',{activityOrderIncomplete:true},{phase:'progress'});
+      text('unplaced','Older missing evidence.',{activityOrderIncomplete:true},{phase:'progress'});
+      text('answer','All done.',{activityOrder:9},{phase:'answer'});
+      send({id:request.id,result:{_meta:{[window]:{requestId:read.requestId,view:2,older:{anchor:'older'},turns:[{turnId:'turn',status:'succeeded',startedAtMs:10,settledAtMs:20}]}}}});
+    `,
+      1,
+      { [TRANSCRIPT_WINDOW]: 1, [NativeActivityOrder.capability]: 1 }
+    );
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        ...test.options,
+        cwd: fs.realpathSync(test.root),
+      });
+      const session = await chat.create();
+      const live: unknown[] = [];
+      chat.subscribe(session, (update) => live.push(update));
+      const page = await chat.transcriptPage(session);
+      const work = page.messages.find(
+        (message) => message.messageId === "work"
+      )!;
+      expect(work).toMatchObject({
+        text: "First message.",
+        activityOrder: 2,
+        activity: [{ callId: "call", activityOrder: 4 }],
+      });
+      expect(
+        page.messages.find((message) => message.messageId === "request")
+      ).toMatchObject({
+        activityOrder: 1,
+        attachments: [{ name: "report.txt" }],
+      });
+      expect(
+        page.messages.find((message) => message.messageId === "tool-only")
+      ).toMatchObject({ text: "", activity: [{ activityOrder: 5 }] });
+      expect(
+        page.messages.find((message) => message.messageId === "tool-only")
+          ?.activityOrder
+      ).toBeUndefined();
+      expect(
+        page.messages.find((message) => message.messageId === "enriched")
+      ).toMatchObject({
+        text: "Unknown then retained still retained",
+        activityOrder: 6,
+      });
+      expect(
+        page.messages.find((message) => message.messageId === "enriched")
+          ?.activityOrderIncomplete
+      ).toBeUndefined();
+      expect(
+        page.messages.find((message) => message.messageId === "unplaced")
+      ).toMatchObject({ activityOrderIncomplete: true });
+      expect(live).toEqual([
+        {
+          kind: "text",
+          role: "assistant",
+          messageId: "live-message",
+          turnId: "live-turn",
+          text: "Later",
+          offsetBytes: 0,
+          replace: false,
+          activityOrder: 8,
+        },
+        {
+          kind: "activity",
+          messageId: "live-container",
+          turnId: "live-turn",
+          activity: {
+            callId: "live-call",
+            title: "read_file",
+            kind: "read",
+            outcome: "succeeded",
+            activityOrder: 4,
+          },
+        },
+        {
+          kind: "text",
+          role: "assistant",
+          messageId: "live-message",
+          turnId: "live-turn",
+          text: " grows",
+          offsetBytes: 5,
+          replace: false,
+          activityOrder: 8,
+        },
+      ]);
+      const older = await chat.transcriptPage(session, page.older!);
+      expect(older.messages).toEqual([
+        {
+          messageId: "older",
+          role: "assistant",
+          turnId: "older-turn",
+          phase: "answer",
+          text: "Earlier turn",
+          activityOrder: 1,
+        },
+      ]);
+      expect(await chat.transcript(session)).toEqual([
+        {
+          messageId: "legacy-read",
+          role: "assistant",
+          turnId: "legacy-turn",
+          text: "Uniform metadata survives.",
+          activityOrder: 11,
+        },
+      ]);
+    } finally {
+      await chat?.close();
+      test.close();
+    }
+  });
+
+  it.each([
+    { activityOrder: 0 },
+    { activityOrder: Number.MAX_SAFE_INTEGER + 1 },
+    { activityOrder: 1, activityOrderIncomplete: true },
+    { activityOrderIncomplete: false },
+  ])(
+    "refuses malformed retained order and signals live resynchronization (%j)",
+    async (fact) => {
+      const test = fixture(
+        `
+      if (request.method === 'session/new') { send({id:request.id,result:{sessionId:'chat'}}); return; }
+      const window='${TRANSCRIPT_WINDOW}',ordered='${NativeActivityOrder.capability}',fact=${JSON.stringify(fact)};
+      const read=request.params._meta[window];
+      send({method:'session/update',params:{sessionId:'chat',_meta:{'co.grida/session/updates':{turnId:'turn',offsetBytes:0,replace:true,...fact},[ordered]:{turnId:'turn',...fact}},update:{sessionUpdate:'agent_message_chunk',messageId:'bad-live',content:{type:'text',text:'Malformed order is not trusted.'}}}});
+      send({method:'session/update',params:{sessionId:'chat',_meta:{[window]:{requestId:read.requestId,turnId:'turn',...fact},[ordered]:{turnId:'turn',...fact}},update:{sessionUpdate:'agent_message_chunk',messageId:'bad-read',content:{type:'text',text:'No partial replay.'}}}});
+      send({id:request.id,result:{_meta:{[window]:{requestId:read.requestId,view:1,older:null}}}});
+    `,
+        1,
+        { [TRANSCRIPT_WINDOW]: 1, [NativeActivityOrder.capability]: 1 }
+      );
+      let chat: NativeAgentChat | undefined;
+      try {
+        chat = await NativeAgentChat.start({
+          ...test.options,
+          cwd: fs.realpathSync(test.root),
+        });
+        const session = await chat.create();
+        const live: unknown[] = [];
+        chat.subscribe(session, (update) => live.push(update));
+        await expect(chat.transcriptPage(session)).rejects.toThrow(
+          "native_chat_activity_order_invalid"
+        );
+        expect(live).toEqual([{ kind: "resync" }]);
+      } finally {
+        await chat?.close();
+        test.close();
+      }
+    }
+  );
+
+  it.each([null, 1, 2])(
+    "negotiates activity ordering without borrowing another feature's capability (%s)",
+    async (version) => {
+      const test = fixture("send({id:request.id,result:requested});", 1, {
+        [NativeActivityOrder.capability]: version,
+      });
+      let agent: NativeAgentProcess | undefined;
+      try {
+        agent = await NativeAgentProcess.start(test.options);
+        expect(await agent.request("fixture/initialize", {})).toHaveProperty(
+          [NativeActivityOrder.capability],
+          1
+        );
+        expect(agent.acceptsActivityOrder).toBe(version === 1);
+      } finally {
+        await agent?.close();
+        test.close();
+      }
+    }
+  );
   it.each([null, 1, 2])(
     "keeps caption replacement independently negotiated and never falls back (%s)",
     async (version) => {

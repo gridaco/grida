@@ -62,6 +62,13 @@ the transcript) do not show the overlay and keep their existing behaviour.
     - Expected: the one-attachment notice preserves both; no folder is read
       and neither attachment is replaced.
 
+12. Return to Home and drag a file over the gallery, workspace picker and
+    composer, including when the composer is docked at the bottom.
+    - Expected: the shared overlay covers the whole Home window without flicker;
+      dropping anywhere stages one attachment and starts no work. Dropping
+      directly on the editor is also handled once. Leaving, cancelling or
+      blurring clears the overlay. Internal gallery-image drags show no overlay.
+
 ## Verification
 
 Automated verification on 2026-11-15:

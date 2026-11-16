@@ -1,9 +1,18 @@
 # agent-kit-sandbox
 
 Run a bounded process, or a long-running process session, under a
-host-issued native filesystem scope with raw networking denied. The caller validates current authority and chooses the
-approved executable, working directory, runtime files, environment, and limits.
+host-issued native filesystem scope with raw networking denied. A separate,
+explicitly unconfined API runs an authorized ordinary-user process with no OS
+filesystem or network confinement. The caller validates current authority and
+chooses the approved executable, working directory, environment, and limits.
 The crate owns preparation, launch, cancellation, and native evidence.
+
+## Anti-goals
+
+- No grant decisions, product permission presets, or credential injection.
+- No automatic fallback from failed confinement to ordinary-user execution.
+- No claim that process-group cleanup contains descendants that create new
+  sessions, or that unconfined commands cannot interfere with same-user work.
 
 ## Launch
 
@@ -45,6 +54,46 @@ sends EOF. Read stdout concurrently with request writes and continue draining
 it through shutdown. The existing output budget covers streamed stdout and
 captured stderr together, and the separate stdin budget stops excess input.
 The running handle still owns cancellation, cleanup, and native evidence.
+
+## Explicit unconfined execution
+
+`Sandbox::prepare` and `Sandbox::probe` always enforce an `ExecutionScope`.
+The only way to omit OS confinement is to issue an `UnconfinedScope` and call
+`prepare_unconfined` or `probe_unconfined`. Those methods are also available
+on an ordinary `Sandbox`. `Sandbox::new_unconfined(helper)` pins the same
+trusted helper without requiring bubblewrap; confined operations on that
+instance still refuse when their backend is unavailable. Root and elevated
+callers are refused. The launcher never elevates the caller's privileges.
+
+An unconfined scope carries grants, policy revision, lifetime, temporary
+parent, and a termination requirement. It carries no path grants or protected
+paths: ordinary-user code can read, write and connect wherever the user can,
+including agent metadata, credentials, helper files, the host's state and
+other launches' temporary directories. The caller must authorize that exposure
+and construct the approved environment. There is no confidentiality or
+same-user process isolation promise. Temporary storage is still owner-only,
+allocated per launch and cleaned up afterwards, but not hidden from the
+payload or other processes of that user. Trusted helper identity and digest
+are checked again before each launch.
+
+The preparation retains exact executable and working-directory identities,
+input/output bounds and deadlines. Its capture fingerprint distinguishes the
+posture, its enforceable path rules and its termination guarantee. For an
+unconfined preparation, `validate_working_root` requires the exact captured
+working directory rather than a parent grant. The same prepared finite,
+streaming and terminal/session APIs own execution; input, output, cancellation,
+interrupt, stop, deadline and owner-loss handling retain their usual limits.
+
+`Support::backend` is `Backend::Unconfined`, with
+`Termination::ProcessGroup`. Requiring `AllDescendants` refuses preparation on
+both macOS and Linux. The helper sweeps the payload's reserved session and its
+process groups before reporting cleanup. A descendant that starts a separate
+session can survive. Evidence is `ProcessGroupSignalled` only after the helper
+confirms cleanup and the launcher is signalled and reaped; otherwise it is
+`Unverified`. It never reports `NamespaceEnded`. Loss of the owner closes the
+helper's control channel and triggers the same limited cleanup. On Linux this
+posture uses neither bubblewrap nor the namespace/seccomp boundary; the helper
+sets `no_new_privs` and disables its own dumpability.
 
 ## Sessions
 
@@ -155,3 +204,9 @@ filesystem and IPC access, descriptor inheritance, temporary isolation,
 bounded output, cancellation, and sessions: retained output, terminal input,
 interrupts, stops with background descendants, and the owner process ending. Their native enforcement evidence belongs to
 the OS, kernel, and bubblewrap configuration on which they execute.
+
+The explicit unconfined fixtures additionally verify filesystem access outside
+confined roots, local HTTP, terminal input and interrupts, cancellation,
+deadlines and owner loss for finite, pipe and terminal launches. They require
+an ordinary-user native process without an outer confinement boundary. These
+tests do not establish stronger isolation or all-descendant termination.

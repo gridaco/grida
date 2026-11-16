@@ -84,6 +84,12 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_CONTROL_SUBAGENT_CHILD:
     "grida:native-chat:control-subagent-child",
   NATIVE_CHAT_CREATE: "grida:native-chat:create",
+  NATIVE_CHAT_ACCEPTS_PERMISSION_MODE:
+    "grida:native-chat:accepts-permission-mode",
+  NATIVE_CHAT_REVIEW_PERMISSION_MODE:
+    "grida:native-chat:review-permission-mode",
+  NATIVE_CHAT_PERMISSION_MODE: "grida:native-chat:permission-mode",
+  NATIVE_CHAT_SET_PERMISSION_MODE: "grida:native-chat:set-permission-mode",
   NATIVE_CHAT_SELECTION: "grida:native-chat:selection",
   NATIVE_CHAT_UPDATE_SELECTION: "grida:native-chat:update-selection",
   NATIVE_CHAT_CREATE_FROM_DRAFT: "grida:native-chat:create-from-draft",

@@ -607,7 +607,8 @@ impl Host {
                 .as_ref()
                 .ok_or_else(|| problem(ErrorKind::Unavailable, "permission_profile_unavailable"))?;
             profile.validate_capture(permission)?;
-            captured.permission_capture = Some(profile.capture(ScopeId::new(id.as_str())?));
+            captured.permission_capture =
+                Some(profile.recapture(permission, ScopeId::new(id.as_str())?)?);
         }
         captured.goal = Some(GoalInput::Continue(continuation));
         Ok(Some(Submission {

@@ -1,7 +1,8 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { CheckIcon, ShieldIcon, XIcon } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import type { NativeChatPermissionMode } from "@grida/desktop-bridge";
+import { CheckIcon, ShieldIcon, ShieldAlertIcon, XIcon } from "lucide-react";
 import { Button } from "@app/ui/components/button";
 import {
   Popover,
@@ -14,22 +15,35 @@ import { ComposerActionMenu, type ComposerMenuAction } from "@/kits/composer";
 export function AgentComposerTools({
   actions,
   intents = [],
+  access,
   children,
 }: AgentComposerTools.Props) {
+  const [accessOpen, setAccessOpen] = useState(false);
+  const full = access?.mode === "full_access";
+  const label = access?.uncertain
+    ? "Access unknown"
+    : full
+      ? "Full access"
+      : "Default";
   return (
     <>
       <ComposerActionMenu items={actions} />
-      <Popover>
+      <Popover open={accessOpen} onOpenChange={setAccessOpen}>
         <PopoverTrigger asChild>
           <Button
             type="button"
             size="xs"
             variant="ghost"
-            className="shrink-0 gap-1 rounded-xl px-1.5 text-muted-foreground"
-            aria-label="Access: Default"
+            className={`shrink-0 gap-1 rounded-xl px-1.5 ${full ? "text-amber-600 hover:text-amber-600" : "text-muted-foreground"}`}
+            aria-label={`Access: ${label}`}
+            disabled={access?.busy}
           >
-            <ShieldIcon className="size-3.5" />
-            <span className="hidden @[26rem]:inline">Default</span>
+            {full ? (
+              <ShieldAlertIcon className="size-3.5" />
+            ) : (
+              <ShieldIcon className="size-3.5" />
+            )}
+            <span className="hidden @[26rem]:inline">{label}</span>
           </Button>
         </PopoverTrigger>
         <PopoverContent
@@ -40,17 +54,71 @@ export function AgentComposerTools({
           <p className="px-2 pt-1.5 pb-1 text-xs text-muted-foreground">
             What can the agent access?
           </p>
-          <div className="flex items-start gap-2 rounded-md px-2 py-1.5">
+          <button
+            type="button"
+            aria-pressed={!full && !access?.uncertain}
+            disabled={!access?.available || access.busy}
+            onClick={() => {
+              setAccessOpen(false);
+              access?.onChange("restricted");
+            }}
+            className="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left hover:bg-muted disabled:cursor-default"
+          >
             <ShieldIcon className="mt-0.5 size-4 shrink-0" />
             <div className="min-w-0 flex-1">
               <p>Default</p>
               <p className="text-xs text-muted-foreground">
-                Reads and edits files in this project and runs commands in a
-                sandbox. Other folders and the internet are off.
+                Reads and edits this project's files and runs sandboxed
+                commands. Commands cannot use the internet.
               </p>
             </div>
-            <CheckIcon className="mt-0.5 size-4 shrink-0" />
-          </div>
+            {!full && !access?.uncertain && (
+              <CheckIcon className="mt-0.5 size-4 shrink-0" />
+            )}
+          </button>
+          <button
+            type="button"
+            aria-pressed={full && !access?.uncertain}
+            disabled={!access?.available || access.busy}
+            onClick={() => {
+              setAccessOpen(false);
+              access?.onChange("full_access");
+            }}
+            className="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-amber-600 hover:bg-muted disabled:opacity-50"
+          >
+            <ShieldAlertIcon className="mt-0.5 size-4 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p>Full access</p>
+              <p className="text-xs">
+                Uses the internet and any file your account can access. Commands
+                run without a sandbox or approval prompts.
+              </p>
+            </div>
+            {full && !access?.uncertain && (
+              <CheckIcon className="mt-0.5 size-4 shrink-0" />
+            )}
+          </button>
+          {!access?.available && (
+            <p className="px-2 py-1.5 text-xs text-muted-foreground">
+              Open a project in a supported Desktop build to choose Full access.
+            </p>
+          )}
+          {access?.onRetry && access.error && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={access.busy}
+              onClick={access.onRetry}
+            >
+              Check access
+            </Button>
+          )}
+          {access?.error && (
+            <p role="status" className="px-2 py-1.5 text-xs text-destructive">
+              {access.error}
+            </p>
+          )}
         </PopoverContent>
       </Popover>
       {children}
@@ -85,6 +153,15 @@ export namespace AgentComposerTools {
   }>;
   export type Props = Readonly<{
     actions: readonly ComposerMenuAction[];
+    access?: Readonly<{
+      mode: NativeChatPermissionMode;
+      available: boolean;
+      uncertain?: boolean;
+      onRetry?(): void;
+      busy: boolean;
+      error?: string | null;
+      onChange(mode: NativeChatPermissionMode): void;
+    }>;
     intents?: readonly Intent[];
     /** Additional toolbar controls, before the intent chips. */
     children?: ReactNode;

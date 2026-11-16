@@ -2,7 +2,9 @@
 
 use super::*;
 use agent_kit_core::inference::InputFormat;
-use agent_kit_core::messages::{OutcomeStatus, ToolArguments};
+use agent_kit_core::messages::{
+    Content, Message, OutcomeStatus, Provenance, ProvenanceKind, Role, ToolArguments,
+};
 use agent_kit_core::tools::{
     Invocation, InvocationContext, InvocationRecovery, RecoveryKind, Tool, ToolDefinition,
     ToolOutcome,
@@ -19,6 +21,7 @@ use std::time::{Duration, Instant};
 const INPUT: &str = "worker-assignment";
 const TURN: &str = "worker-turn";
 const RESULT_BYTES: usize = 4096;
+const MAX_MESSAGES: usize = 16;
 
 /// A distinct retained profile; ordinary/manual children never gain its tools.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -233,9 +236,12 @@ impl WorkerTool {
         &self,
         invocation: &Invocation,
         context: &InvocationContext,
+        recovery: bool,
     ) -> Result<OperationClaimSource> {
         let view = self.operations.view();
-        if view.state.binding() != &self.access.binding || context.cancellation.is_cancelled() {
+        if view.state.binding() != &self.access.binding
+            || (!recovery && context.cancellation.is_cancelled())
+        {
             return Err(unavailable());
         }
         Ok(OperationClaimSource {
@@ -270,7 +276,7 @@ impl WorkerTool {
                 if recovery {
                     return Err(problem(ErrorKind::Unavailable, "worker_not_started"));
                 }
-                let source = self.source(&invocation, &context)?;
+                let source = self.source(&invocation, &context, false)?;
                 self.access
                     .host
                     .start_worker(source, name, instructions, &self.access.policy)
@@ -278,25 +284,16 @@ impl WorkerTool {
             }
             SEND => {
                 let child = SessionId::new(string(arguments, "child")?)?;
+                let source = self.source(&invocation, &context, recovery)?;
                 self.access
                     .host
-                    .owned_worker(&self.access.binding, &child)
-                    .await?;
-                let input = ChangeId::new(format!(
-                    "worker-message/{}",
-                    Fingerprint::of(&(&self.access.binding.turn, invocation.id()))?.to_hex()
-                ))?;
-                let receipt = self
-                    .access
-                    .host
-                    .send_subagent_message(SubagentMessage {
-                        parent: self.access.binding.session.clone(),
-                        child: child.clone(),
-                        input: input.clone(),
-                        text: string(arguments, "text")?.to_owned(),
-                    })
-                    .await?;
-                Ok(json!({"delivered":{"child":child,"input":input,"position":receipt.position}}))
+                    .send_worker_message(
+                        source,
+                        child,
+                        string(arguments, "text")?.to_owned(),
+                        recovery,
+                    )
+                    .await
             }
             WAIT => {
                 let children = arguments["children"].as_array().ok_or_else(invalid)?;
@@ -521,6 +518,173 @@ fn identity(binding: &TurnBinding, operation: &OperationId) -> Result<SessionId>
 }
 
 impl Host {
+    /// General workers have one assignment, so information belongs in that
+    /// assignment's history rather than the reusable-child input queue.
+    async fn send_worker_message(
+        &self,
+        source: OperationClaimSource,
+        child: SessionId,
+        text: String,
+        recovery: bool,
+    ) -> Result<Value> {
+        let _tree = self.delegation_controls.lock().await;
+        let (_, accepted, _) = self.owned_worker(&source.binding, &child).await?;
+        let turn = accepted.turn.ok_or_else(unavailable)?.binding.turn;
+        let input = ChangeId::new(format!(
+            "worker-message/{}",
+            Fingerprint::of(&(&source.binding.turn, &source.operation))?.to_hex()
+        ))?;
+        let message = Message {
+            id: MessageId::new(input.as_str())?,
+            role: Role::User,
+            phase: None,
+            content: vec![Content::Text(text.clone())],
+            provenance: Provenance {
+                source: "worker-parent-message".into(),
+                kind: ProvenanceKind::Supplied,
+                fingerprint: Some(source.action),
+            },
+        };
+        let expected_grants = grant(&source.binding, SEND)?;
+        let expected_definition = definition(SEND)?;
+        let expected_arguments = ToolArguments::Json(json!({"child":child,"text":text}));
+        let operation = source.operation.clone();
+        let action = source.action;
+        self.store
+            .inspect_turn_with(
+                source.binding.session.clone(),
+                source.binding.turn.clone(),
+                move |state| {
+                    let matches = state.operations().get(&operation).is_some_and(|entry| {
+                        entry.record.grants == expected_grants
+                            && matches!(&entry.record.input, OperationInput::Tool(invocation)
+                                if invocation.fingerprint() == action
+                                    && invocation.definition() == &expected_definition
+                                    && invocation.arguments() == &expected_arguments)
+                    });
+                    if matches {
+                        Ok(())
+                    } else {
+                        Err(problem(
+                            ErrorKind::Conflict,
+                            "worker_message_source_changed",
+                        ))
+                    }
+                },
+            )
+            .await?;
+
+        for _ in 0..4 {
+            let expected = message.clone();
+            let (recorded, history, count) = self
+                .store
+                .inspect_turn_with(child.clone(), turn.clone(), move |state| {
+                    let mut recorded = None;
+                    let mut count = 0;
+                    for (index, HistoryRecord::Message(item)) in
+                        state.history().records().iter().enumerate()
+                    {
+                        if item.provenance.source == "worker-parent-message" {
+                            count += 1;
+                        }
+                        if item.id == expected.id {
+                            if item != &expected {
+                                return Err(problem(
+                                    ErrorKind::Conflict,
+                                    "worker_message_identity_reused",
+                                ));
+                            }
+                            recorded = Some(HistoryPosition(index as u64 + 1));
+                        }
+                    }
+                    Ok((recorded, state.history().position(), count))
+                })
+                .await?;
+            // The immutable exact history record is the delivery receipt. It
+            // remains observable after settlement, cancellation or owner loss.
+            if let Some(position) = recorded {
+                return Ok(
+                    json!({"delivered":{"child":child,"input":input,"turn":turn,"history_position":position,"status":"appended"}}),
+                );
+            }
+            if recovery {
+                return Err(problem(
+                    ErrorKind::Unavailable,
+                    "worker_message_not_delivered",
+                ));
+            }
+            if count >= MAX_MESSAGES {
+                return Err(problem(ErrorKind::LimitExceeded, "worker_message_limit"));
+            }
+            let parent_source = source.clone();
+            self.store
+                .inspect_turn_with(
+                    source.binding.session.clone(),
+                    source.binding.turn.clone(),
+                    move |state| {
+                        if state.binding() != &parent_source.binding
+                            || state.outcome().is_some()
+                            || !state.controls().admits_work()
+                            || state.controls().revision != parent_source.control
+                            || !state
+                                .operations()
+                                .get(&parent_source.operation)
+                                .is_some_and(|entry| {
+                                    entry.is_running()
+                                        && entry.attempts.last().is_some_and(|attempt| {
+                                            attempt.id == parent_source.attempt
+                                        })
+                                })
+                        {
+                            return Err(problem(ErrorKind::Conflict, "worker_message_not_active"));
+                        }
+                        Ok(())
+                    },
+                )
+                .await?;
+            let view = self.store.inspect(child.clone()).await?;
+            self.check_execution(&view).await?;
+            let configuration = session_configuration(&view)?;
+            configuration
+                .subagent
+                .as_ref()
+                .ok_or_else(unavailable)?
+                .require_authority(&self.execution()?.authority.inference.authority)?;
+            let current = view
+                .current
+                .as_ref()
+                .filter(|current| current.binding.turn == turn && current.controls.admits_work())
+                .ok_or_else(|| problem(ErrorKind::Conflict, "worker_message_not_active"))?;
+            match self
+                .store
+                .control(ControlRequest {
+                    id: input.clone(),
+                    session: child.clone(),
+                    expected_revision: view.revision,
+                    action: SessionControl::AppendHistory {
+                        turn: turn.clone(),
+                        expected: current.controls.revision,
+                        expected_history: history,
+                        records: vec![HistoryRecord::Message(message.clone())],
+                    },
+                })
+                .await
+            {
+                Ok(_) => {
+                    return Ok(
+                        json!({"delivered":{"child":child,"input":input,"turn":turn,"history_position":HistoryPosition(history.0 + 1),"status":"appended"}}),
+                    );
+                }
+                Err(error) if error.kind == ErrorKind::Conflict => continue,
+                Err(error) => return Err(error),
+            }
+        }
+        Err(problem(
+            ErrorKind::Conflict,
+            "worker_message_history_changed",
+        ))
+    }
+
     async fn retire_worker_resources(&self, session: &SessionId) -> Result<()> {
         if session_configuration(&self.store.inspect(session.clone()).await?)?
             .worker

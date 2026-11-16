@@ -39,6 +39,9 @@ mod effort;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[path = "process/file_references.rs"]
 mod file_references;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[path = "process/full_access.rs"]
+mod full_access;
 #[cfg(unix)]
 #[path = "process/goals.rs"]
 mod goals;

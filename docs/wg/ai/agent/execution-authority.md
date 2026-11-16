@@ -13,7 +13,10 @@ This document decides where an agent host applies confinement. The boundary is
 the authority behind an operation, not the process that happens to contain its
 implementation.
 
-Every raw agent-controlled runtime receives its own confined authority.
+Every raw agent-controlled runtime receives its own captured authority.
+Restricted execution confines that authority. A user may instead explicitly
+choose the Full access posture defined by [Permission policy](./permissions.md#sandbox-levels),
+relinquishing filesystem and network isolation for that chat's execution.
 Mediated or cooperatively configured connections use the user's effective host
 network, within the principal's destination grant. An incompatible opaque
 client remains unavailable.
@@ -113,7 +116,7 @@ MUST NOT become ambient authority for an agent-controlled runtime.
 
 ### A2 — The host network is a route, not a grant
 
-Every authorized connection MUST use the effective host network route by
+Every authorized managed connection MUST use the effective host network route by
 default. This includes the ordinary direct route when no special configuration
 exists, route-based VPNs, host DNS, and system proxy or PAC decisions.
 
@@ -173,7 +176,7 @@ original editing command cannot establish containment of later workspace code.
 
 ### A4 — Raw execution is capability-scoped and fail-closed
 
-Every raw agent-controlled process tree MUST be launched through execution
+Every restricted raw agent-controlled process tree MUST be launched through execution
 confinement. Its immutable authority set MUST be known before it starts and
 MUST cover at least:
 
@@ -185,6 +188,14 @@ MUST cover at least:
 - subprocess rules;
 - lifetime, cancellation, and output bounds; and
 - the credentials, if any, deliberately delegated to that principal.
+
+An explicitly user-selected Full access process runs without that confinement.
+Its authority record MUST identify the unconfined posture before launch; it
+MUST NOT claim protected-path, destination or descendant-isolation guarantees.
+Its network stack follows the launched software's own OS and proxy support,
+without a managed-route or destination-filtering claim. Process ownership,
+bounded observation, cancellation and uncertain cleanup reporting still apply.
+The host MUST NOT choose this posture because a restricted launch failed.
 
 An external agent that owns its own tool loop is raw execution even when its
 binary is first-party or user-installed. The entire process tree, not merely
@@ -204,7 +215,9 @@ not a new isolation claim. The derived grant is the intersection of the
 parent's explicitly delegable permissions and the child's declared
 requirements. Credentials, endpoint grants, and user-presence permissions are
 non-delegable by default. Any raw process the subagent launches receives its own
-execution-confinement domain.
+captured execution posture, confined unless the parent's explicit Full access
+grant permits unconfined execution. A later change to the parent's selection
+does not change an accepted assignment's authority.
 
 An enforcement library with one global network policy cannot, by itself,
 conform for concurrent principals with different grants. A host must isolate
@@ -300,9 +313,12 @@ MUST withhold the capabilities covered by that requirement. Structured local
 capabilities otherwise follow their declared host profile. Ambient raw execution
 MUST NOT be labeled sandboxed.
 
-An explicit human-operated development escape hatch MAY provide ambient raw
-execution, but it is a distinct, visibly unsandboxed posture and is never the
-default consequence of an unavailable enforcer.
+An explicit user-selected Full access grant or human-operated development
+escape hatch MAY provide ambient raw execution. It is a distinct, visibly
+unsandboxed posture and is never the default consequence of an unavailable
+enforcer. Same-user code in this posture may reach readable host state and
+credentials; clearing inherited credentials does not establish isolation from
+their files or other same-user processes.
 
 ## Authority topology
 
@@ -420,9 +436,10 @@ An implementation conforms only if it can demonstrate all of these:
    still cannot read sensitive paths outside the coarse host envelope or write
    outside its union of roots. A capability claiming narrower isolation runs
    in a separate compartment.
-5. **Raw shell is confined.** A model-selected command cannot read protected
+5. **Restricted raw shell is confined.** A model-selected restricted command cannot read protected
    host data, write outside writable roots, spawn beyond its process rules, or
-   reach an ungranted destination.
+   reach an ungranted destination. An explicitly selected Full access command
+   instead reports its unconfined posture and retains lifecycle ownership.
 6. **Allowed confined egress preserves routing.** An allowed destination uses
    the configured host route; a disallowed destination is rejected before any
    upstream request.
@@ -455,7 +472,9 @@ upstream proxy also cannot represent per-destination PAC decisions in general.
 
 Confining finite shell commands alone leaves long-lived external agents,
 extension runtimes, and later workspace-code execution outside the boundary.
-Every raw principal needs its declared confinement. Trusted host services retain
+Every restricted raw principal needs its declared confinement. Explicit Full
+access is a distinct user grant, not a substitute for missing confinement.
+Trusted host services retain
 structured checks and credential custody, with a separately chosen hardening
 profile. A deployment that requires a whole-host envelope must establish it.
 The native host can select another profile while meeting these same authority
@@ -482,7 +501,7 @@ credential custody.
 
 ### Offer a “disable sandbox” switch as the solution
 
-Skipping confinement may be an explicit development posture, but it drops
+Skipping confinement may be an explicit Full access or development posture, but it drops
 filesystem, process, and network protection together. It does not solve host
 routing while keeping agent authority confined.
 

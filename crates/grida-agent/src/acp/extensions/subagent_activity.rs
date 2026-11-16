@@ -39,9 +39,15 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                     let parent = request.parent_session_id;
                     require(&activity.1, CAPABILITY, Some(&parent))?;
                     let _observation = Observation::begin(&activity.1, Some(&parent))?;
+                    let ordered = activity
+                        .1
+                        .lock()
+                        .unwrap()
+                        .negotiated
+                        .contains(super::super::projection::ACTIVITY_ORDER);
                     let page = activity
                         .0
-                        .subagent_activity(parent.clone(), request.after_child_id)
+                        .subagent_activity(parent.clone(), request.after_child_id, ordered)
                         .await
                         .map_err(host_error)?;
                     require(&activity.1, CAPABILITY, Some(&parent))?;
@@ -61,8 +67,18 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                     let parent = request.parent_session_id;
                     require(&sessions, CAPABILITY, Some(&parent))?;
                     let _observation = Observation::begin(&sessions, Some(&parent))?;
+                    let ordered = sessions
+                        .lock()
+                        .unwrap()
+                        .negotiated
+                        .contains(super::super::projection::ACTIVITY_ORDER);
                     let page = host
-                        .subagent_conversation(parent.clone(), request.child_id, request.before)
+                        .subagent_conversation(
+                            parent.clone(),
+                            request.child_id,
+                            request.before,
+                            ordered,
+                        )
                         .await
                         .map_err(host_error)?;
                     require(&sessions, CAPABILITY, Some(&parent))?;

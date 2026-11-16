@@ -40,16 +40,23 @@ import { XIcon } from "lucide-react";
 import { cn } from "@app/ui/lib/utils";
 import {
   getDesktopBridge,
+  useDesktopBridge,
   workspaces as workspacesNs,
   type Workspace,
 } from "@/lib/desktop/bridge";
 import { welcome_message } from "@/lib/desktop/welcome-message";
 import { dotcanvas } from "dotcanvas";
 import { TitleBar } from "@/scaffolds/desktop/chrome/title-bar";
-import { AgentComposerInput } from "@/scaffolds/desktop/shared/agent-composer-input";
-import { NativeModelPicker } from "@/scaffolds/desktop/workbench/native-chat-controls";
+import { AgentComposer } from "@/scaffolds/desktop/shared/agent-composer";
+import { HomeComposer } from "@/scaffolds/desktop/home/home-composer";
+import { NativeAttachmentCard } from "@/scaffolds/desktop/workbench/native-attachment-card";
+import { useWorkspaceFileMentions } from "@/scaffolds/desktop/shared/use-workspace-file-mentions";
 import { WorkspaceCanvasCreation } from "@/scaffolds/desktop/workbench/workspace-canvas-creation";
-import type { ComposerCatalog } from "@/kits/composer";
+import {
+  ComposerDropArea,
+  type ComposerCatalog,
+  type ComposerTransfer,
+} from "@/kits/composer";
 import {
   LibraryExplorerView,
   type LibraryExplorerViewHandle,
@@ -69,7 +76,6 @@ import {
   type ApplicationPresetId,
 } from "@/scaffolds/desktop/home/application-preset";
 import { PresetRail } from "@/scaffolds/desktop/home/preset-rail";
-import { PresetChip } from "@/scaffolds/desktop/home/preset-chip";
 import type { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
 import { last_workspace } from "@/lib/desktop/last-workspace";
 import { NativeChatController } from "@/lib/agent-chat/native-chat-controller";
@@ -141,42 +147,69 @@ function StartupRestoreScreen() {
   );
 }
 
-/** The home composer targets no existing workspace (a fresh project is created
- *  on submit), so there are no `@` file refs or `/` skills to offer. A constant
- *  — not `useWorkspaceComposerCatalog("")`, which would fire doomed bridge
- *  readdirs per mount just to yield this same empty shape. */
-const EMPTY_CATALOG: ComposerCatalog = { commands: [], mentions: [] };
-
 function WelcomeSurface({
   initialWorkspaceId,
 }: {
   initialWorkspaceId: string | null;
 }) {
   const router = useRouter();
+  const bridge = useDesktopBridge();
+  const [composer] = useState(() => new HomeComposer());
+  const staged = useSyncExternalStore(
+    composer.subscribe,
+    composer.read,
+    composer.read
+  );
+  useEffect(() => {
+    void composer.restore();
+  }, [composer]);
+  const filePicker = useRef<HTMLInputElement>(null);
+  const imagePicker = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLDivElement>(null);
   // The home's single page-scroll container — everything (composer, gallery)
   // scrolls together inside it; the gallery virtualizes against it.
   const scrollRef = useRef<HTMLDivElement>(null);
   const libraryRef = useRef<LibraryExplorerViewHandle>(null);
-  const [busy, setBusy] = useState(false);
+  const [openingFolder, setBusy] = useState(false);
+  const busy = openingFolder || staged.busy;
   const [error, setError] = useState<string | null>(null);
-  // The active `application_preset` (SPIKE). Mutated by the icon rail and the
-  // composer's mode chip; re-themes the one shared home (placeholder now; the
-  // gallery's visual references and the handoff seed are the next seams).
+  // Presets supply explicit user intent and select the surrounding gallery.
   const [preset, setPreset] = useState<ApplicationPresetId>(
     ApplicationPreset.DEFAULT
   );
-  // The composer placeholder is the active preset's representative example.
-  // It swaps when the mode changes, but does not rotate.
-  const presetPlaceholder = ApplicationPreset.byId(preset).placeholder;
+  const presetSpec = ApplicationPreset.byId(preset);
+  const PresetIcon = presetSpec.icon;
   // Recent-projects quick switcher (⌃R, VS Code's "Open Recent"). Keeps the
   // home minimal — no persistent recents list.
   const [commandOpen, setCommandOpen] = useState(false);
-  // The composer's target: null = create a NEW project under the managed root
-  // (the default, shown as "Default workspace"), or an existing workspace to
-  // send the prompt into instead. Owned here; the top-left WorkspacePicker
-  // mutates it and the composer's `start` reads it.
+  // Null targets the managed default workspace; an explicit choice is honored
+  // for text, references and templates alike.
   const [target, setTarget] = useState<Workspace | null>(null);
+  const composerDraft = useMemo(
+    () => composer.draftFor(target?.id ?? "default"),
+    [composer, target?.id]
+  );
   const pendingInitialWorkspaceId = useRef(initialWorkspaceId);
+  const [defaultWorkspace, setDefaultWorkspace] = useState<Workspace | null>(
+    null
+  );
+  useEffect(() => {
+    let active = true;
+    void workspacesNs
+      .getDefault()
+      .then((workspace) => {
+        if (active) setDefaultWorkspace(workspace);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+  const mentions = useWorkspaceFileMentions((target ?? defaultWorkspace)?.id);
+  const catalog = useMemo<ComposerCatalog>(
+    () => ({ commands: [], mentions }),
+    [mentions]
+  );
   // References the user has gathered from the gallery (multi-select). They seed
   // ONE fresh board on submit; a click in the gallery toggles membership here.
   const [pickedRefs, setPickedRefs] = useState<
@@ -344,6 +377,9 @@ function WelcomeSurface({
     modelSelection.read,
     modelSelection.read
   );
+  useEffect(() => {
+    composer.initializeEffort(profiles?.newChatDefault?.effort);
+  }, [composer, profiles?.newChatDefault?.effort]);
   const readProfiles = useCallback(() => {
     const list = getDesktopBridge()?.nativeChat?.welcomeProfiles;
     if (!list) return;
@@ -362,67 +398,49 @@ function WelcomeSurface({
   // Open a workspace and, when there is one, leave the first message for its
   // chat. An empty message enters the workspace without starting a turn.
   const start = useCallback(
-    (text: string) => {
-      if (busy) return;
+    async (text: string) => {
       const template = pickedTemplate;
-      const references = template ? [] : pickedRefs;
-      // Picked context only makes sense for a fresh start in the default
-      // workspace; plain text goes to the selected workspace.
-      const fresh = !!template || references.length > 0;
-      if ((fresh || text.trim()) && !getDesktopBridge()?.nativeChat) {
+      if (
+        (text.trim() ||
+          template ||
+          pickedRefs.length ||
+          composer.read().attachment) &&
+        !getDesktopBridge()?.nativeChat
+      ) {
         setError("Chat isn't available in this version of Grida Desktop.");
-        return;
+        throw new Error("Chat unavailable");
       }
-      setBusy(true);
       setError(null);
-      void (async () => {
-        try {
-          const workspace =
-            fresh || !target ? await workspacesNs.getDefault() : target;
-          if (!workspace) {
-            setError("No default workspace available on this host.");
-            setBusy(false);
-            return;
-          }
-          const copied = template
-            ? await WorkspaceCanvasCreation.copy(workspace.id, template).catch(
-                () => {
-                  throw new Error(
-                    "Couldn't copy the template into the workspace."
-                  );
-                }
-              )
-            : null;
-          const message = welcome_message.compose({
+      try {
+        await composer.submit(
+          {
             text,
-            references,
-            template:
-              template && copied
-                ? {
-                    title: template.title,
-                    slides: template.pages.length,
-                    path: copied,
-                  }
-                : null,
-          });
-          if (
-            message !== null &&
-            !welcome_message.stash(workspace.id, { text: message, profileId })
-          ) {
-            setError("Couldn't keep your message for the workspace.");
-            setBusy(false);
-            return;
+            prompt: ApplicationPreset.prompt(preset, text),
+            profileId,
+            target,
+            references: template ? [] : pickedRefs,
+            ...(template && {
+              copyTemplate: async (workspaceId: string) => ({
+                title: template.title,
+                slides: template.pages.length,
+                path: await WorkspaceCanvasCreation.copy(workspaceId, template),
+              }),
+            }),
+          },
+          {
+            defaultWorkspace: workspacesNs.getDefault,
+            stash: welcome_message.stash,
+            open: (workspace) => router.push(workspaceWorkbenchHref(workspace)),
           }
-          router.push(workspaceWorkbenchHref(workspace));
-        } catch (err) {
-          setError(
-            err instanceof Error ? err.message : "Couldn't start a session."
-          );
-          setBusy(false); // navigation unmounts on success
-        }
-      })();
+        );
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Couldn't start a session."
+        );
+        throw err;
+      }
     },
-    [busy, pickedTemplate, pickedRefs, target, profileId, router]
+    [pickedTemplate, pickedRefs, target, profileId, router, composer, preset]
   );
 
   // A Library card's Add action toggles it in the composer's tray (multi-select)
@@ -465,8 +483,15 @@ function WelcomeSurface({
     }
   }, [refreshWorkspaces]);
 
+  // The whole Home window accepts external files/folders through the same
+  // intake as the editor. The shared drop zone consumes each gesture once.
+  const transferAttachment = (event: ComposerTransfer.Event) => {
+    if (!busy) composer.transfer(event);
+  };
+
   return (
-    <div
+    <ComposerDropArea
+      onTransfer={transferAttachment}
       data-testid="desktop-welcome"
       // The desktop shell locks <body> to h-svh/overflow-hidden, so the home
       // owns its layout: one scroll pane with the composer hero on top and the
@@ -606,49 +631,171 @@ function WelcomeSurface({
                       ))}
                     </div>
                   )}
-                  <AgentComposerInput
-                    catalog={EMPTY_CATALOG}
-                    // Docked: lift the input on its own shadow so it floats over
-                    // the gallery — there's no card wrapper doing it anymore.
-                    className={docked ? "shadow-xl" : undefined}
+                  <AgentComposer
+                    draft={composerDraft}
+                    submissionScope={composerDraft.key}
+                    catalog={catalog}
+                    className={cn("@container", docked && "shadow-xl")}
                     onSubmit={start}
+                    awaitSubmission
+                    submitting={staged.busy}
+                    canSubmit={!busy}
                     isStreaming={false}
                     onStop={NOOP}
                     allowEmptySubmit
                     emptySubmitLabel={
-                      pickedTemplate || pickedRefs.length > 0
+                      pickedTemplate ||
+                      pickedRefs.length > 0 ||
+                      staged.attachment
                         ? "Start"
                         : "Open workspace"
                     }
                     autofocus
-                    placeholder={
-                      pickedTemplate
-                        ? `Adapt the "${pickedTemplate.title}" template — describe your deck…`
-                        : pickedRefs.length > 0
-                          ? "Describe what to make from these references…"
-                          : target
-                            ? `Ask Grida to design something in ${target.name}…`
-                            : presetPlaceholder
+                    onAttachmentTransfer={transferAttachment}
+                    attachments={
+                      staged.attachment && (
+                        <NativeAttachmentCard
+                          name={staged.attachment.file.name}
+                          size={
+                            staged.attachment.kind === "directory"
+                              ? undefined
+                              : staged.attachment.file.size
+                          }
+                          png={staged.attachment.file.type === "image/png"}
+                          mimeType={
+                            staged.attachment.kind === "directory"
+                              ? "inode/directory"
+                              : staged.attachment.file.type
+                          }
+                          preview={
+                            staged.attachment.kind === "file" &&
+                            /^image\/(png|jpeg|webp|gif)$/.test(
+                              staged.attachment.file.type
+                            )
+                              ? staged.attachment.file
+                              : null
+                          }
+                          onRemove={composer.removeAttachment}
+                        />
+                      )
                     }
-                    toolbarStart={
-                      <PresetChip value={preset} onChange={setPreset} />
+                    actions={{
+                      files: {
+                        disabled: busy || staged.goal,
+                        onSelect: () => filePicker.current?.click(),
+                      },
+                      image: {
+                        disabled: busy || staged.goal,
+                        onSelect: () => imagePicker.current?.click(),
+                      },
+                      library: {
+                        disabled: busy || staged.goal,
+                        onSelect: () => {
+                          galleryRef.current?.scrollIntoView({
+                            behavior: "smooth",
+                            block: "start",
+                          });
+                          galleryRef.current?.focus({ preventScroll: true });
+                        },
+                      },
+                      plan: {
+                        offered: !!bridge?.nativeChat?.submitInRegime,
+                        active: staged.plan,
+                        disabled: busy,
+                        onChange: composer.selectPlan,
+                      },
+                      goal: {
+                        offered: !!bridge?.nativeChat?.startGoal,
+                        active: staged.goal,
+                        disabled: busy || !!staged.attachment,
+                        removeDisabled: busy,
+                        onChange: composer.selectGoal,
+                      },
+                    }}
+                    commands={[
+                      ...(bridge?.nativeChat?.submitInRegime
+                        ? [
+                            {
+                              id: "plan" as const,
+                              run: () => composer.selectPlan(true),
+                            },
+                          ]
+                        : []),
+                      ...(bridge?.nativeChat?.startGoal
+                        ? [
+                            {
+                              id: "goal" as const,
+                              run: () => composer.selectGoal(true),
+                            },
+                          ]
+                        : []),
+                    ]}
+                    intents={
+                      presetSpec.art
+                        ? [
+                            {
+                              id: preset,
+                              label: presetSpec.label,
+                              icon: <PresetIcon />,
+                              disabled: busy,
+                              onRemove: () =>
+                                setPreset(ApplicationPreset.DEFAULT),
+                            },
+                          ]
+                        : []
                     }
-                    toolbarEnd={
-                      <NativeModelPicker
-                        profiles={{
-                          active: profileId,
-                          choices: profiles?.choices ?? [],
-                          saved: profiles?.saved ?? [],
-                        }}
-                        busy={busy}
-                        onSelect={(selection) =>
-                          modelSelection.choose(selection)
-                        }
-                        onRefresh={readProfiles}
-                        refreshError={profileReadError}
-                      />
-                    }
+                    model={{
+                      profiles: {
+                        active: profileId,
+                        choices: profiles?.choices ?? [],
+                        saved: profiles?.saved ?? [],
+                      },
+                      busy,
+                      onSelect: (selection) => modelSelection.choose(selection),
+                      onRefresh: readProfiles,
+                      refreshError: profileReadError,
+                      effort: staged.effort,
+                      onEffort: composer.selectEffort,
+                      goal: staged.goal,
+                    }}
                   />
+                  <input
+                    ref={filePicker}
+                    type="file"
+                    className="hidden"
+                    aria-label="Attach file"
+                    onChange={(event) => {
+                      const file = event.currentTarget.files?.[0];
+                      if (file)
+                        composer.transfer({
+                          resources: [{ kind: "file", file }],
+                        });
+                      event.currentTarget.value = "";
+                    }}
+                  />
+                  <input
+                    ref={imagePicker}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    className="hidden"
+                    aria-label="Attach image"
+                    onChange={(event) => {
+                      const file = event.currentTarget.files?.[0];
+                      if (file)
+                        composer.transfer({
+                          resources: [{ kind: "file", file }],
+                        });
+                      event.currentTarget.value = "";
+                    }}
+                  />
+                  {staged.notice && (
+                    <p
+                      role="status"
+                      className="px-1 text-xs text-muted-foreground"
+                    >
+                      {staged.notice}
+                    </p>
+                  )}
                   {/* Kept inside the composer so a submit error is visible even when
                   the composer is floating (docked). */}
                   {error && (
@@ -674,7 +821,7 @@ function WelcomeSurface({
               of the single page scroll (the reference gallery virtualizes
               against it). The "Ideas" label is universal — it heads whichever
               gallery renders. */}
-            <div>
+            <div ref={galleryRef} tabIndex={-1}>
               <h2 className="mb-3 text-sm font-medium text-muted-foreground">
                 Start from an idea
               </h2>
@@ -707,6 +854,6 @@ function WelcomeSurface({
         canvasIds={canvasIds}
         onOpenFolder={onOpen}
       />
-    </div>
+    </ComposerDropArea>
   );
 }

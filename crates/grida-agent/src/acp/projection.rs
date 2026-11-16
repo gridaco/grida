@@ -23,9 +23,11 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 const MAX_CHUNK_BYTES: usize = 8 * 1024;
 pub(super) const TRANSCRIPT_WINDOW: &str = "co.grida/session/transcript-window";
+pub(super) const ACTIVITY_ORDER: &str = "co.grida/session/activity-order";
 
 #[derive(Deserialize)]
 #[serde(
@@ -48,6 +50,10 @@ pub(super) struct Projection {
     // Compare live deltas with the recorded message before filling in any
     // unstreamed suffix. A disagreement cannot be represented as an append.
     streamed_text: BTreeMap<MessageId, String>,
+    ordering: Option<Arc<crate::host::activity_order::State>>,
+    turn: Option<agent_kit_core::TurnId>,
+    calls: BTreeMap<agent_kit_core::ToolCallId, (MessageId, ToolCall)>,
+    finished: BTreeSet<agent_kit_core::ToolCallId>,
 }
 
 impl Projection {
@@ -56,7 +62,67 @@ impl Projection {
             session,
             replay_id: None,
             streamed_text: BTreeMap::new(),
+            ordering: None,
+            turn: None,
+            calls: BTreeMap::new(),
+            finished: BTreeSet::new(),
         }
+    }
+
+    pub(super) fn with_activity_order(
+        mut self,
+        ordering: Option<Arc<crate::host::activity_order::State>>,
+    ) -> Self {
+        self.ordering = ordering;
+        self
+    }
+
+    pub(super) fn set_turn(&mut self, turn: agent_kit_core::TurnId) {
+        self.turn = Some(turn);
+    }
+
+    fn stamp(
+        &self,
+        meta: &mut Value,
+        turn: Option<&agent_kit_core::TurnId>,
+        message: Option<&MessageId>,
+        call: Option<&agent_kit_core::ToolCallId>,
+    ) {
+        let Some(ordering) = &self.ordering else {
+            return;
+        };
+        let session = agent_kit_core::SessionId::new(self.session.0.to_string()).ok();
+        let order = session.as_ref().zip(turn).and_then(|(session, turn)| {
+            if let Some(call) = call {
+                ordering.call(session, turn, call)
+            } else {
+                message.and_then(|message| ordering.message(session, turn, message))
+            }
+        });
+        let fields = meta.as_object_mut().expect("object metadata");
+        fields.remove("activityOrder");
+        fields.remove("activityOrderIncomplete");
+        fields.extend(
+            crate::host::activity_order::metadata(order)
+                .as_object()
+                .unwrap()
+                .clone(),
+        );
+    }
+
+    fn metadata(
+        &self,
+        base: Option<(&str, Value)>,
+        fact: &Value,
+    ) -> serde_json::Map<String, Value> {
+        let mut meta = serde_json::Map::new();
+        if let Some((key, value)) = base {
+            meta.insert(key.into(), value);
+        }
+        if self.ordering.is_some() {
+            meta.insert(ACTIVITY_ORDER.into(), fact.clone());
+        }
+        meta
     }
 
     pub(super) fn correlate_replay(&mut self, request_id: ChangeId) {
@@ -121,6 +187,7 @@ impl Projection {
             if let Some(turn) = &turn {
                 meta["turnId"] = json!(turn);
             }
+            self.stamp(&mut meta, turn.as_ref(), Some(&message.id), None);
             if message.role == Role::Assistant {
                 meta["phase"] = json!(match (answers.contains(&message.id), message.phase) {
                     (true, _) | (false, Some(MessagePhase::Answer)) => "answer",
@@ -160,10 +227,10 @@ impl Projection {
                 };
                 let mut attribution = meta.clone();
                 attribution.as_object_mut().expect("object").remove("phase");
+                self.stamp(&mut attribution, turn.as_ref(), None, Some(&call.id));
                 let update = activity_update(&message.id, call, outcome, result, attribution);
-                let notification = SessionNotification::new(self.session.clone(), update.0).meta(
-                    serde_json::Map::from_iter([(TRANSCRIPT_WINDOW.into(), update.1)]),
-                );
+                let notification = SessionNotification::new(self.session.clone(), update.0)
+                    .meta(self.metadata(Some((TRANSCRIPT_WINDOW, update.1.clone())), &update.1));
                 delivery.send(connection, notification).await?;
             }
         }
@@ -196,6 +263,27 @@ impl Projection {
                     self.message(connection, delivery, message).await?;
                 }
             }
+            TurnUpdate::Snapshot(view) if self.ordering.is_some() => {
+                let mut updates = Vec::new();
+                for HistoryRecord::Message(message) in view.state.history().records() {
+                    if message.role != Role::Tool {
+                        continue;
+                    }
+                    for part in &message.content {
+                        if let Content::ToolResult(result) = part
+                            && !self.finished.contains(&result.call)
+                            && let Some((message, call)) = self.calls.get(&result.call)
+                        {
+                            updates.push((message.clone(), call.clone(), result.clone()));
+                        }
+                    }
+                }
+                for (message, call, result) in updates {
+                    self.tool(connection, delivery, &message, &call, Some(&result))
+                        .await?;
+                    self.finished.insert(call.id);
+                }
+            }
             _ => {}
         }
         Ok(())
@@ -219,12 +307,52 @@ impl Projection {
         };
         self.chunk(connection, delivery, message.role, &message.id, suffix)
             .await?;
-        let meta = self
+        let mut meta = self
             .replay_id
             .as_ref()
             .map(|request_id| json!({"requestId": request_id}));
+        if self.ordering.is_some() {
+            let fact = meta.get_or_insert_with(|| json!({}));
+            if let Some(turn) = &self.turn {
+                fact["turnId"] = json!(turn);
+            }
+            self.stamp(fact, self.turn.as_ref(), Some(&message.id), None);
+        }
         self.attachments(connection, delivery, &message, meta.as_ref())
-            .await
+            .await?;
+        if self.ordering.is_some() && message.role == Role::Assistant {
+            for part in &message.content {
+                if let Content::ToolCall(call) = part
+                    && !self.calls.contains_key(&call.id)
+                {
+                    self.calls
+                        .insert(call.id.clone(), (message.id.clone(), call.clone()));
+                    self.tool(connection, delivery, &message.id, call, None)
+                        .await?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn tool(
+        &self,
+        connection: &ConnectionTo<Client>,
+        delivery: &Delivery,
+        message: &MessageId,
+        call: &ToolCall,
+        result: Option<&ToolResult>,
+    ) -> Result<()> {
+        let mut meta = json!({});
+        if let Some(turn) = &self.turn {
+            meta["turnId"] = json!(turn);
+        }
+        self.stamp(&mut meta, self.turn.as_ref(), None, Some(&call.id));
+        let outcome = result.map_or(Outcome::Running, |result| Outcome::Finished(result.status));
+        let (update, meta) = activity_update(message, call, outcome, result, meta);
+        let notification = SessionNotification::new(self.session.clone(), update)
+            .meta(self.metadata(Some((super::live::CAPABILITY, meta.clone())), &meta));
+        delivery.send(connection, notification).await
     }
 
     /// A person's retained attachments, each as a link to the held asset. The
@@ -247,10 +375,14 @@ impl Projection {
                 SessionUpdate::UserMessageChunk(chunk),
             );
             if let Some(meta) = meta {
-                notification = notification.meta(serde_json::Map::from_iter([(
-                    TRANSCRIPT_WINDOW.into(),
-                    meta.clone(),
-                )]));
+                notification = notification.meta(
+                    self.metadata(
+                        self.replay_id
+                            .as_ref()
+                            .map(|_| (TRANSCRIPT_WINDOW, meta.clone())),
+                        meta,
+                    ),
+                );
             }
             delivery.send(connection, notification).await?;
         }
@@ -275,9 +407,8 @@ impl Projection {
                 Role::Assistant => SessionUpdate::AgentMessageChunk(chunk),
                 _ => return Ok(()),
             };
-            let notification = SessionNotification::new(self.session.clone(), update).meta(
-                serde_json::Map::from_iter([(TRANSCRIPT_WINDOW.into(), meta.clone())]),
-            );
+            let notification = SessionNotification::new(self.session.clone(), update)
+                .meta(self.metadata(Some((TRANSCRIPT_WINDOW, meta.clone())), meta));
             delivery.send(connection, notification).await?;
             text = remaining;
         }
@@ -302,11 +433,23 @@ impl Projection {
                 _ => return Ok(()),
             };
             let mut notification = SessionNotification::new(self.session.clone(), update);
-            if let Some(request_id) = &self.replay_id {
-                notification = notification.meta(serde_json::Map::from_iter([(
-                    TRANSCRIPT_WINDOW.into(),
-                    serde_json::json!({"requestId": request_id}),
-                )]));
+            if self.replay_id.is_some() || self.ordering.is_some() {
+                let mut fact = json!({});
+                if let Some(request_id) = &self.replay_id {
+                    fact["requestId"] = json!(request_id);
+                }
+                if let Some(turn) = &self.turn {
+                    fact["turnId"] = json!(turn);
+                }
+                self.stamp(&mut fact, self.turn.as_ref(), Some(id), None);
+                notification = notification.meta(
+                    self.metadata(
+                        self.replay_id
+                            .as_ref()
+                            .map(|_| (TRANSCRIPT_WINDOW, fact.clone())),
+                        &fact,
+                    ),
+                );
             }
             delivery.send(connection, notification).await?;
             text = remaining;

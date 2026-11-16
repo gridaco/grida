@@ -6,6 +6,7 @@ pub(super) mod compaction;
 mod deletion;
 pub(super) mod gateway_billing;
 mod goals;
+mod permission_mode;
 pub(super) const GOAL_SPENDING: &str = goals::SPENDING;
 mod history;
 mod hooks;
@@ -153,8 +154,10 @@ fn capability_keys(
         .chain(reviewer.then_some(IMAGE_INTAKE))
         .chain(reviewer.then_some(model_change::MODEL_CHANGE))
         .chain(reviewer.then_some(selection::CAPABILITY))
+        .chain(reviewer.then_some(permission_mode::CAPABILITY))
         .chain(reviewer.then_some(FILE_REFERENCE))
         .chain(reviewer.then_some(super::projection::TRANSCRIPT_WINDOW))
+        .chain(reviewer.then_some(super::projection::ACTIVITY_ORDER))
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -543,6 +546,7 @@ pub(super) fn handlers(
         .extend(hooks::handlers(host.clone(), sessions.clone()))
         .extend(model_change::handlers(host.clone(), sessions.clone()))
         .extend(selection::handlers(host.clone(), sessions.clone()))
+        .extend(permission_mode::handlers(host.clone(), sessions.clone()))
         .extend(library::handlers(host.clone(), sessions.clone()))
         .extend(compaction::handlers(host.clone(), sessions.clone()))
         .extend(catalog::handlers(host.clone(), sessions.clone()))

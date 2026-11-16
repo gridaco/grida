@@ -32,6 +32,8 @@ import type {
   NativeChatTranscriptPage,
   NativeChatTurnRecord,
   NativeChatOperatingRegime,
+  NativeChatPermissionMode,
+  NativeChatPermissionState,
   NativeChatPage,
   NativeChatQuestion,
   NativeChatQuestionAnswer,
@@ -51,6 +53,7 @@ import type {
   NativeSubagentAssignmentInput,
   NativeSubagentCreate,
 } from "@grida/desktop-bridge";
+import { NativeAgentPermissionModes } from "./native-agent-permission-mode";
 import { NativeAgentArtifacts } from "./native-agent-artifacts";
 import { NativeFileReference } from "./native-file-reference";
 import { NativeInputImages } from "./native-input-images";
@@ -70,6 +73,7 @@ import { NativeAgentCommands } from "./native-agent-commands";
 import { NativeAgentRevisions } from "./native-agent-revisions";
 import { NativeAgentSubagents } from "./native-agent-subagents";
 import { NativeSubagentActivity } from "./native-subagent-activity";
+import { NativeActivityOrder } from "./native-activity-order";
 import {
   NativeAgentGoals,
   type NativeGoalInspection,
@@ -256,6 +260,7 @@ type TranscriptCapture = {
   messages: Map<string, NativeChatMessage>;
   bytes: number;
   overflow: boolean;
+  invalidActivityOrder?: true;
   requestId?: string;
   result?: Promise<readonly NativeChatMessage[]>;
 };
@@ -272,7 +277,8 @@ export class NativeAgentChat {
     turn
   );
   private readonly subagentActivityReader = new NativeSubagentActivity(
-    (method, params) => this.process.request(method, params)
+    (method, params) => this.process.request(method, params),
+    () => this.process.acceptsActivityOrder
   );
   private readonly deletion = new NativeAgentDeletion((method, params) =>
     this.process.request(method, params, 10_000)
@@ -328,6 +334,37 @@ export class NativeAgentChat {
       this.process.supportsSelectedImage &&
       this.selectedImages !== undefined
     );
+  }
+
+  get acceptsPermissionMode(): boolean {
+    return this.connected && this.process.acceptsPermissionMode;
+  }
+
+  async permissionMode(
+    session: NativeChatSession
+  ): Promise<NativeChatPermissionState> {
+    this.requireAttached(session);
+    if (!this.acceptsPermissionMode)
+      throw new Error("native_chat_permission_mode_unavailable");
+    return new NativeAgentPermissionModes(
+      (method, input) => this.process.request(method, input),
+      this.cwd
+    ).inspect(session.id);
+  }
+
+  async setPermissionMode(
+    session: NativeChatSession,
+    revision: number,
+    requestId: string,
+    mode: NativeChatPermissionMode
+  ): Promise<NativeChatPermissionState> {
+    this.requireAttached(session);
+    if (!this.acceptsPermissionMode)
+      throw new Error("native_chat_permission_mode_unavailable");
+    return new NativeAgentPermissionModes(
+      (method, input) => this.process.request(method, input),
+      this.cwd
+    ).update(session.id, revision, requestId, mode);
   }
 
   get acceptsSelection(): boolean {
@@ -1912,6 +1949,8 @@ export class NativeAgentChat {
       .then((reply) => {
         object(reply);
         this.requireAttached(session);
+        if (capture.invalidActivityOrder)
+          throw new Error("native_chat_activity_order_invalid");
         if (capture.overflow)
           throw new Error("native_chat_transcript_too_large");
         return [...capture.messages.values()];
@@ -1966,6 +2005,8 @@ export class NativeAgentChat {
       this.requireAttached(session);
       const page = object(object(response._meta)[TRANSCRIPT_WINDOW]);
       if (page.requestId !== requestId) throw invalidResponse();
+      if (capture.invalidActivityOrder)
+        throw new Error("native_chat_activity_order_invalid");
       if (capture.overflow) throw new Error("native_chat_transcript_too_large");
       const older =
         page.older === null ? null : JSON.stringify(object(page.older));
@@ -2298,6 +2339,10 @@ export class NativeAgentChat {
   }
 
   private publish(params: unknown): void {
+    let orderedCapture: TranscriptCapture | undefined;
+    let orderedListeners:
+      | Set<(update: NativeChatStreamUpdate) => void>
+      | undefined;
     try {
       const notification = object(params);
       const sessionId = identity(notification.sessionId);
@@ -2336,23 +2381,39 @@ export class NativeAgentChat {
         const replay = metadata?.[TRANSCRIPT_WINDOW];
         if (replay !== undefined) {
           const attribution = object(replay);
-          if (capture && capture.requestId === identity(attribution.requestId))
+          if (
+            capture &&
+            capture.requestId === identity(attribution.requestId)
+          ) {
+            orderedCapture = capture;
             captureActivity(
               capture,
               identity(attribution.messageId),
               optionalIdentity(attribution.turnId),
-              activity(update, attribution)
+              activity(
+                update,
+                attribution,
+                metadata,
+                this.process.acceptsActivityOrder
+              )
             );
+          }
           return;
         }
         const live = metadata?.["co.grida/session/updates"];
         if (live === undefined || !listeners) return;
         const attribution = object(live);
+        orderedListeners = listeners;
         const projected: NativeChatStreamUpdate = Object.freeze({
           kind: "activity",
           messageId: identity(attribution.messageId),
           turnId: identity(attribution.turnId),
-          activity: activity(update, attribution),
+          activity: activity(
+            update,
+            attribution,
+            metadata,
+            this.process.acceptsActivityOrder
+          ),
         });
         for (const listener of listeners) {
           try {
@@ -2386,8 +2447,15 @@ export class NativeAgentChat {
             ? undefined
             : identity(attribution.requestId);
         if (capture && capture.requestId === requestId) {
+          orderedCapture = capture;
           const messageId = identity(update.messageId);
           const entry = attachment(content);
+          const order = NativeActivityOrder.notification(
+            metadata,
+            attribution,
+            this.process.acceptsActivityOrder,
+            true
+          );
           const previewId =
             (this.process.acceptsInputImageChunks &&
               ["image/png", "image/jpeg", "image/webp", "image/gif"].includes(
@@ -2406,8 +2474,9 @@ export class NativeAgentChat {
           captureAttachment(
             capture,
             messageId,
-            optionalIdentity(attribution?.turnId),
-            Object.freeze({ ...entry, ...(previewId && { previewId }) })
+            optionalIdentity(order.turnId ?? attribution?.turnId),
+            Object.freeze({ ...entry, ...(previewId && { previewId }) }),
+            order
           );
         }
         return;
@@ -2426,21 +2495,25 @@ export class NativeAgentChat {
           attribution === undefined
             ? undefined
             : identity(attribution.requestId);
-        if (capture && capture.requestId === requestId)
-          captureText(
-            capture,
-            identity(update.messageId),
-            role,
-            content.text,
-            attribution && {
-              turnId: optionalIdentity(attribution.turnId),
-              phase: messagePhase(attribution.phase, role),
-            }
+        if (capture && capture.requestId === requestId) {
+          orderedCapture = capture;
+          const order = NativeActivityOrder.notification(
+            metadata,
+            attribution,
+            this.process.acceptsActivityOrder,
+            content.text.length > 0
           );
+          captureText(capture, identity(update.messageId), role, content.text, {
+            turnId: optionalIdentity(order.turnId ?? attribution?.turnId),
+            phase: messagePhase(attribution?.phase, role),
+            ...order,
+          });
+        }
         return;
       }
       if (!listeners) return;
       const attribution = object(meta);
+      orderedListeners = listeners;
       const projected: NativeChatStreamUpdate =
         attribution.resyncRequired === true && content.text === ""
           ? Object.freeze({ kind: "resync" })
@@ -2452,6 +2525,12 @@ export class NativeAgentChat {
               turnId: identity(attribution.turnId),
               offsetBytes: revision(attribution.offsetBytes),
               replace: flag(attribution.replace),
+              ...NativeActivityOrder.notification(
+                metadata,
+                attribution,
+                this.process.acceptsActivityOrder,
+                content.text.length > 0
+              ),
             });
       for (const listener of listeners) {
         try {
@@ -2460,7 +2539,21 @@ export class NativeAgentChat {
           /* Observers have independent lifetimes. */
         }
       }
-    } catch {
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message === "native_chat_activity_order_invalid"
+      ) {
+        if (orderedCapture) orderedCapture.invalidActivityOrder = true;
+        else if (orderedListeners)
+          for (const listener of orderedListeners) {
+            try {
+              listener(Object.freeze({ kind: "resync" }));
+            } catch {
+              /* Independent observers. */
+            }
+          }
+      }
       // Unknown or unattributed ACP events do not enter the renderer bridge.
     }
   }
@@ -2644,7 +2737,10 @@ function captureText(
   messageId: string,
   role: NativeChatMessage["role"],
   text: string,
-  attribution?: Pick<NativeChatMessage, "turnId" | "phase">
+  attribution?: Pick<
+    NativeChatMessage,
+    "turnId" | "phase" | "activityOrder" | "activityOrderIncomplete"
+  >
 ): void {
   if (capture.overflow) return;
   const previous = capture.messages.get(messageId);
@@ -2658,10 +2754,15 @@ function captureText(
     return;
   }
   if (previous && previous.role !== role) throw invalidResponse();
+  const order = NativeActivityOrder.merge(previous ?? {}, attribution ?? {});
+  const kept = { ...previous };
+  delete kept.activityOrder;
+  delete kept.activityOrderIncomplete;
   capture.messages.set(messageId, {
-    ...previous,
+    ...kept,
     ...(attribution?.turnId && { turnId: attribution.turnId }),
     ...(attribution?.phase && { phase: attribution.phase }),
+    ...order,
     messageId,
     role,
     text: (previous?.text ?? "") + text,
@@ -2672,11 +2773,16 @@ function captureAttachment(
   capture: TranscriptCapture,
   messageId: string,
   turnId: string | undefined,
-  entry: NativeChatMessageAttachment
+  entry: NativeChatMessageAttachment,
+  order: NativeActivityOrder.Fact = {}
 ): void {
   if (capture.overflow) return;
   const previous = capture.messages.get(messageId);
   if (previous && previous.role !== "user") throw invalidResponse();
+  const merged = NativeActivityOrder.merge(previous ?? {}, order);
+  const kept = { ...previous };
+  delete kept.activityOrder;
+  delete kept.activityOrderIncomplete;
   const recorded = previous?.attachments ?? [];
   // A reference's poster frame counts toward the transcript like text.
   capture.bytes += entry.preview?.poster?.length ?? 0;
@@ -2693,8 +2799,9 @@ function captureAttachment(
     messageId,
     role: "user",
     text: "",
-    ...previous,
+    ...kept,
     ...(turnId && { turnId }),
+    ...merged,
     attachments: [...recorded, entry],
   });
 }
@@ -2758,7 +2865,9 @@ function captureActivity(
 /** Validate one projected tool call. Unknown host values are refused. */
 function activity(
   update: Record<string, unknown>,
-  attribution: Record<string, unknown>
+  attribution: Record<string, unknown>,
+  metadata: Record<string, unknown> | undefined,
+  orderAvailable: boolean
 ): NativeChatActivity {
   const kind = attribution.activity;
   const outcome = attribution.outcome;
@@ -2780,6 +2889,16 @@ function activity(
     kind: kind as NativeChatActivity["kind"],
     ...(source !== undefined && { source }),
     outcome: outcome as NativeChatActivity["outcome"],
+    ...NativeActivityOrder.read(
+      NativeActivityOrder.notification(
+        metadata,
+        attribution,
+        orderAvailable,
+        true
+      ),
+      orderAvailable,
+      true
+    ),
     ...(input !== undefined && { input }),
     ...(output !== undefined && { output }),
   });

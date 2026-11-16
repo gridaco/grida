@@ -150,6 +150,7 @@ impl Host {
         self.execution()?;
         let store = Arc::new(SqliteStore::open_in_memory()?);
         Ok(Self {
+            activity_order: Arc::new(activity_order::State::new(None, store.clone())),
             spending: Arc::new(spending::Store::detached(store.clone())),
             store,
             state_dir: None,

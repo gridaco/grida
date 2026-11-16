@@ -74,9 +74,12 @@ Feature status: [`docs/agent/features.md`](../../../docs/agent/features.md).
   connection lock or silently rebind accepted work.
 - **Titles** are opt-in per launch and run on a temporary in-memory, tool-free
   host under the same execution; a rename always wins (catalogue revision).
-- **Commands** run only through `agent-kit-sandbox` (Seatbelt / bubblewrap +
-  seccomp). An unavailable boundary refuses the command; there is no
-  unconfined fallback. Windows starts no chat engine.
+- **Commands** use the native process owner. Default access uses
+  `agent-kit-sandbox` confinement (Seatbelt / bubblewrap + seccomp); unavailable
+  confinement refuses the command with no unconfined fallback. Explicit
+  user-selected Full access uses its separate `UnconfinedScope`, retaining
+  process ownership without filesystem/network isolation. See the native
+  sandbox binding for exact guarantees. Windows starts no chat engine.
 - **Desktop chat state** lives under Electron `userData/native-chat/`
   (`workspaces/<key>/`, `documents/<key>/runtime/`), one SQLite
   `agent.sqlite` per state directory with one owning process. The store opens
@@ -92,7 +95,9 @@ Feature status: [`docs/agent/features.md`](../../../docs/agent/features.md).
   `@grida/ai-host/chatgpt-host`; the sidecar mounts no ChatGPT route and the
   native host receives only an opaque scope (GRIDA-SEC-008).
 - **Gateway grants** are memory-only (GRIDA-SEC-006); BYOK keys live in the
-  shared provider credential file (GRIDA-SEC-014), denied to model commands.
+  shared provider credential file (GRIDA-SEC-014), denied to restricted model
+  commands. Explicit Full access relinquishes same-user file isolation; it
+  does not automatically inject provider credentials.
 
 ## Where tests go
 

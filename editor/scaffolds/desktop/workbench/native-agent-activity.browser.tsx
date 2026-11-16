@@ -1,8 +1,8 @@
-import { act, useState } from "react";
+import { act, useSyncExternalStore } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
-import { NativeAgentActivity } from "./native-agent-activity";
+import { NativeSubagentActivityPanel } from "./native-agent-activity";
 import { NativeActivityFixtures } from "./native-agent-activity.fixtures";
 import { NativeTurnActivity } from "./native-turn-activity";
 import { turn_activity } from "@/lib/agent-chat/turn-activity";
@@ -20,7 +20,11 @@ afterEach(() => {
 });
 
 function ParentChat({ fixture, width }: { fixture: Fixture; width: number }) {
-  const [activityOpen, setActivityOpen] = useState(false);
+  const { open: activityOpen } = useSyncExternalStore(
+    fixture.controller.subscribe,
+    fixture.controller.read,
+    fixture.controller.read
+  );
   const block = turn_activity
     .group(
       [
@@ -84,11 +88,7 @@ function ParentChat({ fixture, width }: { fixture: Fixture; width: number }) {
         }}
       >
         <h1 style={{ fontSize: 13, fontWeight: 500 }}>Parent chat</h1>
-        <NativeAgentActivity
-          subagents={fixture.controller}
-          processes={fixture.processes}
-          onOpenChange={setActivityOpen}
-        />
+        <NativeSubagentActivityPanel subagents={fixture.controller} />
       </header>
       <div
         inert={activityOpen}
@@ -181,11 +181,36 @@ async function screenshot(name: string, width: number) {
 
 describe("parent-local agent activity in Chromium", () => {
   it.each([320, 420])(
-    "navigates list, conversation, parent events and process controls at %spx without losing the parent draft",
+    "navigates read-only subagent list, conversation and parent events at %spx without losing the parent draft",
     async (width) => {
       const { fixture, container, draft } = await setup(width);
+      const mutations = [
+        vi.spyOn(fixture.client, "createSubagent"),
+        vi.spyOn(fixture.client, "assignSubagent"),
+        vi.spyOn(fixture.client, "stopSubagent"),
+        vi.spyOn(fixture.client, "controlSubagentTurn"),
+        vi.spyOn(fixture.client, "controlSubagentChild"),
+      ];
       const originalDraft = draft.value;
-      await click("Open agent activity");
+      expect(
+        container.querySelector('[aria-label="Open subagents"]')
+      ).toBeNull();
+      await click(/Worked for/);
+      await click(/Reviewer finished/);
+      await expect
+        .poll(
+          () =>
+            container.querySelector(
+              '[data-testid="native-subagent-conversation"]'
+            )?.textContent
+        )
+        .toContain("The second approach preserves the contract.");
+      expect(fixture.controller.read().selected).toBe("done-child");
+      expect(container.textContent).toContain("captured-model · High");
+      expect(container.textContent).not.toContain("New named subagent");
+      await screenshot("conversation", width);
+      await click("Back to subagents");
+      await expect.poll(() => fixture.controller.read().detail).toBe(false);
       await expect
         .poll(
           () =>
@@ -197,64 +222,33 @@ describe("parent-local agent activity in Chromium", () => {
         container.querySelector('[aria-label="Completed subagents"]')
           ?.textContent
       ).toContain("Reviewer");
-      expect(fixture.calls.inspect).toEqual([]);
       await screenshot("list", width);
-      await click(/Reviewer/);
-      await expect
-        .poll(
-          () =>
-            container.querySelector(
-              '[data-testid="native-subagent-conversation"]'
-            )?.textContent
-        )
-        .toContain("The second approach preserves the contract.");
-      expect(fixture.controller.read().selected).toBe("done-child");
-      expect(container.textContent).toContain("captured-model · High");
-      await screenshot("conversation", width);
-      await click("Back to subagents");
-      await expect.poll(() => fixture.controller.read().detail).toBe(false);
       await click(/Researcher/);
       await expect
         .poll(() => container.textContent)
         .toContain("I am comparing the evidence.");
-      await click("Stop subagent");
-      await expect
-        .poll(() => fixture.calls.stop)
-        .toEqual(["working-child-token"]);
-      await click("Back to subagents");
-      await click("Processes");
-      await expect
-        .poll(
-          () =>
-            container.querySelector(
-              '[data-testid="native-background-process-list"]'
-            )?.textContent
-        )
-        .toContain("pnpm dev");
-      expect(container.textContent).toContain("pnpm test");
-      await click("Stop pnpm dev");
-      await expect.poll(() => fixture.calls.processStop).toEqual([[1]]);
-      await expect
-        .poll(
-          () =>
-            container.querySelector(
-              '[data-testid="native-background-process-list"]'
-            )?.textContent
-        )
-        .toContain("exited 0");
+      const subagents = container.querySelector(
+        '[data-testid="native-subagent-activity"]'
+      )!;
       expect(
-        container.querySelector(
-          '[data-testid="native-background-process-list"]'
-        )?.textContent
-      ).toContain("pnpm dev");
-      await screenshot("processes", width);
-      await click("Close agent activity");
+        subagents.querySelector("input, textarea, select, form")
+      ).toBeNull();
+      for (const button of subagents.querySelectorAll("button")) {
+        const name =
+          button.getAttribute("aria-label") ?? button.textContent?.trim();
+        expect(["Back to subagents", "Copy"]).toContain(name);
+      }
+      await click("Back to subagents");
+      expect(
+        container.querySelector('[data-testid="native-agent-activity"]')
+          ?.textContent
+      ).not.toContain("Processes");
+      await click("Close subagents");
       expect(
         container.querySelector('[data-testid="native-agent-activity"]')
       ).toBeNull();
       expect(draft.isConnected).toBe(true);
       expect(draft.value).toBe(originalDraft);
-      await click(/Worked for/);
       await click(/Reviewer finished/);
       await expect
         .poll(() => fixture.controller.read().selected)
@@ -270,6 +264,7 @@ describe("parent-local agent activity in Chromium", () => {
       expect(draft.value).toBe(originalDraft);
       expect(container.textContent).not.toContain("View changes");
       expect(container.textContent).not.toContain("Undo");
+      for (const mutation of mutations) expect(mutation).not.toHaveBeenCalled();
     }
   );
 
@@ -284,7 +279,16 @@ describe("parent-local agent activity in Chromium", () => {
       })),
       counts: { active: 0, done: 2, complete: true },
     };
-    await click("Open agent activity");
+    expect(container.querySelector('[aria-label="Open subagents"]')).toBeNull();
+    await click(/Worked for/);
+    const origin = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("Reviewer finished")
+    )!;
+    await click(/Reviewer finished/);
+    await click("Back to subagents");
+    expect(document.activeElement).toBe(
+      container.querySelector('[data-testid="native-agent-activity"]')
+    );
     await act(async () => fixture.controller.list());
     await expect
       .poll(() => container.textContent)
@@ -298,9 +302,7 @@ describe("parent-local agent activity in Chromium", () => {
         container.querySelector('[data-testid="native-agent-activity"]')
       )
       .toBeNull();
-    expect(document.activeElement?.getAttribute("aria-label")).toBe(
-      "Open agent activity"
-    );
+    expect(document.activeElement).toBe(origin);
     expect(draft.closest("[inert]")).toBeNull();
     expect(draft.value).toBe("My unsent parent draft");
   });

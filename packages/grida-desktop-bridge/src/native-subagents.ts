@@ -49,6 +49,8 @@ export type NativeSubagentLifecycleEvent = Readonly<{
   parentTurnId: string;
   inputId: string;
   atMs: number;
+  /** First public publication within parentTurnId, shared with parent messages/calls. */
+  activityOrder?: number;
   status?: NonNullable<NativeChatTurn["status"]>;
 }>;
 
@@ -66,6 +68,8 @@ export type NativeSubagentActivityPage = Readonly<{
   events: readonly NativeSubagentLifecycleEvent[];
   /** False when a child's bounded retained window omitted older events. */
   eventsComplete: boolean;
+  /** Whether all returned lifecycle facts have retained order; older hosts omit this. */
+  orderComplete?: boolean;
 }>;
 
 /** Captured execution; null effort means no explicit reasoning level was captured. */

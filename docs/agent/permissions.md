@@ -1,6 +1,6 @@
 ---
 title: Understand agent permissions
-description: See what Grida Agent can read, change and run in Desktop, and how headless runs choose their own folder rules.
+description: Choose Default or Full access for a Desktop chat and understand what the agent can read, change and run.
 keywords:
   [agent permissions, approvals, Grida Desktop, sandbox, automatic review]
 format: md
@@ -32,14 +32,41 @@ sandbox without asking. For example, ask “Run the tests and fix what fails.”
   it can read the file, but every change to it asks for your approval, and
   commands cannot reach it. [Change agent settings](./settings.md#ask-the-agent)
 
-Desktop offers only this preset. The
-[permission policy](../wg/ai/agent/permissions.md) describes the full set of
-presets and their defaults.
+## Choose Full access
+
+In a project's chat composer, open **Default** and choose **Full access**.
+Confirm the in-app dialog for that chat. You can make the choice before
+sending its first message; opening the chat does not start the agent.
+
+Full access lets the agent run commands without the filesystem or network
+sandbox. It can fetch resources, install packages, change existing Git
+metadata, and reach files and local services available to your OS user. This
+includes readable credentials and Grida's own state. It does not grant
+administrator privileges, supply missing service credentials or automatically
+configure a program's proxy support.
+
+The choice belongs to that chat and survives reopening. Other chats keep their
+own choice, and new chats begin with Default. Change access while the chat is
+idle, its queue is empty and it has no running command processes. Use the
+Processes controls to stop those processes before changing access. Accepted
+work and subagents keep the permissions captured for their assignment.
+
+Choose **Default** again to restore restricted access for subsequent work.
+**Plan** continues to withhold commands and file changes in either mode.
+Process output, cancellation and cleanup reporting remain available in Full
+access, but an unconfined program can escape normal process-group cleanup;
+Grida does not promise isolation from hostile same-user code.
+
+Full access needs a compatible native Desktop build. Older builds keep Default
+and do not offer the choice. Before opening a project, the welcome composer
+cannot grant access to a chat. Automatic approval review, sometimes called
+**Approve for me**, is not offered by Desktop.
 
 ## What the agent cannot reach
 
-In Desktop, the agent's file tools work only inside the project, and its
-commands cannot reach the internet. Desktop does not ask to extend this. To
+With Default access, the agent's file tools work only inside the project, and
+its commands cannot reach the internet. Desktop does not ask to extend this
+for one action. To
 use a file from elsewhere, copy it into the project or attach it to your
 message. [Attach an image or a file](./getting-started.md#attach-an-image)
 
@@ -61,3 +88,8 @@ A profile can also let the model answer one specific file-read request per
 turn. If the model cannot decide or its review is interrupted, the request
 waits for you. Pause and Stop still apply during the review.
 [Configure automatic read review](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#review-one-configured-read)
+
+A trusted native launcher can separately opt into Full access. That authority
+comes from the launcher, not a workspace file or model request. See the
+[native permission profile](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#filesystem-services)
+for its opt-in fields and the private per-chat selection contract.

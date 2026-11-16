@@ -71,6 +71,9 @@ impl Placeholders {
     #[cfg(target_os = "linux")]
     fn hold(prepared: &mut Prepared) -> Result<Self> {
         let mut held = Self::default();
+        if prepared.support.backend == Backend::Unconfined {
+            return Ok(held);
+        }
         let mut verified = Vec::new();
         for (path, access) in prepared.placeholder_candidates()? {
             match Placeholder::hold(&path) {
@@ -279,7 +282,7 @@ const PLATFORM_DEFAULTS: &str = r#"(allow sysctl-read
 "#;
 
 #[cfg(target_os = "macos")]
-fn command(prepared: &Prepared, status: i32) -> Command {
+fn confined_command(prepared: &Prepared, status: i32) -> Command {
     let mut command = Command::new("/usr/bin/sandbox-exec");
     let mut profile = String::from(
         "(version 1)\n(deny default)\n(allow process-fork)\n\
@@ -366,8 +369,15 @@ fn command(prepared: &Prepared, status: i32) -> Command {
 }
 
 #[cfg(target_os = "linux")]
-fn command(prepared: &Prepared, status: i32) -> Command {
-    let mut command = Command::new(prepared.bubblewrap.bound.path());
+fn confined_command(prepared: &Prepared, status: i32) -> Command {
+    let mut command = Command::new(
+        prepared
+            .bubblewrap
+            .as_ref()
+            .expect("confined capture requires bubblewrap")
+            .bound
+            .path(),
+    );
     command.args([
         "--unshare-user",
         "--disable-userns",
@@ -447,6 +457,16 @@ fn command(prepared: &Prepared, status: i32) -> Command {
         .arg(HELPER_FLAG)
         .arg(status.to_string());
     command
+}
+
+fn command(prepared: &Prepared, status: i32) -> Command {
+    if prepared.support.backend == Backend::Unconfined {
+        let mut command = Command::new(prepared.helper.bound.path());
+        command.arg(HELPER_FLAG).arg(status.to_string());
+        command
+    } else {
+        confined_command(prepared, status)
+    }
 }
 
 #[allow(unsafe_code)]
@@ -625,6 +645,7 @@ async fn supervise(
     let pid = child.id().expect("spawned process has id") as i32;
     let deadline = (Instant::now() + prepared.timeout).min(prepared.valid_until);
     let probe = matches!(prepared.launch.task, Task::Probe);
+    let unconfined = prepared.support.backend == Backend::Unconfined;
     let mut status_bytes = Vec::new();
     let mut observation = None;
     let stopped = tokio::select! {
@@ -636,14 +657,22 @@ async fn supervise(
         _ = tokio::time::sleep_until(deadline.into()) => Some(StopReason::Deadline),
         // Seatbelt's helper holds the group open after the payload exits.
         // Darwin can reject a group signal once only zombies remain.
-        _ = read_terminal_prefix(&mut status, &mut status_bytes, probe),
-            if prepared.support.backend == Backend::Seatbelt => None,
+        _ = read_terminal_prefix(&mut status, &mut status_bytes, probe, unconfined),
+            if prepared.support.backend != Backend::Bubblewrap => None,
         result = wait_without_reaping(pid, EXIT_POLL) => {
             observation = Some(result);
             None
         },
     };
     input_task.abort();
+    if unconfined && stopped.is_some() {
+        let _ = status.write_all(&[wire::CONTROL_STOP]).await;
+        let _ = tokio::time::timeout(
+            REAP_GRACE + DRAIN_GRACE,
+            read_terminal_prefix(&mut status, &mut status_bytes, probe, true),
+        )
+        .await;
+    }
     let process_group_signalled = match observation {
         Some(Err(_)) => false,
         _ => signal_process_group(pid).is_ok(),
@@ -677,13 +706,23 @@ async fn supervise(
         }
     }
 
+    let group_ended =
+        unconfined && !probe && status_bytes.last() == Some(&wire::STATUS_GROUP_ENDED);
     let completion = if status_complete {
-        parse_status(&status_bytes, probe)
+        let report = if unconfined && !probe && status_bytes.len() == 7 {
+            &status_bytes[..6]
+        } else {
+            &status_bytes
+        };
+        parse_status(report, probe)
     } else {
         Completion::Uncertain
     };
     let descendants = match (completion, prepared.support.backend) {
         (Completion::SetupFailed, _) if reaped => Descendants::NoPayload,
+        (_, Backend::Unconfined) if (probe || group_ended) && process_group_signalled && reaped => {
+            Descendants::ProcessGroupSignalled
+        }
         (_, Backend::Seatbelt) if process_group_signalled && reaped => {
             Descendants::ProcessGroupSignalled
         }
@@ -722,8 +761,15 @@ async fn read_terminal_prefix(
     status: &mut tokio::net::UnixStream,
     bytes: &mut Vec<u8>,
     probe: bool,
+    unconfined: bool,
 ) -> io::Result<()> {
-    let terminal_size = if probe { 5 } else { 6 };
+    let terminal_size = if probe {
+        5
+    } else if unconfined {
+        7
+    } else {
+        6
+    };
     let mut byte = [0];
     while bytes.len() < terminal_size && bytes.as_slice() != [wire::STATUS_SETUP_FAILED] {
         if status.read(&mut byte).await? == 0 {

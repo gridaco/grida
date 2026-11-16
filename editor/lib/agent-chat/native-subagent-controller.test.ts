@@ -381,6 +381,46 @@ it("uses worker availability rather than preload method presence for rich observ
   expect(fixture.calls.conversations).toEqual([]);
 });
 
+it("deduplicates lifecycle snapshots while retaining each event's known native position", async () => {
+  const fixture = await activityFixture();
+  fixture.data.activity = {
+    ...fixture.data.activity,
+    orderComplete: false,
+    events: fixture.data.activity.events.map((event, index) => ({
+      ...event,
+      activityOrder: index + 2,
+    })),
+  };
+  fixture.controller.show();
+  await vi.waitFor(() => expect(fixture.controller.read().listing).toBe(false));
+  await fixture.controller.list();
+  expect(
+    fixture.controller.read().events.map((event) => event.activityOrder)
+  ).toEqual([2, 3]);
+  fixture.data.activity = {
+    ...fixture.data.activity,
+    events: [...fixture.data.activity.events]
+      .reverse()
+      .map(({ activityOrder: _order, ...event }) => event),
+  };
+  await fixture.controller.list();
+  expect(
+    fixture.controller.read().events.map((event) => event.activityOrder)
+  ).toEqual([2, 3]);
+  expect(fixture.controller.read().events).toHaveLength(2);
+  fixture.data.activity = {
+    ...fixture.data.activity,
+    events: fixture.data.activity.events.map((event) => ({
+      ...event,
+      activityOrder: 99,
+    })),
+  };
+  await fixture.controller.list();
+  expect(
+    fixture.controller.read().events.map((event) => event.activityOrder)
+  ).toEqual([2, 3]);
+});
+
 it("replaces actual live output by identity, merges earlier pages and retains captured execution", async () => {
   const fixture = await activityFixture();
   const childId = "working-child";
@@ -913,4 +953,27 @@ it("opens a newly created child with its own conversation instead of retaining t
   );
   expect(fixture.controller.read().conversation?.childId).toBe("created-child");
   expect(fixture.controller.read().conversation?.messages).toEqual([]);
+});
+
+it("requests presentation only for explicit viewer actions, not observations or back navigation", async () => {
+  const fixture = await activityFixture();
+  const controller = fixture.controller;
+  expect(controller.read().focus).toBe(0);
+  controller.parentUpdated();
+  expect(controller.read().focus).toBe(0);
+  controller.show();
+  expect(controller.read().focus).toBe(1);
+  await controller.list();
+  expect(controller.read().focus).toBe(1);
+  controller.show();
+  expect(controller.read().focus).toBe(2);
+  await controller.openChild("done-child");
+  expect(controller.read().focus).toBe(3);
+  await controller.readConversation();
+  controller.back();
+  expect(controller.read().focus).toBe(3);
+  controller.toggle();
+  expect(controller.read()).toMatchObject({ open: false, focus: 3 });
+  controller.toggle();
+  expect(controller.read()).toMatchObject({ open: true, focus: 4 });
 });

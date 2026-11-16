@@ -81,6 +81,111 @@ const conversation = {
   observedAtMs: 20,
 };
 
+it("preserves lifecycle coordinates independently from wall time and reports missing retained order", async () => {
+  const finish = {
+    ...event,
+    eventId: "child-finished",
+    kind: "finished",
+    status: "succeeded",
+    atMs: 9,
+    activityOrder: 7,
+  };
+  const request = vi.fn<(method: string, params: unknown) => Promise<unknown>>(
+    async () => ({
+      ...overview,
+      events: [{ ...event, activityOrder: 3 }, finish],
+      orderComplete: true,
+    })
+  );
+  const adapter = new NativeSubagentActivity(request, () => true);
+  const page = await adapter.activity(parent, undefined, check);
+  expect(page.events.map((entry) => [entry.kind, entry.activityOrder])).toEqual(
+    [
+      ["started", 3],
+      ["finished", 7],
+    ]
+  );
+  expect(page.orderComplete).toBe(true);
+  request.mockResolvedValueOnce({ ...overview, orderComplete: false });
+  const legacy = await adapter.activity(parent, undefined, check);
+  expect(legacy.events[0].activityOrder).toBeUndefined();
+  expect(legacy.orderComplete).toBe(false);
+  request.mockResolvedValueOnce({ ...overview, orderComplete: true });
+  await expect(adapter.activity(parent, undefined, check)).rejects.toThrow(
+    "native_chat_subagent_invalid_response"
+  );
+});
+
+it.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, null])(
+  "refuses invalid child lifecycle positions (%s)",
+  async (activityOrder) => {
+    const request = vi.fn<
+      (method: string, params: unknown) => Promise<unknown>
+    >(async () => ({
+      ...overview,
+      events: [{ ...event, activityOrder }],
+      orderComplete: true,
+    }));
+    await expect(
+      new NativeSubagentActivity(request, () => true).activity(
+        parent,
+        undefined,
+        check
+      )
+    ).rejects.toThrow("native_chat_activity_order_invalid");
+  }
+);
+
+it("keeps child conversation message and tool coordinates in their own turn without borrowing a parent position", async () => {
+  const messages = conversation.messages.map((message, index) => ({
+    ...message,
+    activityOrder: index + 1,
+    ...(message.activity && {
+      activity: message.activity.map((activity) => ({
+        ...activity,
+        activityOrder: 3,
+      })),
+    }),
+  }));
+  const request = vi.fn<(method: string, params: unknown) => Promise<unknown>>(
+    async () => ({ ...conversation, messages })
+  );
+  const page = await new NativeSubagentActivity(
+    request,
+    () => true
+  ).conversation(attachment, parent, childId, undefined, check);
+  expect(page.messages.map((entry) => entry.activityOrder)).toEqual([1, 2]);
+  expect(page.messages[1].activity?.[0].activityOrder).toBe(3);
+  const unavailable = await new NativeSubagentActivity(request).conversation(
+    attachment,
+    parent,
+    childId,
+    undefined,
+    check
+  );
+  expect(unavailable.messages[0].activityOrder).toBeUndefined();
+  expect(unavailable.messages[1].activity?.[0].activityOrder).toBeUndefined();
+  request.mockResolvedValueOnce({
+    ...conversation,
+    messages: messages.map((entry) => ({
+      ...entry,
+      activityOrder: undefined,
+      activityOrderIncomplete: true,
+    })),
+  });
+  const incomplete = await new NativeSubagentActivity(
+    request,
+    () => true
+  ).conversation(attachment, parent, childId, undefined, check);
+  expect(
+    incomplete.messages.every(
+      (entry) =>
+        entry.activityOrderIncomplete === true &&
+        entry.activityOrder === undefined
+    )
+  ).toBe(true);
+});
+
 it("projects bounded status pages and strips internal fields without inspecting each child", async () => {
   const request = vi.fn<(method: string, params: unknown) => Promise<unknown>>(
     async () => ({

@@ -1,17 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import {
-  ArrowLeftIcon,
-  BotIcon,
-  RefreshCwIcon,
-  TerminalIcon,
-  XIcon,
-} from "lucide-react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
+import { ArrowLeftIcon, BotIcon, RefreshCwIcon, XIcon } from "lucide-react";
 import { Button } from "@app/ui/components/button";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationScrollButton,
+} from "@app/ui/ai-elements/conversation";
 import { NativeSubagentController } from "@/lib/agent-chat/native-subagent-controller";
-import type { NativeBackgroundProcessController } from "@/lib/agent-chat/native-background-process-controller";
-import { NativeBackgroundProcessList } from "./native-background-processes";
 import { NativeSubagentIdentity } from "./native-subagent-identity";
 import type {
   NativeSubagentConversation,
@@ -26,6 +23,7 @@ import { native_message_parts } from "@/lib/agent-chat/native-message-parts";
 
 const EMPTY = Object.freeze({
   open: false,
+  focus: 0,
   detail: false,
   children: [],
   next: null,
@@ -50,74 +48,41 @@ const EMPTY = Object.freeze({
 const readEmpty = () => EMPTY;
 const subscribeEmpty = () => () => {};
 
-/** A parent-local activity view; the underlying parent and its draft stay mounted. */
-export function NativeAgentActivity({
+/** A parent-local subagent viewer; the parent and its draft stay mounted. */
+export function NativeSubagentActivityPanel({
   subagents,
-  processes,
-  onOpenChange,
 }: {
   subagents: NativeSubagentController | null;
-  processes: NativeBackgroundProcessController | null;
-  onOpenChange?: (open: boolean) => void;
 }) {
   const view = useSyncExternalStore(
     subagents?.subscribe ?? subscribeEmpty,
     subagents?.read ?? readEmpty,
     subagents?.read ?? readEmpty
   );
-  const [processOpen, setProcessOpen] = useState(false);
-  const [tab, setTab] = useState<"subagents" | "processes">(
-    subagents ? "subagents" : "processes"
-  );
-  const open = !!(subagents || processes) && (view.open || processOpen);
+  const open = !!subagents && view.open;
   const panel = useRef<HTMLElement>(null);
-  const trigger = useRef<HTMLButtonElement>(null);
+  const returnFocus = useRef<HTMLElement | null>(null);
   const wasOpen = useRef(false);
   useEffect(() => {
-    onOpenChange?.(open);
-    if (open) panel.current?.focus();
-    else if (wasOpen.current) trigger.current?.focus();
+    if (open && !wasOpen.current) {
+      returnFocus.current =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+      panel.current?.focus();
+    } else if (!open && wasOpen.current && returnFocus.current?.isConnected) {
+      returnFocus.current.focus();
+    }
     wasOpen.current = open;
-  }, [open, onOpenChange]);
-  if (!subagents && !processes) return null;
-  const shown =
-    subagents && view.detail
-      ? "subagents"
-      : tab === "processes" && processes
-        ? "processes"
-        : subagents
-          ? "subagents"
-          : "processes";
-  const close = () => {
-    if (view.open) subagents?.toggle();
-    setProcessOpen(false);
-  };
-  const choose = (next: "subagents" | "processes") => {
-    setTab(next);
-    if (subagents) {
-      subagents.back();
-      subagents.show();
-    } else setProcessOpen(true);
-  };
+  }, [open]);
+  if (!subagents) return null;
+  const close = () => subagents.toggle();
   return (
     <>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        className="absolute top-2 right-2 z-10 shrink-0"
-        ref={trigger}
-        tabIndex={open ? -1 : 0}
-        aria-label="Open agent activity"
-        title="Agent activity"
-        onClick={() => (open ? close() : choose(shown))}
-      >
-        <BotIcon className="size-3.5" />
-      </Button>
       {open && (
         <section
           data-testid="native-agent-activity"
-          aria-label="Agent activity"
+          aria-label="Subagents"
           ref={panel}
           tabIndex={-1}
           onKeyDown={(event) => {
@@ -129,52 +94,27 @@ export function NativeAgentActivity({
           }}
           className="absolute inset-0 z-20 flex min-h-0 flex-col bg-background"
         >
-          <header className="flex h-10 shrink-0 items-center gap-1 border-b px-2">
-            {subagents && (
-              <Button
-                type="button"
-                variant={shown === "subagents" ? "secondary" : "ghost"}
-                size="xs"
-                onClick={() => choose("subagents")}
-              >
-                <BotIcon className="size-3.5" />
-                Subagents
-              </Button>
-            )}
-            {processes && (
-              <Button
-                type="button"
-                variant={shown === "processes" ? "secondary" : "ghost"}
-                size="xs"
-                onClick={() => choose("processes")}
-              >
-                <TerminalIcon className="size-3.5" />
-                Processes
-              </Button>
-            )}
-            <span className="flex-1" />
+          <header className="flex h-10 shrink-0 items-center gap-2 border-b px-3">
+            <BotIcon className="size-3.5" />
+            <h2 className="flex-1 text-xs font-medium">Subagents</h2>
             <Button
               type="button"
               variant="ghost"
               size="icon-xs"
-              aria-label="Close agent activity"
+              aria-label="Close subagents"
               onClick={close}
             >
               <XIcon className="size-3.5" />
             </Button>
           </header>
-          <div className="min-h-0 flex-1 overflow-y-auto p-3">
-            {shown === "processes" && processes ? (
-              <NativeBackgroundProcessList controller={processes} />
-            ) : subagents ? (
-              <NativeSubagentActivity
-                controller={subagents}
-                onBack={() => {
-                  setTab("subagents");
-                  subagents.back();
-                }}
-              />
-            ) : null}
+          <div className="min-h-0 flex-1 overflow-hidden p-3">
+            <NativeSubagentActivity
+              controller={subagents}
+              onBack={() => {
+                subagents.back();
+                panel.current?.focus();
+              }}
+            />
           </div>
         </section>
       )}
@@ -182,12 +122,15 @@ export function NativeAgentActivity({
   );
 }
 
+/** Read-only child activity; assignments and execution stay with the parent agent. */
 export function NativeSubagentActivity({
   controller,
   onBack = () => controller.back(),
+  heading = true,
 }: {
   controller: NativeSubagentController;
   onBack?: () => void;
+  heading?: boolean;
 }) {
   const view = useSyncExternalStore(
     controller.subscribe,
@@ -196,10 +139,13 @@ export function NativeSubagentActivity({
   );
   const child = view.observation?.child;
   return (
-    <div data-testid="native-subagent-activity" className="flex flex-col gap-4">
+    <div
+      data-testid="native-subagent-activity"
+      className={`flex h-full min-h-0 flex-col gap-4 ${view.detail && view.selected ? "overflow-hidden" : "overflow-y-auto"}`}
+    >
       {view.detail && view.selected ? (
         <>
-          <header className="flex min-w-0 items-center gap-2">
+          <header className="flex min-w-0 shrink-0 items-center gap-2">
             <Button
               type="button"
               variant="ghost"
@@ -230,82 +176,90 @@ export function NativeSubagentActivity({
               </p>
             )}
           </header>
-          {view.activityAvailable && (
-            <NativeSubagentConversationView controller={controller} />
-          )}
-          {child ? (
-            <>
-              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span>
-                  {child.current
-                    ? child.current.paused
-                      ? "Paused"
-                      : child.current.disposition
-                    : child.queuedInputIds.length
-                      ? "Queued"
-                      : "Idle"}
-                </span>
-                <span>
-                  {child.reserved} of {child.workTurns} assignments used
-                </span>
-                {!!child.queuedInputIds.length && (
-                  <span>{child.queuedInputIds.length} waiting</span>
-                )}
-              </div>
-              {!view.activityAvailable && (
+          <Conversation
+            key={view.selected}
+            className="min-h-0 flex-1"
+            initial="instant"
+            resize={child?.current ? "smooth" : "instant"}
+          >
+            <ConversationContent className="gap-4 p-0 pb-4">
+              {view.activityAvailable && (
+                <NativeSubagentConversationView controller={controller} />
+              )}
+              {child ? (
                 <>
-                  <p className="text-xs text-muted-foreground">
-                    This Desktop connection exposes assignment previews and
-                    settled results. A live conversation is unavailable on this
-                    host.
-                  </p>
-                  {child.assignment && (
-                    <section className="space-y-2 rounded-xl border p-3">
-                      <h3 className="text-xs font-medium">
-                        Assignment preview
-                      </h3>
-                      <p className="whitespace-pre-wrap text-sm">
-                        {child.assignment.instructionPreview}
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <span>
+                      {child.current
+                        ? child.current.paused
+                          ? "Paused"
+                          : child.current.disposition
+                        : child.queuedInputIds.length
+                          ? "Queued"
+                          : "Idle"}
+                    </span>
+                    <span>
+                      {child.reserved} of {child.workTurns} assignments used
+                    </span>
+                    {!!child.queuedInputIds.length && (
+                      <span>{child.queuedInputIds.length} waiting</span>
+                    )}
+                  </div>
+                  {!view.activityAvailable && (
+                    <>
+                      <p className="text-xs text-muted-foreground">
+                        This Desktop connection exposes assignment previews and
+                        settled results. A live conversation is unavailable on
+                        this host.
                       </p>
-                      {child.assignment.instructionTruncated && (
-                        <p className="text-xs text-muted-foreground">
-                          Instructions shortened.
-                        </p>
-                      )}
-                      {child.assignment.result && (
-                        <>
-                          <h3 className="pt-2 text-xs font-medium">
-                            Result · {child.assignment.result.status}
+                      {child.assignment && (
+                        <section className="space-y-2 rounded-xl border p-3">
+                          <h3 className="text-xs font-medium">
+                            Assignment preview
                           </h3>
                           <p className="whitespace-pre-wrap text-sm">
-                            {child.assignment.result.text}
+                            {child.assignment.instructionPreview}
                           </p>
-                          {child.assignment.result.textTruncated && (
+                          {child.assignment.instructionTruncated && (
                             <p className="text-xs text-muted-foreground">
-                              Result shortened.
+                              Instructions shortened.
                             </p>
                           )}
-                        </>
+                          {child.assignment.result && (
+                            <>
+                              <h3 className="pt-2 text-xs font-medium">
+                                Result · {child.assignment.result.status}
+                              </h3>
+                              <p className="whitespace-pre-wrap text-sm">
+                                {child.assignment.result.text}
+                              </p>
+                              {child.assignment.result.textTruncated && (
+                                <p className="text-xs text-muted-foreground">
+                                  Result shortened.
+                                </p>
+                              )}
+                            </>
+                          )}
+                        </section>
                       )}
-                    </section>
+                    </>
                   )}
                 </>
-              )}
-              <NativeSubagentControls
-                key={view.selected}
-                controller={controller}
-              />
-            </>
-          ) : !view.activityAvailable ? (
-            <p role="status" className="text-sm text-muted-foreground">
-              Loading subagent…
-            </p>
-          ) : null}
+              ) : !view.activityAvailable ? (
+                <p role="status" className="text-sm text-muted-foreground">
+                  Loading subagent…
+                </p>
+              ) : null}
+            </ConversationContent>
+            <ConversationScrollButton aria-label="Scroll to bottom" />
+          </Conversation>
         </>
       ) : (
         <>
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-sm font-medium">Subagents</h2>
+          <div className="flex items-center justify-end gap-2">
+            {heading && (
+              <h2 className="mr-auto text-sm font-medium">Subagents</h2>
+            )}
             <Button
               type="button"
               variant="ghost"
@@ -360,7 +314,6 @@ export function NativeSubagentActivity({
               Show more
             </Button>
           )}
-          <NativeSubagentCreate controller={controller} />
         </>
       )}
       {view.error && (
@@ -610,17 +563,32 @@ function NativeChildTranscript({
   const records = new Map(
     conversation.turns.map((turn) => [turn.turnId, turn])
   );
-  const renderMessage = (message: NativeChatMessage) => (
-    <ChatMessageView
-      key={message.messageId}
-      actions={{ hidden: true }}
-      message={{
-        id: message.messageId,
-        role: message.role,
-        parts: native_message_parts.of(message),
-      }}
-    />
-  );
+  const finalAnswer = new Map<string, string>();
+  for (const message of conversation.messages)
+    if (message.role === "assistant" && message.turnId)
+      finalAnswer.set(message.turnId, message.messageId);
+  const renderMessage = (message: NativeChatMessage) => {
+    const record = message.turnId ? records.get(message.turnId) : undefined;
+    return (
+      <ChatMessageView
+        key={message.messageId}
+        actions={
+          message.role === "user"
+            ? { sentAtMs: record?.startedAtMs }
+            : message.turnId &&
+                (finalAnswer.get(message.turnId) !== message.messageId ||
+                  record?.settledAtMs === undefined)
+              ? { hidden: true }
+              : { sentAtMs: record?.settledAtMs }
+        }
+        message={{
+          id: message.messageId,
+          role: message.role,
+          parts: native_message_parts.of(message),
+        }}
+      />
+    );
+  };
   return (
     <div className="space-y-5">
       {blocks.map((block) => {
@@ -640,14 +608,13 @@ function NativeChildTranscript({
             className="space-y-3"
             aria-label="Subagent turn"
           >
-            {record && (
-              <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3 text-xs text-muted-foreground">
-                <time dateTime={new Date(record.startedAtMs).toISOString()}>
-                  {new Date(record.startedAtMs).toLocaleString()}
-                </time>
-                <span>{executionLabel(record.execution)}</span>
-              </div>
-            )}
+            {record &&
+              (record.execution.model !== conversation.execution?.model ||
+                record.execution.effort !== conversation.execution?.effort) && (
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3 text-xs text-muted-foreground">
+                  <span>{executionLabel(record.execution)}</span>
+                </div>
+              )}
             <NativeTurnActivity block={block} renderMessage={renderMessage} />
           </section>
         );
@@ -684,260 +651,4 @@ function relativeTime(atMs: number, nowMs: number): string {
   if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
   return hours < 24 ? `${hours}h ago` : `${Math.floor(hours / 24)}d ago`;
-}
-
-function NativeSubagentCreate({
-  controller,
-}: {
-  controller: NativeSubagentController;
-}) {
-  const [name, setName] = useState("");
-  const [allowance, setAllowance] = useState(2);
-  const view = useSyncExternalStore(
-    controller.subscribe,
-    controller.read,
-    controller.read
-  );
-  return (
-    <details className="rounded-xl border p-3">
-      <summary className="cursor-pointer text-xs font-medium">
-        New named subagent
-      </summary>
-      <form
-        className="mt-3 flex flex-col gap-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void controller.create(name, allowance);
-        }}
-      >
-        <label className="flex flex-col gap-1 text-xs">
-          Name
-          <input
-            className="rounded-md border bg-transparent px-2 py-1.5"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            maxLength={128}
-            required
-          />
-        </label>
-        <label className="flex items-center gap-2 text-xs">
-          Assignment allowance
-          <input
-            className="w-16 rounded-md border bg-transparent px-2 py-1.5"
-            type="number"
-            value={allowance}
-            onChange={(event) => setAllowance(event.target.valueAsNumber)}
-            min={1}
-            max={8}
-            required
-          />
-        </label>
-        <p className="text-xs text-muted-foreground">
-          Named assignments are text-only and do not inherit project tools.
-        </p>
-        <Button
-          type="submit"
-          variant="secondary"
-          size="sm"
-          disabled={view.acting}
-        >
-          Create subagent
-        </Button>
-      </form>
-    </details>
-  );
-}
-
-function NativeSubagentControls({
-  controller,
-}: {
-  controller: NativeSubagentController;
-}) {
-  const view = useSyncExternalStore(
-    controller.subscribe,
-    controller.read,
-    controller.read
-  );
-  const [instructions, setInstructions] = useState("");
-  const [message, setMessage] = useState("");
-  const controls = controller.turnControls;
-  const childControls = controller.childControls;
-  return (
-    <section className="space-y-3 border-t pt-3" aria-label="Subagent controls">
-      <div className="flex flex-wrap gap-2">
-        {view.observation?.stopObservationId && (
-          <Button
-            type="button"
-            size="xs"
-            variant="outline"
-            disabled={view.acting}
-            onClick={() => void controller.stop()}
-          >
-            Stop subagent
-          </Button>
-        )}
-        {controls
-          .filter((kind) => kind !== "steer")
-          .map((kind) => (
-            <Button
-              key={kind}
-              type="button"
-              size="xs"
-              variant="outline"
-              disabled={view.acting}
-              onClick={() => void controller.controlTurn({ kind })}
-            >
-              {kind === "pause" ? "Pause subagent" : "Resume subagent"}
-            </Button>
-          ))}
-        {controller.canRetryTurnControl && (
-          <Button
-            type="button"
-            size="xs"
-            variant="outline"
-            disabled={view.acting}
-            onClick={() => void controller.retryTurnControl()}
-          >
-            Retry subagent control
-          </Button>
-        )}
-        {controller.retryableChildControl && (
-          <Button
-            type="button"
-            size="xs"
-            variant="outline"
-            disabled={view.acting}
-            onClick={() => void controller.retryChildControl()}
-          >
-            Retry subagent action
-          </Button>
-        )}
-        {childControls.includes("resume-queue") && (
-          <Button
-            type="button"
-            size="xs"
-            variant="outline"
-            disabled={view.acting}
-            onClick={() =>
-              void controller.controlChild({ kind: "resume-queue" })
-            }
-          >
-            Resume waiting assignments
-          </Button>
-        )}
-      </div>
-      {!!view.observation?.child.queuedInputIds.length && (
-        <label className="flex flex-col gap-1 text-xs">
-          Waiting assignment
-          <select
-            className="rounded-md border bg-background px-2 py-1.5"
-            value={view.input ?? ""}
-            onChange={(event) =>
-              void controller.select(view.selected!, event.target.value || null)
-            }
-          >
-            <option value="">Latest assignment</option>
-            {view.observation.child.queuedInputIds.map((id) => (
-              <option key={id} value={id}>
-                {id}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      {childControls.includes("withdraw") && view.input && (
-        <Button
-          type="button"
-          size="xs"
-          variant="outline"
-          disabled={view.acting}
-          onClick={() =>
-            void controller.controlChild({
-              kind: "withdraw",
-              inputId: view.input!,
-            })
-          }
-        >
-          Withdraw selected assignment
-        </Button>
-      )}
-      <form
-        className="space-y-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void controller.assign(instructions);
-        }}
-      >
-        <label className="flex flex-col gap-1 text-xs">
-          Assignment or steering instructions
-          <textarea
-            className="min-h-20 rounded-xl border bg-transparent p-2 text-sm"
-            value={instructions}
-            onChange={(event) => setInstructions(event.target.value)}
-            maxLength={64 * 1024}
-          />
-        </label>
-        <div className="flex gap-2">
-          <Button
-            type="submit"
-            size="xs"
-            variant="secondary"
-            disabled={
-              view.acting || !controller.canAssign || !instructions.trim()
-            }
-          >
-            Assign work
-          </Button>
-          {controls.includes("steer") && (
-            <Button
-              type="button"
-              size="xs"
-              variant="outline"
-              disabled={view.acting || !instructions.trim()}
-              onClick={() =>
-                void controller.controlTurn({ kind: "steer", instructions })
-              }
-            >
-              Steer subagent
-            </Button>
-          )}
-        </div>
-        {!controller.canAssign && (
-          <p className="text-xs text-muted-foreground">
-            A new assignment needs a finished Act turn and remaining allowance.
-          </p>
-        )}
-      </form>
-      {childControls.includes("message") && (
-        <form
-          className="space-y-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void controller.controlChild({ kind: "message", text: message });
-          }}
-        >
-          <label className="flex flex-col gap-1 text-xs">
-            Information for subagent
-            <textarea
-              className="min-h-16 rounded-xl border bg-transparent p-2 text-sm"
-              value={message}
-              onChange={(event) => setMessage(event.target.value)}
-              maxLength={4096}
-            />
-          </label>
-          <Button
-            type="submit"
-            size="xs"
-            variant="outline"
-            disabled={view.acting || !message.trim()}
-          >
-            Send information
-          </Button>
-          <p className="text-xs text-muted-foreground">
-            Information does not start an idle subagent.
-          </p>
-        </form>
-      )}
-    </section>
-  );
 }

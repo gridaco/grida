@@ -392,7 +392,9 @@ Headless hosts can run commands on macOS and Linux when the launcher supplies
 a reviewed permission profile and native helper. Each command runs through
 the user's shell (`sh`, `bash`, `zsh` or `dash`, otherwise `/bin/sh`) with the
 selected directory access and a separate temporary scope. Network access is
-denied. Plan keeps the command tools unavailable.
+denied under Default. An explicitly authorized Full access chat instead runs
+commands without filesystem/network confinement; Plan keeps the command tools
+unavailable in either mode. [Choose Full access](./permissions.md#choose-full-access)
 
 A command that is still running after its short wait, such as a development
 server or a watcher, stays with the chat as a numbered process. Later turns of
@@ -466,7 +468,8 @@ repeat the effect.
 
 ## Assign work to a named subagent
 
-Supported Desktop builds expose subagent activity and named client controls.
+Supported Desktop builds expose read-only subagent activity and conversations.
+Named-child controls in this section are available to private ACP clients.
 A native host opted in with `--subagents` also offers general model delegation
 for ordinary Act turns, independently of Ultra. Ask the main agent to delegate
 independent assignments; its workers have separately captured native

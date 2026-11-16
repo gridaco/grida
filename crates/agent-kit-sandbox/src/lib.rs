@@ -1,5 +1,5 @@
-//! Finite commands and long-running sessions under a host-issued,
-//! denied-network native scope.
+//! Finite commands and long-running sessions under explicit host authority.
+//! Confined scopes deny networking; unconfined scopes require a separate API.
 //!
 //! GRIDA-SEC-004 — native confinement for host-approved processes.
 //!
@@ -7,6 +7,9 @@
 //! and [`ProcessSpec`]. This crate prepares the exact launch, confines it
 //! with Seatbelt (macOS) or bubblewrap (Linux), and returns
 //! [`ProcessEvidence`] that never claims more than the backend established.
+//! An explicit [`UnconfinedScope`] instead authorizes ordinary-user execution
+//! without filesystem, network, IPC or same-user process isolation. Confined
+//! operations never fall back to this posture.
 //! Other targets compile, and every operation returns `Unsupported`
 //! `native_sandbox_unavailable`.
 //!
@@ -14,10 +17,10 @@
 //! [`PreparedProcess::spawn_session`] runs the same preparation as a
 //! [`RunningSession`] with no wall-clock limit of its own: retained output
 //! the owner polls, terminal input, interrupts and stop. The trusted helper
-//! inside the sandbox ends everything it launched when the owner's end of
+//! ends the process groups and session it owns when the owner's end of
 //! its private channel closes, so a session does not outlive an owner process
-//! that disappears. On macOS a terminal session's payload leads its own
-//! session; its cleanup rests on the helper's confirmation that no process of
+//! that disappears, within the selected termination guarantee. A terminal
+//! session's payload leads its own session; its cleanup rests on the helper's confirmation that no process of
 //! that session remains, and a descendant that starts a session of its own
 //! can outlive a stop.
 
@@ -63,8 +66,9 @@ pub enum Termination {
     /// The launcher's own process group. A descendant that creates another
     /// session can outlive it.
     ProcessGroup,
-    /// Every descendant. Only the Linux PID namespace provides this; macOS
-    /// refuses the requirement with `sandbox_descendant_guarantee_unavailable`.
+    /// Every descendant. Only the confined Linux PID namespace provides this;
+    /// macOS and unconfined execution refuse the requirement with
+    /// `sandbox_descendant_guarantee_unavailable`.
     AllDescendants,
 }
 
@@ -126,14 +130,35 @@ pub struct ExecutionScope {
     pub disk_read: bool,
 }
 
-/// The exact process to launch inside an [`ExecutionScope`].
+/// Explicit host authority for an ordinary-user process without filesystem,
+/// network, IPC or process isolation. No confined scope is relaxed implicitly.
+///
+/// The payload can access and modify anything the current user can, including
+/// other launches and their temporary storage. This is not a security boundary.
+/// The caller must authorize that exposure and supply an approved environment.
+#[derive(Clone, Debug)]
+pub struct UnconfinedScope {
+    pub grants: GrantSelection,
+    pub revision: BindingId,
+    pub valid_until: Instant,
+    /// Owner-only directory for per-launch temporary storage and cleanup.
+    /// Its contents are accessible to other ordinary-user processes.
+    pub temporary_parent: PathBuf,
+    /// Only `ProcessGroup` is available; descendants that create a new session
+    /// can survive. `AllDescendants` is refused before launch.
+    pub termination: Termination,
+}
+
+/// The exact process to launch under explicit host authority.
 pub struct ProcessSpec {
     /// Absolute path of a regular file covered by the scope (or anywhere
-    /// readable under `disk_read`).
+    /// readable under `disk_read`). Unconfined preparations accept any
+    /// ordinary-user executable.
     pub executable: PathBuf,
     /// Arguments after the program name. No argument may contain NUL.
     pub arguments: Vec<String>,
-    /// Working directory inside a read or write location.
+    /// Working directory inside a read or write location, or any directory
+    /// for an unconfined preparation.
     pub cwd: PathBuf,
     /// The complete payload environment. Nothing is inherited. `TMPDIR`,
     /// `TMP` and `TEMP` are replaced with the private temporary directory.
@@ -158,21 +183,24 @@ impl fmt::Debug for ProcessSpec {
     }
 }
 
-/// The native confinement mechanism.
+/// The native enforcement posture; `Unconfined` provides no isolation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Backend {
     /// macOS `sandbox-exec` with a generated deny-by-default profile.
     Seatbelt,
     /// Linux bubblewrap namespaces with a seccomp filter.
     Bubblewrap,
+    /// Direct ordinary-user execution through the trusted helper. No OS
+    /// filesystem, network, IPC or process isolation is applied.
+    Unconfined,
 }
 
 /// What the backend provides for a scope.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Support {
     pub backend: Backend,
-    /// The termination guarantee actually provided. Linux always provides
-    /// [`Termination::AllDescendants`].
+    /// The termination guarantee actually provided. Bubblewrap provides
+    /// [`Termination::AllDescendants`]; unconfined execution never does.
     pub termination: Termination,
 }
 
@@ -330,6 +358,58 @@ impl Sandbox {
         }
     }
 
+    /// Pin a helper for explicitly unconfined execution without requiring a
+    /// confinement installation. Confined operations on this instance still
+    /// refuse when their backend is unavailable. Never elevates privileges;
+    /// an elevated or root caller is refused.
+    pub fn new_unconfined(helper: TrustedExecutable) -> Result<Self> {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        {
+            Ok(Self {
+                native: native::Installation::new_unconfined(helper)?,
+            })
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        {
+            let _ = helper;
+            Err(unavailable())
+        }
+    }
+
+    /// Probe the explicit unconfined posture. This tests supervision and
+    /// temporary storage, and makes no confinement claim.
+    pub async fn probe_unconfined(&self, scope: &UnconfinedScope) -> Result<Support> {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        {
+            self.native.probe_unconfined(scope).await
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        {
+            let _ = scope;
+            Err(unavailable())
+        }
+    }
+
+    /// Prepare an explicitly authorized ordinary-user process without OS
+    /// confinement, retaining identity checks, limits and owned supervision.
+    pub fn prepare_unconfined(
+        &self,
+        spec: ProcessSpec,
+        scope: UnconfinedScope,
+    ) -> Result<PreparedProcess> {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        {
+            Ok(PreparedProcess {
+                native: self.native.prepare_unconfined(spec, &scope)?,
+            })
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        {
+            let _ = (spec, scope);
+            Err(unavailable())
+        }
+    }
+
     /// Check the actual native launch using the requested scope and an
     /// internal probe, including that the filesystem reports the location
     /// identities [`PreparedProcess::capture_fingerprint`] needs.
@@ -391,7 +471,8 @@ impl PreparedProcess {
     }
 
     /// Require the prepared working directory to belong to this exact
-    /// host-opened read or write root, including its native identity.
+    /// host-opened read or write root, including its native identity. An
+    /// unconfined preparation requires the exact captured working directory.
     pub fn validate_working_root(&self, root: &std::fs::File) -> Result<()> {
         #[cfg(any(target_os = "macos", target_os = "linux"))]
         {

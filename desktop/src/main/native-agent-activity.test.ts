@@ -143,6 +143,17 @@ it.skipIf(!resources || process.platform === "win32")(
       );
       const observed = await ipc.observe(event, id);
       expect(observed.snapshot.subagentActivityAvailable).toBe(true);
+      const parentPage = await ipc.transcriptPage(event, id);
+      const parentAnswer = parentPage.messages.find(
+        (entry) => entry.text === "Parent completed."
+      );
+      expect(parentAnswer).toMatchObject({
+        turnId: observed.snapshot.latest!.turnId,
+        activityOrder: expect.any(Number),
+      });
+      expect(Number.isSafeInteger(parentAnswer?.activityOrder)).toBe(true);
+      expect(parentAnswer!.activityOrder).toBeGreaterThan(0);
+      expect(parentAnswer!.activityOrderIncomplete).toBeUndefined();
       expect(
         (await ipc.subagentActivity(event, id, undefined)).children
       ).toEqual([]);
@@ -179,6 +190,14 @@ it.skipIf(!resources || process.platform === "win32")(
                 entry.text === "Actual live child text." && entry.live === true
             )
           ).toBe(true);
+          const liveMessage = current.messages.find((entry) => entry.live);
+          expect(liveMessage).toMatchObject({
+            turnId: current.turns.at(-1)!.turnId,
+            activityOrder: expect.any(Number),
+          });
+          expect(Number.isSafeInteger(liveMessage?.activityOrder)).toBe(true);
+          expect(liveMessage!.activityOrder).toBeGreaterThan(0);
+          expect(liveMessage!.activityOrderIncomplete).toBeUndefined();
           expect(current.execution).toEqual({
             model: "fixture-model",
             effort: null,
@@ -195,6 +214,9 @@ it.skipIf(!resources || process.platform === "win32")(
       const progressingId = progressing.messages.find(
         (entry) => entry.live
       )?.messageId;
+      const childOrder = progressing.messages.find(
+        (entry) => entry.live
+      )?.activityOrder;
       const activity = await ipc.subagentActivity(event, id, undefined);
       expect(activity.children).toContainEqual(
         expect.objectContaining({
@@ -211,6 +233,12 @@ it.skipIf(!resources || process.platform === "win32")(
           parentTurnId: observed.snapshot.latest!.turnId,
         })
       );
+      // This private assignment names an already settled parent turn. Reading
+      // the event cannot allocate a new coordinate in that closed timeline.
+      expect(activity.orderComplete).toBe(false);
+      expect(
+        activity.events.every((entry) => entry.activityOrder === undefined)
+      ).toBe(true);
       expect(dispatched).toHaveLength(2);
       release!();
       await vi.waitFor(
@@ -241,6 +269,10 @@ it.skipIf(!resources || process.platform === "win32")(
       expect(
         settled.messages.some((entry) => entry.messageId === progressingId)
       ).toBe(true);
+      expect(
+        settled.messages.find((entry) => entry.messageId === progressingId)
+          ?.activityOrder
+      ).toBe(childOrder);
       expect(
         settled.messages.some(
           (entry) => entry.text === "Read this exact child assignment."
@@ -285,6 +317,15 @@ it.skipIf(!resources || process.platform === "win32")(
         "started",
         "finished",
       ]);
+      expect(done.orderComplete).toBe(false);
+      expect(
+        done.events.every((entry) => entry.activityOrder === undefined)
+      ).toBe(true);
+      expect(
+        (await ipc.transcriptPage(event, reopened.attachmentId)).messages.find(
+          (entry) => entry.messageId === parentAnswer!.messageId
+        )?.activityOrder
+      ).toBe(parentAnswer!.activityOrder);
       await expect(ipc.load(event, child.childId)).rejects.toThrow(
         "session_missing"
       );

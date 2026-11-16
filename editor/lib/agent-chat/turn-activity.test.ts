@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { NativeChatMessage } from "@grida/desktop-bridge";
+import type {
+  NativeChatMessage,
+  NativeSubagentLifecycleEvent,
+} from "@grida/desktop-bridge";
 import { turn_activity } from "./turn-activity";
 
 const read = {
@@ -21,6 +24,207 @@ const docs = {
   source: "docs",
   outcome: "succeeded",
 } as const;
+
+describe("turn_activity.merge", () => {
+  const message = (id: string, activityOrder?: number): NativeChatMessage => ({
+    messageId: id,
+    turnId: "parent",
+    role: "assistant",
+    text: id,
+    activityOrder,
+  });
+  const event = (
+    id: string,
+    activityOrder?: number,
+    extra: Partial<NativeSubagentLifecycleEvent> = {}
+  ): NativeSubagentLifecycleEvent => ({
+    eventId: id,
+    childId: "child-a",
+    childTurnId: "child-turn-a",
+    inputId: "input-a",
+    parentTurnId: "parent",
+    name: "Researcher",
+    kind: "started",
+    atMs: activityOrder ?? 0,
+    activityOrder,
+    ...extra,
+  });
+  const ids = (timeline: turn_activity.Timeline) =>
+    timeline.work.map((item) =>
+      item.kind === "commentary"
+        ? item.message.messageId
+        : item.kind === "subagent"
+          ? item.event.eventId
+          : item.calls.map((call) => call.callId).join("+")
+    );
+  const work = () =>
+    turn_activity.items([
+      message("before", 1),
+      {
+        ...message("quiet"),
+        text: "",
+        activity: [
+          { ...read, activityOrder: 3 },
+          { ...command, activityOrder: 5 },
+          { ...docs, activityOrder: 6 },
+        ],
+      },
+      message("after", 9),
+    ]);
+  const events = () => [
+    event("start-a", 2),
+    event("start-b", 4, { childId: "child-b", name: "Reviewer" }),
+    event("finish-a", 7, { kind: "finished", status: "succeeded" }),
+    event("finish-b", 8, {
+      childId: "child-b",
+      kind: "finished",
+      status: "succeeded",
+    }),
+  ];
+
+  it("merges individual calls and two children's completed work before later parent commentary", () => {
+    const result = turn_activity.merge(
+      work(),
+      events()
+        .reverse()
+        .map((event) => ({ ...event, atMs: 100 - event.activityOrder! })),
+      "parent"
+    );
+    expect(ids(result)).toEqual([
+      "before",
+      "start-a",
+      "call-1",
+      "start-b",
+      "call-2+call-3",
+      "finish-a",
+      "finish-b",
+      "after",
+    ]);
+    expect(result.unplaced).toEqual([]);
+  });
+
+  it("keeps stable positions through growth, outcomes, duplicates and replay", () => {
+    const initial = turn_activity.merge(work(), events().slice(0, 2), "parent");
+    const updated = work().map((item) =>
+      item.kind === "commentary"
+        ? {
+            ...item,
+            message: { ...item.message, text: item.message.text + " grew" },
+          }
+        : {
+            ...item,
+            calls: item.calls.map((call) => ({
+              ...call,
+              outcome: "succeeded" as const,
+            })),
+          }
+    );
+    const result = turn_activity.merge(
+      [...updated, updated[0]],
+      [...events().reverse(), events()[0]],
+      "parent"
+    );
+    expect(ids(result)).toEqual([
+      "before",
+      "start-a",
+      "call-1",
+      "start-b",
+      "call-2+call-3",
+      "finish-a",
+      "finish-b",
+      "after",
+    ]);
+    expect(ids(initial).filter((id) => !id.startsWith("finish"))).toEqual(
+      ids(result).filter((id) => !id.startsWith("finish"))
+    );
+    expect(turn_activity.merge(updated, events(), "parent")).toEqual(result);
+  });
+
+  it.each([undefined, 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
+    "leaves parent order untouched and child facts explicitly unplaced when a parent coordinate is %s",
+    (activityOrder) => {
+      const parent = turn_activity.items([
+        message("first", 9),
+        message("second", activityOrder),
+      ]);
+      const result = turn_activity.merge(parent, events(), "parent");
+      expect(ids(result)).toEqual(["first", "second"]);
+      expect(result.unplaced).toEqual(events());
+    }
+  );
+
+  it("treats incomplete and duplicate parent positions as uncomparable", () => {
+    for (const messages of [
+      [
+        message("first", 9),
+        { ...message("second", 1), activityOrderIncomplete: true as const },
+      ],
+      [message("first", 9), message("second", 9)],
+      [message("first", 9), message("first", 1)],
+    ]) {
+      const result = turn_activity.merge(
+        turn_activity.items(messages),
+        events(),
+        "parent"
+      );
+      expect(result.work.every((item) => item.kind !== "subagent")).toBe(true);
+      expect(result.unplaced).toEqual(events());
+    }
+  });
+
+  it("places known child facts while quarantining missing, conflicting and wrong-turn facts", () => {
+    const known = event("known", 2);
+    const unknown = event("unknown");
+    const collision = event("collision", 1);
+    const wrongTurn = event("foreign", 4, { parentTurnId: "other" });
+    const conflicting = [event("changed", 5), event("changed", 6)];
+    const duplicateOrder = [event("same-a", 7), event("same-b", 7)];
+    const result = turn_activity.merge(
+      turn_activity.items([message("parent", 1)]),
+      [known, unknown, collision, wrongTurn, ...conflicting, ...duplicateOrder],
+      "parent"
+    );
+    expect(ids(result)).toEqual(["parent", "known"]);
+    expect(result.unplaced.map((item) => item.eventId)).toEqual([
+      "unknown",
+      "collision",
+      "foreign",
+      "changed",
+      "same-a",
+      "same-b",
+    ]);
+  });
+
+  it("does not require a text coordinate for a tool-only envelope", () => {
+    const result = turn_activity.merge(
+      turn_activity.items([
+        {
+          ...message("quiet"),
+          text: "",
+          activity: [{ ...read, activityOrder: 3 }],
+        },
+      ]),
+      [event("start", 2)],
+      "parent"
+    );
+    expect(ids(result)).toEqual(["start", "call-1"]);
+    expect(result.unplaced).toEqual([]);
+  });
+
+  it("enriches repeated unknown facts and retains known positions when later metadata is absent", () => {
+    const result = turn_activity.merge(
+      turn_activity.items([
+        message("first"),
+        message("first", 1),
+        message("first"),
+      ]),
+      [event("start"), event("start", 2), event("start")],
+      "parent"
+    );
+    expect(ids(result)).toEqual(["first", "start"]);
+    expect(result.unplaced).toEqual([]);
+  });
+});
 
 function turn(id: string, answer = `Answer ${id}`): NativeChatMessage[] {
   return [

@@ -3,8 +3,8 @@
  * workspace workbench (xterm.js over `bridge.terminal`, VSCode-style).
  *
  * Lifecycle: one PTY per mount. The workbench keeps this component
- * mounted while the panel is merely collapsed (ctrl+` toggle), so the
- * shell — and anything running in it — survives hide/show. Unmount
+ * mounted while the panel is collapsed or another utility is selected, so
+ * the shell — and anything running in it — survives hide/show. Unmount
  * (window close, shell exit, the header's close button, workbench
  * teardown) kills the PTY; there is no reattach in v1.
  *
@@ -106,6 +106,10 @@ function attachWheelFix(el: HTMLElement, term: XTerminal): () => void {
 
 export type TerminalPaneProps = {
   workspace: Workspace;
+  /** A shared utility panel owns the header when this terminal is embedded. */
+  embedded?: boolean;
+  /** Hidden utility tabs retain the PTY but must never capture keyboard focus. */
+  active?: boolean;
   /**
    * The terminal session is over — the shell exited (`exit`, crash,
    * kill) or the user clicked the header's close button. The workbench
@@ -115,16 +119,35 @@ export type TerminalPaneProps = {
   onSessionEnded: () => void;
 };
 
-export function TerminalPane({ workspace, onSessionEnded }: TerminalPaneProps) {
+export function TerminalPane({
+  workspace,
+  onSessionEnded,
+  embedded = false,
+  active = true,
+}: TerminalPaneProps) {
+  const paneRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const terminalRef = useRef<XTerminal | null>(null);
+  const activeRef = useRef(active);
+  activeRef.current = active;
   // Latest callback without re-running the terminal effect (same ref
   // pattern as the workbench's openTabsRef).
   const onSessionEndedRef = useRef(onSessionEnded);
   onSessionEndedRef.current = onSessionEnded;
 
   useEffect(() => {
+    if (!active) terminalRef.current?.blur();
+  }, [active]);
+
+  useEffect(() => {
+    const pane = paneRef.current;
     const el = containerRef.current;
-    if (!el) return;
+    if (!pane || !el) return;
+
+    // The padded canvas wrapper can remain 8px tall inside a collapsed
+    // zero-height pane. Visibility belongs to the pane's actual bounds.
+    const visible = () =>
+      activeRef.current && pane.clientWidth > 0 && pane.clientHeight > 0;
 
     let disposed = false;
     let termId: string | null = null;
@@ -148,6 +171,7 @@ export function TerminalPane({ workspace, onSessionEnded }: TerminalPaneProps) {
         cursorBlink: true,
         theme: resolveXtermTheme(),
       });
+      terminalRef.current = term;
       const fit = new FitAddon();
       term.loadAddon(fit);
       term.open(el);
@@ -156,7 +180,7 @@ export function TerminalPane({ workspace, onSessionEnded }: TerminalPaneProps) {
       // to the workbench's window handler.
       term.attachCustomKeyEventHandler((e) => !isTerminalToggleEvent(e));
       const detachWheelFix = attachWheelFix(el, term);
-      fit.fit();
+      if (visible()) fit.fit();
 
       // Follow live theme switches (next-themes flips the `dark` class
       // on <html>); re-resolve the tokens and hand xterm a new theme.
@@ -174,7 +198,7 @@ export function TerminalPane({ workspace, onSessionEnded }: TerminalPaneProps) {
         // drop focus: a hidden terminal must not keep swallowing
         // keystrokes into an invisible shell (covers both the ctrl+`
         // toggle and a drag-to-collapse).
-        if (el.clientWidth === 0 || el.clientHeight === 0) {
+        if (!visible()) {
           term.blur();
           return;
         }
@@ -183,12 +207,14 @@ export function TerminalPane({ workspace, onSessionEnded }: TerminalPaneProps) {
       };
       const resizeObserver = new ResizeObserver(fitAndResize);
       resizeObserver.observe(el);
+      resizeObserver.observe(pane);
 
       dispose = () => {
         themeObserver.disconnect();
         resizeObserver.disconnect();
         detachWheelFix();
         term.dispose();
+        if (terminalRef.current === term) terminalRef.current = null;
       };
 
       try {
@@ -218,7 +244,9 @@ export function TerminalPane({ workspace, onSessionEnded }: TerminalPaneProps) {
       term.onData((data) => {
         if (termId) void bridgeTerminal.write(termId, data);
       });
-      term.focus();
+      // create() may settle after the user selected Processes or collapsed
+      // the panel. An invisible shell must not take focus from that view.
+      if (visible()) term.focus();
     })().catch((err) => {
       // Import or xterm-setup failure (bridge failures are printed into
       // the grid above). No grid exists to render the error, so log and
@@ -236,25 +264,29 @@ export function TerminalPane({ workspace, onSessionEnded }: TerminalPaneProps) {
 
   return (
     <div
+      ref={paneRef}
       data-testid="terminal-pane"
+      inert={!active}
       className="flex h-full w-full flex-col overflow-hidden bg-background"
     >
-      <div className="flex shrink-0 items-center px-2">
-        <span className="text-xs text-muted-foreground">Terminal</span>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className="ml-auto"
-          aria-label="Close terminal"
-          title="Close terminal"
-          // Unmount through the workbench; the unmount cleanup above is
-          // the single PTY-kill path.
-          onClick={() => onSessionEndedRef.current()}
-        >
-          <XIcon />
-        </Button>
-      </div>
+      {!embedded && (
+        <div className="flex shrink-0 items-center px-2">
+          <span className="text-xs text-muted-foreground">Terminal</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="ml-auto"
+            aria-label="Close terminal"
+            title="Close terminal"
+            // Unmount through the workbench; the unmount cleanup above is
+            // the single PTY-kill path.
+            onClick={() => onSessionEndedRef.current()}
+          >
+            <XIcon />
+          </Button>
+        </div>
+      )}
       {/* xterm owns the inner canvas; the wrapper just reserves the box.
           The padding gutter shows the pane background, which matches the
           themed xterm background. */}

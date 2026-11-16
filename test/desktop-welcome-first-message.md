@@ -7,7 +7,7 @@ tags: [welcome, workspace, composer, native-chat, template, model]
 status: untested
 severity: high
 date: 2026-11-13
-updated: 2026-11-13
+updated: 2026-11-16
 automatable: partial
 covered_by:
   [
@@ -22,11 +22,11 @@ covered_by:
 ## Behavior
 
 A message typed on Welcome opens its workspace and becomes the first turn of a
-new native chat there. The model chosen in the Welcome picker runs that turn;
-**Default** keeps the workspace's default connection. Welcome offers only the
-provider-key and saved-endpoint models that exist before a workspace opens;
-Grida models other than the default appear in the workspace's own picker once
-its chat is running.
+new native chat there. The model and effort chosen in the Welcome picker run
+that turn; Plan and Goal intents also travel with it. **Default** keeps the
+workspace's default connection. Welcome offers connections available before a
+workspace opens; any workspace-specific choices appear in the workspace's own
+picker once its chat is running.
 
 The message is sent at most once. It waits while the workspace's chat starts,
 however long that takes, and survives a reload before it is sent. Once the
@@ -36,9 +36,17 @@ choice first — the chat says the Welcome message wasn't sent and puts its text
 in the composer. When chat cannot open in the workspace at all, the
 unavailability notice says the message wasn't sent.
 
-A picked slides template is copied into the workspace as its own deck before
-the workspace opens, and the first message names that copy so the agent adapts
-it in place. References are listed as links in the first message.
+A picked slides template is copied into the selected destination workspace as
+its own deck before the workspace opens, and the first message names that copy
+so the agent adapts it in place. References are listed as links in the first
+message. Selecting Slides or Images makes that requested outcome explicit;
+those presets do not change model capabilities or grant additional access.
+
+A staged file or image keeps its original File through the same-window route
+transition. A reload before consumption retains the request and attachment name,
+but cannot recreate the original disk File: the composer asks for reattachment
+and refuses to send the text alone. A model that cannot accept the staged
+attachment also keeps it with an explanation instead of omitting it.
 
 ## Steps
 
@@ -61,9 +69,22 @@ it in place. References are listed as links in the first message.
    out of Grida with no other provider key, type a request, and send.
    - Expected: the workspace asks for a model, says the Welcome message wasn't
      sent, and the request is in the composer.
-6. Send from Welcome and reload the workspace window while its chat is still
-   starting.
+6. Send a text-only request from Welcome and reload the workspace window while
+   its chat is still starting.
    - Expected: after the reload the chat starts and sends the message once.
+7. On Welcome, choose Plan and a non-default effort, attach an image and send.
+   - Expected: the workspace sends the original request and attachment once in
+     Plan with the chosen effort. A connection that cannot accept the image
+     keeps the complete draft with an explanation and sends nothing.
+8. Reload while an attachment-bearing request is waiting for startup.
+   - Expected: the retained attachment card asks for reattachment. The text is
+     kept and no text-only request starts. Remove or reattach the file to proceed.
+9. Select Goal on Welcome and send an objective.
+   - Expected: the new workspace chat starts it as a goal. An unavailable goal
+     capability retains the request and explains the refusal.
+10. Choose an existing destination workspace and pick a reference or template.
+    - Expected: the request, reference links and any copied deck use that chosen
+      workspace rather than switching to the default destination.
 
 ## Notes
 

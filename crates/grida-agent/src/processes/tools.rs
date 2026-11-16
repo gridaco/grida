@@ -15,6 +15,7 @@ use agent_kit_core::{
 };
 use agent_kit_sandbox::{
     ExecutionScope, PreparedProcess, ProcessSpec, RunningSession, Sandbox, SessionOptions,
+    UnconfinedScope,
 };
 use serde::Deserialize;
 use serde_json::json;
@@ -46,7 +47,7 @@ pub(crate) type SpawnSession = dyn Fn(PreparedProcess, SessionOptions, Cancellat
 
 /// What the host authorizes for one `exec_command` call.
 pub(crate) struct AuthorizedProcess {
-    pub scope: ExecutionScope,
+    pub scope: ProcessScope,
     /// The capture the approved action was bound to.
     pub expected: Fingerprint,
     pub spawn: Arc<SpawnSession>,
@@ -54,6 +55,27 @@ pub(crate) struct AuthorizedProcess {
     pub environment: Arc<BTreeMap<String, String>>,
     /// The working directory when the call names none.
     pub root: PathBuf,
+}
+
+pub(crate) enum ProcessScope {
+    Confined(ExecutionScope),
+    Unconfined(UnconfinedScope),
+}
+
+impl ProcessScope {
+    fn valid_until(&self) -> Instant {
+        match self {
+            Self::Confined(scope) => scope.valid_until,
+            Self::Unconfined(scope) => scope.valid_until,
+        }
+    }
+
+    pub(crate) fn prepare(self, sandbox: &Sandbox, spec: ProcessSpec) -> Result<PreparedProcess> {
+        match self {
+            Self::Confined(scope) => sandbox.prepare(spec, scope),
+            Self::Unconfined(scope) => sandbox.prepare_unconfined(spec, scope),
+        }
+    }
 }
 
 type ResolveProcess = dyn Fn(&Invocation) -> Result<AuthorizedProcess> + Send + Sync;
@@ -122,6 +144,7 @@ impl ProcessTools {
             limits,
             sessions,
             session,
+            false,
         )
     }
 
@@ -130,6 +153,7 @@ impl ProcessTools {
         limits: CommandLimits,
         sessions: Arc<ProcessSessions>,
         session: SessionId,
+        unconfined: bool,
         resolve: Arc<ResolveProcess>,
     ) -> Result<Self> {
         Self::with_authority(
@@ -138,6 +162,7 @@ impl ProcessTools {
             limits,
             sessions,
             session,
+            unconfined,
         )
     }
 
@@ -147,6 +172,7 @@ impl ProcessTools {
         limits: CommandLimits,
         sessions: Arc<ProcessSessions>,
         session: SessionId,
+        unconfined: bool,
     ) -> Result<Self> {
         if !(1..=64 * 1024).contains(&limits.max_input_bytes)
             || !(1..=64 * 1024).contains(&limits.max_output_bytes)
@@ -166,7 +192,7 @@ impl ProcessTools {
         });
         Ok(Self {
             exec: Arc::new(ExecCommand {
-                definition: exec_definition(scoped, limits)?,
+                definition: exec_definition(scoped, unconfined, limits)?,
                 shared: shared.clone(),
             }),
             write: Arc::new(WriteStdin {
@@ -182,7 +208,11 @@ impl ProcessTools {
     }
 }
 
-fn exec_definition(scoped: bool, limits: CommandLimits) -> Result<ToolDefinition> {
+fn exec_definition(
+    scoped: bool,
+    unconfined: bool,
+    limits: CommandLimits,
+) -> Result<ToolDefinition> {
     let mut schema = json!({
         "type": "object",
         "properties": {
@@ -196,8 +226,11 @@ fn exec_definition(scoped: bool, limits: CommandLimits) -> Result<ToolDefinition
         "additionalProperties": false
     });
     let mut description = "Runs a command in a PTY or pipes, returning output or a session ID for ongoing interaction. The command runs with `sh -c` semantics in the user's shell (sh, bash, zsh or dash) inside a sandbox: network access is denied and writes stay inside granted locations. A command still running when the wait ends keeps running; continue with write_stdin and its session ID.".to_owned();
+    if unconfined {
+        description = "Runs a command in a PTY or pipes with sh -c semantics in the user's shell (sh, bash, zsh or dash). Full access was explicitly selected: OS filesystem/network sandboxing is disabled, and commands can use the current OS user's files and network without further approval. This does not grant elevated OS privileges. A command still running when the wait ends keeps running; continue with write_stdin and its session ID.".into();
+    }
     if scoped {
-        schema["properties"]["access"] = json!({"enum": ["read", "read_write"], "description": "read lets the command read the directory; read_write also lets it write there."});
+        schema["properties"]["access"] = json!({"enum": ["read", "read_write"], "description": if unconfined { "Declare the intended operation. Full access does not confine filesystem or network effects, including when read is selected." } else { "read lets the command read the directory; read_write also lets it write there." }});
         schema["properties"]["directory"] = json!({"type": "string", "description": "Named directory ID. Omit for the primary directory."});
         schema["required"] = json!(["cmd", "access"]);
         description.push_str(" Select read or read_write access explicitly. The working directory must be inside the selected directory.");
@@ -443,7 +476,12 @@ impl ExecCommand {
                 scope,
                 environment,
                 root,
-            } => ((**scope).clone(), None, environment.clone(), root.clone()),
+            } => (
+                ProcessScope::Confined((**scope).clone()),
+                None,
+                environment.clone(),
+                root.clone(),
+            ),
             Authority::Authorized(resolve) => match resolve(invocation) {
                 Ok(authority) => (
                     authority.scope,
@@ -463,7 +501,7 @@ impl ExecCommand {
             Ok(launch) => launch,
             Err(error) => return ToolOutcome::failed(&error.code),
         };
-        if context.cancellation.is_cancelled() || scope.valid_until <= Instant::now() {
+        if context.cancellation.is_cancelled() || scope.valid_until() <= Instant::now() {
             return cancelled();
         }
         // The process belongs to the chat, not to this call or its turn.
@@ -482,8 +520,8 @@ impl ExecCommand {
             // Native preparation may inspect paths before it decides
             // containment. Its diagnostics must not disclose whether a
             // refused path exists.
-            let prepared = sandbox
-                .prepare(spec, scope)
+            let prepared = scope
+                .prepare(&sandbox, spec)
                 .map_err(|error| Error::new(error.kind, "command_preparation_refused"))?;
             if cancellation.is_cancelled() || launch_stop.is_cancelled() {
                 return Ok(None);

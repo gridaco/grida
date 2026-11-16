@@ -811,6 +811,34 @@ Continuation rechecks the launch profile and native identity before dispatch.
 Unverified command cleanup surfaces uncertainty and stops automatic queue
 advancement.
 
+### Select Full access explicitly
+
+A trusted launch profile with a command installation may set
+`"allowFullAccess": true`. This enables the private supervisor to offer Full
+access; it does not select it. New chats remain restricted. An unattended
+launcher may also explicitly set `"initialPermissionMode": "full_access"`;
+this requires `allowFullAccess`. Desktop never sets that initial mode.
+
+Full access runs ordinary-user commands without filesystem, network or IPC
+confinement through the same owned process/terminal lifecycle. It deliberately
+relinquishes protected-path and credential-file isolation. The approved command
+environment still excludes host-managed secrets. It gains no elevated OS
+privileges, automatic reviewer or managed proxy/destination guarantee.
+
+File tools keep the project primary and additionally accept directory
+`filesystem` with paths relative to `/`, without the leading slash. They retain
+normal format, size, symlink, hard-link and device checks; commands can use
+ordinary OS paths. The host's reviewed hooks remain confined, and Plan still
+withholds command and mutation tools.
+
+The supervisor negotiates `co.grida/session/permission-mode` version 1 on
+private stdio. Inspection and update create no model work. A mode change is
+durable per chat, requires its current revision and an exact request identity,
+and is refused while work, queue entries or running processes remain.
+Accepted work and child assignments retain the captured mode through recovery;
+a launcher lacking Full access authority cannot resume a Full access capture.
+See the [client protocol](./docs/rust-client-protocol.md#per-chat-permission-mode).
+
 ### Run commands as chat processes
 
 With command rules, Act turns offer two tools. `exec_command` takes `cmd`,
@@ -1162,10 +1190,21 @@ proof remains uncertain across restart. Ordinary parent chat processes retain
 their existing lifetime.
 
 The parent collects the exact child/input/turn results before successful
-completion. Informational delivery starts no idle work; general workers have
-one bounded assignment. Their retained conversations and activity use the
+completion. Information sent to an active worker is appended to its current
+assignment's history for the next permitted model request. The receipt confirms
+the append, not that the model has read it. Paused or finished work refuses a
+new delivery; an exact retry of a recorded delivery returns its original receipt
+without waking work. General workers have one bounded assignment. Their retained conversations and activity use the
 existing parent-scoped child observation contracts. Manual reusable children
 and Ultra reviewers keep their own capability and allowance profiles.
+
+Clients negotiating `co.grida/session/activity-order` version 1 can interleave
+child start/finish events with parent messages and individual tool calls. The
+host retains first-publication positions per turn, separately from execution
+history. Streaming growth and tool status changes keep the same position.
+Observation only reads those positions; old or unavailable records remain
+explicitly unordered. See the [client protocol](docs/rust-client-protocol.md#parent-activity-ordering)
+for compatibility and fallback behavior.
 
 ## Run named child work from a private launcher
 

@@ -355,7 +355,10 @@ impl Host {
         if !profile.matches_primary(&session_configuration(session)?.cwd) {
             return Ok(None);
         }
-        Ok(Some(profile.capture(ScopeId::new(input.as_str())?)))
+        Ok(Some(profile.capture_mode(
+            ScopeId::new(input.as_str())?,
+            self.selected_permission_mode(session)?,
+        )?))
     }
 
     pub(super) fn bind_permissions(

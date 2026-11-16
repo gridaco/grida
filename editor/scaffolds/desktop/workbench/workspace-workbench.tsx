@@ -8,13 +8,13 @@
  *   │ TitleBar            │ TitleBar: tabs ···       │ toggle      │
  *   │ Agent Pane          │ focused content          │ file tree   │
  *   │                     ├───────────────────────────┤             │
- *   │                     │ terminal?                 │             │
+ *   │                     │ utilities?                │             │
  *   └─────────────────────┴───────────────────────────┴─────────────┘
  *
  * Each column owns its title bar. The file tree starts closed; while closed,
  * its toggle lives at the end of the main title bar, and while open it moves
- * into the file tree's own title bar. Documents and the optional terminal use
- * floating surfaces. The file tree is a docked utility column with a hard left
+ * into the file tree's own title bar. Documents and optional workspace utilities
+ * use floating surfaces. The file tree is a docked utility column with a hard left
  * divider, and its resize boundary spans the full main/right height.
  *
  * The workbench owns the small amount of cross-pane state: which tabs
@@ -75,12 +75,15 @@ import { FileTreePane } from "./file-tree-pane";
 import { EditorPane, WorkspaceExplorerToggleButton } from "./editor-pane";
 import { WorkspaceTitleMenu } from "./workspace-title-menu";
 import { AgentPane } from "./agent-pane";
-import { TerminalPane } from "./terminal-pane";
+import { WorkspaceUtilities } from "./workspace-utilities";
+import { WorkspaceUtilitiesPanel } from "./workspace-utilities-panel";
+import type { NativeBackgroundProcessController } from "@/lib/agent-chat/native-background-process-controller";
 import { WorkspaceChangesProvider } from "./workspace-changes";
 import { EditorGroup } from "./editor-group";
 import { WorkbenchTab } from "./workbench-tab";
 import { WorkbenchPanels } from "./workbench-panels";
 import { SideChatTabPlacement } from "./side-chat-tab-placement";
+import { SubagentTabPlacement } from "./subagent-tab-placement";
 import { WorkspaceSurfaceHost } from "./workspace-surface-host";
 import { WorkspaceCanvasCreation } from "./workspace-canvas-creation";
 import styles from "./workspace-workbench.module.css";
@@ -108,11 +111,11 @@ const RESIZE_HANDLE_HIGHLIGHT_CLASS =
   "before:pointer-events-none before:absolute before:z-10 before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-linear-to-b before:from-transparent before:via-muted-foreground/55 before:to-transparent before:opacity-0 before:transition-opacity hover:before:opacity-100 active:before:via-foreground/70 active:before:opacity-100 focus-visible:before:opacity-100 aria-[orientation=horizontal]:before:inset-x-0 aria-[orientation=horizontal]:before:inset-y-auto aria-[orientation=horizontal]:before:left-0 aria-[orientation=horizontal]:before:top-1/2 aria-[orientation=horizontal]:before:h-px aria-[orientation=horizontal]:before:w-full aria-[orientation=horizontal]:before:-translate-y-1/2 aria-[orientation=horizontal]:before:translate-x-0 aria-[orientation=horizontal]:before:bg-linear-to-r";
 const RESIZE_GUTTER_CLASS = `z-20 w-1.5 cursor-col-resize bg-transparent after:w-3 aria-[orientation=horizontal]:h-1.5 aria-[orientation=horizontal]:cursor-row-resize aria-[orientation=horizontal]:after:h-3 ${RESIZE_HANDLE_HIGHLIGHT_CLASS}`;
 const DOCKED_PANE_RESIZE_HANDLE_CLASS = `desktop-no-drag z-20 -mx-1.5 w-3 cursor-col-resize bg-transparent after:w-3 ${RESIZE_HANDLE_HIGHLIGHT_CLASS}`;
-// Bottom terminal panel (VSCode-style). Collapsible: dragging it under
+// Bottom utility panel (VSCode-style). Collapsible: dragging it under
 // its min snaps it closed, and ctrl+` collapse/expand keeps the shell
 // process alive (the panel content stays mounted at zero height).
-const TERMINAL_PANE_DEFAULT = "30%";
-const TERMINAL_PANE_MIN = "120px";
+const UTILITY_PANE_DEFAULT = "30%";
+const UTILITY_PANE_MIN = "120px";
 
 /**
  * Separators remain keyboard-focusable for arrow-key resizing, but pointer
@@ -165,6 +168,10 @@ export function WorkspaceWorkbench({
   const panels = useMemo(() => new WorkbenchPanels(group), [group]);
   const sideChatPlacement = useMemo(
     () => new SideChatTabPlacement(panels),
+    [panels]
+  );
+  const subagentPlacement = useMemo(
+    () => new SubagentTabPlacement(panels),
     [panels]
   );
   const surfaceHost = useMemo(
@@ -239,30 +246,34 @@ export function WorkspaceWorkbench({
   // is hidden.
   const [showTree, setShowTree] = useState(false);
 
-  // Terminal pane (ctrl+` / native View menu), VSCode-style.
-  // `terminalSpawned` tracks whether the bottom panel (and its PTY) exists;
-  // it flips on first open and back off when the shell exits. Collapse keeps
-  // the pane mounted (and the shell alive); only unmount kills the PTY.
-  // Hidden entirely against older desktop binaries whose bridge
-  // predates `terminal` (additive capability on protocol 1).
+  // Terminal and agent Processes share a utility panel, with separate lifetimes.
+  // Processes alone never creates a PTY; switching tabs or collapsing keeps
+  // an existing shell mounted. Older bridges can still show agent processes.
   const supportsTerminal = bridgeTerminal.isSupported();
-  const [terminalSpawned, setTerminalSpawned] = useState(false);
-  const terminalPanelRef = usePanelRef();
-
-  const toggleTerminal = useCallback(() => {
-    if (!terminalSpawned) {
-      setTerminalSpawned(true); // mounts expanded at its default size
-      return;
-    }
-    const panel = terminalPanelRef.current;
-    if (!panel) return;
-    if (panel.isCollapsed()) panel.expand();
-    else panel.collapse();
-  }, [terminalSpawned, terminalPanelRef]);
-
-  const handleTerminalSessionEnded = useCallback(() => {
-    setTerminalSpawned(false);
-  }, []);
+  const [utilities] = useState(
+    () => new WorkspaceUtilities(supportsTerminal ? "terminal" : "processes")
+  );
+  const utilityView = useSyncExternalStore(
+    utilities.subscribe,
+    utilities.read,
+    utilities.read
+  );
+  const utilityPanelRef = usePanelRef();
+  const [utilitiesVisible, setUtilitiesVisible] = useState(false);
+  const [processes, setProcesses] =
+    useState<NativeBackgroundProcessController | null>(null);
+  const toggleTerminal = useCallback(
+    () => utilities.toggleTerminal(utilityPanelRef.current ?? undefined),
+    [utilities, utilityPanelRef]
+  );
+  const toggleUtilities = useCallback(
+    () => utilities.toggle(utilityPanelRef.current ?? undefined),
+    [utilities, utilityPanelRef]
+  );
+  const closeUtilities = useCallback(
+    () => utilityPanelRef.current?.collapse(),
+    [utilityPanelRef]
+  );
 
   const bumpTreeRefresh = useCallback(() => {
     setTreeRefreshKey((k) => k + 1);
@@ -448,6 +459,8 @@ export function WorkspaceWorkbench({
                   workspace={workspace}
                   surfaceHost={surfaceHost}
                   sideChatPlacement={sideChatPlacement}
+                  subagentPlacement={subagentPlacement}
+                  onProcessesChange={setProcesses}
                 />
               </div>
             </div>
@@ -468,8 +481,8 @@ export function WorkspaceWorkbench({
           >
             <div className="h-full">
               {/* Main and file tree are full-height siblings, so their resize
-                  boundary includes both title bars. The terminal remains a
-                  child of main and never extends beneath the docked tree. */}
+                  boundary includes both title bars. Workspace utilities stay
+                  within main, above the bottom edge of the docked tree. */}
               <ResizablePanelGroup className={styles.decorativeOverflow}>
                 <ResizablePanel
                   data-workbench-decorative-overflow
@@ -494,31 +507,39 @@ export function WorkspaceWorkbench({
                         onCreateCanvas={createCanvas}
                         treeVisible={showTree}
                         onToggleTree={toggleTree}
-                        hasBottomPane={terminalSpawned}
+                        hasBottomPane={utilityView.mounted && utilitiesVisible}
+                        utilitiesVisible={utilitiesVisible}
+                        onToggleUtilities={toggleUtilities}
                         onSaved={bumpTreeRefresh}
                         onFileTrashed={(rp) => handleEntryTrashed(rp, false)}
                       />
                     </ResizablePanel>
-                    {terminalSpawned && (
+                    {utilityView.mounted && (
                       <>
                         <ResizableHandle
-                          aria-label="Resize document and terminal"
+                          aria-label="Resize document and workspace utilities"
                           className={RESIZE_GUTTER_CLASS}
                           onPointerUp={releaseResizeHandlePointerFocus}
                           onPointerCancel={releaseResizeHandlePointerFocus}
                         />
                         <ResizablePanel
                           data-workbench-decorative-overflow
-                          panelRef={terminalPanelRef}
+                          panelRef={utilityPanelRef}
+                          onResize={(size) =>
+                            setUtilitiesVisible(size.asPercentage > 0)
+                          }
                           collapsible
-                          defaultSize={TERMINAL_PANE_DEFAULT}
-                          minSize={TERMINAL_PANE_MIN}
+                          defaultSize={UTILITY_PANE_DEFAULT}
+                          minSize={UTILITY_PANE_MIN}
                         >
                           <div className={FLOATING_BOTTOM_SURFACE_GUTTER_CLASS}>
                             <div className={FLOATING_UTILITY_SURFACE_CLASS}>
-                              <TerminalPane
+                              <WorkspaceUtilitiesPanel
                                 workspace={workspace}
-                                onSessionEnded={handleTerminalSessionEnded}
+                                utilities={utilities}
+                                processes={processes}
+                                supportsTerminal={supportsTerminal}
+                                onClose={closeUtilities}
                               />
                             </div>
                           </div>

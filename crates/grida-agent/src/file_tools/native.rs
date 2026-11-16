@@ -26,6 +26,7 @@ mod settings;
 struct Root {
     file: File,
     path: PathBuf,
+    allow_mounts: bool,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Serialize)]
@@ -364,9 +365,10 @@ impl FileTools {
         };
         // Compared without case, because a case-insensitive volume resolves
         // `.GIT` to `.git`.
-        if PROTECTED_METADATA
-            .iter()
-            .any(|protected| protected.eq_ignore_ascii_case(names[0]))
+        if !self.full_access
+            && PROTECTED_METADATA
+                .iter()
+                .any(|protected| protected.eq_ignore_ascii_case(names[0]))
         {
             return Err(problem(ErrorKind::Unsupported, "file_protected_path"));
         }
@@ -394,7 +396,11 @@ impl FileTools {
         for folder in folders {
             budget.check()?;
             match unix::statat(&parent, *folder, AtFlags::SYMLINK_NOFOLLOW) {
-                Ok(stat) => check_kind(&stat, Kind::Directory, &root_stat)?,
+                Ok(stat) => check_kind(
+                    &stat,
+                    Kind::Directory,
+                    if self.full_access { &stat } else { &root_stat },
+                )?,
                 Err(Errno::NOENT) => {
                     match unix::mkdirat(&parent, *folder, Mode::from_raw_mode(0o755)) {
                         Ok(()) | Err(Errno::EXIST) => {}
@@ -405,13 +411,21 @@ impl FileTools {
             }
             let prior =
                 unix::statat(&parent, *folder, AtFlags::SYMLINK_NOFOLLOW).map_err(open_error)?;
-            check_kind(&prior, Kind::Directory, &root_stat)?;
+            check_kind(
+                &prior,
+                Kind::Directory,
+                if self.full_access { &prior } else { &root_stat },
+            )?;
             let next: File =
                 unix::openat(&parent, *folder, read_flags(Kind::Directory), Mode::empty())
                     .map_err(open_error)?
                     .into();
             let after = unix::fstat(&next).map_err(open_error)?;
-            check_kind(&after, Kind::Directory, &root_stat)?;
+            check_kind(
+                &after,
+                Kind::Directory,
+                if self.full_access { &after } else { &root_stat },
+            )?;
             same_inode(&prior, &after)?;
             parent = next;
         }
@@ -435,6 +449,7 @@ impl FileTools {
         Ok(Root {
             file: root.try_clone().map_err(|_| unavailable())?,
             path: target.root().to_path_buf(),
+            allow_mounts: self.full_access,
         })
     }
 
@@ -683,6 +698,7 @@ pub(crate) fn open_root_file(directory: &File, root: &Path, path: &Path) -> Resu
     let root = Root {
         file: directory.try_clone().map_err(|_| unavailable())?,
         path: root.to_path_buf(),
+        allow_mounts: false,
     };
     open_beneath(root, path, Kind::File, || Ok(()))
 }
@@ -697,6 +713,7 @@ pub(crate) fn open_root_directory(directory: &File, root: &Path, path: &Path) ->
         Root {
             file,
             path: root.to_path_buf(),
+            allow_mounts: false,
         },
         path,
         Kind::Directory,
@@ -713,7 +730,11 @@ fn open_beneath(
 ) -> Result<File> {
     use rustix::fs::ResolveFlags;
 
-    let Root { file, path: _path } = root;
+    let Root {
+        file,
+        path: _path,
+        allow_mounts,
+    } = root;
     let root_stat = unix::fstat(&file).map_err(open_error)?;
     let open = |flags| {
         check()?;
@@ -722,7 +743,13 @@ fn open_beneath(
             path,
             flags,
             Mode::empty(),
-            ResolveFlags::BENEATH | ResolveFlags::NO_SYMLINKS | ResolveFlags::NO_XDEV,
+            ResolveFlags::BENEATH
+                | ResolveFlags::NO_SYMLINKS
+                | if allow_mounts {
+                    ResolveFlags::empty()
+                } else {
+                    ResolveFlags::NO_XDEV
+                },
         )
         .map_err(|error| match error {
             Errno::NOSYS => problem(ErrorKind::Unsupported, "file_safe_open_unavailable"),
@@ -734,10 +761,18 @@ fn open_beneath(
     // the entire path beneath the pinned root again and must match this inode.
     let inspected = open(OFlags::PATH | OFlags::CLOEXEC)?;
     let before = unix::fstat(&inspected).map_err(open_error)?;
-    check_kind(&before, expected, &root_stat)?;
+    check_kind(
+        &before,
+        expected,
+        if allow_mounts { &before } else { &root_stat },
+    )?;
     let readable = open(read_flags(expected))?;
     let after = unix::fstat(&readable).map_err(open_error)?;
-    check_kind(&after, expected, &root_stat)?;
+    check_kind(
+        &after,
+        expected,
+        if allow_mounts { &after } else { &root_stat },
+    )?;
     same_inode(&before, &after)?;
     Ok(readable.into())
 }
@@ -752,6 +787,7 @@ fn open_beneath(
     let Root {
         mut file,
         path: root_path,
+        allow_mounts,
     } = root;
     let root_stat = unix::fstat(&file).map_err(open_error)?;
     let mut components = path.components().peekable();
@@ -763,13 +799,13 @@ fn open_beneath(
         };
         check()?;
         let prior = unix::statat(&file, name, AtFlags::SYMLINK_NOFOLLOW).map_err(open_error)?;
-        check_kind(&prior, kind, &root_stat)?;
+        check_kind(&prior, kind, if allow_mounts { &prior } else { &root_stat })?;
         check()?;
         let next: File = unix::openat(&file, name, read_flags(kind), Mode::empty())
             .map_err(open_error)?
             .into();
         let after = unix::fstat(&next).map_err(open_error)?;
-        check_kind(&after, kind, &root_stat)?;
+        check_kind(&after, kind, if allow_mounts { &after } else { &root_stat })?;
         same_inode(&prior, &after)?;
         file = next;
     }

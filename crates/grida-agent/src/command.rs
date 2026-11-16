@@ -372,6 +372,7 @@ pub(crate) fn summarize(evidence: &ProcessEvidence) -> (serde_json::Value, Outco
     let backend = match evidence.support.backend {
         Backend::Seatbelt => "seatbelt",
         Backend::Bubblewrap => "bubblewrap",
+        Backend::Unconfined => "unconfined",
     };
     let descendants = match evidence.descendants {
         Descendants::NoPayload => "no_payload",

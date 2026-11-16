@@ -150,17 +150,33 @@ async fn parent(host: &Host, root: &Path, ultra: bool) -> (ClaimedTurn, StoredPr
 }
 
 async fn source(owner: &ClaimedTurn, index: usize) -> OperationClaimSource {
-    let definition = definition(SPAWN).unwrap();
+    tool_source(owner, SPAWN, index, json!({"name":format!("Worker {index}"),"instructions":format!("Complete independent task {index} and return evidence.")})).await
+}
+
+async fn tool_source(
+    owner: &ClaimedTurn,
+    tool: &str,
+    index: usize,
+    arguments: Value,
+) -> OperationClaimSource {
+    let definition = definition(tool).unwrap();
     let mut inventory = Inventory::new();
     inventory
         .insert(Arc::new(RecordedTool(definition.clone())))
         .unwrap();
-    let operation = OperationId::new(format!("spawn-{index}")).unwrap();
-    let attempt = AttemptId::new(format!("spawn-attempt-{index}")).unwrap();
-    let invocation=inventory.snapshot(std::slice::from_ref(&definition.id)).unwrap().prepare(
-        operation.clone(),&definition.id,
-        ToolArguments::Json(json!({"name":format!("Worker {index}"),"instructions":format!("Complete independent task {index} and return evidence.")})),
-    ).unwrap().invocation().clone();
+    let operation = OperationId::new(format!("{tool}-{index}")).unwrap();
+    let attempt = AttemptId::new(format!("{tool}-attempt-{index}")).unwrap();
+    let invocation = inventory
+        .snapshot(std::slice::from_ref(&definition.id))
+        .unwrap()
+        .prepare(
+            operation.clone(),
+            &definition.id,
+            ToolArguments::Json(arguments),
+        )
+        .unwrap()
+        .invocation()
+        .clone();
     let action = invocation.fingerprint();
     let state = owner.lease.journal().load().await.unwrap();
     owner
@@ -178,7 +194,7 @@ async fn source(owner: &ClaimedTurn, index: usize) -> OperationClaimSource {
                         input: OperationInput::Tool(invocation),
                         origin: None,
                         source_call: None,
-                        grants: grant(state.binding(), SPAWN).unwrap(),
+                        grants: grant(state.binding(), tool).unwrap(),
                     }),
                     JournalAction::StartAttempt {
                         operation: operation.clone(),
@@ -208,6 +224,311 @@ fn control(view: &SessionView) -> TurnControl {
         expected_session: view.revision,
         expected_control: current.controls.revision,
     }
+}
+
+async fn message_worker(
+    host: &Host,
+    owner: &ClaimedTurn,
+    stored: &StoredPrompt,
+) -> (SessionId, ClaimedTurn) {
+    let request = host
+        .worker_claim(
+            source(owner, 0).await,
+            "Worker 0",
+            "Complete independent task 0 and return evidence.",
+            stored.delegation.as_ref().unwrap(),
+        )
+        .await
+        .unwrap();
+    let child = request.claim.session.clone();
+    let ClaimOutcome::Acquired(child_owner) =
+        host.store.claim_from_operation(request).await.unwrap()
+    else {
+        panic!("expected child")
+    };
+    (child, child_owner)
+}
+
+#[tokio::test]
+async fn worker_information_is_appended_once_to_the_active_assignment_and_survives_reopen() {
+    let root = tempfile::tempdir().unwrap();
+    let host = open(root.path());
+    let (owner, stored) = parent(&host, root.path(), false).await;
+    let (child, child_owner) = message_worker(&host, &owner, &stored).await;
+    let text = "Use the clarified acceptance criterion.";
+    let source = tool_source(&owner, SEND, 0, json!({"child":child,"text":text})).await;
+    assert_eq!(
+        host.send_worker_message(source.clone(), child.clone(), text.into(), true)
+            .await
+            .unwrap_err()
+            .code,
+        "worker_message_not_delivered"
+    );
+    let (first, duplicate) = tokio::join!(
+        host.send_worker_message(source.clone(), child.clone(), text.into(), false),
+        host.send_worker_message(source.clone(), child.clone(), text.into(), false),
+    );
+    let first = first.unwrap();
+    assert_eq!(first, duplicate.unwrap());
+    assert_eq!(first["delivered"]["status"], "appended");
+    assert_eq!(first["delivered"]["turn"], TURN);
+    assert_eq!(first["delivered"]["history_position"], 1);
+    let state = child_owner.lease.journal().load().await.unwrap();
+    assert_eq!(state.history().records().len(), 1);
+    let HistoryRecord::Message(message) = &state.history().records()[0];
+    assert_eq!(message.role, Role::User);
+    assert_eq!(message.content, vec![Content::Text(text.into())]);
+    assert!(
+        host.store
+            .inspect(child.clone())
+            .await
+            .unwrap()
+            .queued
+            .is_empty()
+    );
+    assert_eq!(
+        host.store
+            .turn_submissions(child.clone(), TurnId::new(TURN).unwrap())
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        host.send_worker_message(source.clone(), child.clone(), "changed text".into(), false)
+            .await
+            .unwrap_err()
+            .code,
+        "worker_message_source_changed"
+    );
+    let view = host.store.inspect(child.clone()).await.unwrap();
+    host.pause(control(&view)).await.unwrap();
+    assert_eq!(
+        host.send_worker_message(source.clone(), child.clone(), text.into(), true)
+            .await
+            .unwrap(),
+        first
+    );
+    settle_process_worker_cancelled(&child_owner).await;
+    assert_eq!(
+        host.send_worker_message(source.clone(), child.clone(), text.into(), true)
+            .await
+            .unwrap(),
+        first
+    );
+    drop(child_owner);
+    drop(owner);
+    host.shutdown().await.unwrap();
+    drop(host);
+    let reopened = open(root.path());
+    assert_eq!(
+        reopened
+            .send_worker_message(source, child.clone(), text.into(), true)
+            .await
+            .unwrap(),
+        first
+    );
+    assert!(reopened.work.lock().await.ready.is_empty());
+    assert!(
+        reopened
+            .store
+            .inspect(child)
+            .await
+            .unwrap()
+            .queued
+            .is_empty()
+    );
+    reopened.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn new_worker_information_refuses_paused_cancelled_settled_and_unowned_assignments() {
+    for state in [
+        "parent_pause",
+        "parent_cancel",
+        "child_pause",
+        "child_cancel",
+        "child_settled",
+        "unowned",
+    ] {
+        let root = tempfile::tempdir().unwrap();
+        let host = open(root.path());
+        let (owner, stored) = parent(&host, root.path(), false).await;
+        let (child, child_owner) = message_worker(&host, &owner, &stored).await;
+        let text = "Further information.";
+        let mut source = tool_source(&owner, SEND, 0, json!({"child":child,"text":text})).await;
+        match state {
+            "parent_pause" | "child_pause" => {
+                let session = if state == "parent_pause" {
+                    owner.lease.binding().session.clone()
+                } else {
+                    child.clone()
+                };
+                let view = host.store.inspect(session).await.unwrap();
+                host.pause(control(&view)).await.unwrap();
+            }
+            "parent_cancel" | "child_cancel" => {
+                let (session, turn) = if state == "parent_cancel" {
+                    (
+                        owner.lease.binding().session.clone(),
+                        owner.lease.binding().turn.clone(),
+                    )
+                } else {
+                    (child.clone(), TurnId::new(TURN).unwrap())
+                };
+                host.cancel(session, turn).await.unwrap();
+            }
+            "child_settled" => settle_process_worker_cancelled(&child_owner).await,
+            "unowned" => source.binding.turn = TurnId::new("foreign-turn").unwrap(),
+            _ => unreachable!(),
+        }
+        assert!(
+            host.send_worker_message(source, child.clone(), text.into(), false)
+                .await
+                .is_err(),
+            "{state}"
+        );
+        assert!(
+            child_owner
+                .lease
+                .journal()
+                .load()
+                .await
+                .unwrap()
+                .history()
+                .records()
+                .is_empty(),
+            "{state}"
+        );
+        assert!(
+            host.store.inspect(child).await.unwrap().queued.is_empty(),
+            "{state}"
+        );
+        drop(child_owner);
+        drop(owner);
+        host.shutdown().await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn worker_information_has_a_cumulative_assignment_bound() {
+    let root = tempfile::tempdir().unwrap();
+    let host = open(root.path());
+    let (owner, stored) = parent(&host, root.path(), false).await;
+    let (child, child_owner) = message_worker(&host, &owner, &stored).await;
+    for index in 0..=MAX_MESSAGES {
+        let text = format!("Information {index}");
+        let source = tool_source(&owner, SEND, index, json!({"child":child,"text":text})).await;
+        let result = host
+            .send_worker_message(source, child.clone(), text, false)
+            .await;
+        if index < MAX_MESSAGES {
+            assert!(result.is_ok());
+        } else {
+            assert_eq!(result.unwrap_err().code, "worker_message_limit");
+        }
+    }
+    assert_eq!(
+        child_owner
+            .lease
+            .journal()
+            .load()
+            .await
+            .unwrap()
+            .history()
+            .records()
+            .len(),
+        MAX_MESSAGES
+    );
+    assert!(host.store.inspect(child).await.unwrap().queued.is_empty());
+    drop(child_owner);
+    drop(owner);
+    host.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn an_admitted_message_recovery_observes_its_receipt_even_if_its_context_is_cancelled() {
+    let root = tempfile::tempdir().unwrap();
+    let host = open(root.path());
+    let (owner, stored) = parent(&host, root.path(), false).await;
+    let (child, child_owner) = message_worker(&host, &owner, &stored).await;
+    let text = "Already delivered information.";
+    let source = tool_source(&owner, SEND, 0, json!({"child":child,"text":text})).await;
+    let undelivered = tool_source(
+        &owner,
+        SEND,
+        1,
+        json!({"child":child,"text":"Not delivered."}),
+    )
+    .await;
+    let receipt = host
+        .send_worker_message(source.clone(), child.clone(), text.into(), false)
+        .await
+        .unwrap();
+    let state = owner.lease.journal().load().await.unwrap();
+    let invocation = |source: &OperationClaimSource| {
+        let OperationInput::Tool(invocation) = &state.operations()[&source.operation].record.input
+        else {
+            panic!("expected tool")
+        };
+        invocation.clone()
+    };
+    let delivered_invocation = invocation(&source);
+    let undelivered_invocation = invocation(&undelivered);
+    let opened = host
+        .execution()
+        .unwrap()
+        .runtime
+        .open(owner.lease)
+        .await
+        .unwrap();
+    let tool = WorkerTool {
+        access: Access::bind(&host, &source.binding, stored.delegation.unwrap()).unwrap(),
+        operations: opened.turn.operations(),
+        definition: definition(SEND).unwrap(),
+    };
+    let cancellation = agent_kit_core::CancellationToken::new();
+    cancellation.cancel();
+    let context = |attempt| InvocationContext {
+        attempt,
+        cancellation: cancellation.clone(),
+        deadline: None,
+        max_output_bytes: 256 * 1024,
+    };
+    let recovery = |invocation| InvocationRecovery {
+        invocation,
+        checkpoint: None,
+        receipts: Vec::new(),
+    };
+    let result = tool
+        .recover(recovery(delivered_invocation), context(source.attempt))
+        .await;
+    assert_eq!(result.status, OutcomeStatus::Succeeded);
+    assert_eq!(result.structured, Some(receipt));
+    let missing = tool
+        .recover(
+            recovery(undelivered_invocation),
+            context(undelivered.attempt),
+        )
+        .await;
+    assert_eq!(missing.status, OutcomeStatus::Failed);
+    assert_eq!(
+        child_owner
+            .lease
+            .journal()
+            .load()
+            .await
+            .unwrap()
+            .history()
+            .records()
+            .len(),
+        1
+    );
+    assert!(host.store.inspect(child).await.unwrap().queued.is_empty());
+    drop(tool);
+    drop(opened);
+    drop(child_owner);
+    host.shutdown().await.unwrap();
 }
 
 async fn settle_with_cleanup(

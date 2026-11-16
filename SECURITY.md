@@ -546,7 +546,35 @@ load `https://grida.co` while dev loads `http://localhost:3000`;
 `shell.openExternal` after validation; `will-attach-webview` rejects;
 every main-process IPC handler validates `event.senderFrame.url`.
 
-**Native command adapter.** A host can construct the adapter for one
+**Explicit Full access.** The ordinary restricted profile retains all command
+and filesystem exclusions below. A trusted launch can separately opt into
+Full access, and Desktop Main requires an in-app confirmation for the exact
+attached chat before selecting it. The private, negotiated permission-mode
+operation is not a model tool. The host records the per-chat selection and
+captures it with accepted work; another chat and newly created chats remain
+restricted. Changes require an idle chat, an empty queue and no running
+command process. Workers inherit their assignment's captured posture.
+
+Full access deliberately removes model-command filesystem, network and IPC
+confinement. Same-user code can read or modify local credentials, Grida state,
+installed files and other same-user processes wherever OS permissions allow.
+Private file modes and cleared environments do not isolate these resources
+from that code. The command-level exclusions in GRIDA-SEC-004 and
+GRIDA-SEC-014 therefore apply to restricted execution, not this explicit
+posture. The renderer bridge, retained-sidecar sandbox and purpose-bound
+provider transport remain in force; none is widened to provide the escape
+hatch. Full access adds no OS privilege elevation or automatic credential
+injection and does not require automatic approval review.
+
+The native helper provides process ownership, input/output bounds, terminal
+interaction, deadlines and best-effort cleanup for unconfined launches. Its
+evidence identifies the unconfined backend and cannot claim filesystem,
+destination, hostile-process isolation or Linux PID-namespace termination.
+Detached descendants may survive. Restricted setup failure still refuses the
+launch and never selects this path. Host-owned reviewed checks retain their
+confined execution scope.
+
+**Native command adapter (restricted profile).** A host can construct the adapter for one
 authorized execution scope after probing the installed native sandbox. A model
 command runs as `<shell> -c <cmd>` in the user's named POSIX shell: the
 captured environment's `SHELL` only when it is an absolute path to an
@@ -591,7 +619,7 @@ pseudo-terminals, and resolving top-level links such as `/tmp`) are allowed;
 they grant no file contents or network access. The
 [permission policy](docs/wg/ai/agent/permissions.md) owns these defaults.
 
-Native text writes and edits run in the trusted host, not the sandbox, so they
+Restricted native text writes and edits run in the trusted host, not the sandbox, so they
 enforce the same boundary themselves. A write needs a current write grant,
 bound only after the profile's write rule admitted that exact action. The path
 is relative with normal components only; each folder is walked beneath the
@@ -612,7 +640,7 @@ carve-out: the file tools reach the host's settings file, `config.toml` in its
 configuration folder (Desktop: the workspace's folder under `chats/workspaces/`;
 headless: the state directory), as directory `agent-settings`. Nothing else
 in that folder is reachable: list, search, image and other paths are refused,
-and a launch profile cannot name a folder `agent-settings`. A read runs under
+and a launch profile cannot name a folder `agent-settings`. Under restricted access, a read runs under
 the turn's file grant. Every write or edit is an approval request bound to that
 exact action; the fixed ask rule ignores the folder rules, so neither the
 Default preset's project write rule nor an earlier approval covers it, Plan
@@ -693,8 +721,9 @@ login PTY — arbitrary code execution by design, accepted under the same
 trust model as VSCode's integrated terminal: the human runs commands as
 themselves, on their own machine, with their own privileges (no
 escalation). It is deliberately NOT wrapped in an agent sandbox and
-deliberately NOT part of the agent's tool surface — the agent's command tool
-stays confined by the native command sandbox, and no code path hands the
+deliberately NOT part of the agent's tool surface — the agent's Default command tool
+stays confined by the native command sandbox, explicit Full access uses its
+separate owned unconfined process path, and no code path hands the
 agent a handle to a human terminal. What makes the surface acceptable is that
 only the legitimate desktop renderer can reach it: the four terminal IPC
 channels are registered through the same sender-frame `guarded()` wrapper
@@ -828,6 +857,29 @@ history boundary. Development worker/helper resources live outside Forge's
 build-cleanup directory and retain the same fixed-path and binary validation.
 
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-004 .` to enumerate.
+
+- The [native activity-order owner](crates/grida-agent/src/host/activity_order.rs)
+  retains only public fact identities and bounded per-turn presentation
+  coordinates under the existing private store owner. Its files do not contain
+  text, tool arguments, provider reasoning or credentials. Ordering is assigned
+  before publication independently of subscribers; observation performs lookup
+  only and cannot invent missing historical positions. Protected native state,
+  scoped parent/child observation and session retirement still apply. The
+  [Main order decoder](desktop/src/main/native-activity-order.ts) requires the
+  negotiated contract and validates positive safe integers, incomplete markers
+  and matching attribution. Missing evidence stays unplaced; an activity
+  coordinate cannot authorize a tool, access another chat or change execution.
+  [Decoder tests](desktop/src/main/native-activity-order.test.ts) and
+  [public DTO tests](packages/grida-desktop-bridge/src/native-activity-order.test.ts)
+  retain those bounds and compatibility rules.
+
+- Full access selection and capture: [native permission mode](crates/grida-agent/src/host/access.rs),
+  [private ACP adapter](crates/grida-agent/src/acp/extensions/permission_mode.rs),
+  [Main review owner](desktop/src/main/native-agent-permission-mode.ts), and
+  [helper posture protocol](crates/agent-kit-sandbox/src/wire.rs). These add an
+  explicitly confirmed unconfined path without relaxing restricted execution
+  or retained-service containment. Headless evidence lives in the
+  [permission-mode process tests](crates/grida-agent/tests/process/full_access.rs).
 
 - The [development resource preparer](desktop/scripts/prepare-dev-native-agent.mjs)
   builds the locked Rust host and helper, strips only staged copies and verifies
@@ -3987,7 +4039,10 @@ durable or discard unrelated OAuth records.
    write them. A session working directory only selects an exact matching
    profile. Chat input and model-editable configuration confer no grants; the
    approval-gated agent settings file (GRIDA-SEC-004) stays outside every
-   command scope and accepts only reviewed defaults.
+   restricted command scope and accepts only reviewed defaults. Explicit Full
+   access relinquishes these command and file-tool exclusions; ordinary-user
+   unconfined code may reach readable credential files and mutate application
+   state. It does not receive keys automatically through the provider bridge.
    The [Desktop launch adapter](desktop/src/main/native-agent-permissions.ts)
    publishes owner-only profiles from canonical main-selected roots and
    protects the native state and additional custody paths. The profile path

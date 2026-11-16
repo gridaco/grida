@@ -1,5 +1,7 @@
 //! Product composition and ownership for native agent turns.
 
+mod access;
+pub(crate) mod activity_order;
 mod approval_review;
 mod before_tool;
 mod bundled_skills;
@@ -38,6 +40,7 @@ pub(crate) mod subagent_activity;
 mod subagents;
 mod titles;
 mod wakeups;
+pub use access::{PermissionModeReceipt, PermissionModeSnapshot, PermissionModeUpdate};
 pub use catalog::SessionCatalog;
 pub(crate) use catalog::is_archived;
 pub use compaction::{CompactRequest, CompactionReport, CompactionStatus};
@@ -206,6 +209,7 @@ pub struct Host {
     changed: Arc<Notify>,
     live_updates: broadcast::Sender<live::LiveUpdate>,
     subagent_activity: Arc<subagent_activity::State>,
+    pub(crate) activity_order: Arc<activity_order::State>,
     /// The chats' long-running command processes.
     processes: Arc<crate::processes::ProcessSessions>,
 }
@@ -615,6 +619,7 @@ enum TurnWork {
         master: Box<Master>,
         input: Vec<Message>,
         command: Option<Arc<crate::command::CommandSupervisor>>,
+        activity_parent: Option<activity_order::Parent>,
     },
     Compaction(Box<compaction::CompactionPlan>),
 }
@@ -846,6 +851,10 @@ impl Host {
             .map_err(|_| problem(ErrorKind::Unavailable, "state_directory_unavailable"))?;
         let live_updates = broadcast::channel(UPDATE_CAPACITY).0;
         Ok(Self {
+            activity_order: Arc::new(activity_order::State::new(
+                Some(state_dir.clone()),
+                store.clone(),
+            )),
             spending: Arc::new(spending::Store::new(&state_dir, store.clone())),
             store,
             state_dir: Some(state_dir.into()),
@@ -1414,6 +1423,7 @@ impl Host {
                     master,
                     input,
                     command,
+                    activity_parent,
                 } => {
                     let result = drive(
                         host.store.clone(),
@@ -1423,6 +1433,8 @@ impl Host {
                         updates_tx,
                         live,
                         host.subagent_activity.clone(),
+                        host.activity_order.clone(),
+                        activity_parent,
                     )
                     .await;
                     if let Some(command) = command {
@@ -1895,6 +1907,7 @@ impl Host {
         cancellation_only: bool,
         acceptance: Option<Acceptance>,
     ) -> Result<Option<Admitted>> {
+        let activity_parent = self.order_admission(&claim, &prepared.messages).await;
         let permission_scope = if let Some(permissions) = sponsored_permissions {
             permissions.bind_claim(claim.lease.binding().clone())?;
             Some(permissions)
@@ -2290,6 +2303,7 @@ impl Host {
                 master: Box::new(master),
                 input: prepared.messages,
                 command,
+                activity_parent,
             },
             acceptance: acceptance.map(|accepted| {
                 DurableSubmission::accepted(
@@ -4029,6 +4043,7 @@ impl ToolGate for ExecutionAuthority {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn drive(
     store: Arc<SqliteStore>,
     master: Master,
@@ -4037,9 +4052,17 @@ async fn drive(
     updates: broadcast::Sender<TurnUpdate>,
     live: Option<broadcast::Sender<live::LiveUpdate>>,
     activity: Arc<subagent_activity::State>,
+    ordering: Arc<activity_order::State>,
+    parent: Option<activity_order::Parent>,
 ) -> Result<RunResult> {
     let agent_kit_runtime::OpenedTurn { turn, mut observer } = opened;
     let binding = observer.snapshot().state.binding().clone();
+    let mut ordering = activity_order::Publisher::new(
+        ordering,
+        binding.clone(),
+        parent,
+        &observer.snapshot().state,
+    );
     let mut live = live.map(|sender| live::Publisher::new(sender, binding.clone()));
     let review = turn
         .operations()
@@ -4051,6 +4074,7 @@ async fn drive(
             return;
         }
         activity.update(&binding, &update);
+        ordering.update(&update);
         if let Some(live) = &mut live {
             live.update(&update);
         }

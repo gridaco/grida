@@ -1,4 +1,5 @@
 // GRIDA-SEC-004 — main owns workspace process and provider lifetimes.
+import path from "node:path";
 import type { Workspace } from "@grida/daemon";
 import type { WorkspaceDirectoryIdentity } from "@grida/daemon/server";
 import type {
@@ -433,6 +434,9 @@ export class NativeWorkspaceAgents {
       return {
         active: Object.freeze({
           workspaceId: workspace.id,
+          ...("root" in workspace && {
+            workspaceName: path.basename(workspace.root) || "This project",
+          }),
           profileId: profile?.id ?? null,
           ...(identity && { directoryIdentity: identity }),
           chat: opened.chat,

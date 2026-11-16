@@ -48,7 +48,9 @@ the first message.
 Open a folder in Grida Desktop and open its chat pane. The **Default** access
 shown in the composer lets the agent read and edit files in this project and
 run commands in a sandbox without asking; other folders and the internet are
-off. Type `@` to mention a file, for example “Summarize @README.md and list
+off. To let this chat use user-accessible files and the internet, open
+**Default**, choose **Full access**, and confirm the in-app dialog. New chats
+still begin with Default. Type `@` to mention a file, for example “Summarize @README.md and list
 the open TODOs.” A mention gives the agent the file's path; it reads the
 file's current contents when it needs them. To investigate without changing
 anything, type `/plan` or choose **+ → Plan mode** before you send.

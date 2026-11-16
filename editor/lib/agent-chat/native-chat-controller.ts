@@ -27,6 +27,9 @@ import type {
   NativeChatRevisionInput,
   NativeChatRevisionTarget,
   NativeChatOperatingRegime,
+  NativeChatPermissionMode,
+  NativeChatPermissionState,
+  NativeChatPermissionReview,
   NativeChatEffort,
   NativeChatPage,
   NativeChatProfileCatalog,
@@ -57,6 +60,16 @@ import { video_attachment } from "./video-attachment";
 import { image_attachment_preview } from "./image-attachment-preview";
 import { NativeSubagentController } from "./native-subagent-controller";
 import { NativeBackgroundProcessController } from "./native-background-process-controller";
+
+/** Composer choices made before opening a workspace; all execution uses existing APIs. */
+export type NativeChatInitialComposer = Readonly<{
+  effort?: NativeChatEffort;
+  operatingRegime?: NativeChatOperatingRegime;
+  goal?: boolean;
+  attachment?: Readonly<{ kind: "file" | "directory"; file: File }>;
+  /** A reload cannot recreate the original disk-backed File. */
+  missingAttachment?: Readonly<{ kind: "file" | "directory"; name: string }>;
+}>;
 
 export type NativeChatEditorSurfaces = {
   readEditorSurfaces(): NativeEditorSurfaceSnapshot;
@@ -160,6 +173,12 @@ export type NativeChatView = Readonly<{
   catalogArchived: boolean;
   profiles: NativeChatProfileCatalog | null;
   profileBusy: boolean;
+  permissionMode: NativeChatPermissionState | null;
+  permissionModeAvailable: boolean;
+  permissionModeBusy: boolean;
+  permissionModeUncertain: boolean;
+  permissionModeError: string | null;
+  permissionModeReview: NativeChatPermissionReview | null;
   profileError: string | null;
   profileReadError: string | null;
   catalogEntry: NativeChatCatalogEntry | null;
@@ -250,15 +269,30 @@ export type NativeChatView = Readonly<{
   goalIntent: boolean;
   loading: boolean;
   acting: boolean;
+  /** A send is awaiting acceptance/reconciliation, including initial chat setup. */
+  submitting: boolean;
   repairing: boolean;
   error: string | null;
 }>;
 
 type Scope = {
+  permissionRead?: object;
+  permissionConfirmation?: {
+    review: NativeChatPermissionReview;
+    resolve(confirmed: boolean): void;
+  };
+  pendingPermission?: {
+    mode: NativeChatPermissionMode;
+    revision: number;
+    requestId: string;
+    review?: { reviewId: string; confirmed: boolean };
+  };
   selection?: NativeChatSelectionState;
   selectionReady?: Promise<void>;
   selectionChange?: Promise<void>;
   firstInputId?: string;
+  /** Preserved only when the same send activates a different worker route. */
+  submission?: object;
   effortRead?: Promise<void>;
   effortKnown?: boolean;
   id: number;
@@ -403,6 +437,12 @@ const EMPTY: NativeChatView = Object.freeze({
   catalogArchived: false,
   profiles: null,
   profileBusy: false,
+  permissionMode: null,
+  permissionModeAvailable: false,
+  permissionModeBusy: false,
+  permissionModeUncertain: false,
+  permissionModeError: null,
+  permissionModeReview: null,
   profileError: null,
   profileReadError: null,
   catalogEntry: null,
@@ -458,6 +498,7 @@ const EMPTY: NativeChatView = Object.freeze({
   goalIntent: false,
   loading: false,
   acting: false,
+  submitting: false,
   repairing: false,
   error: null,
 });
@@ -935,7 +976,8 @@ export class NativeChatController {
    */
   async startChat(
     profileId: string | null,
-    take: () => string | null
+    take: () => string | null,
+    composer?: NativeChatInitialComposer
   ): Promise<string | null> {
     if (this.remembersSelection) {
       this.beginConnection();
@@ -954,8 +996,10 @@ export class NativeChatController {
       if (scope.selection?.selection?.profileId !== profileId)
         await this.saveSelection(scope, profileId, this.view.effort);
       if (this.chatStart !== run || !this.owns(scope)) return null;
+      await this.prepareFirstMessage(composer);
+      if (this.chatStart !== run || !this.owns(scope)) return null;
       this.chatStart = undefined;
-      if (!this.canSubmit || this.view.profileError)
+      if (!this.canSubmit || this.view.profileError || this.view.error)
         return this.declineMessage(take);
       const text = take();
       if (!text) return null;
@@ -963,7 +1007,7 @@ export class NativeChatController {
         await this.submit(text, scope.id);
         return null;
       } catch {
-        return text;
+        return this.keepFirstMessage(scope, text);
       }
     }
     this.beginConnection();
@@ -982,12 +1026,16 @@ export class NativeChatController {
     }
     // Closed or reconnected meanwhile: the message waits for that connection.
     if (this.chatStart !== run) return null;
-    this.chatStart = undefined;
     const scope = this.scope;
+    await this.prepareFirstMessage(composer);
+    if (this.chatStart !== run || (scope && !this.owns(scope))) return null;
+    this.chatStart = undefined;
     const ready =
       !!scope &&
       this.profileId === profileId &&
       !this.view.profileError &&
+      !this.view.error &&
+      this.canSubmit &&
       this.view.selected === null &&
       scope.requested === null &&
       !scope.attachment;
@@ -1001,8 +1049,122 @@ export class NativeChatController {
       // The send reported why; a refusal before it started has no notice yet.
       if (this.owns(scope) && !this.view.error)
         this.update({ error: MESSAGE_NOT_SENT });
-      return text;
+      return this.keepFirstMessage(scope, text);
     }
+  }
+
+  /** A late failure belongs to its originating draft, never the newly focused chat. */
+  private keepFirstMessage(scope: Scope, text: string): string | null {
+    const key = this.scopeDraftKey(scope);
+    if (key && this.drafts) {
+      const returned = text.split(/\r?\n/).map((line) => ({
+        type: "paragraph",
+        ...(line && { content: [{ type: "text", text: line }] }),
+      }));
+      const saved = this.drafts.store.read(key);
+      if (
+        saved &&
+        typeof saved === "object" &&
+        "type" in saved &&
+        saved.type === "doc" &&
+        "content" in saved &&
+        Array.isArray(saved.content)
+      ) {
+        // Preserve newer rich edits and inline references. A previous fallback
+        // may already be the document's suffix; do not append it twice.
+        const suffix = saved.content.slice(-returned.length);
+        if (JSON.stringify(suffix) !== JSON.stringify(returned))
+          this.drafts.store.write(key, {
+            ...saved,
+            content: [...saved.content, ...returned],
+          });
+      } else this.drafts.store.write(key, { type: "doc", content: returned });
+    }
+    return this.owns(scope) ? text : null;
+  }
+
+  /** Restore a Home request through this chat's ordinary composer capabilities. */
+  private async prepareFirstMessage(
+    composer?: NativeChatInitialComposer
+  ): Promise<void> {
+    const scope = this.scope;
+    if (!composer || !scope) return;
+    if (!scope.draftRestored) await this.restoreDraft(scope);
+    if (!this.owns(scope)) return;
+    let preparationError: string | undefined;
+    if (composer.effort !== undefined) {
+      if (this.remembersSelection && scope.selection?.selection)
+        await this.saveSelection(
+          scope,
+          scope.selection.selection.profileId,
+          composer.effort
+        );
+      else this.selectEffort(composer.effort);
+      if (!this.owns(scope)) return;
+      if (this.view.effort !== composer.effort || this.view.profileError) {
+        preparationError =
+          "Couldn't apply the effort selected on Home. Your request is kept in the composer.";
+      }
+    }
+    if (composer.operatingRegime !== undefined) {
+      this.selectOperatingRegime(composer.operatingRegime);
+      if (this.view.operatingRegime !== composer.operatingRegime) {
+        this.update({ operatingRegime: composer.operatingRegime });
+        this.saveDraftModes();
+        preparationError =
+          "Plan mode is unavailable in this chat. Your request is kept in the composer.";
+      }
+    }
+    if (composer.goal !== undefined) {
+      this.selectGoalIntent(composer.goal);
+      if (this.view.goalIntent !== composer.goal) {
+        preparationError =
+          this.view.error ?? "Goal mode is unavailable in this chat.";
+        this.update({ goalIntent: composer.goal });
+        this.saveDraftModes();
+      }
+    }
+    if (composer.missingAttachment) {
+      this.update({
+        attachmentDraft: {
+          kind: "file",
+          name: composer.missingAttachment.name,
+          error:
+            "The original attachment is unavailable after reloading. Attach it again before sending.",
+        },
+      });
+      return;
+    }
+    if (composer.attachment) {
+      const { file, kind } = composer.attachment;
+      await this.pickTransferredAttachment(scope.id, [composer.attachment]);
+      if (!this.owns(scope)) return;
+      if (!this.view.attachmentDraft) {
+        // Retain custody without granting access. The error prevents a send;
+        // only ordinary attachment intake may make this resource executable.
+        scope.selectedAttachment = {
+          kind: "reference",
+          name: file.name,
+          file,
+          ...(kind === "directory" && { mimeType: DIRECTORY_MIME_TYPE }),
+        };
+        this.saveDraftAttachment(scope.selectedAttachment);
+        this.update({
+          attachmentDraft: {
+            kind: "reference",
+            name: file.name,
+            ...(kind === "directory"
+              ? { mimeType: DIRECTORY_MIME_TYPE }
+              : { size: file.size }),
+            error:
+              this.view.attachmentNotice ??
+              "This chat cannot use the selected attachment. Remove it or attach it again with a compatible model.",
+          },
+        });
+      }
+    }
+    if (preparationError && this.owns(scope))
+      this.update({ error: preparationError });
   }
 
   /**
@@ -1010,9 +1172,10 @@ export class NativeChatController {
    * sent. Returns its text so the composer can keep it.
    */
   declineMessage(take: () => string | null): string | null {
+    const scope = this.scope;
     const text = take();
-    if (text) this.update({ error: MESSAGE_NOT_SENT });
-    return text;
+    if (text && !this.view.error) this.update({ error: MESSAGE_NOT_SENT });
+    return text && scope ? this.keepFirstMessage(scope, text) : text;
   }
 
   /** Begin listing this workspace's chats and connections. */
@@ -1064,6 +1227,14 @@ export class NativeChatController {
     this.profileRead = undefined;
     this.pendingFocus = undefined;
     this.queueRelease(previous);
+    // Retired observers must leave the published view before reconnect can
+    // wait on a saved connection. The retained transcript remains readable.
+    if (!this.scope)
+      this.update({
+        subagents: null,
+        backgroundProcesses: null,
+        submitting: false,
+      });
   }
 
   async listChats(
@@ -1406,6 +1577,7 @@ export class NativeChatController {
       pendingGoalStart: previous.pendingGoalStart,
       pendingCommand: previous.pendingCommand,
       startsWithMessage: previous.startsWithMessage,
+      submission: previous.submission,
       draftReady: previous.draftRestored ? Promise.resolve() : undefined,
       draftRestored: previous.draftRestored,
       pendingRestoreFailed: previous.pendingRestoreFailed,
@@ -1703,6 +1875,10 @@ export class NativeChatController {
       !this.scope.pendingRestoreFailed &&
       !this.view.loading &&
       !this.view.profileBusy &&
+      !this.view.permissionModeBusy &&
+      !this.view.permissionModeUncertain &&
+      (this.view.operatingRegime !== "plan" || !!this.bridge.submitInRegime) &&
+      (!this.view.goalIntent || this.canStartGoal) &&
       (!!this.scope.pending ||
         !this.remembersSelection ||
         (!!this.scope.selection?.selection &&
@@ -2126,6 +2302,193 @@ export class NativeChatController {
     });
   }
 
+  /** A mode change is native authority, separate from new-chat model defaults. */
+  async selectPermissionMode(mode: NativeChatPermissionMode): Promise<void> {
+    let scope = this.scope;
+    if (
+      !scope ||
+      this.fixed ||
+      !this.view.permissionModeAvailable ||
+      !this.bridge.permissionMode ||
+      !this.bridge.setPermissionMode ||
+      !this.bridge.reviewPermissionMode ||
+      this.view.permissionModeBusy ||
+      this.view.acting ||
+      this.view.submitting ||
+      this.view.profileBusy ||
+      this.view.loading
+    )
+      return;
+    scope.permissionRead = {};
+    this.update({ permissionModeBusy: true, permissionModeError: null });
+    try {
+      if (this.remembersSelection) scope = await this.activateSelection(scope);
+      if (!this.owns(scope)) return;
+      // Creating this exact chat submits no model work. Full access never
+      // becomes a workspace/global default or an unbound renderer preference.
+      await this.open(scope);
+      if (!this.owns(scope) || !scope.attachment) return;
+      const current = await this.bridge.permissionMode(
+        scope.attachment.attachmentId
+      );
+      if (!this.owns(scope)) return;
+      if (current.mode === mode && !scope.pendingPermission) {
+        this.update({
+          permissionMode: current,
+          permissionModeUncertain: false,
+        });
+        return;
+      }
+      const pending =
+        scope.pendingPermission?.mode === mode
+          ? scope.pendingPermission
+          : {
+              mode,
+              revision: current.revision,
+              requestId: crypto.randomUUID(),
+              review: undefined as
+                | { reviewId: string; confirmed: boolean }
+                | undefined,
+            };
+      scope.pendingPermission = pending;
+      if (
+        mode === "full_access" &&
+        current.mode !== "full_access" &&
+        !pending.review
+      ) {
+        const review = await this.bridge.reviewPermissionMode(
+          scope.attachment.attachmentId,
+          pending.revision,
+          pending.requestId
+        );
+        if (!this.owns(scope)) return;
+        const confirmed = new Promise<boolean>((resolve) => {
+          scope!.permissionConfirmation = { review, resolve };
+        });
+        this.update({ permissionModeReview: review });
+        const accepted = await confirmed;
+        if (!this.owns(scope)) return;
+        scope.permissionConfirmation = undefined;
+        this.update({ permissionModeReview: null });
+        if (!accepted) {
+          await this.bridge
+            .setPermissionMode(
+              scope.attachment.attachmentId,
+              pending.revision,
+              pending.requestId,
+              mode,
+              { reviewId: review.reviewId, confirmed: false }
+            )
+            .catch(() => {});
+          scope.pendingPermission = undefined;
+          return;
+        }
+        pending.review = { reviewId: review.reviewId, confirmed: true };
+      }
+      const next = await this.bridge.setPermissionMode(
+        scope.attachment.attachmentId,
+        pending.revision,
+        pending.requestId,
+        mode,
+        pending.review
+      );
+      if (!this.owns(scope)) return;
+      scope.pendingPermission = undefined;
+      this.update({
+        permissionMode: next ?? current,
+        permissionModeUncertain: false,
+      });
+    } catch (error) {
+      if (this.owns(scope)) {
+        const busy =
+          error instanceof Error && /permission_mode_busy/.test(error.message);
+        const changed =
+          error instanceof Error &&
+          /permission_mode_revision_changed/.test(error.message);
+        const reviewChanged =
+          error instanceof Error &&
+          /permission_mode_(review_changed|confirmation_required)/.test(
+            error.message
+          );
+        if (busy || changed) scope.pendingPermission = undefined;
+        else if (reviewChanged && scope.pendingPermission)
+          scope.pendingPermission.review = undefined;
+        this.update({
+          permissionModeUncertain: !busy && !changed && !reviewChanged,
+          permissionModeError: busy
+            ? "Finish or stop this chat's accepted work and background processes before changing access."
+            : changed
+              ? "This chat's access changed in another window. Review it and try again."
+              : reviewChanged
+                ? "Full access confirmation expired. Choose Full access again to review it."
+                : "Couldn't confirm this chat's access. Check access before sending.",
+        });
+        await this.readPermissionMode(scope, true);
+      }
+    } finally {
+      if (this.owns(scope)) this.update({ permissionModeBusy: false });
+    }
+  }
+
+  answerPermissionModeReview(confirmed: boolean): void {
+    this.scope?.permissionConfirmation?.resolve(confirmed);
+  }
+
+  async checkPermissionMode(): Promise<void> {
+    const scope = this.scope;
+    if (!scope?.attachment || this.view.permissionModeBusy) return;
+    this.update({ permissionModeBusy: true });
+    await this.readPermissionMode(scope, true);
+    if (this.owns(scope)) this.update({ permissionModeBusy: false });
+  }
+
+  private async readPermissionMode(scope: Scope, force = false): Promise<void> {
+    if (
+      (!force && this.view.permissionModeBusy) ||
+      this.fixed ||
+      !this.bridge.permissionMode ||
+      !this.bridge.acceptsPermissionMode ||
+      !scope.attachment
+    )
+      return;
+    const read = {};
+    scope.permissionRead = read;
+    const attachment = scope.attachment;
+    try {
+      const available = await this.bridge.acceptsPermissionMode();
+      const state = available
+        ? await this.bridge.permissionMode(attachment.attachmentId)
+        : null;
+      if (
+        this.owns(scope) &&
+        scope.attachment === attachment &&
+        scope.permissionRead === read &&
+        (force || !this.view.permissionModeBusy)
+      )
+        this.update({
+          permissionMode: state,
+          permissionModeUncertain: false,
+          ...(this.view.permissionModeUncertain && {
+            permissionModeError: null,
+          }),
+          permissionModeAvailable:
+            available && state?.available.includes("full_access") === true,
+        });
+    } catch {
+      if (
+        this.owns(scope) &&
+        scope.attachment === attachment &&
+        scope.permissionRead === read
+      )
+        this.update({
+          permissionModeAvailable: false,
+          permissionModeUncertain: true,
+          permissionModeError:
+            "Couldn't read this chat's access. Check access before sending.",
+        });
+    }
+  }
+
   private async readInputCapabilities(
     scope: Scope
   ): Promise<
@@ -2134,27 +2497,37 @@ export class NativeChatController {
     const attachment = scope.attachment;
     const read = {};
     scope.attachmentCapabilityRead = read;
-    const [png, file, library, reference, directory, image, queuedText] =
-      await Promise.all([
-        this.bridge.submitImage &&
-          this.bridge.acceptsPng?.().catch(() => false),
-        this.bridge.submitFile &&
-          this.bridge.acceptsFile?.().catch(() => false),
-        this.libraryPicker &&
-          this.bridge.submitWithLibrarySelection &&
-          this.bridge.librarySelections &&
-          this.bridge.answerLibrarySelection &&
-          this.bridge.acceptsLibrarySelection?.().catch(() => false),
-        this.bridge.submitFileReference &&
-          this.bridge.canReferenceFile &&
-          this.bridge.acceptsFileReference?.().catch(() => false),
-        this.bridge.submitFileReference &&
-          this.bridge.canReferenceFile &&
-          this.bridge.acceptsDirectoryReference?.().catch(() => false),
-        this.bridge.submitSelectedImage &&
-          this.bridge.acceptsSelectedImage?.().catch(() => false),
-        this.bridge.acceptsQueuedTextReplacement?.().catch(() => false),
-      ]);
+    const [
+      png,
+      file,
+      library,
+      reference,
+      directory,
+      image,
+      queuedText,
+      permissionMode,
+    ] = await Promise.all([
+      this.bridge.submitImage && this.bridge.acceptsPng?.().catch(() => false),
+      this.bridge.submitFile && this.bridge.acceptsFile?.().catch(() => false),
+      this.libraryPicker &&
+        this.bridge.submitWithLibrarySelection &&
+        this.bridge.librarySelections &&
+        this.bridge.answerLibrarySelection &&
+        this.bridge.acceptsLibrarySelection?.().catch(() => false),
+      this.bridge.submitFileReference &&
+        this.bridge.canReferenceFile &&
+        this.bridge.acceptsFileReference?.().catch(() => false),
+      this.bridge.submitFileReference &&
+        this.bridge.canReferenceFile &&
+        this.bridge.acceptsDirectoryReference?.().catch(() => false),
+      this.bridge.submitSelectedImage &&
+        this.bridge.acceptsSelectedImage?.().catch(() => false),
+      this.bridge.acceptsQueuedTextReplacement?.().catch(() => false),
+      !this.fixed &&
+        this.bridge.permissionMode &&
+        this.bridge.setPermissionMode &&
+        this.bridge.acceptsPermissionMode?.().catch(() => false),
+    ]);
     if (
       !this.owns(scope) ||
       scope.attachment !== attachment ||
@@ -2166,6 +2539,10 @@ export class NativeChatController {
     const directoryAvailable = reference === true && directory === true;
     const draft = this.view.attachmentDraft;
     this.update({
+      permissionModeAvailable:
+        permissionMode === true &&
+        (!attachment ||
+          this.view.permissionMode?.available.includes("full_access") === true),
       imageInput: png === true,
       selectedImageInput: image === true,
       fileInput: file === true,
@@ -2755,6 +3132,8 @@ export class NativeChatController {
   }
 
   get canStartGoal(): boolean {
+    if (this.view.permissionModeBusy || this.view.permissionModeUncertain)
+      return false;
     const scope = this.scope;
     return (
       !!scope &&
@@ -3174,7 +3553,11 @@ export class NativeChatController {
    * choosing Plan turns steering off and says so.
    */
   selectOperatingRegime(operatingRegime: NativeChatOperatingRegime): void {
-    if (!this.bridge.submitInRegime || this.view.acting) return;
+    if (
+      (operatingRegime === "plan" && !this.bridge.submitInRegime) ||
+      this.view.acting
+    )
+      return;
     const queues = operatingRegime === "plan" && this.view.steering;
     if (queues) this.leaveSteering();
     this.update({
@@ -3258,6 +3641,26 @@ export class NativeChatController {
   }
 
   async submit(text: string, scopeId = this.view.scope): Promise<void> {
+    const scope = this.scope;
+    if (!scope || scope.id !== scopeId)
+      throw new Error("native_chat_not_ready");
+    const submission = {};
+    scope.submission = submission;
+    this.update({ submitting: true });
+    try {
+      await this.submitInScope(text, scopeId);
+    } finally {
+      // Route activation can replace this scope during the same send. A real
+      // chat switch starts without this token and must keep its own feedback.
+      const current = this.scope;
+      if (current?.submission === submission) {
+        current.submission = undefined;
+        this.update({ submitting: false });
+      }
+    }
+  }
+
+  private async submitInScope(text: string, scopeId: number): Promise<void> {
     let scope = this.scope;
     if (!scope || scope.id !== scopeId || this.view.profileBusy)
       throw new Error("native_chat_not_ready");
@@ -5143,6 +5546,7 @@ export class NativeChatController {
       this.save();
       void this.readCatalogEntry(scope);
       void this.readCommands(scope);
+      await this.readPermissionMode(scope);
       void this.readBackgroundProcesses(scope, attachment);
       await this.renewSubscription(scope);
     });
@@ -5162,6 +5566,8 @@ export class NativeChatController {
 
   private queueRelease(scope: Scope | undefined): void {
     if (!scope) return;
+    scope.permissionConfirmation?.resolve(false);
+    scope.permissionConfirmation = undefined;
     clearTimeout(scope.timer);
     clearTimeout(scope.titleCheck);
     scope.stopEditorSurfaceOpen?.();
@@ -5484,6 +5890,7 @@ export class NativeChatController {
           this.refreshQuestions(scope, attachment, next),
           this.refreshLibrarySelection(scope, attachment, next),
           this.refreshGoal(scope, attachment, next),
+          this.readPermissionMode(scope),
         ]);
         if (!this.owns(scope)) return;
         if (!replay) return;
@@ -5921,7 +6328,14 @@ export class NativeChatController {
     const activity =
       index < 0
         ? [...recorded, update.activity]
-        : recorded.map((item, at) => (at === index ? update.activity : item));
+        : recorded.map((item, at) =>
+            at === index
+              ? {
+                  ...update.activity,
+                  ...activityOrderMetadata(item, update.activity),
+                }
+              : item
+          );
     scope.live.set(update.messageId, {
       messageId: update.messageId,
       role: "assistant",
@@ -6262,7 +6676,14 @@ function applyText(
       prefix.length === added.length &&
       prefix.every((byte, index) => byte === added[index])
     )
-      return "duplicate";
+      return previous &&
+        (previous.activityOrder !==
+          (previous.activityOrder ?? update.activityOrder) ||
+          (!previous.activityOrder &&
+            update.activityOrderIncomplete &&
+            !previous.activityOrderIncomplete))
+        ? { ...previous, ...activityOrderMetadata(previous, update) }
+        : "duplicate";
   }
   if (update.offsetBytes !== bytes || bytes + added.length > MAX_LIVE_BYTES)
     return null;
@@ -6272,8 +6693,27 @@ function applyText(
     turnId: update.turnId,
     bytes: bytes + added.length,
     text: (existing?.text ?? "") + update.text,
+    ...activityOrderMetadata(
+      previous?.turnId === update.turnId ? previous : undefined,
+      update
+    ),
     ...(activity && { activity }),
   };
+}
+
+/** A visible fact retains its first native position as text/results grow. */
+function activityOrderMetadata(
+  previous:
+    | { activityOrder?: number; activityOrderIncomplete?: true }
+    | undefined,
+  incoming: { activityOrder?: number; activityOrderIncomplete?: true }
+): { activityOrder?: number; activityOrderIncomplete?: true } {
+  const known = previous?.activityOrder ?? incoming.activityOrder;
+  if (known !== undefined)
+    return { activityOrder: known, activityOrderIncomplete: undefined };
+  return previous?.activityOrderIncomplete || incoming.activityOrderIncomplete
+    ? { activityOrderIncomplete: true }
+    : {};
 }
 
 /** Why the host refused a goal start before accepting it. */

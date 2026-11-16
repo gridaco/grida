@@ -102,8 +102,14 @@ can still be integrated honestly by the parent. The policy captures a separate b
 which does not reset with names or new children. The host enforces that allowance
 and supplies the children's declared capabilities; the policy adds no grants.
 Worker processes belong to their assignment and stop before its result can be
-collected. The host supplies that settlement barrier; the parent must own any
-work intended to continue beyond the assignment.
+collected with verified resource retirement. The native host automatically
+retires remaining assignment-owned processes at completion; a worker can leave
+a bounded process running when its assignment requires that, reporting its
+session identity and last observed state. It need not stop the process merely
+to finish or wait for expiry. Worker observations do not substitute for native
+retirement receipts, and unverified cleanup remains uncertain. The host supplies
+that settlement barrier; the parent must own any work intended to continue
+beyond the assignment.
 General worker policy is unavailable for reserved Goal work until its worker
 share has an explicit cumulative accounting contract. An existing Stop still
 settles without admitting further work.

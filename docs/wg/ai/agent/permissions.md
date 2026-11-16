@@ -31,7 +31,6 @@ decision it awaits and the owner of that decision:
 | Requirement                                                 | Unresolved decision                                                                                                           | Owner                                     |
 | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
 | Network escalation (on request, or after a sandbox refusal) | Raw execution currently has no network; reaching the network needs an attributable, enforceable network grant per action.     | Execution authority and sandbox contracts |
-| The Full access preset                                      | Whether an unconfined, network-enabled preset is offered at all, and under what trust signal.                                 | Product policy (master)                   |
 | Layered configuration (user, project, launch)               | How user-level profiles and trusted project files combine with the host's launch-scoped permission profile and settings file. | Host configuration contract               |
 
 ## Vocabulary
@@ -72,10 +71,11 @@ denial the model can act on.
   policy and grants yields the same decision, whichever tool requested it.
 - **L3 — Enforcement does not trust the decision alone.** Every effect is
   carried out through an enforcement point bound to the decided access:
-  processes run inside the operating-system sandbox, and file reads and writes
+  restricted processes run inside the operating-system sandbox, and file reads and writes
   go through one workspace file service that refuses anything outside the
   decided roots and protected paths. A bug in a tool or in the decision cannot
-  widen access.
+  widen access. An explicit Full access grant instead authorizes unconfined
+  execution and broad filesystem access; it carries no restricted-isolation claim.
 - **L4 — Approvals are exact and durable.** An answer authorizes one action's
   effect, survives restart, and is invalid for any other action.
 - **L5 — Unsupported enforcement fails closed.** Where a sandbox level cannot be
@@ -88,9 +88,21 @@ denial the model can act on.
 | --------------- | -------------------------------------------------------------- | --------------------------------------------- | ------- |
 | Read-only       | Read within workspace roots.                                   | Run with read-only access to workspace roots. | Off     |
 | Workspace-write | Read and write within workspace roots, except protected paths. | Run with the same access, confined by the OS. | Off     |
-| Full access     | Anywhere the user can.                                         | Unconfined.                                   | On      |
+| Full access     | Anywhere the user can.                                         | Unconfined, under the ordinary OS user.       | On      |
 
-Protected paths under a writable root: version-control metadata, agent
+Full access is a deliberate user grant. The host must identify the affected
+chat and explain that commands can reach user-accessible files, local services
+and the internet, including readable credentials and application state. It is
+never selected by a project file, model request, new-chat preference or failed
+sandbox setup. A trusted unattended launcher may select it explicitly.
+
+This posture relinquishes the restricted levels' filesystem and network
+isolation. It retains operation identity, captured authority, process ownership,
+cancellation and honest lifecycle evidence. It does not grant elevated OS
+privileges or inject host credentials into command environments. Automatic
+approval review is independent and is not required for Full access.
+
+Under a restricted level, protected paths under a writable root are version-control metadata, agent
 configuration directories, cloud credential directories, and the host's own
 state and credential stores. They stay readable where the level allows reads.
 
@@ -174,12 +186,19 @@ that the person and their tools can read, version and diff:
 - a **project-level** file in the project, honored only for a trusted project;
 - **launch options** that override both for one session.
 
-Each layer can set the preset or the individual sandbox level, approval mode,
+Within the host's authorized restricted profiles, each layer can set the preset or the individual sandbox level, approval mode,
 reviewer, additional writable roots, and network access. More specific layers
 win. A changed configuration applies to the next session or turn; a running
 action keeps the access it was decided with. A product may show which preset is
 active and switch between presets; it does not need settings screens for the
 individual fields.
+
+Full access requires the separate explicit user or trusted-launch choice
+defined above. A project configuration or inherited new-chat preference cannot
+authorize it. Hosts may require idle work, an empty queue and retired processes
+before changing a chat's posture so a displayed restriction cannot coexist
+with accepted broader work. Exact change receipts and retained authority must
+remain recoverable without new model work.
 
 ## Conformance scenarios
 

@@ -24,9 +24,7 @@ const RELAY_DRAIN: Duration = Duration::from_millis(500);
 const TERMINAL_COLUMNS: u16 = 80;
 const TERMINAL_ROWS: u16 = 24;
 /// How long the helper keeps ending what remains of the payload's session.
-#[cfg(target_os = "macos")]
 const SESSION_SWEEP: Duration = Duration::from_secs(2);
-#[cfg(target_os = "macos")]
 const SESSION_SWEEP_PAUSE: Duration = Duration::from_millis(5);
 
 /// What the owner asked of the helper.
@@ -76,7 +74,7 @@ pub fn run() -> bool {
     };
     match launch.task {
         Task::Probe => {
-            if probe(&launch.private_temp).is_err() {
+            if probe(&launch.private_temp, launch.enforcement).is_err() {
                 let _ = status.write_all(&[wire::STATUS_SETUP_FAILED]);
                 return false;
             }
@@ -100,6 +98,7 @@ pub fn run() -> bool {
                 cwd,
                 environment,
                 mode,
+                unconfined: launch.enforcement == wire::Enforcement::Unconfined,
             },
         ),
     }
@@ -111,6 +110,7 @@ struct Spec {
     cwd: PathBuf,
     environment: BTreeMap<String, String>,
     mode: Mode,
+    unconfined: bool,
 }
 
 /// A pseudo-terminal allocated inside the sandbox. Both ends close on exec;
@@ -134,8 +134,8 @@ struct Payload {
     /// The payload's session on macOS: its own for a terminal session, the
     /// helper's otherwise. Job control can move a process to another group
     /// of that session, which a group signal does not reach.
-    #[cfg(target_os = "macos")]
     session: i32,
+    unconfined: bool,
     /// The payload's own process group: always for a terminal session, and
     /// for a pipe session on Linux, where the helper's group reaches outside
     /// the PID namespace.
@@ -199,9 +199,16 @@ impl Payload {
         // The helper leads the launcher's process group, which holds only
         // sandboxed processes. On Linux the helper is the namespace's first
         // process, and its exit ends every other process in it.
-        #[cfg(target_os = "macos")]
-        {
-            end_session(self.session);
+        if cfg!(target_os = "macos") || self.unconfined {
+            // Never revisit a terminal session identifier after its leader
+            // was reaped: that identifier may already belong to other work.
+            let unreaped = self
+                .unreaped
+                .lock()
+                .unwrap_or_else(|error| error.into_inner());
+            if *unreaped {
+                end_session(self.session);
+            }
             unsafe { libc::kill(0, libc::SIGKILL) };
         }
         unsafe { libc::_exit(1) }
@@ -215,12 +222,9 @@ impl Payload {
         if self.group.is_some() {
             self.end();
         }
-        #[cfg(target_os = "macos")]
-        {
+        if cfg!(target_os = "macos") || self.unconfined {
             end_session(self.session)
-        }
-        #[cfg(target_os = "linux")]
-        {
+        } else {
             true
         }
     }
@@ -301,11 +305,11 @@ fn supervise(mut status: File, spec: Spec) -> bool {
     });
     let payload = Arc::new(Payload {
         pid,
-        #[cfg(target_os = "macos")]
         session: match spec.mode {
             Mode::Terminal => pid,
             _ => unsafe { libc::getsid(0) },
         },
+        unconfined: spec.unconfined,
         group: match spec.mode {
             Mode::Terminal => Some(pid),
             Mode::Pipe if cfg!(target_os = "linux") => Some(pid),
@@ -370,15 +374,16 @@ fn supervise(mut status: File, spec: Spec) -> bool {
     } else {
         wire::STATUS_GROUP_UNVERIFIED
     };
-    if !reported || (session && status.write_all(&[confirmation]).is_err()) {
+    if !reported || ((session || spec.unconfined) && status.write_all(&[confirmation]).is_err()) {
         return false;
     }
     // Keep a live group leader until the owner signals the group or closes
     // its end of the private status channel, which ends the helper.
-    #[cfg(target_os = "macos")]
-    let _ = reader.join();
-    #[cfg(target_os = "linux")]
-    drop(reader);
+    if cfg!(target_os = "macos") || spec.unconfined {
+        let _ = reader.join();
+    } else {
+        drop(reader);
+    }
     true
 }
 
@@ -412,7 +417,6 @@ fn wait_exited(pid: i32) -> std::io::Result<()> {
 /// End every process of `session` but the helper, until none remains or the
 /// sweep's time runs out. Returns whether none remains. A process table this
 /// helper cannot read leaves the session unconfirmed.
-#[cfg(target_os = "macos")]
 #[allow(unsafe_code)]
 fn end_session(session: i32) -> bool {
     let deadline = std::time::Instant::now() + SESSION_SWEEP;
@@ -485,6 +489,42 @@ fn session_members(session: i32) -> Option<Vec<i32>> {
             continue;
         }
         members.push(pid);
+    }
+    Some(members)
+}
+
+/// Linux unconfined launches share the host process table. Select only the
+/// payload's reserved session; never imply that a new session is contained.
+#[cfg(target_os = "linux")]
+#[allow(unsafe_code)]
+fn session_members(session: i32) -> Option<Vec<i32>> {
+    let own = unsafe { libc::getpid() };
+    let mut members = Vec::new();
+    for (count, entry) in std::fs::read_dir("/proc").ok()?.enumerate() {
+        if count > 1 << 20 {
+            return None;
+        }
+        let entry = entry.ok()?;
+        let Some(pid) = entry
+            .file_name()
+            .to_str()
+            .and_then(|name| name.parse::<i32>().ok())
+        else {
+            continue;
+        };
+        if pid <= 0 || pid == own || unsafe { libc::getsid(pid) } != session {
+            continue;
+        }
+        match std::fs::read_to_string(entry.path().join("stat")) {
+            Ok(stat) => {
+                let state = stat.rsplit_once(')')?.1.split_whitespace().next()?;
+                if state != "Z" && state != "X" {
+                    members.push(pid);
+                }
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(_) => return None,
+        }
     }
     Some(members)
 }
@@ -810,6 +850,29 @@ fn validate(launch: Launch) -> std::io::Result<Launch> {
     if !launch.roots.iter().all(wire::PathIdentity::matches) {
         return Err(std::io::ErrorKind::InvalidData.into());
     }
+    if launch.enforcement == wire::Enforcement::Unconfined {
+        #[allow(unsafe_code)]
+        let ordinary = unsafe {
+            libc::geteuid() != 0
+                && libc::geteuid() == libc::getuid()
+                && libc::getegid() == libc::getgid()
+        };
+        if !ordinary {
+            return Err(std::io::ErrorKind::PermissionDenied.into());
+        }
+        #[cfg(target_os = "linux")]
+        #[allow(unsafe_code)]
+        unsafe {
+            // Refuse privilege gains through setuid or file capabilities, and
+            // do not expose the supervisor to ordinary ptrace/proc inspection.
+            if libc::prctl(libc::PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) != 0
+                || libc::prctl(libc::PR_SET_DUMPABLE, 0, 0, 0, 0) != 0
+            {
+                return Err(std::io::Error::last_os_error());
+            }
+        }
+        return Ok(launch);
+    }
     #[cfg(target_os = "linux")]
     {
         let current = wire::namespaces()?;
@@ -826,16 +889,18 @@ fn validate(launch: Launch) -> std::io::Result<Launch> {
     Ok(launch)
 }
 
-fn probe(temp: &std::path::Path) -> std::io::Result<()> {
+fn probe(temp: &std::path::Path, enforcement: wire::Enforcement) -> std::io::Result<()> {
     use std::os::unix::net::UnixListener;
     // Both filesystem and abstract Unix socket authority must be unavailable
     // to payloads. Binding inside a private writable directory distinguishes
     // an IPC denial from a filesystem permission error.
-    if UnixListener::bind(temp.join("socket-probe")).is_ok() {
+    if enforcement == wire::Enforcement::Confined
+        && UnixListener::bind(temp.join("socket-probe")).is_ok()
+    {
         return Err(std::io::Error::other("unexpected Unix bind access"));
     }
     let address = std::net::SocketAddrV4::new(std::net::Ipv4Addr::LOCALHOST, 0);
-    if std::net::TcpListener::bind(address).is_ok() {
+    if enforcement == wire::Enforcement::Confined && std::net::TcpListener::bind(address).is_ok() {
         return Err(std::io::Error::other("unexpected IP bind access"));
     }
     let mut file = tempfile::tempfile_in(temp)?;

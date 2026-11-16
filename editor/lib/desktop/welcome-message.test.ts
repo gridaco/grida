@@ -34,6 +34,48 @@ describe("welcome_message", () => {
     expect(welcome_message.peek("workspace-a", storage)).toBeNull();
   });
 
+  it("hands over settings and the original selected File once", () => {
+    const storage = memoryStorage();
+    const file = new File(["notes"], "notes.txt", { type: "text/plain" });
+    const message = {
+      text: "Read these notes",
+      profileId: PROFILE,
+      effort: "high" as const,
+      operatingRegime: "plan" as const,
+      goal: false,
+      attachment: { kind: "file" as const, file },
+    };
+    expect(welcome_message.stash("settings", message, storage)).toBe(true);
+    expect(welcome_message.peek("settings", storage)).toEqual(message);
+    expect(
+      welcome_message.takeMessage("settings", storage)?.attachment?.file
+    ).toBe(file);
+    expect(welcome_message.takeMessage("settings", storage)).toBeNull();
+  });
+
+  it("keeps an unavailable original attachment explicit instead of sending text alone", () => {
+    const storage = memoryStorage();
+    storage.entries.set(
+      "grida.welcome.message.v1.reload",
+      JSON.stringify({
+        text: "Read these notes",
+        profileId: null,
+        effort: "low",
+        attachment: {
+          token: "from-another-page-runtime",
+          kind: "directory",
+          name: "References",
+        },
+      })
+    );
+    expect(welcome_message.takeMessage("reload", storage)).toEqual({
+      text: "Read these notes",
+      profileId: null,
+      effort: "low",
+      missingAttachment: { kind: "directory", name: "References" },
+    });
+  });
+
   it("reports a window that cannot keep the message", () => {
     expect(
       welcome_message.stash(
@@ -60,6 +102,14 @@ describe("welcome_message", () => {
     JSON.stringify({ text: "", profileId: null }),
     JSON.stringify({ text: "Ask", profileId: "not-a-profile" }),
     JSON.stringify({ text: 1, profileId: null }),
+    JSON.stringify({ text: "Ask", profileId: null, effort: "maximum" }),
+    JSON.stringify({
+      text: "Ask",
+      profileId: null,
+      operatingRegime: "unknown",
+    }),
+    JSON.stringify({ text: "Ask", profileId: null, goal: "yes" }),
+    JSON.stringify({ text: "Ask", profileId: null, attachment: { token: 4 } }),
   ])("reads and removes a malformed entry as none (%s)", (raw) => {
     const storage = memoryStorage();
     storage.entries.set("grida.welcome.message.v1.workspace-a", raw);

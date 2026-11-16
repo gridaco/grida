@@ -3,6 +3,7 @@ import type {
   NativeChatMessage,
   NativeChatTurn,
   NativeChatTurnRecord,
+  NativeSubagentLifecycleEvent,
 } from "@grida/desktop-bridge";
 
 /**
@@ -23,6 +24,20 @@ export namespace turn_activity {
         key: string;
         calls: readonly NativeChatActivity[];
       }>;
+
+  export type TimelineItem =
+    | Item
+    | Readonly<{
+        kind: "subagent";
+        key: string;
+        event: NativeSubagentLifecycleEvent;
+      }>;
+
+  export type Timeline = Readonly<{
+    work: readonly TimelineItem[];
+    /** Facts without a comparable retained position stay visible outside the ordered work. */
+    unplaced: readonly NativeSubagentLifecycleEvent[];
+  }>;
 
   export type Outcome = NonNullable<NativeChatTurn["status"]>;
 
@@ -173,6 +188,156 @@ export namespace turn_activity {
         });
     }
     return result;
+  }
+
+  /**
+   * Merge first-publication facts before the final grouping of consecutive
+   * calls. Inputs may contain earlier groups; each call keeps its own order.
+   * No clock or transport-arrival observation can supply a missing position.
+   */
+  export function merge(
+    work: readonly Item[],
+    events: readonly NativeSubagentLifecycleEvent[],
+    turnId: string
+  ): Timeline {
+    type Atom = Readonly<{
+      key: string;
+      order: number | undefined;
+      item:
+        | Extract<Item, { kind: "commentary" }>
+        | Readonly<{ kind: "call"; call: NativeChatActivity }>;
+    }>;
+    const parent = new Map<string, Atom>();
+    let parentConflict = false;
+    const put = (atom: Atom) => {
+      const previous = parent.get(atom.key);
+      if (
+        previous?.order !== undefined &&
+        atom.order !== undefined &&
+        previous.order !== atom.order
+      )
+        parentConflict = true;
+      if (
+        atom.item.kind === "commentary" &&
+        atom.item.message.turnId !== turnId
+      )
+        parentConflict = true;
+      parent.set(atom.key, { ...atom, order: previous?.order ?? atom.order });
+    };
+    for (const item of work) {
+      if (item.kind === "commentary") {
+        put({
+          key: `message:${item.message.messageId}`,
+          order:
+            item.message.turnId === turnId ? order(item.message) : undefined,
+          item,
+        });
+      } else {
+        for (const call of item.calls)
+          put({
+            key: `call:${call.callId}`,
+            order: order(call),
+            item: { kind: "call", call },
+          });
+      }
+    }
+    const parentOrders = [...parent.values()].map((atom) => atom.order);
+    const parentComplete =
+      !parentConflict &&
+      parentOrders.every((value) => value !== undefined) &&
+      new Set(parentOrders).size === parentOrders.length;
+    const children = new Map<string, NativeSubagentLifecycleEvent>();
+    const conflicts = new Set<string>();
+    for (const event of events) {
+      const previous = children.get(event.eventId);
+      if (
+        previous &&
+        ((order(previous) !== undefined &&
+          order(event) !== undefined &&
+          previous.activityOrder !== event.activityOrder) ||
+          previous.childId !== event.childId ||
+          previous.parentTurnId !== event.parentTurnId ||
+          previous.inputId !== event.inputId ||
+          previous.kind !== event.kind ||
+          previous.childTurnId !== event.childTurnId)
+      )
+        conflicts.add(event.eventId);
+      children.set(event.eventId, {
+        ...event,
+        activityOrder: (previous && order(previous)) ?? order(event),
+      });
+    }
+    const candidates = [...children.values()].filter(
+      (event) =>
+        event.parentTurnId === turnId &&
+        order(event) !== undefined &&
+        !conflicts.has(event.eventId)
+    );
+    const eventOrders = new Map<number, number>();
+    for (const event of candidates)
+      eventOrders.set(
+        event.activityOrder!,
+        (eventOrders.get(event.activityOrder!) ?? 0) + 1
+      );
+    const occupied = new Set(parentOrders);
+    const placed = parentComplete
+      ? candidates.filter(
+          (event) =>
+            !occupied.has(event.activityOrder) &&
+            eventOrders.get(event.activityOrder!) === 1
+        )
+      : [];
+    const placedIds = new Set(placed.map((event) => event.eventId));
+    const unplaced = [...children.values()]
+      .filter((event) => !placedIds.has(event.eventId))
+      .sort((a, b) => a.atMs - b.atMs || a.eventId.localeCompare(b.eventId));
+    const atoms: (
+      | Atom
+      | Readonly<{
+          key: string;
+          order: number;
+          item: Extract<TimelineItem, { kind: "subagent" }>;
+        }>
+    )[] = [
+      ...parent.values(),
+      ...placed.map((event) => ({
+        key: event.eventId,
+        order: event.activityOrder!,
+        item: { kind: "subagent" as const, key: event.eventId, event },
+      })),
+    ];
+    if (parentComplete) atoms.sort((a, b) => a.order! - b.order!);
+    const result: TimelineItem[] = [];
+    for (const { item } of atoms) {
+      if (item.kind !== "call") {
+        result.push(item);
+        continue;
+      }
+      const last = result.at(-1);
+      if (last?.kind === "activity")
+        result[result.length - 1] = {
+          ...last,
+          calls: [...last.calls, item.call],
+        };
+      else
+        result.push({
+          kind: "activity",
+          key: item.call.callId,
+          calls: [item.call],
+        });
+    }
+    return { work: result, unplaced };
+  }
+
+  function order(value: {
+    activityOrder?: number;
+    activityOrderIncomplete?: true;
+  }): number | undefined {
+    return !value.activityOrderIncomplete &&
+      Number.isSafeInteger(value.activityOrder) &&
+      value.activityOrder! > 0
+      ? value.activityOrder
+      : undefined;
   }
 
   const PHRASE: Record<

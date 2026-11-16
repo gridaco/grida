@@ -370,9 +370,18 @@ inspect its status, current assignment, history, and results.
 An activity view separates outstanding child work from settled history and
 keeps completed children reachable when none is working. A readable name and
 stable identity connect the child list, assignment start/finish events and the
-child's conversation. Events identify the parent work turn they belong to;
-an absent timestamp or partial history must not be filled with an invented
-chronology.
+child's conversation. Start and finish events appear among the parent turn's
+commentary and actions in their recorded publication order. Opening the same
+history later preserves that placement. An event between actions breaks their
+visual grouping; it must not be moved after the entire turn merely because it
+describes a child. A streaming text message stays one message at its first
+visible position.
+
+Events identify the parent work turn they belong to. Missing ordering evidence
+or partial history must not be filled with an invented chronology. Such events
+remain reachable in a separate section that identifies the unavailable
+relative order. A displayed time alone does not establish their position among
+other activity.
 
 Opening a child observes its exposed messages and activity without starting
 work or changing the parent conversation and its unsent input. The child's

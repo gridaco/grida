@@ -8,8 +8,10 @@ documents its launch sequence, platform requirements, and native fixtures.
 ## Decision
 
 One `agent-kit-sandbox` crate with private platform modules and one trusted
-helper executable confines finite raw commands on macOS and Linux. The raw
-network profile is denied. Native Windows raw execution is deferred: it remains
+helper executable confines finite raw commands on macOS and Linux. The confined
+raw network profile is denied. A separate explicit unconfined scope retains
+process supervision without an isolation claim; see [Explicit unconfined execution](#explicit-unconfined-execution).
+Native Windows raw execution is deferred: it remains
 unavailable until a separate backend meets the same requested profile.
 
 The adapter receives an immutable host-issued execution scope. It resolves and
@@ -222,6 +224,32 @@ capabilities. Commands needing network remain unavailable under this profile.
 A `ProxyOnly` profile is deferred; it needs an attributable per-execution mediator,
 destination checks, OS-enforced reachability, and a Linux namespace bridge.
 Proxy environment variables alone cannot establish the boundary.
+
+## Explicit unconfined execution
+
+`UnconfinedScope` is separate from `ExecutionScope`. The trusted host must
+authorize it explicitly; no confined preparation, probe or launch falls back
+to it. `Sandbox::prepare_unconfined` uses the same digest-pinned helper and
+prepared-process ownership for finite commands, pipe sessions and terminals.
+`Sandbox::new_unconfined` does not require a confinement installation. This is
+available on macOS and Linux and refuses elevated/root execution.
+
+The scope binds grants, policy revision, lifetime, temporary storage and
+process-group termination. It supplies no protected paths or network policy:
+the payload can reach anything its ordinary OS user can. The backend and
+capture fingerprint identify this posture distinctly. The helper keeps input,
+output, deadline, cancellation and owner-loss handling, while evidence reports
+`Unconfined` and never `NamespaceEnded`. A required all-descendant guarantee is
+refused. Descendants that create a new session may survive cleanup on either
+platform; hostile same-user code can also interfere with the host and helper.
+An owner-only temporary directory is cleanup organization, not isolation from
+other same-user processes.
+
+Product Full access selection, consent, persistence and permission capture
+belong to the host. Reviewed hooks retain their confined scope. No automatic
+reviewer or credential injection is introduced by this execution capability.
+
+## Filesystem identity limits
 
 Approved locations retain filesystem identity through setup. Linux can pin
 locations with descriptors and verify the mounted object before payload exec.
