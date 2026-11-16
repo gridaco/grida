@@ -210,6 +210,262 @@ mod tests {
         }
     }
 
+    async fn paused_turn(host: &Host, session: &SessionId) -> TurnView {
+        let view = host.store.inspect(session.clone()).await.unwrap();
+        let prompt = fixture_prompt(session, "original");
+        let policy = host.submission_policy(&prompt, false).unwrap();
+        let input = host
+            .capture_input(&view, prompt.id, prompt.parts, policy)
+            .await
+            .unwrap();
+        let id = input.id.clone();
+        host.store.submit(session.clone(), input).await.unwrap();
+        let view = host.store.inspect(session.clone()).await.unwrap();
+        let claim = new_claim(
+            session.clone(),
+            TurnId::new("paused-turn").unwrap(),
+            view.revision,
+            vec![id],
+        )
+        .unwrap();
+        let ClaimOutcome::Acquired(owner) = host.store.claim(claim).await.unwrap() else {
+            panic!("expected turn lease")
+        };
+        let state = owner.lease.journal().load().await.unwrap();
+        owner
+            .lease
+            .journal()
+            .commit(
+                JournalChange::new(
+                    change_id().unwrap(),
+                    state.binding().clone(),
+                    state.position(),
+                    state.controls().revision,
+                    vec![
+                        JournalAction::Control(ControlDirective::Pause),
+                        JournalAction::Suspend,
+                    ],
+                )
+                .unwrap(),
+            )
+            .await
+            .unwrap();
+        drop(owner);
+        host.store
+            .inspect(session.clone())
+            .await
+            .unwrap()
+            .current
+            .unwrap()
+    }
+
+    async fn finishing_worker(
+        host: &Host,
+        session: &SessionId,
+        turn: TurnId,
+        admitted: bool,
+    ) -> tokio::task::JoinHandle<()> {
+        let finishing = tokio::spawn(std::future::pending::<()>());
+        host.work.lock().await.active.insert(
+            session.clone(),
+            Active {
+                turn,
+                admitted,
+                handle: finishing.abort_handle(),
+                pending_stop: None,
+                missed_stop: false,
+            },
+        );
+        finishing
+    }
+
+    #[tokio::test]
+    async fn resume_waits_for_the_exact_suspended_turn_worker_to_release_the_session() {
+        let root = tempfile::tempdir().unwrap();
+        let host = fixture_host(&root.path().join("state"), "fixture");
+        let session = host
+            .new_session(root.path().canonicalize().unwrap())
+            .await
+            .unwrap();
+        let paused = paused_turn(&host, &session).await;
+        let view = host.store.inspect(session.clone()).await.unwrap();
+        let finishing = finishing_worker(&host, &session, paused.binding.turn.clone(), true).await;
+        let control = || TurnControl {
+            session: session.clone(),
+            turn: paused.binding.turn.clone(),
+            request: ChangeId::new("resume-after-suspension").unwrap(),
+            expected_session: view.revision,
+            expected_control: paused.controls.revision,
+        };
+        let work = host.suspended_work(&session, &paused.binding.turn);
+        tokio::pin!(work);
+        assert!(futures_util::poll!(work.as_mut()).is_pending());
+        // The helper holds Work throughout its SQLite read. Acquiring Work
+        // while the helper is still pending proves it reached the Notify wait.
+        let mut barrier = tokio::select! {
+            work = host.work.lock() => work,
+            result = work.as_mut() => panic!("returned before retirement: {:?}", result.err()),
+        };
+        assert!(barrier.active.contains_key(&session));
+        barrier.active.remove(&session);
+        host.changed.notify_waiters();
+        drop(barrier);
+        finishing.abort();
+        let released = tokio::time::timeout(Duration::from_secs(5), work)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(!released.active.contains_key(&session));
+        drop(released);
+        let resumed = host
+            .resume(control(), paused.binding.epoch, paused.position)
+            .await
+            .unwrap();
+        assert_eq!(resumed.binding.turn, paused.binding.turn);
+        assert_eq!(resumed.binding.epoch, paused.binding.epoch + 1);
+        assert!(!resumed.controls.paused);
+        let retried = host
+            .resume(control(), paused.binding.epoch, paused.position)
+            .await
+            .unwrap();
+        assert_eq!(retried.binding, resumed.binding);
+        host.shutdown().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_suspended_worker_handoff_keeps_the_original_resume_basis() {
+        for (basis, code) in [
+            ("session", "stale_session_revision"),
+            ("epoch", "suspension_mismatch"),
+            ("position", "suspension_mismatch"),
+            ("control", "pause_state_changed"),
+        ] {
+            let root = tempfile::tempdir().unwrap();
+            let host = fixture_host(&root.path().join("state"), "fixture");
+            let session = host
+                .new_session(root.path().canonicalize().unwrap())
+                .await
+                .unwrap();
+            let paused = paused_turn(&host, &session).await;
+            let view = host.store.inspect(session.clone()).await.unwrap();
+            let finishing =
+                finishing_worker(&host, &session, paused.binding.turn.clone(), true).await;
+            let mut control = TurnControl {
+                session: session.clone(),
+                turn: paused.binding.turn.clone(),
+                request: ChangeId::new("stale-resume").unwrap(),
+                expected_session: view.revision,
+                expected_control: paused.controls.revision,
+            };
+            let mut epoch = paused.binding.epoch;
+            let mut position = paused.position;
+            match basis {
+                "session" => control.expected_session.0 += 1,
+                "epoch" => epoch += 1,
+                "position" => position.0 += 1,
+                "control" => control.expected_control.0 += 1,
+                _ => unreachable!(),
+            }
+            let waiting = host.suspended_work(&session, &paused.binding.turn);
+            tokio::pin!(waiting);
+            assert!(futures_util::poll!(waiting.as_mut()).is_pending());
+            let mut barrier = tokio::select! {
+                work = host.work.lock() => work,
+                result = waiting.as_mut() => panic!("returned before retirement: {:?}", result.err()),
+            };
+            let resume = tokio::spawn({
+                let host = host.clone();
+                async move { host.resume(control, epoch, position).await }
+            });
+            barrier.active.remove(&session);
+            host.changed.notify_waiters();
+            drop(barrier);
+            finishing.abort();
+            drop(waiting.await.unwrap());
+            assert_eq!(resume.await.unwrap().unwrap_err().code, code, "{basis}");
+            let unchanged = host.store.inspect(session.clone()).await.unwrap();
+            assert_eq!(unchanged.revision, view.revision);
+            assert_eq!(unchanged.current.unwrap(), paused);
+            host.shutdown().await.unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn resume_does_not_wait_for_running_foreign_or_unadmitted_work() {
+        for condition in ["running", "foreign", "unadmitted", "closed", "retiring"] {
+            let root = tempfile::tempdir().unwrap();
+            let host = fixture_host(&root.path().join("state"), "fixture");
+            let session = host
+                .new_session(root.path().canonicalize().unwrap())
+                .await
+                .unwrap();
+            let paused = paused_turn(&host, &session).await;
+            let owner = if condition == "running" {
+                let view = host.store.inspect(session.clone()).await.unwrap();
+                let ClaimOutcome::Acquired(owner) = host
+                    .store
+                    .claim(ClaimRequest {
+                        id: change_id().unwrap(),
+                        session: session.clone(),
+                        expected_revision: view.revision,
+                        selection: TurnSelection::ResumePaused {
+                            turn: paused.binding.turn.clone(),
+                            epoch: paused.binding.epoch,
+                            position: paused.position,
+                            control_revision: paused.controls.revision,
+                        },
+                    })
+                    .await
+                    .unwrap()
+                else {
+                    panic!("expected running turn lease")
+                };
+                Some(owner)
+            } else {
+                None
+            };
+            let finishing = finishing_worker(
+                &host,
+                &session,
+                if condition == "foreign" {
+                    TurnId::new("another-turn").unwrap()
+                } else {
+                    paused.binding.turn.clone()
+                },
+                condition != "unadmitted",
+            )
+            .await;
+            let view = host.store.inspect(session.clone()).await.unwrap();
+            {
+                let mut work = host.work.lock().await;
+                work.closed = condition == "closed";
+                if condition == "retiring" {
+                    work.retiring.insert(session.clone());
+                }
+            }
+            let work = tokio::time::timeout(
+                Duration::from_secs(5),
+                host.suspended_work(&session, &paused.binding.turn),
+            )
+            .await
+            .unwrap_or_else(|_| panic!("waited for {condition} work"))
+            .unwrap();
+            assert!(work.active.contains_key(&session));
+            assert!(!finishing.is_finished());
+            drop(work);
+            assert_eq!(host.store.inspect(session.clone()).await.unwrap(), view);
+            {
+                let mut work = host.work.lock().await;
+                work.active.remove(&session);
+                work.retiring.remove(&session);
+                work.closed = false;
+            }
+            finishing.abort();
+            drop(owner);
+            host.shutdown().await.unwrap();
+        }
+    }
+
     #[tokio::test]
     async fn a_queued_request_keeps_its_editor_binding() {
         let root = tempfile::tempdir().unwrap();
@@ -897,6 +1153,45 @@ impl Host {
         self.resume_claim(request, control.turn).await
     }
 
+    /// Suspension is durable before the old worker releases its host slot.
+    /// A client resuming that exact turn waits for the existing owner to leave;
+    /// other active work keeps the ordinary registration refusal.
+    async fn suspended_work(
+        &self,
+        session: &SessionId,
+        turn: &TurnId,
+    ) -> Result<MutexGuard<'_, Work>> {
+        let deadline = tokio::time::Instant::now() + SETTLING_WORKER_WAIT;
+        loop {
+            let released = self.changed.notified();
+            tokio::pin!(released);
+            released.as_mut().enable();
+            let work = self.work.lock().await;
+            if work.closed
+                || work.retiring.contains(session)
+                || !work
+                    .active
+                    .get(session)
+                    .is_some_and(|active| active.admitted && active.turn == *turn)
+            {
+                return Ok(work);
+            }
+            // This concrete store read has no Host callbacks. Keep registration
+            // locked so a new owner of the same turn cannot replace this one
+            // between observing suspension and deciding to await retirement.
+            let view = self.store.inspect(session.clone()).await?;
+            if !view.current.as_ref().is_some_and(|current| {
+                current.binding.turn == *turn && current.disposition == TurnDisposition::Suspended
+            }) {
+                return Ok(work);
+            }
+            drop(work);
+            if tokio::time::timeout_at(deadline, released).await.is_err() {
+                return Ok(self.work.lock().await);
+            }
+        }
+    }
+
     pub(super) async fn resume_claim(
         &self,
         request: ClaimRequest,
@@ -920,7 +1215,7 @@ impl Host {
             goals::require_resumable(&view, &turn)?;
         }
         let ticket = {
-            let mut work = self.work.lock().await;
+            let mut work = self.suspended_work(&session, &turn).await?;
             self.register(
                 &mut work,
                 session.clone(),
