@@ -31,7 +31,7 @@ const BEFORE_TOOL_CHECK: &str = r#"
 
 // Coreutils can resolve outside the reviewed system directories, so fixture
 // hooks run the system shell and use its builtin `printf`.
-const SHELL: &str = "/bin/sh";
+const SHELL: &str = "/bin/bash";
 const PRINTF: [&str; 3] = ["-c", r#"printf "$@""#, "printf"];
 
 fn printf_arguments<'a>(arguments: &[&'a str]) -> Vec<&'a str> {
@@ -561,13 +561,13 @@ async fn a_matching_digest_cannot_authorize_a_user_owned_hook_program() {
     let directory = fixture.profile.parent().unwrap().join("reviewed-program");
     fs::create_dir(&directory).unwrap();
     let program = directory.join("check");
-    fs::copy("/usr/bin/printf", &program).unwrap();
+    fs::copy(SHELL, &program).unwrap();
     fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
     assert_ne!(fs::metadata(&program).unwrap().uid(), 0);
     let temporary = hook(
         &fixture,
         program.to_str().unwrap(),
-        &["%s", r#"{"decision":"allow"}"#],
+        &printf_arguments(&["%s", r#"{"decision":"allow"}"#]),
         "required",
         false,
     );

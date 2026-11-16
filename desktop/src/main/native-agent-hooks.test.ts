@@ -34,7 +34,7 @@ async function fixture() {
     id: "inspect",
     event: "before_tool",
     tool: "read_file",
-    executable: await fs.realpath("/usr/bin/printf"),
+    executable: await fs.realpath("/bin/bash"),
     arguments: [],
     mode: "required",
     timeout_ms: 2000,

@@ -38,18 +38,20 @@ schema_version = 1
 [[hooks]]
 id = "team-context"
 event = "session_start"
-executable = "/usr/bin/printf"
-arguments = ["%s", '{"decision":"allow","context":"Team conventions: prefer small changes and include verification results."}']
+executable = "/bin/bash"
+arguments = ["-c", 'printf "%s" "$1"', "hook", '{"decision":"allow","context":"Team conventions: prefer small changes and include verification results."}']
 mode = "observe"
 timeout_ms = 2000
 enabled = true
 ```
 
-Use an executable available on your computer. The command uses literal arguments;
-Grida does not expand a command string, environment variables, or `~` in an
-executable path. Programs must meet the native host's system-executable ownership
-and integrity checks. Arbitrary project-local or user-owned executables are not
-supported in this initial version.
+Use a system executable whose resolved path is in `/bin` or `/usr/bin`. Aliases
+that resolve elsewhere are refused. In this example, Bash interprets the fixed
+script and receives the JSON as a separate argument. Grida passes arguments
+literally and does not expand a command string, environment variables, or `~` in
+an executable path. Programs must meet the native host's system-executable
+ownership and integrity checks. Arbitrary project-local or user-owned executables
+are not supported in this initial version.
 
 Save the file, reload it in **Settings → Hooks**, and review the command before
 trusting it. Configuration is the source of definitions; review records permission
