@@ -1468,5 +1468,5 @@ impl Host {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, any(target_os = "macos", target_os = "linux")))]
 mod tests;

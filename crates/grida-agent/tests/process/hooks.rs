@@ -29,6 +29,15 @@ const BEFORE_TOOL_CHECK: &str = r#"
     END { if (!valid) print "unexpected event"; else print response }
 "#;
 
+// Coreutils can resolve outside the reviewed system directories, so fixture
+// hooks run the system shell and use its builtin `printf`.
+const SHELL: &str = "/bin/sh";
+const PRINTF: [&str; 3] = ["-c", r#"printf "$@""#, "printf"];
+
+fn printf_arguments<'a>(arguments: &[&'a str]) -> Vec<&'a str> {
+    PRINTF.iter().chain(arguments).copied().collect()
+}
+
 fn hook(fixture: &Fixture, path: &str, arguments: &[&str], mode: &str, changed: bool) -> PathBuf {
     let path = Path::new(path).canonicalize().unwrap();
     let mut sha256: [u8; 32] = Sha256::digest(fs::read(&path).unwrap()).into();
@@ -224,7 +233,13 @@ async fn configured_completion_command_records_only_its_reviewed_decision() {
     .await;
     for (reply, mode, changed, regime, exit, check) in cases {
         let fixture = Fixture::new(true);
-        let temporary = hook(&fixture, "/usr/bin/printf", &["%s", reply], mode, changed);
+        let temporary = hook(
+            &fixture,
+            SHELL,
+            &printf_arguments(&["%s", reply]),
+            mode,
+            changed,
+        );
         let output = timeout(
             WAIT,
             fixture
@@ -334,10 +349,21 @@ async fn configured_completion_command_checks_the_real_primary_workspace() {
 #[ignore = "requires a reviewed native helper and OS confinement"]
 async fn completion_command_retains_observed_limits_without_exposing_output() {
     let cases: [(&str, &[&str], u32, &str); 2] = [
-        ("/bin/sleep", &["10"], 1_500, "completion_hook_timed_out"),
         (
-            "/usr/bin/printf",
-            &["untrusted-output:%5000s", ""],
+            SHELL,
+            &["-c", "exec /bin/sleep 10"],
+            1_500,
+            "completion_hook_timed_out",
+        ),
+        (
+            SHELL,
+            &[
+                PRINTF[0],
+                PRINTF[1],
+                PRINTF[2],
+                "untrusted-output:%5000s",
+                "",
+            ],
             20_000,
             "completion_hook_output_limit",
         ),
@@ -478,11 +504,11 @@ async fn hooks_only_configures_a_real_check_without_offering_model_commands() {
 
     let temporary = hook(
         &fixture,
-        "/usr/bin/printf",
-        &[
+        SHELL,
+        &printf_arguments(&[
             "%s",
             r#"{"decision":"deny","reason":"Independent check refused."}"#,
-        ],
+        ]),
         "required",
         false,
     );
@@ -1268,14 +1294,14 @@ async fn restart_preserves_the_selected_check_and_stop_works_without_the_handler
 }
 
 fn lifecycle_hooks(fixture: &Fixture, definitions: &[(&str, &str, &str, Option<&str>, &str)]) {
-    let executable = Path::new("/usr/bin/printf").canonicalize().unwrap();
+    let executable = Path::new(SHELL).canonicalize().unwrap();
     let digest: [u8; 32] = Sha256::digest(fs::read(&executable).unwrap()).into();
     let mut profile: Value = serde_json::from_slice(&fs::read(&fixture.profile).unwrap()).unwrap();
     profile["directories"][0]["commandRead"] = json!("allow");
     profile["command"]["hooksOnly"] = json!(true);
     profile["hooks"]=Value::Array(definitions.iter().map(|(id,event,mode,tool,reply)|json!({
         "id":id,"source":"reviewed-user-definition","event":event,"tool":tool,"enabled":true,
-        "executable":{"path":executable,"sha256":digest},"arguments":["%s",reply],"mode":mode,"timeoutMs":20_000,
+        "executable":{"path":executable,"sha256":digest},"arguments":printf_arguments(&["%s",reply]),"mode":mode,"timeoutMs":20_000,
     })).collect());
     fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
 }
