@@ -636,29 +636,43 @@ export async function proveInstalled({ binary, launcher, workdir }) {
       )
     );
 
-    chatOrganization = {
+    const otherOrganization = {
       id: 2,
       name: "other-fixture",
       display_name: "Other fixture",
     };
+    chatOrganization = otherOrganization;
     issuedGrant = "synthetic.agent.other";
-    const changed = await start([
-      ...task,
-      "--session",
-      accepted.session_id,
-      "--org-id",
-      "2",
-      "--prompt",
-      "Must stay local.",
-    ]).result;
-    assert.equal(changed.code, 1);
-    assert.match(changed.stderr, /session_execution_configuration_changed/);
-    assert.equal(changed.stdout, "");
+    // Creation records provenance. A new idle input can deliberately select
+    // another authorized funding scope while retaining visible conversation.
+    const [changedAccepted, changedFinished] = records(
+      await run([
+        ...task,
+        "--session",
+        accepted.session_id,
+        "--org-id",
+        "2",
+        "--prompt",
+        "Continue with the selected organization.",
+      ])
+    );
+    assert.equal(changedAccepted.kind, "accepted");
+    assert.equal(changedAccepted.session_id, accepted.session_id);
+    assert.notEqual(changedAccepted.turn_id, accepted.turn_id);
+    assert.equal(changedFinished.kind, "finished");
+    assert.equal(changedFinished.turn_id, changedAccepted.turn_id);
+    assert.equal(changedFinished.disposition, "succeeded");
+    checkBilling(changedFinished, "settled", "0");
     assert.equal(
       chatRequests.length,
-      3,
-      "different organization cannot dispatch saved session"
+      4,
+      "one new idle turn dispatches with the selected organization's grant"
     );
+    const changedContext = JSON.stringify(chatRequests.at(-1).messages);
+    assert(changedContext.includes("Remember this fixture."));
+    assert(changedContext.includes("Use the saved context."));
+    assert(changedContext.includes("Scoped reply"));
+    assert(changedContext.includes("Continue with the selected organization."));
 
     chatOrganization = organization;
     issuedGrant = "synthetic.agent.no-credits";
@@ -679,7 +693,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     assert.equal(rejected.account.inference_failure.code, "payment_required");
     assert.equal(
       chatRequests.length,
-      4,
+      5,
       "credit refusal is never retried or moved to another provider"
     );
     assert(!JSON.stringify(rejected).includes("private-upstream-error"));
@@ -727,9 +741,32 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     }
     assert.equal(
       chatRequests.length,
-      4,
+      5,
       "shutdown does not dispatch after a held renewal"
     );
+
+    // The shutdown retained accepted, unfinished work under organization 1.
+    // A new process must not resume or replace it using organization 2.
+    chatOrganization = otherOrganization;
+    issuedGrant = "synthetic.agent.other-retained";
+    const changedRetained = await start([
+      ...task,
+      "--session",
+      accepted.session_id,
+      "--org-id",
+      "2",
+      "--prompt",
+      "Do not rebind the accepted work.",
+    ]).result;
+    assert.equal(changedRetained.code, 1);
+    assert.match(changedRetained.stderr, /session_active_route_changed/);
+    assert.equal(changedRetained.stdout, "");
+    assert.equal(
+      chatRequests.length,
+      5,
+      "a changed organization cannot dispatch retained accepted work"
+    );
+    chatOrganization = organization;
     issuedGrant = grant;
     grantLifetimeMs = 600_000;
     for (const [scenario, expected] of [
@@ -745,10 +782,11 @@ export async function proveInstalled({ binary, launcher, workdir }) {
       assert.equal(finished.account.text, "Scoped reply");
       checkBilling(finished, expected);
     }
-    assert.equal(chatRequests.length, 7);
+    assert.equal(chatRequests.length, 8);
     assert.equal(billingReads(), readsBefore);
     checks.push(
       "installed_native_agent_scoped_chat",
+      "installed_native_agent_connection_transition",
       "installed_native_agent_renewal",
       "installed_native_agent_billing_receipt"
     );

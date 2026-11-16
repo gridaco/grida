@@ -1727,6 +1727,7 @@ async fn unconfined_stop_cancellation_and_deadlines_keep_cleanup_evidence() {
         })
         .await;
         assert!(contains(&output, "ready"));
+        assert!(wait_for_file(&fixture.workspace.join("child"), Duration::from_secs(5)).await);
         if terminal {
             cancellation.cancel();
         } else {
