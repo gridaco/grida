@@ -7,23 +7,40 @@ description: >-
   (`editor/lib/agent-chat/native-*`), plus the retained host services —
   `@grida/daemon` (DaemonServer, loopback perimeter, files/workspaces/recents,
   secrets store) and `@grida/ai-host` (media tenant, provider custody, ChatGPT
-  subscription host). Use for chat, session, tool, permission, provider,
-  compaction or stream bugs, ACP/MCP protocol changes, and sidecar route
-  changes. For pure Electron window, preload, menu, deep-link, or CDP work,
+  subscription host). Use before implementing agent features or choosing
+  their layer, including chat settings, attachments, session, tool,
+  permission, provider, compaction or stream bugs, ACP/MCP protocol changes,
+  and sidecar route changes. For pure Electron window, preload, menu, deep-link, or CDP work,
   use `desktop`.
 ---
 
 # Grida Agent System
 
-Chat runs in the **native Rust agent**. The TypeScript agent engine is gone;
-`@grida/ai-host` is now a retained media-services package with no chat loop,
-sessions, prompts, skills or tool assembly. Do not re-add chat logic to a
-TypeScript package or to `desktop/src/**`.
+Chat execution and strategy run in the **native Rust agent**. The TypeScript
+agent engine is gone; `@grida/ai-host` is now a retained media-services package
+with no chat loop, sessions, prompts, skills or tool assembly. Desktop still
+owns its client presentation, shell integration, and application preferences.
+Do not recreate an execution engine or product master there.
 
 Use [`desktop`](../desktop/SKILL.md) for Electron shell work. Adjacent:
 [`security`](../security/SKILL.md) for GRIDA-SEC-004/006/008/014,
 [`sdk-seam`](../sdk-seam/SKILL.md) for protocol changes between host and
 Desktop.
+
+## Start here
+
+Before selecting implementation files, read the canonical
+[architecture rings and placement rules](../../../docs/wg/ai/agent/index.md#architecture-rings),
+then the [native package mapping and checked dependency budgets](../../../crates/grida-agent/docs/rust-core.md#dependency-budgets).
+Record the behavior's owner, execution surface, retained-state owner, and
+affected contracts. Application behavior outside the rings is a valid result;
+an agent feature does not automatically need a core change.
+
+Keep the definitions in that WG section and the concrete budgets in the native
+binding. Link to those owners rather than copying their rules into skills,
+local instructions, or feature implementations. For a boundary change,
+identify each side's contract and required evidence before editing either side.
+Run the dependency guard when changing agent manifests or dependency budgets.
 
 ## Topology
 
@@ -51,12 +68,10 @@ Feature status: [`docs/agent/features.md`](../../../docs/agent/features.md).
 
 ## Non-obvious facts
 
-- **The master depends only on runtime + core.** Storage, providers and
-  execution arrive as host-supplied capabilities; concrete wiring lives in
-  `grida-agent`. Product policy changes go in `grida-agent-master`, not the host.
-- **Provider authority is captured per chat.** Continuation, retry,
-  compaction and recovery refuse (`*_authority_changed`) when the live
-  principal/scope/provider differs. Never "fix" this by switching providers.
+- **Provider selection and accepted-work authority have distinct lifetimes.**
+  Follow the current [native continuation contract](../../../crates/grida-agent/docs/rust-core.md#persistent-adapter-and-composition)
+  before changing selection or recovery. Do not impose a chat-lifetime
+  connection lock or silently rebind accepted work.
 - **Titles** are opt-in per launch and run on a temporary in-memory, tool-free
   host under the same execution; a rename always wins (catalogue revision).
 - **Commands** run only through `agent-kit-sandbox` (Seatbelt / bubblewrap +
@@ -93,6 +108,7 @@ Feature status: [`docs/agent/features.md`](../../../docs/agent/features.md).
 ## Verification
 
 ```sh
+cargo test -p grida-agent --locked --test dependency_boundaries
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo test --workspace --all-features --locked

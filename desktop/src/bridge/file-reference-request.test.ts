@@ -40,6 +40,25 @@ describe("FileReferenceRequest", () => {
     }
   });
 
+  it("preserves a dropped directory's exact disk-backed handle through path resolution", () => {
+    const folder = new File([], "assets");
+    const resolve = (file: File) => (file === folder ? "/project/assets" : "");
+    expect(FileReferenceRequest.available(folder, resolve)).toBe(true);
+    expect(
+      FileReferenceRequest.from({ ...input, file: folder }, resolve)
+    ).toEqual({
+      action: "submit",
+      inputId: "reference",
+      text: "Look at this.",
+      mimeType: "video/quicktime",
+      operatingRegime: "act",
+      path: "/project/assets",
+    });
+    expect(
+      FileReferenceRequest.available(new File([], "assets"), resolve)
+    ).toBe(false);
+  });
+
   it("refuses a path supplied by the page", () => {
     expect(() =>
       FileReferenceRequest.from(

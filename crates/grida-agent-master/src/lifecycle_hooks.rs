@@ -719,6 +719,7 @@ mod tests {
                 unreported_attempts: Vec::new(),
             },
             independent_review: None,
+            delegation: None,
             goal: None,
             completion_checks: Vec::new(),
             lifecycle_hooks: evidence

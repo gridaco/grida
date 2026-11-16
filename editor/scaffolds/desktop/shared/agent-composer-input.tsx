@@ -28,13 +28,15 @@ import {
   type ReactNode,
   type Ref,
 } from "react";
-import { ArrowUpIcon, SquareIcon } from "lucide-react";
+import { ArrowUpIcon, CheckIcon, PencilIcon, SquareIcon } from "lucide-react";
 import type { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
 import { ComposerDraftBinding } from "@/lib/agent-chat/composer-draft-binding";
+import { AgentComposerEditSession } from "./agent-composer-edit-session";
 import { Button } from "@app/ui/components/button";
 import { cn } from "@app/ui/lib/utils";
 import {
   ComposerContent,
+  ComposerMenuAnchor,
   ComposerProvider,
   ComposerTransfer,
   ComposerTriggerMenu,
@@ -63,6 +65,18 @@ export type ComposerCommandAction = {
 };
 
 export type AgentComposerInputProps = {
+  /** Borrow this input for an existing message; the ordinary draft is retained. */
+  editing?: Readonly<{
+    id: string;
+    text: string;
+    label: string;
+    busy?: boolean;
+    /** The edited message has retained non-text content even with empty text. */
+    allowEmpty?: boolean;
+    /** True only after confirmation. The caller then clears `editing`. */
+    onSave(text: string): Promise<boolean>;
+    onCancel(): void;
+  }>;
   catalog: ComposerCatalog;
   /** Action `/`-commands (e.g. `/compact`). Merged into the menu, ahead
    *  of the catalog's own commands, and intercepted on submit. */
@@ -128,10 +142,12 @@ export function AgentComposerInput({
   catalog,
   commandActions,
   onCommandSelect,
+  editing,
   ...rest
 }: AgentComposerInputProps) {
   // Surface action commands in the `/` menu alongside catalog commands.
   const effectiveCatalog = useMemo<ComposerCatalog>(() => {
+    if (editing) return { commands: [], mentions: [] };
     if (!commandActions || commandActions.length === 0) return catalog;
     const actionCommands = commandActions.map((a) => ({
       id: a.id,
@@ -142,19 +158,24 @@ export function AgentComposerInput({
       commands: [...actionCommands, ...catalog.commands],
       mentions: catalog.mentions,
     };
-  }, [catalog, commandActions]);
+  }, [catalog, commandActions, !!editing]);
 
   return (
     <ComposerProvider
       catalog={effectiveCatalog}
-      onCommandSelect={onCommandSelect}
+      onCommandSelect={editing ? undefined : onCommandSelect}
     >
-      <AgentComposerInner commandActions={commandActions} {...rest} />
+      <AgentComposerInner
+        editing={editing}
+        commandActions={commandActions}
+        {...rest}
+      />
     </ComposerProvider>
   );
 }
 
 function AgentComposerInner({
+  editing,
   commandActions,
   onSubmit,
   isStreaming,
@@ -179,10 +200,12 @@ function AgentComposerInner({
   const isBusy = busy ?? isStreaming;
   const composer = useComposer();
   const { readDocument, restoreDocument } = composer;
+  const [editSession] = useState(() => new AgentComposerEditSession());
   // Restore this chat's unsent draft once the editor exists, then keep every
   // change. A different chat starts from its own draft.
   const draftKey = draft?.key;
   const draftStore = draft?.store;
+  const editOwner = draftKey ?? submissionScope;
   const [binding] = useState(() => new ComposerDraftBinding());
   useEffect(() => {
     if (!draftKey || !draftStore) return;
@@ -200,8 +223,16 @@ function AgentComposerInner({
   }, [binding, draftKey, draftStore, readDocument, restoreDocument]);
   useEffect(() => {
     if (!draftKey || !draftStore || binding.held !== draftKey) return;
-    draftStore.write(draftKey, readDocument());
-  }, [binding, composer.snapshot, draftKey, draftStore, readDocument]);
+    draftStore.write(draftKey, editSession.document(editOwner, readDocument()));
+  }, [
+    binding,
+    composer.snapshot,
+    draftKey,
+    draftStore,
+    readDocument,
+    editSession,
+    editOwner,
+  ]);
   useImperativeHandle(
     draftRef,
     () => ({ appendText: composer.appendText, focus: composer.focus }),
@@ -232,6 +263,10 @@ function AgentComposerInner({
     queueSubmitGuard.mount();
     return () => queueSubmitGuard.unmount();
   }, [queueSubmitGuard]);
+  const editingRef = useRef(editing);
+  editingRef.current = editing;
+  const editOwnerRef = useRef(editOwner);
+  editOwnerRef.current = editOwner;
 
   // Minimal, neutral inline feedback for cases that would otherwise do nothing
   // visible, such as an unconfirmed send.
@@ -248,8 +283,48 @@ function AgentComposerInner({
     },
     []
   );
+  useEffect(() => {
+    const result = editSession.sync(
+      editing,
+      editOwner,
+      composer,
+      !!draftStore && !!draftKey
+    );
+    if (result === "changed" || result === "rejected") notify(null);
+    if (result === "rejected") editing?.onCancel();
+  }, [editSession, editing, editOwner, composer, notify, draftStore, draftKey]);
 
   const submit = async () => {
+    if (editing) {
+      const text = composer.submit({
+        submitted_at: Date.now(),
+        allow_empty: editing.allowEmpty,
+      })?.meta.text;
+      if (
+        text === undefined ||
+        (!editing.allowEmpty && !text.trim()) ||
+        editing.busy
+      )
+        return;
+      const lease = queueSubmitGuard.begin(submissionScope);
+      if (!lease) return;
+      setQueueingLease(lease);
+      const ownsEdit = () =>
+        queueSubmitGuard.owns(lease, submissionScopeRef.current) &&
+        editingRef.current?.id === editing.id &&
+        editSession.owns(editing.id, editOwnerRef.current);
+      try {
+        const saved = await editing.onSave(text);
+        if (!saved && ownsEdit())
+          notify("Couldn't save changes. Your edit is still here.");
+      } catch {
+        if (ownsEdit())
+          notify("Couldn't save changes. Your edit is still here.");
+      } finally {
+        if (queueSubmitGuard.finish(lease)) setQueueingLease(null);
+      }
+      return;
+    }
     if (!canSubmit) return;
     if (queueSubmitGuard.inFlightFor(submissionScope)) return;
     // No `isStreaming` early-return: submitting while a turn runs queues the
@@ -378,14 +453,30 @@ function AgentComposerInner({
   };
 
   return (
-    <div
+    <ComposerMenuAnchor
+      onKeyDownCapture={(event) => {
+        if (editing && event.key === "Escape" && !editing.busy && !isQueueing) {
+          event.preventDefault();
+          event.stopPropagation();
+          editing.onCancel();
+        }
+      }}
       className={cn(
-        "relative rounded-lg border bg-accent transition-colors [&_button:focus-visible]:ring-1! [&_button:focus-visible]:ring-inset",
+        "relative rounded-xl border bg-accent transition-colors [&_button:focus-visible]:ring-1! [&_button:focus-visible]:ring-inset",
         className
       )}
     >
-      <ComposerTriggerMenu />
-      {attachments && (
+      {!editing && <ComposerTriggerMenu />}
+      {editing && (
+        <div
+          role="status"
+          className="flex items-center gap-1.5 px-3 pt-2 text-xs text-muted-foreground"
+        >
+          <PencilIcon className="size-3.5" />
+          {editing.label}
+        </div>
+      )}
+      {!editing && attachments && (
         <div className="flex flex-wrap items-center gap-1.5 px-3 pt-2">
           {attachments}
         </div>
@@ -393,27 +484,54 @@ function AgentComposerInner({
       <ComposerContent
         autofocus={autofocus}
         onSubmitRequest={submit}
-        onTransfer={onAttachmentTransfer}
-        placeholder={placeholder}
+        readOnly={!!editing && (!!editing.busy || isQueueing)}
+        onTransfer={editing ? () => {} : onAttachmentTransfer}
+        placeholder={editing ? "Edit message…" : placeholder}
         className="px-3 pt-2"
         editorClassName="min-h-9 max-h-48 overflow-y-auto text-[15px] leading-6"
       />
       {notice && (
         <p className="px-3 pb-1 text-xs text-muted-foreground">{notice}</p>
       )}
-      <div className="flex items-center gap-1 px-2 pb-2 pt-1">
+      <div className="flex items-center gap-2 px-2 pb-2 pt-1">
         {/* Start/end tools share a shrinkable, clipping track. `ml-auto`
             creates the space-between split while the submit button stays
             outside as shrink-0, so pickers truncate before the terminal
             action is ever culled. */}
         <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden">
-          {toolbarStart}
+          {!editing && toolbarStart}
           <div className="ml-auto flex min-w-0 items-center gap-0.5 overflow-hidden">
-            {toolbarEnd}
+            {!editing && toolbarEnd}
           </div>
         </div>
         <div className="shrink-0">
-          {emptyAction && !isStreaming && !composer.snapshot.text.trim() ? (
+          {editing ? (
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={editing.busy || isQueueing}
+                onClick={editing.onCancel}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                className="rounded-xl"
+                disabled={
+                  editing.busy ||
+                  isQueueing ||
+                  (!editing.allowEmpty && !composer.snapshot.text.trim())
+                }
+                onClick={submit}
+              >
+                <CheckIcon className="size-3.5" />
+                Save changes
+              </Button>
+            </div>
+          ) : emptyAction && !isStreaming && !composer.snapshot.text.trim() ? (
             <Button
               type="button"
               size="icon-xs"
@@ -453,7 +571,7 @@ function AgentComposerInner({
           )}
         </div>
       </div>
-    </div>
+    </ComposerMenuAnchor>
   );
 }
 

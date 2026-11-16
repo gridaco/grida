@@ -131,7 +131,8 @@ impl Host {
         allow_wakeups: bool,
     ) -> Result<DurableSubmission> {
         self.owned_control(move |host| async move {
-            host.accept_goal(request, goal, allow_wakeups, None).await
+            host.accept_goal(request, goal, allow_wakeups, None, None)
+                .await
         })
         .await
     }
@@ -146,8 +147,29 @@ impl Host {
         allow_wakeups: bool,
     ) -> Result<DurableSubmission> {
         self.owned_control(move |host| async move {
-            host.accept_goal(request, goal, allow_wakeups, Some(max_cost_mills))
+            host.accept_goal(request, goal, allow_wakeups, Some(max_cost_mills), None)
                 .await
+        })
+        .await
+    }
+
+    pub(crate) async fn start_goal_with_selection(
+        &self,
+        request: PromptRequest,
+        goal: GoalRequest,
+        allow_wakeups: bool,
+        max_cost_mills: Option<String>,
+        selection_revision: Option<u64>,
+    ) -> Result<DurableSubmission> {
+        self.owned_control(move |host| async move {
+            host.accept_goal(
+                request,
+                goal,
+                allow_wakeups,
+                max_cost_mills,
+                selection_revision,
+            )
+            .await
         })
         .await
     }
@@ -164,6 +186,7 @@ impl Host {
         goal: GoalRequest,
         allow_wakeups: bool,
         max_cost_mills: Option<String>,
+        selection_revision: Option<u64>,
     ) -> Result<DurableSubmission> {
         self.refuse_in_side_chat(&request.session, side_chats::Refusal::Goals)
             .await?;
@@ -187,25 +210,38 @@ impl Host {
             .store
             .input(request.session.clone(), request.id.clone())
             .await?;
-        let spending = max_cost_mills
-            .as_ref()
-            .map(|maximum| {
-                if !self.supports_goal_spending() {
-                    return Err(problem(ErrorKind::Unsupported, "goal_spending_unavailable"));
+        let spending = if let Some(accepted) = &previous {
+            // An exact retry observes the original funding capture. Selecting
+            // another connection cannot rewrite it or allocate a second budget.
+            let stored = retained_goal_prompt(&accepted.input)?;
+            match (max_cost_mills.as_deref(), stored.spending) {
+                (None, None) => None,
+                (Some(maximum), Some(selection)) if selection.matches_maximum(maximum)? => {
+                    Some(selection)
                 }
-                let gateway = self
-                    .supervised_gateway()
-                    .ok_or_else(|| problem(ErrorKind::Unsupported, "goal_spending_unavailable"))?;
-                gateway.validate()?;
-                spending::Store::select(
-                    gateway.scope,
-                    &request.session,
-                    &request.id,
-                    maximum,
-                    goal.allowance.inference_steps.get(),
-                )
-            })
-            .transpose()?;
+                _ => return Err(problem(ErrorKind::Conflict, "input_identity_reused")),
+            }
+        } else {
+            max_cost_mills
+                .as_ref()
+                .map(|maximum| {
+                    if !self.supports_goal_spending() {
+                        return Err(problem(ErrorKind::Unsupported, "goal_spending_unavailable"));
+                    }
+                    let gateway = self.supervised_gateway().ok_or_else(|| {
+                        problem(ErrorKind::Unsupported, "goal_spending_unavailable")
+                    })?;
+                    gateway.validate()?;
+                    spending::Store::select(
+                        gateway.scope,
+                        &request.session,
+                        &request.id,
+                        maximum,
+                        goal.allowance.inference_steps.get(),
+                    )
+                })
+                .transpose()?
+        };
         if let Some(accepted) = previous {
             let stored = retained_goal_prompt(&accepted.input)?;
             if stored.goal.as_ref() != Some(&GoalInput::Start(goal))
@@ -252,7 +288,7 @@ impl Host {
         let mut attempts = 0;
         let (accepted, title) = loop {
             let view = self.store.inspect(request.session.clone()).await?;
-            self.check_execution(&view)?;
+            self.check_execution(&view).await?;
             if self
                 .permissions
                 .as_ref()
@@ -282,6 +318,8 @@ impl Host {
                 self.check_ready_capacity(&request.session).await?;
             }
             let mut policy = self.submission_policy(&request, allow_wakeups)?;
+            policy.selection_revision = selection_revision;
+            policy.selection_goal = true;
             if goal.named_child.is_some() && !policy.operating_regime.is_act() {
                 return Err(problem(
                     ErrorKind::Unsupported,
@@ -361,6 +399,7 @@ impl Host {
             .filter(|profile| profile.parent() == parent && profile.sponsorship().is_none())
             .ok_or_else(unavailable)?;
         self.check_execution(&child_view)
+            .await
             .map_err(|_| unavailable())?;
         let allocation = profile
             .allocation(&child_view.driver_state)
@@ -417,7 +456,7 @@ impl Host {
     pub async fn recover_goal_work(&self, session: SessionId) -> Result<()> {
         self.owned_control(move |host| async move {
             let view = host.store.inspect(session.clone()).await?;
-            host.check_execution(&view)?;
+            host.check_execution(&view).await?;
             if view.driver_state.value().is_none() {
                 return Err(problem(ErrorKind::Unavailable, "goal_missing"));
             }
@@ -575,6 +614,23 @@ impl Host {
             id,
             payload: encode_stored_prompt(&captured)?,
         }))
+    }
+
+    pub(super) async fn goal_matches_execution(&self, view: &SessionView) -> Result<bool> {
+        let Some(value) = view.driver_state.value() else {
+            return Ok(true);
+        };
+        let goal = Goal::decode(value)?;
+        let original = self
+            .store
+            .input(view.session.clone(), goal.basis().goal.clone())
+            .await?
+            .ok_or_else(|| problem(ErrorKind::InvalidState, "goal_origin_unavailable"))?;
+        Ok(CapturedRoute::admits(
+            &original.input,
+            self.execution()?,
+            session_configuration(view)?.execution,
+        ))
     }
 
     async fn goal_origin(
@@ -783,8 +839,8 @@ impl Host {
             wake.revision != view.revision
                 || wake.binding != current.binding
                 || wake.position != current.position
-                || self.check_execution(view).is_err()
-        }) || require_resumable(view, &current.binding.turn).is_err()
+        }) || (wake.is_some() && self.check_execution(view).await.is_err())
+            || require_resumable(view, &current.binding.turn).is_err()
         {
             return;
         }

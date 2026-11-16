@@ -13,7 +13,7 @@ type ProcessBridge = Required<
 >;
 type View = Readonly<{
   processes: readonly NativeChatBackgroundProcess[];
-  /** Processes still running; the indicator shows only while this is > 0. */
+  /** Processes still running; completed entries remain available in activity. */
   running: number;
   /** The processes a stop request is waiting on, or `"all"`. */
   stopping: readonly number[] | "all" | null;

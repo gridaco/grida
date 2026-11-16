@@ -8,16 +8,18 @@ use agent_kit_core::WaitId;
 const ENQUEUE: &str = "co.grida/session/enqueue";
 const INPUT: &str = "co.grida/session/input";
 const REPLACE: &str = "co.grida/session/replace";
+const REPLACE_TEXT: &str = "co.grida/session/replace-text";
 const WITHDRAW: &str = "co.grida/session/withdraw";
 const REORDER: &str = "co.grida/session/reorder";
 const RESUME_QUEUE: &str = "co.grida/session/resume-queue";
 const STEER: &str = "co.grida/session/steer";
 const PAUSE: &str = "co.grida/session/pause";
 const RESUME: &str = "co.grida/session/resume";
-pub(super) const CAPABILITIES: [&str; 9] = [
+pub(super) const CAPABILITIES: [&str; 10] = [
     ENQUEUE,
     INPUT,
     REPLACE,
+    REPLACE_TEXT,
     WITHDRAW,
     REORDER,
     RESUME_QUEUE,
@@ -30,10 +32,13 @@ pub(super) const CAPABILITIES: [&str; 9] = [
 #[request(method = "_co.grida/session/enqueue", response = SubmitResponse)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Enqueue {
+    #[serde(rename = "_meta")]
+    meta: Option<Meta>,
     session_id: SessionId,
     input_id: ChangeId,
     prompt: Vec<ContentBlock>,
     selected_file: Option<SelectedFile>,
+    selected_image: Option<crate::host::SelectedImage>,
     operating_regime: Option<crate::OperatingRegime>,
     effort: Option<crate::EffortPreset>,
     #[serde(default)]
@@ -57,6 +62,8 @@ struct Input {
 struct InputResponse {
     receipt: SubmitResponse,
     settings: InputSettings,
+    text_only: bool,
+    text_editable: bool,
     prompt: Vec<ContentBlock>,
 }
 
@@ -76,6 +83,16 @@ struct Replace {
     input_id: ChangeId,
     replacement_input_id: ChangeId,
     prompt: Vec<ContentBlock>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
+#[request(method = "_co.grida/session/replace-text", response = QueueResponse)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ReplaceText {
+    queue: QueueBasis,
+    input_id: ChangeId,
+    replacement_input_id: ChangeId,
+    text: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -179,6 +196,7 @@ pub(super) fn handlers(
     let enqueue = (host.clone(), sessions.clone());
     let input = (host.clone(), sessions.clone());
     let replace = (host.clone(), sessions.clone());
+    let replace_text = (host.clone(), sessions.clone());
     let withdraw = (host.clone(), sessions.clone());
     let reorder = (host.clone(), sessions.clone());
     let resume_queue = (host.clone(), sessions.clone());
@@ -201,6 +219,7 @@ pub(super) fn handlers(
                         image_intake,
                         embedded_context,
                         request.selected_file,
+                        request.selected_image,
                         &enqueue.1,
                         request.editor_endpoint_id.is_some(),
                     )?;
@@ -220,6 +239,10 @@ pub(super) fn handlers(
                                 reasoning: request.reasoning,
                             },
                             SubmissionContext {
+                                selection_revision: selection::revision(
+                                    request.meta.as_ref(),
+                                    &enqueue.1,
+                                )?,
                                 editor_endpoint: request.editor_endpoint_id,
                                 editor_presentation: request.editor_presentation,
                                 editor_svg_target: request.editor_svg_target_id,
@@ -247,6 +270,8 @@ pub(super) fn handlers(
                     Ok(InputResponse {
                         receipt: SubmitResponse::from(inspected.receipt),
                         settings: inspected.settings,
+                        text_editable: inspected.text_editable,
+                        text_only: matches!(inspected.parts.as_slice(), [PromptPart::Text { .. }]),
                         prompt: inspected.parts.into_iter().map(prompt_block).collect(),
                     })
                 }
@@ -266,6 +291,33 @@ pub(super) fn handlers(
                         questions: questions::available(&replace.1),
                     };
                     edit_queue(&replace.0, request.queue, edit).await
+                }
+                .await;
+                responder.respond_with_result(result)
+            },
+            on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |request: ReplaceText, responder, _| {
+                let result = async {
+                    require(
+                        &replace_text.1,
+                        REPLACE_TEXT,
+                        Some(&request.queue.session_id),
+                    )?;
+                    replace_text
+                        .0
+                        .replace_queued_text(
+                            request.queue.session_id,
+                            request.queue.request_id,
+                            request.queue.expected_session_revision,
+                            request.input_id,
+                            request.replacement_input_id,
+                            request.text,
+                        )
+                        .await
+                        .map(QueueResponse::from)
+                        .map_err(host_error)
                 }
                 .await;
                 responder.respond_with_result(result)
@@ -419,7 +471,7 @@ async fn edit_queue(host: &Host, queue: QueueBasis, edit: QueueEdit) -> Result<Q
     .map_err(host_error)
 }
 
-fn prompt_block(part: PromptPart) -> ContentBlock {
+pub(super) fn prompt_block(part: PromptPart) -> ContentBlock {
     match part {
         PromptPart::Text { text } => text.into(),
         PromptPart::ResourceLink {
@@ -431,9 +483,10 @@ fn prompt_block(part: PromptPart) -> ContentBlock {
             || format!("Selected skill {}.", reference.name()).into(),
             |uri| ContentBlock::ResourceLink(ResourceLink::new(reference.name(), uri)),
         ),
-        PromptPart::RetainedImage { .. } | PromptPart::Image { .. } => {
-            crate::host::RETAINED_IMAGE_LABEL.trim().into()
-        }
+        PromptPart::RetainedImage { .. }
+        | PromptPart::PreparedImage { .. }
+        | PromptPart::Image { .. }
+        | PromptPart::SelectedImage { .. } => crate::host::RETAINED_IMAGE_LABEL.trim().into(),
         PromptPart::RetainedFile { work } => {
             grida_agent_master::retained_file::display_name(work.asset().name())
                 .as_deref()

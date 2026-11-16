@@ -7,11 +7,10 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { atomicWrite } from "@grida/daemon/server";
-import {
-  NativeAgentPermissions,
-  type NativeWorkspaceSelection,
-} from "./native-agent-permissions";
+import { parse as parseToml } from "smol-toml";
+import type { NativeWorkspaceSelection } from "./native-agent-permissions";
 import type {
+  NativeGlobalHookInspection,
   NativeHookEvent,
   NativeHookInfo,
   NativeHookInspection,
@@ -70,76 +69,142 @@ export class NativeAgentHooks {
     directory: string,
     workspace: string
   ): Promise<NativeAgentHooks> {
-    await privateDirectory(directory);
+    if (!path.isAbsolute(directory) || path.normalize(directory) !== directory)
+      throw invalid();
     if (
       !path.isAbsolute(workspace) ||
       (await fs.realpath(workspace)) !== workspace
     )
       throw invalid();
     const owner = new NativeAgentHooks(directory, workspace, []);
-    return new NativeAgentHooks(directory, workspace, await owner.read());
+    try {
+      return new NativeAgentHooks(directory, workspace, await owner.read());
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message === "native_hooks_review_required"
+      )
+        throw error;
+      throw new Error("native_hooks_configuration_invalid");
+    }
   }
 
-  async review(file: string): Promise<NativeHookReview> {
-    const draft = record(parse(await boundedFile(file, MAX_FILE, false)));
-    const allowed = [
-      "id",
-      "event",
-      "tool",
-      "enabled",
-      "executable",
-      "arguments",
-      "mode",
-      "timeoutMs",
-    ];
-    if (
-      Object.keys(draft).some((key) => !allowed.includes(key)) ||
-      typeof draft.executable !== "string"
-    )
+  /** Settings owns global source inspection; no workspace registry is read. */
+  static settings(directory: string): NativeAgentHooks {
+    if (!path.isAbsolute(directory) || path.normalize(directory) !== directory)
       throw invalid();
-    const executable = await pin(draft.executable, true);
-    if (overlaps(executable.path, this.workspace)) throw invalid();
-    const captured = this.capture({
-      ...draft,
-      enabled: draft.enabled ?? true,
-      source: `user-selected:${path.basename(file)}`,
-      executable,
-    });
+    return new NativeAgentHooks(directory, "", []);
+  }
+
+  get configPath(): string {
+    return path.join(this.directory, "config.toml");
+  }
+
+  async configuration(): Promise<NativeGlobalHookInspection> {
+    try {
+      const source = await this.readSource();
+      const trusted = await this.trustedRevisions();
+      return {
+        configPath: this.configPath,
+        exists: source.exists,
+        hooks: source.hooks.map((hook) => ({
+          ...info(hook),
+          trusted: trusted.has(hook.revision),
+        })),
+        diagnostics: [],
+        activation: "new_connections",
+      };
+    } catch (error) {
+      return {
+        configPath: this.configPath,
+        exists: await fs.lstat(this.configPath).then(
+          () => true,
+          () => false
+        ),
+        hooks: [],
+        diagnostics: [hookDiagnostic(error)],
+        activation: "new_connections",
+      };
+    }
+  }
+
+  async reviewConfigured(
+    id: string,
+    revision: string
+  ): Promise<NativeHookReview> {
+    const source = await this.readSource();
+    const captured = source.hooks.find(
+      (hook) => hook.id === id && hook.revision === revision
+    );
+    if (!captured) throw new Error("native_hook_revision_changed");
     const review = Object.freeze({
       definition: info(captured),
-      workspace: this.workspace,
+      workspace: "All workspaces",
     });
     reviews.set(review, { owner: this, captured });
     return review;
   }
 
-  async install(review: NativeHookReview): Promise<void> {
+  async trust(review: NativeHookReview): Promise<void> {
     const issued = reviews.get(review);
     if (!issued || issued.owner !== this)
       throw new Error("native_hook_review_unavailable");
     reviews.delete(review);
-    const captured = issued.captured;
-    await this.mutate(async (current) => {
-      await verifyPin(captured.executable, true);
-      const next = current.filter((hook) => hook.id !== captured.id);
-      if (next.length >= 8) throw new Error("native_hook_limit");
-      const selected = [...next, captured];
-      if (this.launchContext) {
-        await NativeAgentPermissions.validateHookProfile(
-          this.launchContext.workspace,
-          await this.plan(this.launchContext.resources, selected)
+    const previous = writes.get(this.directory) ?? Promise.resolve();
+    const next = previous
+      .catch(() => {})
+      .then(async () => {
+        // Re-read the sole source and pin after the person reviewed it. No stale
+        // dialog may bless a different command or a replaced executable.
+        const current = (await this.readSource()).hooks;
+        if (!current.some((hook) => hook.revision === issued.captured.revision))
+          throw new Error("native_hook_revision_changed");
+        await verifyPin(issued.captured.executable, true);
+        const trusted = await this.trustedRevisions();
+        trusted.add(issued.captured.revision);
+        const receiptDirectory = path.join(this.directory, "agent");
+        await fs.mkdir(receiptDirectory, { mode: 0o700, recursive: true });
+        await sourceDirectory(receiptDirectory);
+        await atomicWrite(
+          path.join(receiptDirectory, "hooks-trust.json"),
+          JSON.stringify({ version: 1, revisions: [...trusted].slice(-64) }),
+          { mode: 0o600, ensure_dir: false }
         );
-      }
-      return selected;
-    });
+      });
+    writes.set(this.directory, next);
+    try {
+      await next;
+    } finally {
+      if (writes.get(this.directory) === next) writes.delete(this.directory);
+    }
   }
 
-  async remove(id: string, revision: string): Promise<void> {
-    await this.mutate(async (current) => {
-      if (!current.some((hook) => hook.id === id && hook.revision === revision))
-        throw new Error("native_hook_revision_changed");
-      return current.filter((hook) => hook.id !== id);
-    });
+  /** Retired workspace JSON/import mutation paths never change global state. */
+  async review(_file: string): Promise<NativeHookReview> {
+    throw new Error("native_hooks_config_toml_only");
+  }
+  async install(_review: NativeHookReview): Promise<void> {
+    throw new Error("native_hooks_config_toml_only");
+  }
+  async remove(_id: string, _revision: string): Promise<void> {
+    throw new Error("native_hooks_config_toml_only");
+  }
+
+  /** Create the editable global file, without executing or trusting any hook. */
+  async ensureConfig(): Promise<string> {
+    await fs.mkdir(this.directory, { recursive: true, mode: 0o700 });
+    await sourceDirectory(this.directory);
+    try {
+      await fs.writeFile(
+        this.configPath,
+        "schema_version = 1\n\n# Configure global hooks with [[hooks]].\n",
+        { flag: "wx", mode: 0o600 }
+      );
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+    }
+    await boundedFile(this.configPath, MAX_FILE, false, false, false, true);
+    return this.configPath;
   }
 
   async inspect(active: unknown): Promise<NativeHookInspection> {
@@ -158,13 +223,22 @@ export class NativeAgentHooks {
       throw protocol();
     const hooks = value.hooks.map(readInfo);
     const results = value.results.map(readResult);
-    const saved = await this.read();
+    let saved = this.selected;
+    let sourceInvalid = false;
+    try {
+      saved = (await this.readSource()).hooks;
+    } catch {
+      // An invalid future configuration cannot hide a live task's captured
+      // policy or retained results. Settings owns the source diagnostic.
+      sourceInvalid = true;
+    }
     return Object.freeze({
       supportedEvents: [...value.supportedEvents] as NativeHookEvent[],
       active: hooks,
       saved: saved.map(info),
       results,
       activation:
+        !sourceInvalid &&
         JSON.stringify(saved) === JSON.stringify(this.selected)
           ? "current"
           : "restart_required",
@@ -303,62 +377,144 @@ export class NativeAgentHooks {
       arguments: [...hook.arguments] as string[],
       timeoutMs: hook.timeoutMs as number,
     };
-    return { ...definition, revision: digest([this.workspace, definition]) };
+    return {
+      ...definition,
+      revision: digest(["global-config-v1", definition]),
+    };
   }
 
   private async read(): Promise<Stored[]> {
-    await privateDirectory(this.directory);
+    const { hooks } = await this.readSource();
+    const trusted = await this.trustedRevisions();
+    if (hooks.some((hook) => hook.enabled && !trusted.has(hook.revision)))
+      throw new Error("native_hooks_review_required");
+    return hooks;
+  }
+
+  private async readSource(): Promise<{ exists: boolean; hooks: Stored[] }> {
+    try {
+      await sourceDirectory(this.directory);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT")
+        return { exists: false, hooks: [] };
+      throw error;
+    }
     let bytes: Buffer;
     try {
       bytes = await boundedFile(
-        path.join(this.directory, "hooks.json"),
+        this.configPath,
+        MAX_FILE,
+        false,
+        false,
+        false,
+        true
+      );
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT")
+        return { exists: false, hooks: [] };
+      throw error;
+    }
+    let value: Record<string, unknown>;
+    try {
+      value = record(
+        parseToml(new TextDecoder("utf-8", { fatal: true }).decode(bytes))
+      );
+    } catch {
+      throw new Error("native_hooks_toml_invalid");
+    }
+    if (
+      Object.keys(value).some(
+        (key) => !["schema_version", "hooks"].includes(key)
+      ) ||
+      value.schema_version !== 1 ||
+      (value.hooks !== undefined && !Array.isArray(value.hooks))
+    )
+      throw new Error("native_hooks_schema_invalid");
+    const entries = value.hooks ?? [];
+    if (!Array.isArray(entries) || entries.length > 8)
+      throw new Error("native_hooks_count_invalid");
+    const hooks: Stored[] = [];
+    for (const entry of entries) {
+      const draft = record(entry);
+      if (
+        Object.keys(draft).some(
+          (key) =>
+            ![
+              "id",
+              "event",
+              "tool",
+              "enabled",
+              "executable",
+              "arguments",
+              "mode",
+              "timeout_ms",
+            ].includes(key)
+        ) ||
+        typeof draft.executable !== "string"
+      )
+        throw new Error("native_hooks_fields_invalid");
+      if (!EVENTS.includes(draft.event as NativeHookEvent))
+        throw new Error("native_hooks_event_invalid");
+      if (
+        !Number.isSafeInteger(draft.timeout_ms) ||
+        (draft.timeout_ms as number) < 1 ||
+        (draft.timeout_ms as number) > 30000
+      )
+        throw new Error("native_hooks_timeout_invalid");
+      let executable: Pin;
+      try {
+        executable = await pin(draft.executable, true);
+      } catch {
+        throw new Error("native_hooks_executable_invalid");
+      }
+      hooks.push(
+        this.capture({
+          id: draft.id,
+          event: draft.event,
+          ...(draft.tool !== undefined && { tool: draft.tool }),
+          source: this.configPath,
+          enabled: draft.enabled ?? true,
+          mode: draft.mode,
+          executable,
+          arguments: draft.arguments,
+          timeoutMs: draft.timeout_ms,
+        })
+      );
+    }
+    if (new Set(hooks.map((hook) => hook.id)).size !== hooks.length)
+      throw new Error("native_hooks_id_duplicate");
+    return { exists: true, hooks };
+  }
+
+  private async trustedRevisions(): Promise<Set<string>> {
+    const directory = path.join(this.directory, "agent");
+    let bytes: Buffer;
+    try {
+      await sourceDirectory(directory);
+      bytes = await boundedFile(
+        path.join(directory, "hooks-trust.json"),
         MAX_FILE,
         true
       );
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return new Set();
       throw error;
     }
     const value = record(parse(bytes));
     if (
-      Object.keys(value).some((key) => key !== "version" && key !== "hooks") ||
+      Object.keys(value).some(
+        (key) => !["version", "revisions"].includes(key)
+      ) ||
       value.version !== 1 ||
-      !Array.isArray(value.hooks) ||
-      value.hooks.length > 8
+      !Array.isArray(value.revisions) ||
+      value.revisions.length > 64 ||
+      value.revisions.some(
+        (revision) =>
+          typeof revision !== "string" || !/^[a-f0-9]{64}$/.test(revision)
+      )
     )
       throw invalid();
-    const hooks = value.hooks.map((raw) => {
-      const captured = this.capture(raw);
-      if (record(raw).revision !== captured.revision) throw invalid();
-      return captured;
-    });
-    if (new Set(hooks.map((hook) => hook.id)).size !== hooks.length)
-      throw invalid();
-    return hooks;
-  }
-
-  private async mutate(
-    change: (current: Stored[]) => Promise<Stored[]>
-  ): Promise<void> {
-    const previous = writes.get(this.directory) ?? Promise.resolve();
-    const next = previous
-      .catch(() => {})
-      .then(async () => {
-        const hooks = await change(await this.read());
-        const content = JSON.stringify({ version: 1, hooks });
-        if (Buffer.byteLength(content) > MAX_FILE) throw invalid();
-        await privateDirectory(this.directory);
-        await atomicWrite(path.join(this.directory, "hooks.json"), content, {
-          mode: 0o600,
-          ensure_dir: false,
-        });
-      });
-    writes.set(this.directory, next);
-    try {
-      await next;
-    } finally {
-      if (writes.get(this.directory) === next) writes.delete(this.directory);
-    }
+    return new Set(value.revisions as string[]);
   }
 }
 
@@ -372,6 +528,20 @@ async function pin(location: string, system = false): Promise<Pin> {
     true,
     system
   );
+  if (system) {
+    await noAcl(canonical);
+    for (
+      let ancestor = path.dirname(canonical);
+      ;
+      ancestor = path.dirname(ancestor)
+    ) {
+      const stat = await fs.lstat(ancestor);
+      if (!stat.isDirectory() || stat.uid !== 0 || (stat.mode & 0o022) !== 0)
+        throw invalid();
+      await noAcl(ancestor);
+      if (ancestor === path.dirname(ancestor)) break;
+    }
+  }
   return {
     path: canonical,
     sha256: [...createHash("sha256").update(data).digest()],
@@ -390,7 +560,8 @@ async function boundedFile(
   maximum: number,
   privateFile: boolean,
   executable = false,
-  system = false
+  system = false,
+  userOwned = false
 ): Promise<Buffer> {
   const handle = await fs.open(
     location,
@@ -405,12 +576,16 @@ async function boundedFile(
         (stat.uid !== process.geteuid?.() ||
           (stat.mode & 0o7777) !== 0o600 ||
           stat.nlink !== 1)) ||
+      (userOwned &&
+        (stat.uid !== process.geteuid?.() ||
+          (stat.mode & 0o022) !== 0 ||
+          stat.nlink !== 1)) ||
       (executable &&
         ((stat.mode & 0o022) !== 0 || (stat.mode & 0o111) === 0)) ||
       (system && stat.uid !== 0)
     )
       throw invalid();
-    if (privateFile) await noAcl(location);
+    if (privateFile || userOwned) await noAcl(location);
     const data = Buffer.alloc(stat.size + 1);
     const { bytesRead } = await handle.read(data, 0, data.length, 0);
     const after = await handle.stat();
@@ -441,6 +616,19 @@ async function commandTemporaryRoot(): Promise<string> {
   if (overlaps(fallback, shared))
     throw new Error("native_command_temporary_root_unavailable");
   return fallback;
+}
+/** Global config needs integrity, not secret-directory permissions. Existing
+ * Grida homes may be 0755; definitions and private receipts remain owner-writable. */
+async function sourceDirectory(location: string): Promise<void> {
+  const stat = await fs.lstat(location);
+  if (
+    !stat.isDirectory() ||
+    stat.uid !== process.geteuid?.() ||
+    (stat.mode & 0o022) !== 0 ||
+    (await fs.realpath(location)) !== location
+  )
+    throw invalid();
+  await noAcl(location);
 }
 async function privateDirectory(location: string): Promise<void> {
   const stat = await fs.lstat(location);
@@ -535,6 +723,29 @@ function overlaps(left: string, right: string): boolean {
     left.startsWith(right + path.sep) ||
     right.startsWith(left + path.sep)
   );
+}
+function hookDiagnostic(error: unknown): string {
+  const code = error instanceof Error ? error.message : "";
+  switch (code) {
+    case "native_hooks_toml_invalid":
+      return "config.toml is not valid UTF-8 TOML. Correct its syntax and reload.";
+    case "native_hooks_schema_invalid":
+      return "Use schema_version = 1 and ordered [[hooks]] tables. Other global configuration fields are not supported yet.";
+    case "native_hooks_count_invalid":
+      return "Configure at most eight hooks.";
+    case "native_hooks_fields_invalid":
+      return "A hook contains an unsupported field or is missing executable. Use id, event, executable, arguments, mode, timeout_ms, enabled and optional tool.";
+    case "native_hooks_event_invalid":
+      return "Hook event must be session_start, before_input, before_tool, after_tool or before_completion.";
+    case "native_hooks_timeout_invalid":
+      return "Hook timeout_ms must be an integer from 1 to 30000.";
+    case "native_hooks_executable_invalid":
+      return "Hook executable must name an available absolute system program owned by root, without non-owner write access or ACLs.";
+    case "native_hooks_id_duplicate":
+      return "Each hook must have a unique id.";
+    default:
+      return "The hook configuration or trust receipt is invalid or unsafe. Check file ownership and permissions, hook IDs, literal arguments, required/observe mode, and exact tool selection.";
+  }
 }
 function invalid(): Error {
   return new Error("native_hook_configuration_invalid");

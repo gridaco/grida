@@ -7,8 +7,8 @@ tags: [agent-chat, background-processes, exec-command, stop, composer]
 status: untested
 severity: high
 date: 2026-11-14
-updated: 2026-11-15
-automatable: false
+updated: 2026-11-16
+automatable: partial
 covered_by:
   - desktop/src/main/native-agent-background-processes.test.ts
   - desktop/src/main/native-chat-ipc.test.ts
@@ -27,6 +27,10 @@ neutral "N running" indicator. With none running, there is no indicator. The
 indicator opens a list of the chat's processes: the command, the end of its
 working directory, and whether it is running or ended (with its exit code).
 Each running process has Stop; the list has Stop all.
+
+The chat's activity view also exposes Processes through the same list and
+controls. Host-retained ended entries remain reachable there when the running
+indicator is absent. Closing that view has no effect on process lifetime.
 
 Typing `/stop` on its own, or choosing "stop" in the command menu, stops every
 background process of this chat. It does not stop the current turn: the turn's
@@ -55,6 +59,8 @@ has also shown that chat.
    "1 running".
 7. Type `/stop` and send. Expected: no message is sent, the turn is not
    stopped, and the indicator disappears.
+   Open Processes in the activity view. Expected: retained ended entries remain
+   readable and no running-process Stop action is offered for an ended entry.
 8. Start another long-running command, then choose "stop" in the `/` menu.
    Expected: the indicator disappears without sending a message.
 9. Start another long-running command, then reload the window. Expected:

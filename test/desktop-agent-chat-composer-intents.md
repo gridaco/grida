@@ -7,11 +7,12 @@ tags: [agent-chat, composer, plan, goal, side, keyboard, focus]
 status: untested
 severity: high
 date: 2026-11-11
-updated: 2026-11-15
+updated: 2026-11-16
 automatable: true
 covered_by:
   - editor/kits/composer/composer-command-selection.browser.ts
   - editor/lib/agent-chat/native-chat-controller.test.ts
+  - editor/app/(dev)/ui/components/composer/desktop-demo.browser.tsx
 ---
 
 ## Behavior
@@ -78,9 +79,26 @@ of disappearing.
    turn shows **You stopped** and the new message starts right away,
    ahead of any queued messages, which run after it.
 9. Queue three messages while a turn runs. Hover a row: a grip appears at its left; drag the last
-   row to the top and the order sticks after the queue refreshes. Choose
-   **…** → **Edit**: the row becomes an editable text box; Enter saves,
-   Escape cancels. The messages run in the new order. When an interruption
+   row to the top and the order sticks after the queue refreshes. The grip is
+   also keyboard reachable: Space picks up, arrow keys move, Space drops and
+   Escape cancels. After a reorder settles, moving the rows back to their
+   earlier order must keep that order rather than reviving a previous drag.
+   The local composer playground demonstrates this without a running agent;
+   **Reset examples** restores the original queue after a drag. Choose
+   **…** → **Edit**: its text opens in the same main composer, and the row stays
+   visible as **Editing**. **Save changes** or Enter replaces only that text;
+   Cancel or Escape leaves the queue unchanged. The prior unsent draft, its
+   attachment and mode chips return. During save, the input is read-only; a
+   failed save keeps the edited text for retry. No other row can steer while an
+   edit occupies the composer. Every row keeps its queue icon, including rows
+   with image thumbnails. On a runtime that supports caption replacement, edit
+   the image message's text and save: the image, captured modes and queue
+   position stay the same. Edit again and clear the caption: Save remains
+   available, and the image-only message stays queued. A text-only message
+   cannot be saved empty. The local playground covers these caption edits and
+   restores any ordinary draft and staged attachment afterward. Goals remain
+   non-editable, and an older runtime must not offer attachment text editing.
+   The messages run in the new order. When an interruption
    holds the queue with no turn running, it shows **Queue paused because you
    interrupted** with **Resume**, and the empty composer's primary button is ▶.
    A queue left waiting with nothing paused (for example after a restart)

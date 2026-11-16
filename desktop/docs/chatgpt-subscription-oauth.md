@@ -29,8 +29,7 @@ changing provider, callback, or renderer code.
 - public Codex native OAuth client id
   `app_EMoamEEZ73f0CkXaXp7hrann`, replaceable with
   `GRIDA_CHATGPT_OAUTH_CLIENT_ID`;
-- the default and tier choices from `@grida/ai-host`'s closed subscription
-  model set.
+- the generated default model from `data/ai/chatgpt-subscription.json`.
 
 The client id is public native-app identity, not a secret. Desktop accepts no
 client secret. It must not be described as Grida-owned or OpenAI-approved.
@@ -40,16 +39,65 @@ The authorization query also pins
 `codex_cli_simplified_flow=true`, and `originator=grida`. Inference sends
 `originator: grida`.
 
-The current closed model compatibility projection consists of
-`openai/gpt-5.6-sol`, `openai/gpt-5.6-terra`,
-`openai/gpt-5.6-luna`, `openai/gpt-5.5`, and `openai/gpt-5.4`. It mirrors the
-observed Zed/Codex-compatible surface, not authenticated discovery; it may
-drift, and an account can refuse a listed model.
+The current closed model compatibility projection offers **GPT-6.1 Sol** as
+its default, plus GPT-6 Astra, GPT-6.1 Terra, GPT-6 Luna, GPT-6 Sol and the
+compatible GPT-5.6 Sol, Terra and Luna models. Access depends on the person's
+ChatGPT plan and workspace. This is a subscription compatibility projection;
+public API availability does not establish subscription entitlement.
+
+Membership and the default are authored once in
+[`data/ai/chatgpt-subscription.json`](../../data/ai/chatgpt-subscription.json),
+with the dedicated
+[`subscription schema`](../../data/ai/schemas/chatgpt-subscription.schema.json).
+The standard AI catalogue generator writes both the marked TypeScript
+projection in `packages/grida-ai-host/src/protocol/chatgpt.ts` and the native
+`crates/grida-agent/data/chatgpt-subscription-models.json` asset. Follow the
+[catalogue update workflow](../../data/ai/README.md), regenerate the projections
+and check for drift; do not hand-edit a consumer's model list or default.
+Runtime consumers use these bundled generated projections.
 
 A Main-only provider network grant admits exact `auth.openai.com` and
 `chatgpt.com` HTTPS origins only on the credential-bearing provider lane. It is
 never published to the retained media sidecar. Neither origin joins the
 credential-free asset-download lane, and lookalike subdomains are refused.
+
+## Model selection
+
+Ordinary macOS and Linux Desktop exposes the closed subscription model list in
+the Welcome and workspace model pickers when its Main-owned subscription host
+reports a ready connection. A fresh chat with no persisted or explicit choice
+prefers that connection. An explicit choice takes precedence; connecting
+ChatGPT never reassigns an existing chat's provider or funding.
+
+Each choice records the subscription provider and exact model. Main resolves
+the selection through the existing OAuth host, captures that model under the
+current opaque account and sign-in lineage, and supplies only the captured
+scope and model to the native agent. Saved subscription selections are bound
+to that lineage. Reconnecting requires a new explicit selection; another
+account cannot inherit the previous selection or reopen its chat authority.
+Token rotation within the same connection preserves the lineage.
+
+GPT-5.5 and GPT-5.4 are withdrawn subscription choices. Their saved receipts
+remain readable and are presented as unavailable. Selection and dispatch
+refuse the withdrawn model until the person chooses a replacement explicitly;
+the default recommendation does not replace that saved choice.
+
+The picker projects readiness and compatibility, not OAuth material or
+account-discovered offerings. Refresh rechecks that projection. Text, tools
+and supported reasoning settings use the existing restricted Responses
+adapter. Subscription image input, provider-native compaction and
+authenticated model discovery remain unavailable. These are provider and
+product-host capabilities; the reusable agent core receives the existing
+provider contracts.
+
+Ultra is an independent harness capability available on this connection. Its
+bounded reviewer uses the parent's captured subscription model, opaque scope
+and Main-owned provider broker. It receives no OAuth material and cannot
+select another account or route. The restricted Responses adapter continues
+to omit unsupported output-token fields; inference-step bounds do not imply
+a provider-token, subscription-quota or monetary ceiling. The model's reasoning
+settings remain separate capabilities. Parent cancellation, sign-out and host
+shutdown retain ownership of child work.
 
 ## Ceremony
 
@@ -118,7 +166,7 @@ invalidates pending exchange/refresh generations before removing the durable
 record, so a late network completion cannot resurrect it.
 
 Application shutdown closes the callback and cancels its exact attempt. The
-native subscription profile also drains its workspace processes and accepted
+subscription owner also drains its workspace processes and accepted
 credential work within a bounded wait. Subscription sign-out withdraws those
 workspaces before another can open. Grida account sign-out preserves the
 separate subscription record.
@@ -132,10 +180,11 @@ inputs; there is no HTTP route. The renderer, the retained sidecar and the
 Rust executable receive no OAuth tokens. The native model request passes through the private
 provider broker, which injects credentials on the exact route.
 
-The disposable profile defaults to Gateway. Select ChatGPT explicitly with
+The disposable profile defaults to Gateway. It can select ChatGPT explicitly with
 `--native-chat-provider=chatgpt` alongside `--native-chat` on a supported
-development or Insiders profile. The experimental account and service
-availability constraints also apply to this launch.
+development or Insiders profile. That fixed launch uses the reviewed default
+subscription model. Ordinary Desktop uses the model-selection flow above;
+the experimental account and service availability constraints apply to both.
 
 The implementation never reads `~/.codex/auth.json` or another application's
 credential store.
@@ -159,6 +208,19 @@ The focused offline contract covers:
 
 A live-account smoke remains manual because it opens the system browser,
 requires the user's ChatGPT account, and may consume plan quota.
+
+### Executed native fixtures
+
+On 2026-11-15, the macOS arm64 native-resource suite in
+`desktop/src/main/native-subscription-profiles.test.ts` passed four cases for
+ordinary Desktop composition using synthetic Responses. It exercised the
+closed catalog without refresh or inference, exact selected-model and High
+reasoning dispatch, token rotation, saved-chat restart, changed-lineage refusal
+and sign-out withdrawal. An Ultra case executed a separate reviewer and
+collected its finding over the same captured model and OAuth route, excluded
+parent conversation from the child, and kept unsupported output-token fields
+absent. These fixtures establish composed host and native-process behavior;
+they do not establish a live subscription request or the Desktop UI flow.
 
 ### Executed live smoke
 

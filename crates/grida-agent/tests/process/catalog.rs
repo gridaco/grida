@@ -406,3 +406,120 @@ async fn a_first_request_titles_an_untitled_chat_without_overriding_a_rename() {
     endpoint.done().await;
     terminate_shared_server(child).await;
 }
+
+#[tokio::test]
+async fn settings_archives_are_scoped_metadata_without_attaching_or_model_execution() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let other = TempDir::new().unwrap();
+    let endpoint = Endpoint::start(vec![]).await;
+    let (child, url) = shared_server(&state, &endpoint.url).await;
+    let mut creator = organizer(&url).await;
+    let session = new_session(&mut creator, 2, workspace.path()).await;
+    let archived = ws_rpc(
+        &mut creator,
+        3,
+        "_co.grida/session/organize",
+        json!({"sessionId":session,"revision":0,"title":"Archived example","archived":true}),
+    )
+    .await;
+    assert_eq!(archived["result"]["revision"], 1);
+    let mut settings = connect_shared(&url, Some(SERVER_TOKEN), None, None)
+        .await
+        .unwrap();
+    let mut init = extension_initialize();
+    init["clientCapabilities"]["_meta"]["co.grida/settings/archive-catalog"] = 1.into();
+    let initialized = ws_rpc(&mut settings, 1, "initialize", init).await;
+    assert_eq!(
+        initialized["result"]["agentCapabilities"]["_meta"]["co.grida/settings/archive-catalog"],
+        1
+    );
+    let listed = ws_rpc(
+        &mut settings,
+        2,
+        "_co.grida/settings/archive-catalog",
+        json!({"cwd":workspace.path()}),
+    )
+    .await;
+    assert_eq!(
+        listed["result"],
+        json!({"entries":[{"sessionId":session,"title":"Archived example","revision":1}],"nextCursor":null})
+    );
+    let denied = ws_rpc(
+        &mut settings,
+        3,
+        "_co.grida/settings/unarchive",
+        json!({"cwd":other.path(),"sessionId":session,"revision":1}),
+    )
+    .await;
+    assert_eq!(denied["error"]["data"], "session_catalog_scope_mismatch");
+    let stale = ws_rpc(
+        &mut settings,
+        4,
+        "_co.grida/settings/unarchive",
+        json!({"cwd":workspace.path(),"sessionId":session,"revision":0}),
+    )
+    .await;
+    assert_eq!(stale["error"]["data"], "session_catalog_revision_changed");
+    let executable = env!("CARGO_BIN_EXE_grida-agent");
+    let competing = Command::new(executable)
+        .args(["archive-catalog", "--state-dir"])
+        .arg(&state)
+        .arg("--cwd")
+        .arg(workspace.path())
+        .output()
+        .await
+        .unwrap();
+    assert!(!competing.status.success());
+    assert!(String::from_utf8_lossy(&competing.stderr).contains("store_already_owned"));
+    drop(settings);
+    drop(creator);
+    terminate_shared_server(child).await;
+    let listed = Command::new(executable)
+        .args(["archive-catalog", "--state-dir"])
+        .arg(&state)
+        .arg("--cwd")
+        .arg(workspace.path())
+        .output()
+        .await
+        .unwrap();
+    assert!(
+        listed.status.success(),
+        "{}",
+        String::from_utf8_lossy(&listed.stderr)
+    );
+    let listed: Value = serde_json::from_slice(&listed.stdout).unwrap();
+    assert_eq!(listed["entries"][0]["sessionId"], session);
+    let restored = Command::new(executable)
+        .args(["archive-catalog", "--state-dir"])
+        .arg(&state)
+        .arg("--cwd")
+        .arg(workspace.path())
+        .arg("--unarchive")
+        .arg(&session)
+        .args(["--revision", "1"])
+        .output()
+        .await
+        .unwrap();
+    assert!(
+        restored.status.success(),
+        "{}",
+        String::from_utf8_lossy(&restored.stderr)
+    );
+    let host = grida_agent::host::Host::open(&state, None).unwrap();
+    let archived = host
+        .archive_catalog(workspace.path().to_path_buf(), None)
+        .await
+        .unwrap();
+    assert!(archived.entries.is_empty());
+    let active = host
+        .list_sessions(workspace.path().to_path_buf(), false, None)
+        .await
+        .unwrap();
+    assert_eq!(active.entries.len(), 1);
+    assert_eq!(active.entries[0].revision, 2);
+    let id = agent_kit_core::SessionId::new(&session).unwrap();
+    let view = host.inspect(id).await.unwrap();
+    assert!(view.current.is_none() && view.latest.is_none());
+}

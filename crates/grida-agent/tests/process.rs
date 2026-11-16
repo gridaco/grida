@@ -28,6 +28,9 @@ mod compaction;
 #[path = "process/configuration.rs"]
 mod configuration;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
+#[path = "process/delegation.rs"]
+mod delegation;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 #[path = "process/deletion.rs"]
 mod deletion;
 #[cfg(unix)]
@@ -53,6 +56,9 @@ mod images;
 mod lifecycle;
 #[path = "process/live.rs"]
 mod live;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[path = "process/model_change.rs"]
+mod model_change;
 #[cfg(unix)]
 #[path = "process/operating_regime.rs"]
 mod operating_regime;
@@ -70,6 +76,9 @@ mod responses;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[path = "process/retained_files.rs"]
 mod retained_files;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[path = "process/selection.rs"]
+mod selection;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[path = "process/side_chats.rs"]
 mod side_chats;
@@ -123,6 +132,7 @@ fn is_title_request(request: &Value) -> bool {
 }
 
 enum Reply {
+    Credential(&'static str, Box<Reply>),
     Finished(&'static str),
     InputCount(u64),
     InvalidInputCount,
@@ -150,6 +160,9 @@ enum Reply {
     ResponsesSigned(&'static str),
     #[cfg(unix)]
     Release(&'static str, tokio::sync::oneshot::Receiver<()>),
+    /// Hold a selected fixture response until an independent observation ends.
+    #[cfg(unix)]
+    After(tokio::sync::oneshot::Receiver<()>, Box<Reply>),
 }
 
 impl Endpoint {
@@ -389,6 +402,10 @@ async fn fixture_request(
     protocol: ProviderProtocol,
     credential: Option<&str>,
 ) {
+    let (reply, credential) = match reply {
+        Reply::Credential(credential, reply) => (*reply, Some(credential)),
+        reply => (reply, credential),
+    };
     let FixtureHead {
         line,
         authorization,
@@ -426,6 +443,14 @@ async fn fixture_request(
         other => other,
     };
     sent.send(request).unwrap();
+    #[cfg(unix)]
+    let reply = match reply {
+        Reply::After(ready, reply) => {
+            timeout(WAIT, ready).await.unwrap().unwrap();
+            *reply
+        }
+        reply => reply,
+    };
     #[cfg(unix)]
     if let Reply::RawHttp(response) = reply {
         assert!(response.len() <= 16 * 1024, "oversized fixture response");
@@ -522,6 +547,7 @@ fn fixture_body(reply: Reply, protocol: ProviderProtocol) -> String {
     #[cfg_attr(not(any(target_os = "linux", target_os = "macos")), allow(unused_mut))]
     let mut signed = false;
     let (text, finish) = match reply {
+        Reply::Credential(_, _) => unreachable!("credential override is handled before the body"),
         Reply::Finished(text) => (text, Some("stop")),
         Reply::Hold(text) => (text, None),
         Reply::Stop(reason) => ("", Some(reason)),
@@ -548,7 +574,28 @@ fn fixture_body(reply: Reply, protocol: ProviderProtocol) -> String {
                 }});
                 return format!("data: {item}\n\ndata: {terminal}\n\n");
             }
-            assert_eq!(protocol, ProviderProtocol::OpenAiCompatible);
+            if protocol == ProviderProtocol::Anthropic {
+                let events = [
+                    json!({"type":"message_start","message":{"role":"assistant","content":[],"usage":{"input_tokens":5,"output_tokens":0}}}),
+                    json!({"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"fixture-tool","name":name,"input":{}}}),
+                    json!({"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":arguments}}),
+                    json!({"type":"content_block_stop","index":0}),
+                    json!({"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":3}}),
+                    json!({"type":"message_stop"}),
+                ];
+                return events
+                    .into_iter()
+                    .map(|event| format!("data: {event}\n\n"))
+                    .collect();
+            }
+            if protocol == ProviderProtocol::Gemini {
+                let arguments: Value = serde_json::from_str(arguments).unwrap();
+                let event = json!({
+                    "candidates":[{"index":0,"content":{"role":"model","parts":[{"functionCall":{"name":name,"args":arguments}}]},"finishReason":"STOP"}],
+                    "usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":3},
+                });
+                return format!("data: {event}\n\n");
+            }
             return fixture_tool_body(name, arguments);
         }
         #[cfg(unix)]
@@ -569,7 +616,7 @@ fn fixture_body(reply: Reply, protocol: ProviderProtocol) -> String {
             (text, Some("stop"))
         }
         #[cfg(unix)]
-        Reply::Release(..) | Reply::QuestionThenHold(_) | Reply::Choose(_) => {
+        Reply::Release(..) | Reply::QuestionThenHold(_) | Reply::Choose(_) | Reply::After(..) => {
             unreachable!("fixture releases the response before encoding")
         }
     };
@@ -1982,7 +2029,8 @@ async fn built_anthropic_host_uses_native_headers_body_and_stream() {
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 #[tokio::test]
-async fn built_gemini_host_replays_signed_history_only_for_unchanged_credentials() {
+async fn built_gemini_host_keeps_compatible_signatures_and_projects_portable_history_for_new_credentials()
+ {
     let temporary = TempDir::new().unwrap();
     let state = temporary.path().join("agent-state");
     let workspace = TempDir::new().unwrap();
@@ -1991,7 +2039,10 @@ async fn built_gemini_host_replays_signed_history_only_for_unchanged_credentials
         vec![
             Reply::GeminiSigned("Signed response."),
             Reply::Finished("Continued response."),
-            Reply::Finished("Unexpected response."),
+            Reply::Credential(
+                "changed-fixture-token",
+                Box::new(Reply::Finished("Portable account response.")),
+            ),
         ],
         Some(TEST_CREDENTIAL),
     )
@@ -2042,12 +2093,13 @@ async fn built_gemini_host_replays_signed_history_only_for_unchanged_credentials
     .await
     .unwrap()
     .unwrap();
-    assert_eq!(rotated.status.code(), Some(1));
-    let rotated = records(&rotated.stdout);
-    assert_eq!(
-        rotated[1]["account"]["failure"]["code"],
-        "provider_state_binding_changed"
+    assert!(
+        rotated.status.success(),
+        "{}",
+        String::from_utf8_lossy(&rotated.stderr)
     );
+    let rotated = records(&rotated.stdout);
+    assert_eq!(rotated[1]["account"]["text"], "Portable account response.");
     let initial = endpoint.request().await;
     assert_eq!(initial["contents"][0]["parts"][0]["text"], "First");
     let continued = endpoint.request().await;
@@ -2057,6 +2109,17 @@ async fn built_gemini_host_replays_signed_history_only_for_unchanged_credentials
     );
     assert_eq!(continued["contents"][2]["parts"][0]["text"], "Second");
     assert_eq!(continued["generationConfig"]["maxOutputTokens"], 2048);
+    let portable = endpoint.request().await;
+    assert!(
+        portable["contents"]
+            .to_string()
+            .contains("Signed response.")
+    );
+    assert!(
+        !portable["contents"]
+            .to_string()
+            .contains("thoughtSignature")
+    );
     assert!(matches!(
         endpoint.requests.try_recv(),
         Err(mpsc::error::TryRecvError::Empty)

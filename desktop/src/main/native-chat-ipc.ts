@@ -1,5 +1,6 @@
 // GRIDA-SEC-004 — native chat attachments and delivery belong to the admitted frame.
 import { randomUUID } from "node:crypto";
+import { GG_PROVIDER_ID } from "@grida/ai-host";
 import type { IpcMainInvokeEvent, WebContents, WebFrameMain } from "electron";
 import type { WorkspaceDirectoryIdentity } from "@grida/daemon/server";
 import type { WorkspaceMediaGrant } from "./workspace-media-registry";
@@ -69,6 +70,7 @@ import type {
 import { NativeAgentDeletion } from "./native-agent-deletion";
 import { RetainedFileExport } from "./retained-file-export";
 import { NativeChatProfiles } from "./native-chat-profiles";
+import type { NativeChatSelections } from "./native-chat-selections";
 
 const MAX_ATTACHMENTS = 16;
 const MAX_OBSERVATIONS = 16;
@@ -81,6 +83,8 @@ const TOKEN = /^[a-f0-9-]{36}$/;
 
 export type ActiveNativeChat = Readonly<{
   workspaceId: string;
+  /** Actual live worker route; reading another chat does not select it. */
+  profileId?: string | null;
   directoryIdentity?: WorkspaceDirectoryIdentity;
   chat: Pick<
     NativeAgentChat,
@@ -123,6 +127,8 @@ export type ActiveNativeChat = Readonly<{
     Partial<
       Pick<
         NativeAgentChat,
+        | "archiveCatalog"
+        | "unarchiveCatalog"
         | "acceptsSavedChatDeletion"
         | "deleteSavedChat"
         | "previewSavedChatDeletion"
@@ -132,6 +138,8 @@ export type ActiveNativeChat = Readonly<{
         | "prepareRevision"
         | "revise"
         | "listSubagents"
+        | "subagentActivity"
+        | "subagentConversation"
         | "inspectSubagent"
         | "createSubagent"
         | "assignSubagent"
@@ -139,6 +147,13 @@ export type ActiveNativeChat = Readonly<{
         | "controlSubagentTurn"
         | "controlSubagentChild"
         | "readArtifact"
+        | "readAttachmentPreview"
+        | "queuedMessage"
+        | "acceptsQueuedTextReplacement"
+        | "readQueuedAttachmentPreview"
+        | "acceptsSelectedImage"
+        | "supportsSelectedImage"
+        | "submitSelectedImage"
         | "acceptsLibrarySelection"
         | "submitWithLibrarySelection"
         | "librarySelections"
@@ -153,6 +168,10 @@ export type ActiveNativeChat = Readonly<{
         | "reviewHook"
         | "installHook"
         | "removeHook"
+        | "acceptsSelection"
+        | "selectionRequest"
+        | "createSelected"
+        | "modelId"
       >
     >;
 }>;
@@ -297,9 +316,14 @@ export class NativeChatIpc {
   private readonly startups = new Map<WebContents, Startup>();
   private readonly deleting = new WeakSet<NativeChatSession>();
   private readonly savingArtifact = new WeakSet<WebContents>();
+  private readonly readingInputImages = new WeakMap<Owner, number>();
   private readonly selectedProfiles = new WeakMap<
     WebContents,
     SelectedProfile
+  >();
+  private readonly presentedSelections = new WeakMap<
+    WebContents,
+    { frame: WebFrameMain; href: string; state: NativeChatSelections.View }
   >();
   private readonly selectingProfile = new WeakSet<WebContents>();
   private readonly svgTextReplies = new NativeEditorSvgTextReplies();
@@ -343,7 +367,8 @@ export class NativeChatIpc {
         workspace: string,
         action: "install" | "remove"
       ): Promise<boolean>;
-    }
+    },
+    private readonly selections?: NativeChatSelections
   ) {}
 
   async documentRequest<T>(
@@ -695,6 +720,10 @@ export class NativeChatIpc {
                 return "native-provider-key-required";
               case "native_provider_model_unavailable":
                 return "native-provider-model-unavailable";
+              case "native_hooks_review_required":
+                return "native-hooks-review-required";
+              case "native_hooks_configuration_invalid":
+                return "native-hooks-configuration-invalid";
               case "native_provider_endpoint_https_required":
                 return "native-provider-endpoint-https-required";
               case "native_provider_endpoint_not_approved":
@@ -820,7 +849,16 @@ export class NativeChatIpc {
         this.profile(sender, frame, workspaceId) !== profile
       )
         throw new Error("native_chat_scope_changed");
-      return { ...result, active: profile?.id ?? null };
+      const active = this.scope(sender, frame);
+      const newChatDefault = this.newChatDefault();
+      return {
+        ...result,
+        active:
+          active?.profileId !== undefined
+            ? active.profileId
+            : (profile?.id ?? null),
+        ...(newChatDefault && { newChatDefault }),
+      };
     } finally {
       stopWatching();
     }
@@ -856,10 +894,39 @@ export class NativeChatIpc {
       const result = await list.call(this.profilesOwner);
       if (!admitted || frame.url !== href)
         throw new Error("native_chat_scope_changed");
-      return { ...result, active: null, saved: [] };
+      const newChatDefault = this.newChatDefault();
+      const unavailable =
+        newChatDefault?.profileId &&
+        !result.choices.some(({ id }) => id === newChatDefault.profileId)
+          ? [
+              {
+                id: newChatDefault.profileId,
+                connection: "Saved connection",
+                model: newChatDefault.modelId,
+                available: false,
+              },
+            ]
+          : [];
+      return {
+        ...result,
+        active: null,
+        saved: unavailable,
+        ...(newChatDefault && { newChatDefault }),
+      };
     } finally {
       stopWatching();
     }
+  }
+
+  private newChatDefault() {
+    const selected = this.selections?.readDefaults();
+    return selected
+      ? {
+          profileId: selected.connectionId,
+          modelId: selected.model,
+          effort: selected.effort,
+        }
+      : undefined;
   }
 
   async selectProfile(
@@ -914,6 +981,170 @@ export class NativeChatIpc {
 
   create(event: IpcMainInvokeEvent): Promise<NativeChatAttachment> {
     return this.attach(event, (chat) => chat.create());
+  }
+
+  async selection(event: IpcMainInvokeEvent, value: unknown) {
+    const { workspaceId, check } = this.selectionScope(event);
+    const target = selectionTarget(value);
+    const result = await this.selections!.read(
+      workspaceId,
+      "sessionId" in target ? target.sessionId : null,
+      "draftId" in target ? target.draftId : undefined,
+      check
+    );
+    check();
+    this.presentedSelections.set(event.sender, {
+      frame: event.senderFrame!,
+      href: event.senderFrame!.url,
+      state: result,
+    });
+    return result;
+  }
+
+  async updateSelection(
+    event: IpcMainInvokeEvent,
+    value: unknown,
+    expectedRevision: unknown,
+    operationId: unknown,
+    choice: unknown
+  ) {
+    const { workspaceId, check } = this.selectionScope(event);
+    const target = selectionTarget(value);
+    if (
+      !Number.isSafeInteger(expectedRevision) ||
+      (expectedRevision as number) < 0 ||
+      !token(operationId) ||
+      !choice ||
+      typeof choice !== "object" ||
+      Array.isArray(choice)
+    )
+      throw new Error("native_chat_selection_invalid");
+    const selected = choice as { profileId?: unknown; effort?: unknown };
+    if (
+      Object.keys(selected).length !== 2 ||
+      (selected.profileId !== null &&
+        !NativeChatProfiles.validId(selected.profileId))
+    )
+      throw new Error("native_chat_selection_invalid");
+    const effort = agentEffort(selected.effort);
+    if (!effort) throw new Error("native_chat_selection_invalid");
+    const result = await this.selections!.update(
+      workspaceId,
+      target,
+      expectedRevision as number,
+      operationId,
+      { profileId: selected.profileId as string | null, effort },
+      check
+    );
+    check();
+    this.presentedSelections.set(event.sender, {
+      frame: event.senderFrame!,
+      href: event.senderFrame!.url,
+      state: result,
+    });
+    return result;
+  }
+
+  private selectedSettings({
+    sender,
+    senderFrame,
+  }: IpcMainInvokeEvent): NativeChatSelections.View | undefined {
+    const shown = this.presentedSelections.get(sender);
+    return shown?.frame === senderFrame && shown.href === senderFrame?.url
+      ? shown.state
+      : undefined;
+  }
+
+  async createFromDraft(event: IpcMainInvokeEvent, draftId: unknown) {
+    const { workspaceId, check } = this.selectionScope(event);
+    if (!token(draftId)) throw new Error("native_chat_selection_invalid");
+    const creation = await this.selections!.prepareCreation(
+      workspaceId,
+      draftId,
+      check
+    );
+    check();
+    const active = this.scope(event.sender, event.senderFrame);
+    const selected =
+      active?.profileId !== undefined
+        ? active.profileId
+        : (this.profile(event.sender, event.senderFrame, workspaceId)?.id ??
+          null);
+    if (selected !== creation.selection.connectionId)
+      throw new Error("native_chat_selection_route_changed");
+    const attached = await this.attach(event, (chat) => {
+      if (!chat.createSelected)
+        throw new Error("native_chat_selection_unsupported");
+      return chat.createSelected(creation);
+    });
+    check();
+    await this.selections!.finishCreation(workspaceId, draftId);
+    check();
+    return { ...attached, firstInputId: creation.firstInputId };
+  }
+
+  private selectionScope({ sender, senderFrame: frame }: IpcMainInvokeEvent) {
+    const workspaceId = this.workspaceId(sender, frame);
+    if (!this.selections || !frame || !workspaceId || this.disabled)
+      throw new Error("native_chat_selection_unavailable");
+    const href = frame.url;
+    const check = () => {
+      if (frame.url !== href || this.workspaceId(sender, frame) !== workspaceId)
+        throw new Error("native_chat_scope_changed");
+    };
+    check();
+    return { workspaceId, check };
+  }
+
+  private async selectionAdmission(
+    owner: Owner,
+    attachment: Attachment,
+    inputId: string,
+    selectionRevision: unknown
+  ): Promise<NativeChatAcceptance | null> {
+    if (attachment.sideOf) return null;
+    if (selectionRevision === undefined) {
+      const requested =
+        this.profile(owner.sender, owner.frame, owner.active.workspaceId)?.id ??
+        null;
+      if (
+        (owner.active.profileId !== undefined
+          ? owner.active.profileId
+          : requested) !== requested
+      )
+        throw new Error("native_chat_selection_route_changed");
+      return null;
+    }
+    if (
+      !Number.isSafeInteger(selectionRevision) ||
+      (selectionRevision as number) < 1 ||
+      !this.selections
+    )
+      throw new Error("native_chat_selection_invalid");
+    // An accepted retry observes its original capture before newer settings.
+    const accepted = await owner.active.chat
+      .inputReceipt(attachment.session, inputId)
+      .catch(() => null);
+    this.revalidate(owner, attachment);
+    if (accepted) return accepted;
+    const state = await this.selections.read(
+      owner.active.workspaceId,
+      attachment.session.id
+    );
+    this.revalidate(owner, attachment);
+    const active =
+      owner.active.profileId !== undefined
+        ? owner.active.profileId
+        : (this.profile(owner.sender, owner.frame, owner.active.workspaceId)
+            ?.id ?? null);
+    if (
+      state.revision !== selectionRevision ||
+      !state.selection ||
+      state.selection.profileId !== active
+    )
+      throw new Error("native_chat_selection_revision_changed");
+    if (!state.available) throw new Error("native_chat_selection_unavailable");
+    return null;
   }
 
   load(
@@ -1001,6 +1232,52 @@ export class NativeChatIpc {
       },
       (expected) => this.revalidateRevision(owner, attachment, expected)
     );
+  }
+
+  async subagentActivity(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    afterChildId: unknown
+  ) {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const chat = owner.active.chat;
+    if (
+      !chat.subagentActivity ||
+      (afterChildId !== undefined && typeof afterChildId !== "string")
+    )
+      throw new Error("native_chat_subagent_activity_unavailable");
+    const result = await chat.subagentActivity(
+      attachment.session,
+      afterChildId,
+      () => this.revalidate(owner, attachment)
+    );
+    this.revalidate(owner, attachment);
+    return result;
+  }
+
+  async subagentConversation(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    childId: unknown,
+    before: unknown
+  ) {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const chat = owner.active.chat;
+    if (
+      !chat.subagentConversation ||
+      typeof childId !== "string" ||
+      (before !== undefined && typeof before !== "string")
+    )
+      throw new Error("native_chat_subagent_activity_unavailable");
+    const result = await chat.subagentConversation(
+      attachment,
+      attachment.session,
+      childId,
+      before,
+      () => this.revalidate(owner, attachment)
+    );
+    this.revalidate(owner, attachment);
+    return result;
   }
 
   listSubagents(
@@ -1464,9 +1741,17 @@ export class NativeChatIpc {
     text: string,
     regime?: unknown,
     effort?: unknown,
-    svgTargetId?: unknown
+    svgTargetId?: unknown,
+    selectionRevision?: unknown
   ) {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const prior = await this.selectionAdmission(
+      owner,
+      attachment,
+      inputId,
+      selectionRevision
+    );
+    if (prior) return prior;
     const mode = operatingRegime(regime);
     if (
       svgTargetId !== undefined &&
@@ -1483,7 +1768,7 @@ export class NativeChatIpc {
       inputId,
       text,
       mode,
-      ...submitSelections(surfaces, selected)
+      ...submitSelections(surfaces, selected, selectionRevision)
     );
     this.revalidate(owner, attachment);
     return result;
@@ -1496,9 +1781,17 @@ export class NativeChatIpc {
     text: string,
     regime?: unknown,
     effort?: unknown,
-    svgTargetId?: unknown
+    svgTargetId?: unknown,
+    selectionRevision?: unknown
   ) {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const prior = await this.selectionAdmission(
+      owner,
+      attachment,
+      inputId,
+      selectionRevision
+    );
+    if (prior) return prior;
     const mode = operatingRegime(regime);
     if (
       svgTargetId !== undefined &&
@@ -1515,7 +1808,7 @@ export class NativeChatIpc {
       inputId,
       text,
       mode,
-      ...submitSelections(surfaces, selected)
+      ...submitSelections(surfaces, selected, selectionRevision)
     );
     this.revalidate(owner, attachment);
     return result;
@@ -1532,9 +1825,17 @@ export class NativeChatIpc {
     inputId: string,
     text: string,
     regime?: unknown,
-    effort?: unknown
+    effort?: unknown,
+    selectionRevision?: unknown
   ): Promise<NativeChatAcceptance> {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const prior = await this.selectionAdmission(
+      owner,
+      attachment,
+      inputId,
+      selectionRevision
+    );
+    if (prior) return prior;
     const { chat } = owner.active;
     if (!chat.acceptsLibrarySelection || !chat.submitWithLibrarySelection)
       throw new Error("native_chat_library_selection_unavailable");
@@ -1546,7 +1847,7 @@ export class NativeChatIpc {
       inputId,
       text,
       mode,
-      ...submitSelections(surfaces, agentEffort(effort))
+      ...submitSelections(surfaces, agentEffort(effort), selectionRevision)
     );
     this.revalidate(owner, attachment);
     return result;
@@ -1609,6 +1910,39 @@ export class NativeChatIpc {
 
   acceptsPng(event: IpcMainInvokeEvent): boolean {
     return this.owner(event).active.chat.acceptsPng;
+  }
+
+  async acceptsSelectedImage(event: IpcMainInvokeEvent): Promise<boolean> {
+    const owner = this.owner(event);
+    const desired = this.selectedSettings(event);
+    if (!desired) return owner.active.chat.acceptsSelectedImage === true;
+    if (
+      !owner.active.chat.supportsSelectedImage ||
+      !desired.available ||
+      !desired.selection
+    )
+      return false;
+    if (desired.selection.profileId === null) {
+      if (
+        (owner.active.profileId ?? null) === null &&
+        owner.active.chat.modelId === desired.selection.modelId
+      )
+        return owner.active.chat.acceptsSelectedImage === true;
+      return NativeChatProfiles.imageInput(
+        GG_PROVIDER_ID,
+        desired.selection.modelId
+      );
+    }
+    const catalogue = await this.profiles(event);
+    this.revalidate(owner);
+    if (this.selectedSettings(event) !== desired) return false;
+    return (
+      catalogue?.choices.some(
+        (choice) =>
+          choice.id === desired.selection!.profileId &&
+          choice.imageInput === true
+      ) === true
+    );
   }
 
   acceptsFile(event: IpcMainInvokeEvent): boolean {
@@ -1717,10 +2051,59 @@ export class NativeChatIpc {
     input: unknown
   ) {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const data = record(input);
+    const prior = await this.selectionAdmission(
+      owner,
+      attachment,
+      String(data?.inputId ?? ""),
+      data?.selectionRevision
+    );
+    if (prior) return prior;
     const result = await owner.active.chat.submitImage(
       attachment.session,
       input
     );
+    this.revalidate(owner, attachment);
+    return result;
+  }
+
+  async submitSelectedImage(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    value: unknown
+  ) {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      throw new Error("native_chat_selected_image_unavailable");
+    const input = value as Record<string, unknown>;
+    if (typeof input.inputId !== "string")
+      throw new Error("native_chat_selected_image_unavailable");
+    // The original native receipt wins even for clients omitting revisions,
+    // after Main has retired accepted temporary custody or model support changed.
+    let accepted: NativeChatAcceptance | undefined;
+    try {
+      accepted = await owner.active.chat.inputReceipt(
+        attachment.session,
+        input.inputId
+      );
+    } catch (error) {
+      this.revalidate(owner, attachment);
+      if (!(error instanceof Error) || error.message !== "input_unavailable")
+        throw error;
+    }
+    this.revalidate(owner, attachment);
+    if (accepted) return accepted;
+    const prior = await this.selectionAdmission(
+      owner,
+      attachment,
+      input.inputId,
+      input.selectionRevision
+    );
+    if (prior) return prior;
+    const chat = owner.active.chat;
+    if (!chat.acceptsSelectedImage || !chat.submitSelectedImage)
+      throw new Error("image_input_unavailable");
+    const result = await chat.submitSelectedImage(attachment.session, input);
     this.revalidate(owner, attachment);
     return result;
   }
@@ -1731,6 +2114,14 @@ export class NativeChatIpc {
     input: unknown
   ) {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const data = record(input);
+    const prior = await this.selectionAdmission(
+      owner,
+      attachment,
+      String(data?.inputId ?? ""),
+      data?.selectionRevision
+    );
+    if (prior) return prior;
     const result = await owner.active.chat.submitFile(
       attachment.session,
       input
@@ -1745,6 +2136,14 @@ export class NativeChatIpc {
     input: unknown
   ) {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const data = record(input);
+    const prior = await this.selectionAdmission(
+      owner,
+      attachment,
+      String(data?.inputId ?? ""),
+      data?.selectionRevision
+    );
+    if (prior) return prior;
     const result = await owner.active.chat.submitFileReference(
       attachment.session,
       input
@@ -1810,6 +2209,34 @@ export class NativeChatIpc {
       ? { turnId: latest.turnId, items: summary.artifacts }
       : undefined;
     return summary;
+  }
+
+  async readAttachmentPreview(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    previewId: unknown
+  ): Promise<ArrayBuffer> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const read = owner.active.chat.readAttachmentPreview;
+    if (typeof previewId !== "string" || !TOKEN.test(previewId) || !read)
+      throw new Error("native_chat_input_image_unavailable");
+    const reading = this.readingInputImages.get(owner) ?? 0;
+    if (reading >= 8) throw new Error("native_chat_input_image_busy");
+    this.readingInputImages.set(owner, reading + 1);
+    try {
+      const bytes = await read.call(
+        owner.active.chat,
+        attachment.session,
+        previewId
+      );
+      this.revalidate(owner, attachment);
+      return bytes;
+    } finally {
+      this.readingInputImages.set(
+        owner,
+        (this.readingInputImages.get(owner) ?? 1) - 1
+      );
+    }
   }
 
   async readArtifact(
@@ -1958,6 +2385,10 @@ export class NativeChatIpc {
     return page;
   }
 
+  acceptsQueuedTextReplacement(event: IpcMainInvokeEvent): boolean {
+    return this.owner(event).active.chat.acceptsQueuedTextReplacement === true;
+  }
+
   async queuedText(
     event: IpcMainInvokeEvent,
     attachmentId: string,
@@ -1973,6 +2404,83 @@ export class NativeChatIpc {
     );
     this.revalidate(owner, attachment);
     return text;
+  }
+
+  async queuedMessage(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    observationId: string,
+    inputId: string
+  ) {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const snapshot = requireObservation(attachment, observationId);
+    const read = owner.active.chat.queuedMessage;
+    if (!read || typeof inputId !== "string")
+      throw new Error("native_chat_queued_message_unavailable");
+    const requireCurrent = () => {
+      this.revalidate(owner, attachment);
+      if (
+        attachment.latestObservation?.sessionRevision !==
+        snapshot.sessionRevision
+      )
+        throw new Error("native_chat_queue_changed");
+    };
+    requireCurrent();
+    const message = await read.call(
+      owner.active.chat,
+      attachment.session,
+      snapshot,
+      inputId
+    );
+    requireCurrent();
+    return message;
+  }
+
+  async readQueuedAttachmentPreview(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    observationId: string,
+    inputId: string,
+    previewId: unknown
+  ): Promise<ArrayBuffer> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const snapshot = requireObservation(attachment, observationId);
+    const read = owner.active.chat.readQueuedAttachmentPreview;
+    if (
+      !read ||
+      typeof inputId !== "string" ||
+      typeof previewId !== "string" ||
+      !TOKEN.test(previewId)
+    )
+      throw new Error("native_chat_queued_message_unavailable");
+    const requireCurrent = () => {
+      this.revalidate(owner, attachment);
+      if (
+        attachment.latestObservation?.sessionRevision !==
+        snapshot.sessionRevision
+      )
+        throw new Error("native_chat_queue_changed");
+    };
+    requireCurrent();
+    const reading = this.readingInputImages.get(owner) ?? 0;
+    if (reading >= 8) throw new Error("native_chat_input_image_busy");
+    this.readingInputImages.set(owner, reading + 1);
+    try {
+      const bytes = await read.call(
+        owner.active.chat,
+        attachment.session,
+        snapshot,
+        inputId,
+        previewId
+      );
+      requireCurrent();
+      return bytes;
+    } finally {
+      this.readingInputImages.set(
+        owner,
+        (this.readingInputImages.get(owner) ?? 1) - 1
+      );
+    }
   }
 
   async editQueue(
@@ -2060,6 +2568,13 @@ export class NativeChatIpc {
     request: unknown
   ) {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const prior = await this.selectionAdmission(
+      owner,
+      attachment,
+      inputId,
+      record(request)?.selectionRevision
+    );
+    if (prior) return prior;
     const accepted = await owner.active.chat.startGoal(
       attachment.session,
       inputId,
@@ -2779,6 +3294,24 @@ function chatProfileSelection(value: unknown): NativeChatProfileSelection {
   throw new Error("native_chat_profile_selection_invalid");
 }
 
+function selectionTarget(value: unknown): NativeChatSelections.Target {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    Object.keys(value).length !== 1
+  )
+    throw new Error("native_chat_selection_invalid");
+  const target = value as { sessionId?: unknown; draftId?: unknown };
+  if (
+    typeof target.sessionId === "string" &&
+    /^[A-Za-z0-9_.:@/-]{1,256}$/.test(target.sessionId)
+  )
+    return { sessionId: target.sessionId };
+  if (token(target.draftId)) return { draftId: target.draftId };
+  throw new Error("native_chat_selection_invalid");
+}
+
 function sameActive(
   left: ActiveNativeChat,
   right: ActiveNativeChat | null
@@ -2904,8 +3437,15 @@ function agentEffort(value: unknown): NativeChatEffort | undefined {
 
 function submitSelections(
   surfaces: NativeEditorSurfaceSelection | undefined,
-  effort: NativeChatEffort | undefined
-): [surfaces?: NativeEditorSurfaceSelection, effort?: NativeChatEffort] {
+  effort: NativeChatEffort | undefined,
+  selectionRevision?: unknown
+): [
+  surfaces?: NativeEditorSurfaceSelection,
+  effort?: NativeChatEffort,
+  selectionRevision?: number,
+] {
+  if (selectionRevision !== undefined)
+    return [surfaces, effort, selectionRevision as number];
   if (effort) return [surfaces, effort];
   return surfaces ? [surfaces] : [];
 }
@@ -2934,7 +3474,7 @@ function queueChange(input: unknown): NativeChatQueueChange {
       if (action === "withdraw" && count === 4)
         return { ...basis, action, inputId };
       if (
-        action === "replace" &&
+        (action === "replace" || action === "replaceText") &&
         count === 5 &&
         typeof change.text === "string"
       )

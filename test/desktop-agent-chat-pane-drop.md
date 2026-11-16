@@ -1,13 +1,13 @@
 ---
 id: TC-DESKTOP-AGENT-CHAT-024
-title: Drop a file anywhere on the agent chat pane
+title: Drop a file or folder anywhere on the agent chat pane
 module: desktop
 area: agent-chat
-tags: [agent-chat, composer, file, drag-drop, side-chat]
+tags: [agent-chat, composer, file, folder, drag-drop, side-chat]
 status: untested
 severity: medium
 date: 2026-11-15
-updated: 2026-11-15
+updated: 2026-11-16
 automatable: false
 covered_by:
   - editor/kits/composer/composer-drop-zone.test.tsx
@@ -24,8 +24,9 @@ overlay disappears when the drag leaves the pane, on drop, when the drag is
 cancelled with Escape, and when the window loses focus.
 
 A drop anywhere in the pane takes the same intake as a drop on the composer
-text, so the same notices apply (one file at a time, folders, PNG-only images,
-not ready). A drop on the composer text is handled once, never twice. Text
+text, so the same single-attachment, host-capability and readiness checks
+apply. A folder becomes a reference with no size or preview; it is never read
+as an empty file. A drop on the composer text is handled once, never twice. Text
 drags and drags that start inside the app (for example a slide or an image in
 the transcript) do not show the overlay and keep their existing behaviour.
 
@@ -43,15 +44,40 @@ the transcript) do not show the overlay and keep their existing behaviour.
 5. Remove it, then drop the file on the composer text.
    - Expected: exactly one chip, with no duplicate notice or second attempt.
 6. Drop a folder on the transcript.
-   - Expected: the notice asks for a file instead of a folder.
+   - Expected: one folder-reference chip appears with no size or preview.
+     Repeat on the header and composer: each drop is handled once. On an older
+     Main build without folder-reference support, the draft and current
+     attachment remain and an unsupported/update notice appears.
 7. Drop a `.jpg` on the transcript.
-   - Expected: the notice asks for a PNG.
+   - Expected: it follows the explicit raster-image intake in
+     TC-DESKTOP-AGENT-CHAT-021, including draft-preserving refusal on a model
+     without image input.
 8. Start a drag from Finder over the pane and press Escape.
    - Expected: the overlay disappears.
 9. Select some text in the transcript and drag it over the pane.
    - Expected: no overlay.
 10. Open a side chat tab and repeat steps 2–3 there.
     - Expected: the same overlay and intake in the side chat pane.
+11. Drop a file and folder together while a draft and attachment are present.
+    - Expected: the one-attachment notice preserves both; no folder is read
+      and neither attachment is replaced.
+
+## Verification
+
+Automated verification on 2026-11-15:
+
+- Renderer fixtures: 183 passed, including intake and retained-draft checks.
+  Main/preload reference fixtures: 21 passed.
+- Desktop suite: 763 passed, 98 skipped. Native Rust workspace: 967 passed,
+  73 ignored; TC-DESKTOP-AGENT-CHAT-025 records its folder-reference process
+  coverage.
+- Full typecheck: 63 tasks passed. Lint: no errors and one existing warning.
+  English docs production build passed.
+
+Manual status remains untested. The complete operating-system drop flow,
+overlay behavior across the pane and older-host presentation are pending human
+QA. No successful Finder drop was verified before that handoff; the app was
+left open and no live provider turn was submitted during the QA handoff.
 
 ## Notes
 

@@ -8,6 +8,24 @@ use agent_kit_store_sqlite::catalog::CatalogEntry;
 use std::path::PathBuf;
 
 pub(super) const ORGANIZE: &str = "co.grida/session/organize";
+pub(super) const ARCHIVE_CATALOG: &str = "co.grida/settings/archive-catalog";
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
+#[request(method = "_co.grida/settings/archive-catalog", response = Value)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ArchiveCatalog {
+    cwd: PathBuf,
+    cursor: Option<SessionId>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
+#[request(method = "_co.grida/settings/unarchive", response = Value)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct Unarchive {
+    cwd: PathBuf,
+    session_id: SessionId,
+    revision: u64,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
 #[request(method = "_co.grida/session/catalog-entry", response = Entry)]
@@ -57,11 +75,45 @@ struct ListArchived {
 }
 
 pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>) -> RequestRoutes {
+    let archive_host = host.clone();
+    let archive_sessions = sessions.clone();
+    let restore_host = host.clone();
+    let restore_sessions = sessions.clone();
     let get_host = host.clone();
     let get_sessions = sessions.clone();
     let update_host = host.clone();
     let update_sessions = sessions.clone();
     RequestRoutes::default()
+        .on_receive_request(
+            async move |request: ArchiveCatalog, responder, _| {
+                let result = async {
+                    require(&archive_sessions, ARCHIVE_CATALOG, None)?;
+                    let page = archive_host
+                        .archive_catalog(request.cwd, request.cursor)
+                        .await
+                        .map_err(host_error)?;
+                    serde_json::to_value(page).map_err(|_| Error::internal_error())
+                }
+                .await;
+                responder.respond_with_result(result)
+            },
+            on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |request: Unarchive, responder, _| {
+                let result = async {
+                    require(&restore_sessions, ARCHIVE_CATALOG, None)?;
+                    restore_host
+                        .unarchive_catalog(request.cwd, request.session_id, request.revision)
+                        .await
+                        .map_err(host_error)?;
+                    Ok(Value::Null)
+                }
+                .await;
+                responder.respond_with_result(result)
+            },
+            on_receive_request!(),
+        )
         .on_receive_request(
             async move |request: Get, responder, _| {
                 let _observation =

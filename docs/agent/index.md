@@ -12,9 +12,11 @@ Ask the agent about a project, plan a change, or have it carry out a task.
 ## Where you can use it
 
 - **Grida Desktop on macOS and Linux.** Chat in a workspace folder or in a
-  deck's own window. On macOS you can also chat about a standalone SVG. The
-  default model runs on your Grida account; you can also use your own
-  OpenRouter or Vercel AI Gateway key or an approved endpoint.
+  deck's own window. On macOS you can also chat about a standalone SVG. A
+  new chat with no saved or explicit model choice prefers a ready ChatGPT
+  subscription, currently defaulting to GPT-6.1 Sol. You can also choose a
+  Grida account model, your own OpenRouter or Vercel AI Gateway key, or an
+  approved endpoint.
   [Choose models and understand usage](./models-and-usage.md)
 - **Grida Desktop on Windows** opens files and media, but agent chat is not
   available.
@@ -77,7 +79,8 @@ send. [Plan work, choose effort, and pursue a goal](./effort-and-goals.md)
 - [Return to work and manage chat history](./history.md)
 - [Use chat commands, skills, and tools](./skills-and-tools.md)
 - [Change agent settings](./settings.md)
-- [Automate lifecycle checks](./hooks.md)
+- [Configure hooks](./hooks.md)
+- [Desktop settings](./desktop-settings.md)
 - [Work with subagents](./subagents.md)
 - [Schedule a follow-up](./scheduled-work.md) (headless and ACP clients)
 - [Connect an agent client](./clients.md)

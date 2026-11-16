@@ -97,6 +97,10 @@ export class NativeAgentGoals {
       input.maxCostMills === undefined
         ? undefined
         : amount(input.maxCostMills, true);
+    const selectionRevision =
+      input.selectionRevision === undefined
+        ? undefined
+        : number(input.selectionRevision, 1, Number.MAX_SAFE_INTEGER);
     const namedChildId =
       input.namedChildId === undefined
         ? undefined
@@ -108,7 +112,8 @@ export class NativeAgentGoals {
           Number(operatingRegime !== undefined) +
           Number(effort !== undefined) +
           Number(maxCostMills !== undefined) +
-          Number(namedChildId !== undefined) ||
+          Number(namedChildId !== undefined) +
+          Number(selectionRevision !== undefined) ||
       (allowance !== undefined && Object.keys(allowance).length !== 2)
     )
       throw invalid();
@@ -128,6 +133,7 @@ export class NativeAgentGoals {
         },
       }),
       automatic: flag(input.automatic),
+      ...(selectionRevision !== undefined && { selectionRevision }),
       ...(operatingRegime && { operatingRegime }),
       ...(effort && { effort }),
       ...(namedChildId && { namedChildId }),
@@ -189,6 +195,7 @@ export class NativeAgentGoals {
       effort,
       namedChildId,
       maxCostMills,
+      selectionRevision,
     } = NativeAgentGoals.readRequest(request);
     if (maxCostMills !== undefined && !capabilities.spending)
       throw new Error("native_chat_goal_spending_unavailable");
@@ -205,6 +212,9 @@ export class NativeAgentGoals {
     return this.request("_co.grida/goal/start", {
       sessionId,
       inputId,
+      ...(selectionRevision !== undefined && {
+        _meta: { "co.grida/selectionRevision": selectionRevision },
+      }),
       prompt: [{ type: "text", text: objective }],
       ...(effort === "ultra" && { effort }),
       ...(regime && { operatingRegime: regime }),

@@ -13,6 +13,10 @@ This working group defines an agent system through reusable mechanisms,
 product decisions, and expected behavior. The three documents below are its
 current contracts.
 
+For architectural or feature changes, start with the
+[architecture rings and placement rules](#architecture-rings) before choosing
+an implementation owner.
+
 Start with the compact [Agent Features](../../../agent/features.md) catalog for
 the product's features, delivery status, and scope. The documents below provide
 the detailed behavior and engineering contracts behind that catalog.
@@ -70,6 +74,74 @@ are evaluated at the master and experience layers.
 
 Each invariant carries its own domain rationale and conformance case. No
 other implementation serves as the model for these contracts.
+
+## Architecture rings
+
+This section owns the agent system's ring vocabulary and placement rules.
+Implementation bindings map these responsibilities to packages and enforce
+their dependency budgets. Skills and contribution instructions route here;
+they do not maintain a second definition of the rings.
+
+Rings classify responsibility, independently of language, process, storage
+technology, and the size of a change. The numbers do not denote security
+privilege. Use the name with the number when discussing ownership.
+
+| Ring                      | Owns                                                                                                                            | Keeps outside                                                                                  |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **R0 — Contracts**        | Shared values, capability interfaces, pure transformations, and execution invariants that retain their meaning across products. | Product preferences, concrete transport, storage, credential custody, and presentation.        |
+| **R1 — Mechanisms**       | Reusable execution, durable sessions, provider adaptation, storage adapters, and confinement implementing those contracts.      | Product strategy, model defaults, account offerings, and user-interface behavior.              |
+| **R2 — Product policy**   | The product master: selection of context, models, tools, effort, continuation, verification, and completion.                    | Concrete provider construction, database access, server startup, and application presentation. |
+| **R3 — Host composition** | Assembly of the product and its capabilities, authority and credentials, product-setting persistence, and client protocols.     | A second agent strategy or task loop independent of the master.                                |
+
+Application presentation and convenience state sit outside the agent rings.
+A client submits intent and presents results. Layout, previews, popover state,
+and a local composer preference need no agent abstraction solely because they
+appear in chat. State whose promise includes session continuity, recovery, or
+use by another client belongs to the product host rather than a particular
+view's local state. Its storage technology does not determine its owner.
+
+R0 has no outward dependency. Mechanisms depend on contracts; product policy
+uses execution and supplied capabilities; the host selects concrete
+implementations. This is a dependency graph, not a requirement to import every
+intermediate ring. Mechanisms in R1 are siblings with explicit dependency
+budgets: a storage adapter may implement a session-store contract, while the
+runtime does not acquire the session service or a database. A master receives
+provider and storage capabilities without constructing their adapters.
+Execution location is a separate concern: sharing a process does not merge
+owners, and crossing a process does not make policy generic.
+
+The master is thin in infrastructure, not in decision-making. A product can
+change its strategy by replacing policy while retaining execution semantics.
+A reusable mechanism can require a supplied policy without choosing that
+policy itself. New generic contracts need a product-independent meaning and
+conformance evidence; moving a product condition behind an interface alone
+does not make it reusable.
+
+### Placing a change
+
+Before selecting files, state the behavior's owner, where it runs, who owns
+its retained state, and which contracts or consumers the change affects.
+Keep those questions separate: a small edit can change an execution invariant,
+and a large application feature can remain outside the agent rings.
+
+| Decision                                                                                          | Owner                                                                                                   |
+| ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Whether an explicitly attached image is included immediately or inspected on demand.              | R2 product policy, composed through R3; R1 supplies media resolution and input validation.              |
+| Retain a chat's selected model and effort, including an unsent change, across clients or restart. | R3 product settings and persistence; R2 supplies execution policy and the client submits the selection. |
+| Use the last explicitly chosen preference for a new chat.                                         | Application default policy and persistence, separate from an existing chat's settings.                  |
+| Preserve the captured execution identity of already accepted work.                                | R0 invariant implemented by R1; R3 supplies and validates authority.                                    |
+| Place an attachment outside a text bubble or display its preview.                                 | Application presentation outside the agent rings.                                                       |
+
+A change spanning owners needs an explicit contract between them. Keep the
+product choice at its owner and add only the capability the inner owner can
+define independently. Check both the requested behavior and the invariant
+preserved at that boundary. Do not move policy inward to avoid a protocol or
+persistence change.
+
+The [native implementation binding](https://github.com/gridaco/grida/blob/main/crates/grida-agent/docs/rust-core.md)
+owns the concrete package mapping and checked dependency budgets. Application
+features remain governed by their own domain contracts; these rings do not
+turn unrelated application work into an agent-system project.
 
 ## Vocabulary
 

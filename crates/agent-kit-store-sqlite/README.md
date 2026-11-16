@@ -132,6 +132,18 @@ recheck an identity before acting and restart a pass to observe concurrent
 insertions behind its cursor. Malformed stored identities fail explicitly.
 The partial active-session index makes each page an indexed traversal.
 
+`session_page` lists at most 32 stored session identities in ascending identity
+order, across every catalog scope and bucket, including sessions outside the
+catalog. It reads only identities through their existing unique index: no
+configuration, driver state, queues, turn snapshots or leases. Its cursor is
+the last returned identity when another row exists; an empty or final page
+has no continuation. The cursor is a value and need not name a session that
+still exists. Pages reflect each read rather than a frozen snapshot. Recheck
+each session before acting and restart a pass to observe insertions behind
+the cursor. Malformed stored identities fail explicitly. Host-specific policy
+and any coordination needed while acting on these observations remain with
+the caller.
+
 On Unix, the parent directory must exclude group/other access. Database and lock
 files use owner-only permissions, and existing symlinks or hard-linked files are
 rejected. Other platforms rely on the host's application-directory access policy.

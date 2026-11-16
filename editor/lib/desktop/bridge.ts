@@ -395,6 +395,35 @@ export namespace providers {
     await bridge.set_endpoint(config);
   }
 
+  /** Both capabilities identify hosts whose Connect/Save consent is durable. */
+  export function supportsEndpointConsent(): boolean {
+    const native = getDesktopBridge()?.providers;
+    return (
+      typeof native?.endpoint_authorization === "function" &&
+      typeof native.update_endpoint_models === "function"
+    );
+  }
+
+  export async function endpointAuthorization(
+    id: string,
+    baseUrl: string
+  ): Promise<boolean> {
+    const native = bridgeOrThrow().providers;
+    if (!native?.endpoint_authorization) throw new DesktopBridgeMissingError();
+    return await native.endpoint_authorization(id, baseUrl);
+  }
+
+  /** Discovery cannot authorize a destination or overwrite human settings. */
+  export async function updateEndpointModels(update: {
+    id: string;
+    base_url: string;
+    models: ProbedEndpointModel[];
+  }): Promise<void> {
+    const native = bridgeOrThrow().providers;
+    if (!native?.update_endpoint_models) throw new DesktopBridgeMissingError();
+    await native.update_endpoint_models(update);
+  }
+
   export async function deleteEndpoint(id: string): Promise<void> {
     const bridge = bridgeOrThrow().providers;
     if (!bridge) throw new DesktopBridgeMissingError();
@@ -774,6 +803,13 @@ export type DesktopAppInfo = {
  * `window.grida`.
  */
 export namespace app {
+  /** Open or focus the native Settings window, keeping the caller in place. */
+  export async function openSettings(): Promise<void> {
+    const open = bridgeOrThrow().window.open_settings;
+    if (!open) throw new DesktopBridgeMissingError();
+    await open();
+  }
+
   /**
    * Synchronous because `bridge.app.*` is populated at preload-run
    * time (see `desktop/src/preload.ts`). If the bridge isn't installed

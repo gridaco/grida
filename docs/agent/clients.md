@@ -91,13 +91,18 @@ account. Diagnostics use stderr. Save the accepted identifiers when running
 from an automated client.
 
 Pass `--session SESSION_ID` to continue a settled chat with its saved history.
-Use its original project directory. You can choose a different model or
-endpoint for the next turn, as long as the credentials belong to the same
-owner: local keys and endpoints with local keys, a Grida account with the same
-account and organization. A running turn, queued inputs, an unresolved goal
-and delegated work keep the model they started with, and chats saved before
-this was recorded keep their original model. Reopening a chat for inspection
-starts no model request.
+Use its original project directory. For a new input in an idle chat, you can
+explicitly choose another authorized model, endpoint or credential, including
+a different provider or account. Earlier visible conversation remains
+available as portable context; provider-private reasoning and continuation
+state do not cross that boundary.
+
+A running or paused turn, queued inputs, an unfinished goal and delegated
+work retain their captured model and authority. Restore that connection to
+continue them, or resolve the retained work before selecting another for a
+new input. Older chats without captured input routes retain their original
+execution restrictions. Reopening a chat for inspection starts no model
+request.
 
 ```sh
 target/debug/grida-agent inspect \
@@ -186,10 +191,15 @@ see that the review is still pending or uncertain.
 The finished record identifies the reviewer and records whether its verified
 findings were collected.
 
-Ultra is available in Plan and Act. It requires a
-model with JSON tool calls and a provider that supports a bounded output.
-For compatible Chat Completions endpoints, select the output limit field the
-endpoint accepts using `--compatible-output-limit-field`.
+Ultra is available in Plan and Act through every supported native model
+connection with tool calls. Its reviewer uses the parent's captured
+connection and account. The inference-step allowance applies even when a
+provider has no supported output-token limit field. For compatible Chat
+Completions endpoints, select the field the endpoint accepts using
+`--compatible-output-limit-field`; subscription requests keep their restricted
+wire format. A step allowance does not cap provider tokens, quota or charges.
+Gateway goals can separately enforce a
+[spending limit](#set-a-goals-spending-limit).
 
 ### Require a completion check
 
@@ -240,9 +250,10 @@ by the response and makes no follow-up billing query.
 
 For an ACP client, use `target/debug/grida agent serve --stdio` with the same
 provider, model, organization, and state-directory options. The client supplies
-the project directory when opening a session. Keep the same account and
-organization to continue a saved chat; you can change the model between turns.
-Gateway requests use the selected organization's credits.
+the project directory when opening a session. An eligible future input can use
+an explicitly selected connection; accepted work still requires its original
+account and organization. Gateway requests use the selected organization's
+credits.
 
 The host renews its short-lived Gateway grant before new model work needs it.
 Renewal uses the account and organization that opened the host. If that scope
@@ -455,8 +466,12 @@ repeat the effect.
 
 ## Assign work to a named subagent
 
-Desktop chat does not offer named subagents, and the model cannot create them;
-Desktop's Ultra effort can start an independent review instead.
+Supported Desktop builds expose subagent activity and named client controls.
+A native host opted in with `--subagents` also offers general model delegation
+for ordinary Act turns, independently of Ultra. Ask the main agent to delegate
+independent assignments; its workers have separately captured native
+capabilities and bounded allowances. The client operations below remain the
+manual, inference-only assignment contract.
 [Work with subagents](./subagents.md)
 
 Start the host with a direct provider and private stdio.
@@ -603,16 +618,53 @@ through `--input-png` on a compatible image profile. Omit `--cwd` and
 Gemini `gemini-3.8-flash` also supports PNG prompts on this host. Image edits
 use a saved working copy. [Run locally with a PNG](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#run-locally)
 
-In Desktop, images work with the default Grida model or with a saved
-OpenRouter key on any listed model that takes images; choose one under
-**Select model** in the model picker. ChatGPT subscription, Vercel and custom
-endpoint connections take text only. The selected provider receives the saved
-PNG when the conversation uses it.
+Desktop supports PNG, JPEG, WebP and GIF on a connection that advertises image
+input, including compatible ChatGPT subscription models. It sends prepared
+pixels in the first request and includes a verified original path for disk
+images. A clipboard image without a disk origin is identified as a retained
+snapshot. Original sources are retained separately from the bounded model
+image. Unsupported image input preserves the entire draft before submission.
+
+Private clients can negotiate the selected-image protocol for this raster
+workflow. The inline PNG and headless `--input-png` interfaces above retain
+their existing 256 KiB bounds; they are separate from the richer selected-image
+custody contract. [Native image protocol](https://github.com/gridaco/grida/blob/main/crates/grida-agent/docs/rust-client-protocol.md)
+
+Sent attachments render outside the message's text bubble. Supported images
+show just the image, without a card frame, filename or dimensions caption;
+files, folders and videos keep individual cards. A compatible Desktop build
+reads the exact retained raster original from its owning chat for image
+preview, also after reopening; older builds keep the named card.
+Referenced videos can retain bounded still previews. Enlarging a
+video's still does not play the clip. PDF, SVG and HTML attachments keep file
+cards. These display choices do not alter model input or filesystem grants.
+[Inspect an attachment](./results.md#inspect-an-attachment)
 
 ## Attach a file for inspection
 
 In Desktop, choose **+ → Files** or drop or paste a file.
 [Attach a file](./getting-started.md#attach-a-file)
+
+Disk files are references, including small text files. The model receives the
+verified source path and facts, and content inspection happens on demand under
+existing permissions. No-origin ordinary files can use the bounded retained
+file workflow when available; no original disk path is invented.
+
+Drop a folder from the operating system to attach it by reference. The model
+receives its location and directory type, with no total size, preview or
+copied contents. Folder references follow the same single-attachment,
+queue and saved-message ownership as other attachments. Viewing the retained
+message starts no file read or model request.
+[Attach a folder](./getting-started.md#attach-a-folder)
+
+A private native client represents a folder with the existing local resource
+link, a canonical file URI and the `inode/directory` media type, omitting size
+and preview. The reference adds no filesystem grant. File tools still need an
+already permitted root; Plan has no command-inspection path, and Act uses the
+existing command scope. Desktop Main validates the actual dropped directory
+and refuses protected directories, containing ancestors and canonical aliases.
+An older Desktop host without folder-reference support refuses the drop
+before submission and preserves the draft and current attachment.
 
 ## Inspect a local file headlessly
 
@@ -625,18 +677,24 @@ Reopening preserves the same file or identifies which copy is unavailable.
 
 ## View a workspace PNG headlessly
 
-On macOS and Linux, use a source-built host with a connection that can
-return images in tool results and a trusted workspace permission profile:
-`--provider responses` with an OpenAI model that takes PNG input, or a saved
-OpenRouter key with a listed OpenRouter model that takes PNG input. Ask the agent to view
-a PNG of up to 256 KiB by its relative path. Include the directory ID if
-the file is outside the primary folder. A folder configured to ask still
-requires approval for that exact read.
+PNG, JPEG, WebP and GIF can be inspected through `view_image` on a connection
+that supports image-bearing tool results. Use a trusted workspace permission
+profile and name the file by its relative path; include its directory ID when
+outside the primary folder. A read that requires approval still requires it.
 
-The selected provider receives the pixels for the current turn. Grida keeps
-the captured bytes in private chat storage so continuing that turn uses the
-same image even if the source changes. Later turns keep a short description.
-Ask to view the file again when you need its current pixels.
+The tool decodes and prepares a bounded PNG, using the same source and image
+limits as selected raster attachments. The next model request receives actual
+pixels with the corresponding tool result. A resized image or one still frame
+does not establish original-resolution or full-animation inspection. Inspecting
+a path confers no write or additional directory permission.
+
+Subscription Responses, supported Responses API, compatible/OpenRouter and
+Gateway routes can offer this tool when they implement image-bearing tool
+results. A model that accepts a user image need not support tool images: the
+current direct Gemini image profile accepts user images but does not offer
+`view_image`. SVG, HTML, PDF and document rendering remain separate workflows.
+Already accepted work keeps its captured vision-tool version and limits after
+an update. A new message can use the expanded raster tool.
 [Work with selected folders](#work-with-selected-folders)
 
 ## Read a finished turn
@@ -670,6 +728,7 @@ Each suffix in a grouped row uses the displayed prefix and is negotiated separat
 | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
 | `co.grida/session/submit`                                                                  | Accept a prompt for an idle session under a client-chosen input ID.                                       |
 | `co.grida/session/snapshot`                                                                | Read revisions, waiting inputs in order, and the current or latest turn.                                  |
+| `co.grida/session/model-change`                                                            | Inspect connection-change blockers or prepare an idle worker for replacement, over private stdio only.    |
 | `co.grida/session/enqueue`, `input`                                                        | Queue a prompt and read its retained content, settings, and disposition.                                  |
 | `co.grida/session/replace`, `withdraw`, `reorder`                                          | Edit waiting inputs using the current queue revision.                                                     |
 | `co.grida/session/pause`, `resume`, `steer`                                                | Pause a turn, resume its verified suspension, or send a correction to that turn.                          |
@@ -698,6 +757,28 @@ loads its retained state. An ACP client that saved a Resume Queue request ID
 can retry it to recover the same unchanged queue; the retry does not start
 later inputs added after that decision.
 
+### Prepare a model connection change
+
+A supervising private stdio client can negotiate
+`co.grida/session/model-change` version 1. Call
+`_co.grida/session/model-change` with `{ "sessionId": "SESSION_ID" }` to
+inspect one attached chat, or `{}` to inspect every chat in the worker's
+store. A clear response has no `blocker`. A blocker identifies pending
+admission, an active or retained turn, queued input, an unfinished goal,
+a temporary side chat, delegated work or a background process. Inspection
+starts no model request, changes no connection and supplies no credential or
+account identity.
+
+Before replacing a worker, call the same method with `{ "prepare": true }`
+and no session ID. A `{ "prepared": true }` response seals that worker's
+admission after checking its retained work. Close it and open the replacement
+under the explicitly selected connection. Preparation is terminal: if the
+replacement fails, restore the previous connection in a new worker. A clear
+inspection alone cannot authorize replacement because work may have arrived
+since that read. If the capability is absent, report that connection changes
+need a compatible host; do not send the unsupported method or silently stop
+the previous worker.
+
 Negotiate `co.grida/session/turn-summary` to read a settled turn by its
 `sessionId` and `turnId`. The response reports the retained answer or a status
 fallback, recorded tool dispositions, unresolved operations, and any completion
@@ -705,8 +786,9 @@ checks. The same record is available after reopening the chat.
 
 Negotiate both question operations to enable question tools for new inputs.
 An answer can resume suspended work when its other conditions allow execution.
-An explicit Pause remains effective after the answer. Ordinary ACP prompts keep
-their existing text-only profile.
+An explicit Pause remains effective after the answer. Question negotiation does
+not add image or file-input capabilities; clients keep the input profile their
+host advertises.
 
 A host operator can enable native workspace tools with a trusted
 `--permission-profile` on macOS or Linux. The profile selects named directories,
@@ -880,6 +962,11 @@ spending limit; their step allowances still apply.
   repeat work or refund an unknown outcome.
 - Pause, restart, retry and objective edits keep the same limit. Deleting a
   subagent does not reset it.
+- Changing connections keeps the old goal's recorded spending intact. An
+  exact retry of its start observes the original acceptance and allocates no
+  new budget. A new goal uses its explicitly selected connection; refreshing
+  an old request's billing still requires its original Gateway account and
+  organization.
 - The service must support capped requests. If it does not, the request fails
   rather than running without the limit. The amount is exact; a value with
   unsupported precision is rejected rather than rounded.

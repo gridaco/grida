@@ -28,6 +28,31 @@ pub struct CatalogPage<T = CatalogEntry> {
 }
 
 impl SqliteStore {
+    /// Read presentation metadata only after verifying its owner-defined scope.
+    pub async fn scoped_catalog_entry(
+        &self,
+        scope: Fingerprint,
+        session: SessionId,
+    ) -> Result<CatalogEntry> {
+        execute(Arc::clone(&self.inner), move |_, connection| {
+            let admitted: bool = connection
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM sessions WHERE id=?1 AND scope=?2)",
+                    params![session.as_str(), scope.bytes().as_slice()],
+                    |row| row.get(0),
+                )
+                .map_err(database_error)?;
+            if !admitted {
+                return Err(error(
+                    ErrorKind::Unavailable,
+                    "session_catalog_scope_mismatch",
+                ));
+            }
+            lookup(connection, &session)
+        })
+        .await
+    }
+
     /// List by newest creation within one scope and owner-selected bucket.
     /// The supplied anchor must belong to that scope. This reads no turns.
     pub async fn list_catalog(

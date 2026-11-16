@@ -63,6 +63,41 @@ A conforming implementation MUST keep these as two tools. It MUST NOT
 overload the read tool with a media-returning mode, and MUST NOT make the
 view tool also serve text.
 
+## Explicit image attachments
+
+Tool-driven viewing and explicit image attachment are different entry points
+to the same image mechanism. Selecting an image for a message supplies prepared
+pixels to the first compatible inference. Naming an ordinary file or folder
+supplies a reference for later inspection. This eager-versus-on-demand choice
+belongs to the product's input policy, not to the reusable execution substrate.
+
+Four identities remain distinct:
+
+- the exact retained source bytes;
+- a verified original path, when a disk origin exists;
+- the bounded image prepared for the model;
+- the image or poster shown as a display preview.
+
+A path records provenance at capture time. It is not a permission grant or a
+promise that the path will forever contain the retained bytes. A clipboard
+snapshot has a truthful managed identity, without an invented original path.
+Queueing and retry resolve accepted immutable image bytes rather than rereading
+a changing live source. The original may remain previewable when a later model
+cannot receive images, and previewing itself starts no inference.
+
+A model-facing description identifies preparation that matters: downsampling
+or a selected still frame cannot imply original-resolution or temporal
+inspection. Reading more detail from a live source retains its independent
+filesystem checks. New unsupported image input refuses the whole request before
+acceptance. A text-only projection of historical media explicitly identifies
+omitted pixels while leaving retained originals available to their owner.
+
+Authentication method and image modality are independent. An endpoint's support
+for images must be declared separately from unrelated transport facets such as
+output limits or request measurement. A client preview and a permissive network
+serializer do not establish that a model received pixels; the complete request
+projection must carry them.
+
 ## The perception-tool contract
 
 The view tool takes a **reference to a source** (a path in the agent
@@ -92,13 +127,13 @@ What counts as "perceivable" grows over time under the same tool. The verb
 is honest across that growth: whatever the source, the _output_ is an image
 the model sees.
 
-| Source class                            | How it becomes pixels                               | Status      |
-| --------------------------------------- | --------------------------------------------------- | ----------- |
-| Raster bitmap (png / jpeg / webp / gif) | Decoded bytes, handed to the provider directly      | **Shipped** |
-| Vector / markup (svg)                   | Rendered to a raster, then perceived                | Planned     |
-| Text / code / document                  | Rendered to a raster (a "screenshot" of the source) | Planned     |
+| Source class                            | How it becomes pixels                               | Status                               |
+| --------------------------------------- | --------------------------------------------------- | ------------------------------------ |
+| Raster bitmap (png / jpeg / webp / gif) | Bounded decode, normalization and prepared pixels   | Available on compatible image routes |
+| Vector / markup (svg)                   | Rendered to a raster, then perceived                | Planned                              |
+| Text / code / document                  | Rendered to a raster (a "screenshot" of the source) | Planned                              |
 
-The first row needs only a byte read. The others need a **renderer** — a
+The first row needs a bounded byte read and image preparation. The others need a **renderer** — a
 host-supplied capability that rasterizes a source the provider can't see
 natively. The contract is designed so adding them is a capability the host
 injects, not a new tool and not a renamed one.
@@ -195,8 +230,9 @@ A conforming implementation SHOULD:
 - Ship perception as a tool distinct from the read tool; keep read text-only.
 - Return a typed refusal (absent / unperceivable-type / too-large) rather
   than throwing.
-- Bound the perceivable byte size, consistent with the inline-attachment
-  bound.
+- Bound source bytes, decoded allocation, prepared pixels and the encoded
+  provider request separately. Retain the source when preparing a derivative;
+  do not use one transport cutoff as a universal perception rule.
 - Lower a perception so it reproduces from the **persisted** result, not just
   the live return.
 - Choose the lowering strategy by **wire format**: tool-output media only on

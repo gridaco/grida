@@ -29,6 +29,10 @@ type ProviderLaunch = Readonly<{
 type ChatProfile = Readonly<{
   id: string;
   prepare(signal: AbortSignal): Promise<ProviderLaunch>;
+  /** Revalidate the initiating selection without becoming part of its route. */
+  admit?(): void;
+  /** Publish a new choice only after its worker starts successfully. */
+  commit?(): Promise<void>;
 }>;
 type Owner = {
   active: ActiveNativeChat & { chat: NativeAgentChat };
@@ -37,6 +41,7 @@ type Owner = {
 };
 type Slot = {
   workspace: Project;
+  profile?: ChatProfile;
   opened: Promise<Owner>;
   visible: Promise<ActiveNativeChat>;
   stopping: AbortController;
@@ -47,6 +52,16 @@ type Slot = {
 export class NativeWorkspaceAgents {
   private readonly slots = new Map<string, Slot>();
   private readonly stopping = new AbortController();
+  private readonly transitions = new Map<
+    string,
+    {
+      workspace: Project;
+      key: string;
+      result?: Promise<ActiveNativeChat>;
+    }
+  >();
+  private readonly recoveries = new Set<string>();
+  private readonly workspaceGenerations = new Map<string, number>();
   private closed: Promise<void> | undefined;
 
   constructor(
@@ -62,7 +77,34 @@ export class NativeWorkspaceAgents {
     return this.active(slotKey(workspaceId, profileId));
   }
 
+  /** Catalog metadata shares the one workspace store across model profiles. */
+  catalogOwner(workspaceId: string): ActiveNativeChat | null {
+    for (const [key, slot] of this.slots) {
+      if (
+        "root" in slot.workspace &&
+        !slot.workspace.nestedDeck &&
+        slot.workspace.id === workspaceId
+      ) {
+        const active = this.active(key);
+        if (active) return active;
+      }
+    }
+    return null;
+  }
+
   gatewayScope(workspaceId: string, profileId?: string): string | undefined {
+    if (profileId === undefined) {
+      for (const [key, slot] of this.slots)
+        if (
+          "root" in slot.workspace &&
+          !slot.workspace.nestedDeck &&
+          slot.workspace.id === workspaceId &&
+          this.active(key) &&
+          slot.owner?.gatewayScope
+        )
+          return slot.owner.gatewayScope;
+      return undefined;
+    }
     const key = slotKey(workspaceId, profileId);
     return this.active(key)
       ? this.slots.get(key)?.owner?.gatewayScope
@@ -92,7 +134,55 @@ export class NativeWorkspaceAgents {
 
   async open(
     workspace: Project,
-    profile?: ChatProfile
+    profile?: ChatProfile,
+    admit?: () => void
+  ): Promise<ActiveNativeChat> {
+    if (!("root" in workspace) || workspace.nestedDeck)
+      return this.openOwned(workspace, profile, admit);
+    const existing = this.transitions.get(workspace.id);
+    if (existing) {
+      if (!sameProject(existing.workspace, workspace, false))
+        throw new Error("native_workspace_root_changed");
+      for (const slot of this.slots.values())
+        if (
+          slot.workspace.id === workspace.id &&
+          !sameProject(slot.workspace, workspace, false)
+        )
+          throw new Error("native_workspace_root_changed");
+      if (
+        existing.key === slotKey(workspace.id, profile?.id) &&
+        existing.result &&
+        !this.recoveries.has(workspace.id)
+      ) {
+        (profile?.admit ?? admit)?.();
+        const active = await existing.result;
+        (profile?.admit ?? admit)?.();
+        return active;
+      }
+      throw new Error("native_chat_model_change_busy");
+    }
+    const transition: {
+      workspace: Project;
+      key: string;
+      result?: Promise<ActiveNativeChat>;
+    } = {
+      workspace,
+      key: slotKey(workspace.id, profile?.id),
+    };
+    this.transitions.set(workspace.id, transition);
+    try {
+      transition.result = this.openOwned(workspace, profile, admit);
+      return await transition.result;
+    } finally {
+      if (!this.recoveries.has(workspace.id))
+        this.transitions.delete(workspace.id);
+    }
+  }
+
+  private async openOwned(
+    workspace: Project,
+    profile?: ChatProfile,
+    admit?: () => void
   ): Promise<ActiveNativeChat> {
     if (this.stopping.signal.aborted) throw closing();
     const { id } = workspace;
@@ -136,14 +226,19 @@ export class NativeWorkspaceAgents {
       if (!chat.hasExited)
         throw new Error("native_workspace_disconnect_pending");
       existing.stopping.abort();
-    } else if (this.slots.size >= MAX_LIVE_WORKSPACES) {
+    } else if (
+      this.slots.size >= MAX_LIVE_WORKSPACES &&
+      ![...this.slots.values()].some(
+        (slot) => "root" in slot.workspace && slot.workspace.id === id
+      )
+    ) {
       if (this.live() >= MAX_LIVE_WORKSPACES)
         throw new Error("native_workspace_capacity_reached");
       this.reclaimExited(key);
     }
 
-    // One workspace store admits one worker. Choosing another model
-    // connection retires the workspace's other worker before starting.
+    // The store owns one worker. A different connection may replace it only
+    // after native admission has been sealed for every chat in that store.
     const siblings =
       "root" in workspace && !nested
         ? [...this.slots].filter(
@@ -156,27 +251,108 @@ export class NativeWorkspaceAgents {
         : [];
     const stopping = new AbortController();
     const signal = AbortSignal.any([this.stopping.signal, stopping.signal]);
+    const generation = this.workspaceGenerations.get(id);
     const opened = Promise.resolve().then(async () => {
-      if (siblings.length) await this.drain(siblings);
-      if (existing?.owner) {
-        // Exit was observed by the process owner. The store will reconcile
-        // retained work; replacing the connection is not a retry of a turn.
-        try {
-          await existing.owner.active.chat.close();
-        } catch {
-          // Work cleanup can remain unverified after an abrupt child exit.
-        } finally {
-          existing.owner.release?.();
+      const candidate = await (profile
+        ? profile.prepare(signal)
+        : this.prepare(workspace, signal));
+      let handed = false;
+      let replaced = false;
+      let started: Owner | undefined;
+      try {
+        if (signal.aborted) throw closing();
+        (profile?.admit ?? admit)?.();
+        for (const [, sibling] of siblings) {
+          const owner = await sibling.opened;
+          if (!owner.active.chat.hasExited)
+            await owner.active.chat.prepareModelChange();
         }
+        if (siblings.length) {
+          await this.drain(siblings);
+          replaced = true;
+        }
+        if (existing?.owner) {
+          // Exit was observed by the process owner. The store will reconcile
+          // retained work; replacing the connection is not a retry of a turn.
+          try {
+            await existing.owner.active.chat.close();
+          } catch {
+            // Work cleanup can remain unverified after an abrupt child exit.
+          } finally {
+            existing.owner.release?.();
+          }
+        }
+        handed = true;
+        started = await this.start(workspace, signal, profile, candidate);
+        if (signal.aborted) throw closing();
+        (profile?.admit ?? admit)?.();
+        await profile?.commit?.();
+        return started;
+      } catch (error) {
+        if (!handed) candidate.release?.();
+        if (started) {
+          try {
+            await started.active.chat.close();
+          } finally {
+            started.release?.();
+          }
+        }
+        // A preparation response may be lost after native admission sealed.
+        // Such a worker is replaced with the original route, never unlocked.
+        if (
+          !signal.aborted &&
+          (replaced ||
+            siblings.some(
+              ([, sibling]) => sibling.owner?.active.chat.modelChangePending
+            ))
+        ) {
+          await this.drain(siblings);
+          if (
+            signal.aborted ||
+            generation !== this.workspaceGenerations.get(id)
+          )
+            throw closing();
+          if (
+            error instanceof NativeAgentTerminationPending &&
+            !error.hasExited
+          ) {
+            this.recoveries.add(id);
+            void error.terminated
+              .then(() => {
+                if (
+                  !signal.aborted &&
+                  generation === this.workspaceGenerations.get(id)
+                )
+                  return this.restore(siblings);
+              })
+              .catch(() => {})
+              .finally(() => {
+                this.recoveries.delete(id);
+                this.transitions.delete(id);
+              });
+          } else {
+            try {
+              await this.restore(siblings);
+            } catch {
+              throw new Error("native_chat_model_change_restore_failed");
+            }
+          }
+          throw new Error(
+            error instanceof NativeAgentTerminationPending && !error.hasExited
+              ? "native_chat_model_change_recovery_pending"
+              : "native_chat_model_change_failed_restored",
+            { cause: error }
+          );
+        }
+        throw error;
       }
-      return await this.start(workspace, signal, profile);
     });
     const visible = opened.then((owner) => {
       if (signal.aborted) throw closing();
       slot.owner = owner;
       return owner.active;
     });
-    const slot: Slot = { workspace, opened, visible, stopping };
+    const slot: Slot = { workspace, profile, opened, visible, stopping };
     this.slots.set(key, slot);
     void opened.catch((error: unknown) => this.retireSlot(key, slot, error));
     return visible;
@@ -208,6 +384,10 @@ export class NativeWorkspaceAgents {
   }
 
   closeWorkspace(workspaceId: string): Promise<void> {
+    this.workspaceGenerations.set(
+      workspaceId,
+      (this.workspaceGenerations.get(workspaceId) ?? 0) + 1
+    );
     return this.drain(
       [...this.slots].filter(
         ([, slot]) =>
@@ -234,12 +414,14 @@ export class NativeWorkspaceAgents {
   private async start(
     workspace: Project,
     signal: AbortSignal,
-    profile?: ChatProfile
+    profile?: ChatProfile,
+    prepared?: ProviderLaunch
   ): Promise<Owner> {
-    if (signal.aborted) throw closing();
-    const candidate = await (profile
-      ? profile.prepare(signal)
-      : this.prepare(workspace, signal));
+    const candidate =
+      prepared ??
+      (await (profile
+        ? profile.prepare(signal)
+        : this.prepare(workspace, signal)));
     try {
       if (signal.aborted) throw closing();
       const opened = await this.startProject(
@@ -251,6 +433,7 @@ export class NativeWorkspaceAgents {
       return {
         active: Object.freeze({
           workspaceId: workspace.id,
+          profileId: profile?.id ?? null,
           ...(identity && { directoryIdentity: identity }),
           chat: opened.chat,
         }),
@@ -266,6 +449,31 @@ export class NativeWorkspaceAgents {
           throw releaseError;
       }
       throw error;
+    }
+  }
+
+  /** Reacquire the prior connection; its closed worker and leases stay retired. */
+  private async restore(siblings: readonly [string, Slot][]): Promise<void> {
+    for (const [key, previous] of siblings) {
+      if (this.stopping.signal.aborted) throw closing();
+      const stopping = new AbortController();
+      const signal = AbortSignal.any([this.stopping.signal, stopping.signal]);
+      const opened = this.start(previous.workspace, signal, previous.profile);
+      const visible = opened.then((owner) => {
+        if (signal.aborted) throw closing();
+        slot.owner = owner;
+        return owner.active;
+      });
+      const slot: Slot = {
+        workspace: previous.workspace,
+        profile: previous.profile,
+        opened,
+        visible,
+        stopping,
+      };
+      this.slots.set(key, slot);
+      void opened.catch((error: unknown) => this.retireSlot(key, slot, error));
+      await visible;
     }
   }
 
@@ -312,8 +520,8 @@ export class NativeWorkspaceAgents {
         }
       },
       (error: unknown) => {
-        if (error instanceof NativeAgentTerminationPending && !error.hasExited)
-          throw error;
+        const pending = pendingTermination(error);
+        if (pending && !pending.hasExited) throw error;
       }
     );
     return slot.retirement;
@@ -325,10 +533,21 @@ export class NativeWorkspaceAgents {
     };
     // Startup can fail before a chat attachment exists. Keep the workspace
     // occupied until the exact child and its pipes have closed.
-    if (error instanceof NativeAgentTerminationPending && !error.hasExited)
-      void error.terminated.then(remove);
+    const pending = pendingTermination(error);
+    if (pending && !pending.hasExited) void pending.terminated.then(remove);
     else remove();
   }
+}
+
+function pendingTermination(
+  error: unknown
+): NativeAgentTerminationPending | undefined {
+  return error instanceof NativeAgentTerminationPending
+    ? error
+    : error instanceof Error &&
+        error.cause instanceof NativeAgentTerminationPending
+      ? error.cause
+      : undefined;
 }
 
 function sameProject(left: Project, right: Project, exited: boolean): boolean {

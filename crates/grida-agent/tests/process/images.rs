@@ -10,6 +10,372 @@ const IMAGE_MODEL: &str = "gpt-6.1-sol";
 const GATEWAY_PNG_MODEL: &str = "openai/gpt-5.6-sol";
 const GATEWAY_ENDPOINT: &str = "https://grida.co/api/v1/ai";
 const ARTIFACTS: &str = "co.grida/session/artifacts";
+const INPUT_IMAGE: &str = "co.grida/session/input-image";
+
+#[path = "raster_images.rs"]
+mod raster_images;
+
+#[path = "queued_text.rs"]
+mod queued_text;
+
+fn input_image_initialize() -> Value {
+    let mut value = extension_initialize();
+    value["clientCapabilities"]["_meta"][INPUT_IMAGE] = 1.into();
+    value["clientCapabilities"]["_meta"]["co.grida/session/compact"] = 1.into();
+    value
+}
+
+async fn input_image_identity(
+    client: &mut StdioClient,
+    session: &str,
+    cwd: &Path,
+) -> (String, String) {
+    let id = client
+        .send(
+            "session/load",
+            json!({"sessionId":session,"cwd":cwd,"mcpServers":[]}),
+        )
+        .await;
+    let mut identity = None;
+    loop {
+        let frame = client.read_frame().await;
+        if frame["id"] == id {
+            assert!(frame["result"].is_object(), "{frame}");
+            break;
+        }
+        let update = &frame["params"]["update"];
+        if update["sessionUpdate"] == "user_message_chunk"
+            && update["content"]["type"] == "resource_link"
+            && update["content"]["mimeType"] == "image/png"
+        {
+            identity = Some((
+                update["messageId"].as_str().unwrap().to_owned(),
+                update["content"]["uri"].as_str().unwrap().to_owned(),
+            ));
+        }
+    }
+    identity.expect("recorded input PNG link")
+}
+
+async fn read_input_image(
+    client: &mut StdioClient,
+    session: &str,
+    message: &str,
+    uri: &str,
+) -> Value {
+    client
+        .request(
+            "_co.grida/session/read-input-image",
+            json!({"sessionId":session,"messageId":message,"attachmentUri":uri}),
+        )
+        .await
+}
+
+#[tokio::test]
+async fn input_image_reads_preserve_queued_originals_after_compaction_restart_and_model_change() {
+    use std::fs;
+    let directory = TempDir::new().unwrap();
+    let state = directory.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let original = png([12, 34, 56]);
+    let data = STANDARD.encode(&original);
+    let mut endpoint = Endpoint::start_protocol(
+        ProviderProtocol::Responses,
+        vec![
+            Reply::Hold("Earlier work is waiting."),
+            Reply::Finished("The supplied image was observed."),
+            Reply::Finished("Older large task answered."),
+            Reply::Finished("Recent large task answered."),
+            Reply::Finished("Earlier visual task and decisions summarized."),
+            Reply::Finished("The earlier request was revised."),
+        ],
+        Some(TEST_CREDENTIAL),
+    )
+    .await;
+    let mut first = stdio(&state, &endpoint.url, IMAGE_MODEL);
+    let ready = first.request("initialize", input_image_initialize()).await;
+    assert_eq!(
+        ready["result"]["agentCapabilities"]["_meta"][INPUT_IMAGE],
+        1
+    );
+    let created = first
+        .request(
+            "session/new",
+            json!({"cwd":workspace.path(),"mcpServers":[]}),
+        )
+        .await;
+    let session = created["result"]["sessionId"].as_str().unwrap();
+    first
+        .request(
+            "_co.grida/session/submit",
+            super::lifecycle::prompt_request(session, "earlier", "Wait for more input."),
+        )
+        .await;
+    endpoint.request().await;
+    let accepted = first
+        .request(
+            "_co.grida/session/enqueue",
+            upload(session, "queued-image", &data),
+        )
+        .await;
+    assert_eq!(accepted["result"]["disposition"], "queued", "{accepted}");
+    let invalid = read_input_image(
+        &mut first,
+        session,
+        "not-recorded",
+        "urn:grida:retained-attachment:input/not-recorded",
+    )
+    .await;
+    assert_eq!(invalid["error"]["data"], "input_image_unavailable");
+    let current = snapshot(&mut first, session).await;
+    first
+        .request(
+            "_co.grida/session/stop",
+            task_basis(&current, session, "hold-image-queue"),
+        )
+        .await;
+    settled(&mut first, session).await;
+    first.close().await;
+
+    let mut client = stdio(&state, &endpoint.url, IMAGE_MODEL);
+    client.request("initialize", input_image_initialize()).await;
+    client
+        .request(
+            "session/load",
+            json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]}),
+        )
+        .await;
+    let held = snapshot(&mut client, session).await;
+    assert_eq!(held["queue"][0]["inputId"], "queued-image");
+    client
+        .request(
+            "_co.grida/session/resume-queue",
+            queue_basis(&held, session, "release-image-queue"),
+        )
+        .await;
+    let inference = endpoint.request().await;
+    assert!(inference.to_string().contains(&data));
+    settled(&mut client, session).await;
+    let (message, uri) = input_image_identity(&mut client, session, workspace.path()).await;
+    let before = snapshot(&mut client, session).await;
+    let opened = read_input_image(&mut client, session, &message, &uri).await;
+    assert_eq!(
+        opened["result"],
+        json!({"messageId":message,"attachmentUri":uri,"mimeType":"image/png","data":data})
+    );
+    assert_eq!(snapshot(&mut client, session).await, before);
+    assert!(endpoint.requests.try_recv().is_err());
+    let history = client
+        .request("_co.grida/session/history", json!({"sessionId":session}))
+        .await;
+    let messages = history["result"]["messages"].as_array().unwrap();
+    let assistant = messages
+        .iter()
+        .find(|item| item["role"] == "assistant")
+        .unwrap()["anchor"]["message"]
+        .as_str()
+        .unwrap();
+    assert_eq!(
+        read_input_image(&mut client, session, assistant, &uri).await["error"]["data"],
+        "input_image_unavailable"
+    );
+    let anchor = messages
+        .iter()
+        .find(|item| item["anchor"]["message"] == message)
+        .unwrap()["anchor"]
+        .clone();
+    let forked = client.request("_co.grida/session/fork",json!({"sessionId":session,"requestId":"fork-image-reference","expectedHistory":history["result"]["basis"],"anchor":anchor})).await;
+    let fork = forked["result"]["sessionId"].as_str().unwrap();
+    client
+        .request(
+            "session/load",
+            json!({"sessionId":fork,"cwd":workspace.path(),"mcpServers":[]}),
+        )
+        .await;
+    assert_eq!(
+        read_input_image(&mut client, fork, &message, &uri).await["error"]["data"],
+        "input_image_unavailable"
+    );
+    for index in 0..2 {
+        let text = format!("Large task {index}: {}", "x".repeat(115_000));
+        let result = client
+            .request(
+                "session/prompt",
+                json!({"sessionId":session,"prompt":[{"type":"text","text":text}]}),
+            )
+            .await;
+        assert_eq!(result["result"]["stopReason"], "end_turn", "{result}");
+        endpoint.request().await;
+    }
+    let compacted = client
+        .request(
+            "_co.grida/session/compact",
+            json!({"sessionId":session,"requestId":"compact-old-image"}),
+        )
+        .await;
+    assert_eq!(compacted["result"]["status"], "installed", "{compacted}");
+    endpoint.request().await;
+    assert_eq!(
+        read_input_image(&mut client, session, &message, &uri).await["result"],
+        opened["result"]
+    );
+    client.close().await;
+
+    let mut reader = stdio(&state, &endpoint.url, "fixture-model");
+    let ready = reader.request("initialize", input_image_initialize()).await;
+    assert_eq!(
+        ready["result"]["agentCapabilities"]["promptCapabilities"]["image"],
+        false
+    );
+    assert_eq!(
+        ready["result"]["agentCapabilities"]["_meta"][INPUT_IMAGE],
+        1
+    );
+    let detached = read_input_image(&mut reader, session, &message, &uri).await;
+    assert!(detached["error"].is_object());
+    assert_eq!(
+        input_image_identity(&mut reader, session, workspace.path()).await,
+        (message.clone(), uri.clone())
+    );
+    assert_eq!(
+        read_input_image(&mut reader, session, &message, &uri).await["result"],
+        opened["result"]
+    );
+    for (wrong_message, wrong_uri) in [
+        ("other-message", uri.as_str()),
+        (message.as_str(), "file:///etc/passwd"),
+        (
+            message.as_str(),
+            "urn:grida:retained-attachment:input/invented",
+        ),
+    ] {
+        let refused = read_input_image(&mut reader, session, wrong_message, wrong_uri).await;
+        assert_eq!(
+            refused["error"]["data"], "input_image_unavailable",
+            "{refused}"
+        );
+    }
+    let foreign = reader
+        .request(
+            "session/new",
+            json!({"cwd":workspace.path(),"mcpServers":[]}),
+        )
+        .await;
+    let refused = read_input_image(
+        &mut reader,
+        foreign["result"]["sessionId"].as_str().unwrap(),
+        &message,
+        &uri,
+    )
+    .await;
+    assert_eq!(refused["error"]["data"], "input_image_unavailable");
+    let owner = fs::read_dir(state.join("retained-inputs"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    let source = fs::read_dir(owner.join("sources"))
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .find(|path| {
+            path.extension()
+                .is_some_and(|extension| extension == "asset")
+        })
+        .unwrap();
+    let stored = fs::read(&source).unwrap();
+    let lock = owner.join("owner.lock");
+    let moved_lock = owner.join("owner.lock-preview-fixture");
+    fs::rename(&lock, &moved_lock).unwrap();
+    assert_eq!(
+        read_input_image(&mut reader, session, &message, &uri).await["error"]["data"],
+        "input_image_unavailable"
+    );
+    assert!(!lock.exists());
+    fs::rename(&moved_lock, &lock).unwrap();
+    let mut replaced = stored.clone();
+    *replaced.last_mut().unwrap() ^= 1;
+    fs::write(&source, &replaced).unwrap();
+    assert_eq!(
+        read_input_image(&mut reader, session, &message, &uri).await["error"]["data"],
+        "input_image_unavailable"
+    );
+    fs::write(&source, &stored).unwrap();
+    assert_eq!(
+        read_input_image(&mut reader, session, &message, &uri).await["result"],
+        opened["result"]
+    );
+    fs::remove_file(&source).unwrap();
+    assert_eq!(
+        read_input_image(&mut reader, session, &message, &uri).await["error"]["data"],
+        "input_image_unavailable"
+    );
+    assert!(!source.exists());
+    assert!(endpoint.requests.try_recv().is_err());
+    fs::write(&source, &stored).unwrap();
+    std::fs::set_permissions(&source, std::os::unix::fs::PermissionsExt::from_mode(0o600)).unwrap();
+    assert_eq!(
+        read_input_image(&mut reader, session, &message, &uri).await["result"],
+        opened["result"]
+    );
+    let history = reader
+        .request("_co.grida/session/history", json!({"sessionId":session}))
+        .await;
+    let target = history["result"]["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| {
+            item["role"] == "user"
+                && item["editable"] == true
+                && item["anchor"]["message"] != message
+        })
+        .unwrap()["anchor"]
+        .clone();
+    let revised = reader.request("_co.grida/session/revise",json!({"sessionId":session,"requestId":"revise-before-image","expectedSessionRevision":history["result"]["sessionRevision"],"expectedHistory":history["result"]["basis"],"anchor":target,"replacementInputId":"replacement-before-image","prompt":[{"type":"text","text":"Revise the earlier request."}]})).await;
+    assert!(revised["result"].is_object(), "{revised}");
+    endpoint.request().await;
+    settled(&mut reader, session).await;
+    assert_eq!(
+        read_input_image(&mut reader, session, &message, &uri).await["error"]["data"],
+        "input_image_unavailable"
+    );
+    assert!(source.exists());
+    assert!(endpoint.requests.try_recv().is_err());
+    reader.close().await;
+    endpoint.done().await;
+}
+
+#[tokio::test]
+async fn input_image_reads_require_private_negotiation_and_recorded_asset_identity() {
+    let directory = TempDir::new().unwrap();
+    let state = directory.path().join("state");
+    let mut endpoint =
+        Endpoint::start_protocol(ProviderProtocol::Responses, vec![], Some(TEST_CREDENTIAL)).await;
+    let mut plain = stdio(&state, &endpoint.url, "fixture-model");
+    plain.request("initialize", extension_initialize()).await;
+    let refused = read_input_image(
+        &mut plain,
+        "any",
+        "message",
+        "urn:grida:retained-attachment:input/id",
+    )
+    .await;
+    assert_eq!(refused["error"]["code"], -32601, "{refused}");
+    plain.close().await;
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = connect_shared(&url, Some(SERVER_TOKEN), None, None)
+        .await
+        .unwrap();
+    let ready = ws_rpc(&mut socket, 1, "initialize", input_image_initialize()).await;
+    assert!(ready["result"]["agentCapabilities"]["_meta"][INPUT_IMAGE].is_null());
+    let refused = ws_rpc(&mut socket,2,"_co.grida/session/read-input-image",json!({"sessionId":"any","messageId":"message","attachmentUri":"urn:grida:retained-attachment:input/id"})).await;
+    assert_eq!(refused["error"]["code"], -32601, "{refused}");
+    drop(socket);
+    super::lifecycle::terminate_shared_server(host).await;
+    assert!(endpoint.requests.try_recv().is_err());
+    endpoint.done().await;
+}
 
 #[tokio::test]
 async fn requested_library_selection_survives_restart_and_replays_the_exact_answer() {
@@ -1102,17 +1468,19 @@ async fn supervised_gateway_sends_only_the_selected_png_and_reopens_its_scope() 
     let mut foreign = gateway_stdio(&state, &"b".repeat(64)).await;
     let loaded = foreign.request("session/load", load.clone()).await;
     assert!(loaded["result"].is_object(), "{loaded}");
-    let denied_id = foreign
-        .send(
-            "_co.grida/session/submit",
-            super::lifecycle::prompt_request(session, "foreign", "Describe the image again."),
-        )
-        .await;
-    let denied = foreign.read_reply().await;
-    assert_eq!(denied["id"], denied_id, "{denied}");
+    let request = gateway_exchange(
+        &mut foreign,
+        super::lifecycle::prompt_request(
+            session,
+            "foreign",
+            "Describe the image again on the selected account.",
+        ),
+    )
+    .await;
+    assert_gateway_png(&request, &data);
     assert_eq!(
-        denied["error"]["data"], "session_execution_configuration_changed",
-        "{denied}"
+        settled(&mut foreign, session).await["latest"]["status"],
+        "succeeded"
     );
     foreign.close().await;
 
@@ -1269,8 +1637,7 @@ fn assert_gateway_png(request: &Value, data: &str) {
             tools.iter().all(|tool| !matches!(
                 tool["function"]["name"].as_str(),
                 Some(
-                    "crop_retained_image"
-                        | "view_image"
+                    "view_image"
                         | "design_search"
                         | "generate_image"
                         | "place_generated_image"

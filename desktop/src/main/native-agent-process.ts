@@ -19,7 +19,10 @@ import {
 } from "./native-image-generation";
 import { NativeImagePlacement } from "./native-image-placement";
 import { NativeFileReference } from "./native-file-reference";
-import { NativeProviderSelection } from "./native-provider-selection";
+import { NativeInputImages } from "./native-input-images";
+import { NativeQueuedMessages } from "./native-queued-messages";
+import { NativeSubagentActivity } from "./native-subagent-activity";
+import { NativeSelectedImages } from "./native-selected-images";
 import {
   NativeEditorSurfaceEndpoints,
   type NativeEditorSurfaceDelivery,
@@ -49,6 +52,7 @@ const LIBRARY_SELECTION_CAPABILITIES = {
   "co.grida/session/answer-library-selection": 1,
 } as const;
 export const TRANSCRIPT_WINDOW = "co.grida/session/transcript-window";
+const MODEL_CHANGE = "co.grida/session/model-change";
 const SUBAGENT_CAPABILITIES = {
   "co.grida/subagent/list": 1,
   "co.grida/subagent/create": 1,
@@ -85,7 +89,7 @@ export type NativeAgentLaunch = {
   gatewayScope?: string;
   gatewayJobBilling?: NativeGatewayConnection["readJobBilling"];
   subscriptionScope?: string;
-  /** Trusted Main opt-in for the captured Gateway or saved BYOK connection. */
+  /** Trusted Main opt-in for child work on the selected provider connection. */
   subagents?: true;
   /** Title an untitled chat from its first request (one extra model request). */
   chatTitles?: true;
@@ -155,15 +159,23 @@ export class NativeAgentProcess {
   private librarySelection = false;
   private fileInput = false;
   private fileReference = false;
+  private inputImages = false;
+  private inputImageChunks = false;
+  private queuedMessages = false;
+  private queuedTextReplacement = false;
+  private selectedImage = false;
   private agentEffort = false;
   private historyRevision = false;
   private transcriptWindow = false;
+  private modelChange = false;
+  private changingModel = false;
   private gatewayBillingEnabled = false;
   private childGatewayBilling = false;
   private namedChildren = false;
   private childTurnControls = false;
   private childMessaging = false;
   private childQueueControls = false;
+  private childActivity = false;
   private artifacts = false;
   private savedChatDeletion = false;
   private savedChatDeletionPreview = false;
@@ -176,6 +188,7 @@ export class NativeAgentProcess {
   private editorSurfaces = false;
   private editorSurfaceOpen = false;
   private editorSvgText = false;
+  private chatSelection = false;
   private readonly commandCapabilities = new Set<string>();
   private observedExit = false;
   private shutdown: Promise<void> | undefined;
@@ -262,6 +275,34 @@ export class NativeAgentProcess {
     return this.connected && this.fileReference;
   }
 
+  get acceptsInputImages(): boolean {
+    return this.connected && this.inputImages;
+  }
+
+  get acceptsInputImageChunks(): boolean {
+    return this.connected && this.inputImageChunks;
+  }
+
+  get acceptsQueuedMessages(): boolean {
+    return this.connected && this.queuedMessages;
+  }
+
+  get acceptsQueuedTextReplacement(): boolean {
+    return this.connected && this.queuedMessages && this.queuedTextReplacement;
+  }
+
+  get acceptsSelectedImage(): boolean {
+    return this.connected && this.imageInput && this.selectedImage;
+  }
+
+  get supportsSelectedImage(): boolean {
+    return this.connected && this.selectedImage;
+  }
+
+  get acceptsSelection(): boolean {
+    return this.connected && this.chatSelection;
+  }
+
   get acceptsEffort(): boolean {
     return this.connected && this.agentEffort;
   }
@@ -304,6 +345,10 @@ export class NativeAgentProcess {
 
   get acceptsSubagentQueueControls(): boolean {
     return this.acceptsSubagents && this.childQueueControls;
+  }
+
+  get acceptsSubagentActivity(): boolean {
+    return this.acceptsSubagents && this.childActivity;
   }
 
   get acceptsArtifacts(): boolean {
@@ -392,16 +437,8 @@ export class NativeAgentProcess {
       throw new Error("native_agent_compatible_output_limit_invalid");
     if (options.workspaceConfiguration && !options.providerNetwork)
       throw new Error("native_workspace_configuration_requires_supervision");
-    const storedSubagents =
-      options.provider === "openai-compatible" &&
-      NativeProviderSelection.isBuiltInEndpoint(options.endpoint) &&
-      options.credentialHome !== undefined &&
-      options.providerNetwork !== undefined &&
-      options.configuredEndpointKey === undefined &&
-      options.gatewayScope === undefined &&
-      options.subscriptionScope === undefined;
-    if (options.subagents && !options.gatewayScope && !storedSubagents)
-      throw new Error("native_agent_subagent_provider_unsupported");
+    if (options.subagents && !options.providerNetwork)
+      throw new Error("native_agent_subagent_transport_unavailable");
     if (
       options.configuredEndpointKey !== undefined &&
       (!options.credentialHome ||
@@ -469,8 +506,9 @@ export class NativeAgentProcess {
       ...(options.hooks ? NativeAgentHooks.capabilities : {}),
       ...(permissionProfile ? NativeAgentPermissions.capabilities : {}),
     };
-    if (storedSubagents) {
-      // Older workers can omit these optionally requested review capabilities.
+    if (options.subagents) {
+      // Review support is negotiated with the worker, independently of the
+      // connection's provider and any optional monetary spending capability.
       delete capabilities[SESSION_EFFORT];
       delete capabilities[NativeAgentGoals.fundedReviewCapability];
       delete capabilities[NativeAgentGoals.namedChildCapability];
@@ -596,13 +634,13 @@ export class NativeAgentProcess {
                   [CHILD_MESSAGING]: 1,
                   [CHILD_QUEUE[0]]: 1,
                   [CHILD_QUEUE[1]]: 1,
+                  [NativeSubagentActivity.capability]: 1,
                   [SESSION_EFFORT]: 1,
                 }),
-                ...(options.subagents &&
-                  (options.gatewayScope !== undefined || storedSubagents) && {
-                    [NativeAgentGoals.fundedReviewCapability]: 1,
-                    [NativeAgentGoals.namedChildCapability]: 1,
-                  }),
+                ...(options.subagents && {
+                  [NativeAgentGoals.fundedReviewCapability]: 1,
+                  [NativeAgentGoals.namedChildCapability]: 1,
+                }),
                 [NativeEditorSurfaceEndpoints.capability]: 1,
                 ...(providerEgress && {
                   [NativeEditorSurfaceEndpoints.openCapability]: 1,
@@ -617,7 +655,14 @@ export class NativeAgentProcess {
                 ...(options.workspace && LIBRARY_SELECTION_CAPABILITIES),
                 "co.grida/session/selected-file": 1,
                 [NativeFileReference.capability]: 1,
+                [NativeInputImages.capability]: 1,
+                [NativeInputImages.chunkCapability]: 1,
+                [NativeQueuedMessages.capability]: 1,
+                [NativeQueuedMessages.replaceTextCapability]: 1,
+                [NativeSelectedImages.capability]: 1,
                 [TRANSCRIPT_WINDOW]: 1,
+                [MODEL_CHANGE]: 1,
+                "co.grida/session/selection": 1,
                 ...(requestDeletion && {
                   [NativeAgentDeletion.capability]: 1,
                   [NativeAgentDeletion.previewCapability]: 1,
@@ -637,6 +682,9 @@ export class NativeAgentProcess {
       const agentCapabilities = object(response.agentCapabilities);
       const advertised = object(agentCapabilities?._meta);
       processOwner.transcriptWindow = advertised?.[TRANSCRIPT_WINDOW] === 1;
+      processOwner.modelChange = advertised?.[MODEL_CHANGE] === 1;
+      processOwner.chatSelection =
+        advertised?.["co.grida/session/selection"] === 1;
       processOwner.gatewayBillingEnabled =
         options.gatewayJobBilling !== undefined &&
         advertised?.[NativeGatewayConnection.billingCapability] === 1;
@@ -673,6 +721,16 @@ export class NativeAgentProcess {
         advertised?.["co.grida/session/selected-file"] === 1;
       processOwner.fileReference =
         advertised?.[NativeFileReference.capability] === 1;
+      processOwner.inputImages =
+        advertised?.[NativeInputImages.capability] === 1;
+      processOwner.inputImageChunks =
+        advertised?.[NativeInputImages.chunkCapability] === 1;
+      processOwner.queuedMessages =
+        advertised?.[NativeQueuedMessages.capability] === 1;
+      processOwner.queuedTextReplacement =
+        advertised?.[NativeQueuedMessages.replaceTextCapability] === 1;
+      processOwner.selectedImage =
+        advertised?.[NativeSelectedImages.capability] === 1;
       processOwner.agentEffort =
         options.subagents === true && advertised?.[SESSION_EFFORT] === 1;
       processOwner.historyRevision = Object.keys(
@@ -683,7 +741,6 @@ export class NativeAgentProcess {
       processOwner.goalManualContinuation =
         advertised?.[NativeAgentGoals.manualContinuationCapability] === 1;
       processOwner.goalFundedReview =
-        (options.gatewayScope !== undefined || storedSubagents) &&
         processOwner.agentEffort &&
         advertised?.[NativeAgentGoals.fundedReviewCapability] === 1;
       processOwner.goalSpending =
@@ -703,6 +760,8 @@ export class NativeAgentProcess {
       processOwner.childQueueControls = CHILD_QUEUE.every(
         (key) => advertised?.[key] === 1
       );
+      processOwner.childActivity =
+        advertised?.[NativeSubagentActivity.capability] === 1;
       for (const key of Object.keys(NativeAgentCommands.capabilities)) {
         if (advertised?.[key] === 1) processOwner.commandCapabilities.add(key);
       }
@@ -737,9 +796,48 @@ export class NativeAgentProcess {
     params: unknown,
     timeoutMs = 130_000
   ): Promise<unknown> {
+    if (this.changingModel)
+      return Promise.reject(new Error("native_chat_model_change_busy"));
     if (method === NativeAgentPermissions.answerMethod)
       return Promise.reject(new Error("native_agent_approval_requires_review"));
     return this.call(method, params, timeoutMs);
+  }
+
+  /** Seal native work admission before the owner replaces this store's worker. */
+  get modelChangePending(): boolean {
+    return this.changingModel;
+  }
+
+  async prepareModelChange(): Promise<void> {
+    if (!this.modelChange)
+      throw new Error("native_chat_model_change_unsupported");
+    if (this.changingModel) throw new Error("native_chat_model_change_busy");
+    if (this.pending.size)
+      throw new Error("native_chat_model_change_pending_work");
+    this.changingModel = true;
+    // A lost response can mean that native admission was already sealed.
+    // Keep the local gate closed until this exact process has exited.
+    const response = object(
+      await this.call(`_${MODEL_CHANGE}`, { prepare: true }, 20_000)
+    );
+    const blocker = response?.blocker;
+    if (
+      typeof blocker === "string" &&
+      [
+        "pending_work",
+        "active_turn",
+        "retained_turn",
+        "queued_input",
+        "unresolved_goal",
+        "delegated_session",
+        "background_process",
+      ].includes(blocker)
+    ) {
+      this.changingModel = false;
+      throw new Error(`native_chat_model_change_${blocker}`);
+    }
+    if (response?.prepared !== true)
+      throw new Error("native_chat_model_change_unverified");
   }
 
   async gatewayBillingStatus(
@@ -818,6 +916,7 @@ export class NativeAgentProcess {
   }
 
   notify(method: string, params: unknown): void {
+    if (this.changingModel) throw new Error("native_chat_model_change_busy");
     if (method === NativeAgentPermissions.answerMethod)
       throw new Error("native_agent_approval_requires_review");
     if (this.failure || this.shutdown)

@@ -10,7 +10,7 @@ use agent_kit_core::inference::{
     ProviderBinding, ProviderEvent, RequestControl, UsageObservation,
 };
 use agent_kit_core::messages::{
-    Content, Message, OutcomeStatus, Provenance, ProvenanceKind, ResultContent, Role,
+    Content, Message, MessagePhase, OutcomeStatus, Provenance, ProvenanceKind, ResultContent, Role,
     ToolArguments, ToolCall,
 };
 use agent_kit_core::tools::{
@@ -131,6 +131,12 @@ enum Script {
     MalformedThenAnswer,
     Malformed,
     EffortReview,
+    GeneralDelegation {
+        collect: bool,
+        explicit_phase: bool,
+    },
+    DelegationResourceRecovery,
+    DelegationResourceUnknown,
     GoalReport {
         call: &'static str,
     },
@@ -338,6 +344,69 @@ impl Provider for ScriptProvider {
                 };
             }
         }
+        if let Script::GeneralDelegation { collect, .. } = self.script {
+            use grida_agent_master::delegation;
+            content = if index == 0 {
+                (0..5)
+                    .map(|slot| {
+                        Ok(Content::ToolCall(ToolCall {
+                            id: ToolCallId::new(format!("spawn-{slot}"))?,
+                            tool: ToolId::new(delegation::SPAWN)?,
+                            arguments: ToolArguments::Json(serde_json::json!({"slot":slot})),
+                        }))
+                    })
+                    .collect::<Result<_>>()?
+            } else if index == 2 && collect {
+                assert!(request.request().messages.iter().any(|message| {
+                    message.role == Role::System && message.content.iter().any(|part| {
+                        matches!(part, Content::Text(text) if text.contains("Outstanding delegated assignments"))
+                    })
+                }));
+                vec![Content::ToolCall(ToolCall {
+                    id: ToolCallId::new("collect-assignments")?,
+                    tool: ToolId::new(delegation::WAIT)?,
+                    arguments: ToolArguments::Json(serde_json::json!({})),
+                })]
+            } else {
+                vec![Content::Text("Finished".into())]
+            };
+        }
+        if matches!(
+            self.script,
+            Script::DelegationResourceRecovery | Script::DelegationResourceUnknown
+        ) {
+            use grida_agent_master::delegation;
+            content = match index {
+                0 => vec![Content::ToolCall(ToolCall {
+                    id: ToolCallId::new("spawn-resource-work")?,
+                    tool: ToolId::new(delegation::SPAWN)?,
+                    arguments: ToolArguments::Json(serde_json::json!({"slot":0})),
+                })],
+                1 | 3 => vec![Content::ToolCall(ToolCall {
+                    id: ToolCallId::new(format!("collect-resource-work-{index}"))?,
+                    tool: ToolId::new(delegation::WAIT)?,
+                    arguments: ToolArguments::Json(serde_json::json!({})),
+                })],
+                2 if matches!(self.script, Script::DelegationResourceUnknown) => {
+                    vec![Content::Text(
+                        "The task was cancelled; resource retirement could not be verified.".into(),
+                    )]
+                }
+                2 => {
+                    assert!(request.request().messages.iter().any(|message|message.content.iter().any(|part|{
+                        matches!(part,Content::Text(text) if text.contains("\"resource_retirement_unverified\":[{\"child\":\"worker-0\""))
+                    })));
+                    vec![Content::ToolCall(ToolCall {
+                        id: ToolCallId::new("retire-resource-work")?,
+                        tool: ToolId::new(delegation::STOP)?,
+                        arguments: ToolArguments::Json(serde_json::json!({"child":"worker-0"})),
+                    })]
+                }
+                _ => vec![Content::Text(
+                    "Integrated the cancelled work and verified resource retirement.".into(),
+                )],
+            };
+        }
         if matches!(self.script, Script::ToolAndDeferred) && index == 0 {
             content.push(Content::ToolCall(ToolCall {
                 id: ToolCallId::new(format!("deferred-{index}"))?,
@@ -409,7 +478,20 @@ impl Provider for ScriptProvider {
             messages: vec![Message {
                 id: MessageId::new(format!("answer-{index}"))?,
                 role: Role::Assistant,
-                phase: None,
+                phase: if matches!(
+                    self.script,
+                    Script::GeneralDelegation {
+                        explicit_phase: true,
+                        ..
+                    }
+                ) && !content
+                    .iter()
+                    .any(|part| matches!(part, Content::ToolCall(_)))
+                {
+                    Some(MessagePhase::Answer)
+                } else {
+                    None
+                },
                 content,
                 provenance: Provenance {
                     source: "fixture".into(),
@@ -477,6 +559,80 @@ impl Tool for EchoTool {
                 status: OutcomeStatus::Succeeded,
                 content: vec![ResultContent::Text(value)],
                 structured: None,
+                receipt: None,
+                truncated: false,
+            }
+        })
+    }
+}
+
+struct DelegationReceiptTool {
+    definition: ToolDefinition,
+    terminal: OutcomeStatus,
+    resource_recovery: bool,
+    retired: Arc<AtomicBool>,
+}
+
+impl Tool for DelegationReceiptTool {
+    fn definition(&self) -> &ToolDefinition {
+        &self.definition
+    }
+
+    fn validate(&self, arguments: &ToolArguments) -> Result<()> {
+        if matches!(arguments, ToolArguments::Json(value) if value.is_object()
+            && (self.definition.id.as_str() != grida_agent_master::delegation::SPAWN
+                || value["slot"].as_u64().is_some()))
+        {
+            Ok(())
+        } else {
+            Err(Error::new(ErrorKind::InvalidInput, "invalid_assignment"))
+        }
+    }
+
+    fn invoke(&self, invocation: Invocation, _: InvocationContext) -> BoxFuture<'_, ToolOutcome> {
+        Box::pin(async move {
+            use grida_agent_master::delegation;
+            let work = |slot: u64| {
+                serde_json::json!({
+                    "child":format!("worker-{slot}"),"input":format!("assignment-{slot}"),"turn":format!("work-turn-{slot}")
+                })
+            };
+            let value = match self.definition.id.as_str() {
+                delegation::SPAWN => {
+                    let ToolArguments::Json(arguments) = invocation.arguments() else {
+                        unreachable!()
+                    };
+                    serde_json::json!({"assignment":work(arguments["slot"].as_u64().unwrap())})
+                }
+                delegation::WAIT | delegation::STOP => {
+                    if self.definition.id.as_str() == delegation::STOP {
+                        self.retired.store(true, Ordering::SeqCst);
+                    }
+                    let count = if self.resource_recovery { 1 } else { 5 };
+                    let collected: Vec<_> = (0..count)
+                        .map(|slot| {
+                            let mut result = work(slot);
+                            result["disposition"] = serde_json::json!("settled");
+                            result["status"] = serde_json::json!(self.terminal);
+                            result["resource_status"] =
+                                serde_json::json!(if self.resource_recovery
+                                    && !self.retired.load(Ordering::SeqCst)
+                                {
+                                    "uncertain"
+                                } else {
+                                    "verified"
+                                });
+                            result
+                        })
+                        .collect();
+                    serde_json::json!({"collected":collected,"pending":[]})
+                }
+                _ => serde_json::json!({"delivered":{"child":"worker-0","input":"information-0"}}),
+            };
+            ToolOutcome {
+                status: OutcomeStatus::Succeeded,
+                content: vec![ResultContent::Text(value.to_string())],
+                structured: Some(value),
                 receipt: None,
                 truncated: false,
             }
@@ -624,6 +780,48 @@ impl Fixture {
         review
     }
 
+    fn install_delegation(
+        &mut self,
+        terminal: OutcomeStatus,
+    ) -> grida_agent_master::delegation::Policy {
+        use grida_agent_master::delegation;
+        let mut inventory = Inventory::new();
+        inventory.insert(self.tool.clone()).unwrap();
+        let mut selected = vec![tool_id()];
+        let retired = Arc::new(AtomicBool::new(false));
+        for name in [
+            delegation::SPAWN,
+            delegation::SEND,
+            delegation::WAIT,
+            delegation::STOP,
+        ] {
+            let id = ToolId::new(name).unwrap();
+            inventory
+                .insert(Arc::new(DelegationReceiptTool {
+                    definition: ToolDefinition {
+                        id: id.clone(),
+                        version: 1,
+                        description: format!("Perform {name}"),
+                        input: InputFormat::Json(serde_json::json!({"type":"object"})),
+                        max_input_bytes: 4096,
+                        max_output_bytes: 4096,
+                        recovery: RecoveryKind::Reconcile,
+                    },
+                    terminal,
+                    resource_recovery: matches!(
+                        self.provider.script,
+                        Script::DelegationResourceRecovery | Script::DelegationResourceUnknown
+                    ),
+                    retired: retired.clone(),
+                }))
+                .unwrap();
+            selected.push(id);
+        }
+        self.inventory = inventory.snapshot(&selected).unwrap();
+        let grants = selected.into_iter().map(|id| (id, self.grants())).collect();
+        delegation::Policy::capture(&self.inventory.offers().unwrap(), &grants).unwrap()
+    }
+
     fn effort(&self, preset: Preset) -> EffortPolicy {
         let offer = self
             .inventory
@@ -701,7 +899,12 @@ impl Fixture {
                 inference: self.grants(),
                 tools: match self.provider.script {
                     Script::Answer => BTreeMap::new(),
-                    Script::GoalReport { .. } | Script::EffortReview | Script::Tools => self
+                    Script::GoalReport { .. }
+                    | Script::EffortReview
+                    | Script::GeneralDelegation { .. }
+                    | Script::DelegationResourceRecovery
+                    | Script::DelegationResourceUnknown
+                    | Script::Tools => self
                         .inventory
                         .offers()
                         .unwrap()
@@ -1367,6 +1570,262 @@ async fn ultra_requests_and_integrates_independent_review_in_plan_and_act() {
                 assert_eq!(instructions.contains("Plan is active."), !regime.is_act());
                 assert_eq!(instructions.contains("Ultra effort is active."), ultra);
             }
+        }
+    }
+}
+
+#[tokio::test]
+async fn a_premature_parent_answer_continues_to_collect_each_delegated_assignment() {
+    let mut fixture = Fixture::new(Script::GeneralDelegation {
+        collect: true,
+        explicit_phase: false,
+    });
+    let policy = fixture.install_delegation(OutcomeStatus::Succeeded);
+    let store = fixture.store();
+    let claim = fixture.claim(&store).await;
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    let MasterOutcome::Settled(receipt) = fixture
+        .master(4, "Complete the independent assignments.")
+        .with_delegation(policy)
+        .unwrap()
+        .run(opened.turn, input())
+        .await
+        .unwrap()
+    else {
+        panic!("expected settled delegation");
+    };
+    assert_eq!(receipt.outcome.status, OutcomeStatus::Succeeded);
+    let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
+    assert_eq!(account.steps, 4);
+    assert_eq!(account.tool_activity.succeeded, 6);
+    let evidence = account.delegation.unwrap();
+    assert_eq!(evidence.assignments.len(), 5);
+    assert!(!evidence.has_pending());
+    assert!(
+        evidence
+            .assignments
+            .iter()
+            .all(|work| work.collected == Some(OutcomeStatus::Succeeded))
+    );
+    let requests = fixture.provider.requests.lock().unwrap();
+    assert!(requests[0].messages[0].content.iter().any(|part| matches!(part,Content::Text(text) if text.contains("independently of reasoning effort"))));
+    assert!(!requests[3].messages.iter().any(|message| message.content.iter().any(|part| matches!(part,Content::Text(text) if text.contains("Outstanding delegated assignments")))));
+}
+
+#[tokio::test]
+async fn unverifiable_resource_retirement_settles_uncertain_without_exhausting_the_parent_allowance()
+ {
+    let mut fixture = Fixture::new(Script::DelegationResourceUnknown);
+    let policy = fixture.install_delegation(OutcomeStatus::Cancelled);
+    let store = fixture.store();
+    let claim = fixture.claim(&store).await;
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    let MasterOutcome::Settled(receipt) = fixture
+        .master(64, "Account for the cancelled assignment honestly.")
+        .with_delegation(policy)
+        .unwrap()
+        .run(opened.turn, input())
+        .await
+        .unwrap()
+    else {
+        panic!("expected uncertain resource retirement settlement");
+    };
+    assert_eq!(receipt.outcome.status, OutcomeStatus::Uncertain);
+    let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
+    assert_eq!(account.steps, 3);
+    assert_eq!(account.failure.unwrap().code, "delegation_uncertain");
+    let evidence = account.delegation.unwrap();
+    assert_eq!(
+        evidence.assignments[0].collected,
+        Some(OutcomeStatus::Cancelled)
+    );
+    assert_eq!(
+        evidence.assignments[0].resource_status,
+        Some(grida_agent_master::delegation::ResourceStatus::Uncertain)
+    );
+    assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 3);
+}
+
+#[tokio::test]
+async fn verified_resource_retirement_does_not_change_the_cancelled_assignment_outcome() {
+    let mut fixture = Fixture::new(Script::DelegationResourceRecovery);
+    let policy = fixture.install_delegation(OutcomeStatus::Cancelled);
+    let store = fixture.store();
+    let claim = fixture.claim(&store).await;
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    let MasterOutcome::Settled(receipt) = fixture
+        .master(5, "Account for the task and retire its resources.")
+        .with_delegation(policy)
+        .unwrap()
+        .run(opened.turn, input())
+        .await
+        .unwrap()
+    else {
+        panic!("expected settled resource retirement");
+    };
+    assert_eq!(receipt.outcome.status, OutcomeStatus::Succeeded);
+    let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
+    let evidence = account.delegation.unwrap();
+    assert_eq!(evidence.assignments.len(), 1);
+    assert_eq!(
+        evidence.assignments[0].collected,
+        Some(OutcomeStatus::Cancelled)
+    );
+    assert_eq!(
+        evidence.assignments[0].resource_status,
+        Some(grida_agent_master::delegation::ResourceStatus::Verified)
+    );
+    assert!(!evidence.has_uncertain());
+    assert_eq!(account.steps, 5);
+    let requests = fixture.provider.requests.lock().unwrap();
+    assert!(
+        requests[4]
+            .messages
+            .iter()
+            .all(|message| message.id.as_str() != "grida-delegation-context")
+    );
+}
+
+#[tokio::test]
+async fn a_provider_answer_before_delegation_collection_is_published_as_work_not_the_final_answer()
+{
+    let mut fixture = Fixture::new(Script::GeneralDelegation {
+        collect: true,
+        explicit_phase: true,
+    });
+    let policy = fixture.install_delegation(OutcomeStatus::Succeeded);
+    let store = fixture.store();
+    let claim = fixture.claim(&store).await;
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    let MasterOutcome::Settled(receipt) = fixture
+        .master(4, "Integrate the independently assigned work.")
+        .with_delegation(policy)
+        .unwrap()
+        .run(opened.turn, input())
+        .await
+        .unwrap()
+    else {
+        panic!("expected settled delegation");
+    };
+    assert_eq!(receipt.outcome.status, OutcomeStatus::Succeeded);
+    let (messages, raw_early_phase) = store
+        .inspect_turn_with(session_id(), turn_id(), |state| {
+            let messages = state
+                .history()
+                .records()
+                .iter()
+                .map(|record| {
+                    let HistoryRecord::Message(message) = record;
+                    message.clone()
+                })
+                .collect::<Vec<_>>();
+            let raw_phase = state
+                .operations()
+                .values()
+                .find_map(|operation| {
+                    let OperationOutcome::Inference(outcome) = operation.outcome()? else {
+                        return None;
+                    };
+                    outcome
+                        .messages
+                        .iter()
+                        .find(|message| message.id.as_str() == "answer-1")
+                        .map(|message| message.phase)
+                })
+                .flatten();
+            Ok((messages, raw_phase))
+        })
+        .await
+        .unwrap();
+    assert_eq!(raw_early_phase, Some(MessagePhase::Answer));
+    assert_eq!(
+        messages
+            .iter()
+            .find(|message| message.id.as_str() == "answer-1")
+            .unwrap()
+            .phase,
+        Some(MessagePhase::Progress)
+    );
+    assert_eq!(
+        messages
+            .iter()
+            .find(|message| message.id.as_str() == "answer-3")
+            .unwrap()
+            .phase,
+        Some(MessagePhase::Answer)
+    );
+    assert_eq!(
+        grida_agent_master::activity::final_answers(&messages, Some(OutcomeStatus::Succeeded)),
+        BTreeSet::from([MessageId::new("answer-3").unwrap()])
+    );
+}
+
+#[tokio::test]
+async fn delegated_work_without_collected_results_cannot_be_reported_as_success() {
+    let mut fixture = Fixture::new(Script::GeneralDelegation {
+        collect: false,
+        explicit_phase: false,
+    });
+    let policy = fixture.install_delegation(OutcomeStatus::Succeeded);
+    let store = fixture.store();
+    let claim = fixture.claim(&store).await;
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    let MasterOutcome::Settled(receipt) = fixture
+        .master(3, "Complete the independent assignments.")
+        .with_delegation(policy)
+        .unwrap()
+        .run(opened.turn, input())
+        .await
+        .unwrap()
+    else {
+        panic!("expected settled delegation");
+    };
+    assert_eq!(receipt.outcome.status, OutcomeStatus::Failed);
+    let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
+    assert_eq!(account.steps, 3);
+    assert_eq!(account.failure.unwrap().code, "delegation_incomplete");
+    assert_eq!(account.delegation.as_ref().unwrap().assignments.len(), 5);
+    assert!(account.delegation.unwrap().has_pending());
+    assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 3);
+}
+
+#[tokio::test]
+async fn collected_failed_work_allows_parent_integration_but_uncertain_effects_stay_uncertain() {
+    for terminal in [
+        OutcomeStatus::Failed,
+        OutcomeStatus::Cancelled,
+        OutcomeStatus::Uncertain,
+    ] {
+        let mut fixture = Fixture::new(Script::GeneralDelegation {
+            collect: true,
+            explicit_phase: false,
+        });
+        let policy = fixture.install_delegation(terminal);
+        let store = fixture.store();
+        let claim = fixture.claim(&store).await;
+        let opened = fixture.runtime().open(claim.lease).await.unwrap();
+        let MasterOutcome::Settled(receipt) = fixture
+            .master(4, "Integrate the recorded work honestly.")
+            .with_delegation(policy)
+            .unwrap()
+            .run(opened.turn, input())
+            .await
+            .unwrap()
+        else {
+            panic!("expected settled delegation");
+        };
+        assert_eq!(
+            receipt.outcome.status,
+            if terminal == OutcomeStatus::Uncertain {
+                OutcomeStatus::Uncertain
+            } else {
+                OutcomeStatus::Succeeded
+            }
+        );
+        let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
+        assert!(!account.delegation.as_ref().unwrap().has_pending());
+        if terminal == OutcomeStatus::Uncertain {
+            assert_eq!(account.failure.unwrap().code, "delegation_uncertain");
         }
     }
 }
@@ -4053,6 +4512,55 @@ async fn claim_goal_work(store: &SqliteStore, goal: &Goal) -> ClaimedTurn {
 }
 
 #[tokio::test]
+async fn general_delegation_cannot_add_worker_budget_to_goal_work_but_stop_still_settles() {
+    for cancelled in [false, true] {
+        let mut fixture = Fixture::new(Script::GeneralDelegation {
+            collect: true,
+            explicit_phase: false,
+        });
+        let policy = fixture.install_delegation(OutcomeStatus::Succeeded);
+        let store = fixture.store();
+        let goal = goal_for_work(8);
+        let claim = claim_goal_work(&store, &goal).await;
+        if cancelled {
+            let view = store.inspect(session_id()).await.unwrap();
+            store
+                .control(ControlRequest {
+                    id: change_id("cancel-goal"),
+                    session: session_id(),
+                    expected_revision: view.revision,
+                    action: SessionControl::Turn {
+                        turn: turn_id(),
+                        expected: view.current.unwrap().controls.revision,
+                        directive: ControlDirective::Cancel,
+                    },
+                })
+                .await
+                .unwrap();
+        }
+        let opened = fixture.runtime().open(claim.lease).await.unwrap();
+        let result = fixture
+            .master(4, "Complete the accepted work.")
+            .with_delegation(policy)
+            .unwrap()
+            .run(opened.turn, input())
+            .await;
+        if cancelled {
+            let MasterOutcome::Settled(receipt) = result.unwrap() else {
+                panic!("expected cancellation settlement")
+            };
+            assert_eq!(receipt.outcome.status, OutcomeStatus::Cancelled);
+        } else {
+            let Err(error) = result else {
+                panic!("expected unavailable Goal worker allowance")
+            };
+            assert_eq!(error.code, "goal_worker_allowance_unavailable");
+        }
+        assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 0);
+    }
+}
+
+#[tokio::test]
 async fn ultra_cannot_spend_child_capacity_from_a_parent_only_goal_reservation() {
     let mut fixture = Fixture::new(Script::EffortReview);
     let review = fixture.install_review();
@@ -4194,4 +4702,57 @@ async fn goal_work_clamps_steps_and_retains_uncertainty() {
             assert_eq!(account.spent.inference_steps, 1);
         }
     }
+}
+
+#[tokio::test]
+async fn an_explicitly_cancelled_retained_turn_can_settle_with_changed_configuration_without_dispatch()
+ {
+    let fixture = Fixture::new(Script::Answer);
+    let store = fixture.store();
+    let claim = fixture.claim(&store).await;
+    let opened = fixture
+        .runtime()
+        .open(interrupted(claim.lease))
+        .await
+        .unwrap();
+    assert!(
+        fixture
+            .master(4, "Original")
+            .run(opened.turn, input())
+            .await
+            .is_err()
+    );
+    drop(store);
+    let reopened = fixture.reopen().await;
+    let claim = fixture.recover(&reopened).await;
+    let view = reopened.inspect(session_id()).await.unwrap();
+    reopened
+        .control(ControlRequest {
+            id: change_id("stop-with-unavailable-configuration"),
+            session: session_id(),
+            expected_revision: view.revision,
+            action: SessionControl::Turn {
+                turn: turn_id(),
+                expected: view.current.unwrap().controls.revision,
+                directive: ControlDirective::Cancel,
+            },
+        })
+        .await
+        .unwrap();
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    let MasterOutcome::Settled(receipt) = fixture
+        .master(4, "Changed")
+        .run(opened.turn, input())
+        .await
+        .unwrap()
+    else {
+        panic!("expected cancelled settlement")
+    };
+    assert_eq!(receipt.outcome.status, OutcomeStatus::Cancelled);
+    reopened
+        .verify(CommitReceipt::Settled(receipt))
+        .await
+        .unwrap();
+    assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(fixture.tool.calls.load(Ordering::SeqCst), 0);
 }

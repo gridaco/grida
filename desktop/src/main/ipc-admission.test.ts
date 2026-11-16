@@ -14,6 +14,23 @@ const workspacePublish = IPC_CHANNELS.WORKSPACE_PUBLISH_EDITOR_SURFACES;
 const documentFiles = [IPC_CHANNELS.DOCUMENT_READ, IPC_CHANNELS.DOCUMENT_WRITE];
 
 describe("ipc_admission", () => {
+  it("admits opening native Settings only in the authenticated main role", () => {
+    const channel = IPC_CHANNELS.WINDOW_OPEN_SETTINGS;
+    for (const pathname of [
+      "/desktop/welcome",
+      "/desktop/workspace",
+      "/desktop/file",
+      "/desktop/settings",
+    ]) {
+      expect(allowedFor("main", pathname)).toContain(channel);
+    }
+    expect(allowedFor("onboarding", "/desktop/onboarding")).not.toContain(
+      channel
+    );
+    expect(allowedFor("sign-in", "/desktop/auth/sign-in")).not.toContain(
+      channel
+    );
+  });
   it("gives sign-in only browser launch and read-only title-bar state", () => {
     expect(allowedFor("sign-in", "/desktop/auth/sign-in")).toEqual([
       IPC_CHANNELS.WINDOW_NAVIGATION_STATE,
@@ -53,6 +70,9 @@ describe("ipc_admission", () => {
     expect(allowedFor("main", "/desktop/tools")).toEqual(
       allChannels.filter(
         (channel) =>
+          !channel.startsWith("grida:provider:endpoint:") &&
+          !channel.startsWith("grida:hooks:") &&
+          !channel.startsWith("grida:archives:") &&
           !nativeChat.includes(channel) &&
           !nativeExternal.includes(channel) &&
           channel !== workspacePublish &&
@@ -75,6 +95,23 @@ describe("ipc_admission", () => {
       expect(allowedFor("onboarding", "/desktop/onboarding")).not.toContain(
         channel
       );
+    }
+  });
+
+  it("keeps archived-chat metadata and restoration in Settings", () => {
+    for (const channel of [
+      IPC_CHANNELS.ARCHIVES_LIST,
+      IPC_CHANNELS.ARCHIVES_UNARCHIVE,
+    ]) {
+      expect(allowedFor("main", "/desktop/settings")).toContain(channel);
+      for (const route of [
+        "/desktop/workspace",
+        "/desktop/tools",
+        "/desktop/welcome",
+        "/desktop/file",
+      ]) {
+        expect(allowedFor("main", route)).not.toContain(channel);
+      }
     }
   });
 

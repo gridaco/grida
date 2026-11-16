@@ -197,6 +197,12 @@ export namespace ComposerTiptap {
     const trigger = input.core.getSnapshot().trigger;
     const triggerItemsCount = trigger?.items.length ?? 0;
 
+    if (trigger && input.event.key === "Escape") {
+      input.event.preventDefault();
+      input.core.dismissTrigger();
+      return true;
+    }
+
     if (trigger && triggerItemsCount > 0) {
       if (input.event.key === "ArrowDown") {
         input.event.preventDefault();

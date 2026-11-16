@@ -8,6 +8,8 @@ export type WorkbenchPanel = Readonly<{
   icon?: ReactNode;
   /** Fills the editor region while the tab is active. */
   content: ReactNode;
+  /** Informational hover content. Mounting it must not start work. */
+  preview?: ReactNode;
 }>;
 
 /**

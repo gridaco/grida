@@ -6,7 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthStore } from "@grida/daemon/server";
 import {
   CHATGPT_PROVIDER_ID,
+  CHATGPT_SUBSCRIPTION_DEFAULT_MODEL_ID,
   CHATGPT_SUBSCRIPTION_MODEL_IDS,
+  CHATGPT_SUBSCRIPTION_RETIRED_MODEL_IDS,
   isChatGptSubscriptionModelId,
 } from "../protocol/chatgpt";
 import { ChatGptCredentialManager } from "./chatgpt-credentials";
@@ -49,11 +51,58 @@ afterEach(async () => {
 });
 
 describe("ChatGptProvider", () => {
-  it("pins the five-model namespaced allowlist mirrored from the reference client", () => {
+  it("preserves multiple image inputs within an 8 MiB aggregate request and refuses excess before dispatch", async () => {
+    await connection("same-image-lineage");
+    const request = vi.fn<typeof fetch>(async () =>
+      completedResponse("gpt-5.6-terra")
+    );
+    const bound = await runtime(request).captureNative();
+    const inputs = [17, 31].map((value) => ({
+      type: "input_image",
+      image_url: `data:image/png;base64,${Buffer.alloc(384 * 1024, value).toString("base64")}`,
+      detail: "auto",
+    }));
+    const body = nativeBody({
+      input: [{ type: "message", role: "user", content: inputs }],
+    });
+    expect(body.length).toBeGreaterThan(1024 * 1024);
+    await expect(
+      bound.request(body, new AbortController().signal)
+    ).resolves.toMatchObject({ status: 200 });
+    expect(Buffer.from(request.mock.calls[0][1]!.body as ArrayBuffer)).toEqual(
+      Buffer.from(body)
+    );
+    const maximum = 8 * 1024 * 1024;
+    const overhead = nativeBody({ instructions: "" }).length;
+    const exact = nativeBody({ instructions: "x".repeat(maximum - overhead) });
+    expect(exact.length).toBe(maximum);
+    await expect(
+      bound.request(exact, new AbortController().signal)
+    ).resolves.toMatchObject({ status: 200 });
+    const oversized = nativeBody({
+      instructions: "x".repeat(maximum - overhead + 1),
+    });
+    await expect(
+      bound.request(oversized, new AbortController().signal)
+    ).resolves.toBeNull();
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+  it("offers current subscription models and keeps retired IDs outside execution", () => {
     expect(CHATGPT_SUBSCRIPTION_MODEL_IDS).toEqual([
+      "openai/gpt-6.1-sol",
+      "openai/gpt-6-astra",
+      "openai/gpt-6.1-terra",
+      "openai/gpt-6-luna",
+      "openai/gpt-6-sol",
       "openai/gpt-5.6-sol",
       "openai/gpt-5.6-terra",
       "openai/gpt-5.6-luna",
+    ]);
+    expect(CHATGPT_SUBSCRIPTION_DEFAULT_MODEL_ID).toBe("openai/gpt-6.1-sol");
+    expect(CHATGPT_SUBSCRIPTION_MODEL_IDS).toContain(
+      CHATGPT_SUBSCRIPTION_DEFAULT_MODEL_ID
+    );
+    expect(CHATGPT_SUBSCRIPTION_RETIRED_MODEL_IDS).toEqual([
       "openai/gpt-5.5",
       "openai/gpt-5.4",
     ]);
@@ -63,7 +112,62 @@ describe("ChatGptProvider", () => {
     expect(isChatGptSubscriptionModelId("anthropic/claude-sonnet-5")).toBe(
       false
     );
+    for (const id of CHATGPT_SUBSCRIPTION_RETIRED_MODEL_IDS)
+      expect(isChatGptSubscriptionModelId(id)).toBe(false);
   });
+
+  it.each([
+    ["openai/gpt-6.1-sol", "gpt-6.1-sol"],
+    ["openai/gpt-6-astra", "gpt-6-astra"],
+    ["openai/gpt-6.1-terra", "gpt-6.1-terra"],
+    ["openai/gpt-6-luna", "gpt-6-luna"],
+    ["openai/gpt-6-sol", "gpt-6-sol"],
+    ["openai/gpt-5.6-sol", "gpt-5.6-sol"],
+    ["openai/gpt-5.6-terra", "gpt-5.6-terra"],
+    ["openai/gpt-5.6-luna", "gpt-5.6-luna"],
+  ])("binds %s to only its exact %s wire request", async (model, wireModel) => {
+    await connection("same-subscription-lineage");
+    const request = vi.fn<typeof fetch>(async () =>
+      completedResponse(wireModel)
+    );
+    const bound = await runtime(request).captureNative(model);
+    expect(bound.model).toBe(model);
+    const signal = new AbortController().signal;
+    await expect(
+      bound.request(nativeBody({ model: "gpt-other" }), signal)
+    ).resolves.toBeNull();
+    expect(request).not.toHaveBeenCalled();
+    await expect(
+      bound.request(nativeBody({ model: wireModel }), signal)
+    ).resolves.toMatchObject({ status: 200 });
+    expect(request).toHaveBeenCalledTimes(1);
+    const [target, init] = request.mock.calls[0];
+    expect(target).toBe(RESPONSES_URL);
+    expect(new Headers(init?.headers).get("authorization")).toBe(
+      "Bearer access-one"
+    );
+    expect(
+      JSON.parse(Buffer.from(init!.body as Uint8Array).toString())
+    ).toMatchObject({
+      model: wireModel,
+      store: false,
+      stream: true,
+    });
+  });
+
+  it.each(CHATGPT_SUBSCRIPTION_RETIRED_MODEL_IDS)(
+    "refuses retired %s before credential capture or network dispatch",
+    async (model) => {
+      const request = vi.fn<typeof fetch>();
+      const { captureNative, credentials } = runtime(request);
+      const capture = vi.spyOn(credentials, "captureConnection");
+      await expect(captureNative(model)).rejects.toMatchObject({
+        code: "chatgpt_model_not_available",
+      });
+      expect(capture).not.toHaveBeenCalled();
+      expect(request).not.toHaveBeenCalled();
+    }
+  );
 
   it("captures only a durable subscription connection and stateless selected wire model", async () => {
     const request = vi.fn<typeof fetch>(async () =>

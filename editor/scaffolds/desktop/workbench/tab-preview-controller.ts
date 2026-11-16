@@ -11,30 +11,31 @@
  * pass; the short close bridge lets the pointer cross gaps between tabs without
  * flashing the shared viewport closed.
  */
+import { WorkbenchTab } from "./workbench-tab";
 
 export const TAB_PREVIEW_OPEN_DELAY_MS = 50;
 export const TAB_PREVIEW_CLOSE_DELAY_MS = 100;
 
 export type TabPreviewTarget = {
-  readonly relPath: string;
+  readonly tabKey: string;
   readonly anchor: HTMLElement;
 };
 
 export type TabPreviewSnapshot =
   | {
       readonly open: false;
-      readonly relPath: null;
+      readonly tabKey: null;
       readonly anchor: null;
     }
   | {
       readonly open: true;
-      readonly relPath: string;
+      readonly tabKey: string;
       readonly anchor: HTMLElement;
     };
 
 const CLOSED: TabPreviewSnapshot = {
   open: false,
-  relPath: null,
+  tabKey: null,
   anchor: null,
 };
 
@@ -57,10 +58,12 @@ export class TabPreviewController {
   getSnapshot = (): TabPreviewSnapshot => this.snapshot;
 
   matchesChangedPath(relPath: string): boolean {
+    const target = this.snapshot.open
+      ? WorkbenchTab.relPath(this.snapshot.tabKey)
+      : null;
     return (
-      this.snapshot.open &&
-      (relPath === this.snapshot.relPath ||
-        relPath.startsWith(`${this.snapshot.relPath}/`))
+      target !== null &&
+      (relPath === target || relPath.startsWith(`${target}/`))
     );
   }
 
@@ -89,12 +92,12 @@ export class TabPreviewController {
   }
 
   /** A tab trigger lost the pointer; the rail itself may still be active. */
-  pointerLeave(relPath: string, pointerType: string): void {
+  pointerLeave(tabKey: string, pointerType: string): void {
     if (this.disposed || pointerType === "touch") return;
 
-    if (this.pending?.relPath === relPath) this.cancelPending();
-    if (!this.snapshot.open || this.snapshot.relPath !== relPath) return;
-    this.scheduleClose(relPath);
+    if (this.pending?.tabKey === tabKey) this.cancelPending();
+    if (!this.snapshot.open || this.snapshot.tabKey !== tabKey) return;
+    this.scheduleClose(tabKey);
   }
 
   /**
@@ -106,7 +109,7 @@ export class TabPreviewController {
     if (this.disposed || pointerType === "touch") return;
     this.cancelPending();
     if (this.snapshot.open) {
-      this.scheduleClose(this.snapshot.relPath, true);
+      this.scheduleClose(this.snapshot.tabKey, true);
     } else {
       this.warm = false;
     }
@@ -126,11 +129,11 @@ export class TabPreviewController {
    * closed must never outlive its trigger. Warmth survives removal while other
    * tabs remain, so closing the hovered tab can still hand off to its sibling.
    */
-  reconcile(relPaths: Iterable<string>): void {
+  reconcile(tabKeys: Iterable<string>): void {
     if (this.disposed) return;
-    const live = new Set(relPaths);
-    if (this.pending && !live.has(this.pending.relPath)) this.cancelPending();
-    if (this.snapshot.open && !live.has(this.snapshot.relPath)) {
+    const live = new Set(tabKeys);
+    if (this.pending && !live.has(this.pending.tabKey)) this.cancelPending();
+    if (this.snapshot.open && !live.has(this.snapshot.tabKey)) {
       this.clearCloseTimer();
       this.commitClosed();
     }
@@ -148,7 +151,7 @@ export class TabPreviewController {
     this.listeners.clear();
   }
 
-  private scheduleClose(relPath: string, resetWarmOnClose = false): void {
+  private scheduleClose(tabKey: string, resetWarmOnClose = false): void {
     this.resetWarmOnClose ||= resetWarmOnClose;
     if (this.closeTimer !== null) return;
     this.closeTimer = setTimeout(() => {
@@ -158,7 +161,7 @@ export class TabPreviewController {
       if (
         !this.disposed &&
         this.snapshot.open &&
-        this.snapshot.relPath === relPath
+        this.snapshot.tabKey === tabKey
       ) {
         this.commitClosed();
       }
@@ -184,14 +187,14 @@ export class TabPreviewController {
   private commitOpen(target: TabPreviewTarget): void {
     if (
       this.snapshot.open &&
-      this.snapshot.relPath === target.relPath &&
+      this.snapshot.tabKey === target.tabKey &&
       this.snapshot.anchor === target.anchor
     ) {
       return;
     }
     this.snapshot = {
       open: true,
-      relPath: target.relPath,
+      tabKey: target.tabKey,
       anchor: target.anchor,
     };
     this.notify();
@@ -209,5 +212,5 @@ export class TabPreviewController {
 }
 
 function sameTarget(a: TabPreviewTarget | null, b: TabPreviewTarget): boolean {
-  return a?.relPath === b.relPath && a.anchor === b.anchor;
+  return a?.tabKey === b.tabKey && a.anchor === b.anchor;
 }

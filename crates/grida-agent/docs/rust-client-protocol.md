@@ -53,6 +53,20 @@ without another write. On a revision conflict, read the current entry before
 asking the user to reapply the edit. Archiving and restoring preserve chat
 identity and leave execution controls unchanged.
 
+Settings clients can negotiate `co.grida/settings/archive-catalog` version 1.
+`_co.grida/settings/archive-catalog` takes an absolute workspace `cwd` and an
+optional `cursor`, returning `{entries, nextCursor}`. Each entry has `sessionId`,
+`title` and `revision`. `_co.grida/settings/unarchive` takes `cwd`, `sessionId`
+and the observed `revision`. It restores only catalog placement and preserves
+the title. These operations need no attached session, provider, transcript read,
+or execution lease. Workspace scope excludes side chats and named children.
+A stale revision or another workspace's session is refused. The hidden native
+`archive-catalog --state-dir <directory> --cwd <workspace>` command exposes the
+same metadata-only operation for an existing closed store; `--unarchive <id>
+--revision <revision>` restores an entry. An open store keeps its existing sole
+owner, so a supervisor must use that owner's protocol rather than spawning a
+second database owner.
+
 On macOS and Linux, negotiate `co.grida/session/delete` version 1 on private
 stdio. Send `_co.grida/session/delete` with `sessionId`, absolute workspace
 `cwd`, a stable `requestId`, `expectedSessionRevision` from the session
@@ -130,6 +144,117 @@ separately with a constrained target. Standard transcript and
 tool content remain useful when a client omits the extensions. Grida Desktop
 negotiates the operations needed for its complete experience.
 
+### Connection replacement
+
+The private supervisor may negotiate `co.grida/session/model-change` version 1.
+`_co.grida/session/model-change` accepts optional `sessionId` and `prepare`.
+Omitting `sessionId` inspects the whole owning store, including saved chats that
+are not attached. A session-specific check requires an attached session.
+Observation returns an optional `blocker`: `pending_work`, `active_turn`,
+`retained_turn`, `queued_input`, `unresolved_goal`, `delegated_session`, or
+`background_process`. `delegated_session` also covers temporary side chats,
+whose data cannot be discarded by replacing the worker. It exposes no owner
+fingerprint or credential and starts no provider work.
+
+`prepare: true` is valid only without `sessionId`. If blocked, admission remains
+open. If clear, the result is `{"prepared":true}` and native admission closes
+atomically with the check. Existing observer reads remain available. Repeating
+preparation preserves the prepared result. The supervisor closes the process
+before opening the replacement; if that fails it reopens the previous connection
+in a new process. Dropping an observational result grants no permission to close
+a busy worker. An absent capability means unsupported: do not issue a speculative
+method or substitute an account warning for that result.
+
+Creation profiles remain provenance. Accepted current and queued work, Goal
+continuations and delegated sessions validate their captured model and authority.
+Mismatches report `session_active_route_changed`, `session_queued_route_changed`,
+`session_goal_route_changed`, or `session_delegated_route_changed`. A new idle
+input can deliberately capture another authorized connection and receives
+portable visible history when model, capabilities, principal or scope differs.
+Private continuation and reasoning never cross that transition.
+An explicit Stop can locally finalize an exact already-cancelled retained turn
+when its original connection is unavailable; that recovery starts no provider
+or tool work and preserves uncertain attempts and spending holds. A Resume
+still requires the captured connection. Resolve queued inputs and Goals before
+preparing a replacement.
+
+An exact Goal Start retry observes the original receipt and allocation even
+when another connection is now selected. It cannot reserve a new budget or
+rebind old attempts. Historical billing refresh remains restricted to each
+attempt's captured Gateway scope; another scope sees it as unavailable while
+the settled outcome and retained spending account remain readable.
+
+### Durable chat selection
+
+A private supervisor can negotiate `co.grida/session/selection` version 1.
+Selection is product metadata independent of the session's immutable birth
+configuration and of accepted execution settings. These operations never
+activate a provider, recover a turn, or change queued or running work. An
+absolute canonical workspace `cwd` scopes every operation; side chats and named
+children cannot use this top-level setting surface. Session attachment is not
+required for metadata inspection or mutation.
+
+- `_co.grida/session/selection` takes `{cwd, sessionId}` and returns
+  `{sessionId, revision, selection, legacy?}`. An absent record has revision 0
+  and null selection. `legacy`, when recoverable, describes the newest retained
+  accepted model, visible effort, and opaque principal/scope; it cannot identify
+  a Desktop connection by model label or reconstruct an unsent preference.
+  `matchesCurrent: true` is supplied only when its captured model and
+  principal/scope exactly match the currently composed execution. It is absent
+  in a providerless metadata host and is not an independent execution grant.
+- `_co.grida/session/selection/update` takes `{cwd, sessionId,
+expectedRevision, operationId, selection}`. A selection is `{connectionId,
+model, effort}`: connection ID is a stable 64-character lowercase hex host
+  reference or null for the workspace default; model is the wire model ID;
+  effort is `low`, `medium`, `high`, `xhigh`, or `ultra`. Legacy `standard`
+  normalizes to `medium`. The supervisor validates configured connection and
+  model availability separately from worker readiness. A successful response
+  is `{sessionId, operationId, revision, selection}`. An invalid selection or
+  stale expected revision changes no metadata. Exact outstanding operation
+  retries return the original receipt without moving the current head back.
+- `_co.grida/session/selection/receipt` takes `{cwd, sessionId, operationId}`
+  and returns `{status: "missing"}`, or `{status: "committed" | "retired",
+receipt}`. Reading an older outcome does not reapply it. Retirement preserves
+  unacknowledged outcomes so a supervisor can finish or cancel its own durable
+  coordination intent without recreating the chat.
+- `_co.grida/session/selection/ack` takes the same identity and returns null.
+  Acknowledge only after the supervisor's dependent preference operation is
+  durable or terminally canceled. The current head remains observable after
+  acknowledgment; older acknowledged operations may no longer have receipts.
+  The host bounds outstanding outcomes and refuses another change before
+  discarding unresolved evidence.
+- `_co.grida/session/selection/create` takes `{cwd, sessionId, requestId,
+selection}` with stable supervisor-owned creation identities. It creates the
+  session and initial selection and returns its selection receipt with
+  `operationId: requestId` and revision 1. Reuse those identities and selection
+  after a lost reply. This operation submits no input and creates no ACP
+  attachment: follow it with ordinary `session/load` before sending. The first
+  input needs its own stable identity for retry.
+
+On fresh private `session/submit`, `session/enqueue`, or `goal/start` requests,
+send `_meta: {"co.grida/selectionRevision": revision}` when using a persisted
+selection. The revision must be positive. Admission checks it and the exact
+effective model under the same gate as selection changes, and retains the
+selected pair as provenance. The supervisor separately matches its active
+connection to `connectionId`. An exact accepted-input retry observes its
+original receipt before consulting newer chat settings. Historical inputs,
+Goals, reviews and retries keep their original execution captures.
+
+The native host persists versioned private selection records adjacent to its
+database under the same exclusive process owner. This adds no SQLite schema
+migration. Forks capture the source selection once at the fork action;
+retries after source edits reuse that captured inheritance and never overwrite
+later destination edits. Missing legacy records remain absent until explicit
+initialization or selection.
+
+For an existing closed store, the hidden `chat-selection --state-dir <dir>
+--cwd <workspace> --session <id> --operation inspect|update|receipt|ack` command
+provides the same providerless metadata operations. Inspect is the default.
+Update supplies the complete update object through `--request-json`; receipt
+and acknowledgment supply `{operationId}` with optional matching `cwd` and
+`sessionId`. A live store must use its existing owner's protocol rather than
+opening a second writer. The command never reads model credentials.
+
 ### Available durable session operations
 
 The agent advertises each supported capability with value `1` in
@@ -188,11 +313,96 @@ and `artifactId`. It returns `artifactId`, `mimeType`, and standard base64
 `artifact_unavailable`. The operation reads existing state and never starts
 inference or runs a tool.
 
+Private stdio clients on macOS and Linux can separately negotiate
+`co.grida/session/input-image` version 1, independently of the current model's
+image-input support. `_co.grida/session/read-input-image` takes an attached
+`sessionId`, exact recorded user `messageId`, and the `attachmentUri` from that
+message's retained PNG resource link. It returns `messageId`, `attachmentUri`,
+`mimeType: "image/png"`, and standard-base64 `data` for at most 256 KiB of the
+original accepted PNG. The URI is an opaque transcript identity, not a path or
+download URL.
+
+Richer selected raster inputs use the separately negotiated
+`co.grida/session/input-image-chunks` version 1 operation.
+`_co.grida/session/read-input-image-chunk` takes the same three identities and
+an `offset`, starting at zero. The response echoes those identities and offset,
+with the original `mimeType`, `totalBytes`, standard-base64 `data` for at most
+256 KiB, and `nextOffset` or `null`. Every nonzero offset must be a multiple of
+256 KiB. Clients bound the declared total to 20 MiB, verify contiguous offsets,
+stable MIME/total/identity, and assemble only a complete response. Each read
+revalidates recorded selection and exact retained bytes. It neither reads the
+original live source path nor changes model execution. The older PNG operation
+does not return a derivative or a JPEG/WebP/GIF through its PNG contract.
+
+Waiting inputs have a separate private capability,
+`co.grida/session/queued-input-image-chunks` version 1. An attached client calls
+`_co.grida/session/queued-message` with `sessionId`, `inputId`, and the observed
+`expectedSessionRevision`. The result contains `inputId`, factual `textOnly`
+eligibility (exactly one retained text block), and the full `prompt`
+as text blocks and display resource links. Retained image links carry only a
+name, original MIME, byte size and retained attachment URI; selected source paths
+and preparation metadata stay private. This view neither claims nor changes work.
+The ordinary input inspection's `textOnly` field separately reports whether its
+retained prompt is exactly one text block; display placeholders do not establish
+text replacement eligibility.
+
+`_co.grida/session/read-queued-input-image-chunk` takes the same three fields,
+an `attachmentUri` from that queued prompt, and an `offset`. Its response uses
+the same 256 KiB chunk and 20 MiB original bounds as recorded-image reads,
+echoing `inputId` rather than a message identity. Before and after reading the
+retained bytes, the host requires the same session revision, an input still in
+the queue, and the exact attachment owned by that input and session. A claimed,
+withdrawn or replaced input, changed queue revision, missing retained bytes or
+foreign attachment returns `queued_input_image_unavailable`. Negotiating this
+capability grants no source-file read, model execution, or queue mutation.
+
+The host selects the actual recorded asset and checks its owner, immutable
+identity, size and digest. The message must remain in the chat's current
+transcript view before and after the read. Older local messages remain readable
+after context compaction; inherited assets and revised-away messages do not.
+For recorded-message operations, a queued image becomes eligible when its local
+user message is recorded.
+Missing or replaced bytes, a wrong message or a foreign asset return
+`input_image_unavailable`. A read creates no files or work, changes no model
+input, and grants no filesystem access. This is separate from crop-result
+artifacts and does not relax their receipt checks.
+
 A queue basis contains `sessionId`, `requestId`, and
 `expectedSessionRevision`. A task basis adds `turnId` and
 `expectedControlRevision`. Snapshot returns the ordered queue and turn
 summaries, with `sessionRevision`, `controlRevision`, `historyPosition`,
 `journalPosition`, and turn `epoch` for conditional operations.
+
+### Replace only queued user text
+
+Negotiate `co.grida/session/replace-text` version 1 separately from general
+replacement. Call `_co.grida/session/replace-text` with `queue` (the queue basis),
+`inputId`, a fresh `replacementInputId`, and `text` (a UTF-8 string). The response
+is the ordinary queue control receipt: `sessionId`, `requestId`, and the committed
+`sessionRevision`. The replacement keeps the original queue slot.
+
+The host transforms its retained input: all text parts become one text part in
+the first text position, or at the start if none existed. An empty string removes
+text parts and is accepted only when another part remains. Non-text parts keep
+their exact retained identities and order. The entire captured configuration,
+provider/model/reasoning, Plan/Ultra allowance, spending, permissions, guidance,
+skills and tool authority are preserved; current defaults are not recaptured.
+Clients send no attachment, prompt reconstruction, or setting overrides.
+
+Both `input` and revision-bound `queued-message` return factual `textEditable`.
+It is true only for a still queued ordinary retained input. Goals, Library
+selection, scheduled inputs, and internal worker assignments are refused with
+`queued_text_not_editable`. `textOnly` continues to mean exactly one retained
+text block and does not establish caption eligibility or steering eligibility.
+Capability negotiation and an observed eligible input are both required before
+offering this action. A changed revision or claimed, withdrawn, or superseded
+input cannot receive a new edit. Every failed control leaves the original intact.
+
+An exact retry must repeat the original queue basis, request and input IDs and
+text. It returns the original control receipt, including after replacement
+admission or host restart, without accepting more work. Reusing a request ID with
+a different action is refused. The general `replace` operation retains its
+whole-input behavior; it is not a fallback for caption editing.
 
 Private stdio clients can negotiate `co.grida/session/updates` version 1.
 Already attached sessions then receive standard `session/update` assistant
@@ -204,29 +414,30 @@ before appending later chunks. A `resyncRequired` notice has no text and
 asks the client to reload committed history. Observation owns neither work
 admission nor cancellation.
 
-| Method suffix after `_co.grida/session/` | Parameters and result                                                                                                                                                                                   |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `submit`, `enqueue`                      | `sessionId`, `inputId`, ACP `prompt`. Submit selects idle work. Enqueue accepts waiting work. Both return `inputPosition`, `disposition`, and the `turnId` once selected.                               |
-| `snapshot`                               | `sessionId`. Read the bounded session summary without claiming work.                                                                                                                                    |
-| `input`                                  | `sessionId`, `inputId`. Read the accepted prompt, captured settings, and retained receipt.                                                                                                              |
-| `replace`                                | Queue basis in `queue`, `inputId`, `replacementInputId`, ACP `prompt`. Retain the slot and supersede the prior input.                                                                                   |
-| `withdraw`, `reorder`                    | Queue basis in `queue`, plus `inputId` or the complete ordered `inputIds` list.                                                                                                                         |
-| `resume-queue`                           | Flat queue basis. Reopen queue admission and schedule eligible waiting work.                                                                                                                            |
-| `stop`, `pause`                          | Flat task basis. Return the committed control receipt. Stop also pauses queue admission. Pause becomes verified when the turn reports `suspended`.                                                      |
-| `resume`                                 | Task basis in `task`, `expectedEpoch`, `expectedJournalPosition`. Claim the verified suspension and clear its task pause. Return the claimed turn summary.                                              |
-| `steer`                                  | Task basis in `task`, `expectedHistoryPosition`, ACP `prompt`. Append the correction to the targeted turn and return the committed receipt.                                                             |
-| `questions`                              | `sessionId`, `turnId`. Read pending question identities, prompts, choices, and the current control/history basis.                                                                                       |
-| `answer-question`                        | Flat task basis plus `expectedHistoryPosition`, `waitId`, and `answer`. Commit a typed answer and its correlated contribution.                                                                          |
-| `approvals`                              | `sessionId`, `turnId`. Read pending approval requests and their wait IDs with the current control revision.                                                                                             |
-| `answer-approval`                        | Flat task basis plus `waitId` and `decision`. Commit a decision for the exact recorded action. Available on private supervising stdio.                                                                  |
-| `history`                                | `sessionId`, optional `view`, `offset`, and `expectedHistory`. Read visible message anchors, previews, and any seed lineage.                                                                            |
-| `revision-target`                        | `sessionId`, visible `messageId`, and `expectedSessionRevision`. Read the original editable text, its effort and reasoning level, exact current basis and anchor, and subsequent visible message count. |
-| `fork`                                   | `sessionId`, `requestId`, `expectedHistory`, and `anchor`. Return the independent `sessionId` for a committed prefix through that message.                                                              |
-| `revise`                                 | Fork parameters plus `expectedSessionRevision`, `replacementInputId`, ACP `prompt`, and optional `effort` and `reasoning`. Return the installed view and accepted input.                                |
-| `compact`                                | `sessionId`, `requestId`, and optional `recover`. Run or inspect one retained context compaction. Return its status and available usage/failure evidence.                                               |
-| `skills`                                 | `sessionId`. Read names, descriptions, sources, and versioned ACP resource-link URIs for available skills.                                                                                              |
-| `processes`                              | `sessionId`. Read the chat's command processes: running ones first, then ended ones the model has not read yet. Requires `co.grida/session/processes` on private stdio.                                 |
-| `stop-processes`                         | `sessionId`, optional `processIds` (1 to 64 distinct positive numbers; omitted stops all). Stop them, wait a bounded time for each to end, and return the `stopped` numbers that have ended.            |
+| Method suffix after `_co.grida/session/` | Parameters and result                                                                                                                                                                                           |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `submit`, `enqueue`                      | `sessionId`, `inputId`, ACP `prompt`. Submit selects idle work. Enqueue accepts waiting work. Both return `inputPosition`, `disposition`, and the `turnId` once selected.                                       |
+| `snapshot`                               | `sessionId`. Read the bounded session summary without claiming work.                                                                                                                                            |
+| `input`                                  | `sessionId`, `inputId`. Read the accepted prompt, captured settings, and retained receipt.                                                                                                                      |
+| `replace`                                | Queue basis in `queue`, `inputId`, `replacementInputId`, ACP `prompt`. Retain the slot and supersede the prior input.                                                                                           |
+| `replace-text`                           | Queue basis in `queue`, `inputId`, `replacementInputId`, and `text`. Replace only user text in the retained input, preserving captured non-text parts and settings. Requires its separate version 1 capability. |
+| `withdraw`, `reorder`                    | Queue basis in `queue`, plus `inputId` or the complete ordered `inputIds` list.                                                                                                                                 |
+| `resume-queue`                           | Flat queue basis. Reopen queue admission and schedule eligible waiting work.                                                                                                                                    |
+| `stop`, `pause`                          | Flat task basis. Return the committed control receipt. Stop also pauses queue admission. Pause becomes verified when the turn reports `suspended`.                                                              |
+| `resume`                                 | Task basis in `task`, `expectedEpoch`, `expectedJournalPosition`. Claim the verified suspension and clear its task pause. Return the claimed turn summary.                                                      |
+| `steer`                                  | Task basis in `task`, `expectedHistoryPosition`, ACP `prompt`. Append the correction to the targeted turn and return the committed receipt.                                                                     |
+| `questions`                              | `sessionId`, `turnId`. Read pending question identities, prompts, choices, and the current control/history basis.                                                                                               |
+| `answer-question`                        | Flat task basis plus `expectedHistoryPosition`, `waitId`, and `answer`. Commit a typed answer and its correlated contribution.                                                                                  |
+| `approvals`                              | `sessionId`, `turnId`. Read pending approval requests and their wait IDs with the current control revision.                                                                                                     |
+| `answer-approval`                        | Flat task basis plus `waitId` and `decision`. Commit a decision for the exact recorded action. Available on private supervising stdio.                                                                          |
+| `history`                                | `sessionId`, optional `view`, `offset`, and `expectedHistory`. Read visible message anchors, previews, and any seed lineage.                                                                                    |
+| `revision-target`                        | `sessionId`, visible `messageId`, and `expectedSessionRevision`. Read the original editable text, its effort and reasoning level, exact current basis and anchor, and subsequent visible message count.         |
+| `fork`                                   | `sessionId`, `requestId`, `expectedHistory`, and `anchor`. Return the independent `sessionId` for a committed prefix through that message.                                                                      |
+| `revise`                                 | Fork parameters plus `expectedSessionRevision`, `replacementInputId`, ACP `prompt`, and optional `effort` and `reasoning`. Return the installed view and accepted input.                                        |
+| `compact`                                | `sessionId`, `requestId`, and optional `recover`. Run or inspect one retained context compaction. Return its status and available usage/failure evidence.                                                       |
+| `skills`                                 | `sessionId`. Read names, descriptions, sources, and versioned ACP resource-link URIs for available skills.                                                                                                      |
+| `processes`                              | `sessionId`. Read the chat's command processes: running ones first, then ended ones the model has not read yet. Requires `co.grida/session/processes` on private stdio.                                         |
+| `stop-processes`                         | `sessionId`, optional `processIds` (1 to 64 distinct positive numbers; omitted stops all). Stop them, wait a bounded time for each to end, and return the `stopped` numbers that have ended.                    |
 
 Each process entry carries `processId`, `command` (cut to 1 KiB with a
 trailing `…`), the absolute `cwd`, `terminal`, `startedAt` in Unix
@@ -308,17 +519,89 @@ new control uses a refreshed snapshot and a fresh request identity. Late
 steering that loses the terminal race returns an explicit conflict, leaving the
 client free to keep its draft or submit another task.
 
-Private stdio advertises `promptCapabilities.image` with the native GPT-5.4
-Responses profile on macOS and Linux. `session/prompt`, Submit, Enqueue, and
+Private stdio advertises `promptCapabilities.image` on declared image-capable
+native profiles on macOS and Linux, including the subscription composition.
+`session/prompt`, Submit, Enqueue, and
 Replace accept one ACP `image` block with `mimeType: "image/png"` and base64
 `data`. Its `uri` must be absent. The encoded PNG may be up to 256 KiB before
-base64 encoding. The host checks decoded image bounds, limits each chat to 16
-retained images and 2 MiB of source bytes, and rejects the full input if an
+base64 encoding. The host checks decoded image bounds and rejects the full input if an
 image cannot be accepted. Readback identifies the image with a text marker.
 Only the original digest and identity are in conversation records. Resume
 verifies the exact retained bytes before dispatch. A fork or compaction can
 omit earlier image content and records that omission. Image steering, earlier
 message replacement, and shared WebSocket intake are unavailable.
+
+For an explicitly selected local raster, negotiate
+`co.grida/session/selected-image` version 1. Submit, Enqueue and Goal Start accept one
+`selectedImage` instead of an ACP image block or another attachment:
+
+```json
+{
+  "selectedImage": {
+    "path": "/absolute/path/to/selected.jpg",
+    "sha256": [
+      0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+      21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31
+    ],
+    "name": "selected.jpg",
+    "source": "disk"
+  }
+}
+```
+
+`sha256` contains exactly 32 byte values. The trusted launcher verifies source custody and
+captures the selected bytes' digest. The native host opens one pinned regular
+file and refuses a digest mismatch as `selected_image_changed`, before input
+admission. The original can be up to 20 MiB. Actual bounded decoding identifies
+PNG, JPEG, WebP or GIF independently of MIME/extension claims, applies
+orientation and supported decoder color conversion, and derives one PNG still
+of at most 384 KiB, 2048 pixels per side and two megapixels. Animation is
+represented by its first frame. Preparation preserves meaningful alpha and
+records original/prepared dimensions, image count and frame disclosure.
+
+The host retains the unchanged original and frozen derivative separately;
+queueing, retry and restart use those accepted bytes. The transcript contains
+one original-MIME resource link, with display name/size and
+`_meta["co.grida/image-attachment"]` carrying `preparation` and optional verified
+`sourcePath`. Model context receives actual prepared pixels and source-path
+provenance. UI preview is independent of perception. Cropping a prepared raster
+uses coordinates in that bounded view; it cannot recover detail removed by
+downsampling. Color-critical inspection can use the unchanged original;
+ICC-only input follows the decoder's color interpretation.
+
+For clipboard/no-origin bytes, the launcher stages an owner-only snapshot and
+uses `source: "snapshot"`. Only flat regular single-link mode-0600 files under
+the private native state directory's `desktop-image-custody/snapshots/` root
+are eligible; both custody directories are private and canonical with no
+symlink alias. Ordinary tools still deny the native state directory. Snapshot
+context uses an honest retained resource identity and never describes its
+staging path as an original local path. `disk` sources remain subject to all
+protected-root checks, and image selection grants no directory or command
+access. A valid exact receipt retry does not reopen a missing/changed source.
+
+Retained inputs are bounded to 32 asset records and 256 MiB of total source
+bytes per chat; a richer image uses two records. Provider request composition
+and supervised egress share an independent 8 MiB aggregate encoded-body limit,
+including all retained history and tool framing; individual ACP frames remain
+at most 1 MiB. Exhaustion is an explicit failure, never a text-only partial
+submission or silent image omission. A text-only model refuses new images
+before admission. Historical image pixels on such a model are explicitly
+omitted from its model context with a retained-reference note; transcript and
+original preview remain available.
+
+New accepted subscription inputs capture the image-capable wire profile and
+tool policy. Inputs accepted before that profile retain the original text-only
+restricted adapter and tool inventory during recovery; their serialized
+capability/replay identities are not reinterpreted. Both profiles omit output
+token limits, token measurement and admission-rejection evidence.
+
+The product also captures its `view_image` contract independently of the
+provider. Older accepted inputs with no raster-tool policy reconstruct the
+exact version-1 PNG-only definition, 256 KiB read bound and three-second tool
+deadline. New inputs capture version 2 with bounded raster preparation and a
+30-second image-inspection deadline. Ordinary file operations keep their
+three-second limit. An older serialized invocation therefore does not acquire
+new semantics or fail merely because the current product offers raster tools.
 
 On the private stdio Responses PNG profile or reviewed saved OpenRouter PNG
 profile, negotiate both
@@ -357,7 +640,7 @@ excerpt on request. Reopening an input returns a marker and its receipt.
 
 Private stdio clients may also negotiate `co.grida/session/file-reference`
 version 1. Identified Submit and Enqueue then record a prompt `resource_link`
-whose `uri` is a local `file:` URL as a file reference, alongside nonempty
+whose `uri` is a local `file:` URL as a resource reference, alongside nonempty
 text and at most one per message. The link carries `name`, optional
 `mimeType` and `size`, and optional `_meta["co.grida/file-reference"]` with
 `workspacePath` (the path relative to the chat's working directory, which
@@ -365,7 +648,13 @@ must name the same file) and `preview` (`poster` as a JPEG or PNG data URL of
 at most 48 KiB, `durationMs`, `width`, `height`). The model reads the name,
 path, type, size and media facts as text, never the poster or the bytes. The
 host never opens the file, and the reference grants no access: the agent
-reaches it only through tools its permissions already allow. Replay and input
+reaches it only through tools its permissions already allow. A directory uses
+`mimeType: "inode/directory"` with size and preview omitted: a directory's
+filesystem stat size is not its contents' size. The model sees a folder
+description and uses its existing tools to list or inspect it. Attachment does
+not enumerate or copy the directory, register a workspace root, or issue a
+grant. A reference is a path, not a snapshot; moving or replacing the resource
+can change what later permitted tools observe. Replay and input
 inspection return the same link. Without the capability, a `file:` link stays
 ordinary context text.
 
@@ -505,6 +794,22 @@ receipt. A conflicting answer fails. Continuation checks the current profile
 and resource identities before executing the approved action. One-shot `run`
 returns pending `approvals` with `input_required` and exit code `6`.
 
+### Model-created workers
+
+An opted-in native host can supply general model delegation on ordinary Act
+turns independently of effort. These workers are admitted from live model tool
+operations, not from the client's settled-parent assignment operation. Each
+retains one bounded assignment with its captured native capabilities, model,
+reasoning and provider. Existing parent-scoped listing, inspection and rich
+activity/conversation reads expose these children; the model's collection
+receipts remain separate from client observation. A general worker is reported
+as a named child, while independent reviewers keep their review classification.
+Its inspection reports the actual captured generation-step limit.
+
+No new client method or authority is implied by seeing a worker. The
+[native binding](./rust-core.md#model-initiated-child-work) defines the model
+tools and the distinction from manual assignments below.
+
 ### Named subagents
 
 A host launched with `serve --stdio --subagents` on an Act launch advertises
@@ -515,6 +820,13 @@ matching `_co.grida/subagent/` method; all are client-to-agent requests on the
 private supervising connection. Every request names the attached
 `parentSessionId`. Children have their own stable IDs and history and are
 absent from ordinary chat listing and load.
+
+The launch can use any supported native inference connection, including an
+anonymous compatible endpoint or a subscription route. Child work retains
+the parent's captured provider, model, principal and destination scope. Its
+generation-step allowance does not require a provider wire output-token limit;
+an unsupported field remains absent. The allowance and local output bounds
+do not promise a remote token or monetary ceiling.
 
 | Method suffix after `_co.grida/subagent/` | Parameters and result                                                                                                                                                             |
 | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -535,6 +847,62 @@ still inspect, retry an existing receipt, withdraw, pause, or stop. The
 documents allowance and context behavior. ACP's subagent and session-fork work
 is under upstream discussion; the host adopts a matching upstream contract when
 one covers these semantics.
+
+#### Child activity and conversation observation
+
+Private clients separately negotiate `co.grida/subagent/activity` version 1.
+Both read methods below require the attached `parentSessionId`; they do not
+attach a child session, start inference, resume work or grant controls. A child
+ID or cursor from another parent is refused. Ordinary session load still
+excludes children.
+
+- `_co.grida/subagent/activity` takes an optional `afterChildId`. It returns
+  up to 32 `children` in newest-creation order, `nextAfterChildId`, `counts`,
+  `observedAtMs`, `events` and `eventsComplete`. Each row carries stable child
+  identity, name, `kind` (`named` or `review` from retained sponsorship), status,
+  `section`, and factual latest turn/time when available. Ready, queued,
+  running, paused, interrupted and uncertain work belongs to Active. A settled
+  success, failure or cancellation with no waiting assignment belongs to Done,
+  even if future allowance remains. Never-assigned children have no fabricated
+  activity timestamp. Count snapshots inspect at most the newest 512 children
+  and can be reused for two seconds. `counts.complete: false` makes the counts
+  lower bounds; later catalog pages remain available beyond that scan.
+- The page's `events` describe only its returned children. Stable `eventId`,
+  child ID/name, `childTurnId`, `parentTurnId` and `inputId` identify a started
+  or finished assignment. `atMs` is the recorded turn start or first settlement;
+  finished events also carry their terminal `status`. At most 512 events and
+  a bounded serialized response are returned. `eventsComplete: false` reports
+  omitted older retained events or byte-bound trimming for those children; it
+  is not a claim that unloaded catalog pages have no events. Clients group
+  events under the owning parent turn rather than infer timing against parent
+  commentary that has no recorded timestamp.
+- `_co.grida/subagent/conversation` takes `childId` and optional opaque `before`
+  continuation. It returns `parentSessionId`, `childId`, `name`, `kind`, `view`,
+  `messages`, `turns`, `execution`, `older`, `live` and `observedAtMs`. Messages
+  contain actual exposed user/assistant text and bounded tool activity, with
+  stable message/turn identities and answer/progress classification. The
+  latest page can include actual in-flight text marked `live: true`. Polls
+  replace messages by identity; they are not append-only deltas. Each turn and
+  the current/latest header carry captured `execution: {model, effort}`.
+  Null effort means model default or unavailable legacy evidence, never the
+  parent's currently selected effort.
+
+Conversation windows use the existing bounded retained replay: up to 128
+records, 256 KiB of displayed text and 32 turns, with an `older` continuation.
+Individual displayed text is capped at 64 KiB with `truncated: true`; tool
+arguments/results are bounded previews, and hidden reasoning, provider state
+and credentials are excluded. Including live messages keeps the total at 128
+messages and 256 KiB of text. The serialized response must fit 768 KiB or the
+read explicitly refuses. A continuation binds parent, child and retained view;
+if an in-flight cut changes, reload the latest page rather than append a stale
+page.
+
+In-flight text is a transient host cache, bounded to 128 sessions and 256 KiB
+per session. `live.available: false` reports a missing current cache after
+restart or eviction; it cannot reconstruct uncommitted output until that
+output is published. `live.truncated` reports a cache or page bound. Completed
+history remains readable after restart. Closing this observation does not stop
+work, and parent deletion retains ownership of child removal.
 
 Lifecycle hook inspection uses the `co.grida/session/hooks` operation below.
 Hook progress and failures have ordinary tool and notice projections, with
@@ -771,6 +1139,9 @@ not continue it automatically. Automatic later Goal turns omit the opt-in.
 For a funded review, the trusted private launch must support subagents and
 the client must negotiate `co.grida/session/effort` version 1. Goal Start
 accepts optional `effort` (`standard` or `ultra`), defaulting to `standard`.
+Here, funding reserves inference steps; monetary spending is a separate
+negotiated capability. All supported native inference connections can supply
+the reviewer through the parent's captured execution.
 Ultra requires at least three total inference steps. Its active reservation
 includes a two-step child share in `reservation.child_inference_steps`.
 Automatic continuation with fewer than three steps remaining uses Standard
@@ -888,7 +1259,7 @@ prepared provider request to it over the private pipe.
 Replies report `accepted` for an open or append, `ready` with `httpStatus`,
 optional `requestId`, and optional `retryAfterMs` after dispatch, `chunk` with
 base64 `data` of at most 32 KiB decoded, `end`, `unavailable`, or
-`interrupted`. Request bodies are at most 1 MiB, uploaded in 64 KiB chunks;
+`interrupted`. Request bodies are at most 8 MiB, uploaded in 64 KiB chunks;
 responses are at most 4 MiB within the caller's limit, and an exchange lasts at
 most 120 seconds. A stored credential is revalidated after upload and before
 dispatch. The client authorizes the exact route before dispatching. Any failure

@@ -9,14 +9,18 @@ mod goals;
 pub(super) const GOAL_SPENDING: &str = goals::SPENDING;
 mod history;
 mod hooks;
+mod input_images;
 pub(super) mod library;
 mod lifecycle;
+mod model_change;
 mod processes;
 pub(super) use processes::PROCESSES;
 mod questions;
 mod routes;
+mod selection;
 mod side_chats;
 mod skills;
+mod subagent_activity;
 mod subagents;
 mod summaries;
 mod wakeups;
@@ -43,7 +47,8 @@ use std::sync::{Arc, Mutex};
 
 const SUBMIT: &str = "co.grida/session/submit";
 const FILE_INTAKE: &str = "co.grida/session/selected-file";
-/// A prompt `resource_link` with a `file:` URI names a local file by
+const IMAGE_INTAKE: &str = "co.grida/session/selected-image";
+/// A prompt `resource_link` with a `file:` URI names a local file or directory by
 /// reference: the host records its path and facts and never reads it.
 const FILE_REFERENCE: &str = "co.grida/session/file-reference";
 const SNAPSHOT: &str = "co.grida/session/snapshot";
@@ -129,7 +134,10 @@ fn capability_keys(
         .chain([hooks::INSPECT])
         .chain([summaries::SUMMARY])
         .chain(summaries::artifact_capability(reviewer))
-        .chain([catalog::ORGANIZE])
+        .chain(input_images::capability(reviewer))
+        .chain(input_images::chunks_capability(reviewer))
+        .chain(input_images::queued_capability(reviewer))
+        .chain([catalog::ORGANIZE, catalog::ARCHIVE_CATALOG])
         .chain(delete_chat.then_some(deletion::DELETE))
         .chain(delete_chat.then_some(deletion::PREVIEW))
         .chain(goals::CAPABILITIES)
@@ -137,10 +145,14 @@ fn capability_keys(
         .chain(wakeups::capabilities(reviewer))
         .chain(processes::capabilities(reviewer))
         .chain(subagents::capabilities(reviewer && subagents))
+        .chain((reviewer && subagents).then_some(subagent_activity::CAPABILITY))
         .chain((reviewer && effort).then_some(EFFORT))
         .chain((reviewer && goal_effort).then_some(goals::FUNDED_REVIEW))
         .chain((reviewer && goal_effort && subagents).then_some(goals::NAMED_CHILD))
         .chain((reviewer && files).then_some(FILE_INTAKE))
+        .chain(reviewer.then_some(IMAGE_INTAKE))
+        .chain(reviewer.then_some(model_change::MODEL_CHANGE))
+        .chain(reviewer.then_some(selection::CAPABILITY))
         .chain(reviewer.then_some(FILE_REFERENCE))
         .chain(reviewer.then_some(super::projection::TRANSCRIPT_WINDOW))
 }
@@ -149,10 +161,13 @@ fn capability_keys(
 #[request(method = "_co.grida/session/submit", response = SubmitResponse)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Submit {
+    #[serde(rename = "_meta")]
+    meta: Option<Meta>,
     session_id: SessionId,
     input_id: ChangeId,
     prompt: Vec<ContentBlock>,
     selected_file: Option<SelectedFile>,
+    selected_image: Option<crate::host::SelectedImage>,
     #[serde(default)]
     allow_wakeups: bool,
     #[serde(default)]
@@ -187,6 +202,7 @@ fn identified_prompt(
     image_intake: bool,
     embedded_context: bool,
     file: Option<SelectedFile>,
+    image: Option<crate::host::SelectedImage>,
     sessions: &Mutex<ConnectionSessions>,
     incompatible: bool,
 ) -> Result<Vec<crate::host::PromptPart>> {
@@ -203,6 +219,28 @@ fn identified_prompt(
         if let Some(reference) = reference {
             *part = crate::host::PromptPart::FileReference { reference };
         }
+    }
+    if image.is_some() && file.is_some() {
+        return Err(Error::invalid_params().data("file_attachment_count_limit"));
+    }
+    if let Some(image) = image {
+        require(sessions, IMAGE_INTAKE, None)?;
+        if !image_intake {
+            return Err(Error::invalid_params().data("image_input_unavailable"));
+        }
+        if has_embedded
+            || parts.iter().any(|part| {
+                matches!(
+                    part,
+                    crate::host::PromptPart::Image { .. }
+                        | crate::host::PromptPart::FileReference { .. }
+                )
+            })
+        {
+            return Err(Error::invalid_params().data("file_attachment_count_limit"));
+        }
+        image.validate().map_err(host_error)?;
+        parts.push(crate::host::PromptPart::SelectedImage { selection: image });
     }
     if let Some(file) = file {
         require(sessions, FILE_INTAKE, None)?;
@@ -503,6 +541,8 @@ pub(super) fn handlers(
         ))
         .extend(history::handlers(host.clone(), sessions.clone()))
         .extend(hooks::handlers(host.clone(), sessions.clone()))
+        .extend(model_change::handlers(host.clone(), sessions.clone()))
+        .extend(selection::handlers(host.clone(), sessions.clone()))
         .extend(library::handlers(host.clone(), sessions.clone()))
         .extend(compaction::handlers(host.clone(), sessions.clone()))
         .extend(catalog::handlers(host.clone(), sessions.clone()))
@@ -513,6 +553,7 @@ pub(super) fn handlers(
         ))
         .extend(skills::handlers(host.clone(), sessions.clone()))
         .extend(summaries::handlers(host.clone(), sessions.clone()))
+        .extend(input_images::handlers(host.clone(), sessions.clone()))
         .extend(gateway_billing::handlers(host.clone(), sessions.clone()))
         .extend(goals::handlers(
             host.clone(),
@@ -520,6 +561,7 @@ pub(super) fn handlers(
             image_intake,
         ))
         .extend(subagents::handlers(host.clone(), sessions.clone()))
+        .extend(subagent_activity::handlers(host.clone(), sessions.clone()))
         .extend(wakeups::handlers(host.clone(), sessions.clone()))
         .extend(processes::handlers(host.clone(), sessions.clone()))
         .extend(side_chats::handlers(
@@ -549,6 +591,7 @@ pub(super) fn handlers(
                         image_intake,
                         embedded_context,
                         request.selected_file,
+                        request.selected_image,
                         &submit_sessions,
                         request.allow_wakeups || request.editor_endpoint_id.is_some(),
                     )?;
@@ -567,6 +610,10 @@ pub(super) fn handlers(
                                 reasoning: request.reasoning,
                             },
                             SubmissionContext {
+                                selection_revision: selection::revision(
+                                    request.meta.as_ref(),
+                                    &submit_sessions,
+                                )?,
                                 allow_wakeups: request.allow_wakeups,
                                 allow_library_selection: request.allow_library_selection,
                                 editor_endpoint: request.editor_endpoint_id,

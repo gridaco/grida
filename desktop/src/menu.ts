@@ -38,7 +38,10 @@ export type DesktopWindowAdmission = {
  * distinct from any open doc). Dedup: if a `/desktop/settings` window
  * already exists, focus it instead of spawning a second one.
  */
-function open_or_focus_settings(app: App, admission?: DesktopWindowAdmission) {
+export function open_or_focus_settings(
+  app: App,
+  admission?: DesktopWindowAdmission
+) {
   if (admission && !admission.can_open()) {
     admission.focus_entry();
     return;

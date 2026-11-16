@@ -41,6 +41,7 @@ import {
   FilePenLineIcon,
   FilePlus2Icon,
   FolderTreeIcon,
+  FolderIcon,
   ImageIcon,
   ImagesIcon,
   ListTodoIcon,
@@ -86,6 +87,8 @@ import {
 import { groupMessageParts } from "./group-parts";
 import { AnsweredQuestionSummary, isQuestionEntry } from "./question-card";
 import { workspace_links } from "./workspace-links";
+import { FullscreenImagePreview } from "@/kits/image-preview";
+import { AttachmentImagePreview } from "./attachment-image-preview";
 import {
   hasOpenTabsResult,
   isSurfaceToolEntry,
@@ -143,11 +146,14 @@ export function ChatMessageView({
   message,
   isStreaming,
   actions,
+  loadAttachmentPreview,
 }: {
   message: ChatMessage;
   isStreaming?: boolean;
   /** Per-turn affordances under a message. User bubbles show copy without them. */
   actions?: ChatMessageActions;
+  /** Read-only retained PNG display, supplied by the owning host. */
+  loadAttachmentPreview?: AttachmentImagePreview.Loader;
 }) {
   // A compaction summary (synthetic assistant turn carrying a
   // `data-compaction` part) renders as a divider with an expandable
@@ -164,17 +170,13 @@ export function ChatMessageView({
       .filter(isTextUIPart)
       .map((part) => part.text)
       .join("");
-    // Provider-native image parts the user pasted/dropped. Rendered as
-    // thumbnails in the bubble so the sent message mirrors what the model
-    // perceived; an operable scratch twin, when present, is a separate context
-    // part.
+    const hasText = text.trim().length > 0;
+    // Perceived images and host-supplied resources stay outside the prose
+    // bubble. Neither their labels nor their previews become copyable text.
     const images = message.parts.filter(
       (part): part is FileUIPart =>
         isFileUIPart(part) && part.mediaType.startsWith("image/")
     );
-    // Context the host attached on the user's behalf — the files sent with the
-    // message. Rendered as a chip so it is visible without being written into
-    // the user's prose.
     const contexts = message.parts.filter(
       (part) =>
         typeof (part as { type?: unknown }).type === "string" &&
@@ -182,97 +184,18 @@ export function ChatMessageView({
     );
     return (
       <Message from="user">
-        <MessageContent className={CHAT_TEXT}>
-          <CollapsibleBubbleBody>
-            {contexts.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {contexts.map((rawPart, index) => {
-                  // `data-*` context part — read past the closed UIMessagePart
-                  // union; the filter above already gated `type` to the context markers.
-                  const part = rawPart as {
-                    type: string;
-                    data?: Record<string, unknown>;
-                  };
-                  const isFiles =
-                    part.type === chat_vocabulary.CONTEXT_PARTS.files;
-                  const d = part.data ?? {};
-                  // Name the chip by the file(s) sent with the message.
-                  const files = (Array.isArray(d.files) ? d.files : []).flatMap(
-                    (f) =>
-                      f && typeof (f as { name?: unknown }).name === "string"
-                        ? [
-                            f as {
-                              name: string;
-                              poster?: unknown;
-                              caption?: unknown;
-                            },
-                          ]
-                        : []
-                  );
-                  const label = isFiles
-                    ? files.length === 1
-                      ? files[0].name
-                      : `${files.length} files`
-                    : chat_vocabulary.CONTEXT_MARKERS[part.type];
-                  // A single file with a still (a video's poster frame) shows
-                  // it in place of the clip icon, with its caption.
-                  const single =
-                    isFiles && files.length === 1 ? files[0] : undefined;
-                  const poster =
-                    typeof single?.poster === "string" &&
-                    single.poster.startsWith("data:image/")
-                      ? single.poster
-                      : undefined;
-                  const caption =
-                    typeof single?.caption === "string"
-                      ? single.caption
-                      : undefined;
-                  return (
-                    // Index key: a sent user message's parts are immutable and
-                    // never reorder (same reasoning as the images below).
-                    <span
-                      key={index}
-                      className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs shadow-sm"
-                    >
-                      {poster ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={poster}
-                          alt=""
-                          className="size-8 shrink-0 rounded object-cover"
-                        />
-                      ) : (
-                        <PaperclipIcon className="size-3.5 text-muted-foreground" />
-                      )}
-                      <span className="font-medium">{label}</span>
-                      {caption && (
-                        <span className="text-muted-foreground">{caption}</span>
-                      )}
-                    </span>
-                  );
-                })}
-              </div>
-            )}
-            {images.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {images.map((image, index) => (
-                  // Index key: a sent user message's attachments are immutable
-                  // and never reorder, so the index is stable — and it avoids
-                  // putting a multi-MB data-URL into the key (which React keeps
-                  // + compares).
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    key={index}
-                    src={image.url}
-                    alt={image.filename ?? ""}
-                    loading="lazy"
-                    decoding="async"
-                    className="max-h-48 max-w-full rounded-md border object-contain"
-                  />
-                ))}
-              </div>
-            )}
-            {text.length > 0 && (
+        <UserMessageAttachments
+          contexts={contexts}
+          images={images}
+          loadAttachmentPreview={loadAttachmentPreview}
+        />
+        {hasText && (
+          <MessageContent
+            className={CHAT_TEXT}
+            role="group"
+            aria-label="Message text"
+          >
+            <CollapsibleBubbleBody>
               <MessageResponse
                 plugins={markdown.plugins}
                 rehypePlugins={markdown.rehypePlugins}
@@ -280,35 +203,37 @@ export function ChatMessageView({
               >
                 {text}
               </MessageResponse>
-            )}
-          </CollapsibleBubbleBody>
-        </MessageContent>
+            </CollapsibleBubbleBody>
+          </MessageContent>
+        )}
         {/* Subtle until hover so the transcript stays clean; right-aligned
             to sit under the user bubble. Copy is always available (a pure
             clipboard action, never disabled). History controls appear only
             when the host wires them. */}
-        <div className="ml-auto flex items-center gap-2">
-          <MessageActions className={revealOnHoverActions}>
-            {actions?.sentAtMs !== undefined && (
-              <MessageTime at={actions.sentAtMs} />
+        {(hasText || actions?.sentAtMs !== undefined || actions?.note) && (
+          <div className="ml-auto flex items-center gap-2">
+            <MessageActions className={revealOnHoverActions}>
+              {actions?.sentAtMs !== undefined && (
+                <MessageTime at={actions.sentAtMs} />
+              )}
+              {hasText && <CopyMessageAction text={text} />}
+              {hasText && actions?.onEdit && (
+                <MessageAction
+                  tooltip="Edit and resubmit"
+                  disabled={actions.disabled}
+                  onClick={() => actions.onEdit?.(message.id)}
+                >
+                  <PencilIcon />
+                </MessageAction>
+              )}
+            </MessageActions>
+            {actions?.note && (
+              <span className="text-muted-foreground flex items-center gap-1 text-xs [&_svg]:size-3.5">
+                {actions.note}
+              </span>
             )}
-            <CopyMessageAction text={text} />
-            {actions?.onEdit && (
-              <MessageAction
-                tooltip="Edit and resubmit"
-                disabled={actions.disabled}
-                onClick={() => actions.onEdit?.(message.id)}
-              >
-                <PencilIcon />
-              </MessageAction>
-            )}
-          </MessageActions>
-          {actions?.note && (
-            <span className="text-muted-foreground flex items-center gap-1 text-xs [&_svg]:size-3.5">
-              {actions.note}
-            </span>
-          )}
-        </div>
+          </div>
+        )}
       </Message>
     );
   }
@@ -365,6 +290,203 @@ export function ChatMessageView({
   );
 }
 
+/** Display supplied previews or an exact host-minted read capability, never a path. */
+function UserMessageAttachments({
+  contexts,
+  images,
+  loadAttachmentPreview,
+}: {
+  contexts: ChatMessage["parts"];
+  images: FileUIPart[];
+  loadAttachmentPreview?: AttachmentImagePreview.Loader;
+}) {
+  const otherContexts = contexts.flatMap((part, contextIndex) => {
+    const type = (part as { type: string }).type;
+    const label = chat_vocabulary.CONTEXT_MARKERS[type];
+    return type !== chat_vocabulary.CONTEXT_PARTS.files && label
+      ? [{ label, contextIndex }]
+      : [];
+  });
+  const files = contexts.flatMap((rawPart, contextIndex) => {
+    const part = rawPart as { type: string; data?: { files?: unknown } };
+    if (part.type !== chat_vocabulary.CONTEXT_PARTS.files) return [];
+    return (Array.isArray(part.data?.files) ? part.data.files : []).flatMap(
+      (file) => {
+        if (!file || typeof file.name !== "string" || !file.name) return [];
+        const directory = file.kind === "directory";
+        const image =
+          !directory &&
+          ["image/png", "image/jpeg", "image/webp", "image/gif"].includes(
+            file.mimeType
+          );
+        const previewId =
+          !directory &&
+          image &&
+          typeof file.previewId === "string" &&
+          file.previewId.length > 0 &&
+          file.previewId.length <= 256
+            ? file.previewId
+            : undefined;
+        const poster =
+          !directory &&
+          typeof file.poster === "string" &&
+          file.poster.length <= 48 * 1024 &&
+          /^data:image\/(?:jpeg|png);base64,[A-Za-z0-9+/]+={0,2}$/.test(
+            file.poster
+          )
+            ? file.poster
+            : undefined;
+        return [
+          {
+            name: file.name,
+            contextIndex,
+            directory,
+            image,
+            poster,
+            previewId,
+            caption: directory
+              ? "Folder"
+              : typeof file.caption === "string"
+                ? file.caption
+                : image
+                  ? "Preview unavailable"
+                  : "File",
+          },
+        ];
+      }
+    );
+  });
+  const items = [...files, ...otherContexts].sort(
+    (first, second) => first.contextIndex - second.contextIndex
+  );
+  if (items.length === 0 && images.length === 0) return null;
+  return (
+    <ul
+      aria-label="Message attachments"
+      className="ml-auto flex max-w-full flex-wrap justify-end gap-2"
+    >
+      {items.map((item, index) => {
+        if ("label" in item)
+          return (
+            <li key={`context-${index}`} className="max-w-full min-w-0">
+              <span className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs shadow-sm">
+                <PaperclipIcon className="size-3.5 text-muted-foreground" />
+                {item.label}
+              </span>
+            </li>
+          );
+        const file = item;
+        return (
+          // Accepted message parts never reorder. Avoid keeping preview bytes in keys.
+          <li key={`file-${index}`} className="max-w-full min-w-0">
+            {file.previewId && loadAttachmentPreview ? (
+              <AttachmentImagePreview.View
+                previewId={file.previewId}
+                loader={loadAttachmentPreview}
+                name={file.name}
+              />
+            ) : file.image && file.poster ? (
+              <AttachmentImagePreview.Image
+                source={file.poster}
+                name={file.name}
+                downloadName={`${file.name}.preview.${file.poster.startsWith("data:image/png") ? "png" : "jpg"}`}
+              />
+            ) : (
+              <figure className="m-0 w-52 max-w-full overflow-hidden rounded-lg border bg-background">
+                {file.poster ? (
+                  <FullscreenImagePreview
+                    src={file.poster}
+                    alt={file.name}
+                    title={`Preview ${file.name}`}
+                    downloadName={`${file.name}.preview.${file.poster.startsWith("data:image/png") ? "png" : "jpg"}`}
+                    className="w-full"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={file.poster}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      className="h-36 w-full bg-muted/30 object-contain"
+                    />
+                  </FullscreenImagePreview>
+                ) : null}
+                <figcaption className="flex min-w-0 items-center gap-2 p-2 text-xs">
+                  {!file.poster &&
+                    (file.directory ? (
+                      <FolderIcon className="size-5 shrink-0 text-muted-foreground" />
+                    ) : file.image ? (
+                      <ImageIcon className="size-5 shrink-0 text-muted-foreground" />
+                    ) : (
+                      <PaperclipIcon className="size-5 shrink-0 text-muted-foreground" />
+                    ))}
+                  <span className="flex min-w-0 flex-col gap-0.5">
+                    <span className="truncate font-medium" title={file.name}>
+                      {file.name}
+                    </span>
+                    {file.caption && (
+                      <span className="truncate text-muted-foreground">
+                        {file.caption}
+                      </span>
+                    )}
+                  </span>
+                </figcaption>
+              </figure>
+            )}
+          </li>
+        );
+      })}
+      {images.map((image, index) => {
+        const source = attachmentImageSource(image.url);
+        return (
+          <li key={`image-${index}`} className="max-w-full min-w-0">
+            <figure className="m-0 flex max-w-full flex-col gap-1">
+              {source ? (
+                <AttachmentImagePreview.Image
+                  source={source}
+                  name={image.filename ?? "Attached image"}
+                  downloadName={image.filename}
+                />
+              ) : (
+                <span className="flex h-36 w-52 max-w-full flex-col items-center justify-center gap-2 rounded-lg border bg-muted/30 text-xs text-muted-foreground">
+                  <ImageIcon className="size-6" />
+                  Preview unavailable
+                </span>
+              )}
+              {!source && (
+                <figcaption className="truncate text-xs text-muted-foreground">
+                  {image.filename ?? "Attached image"}
+                </figcaption>
+              )}
+            </figure>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** Only explicit image sources; file/custom schemes cannot become display grants. */
+function attachmentImageSource(value: string): string | null {
+  try {
+    const source = new URL(value);
+    if (source.protocol === "data:")
+      return /^data:image\/(?:png|jpeg|webp|gif|avif|bmp);base64,[A-Za-z0-9+/]+={0,2}$/.test(
+        value
+      )
+        ? value
+        : null;
+    if (source.protocol === "blob:") return value;
+    return (source.protocol === "https:" || source.protocol === "http:") &&
+      !source.username &&
+      !source.password
+      ? value
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 /** The local time a message was sent, shown with its hover actions. */
 function MessageTime({ at }: { at: number }) {
   return (
@@ -419,8 +541,8 @@ function CollapsibleBubbleBody({ children }: { children: ReactNode }) {
       setOverflowing(el.scrollHeight > BUBBLE_COLLAPSE_THRESHOLD_PX);
     measure();
     if (typeof ResizeObserver === "undefined") return;
-    // Re-measure on reflow — a late-loading image or a window resize can flip
-    // a bubble across the threshold after the first paint.
+    // Re-measure text wrapping after a resize or font change. Attachment
+    // previews live outside the measured bubble.
     const observer = new ResizeObserver(measure);
     observer.observe(el);
     return () => observer.disconnect();

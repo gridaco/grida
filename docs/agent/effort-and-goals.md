@@ -27,8 +27,14 @@ agent's access or effort. [Understand agent permissions](./permissions.md)
 
 The model button at the bottom right of the composer shows the model name
 followed by its effort. Select it and drag the **Effort** slider: **Low**,
-**Medium**, **High**, **Extra high** and, on supported connections,
-**Ultra**. Medium is the default; the reset button returns to it.
+**Medium**, **High**, **Extra high** and **Ultra**. Medium is the default;
+the reset button returns to it.
+
+Each chat remembers its model and effort together, including unsent changes.
+Opening another chat restores that chat's pair. A new chat uses the complete
+pair from your last explicit model or effort change; simply reopening a chat
+never updates that default. Accepted messages and Goals keep their captured
+effort when you change the composer for future work.
 
 Low through Extra high set how much the model reasons before answering, for
 models whose provider supports a reasoning setting. Other models keep their
@@ -36,14 +42,32 @@ own reasoning, and the panel says so. Any effort works with Plan and applies
 to your next message. Steering keeps the current turn's effort, and editing a
 queued or earlier message keeps its original effort.
 
-**Ultra** uses the highest reasoning level and gives the work a larger
-allowance. With Ultra, the agent can ask one independent reviewer to check its
-work while it continues. The reviewer can read the project but does not see
-your chat. Its work appears in the turn's activity. Ultra is available on
-Grida Gateway, saved OpenRouter and saved Vercel AI Gateway models; the panel
-says when the selected model cannot use it. Resubmitting an earlier Ultra
-message needs a model that supports Ultra.
+Explicit delegation in ordinary **Act** work is available at every effort
+level on a supported native connection. Ask the agent to divide independent
+work; Ultra is not required. General workers have a separately bounded
+allowance and the parent's delegated permissions. Plan and persistent Goals
+retain their existing narrower delegation contracts.
+
+**Ultra** gives an ordinary task more inference steps and lets the agent ask
+one independent reviewer to check its work while it continues. It is available
+on every supported native model connection, including ChatGPT subscriptions
+and compatible endpoints. On models with a reasoning setting, Ultra also
+selects the highest supported reasoning level. Other models keep their own
+reasoning and still receive the larger work allowance and review option.
+
+The reviewer uses the same model connection and account as the main agent. It
+can read the permitted project but does not see your chat. Its work appears
+in the turn's activity. Choosing Ultra permits a review; the agent decides
+whether one is useful for the task.
 [Work with subagents](./subagents.md)
+
+The agent and reviewer work within bounded inference-step allowances. Provider
+token limits still apply when the connection supports them. Ultra does not set
+a subscription-quota or spending limit.
+
+If the Desktop host cannot start Ultra, the message stays unsent with your
+selected effort. Restore the connection or update Desktop before retrying;
+Grida does not send that message with ordinary effort instead.
 
 ## Keep an objective across turns
 

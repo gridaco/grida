@@ -121,6 +121,43 @@ describe.skipIf(!supported)("Native chat store", () => {
     }
   );
 
+  it.each(["fresh", "ordinary"] as const)(
+    "threads authoritative private roots into %s workspace and fixed-document image custody",
+    async (profile) => {
+      const test = await fixture();
+      const prepared =
+        profile === "fresh"
+          ? await test.NativeChatStore.prepareFresh()
+          : await test.NativeChatStore.prepareOrdinary([test.agentData]);
+      const { NativeAgentChat } = await import("./native-agent-chat");
+      const start = vi
+        .spyOn(NativeAgentChat, "start")
+        .mockResolvedValue({} as import("./native-agent-chat").NativeAgentChat);
+      try {
+        await prepared.startWorkspace("work", {
+          ...test.launch,
+          protectedPaths: [],
+        });
+        const { cwd: _cwd, ...rootless } = test.launch;
+        await prepared.startDocument(randomUUID(), {
+          ...rootless,
+          providerNetwork: { prepare: () => null },
+          protectedPaths: [],
+        });
+        expect(start).toHaveBeenCalledTimes(2);
+        for (const [launch] of start.mock.calls) {
+          expect(launch.protectedPaths).toBe(prepared.protectedPaths);
+          expect(launch.protectedPaths).toEqual(
+            expect.arrayContaining([electron.userData, test.agentData])
+          );
+          expect(launch).not.toHaveProperty("workspace");
+        }
+      } finally {
+        start.mockRestore();
+      }
+    }
+  );
+
   it("refuses native state it did not create", async () => {
     const test = await fixture();
     fs.mkdirSync(test.nativeState, { mode: 0o700 });

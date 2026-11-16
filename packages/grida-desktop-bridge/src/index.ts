@@ -51,7 +51,7 @@ import type {
   WorkspaceWriteFileResult,
 } from "@grida/daemon";
 
-import type { DesktopNativeChat } from "./native-chat";
+import type { DesktopHooks, DesktopNativeChat } from "./native-chat";
 import type { DesktopNativeExternalAgent } from "./native-external-agent";
 import type { NativeEditorSurfaceSnapshot } from "./native-editor-surfaces";
 export type * from "./native-chat";
@@ -218,12 +218,34 @@ export type DesktopMediaReadResult = {
 
 export type DesktopMediaSaveCopyResult = "saved" | "cancelled" | "failed";
 
+/** Metadata-only Settings view; ids are opaque native-issued handles. */
+export type DesktopArchivedChat = Readonly<{
+  id: string;
+  workspace: string;
+  title: string | null;
+  revision: number;
+}>;
+
+export type DesktopArchivedChatPage = Readonly<{
+  entries: readonly DesktopArchivedChat[];
+  nextCursor: string | null;
+  /** Registered workspaces whose metadata is temporarily unavailable. */
+  unavailableWorkspaces?: readonly string[];
+}>;
+
 export type DesktopBridge = {
   protocol: typeof DESKTOP_BRIDGE_PROTOCOL;
   app: { version: string; platform: string };
   caps: DesktopCapabilities;
   handshake: () => Promise<HandshakeResponse>;
   nativeChat?: DesktopNativeChat;
+  /** Global config.toml hooks. Absent on older native builds. */
+  hooks?: DesktopHooks;
+  /** Fixed Settings archive operations, absent on older protocol-1 hosts. */
+  archives?: {
+    list: (cursor?: string | null) => Promise<DesktopArchivedChatPage>;
+    unarchive: (id: string, revision: number) => Promise<void>;
+  };
   nativeExternalAgent?: DesktopNativeExternalAgent;
   /**
    * Grida account lifecycle owned by the native entry controller. Optional
@@ -248,6 +270,11 @@ export type DesktopBridge = {
     set_document_edited: (edited: boolean) => Promise<void>;
     set_represented_filename: (filePath: string) => Promise<void>;
     close: () => Promise<void>;
+    /**
+     * Open or focus the native Settings window without navigating this window.
+     * Optional because older protocol-1 hosts expose no Settings action.
+     */
+    open_settings?: () => Promise<void>;
     /**
      * Finish the dedicated onboarding surface and promote the same entry
      * BrowserWindow to the regular workstation. Optional because older
@@ -424,12 +451,25 @@ export type DesktopBridge = {
     /** Anonymous metadata is read by the native host; absent on older builds. */
     gg_models?: () => Promise<GGModelsView>;
     list_endpoints: () => Promise<EndpointProviderConfig[]>;
+    /** Explicit Connect/Save consents to this exact saved destination. New
+     * hosts retain that consent across restarts without another dialog. */
     set_endpoint: (config: EndpointProviderConfig) => Promise<void>;
+    /** Non-minting status for the exact saved id and canonical full base URL.
+     * Absent on hosts with the former per-launch native approval flow. */
+    endpoint_authorization?: (id: string, baseUrl: string) => Promise<boolean>;
+    /** Background discovery merges only detected model fields on an existing,
+     * authorized destination. Missing, replaced or unapproved configs reject.
+     * Human overrides, the default model and other saved configuration are preserved. */
+    update_endpoint_models?: (update: {
+      id: string;
+      base_url: string;
+      models: ProbedEndpointModel[];
+    }) => Promise<void>;
     delete_endpoint: (id: string) => Promise<void>;
     /** Where the endpoint config JSON lives (the hand-editable file). */
     info: () => Promise<{ path: string }>;
-    /** Discover the models an endpoint serves (agent-host-side fetch —
-     *  the renderer's origin can't reach a local Ollama directly). */
+    /** Discover the models an endpoint serves. New hosts require matching
+     * saved consent; this read never authorizes an unsaved destination. */
     probe_endpoint: (baseUrl: string) => Promise<{
       source: "ollama" | "openai";
       models: ProbedEndpointModel[];

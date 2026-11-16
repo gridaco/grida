@@ -248,7 +248,7 @@ impl Host {
     ) -> Result<Wakeups> {
         self.owned_control(move |host| async move {
             let view = host.store.inspect(session.clone()).await?;
-            host.check_execution(&view)?;
+            host.check_execution(&view).await?;
             let mut scheduled = host.wakeups(session.clone(), turn.clone()).await?;
             let schedule = scheduled
                 .wakeup
@@ -462,7 +462,7 @@ impl Host {
         }) {
             return Ok(TimerAction::Done);
         }
-        self.check_execution(&view)?;
+        self.check_execution(&view).await?;
         let now = now_ms()?;
         let wait = wait.clone();
         let step = self

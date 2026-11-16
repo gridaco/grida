@@ -14,6 +14,12 @@ export {
 
 export { ComposerTransfer } from "./composer-transfer";
 
+export {
+  ComposerActionMenu,
+  ComposerMenuAnchor,
+  type ComposerMenuAction,
+} from "./composer-menu";
+
 export { ComposerDropZone } from "./composer-drop-zone";
 
 export { ComposerDropArea, ComposerDropOverlay } from "./composer-drop-area";

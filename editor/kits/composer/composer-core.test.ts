@@ -99,6 +99,45 @@ describe("ComposerCore", () => {
     });
   });
 
+  it("keeps a dismissed completion hidden through focus/caret and catalog refresh without changing its draft", () => {
+    const core = new ComposerCore({
+      commands: [{ id: "review", title: "Review" }],
+    });
+    core.inspectCursor("/rev", 4);
+    core.addAttachment({ name: "image.png", mime: "image/png" });
+    const before = core.getSnapshot();
+    core.dismissTrigger();
+    core.inspectCursor("/re", 3);
+    core.inspectCursor("/rev", 4);
+    core.setCatalog({ commands: [{ id: "review", title: "Review changed" }] });
+    expect(core.getSnapshot().trigger).toBeNull();
+    expect(core.getSnapshot().document).toBe(before.document);
+    expect(core.getSnapshot().attachments).toEqual(before.attachments);
+  });
+
+  it("reopens completion after editing the draft or leaving the dismissed token", () => {
+    const core = new ComposerCore({
+      commands: [{ id: "review", title: "Review" }],
+    });
+    core.inspectCursor("/re", 3);
+    core.dismissTrigger();
+    core.ingestDocument({
+      text: "/rev",
+      document: {
+        type: "doc",
+        children: [
+          { type: "paragraph", children: [{ type: "text", text: "/rev" }] },
+        ],
+      },
+    });
+    core.inspectCursor("/rev", 4);
+    expect(core.getSnapshot().trigger?.query).toBe("rev");
+    core.dismissTrigger();
+    core.inspectCursor("", 0);
+    core.inspectCursor("/rev", 4);
+    expect(core.getSnapshot().trigger?.query).toBe("rev");
+  });
+
   it("refreshes the active trigger when the catalog changes", () => {
     const core = new ComposerCore({
       commands: [{ id: "review", title: "Review" }],

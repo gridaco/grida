@@ -12,6 +12,7 @@ Import from the kit entrypoint:
 import {
   ComposerAttachmentCards,
   ComposerContent,
+  ComposerMenuAnchor,
   ComposerProvider,
   ComposerTriggerMenu,
   useComposer,
@@ -48,7 +49,7 @@ function ComposerBox() {
   };
 
   return (
-    <div className="relative rounded-lg border">
+    <ComposerMenuAnchor className="rounded-xl border">
       <ComposerTriggerMenu />
       <ComposerAttachmentCards className="px-2 pt-2" />
       <ComposerContent
@@ -58,14 +59,14 @@ function ComposerBox() {
       <button onClick={submit} type="button">
         Send
       </button>
-    </div>
+    </ComposerMenuAnchor>
   );
 }
 ```
 
 ## Capabilities
 
-- Slash commands with keyboard selection.
+- Slash commands with keyboard selection, Escape and outside-click dismissal.
 - Optional host actions on explicit command selection, shared by keyboard and menu clicks.
 - Mentions from a caller-provided catalog.
 - File attachments as message parts.
@@ -92,6 +93,19 @@ The message `meta` intentionally includes only stable submission metadata: plain
 
 ## Customization
 
+`ComposerMenuAnchor` is the shared full-composer anchor for completion and
+toolbar menus. `ComposerTriggerMenu` and `ComposerActionMenu` both open directly
+above it with the same width, spacing and surface. Toolbar menus portal into
+that root so a clipping toolbar does not hide them. A dismissed completion keeps
+its draft and stays closed through focus and catalog refresh; editing the draft
+or leaving and re-entering its token makes completion available again.
+
+`ComposerActionMenu` renders the composer’s + button. Pass an `items` array of
+`{ id, title, description?, icon?, disabled?, onSelect }`; actions stay owned by
+the caller. It supports keyboard selection, Escape and outside-click dismissal,
+and hides itself when no actions exist. Selecting an action preserves the draft.
+Opening it dismisses active text completion so the two menus cannot overlap.
+
 Use the provider/controller for behavior:
 
 - `addAttachment(input, { filter })`
@@ -100,6 +114,7 @@ Use the provider/controller for behavior:
 - `setContexts(contexts)`
 - `submit({ submitted_at })`
 - `clear()`
+- `dismissTrigger()`
 
 `ComposerProvider` accepts an optional synchronous
 `onCommandSelect?: (command: ComposerCommand) => boolean`. It runs once when a
@@ -144,6 +159,10 @@ disk-backed `File` unchanged. It never enumerates the tree. A capable host can
 exchange that trusted handle for a reference; browsers without such a host can
 reject the gesture without copying the directory into attachment storage.
 
+A metadata-only folder resource can use a file attachment with MIME
+`inode/directory`; its card says **Folder**. This is separate from the opaque
+read-only directory scope attachment: displaying a resource grants no access.
+
 Use CSS variables for the default editor skin:
 
 ```css
@@ -155,6 +174,17 @@ Use CSS variables for the default editor skin:
 ```
 
 For custom UI, keep `ComposerProvider` and `ComposerContent`, then replace `ComposerTriggerMenu` and `ComposerAttachmentCards` with call-site components built on `useComposer()`.
+
+`ComposerController.ready` says when document operations can be applied.
+`ComposerContent` accepts `readOnly` to freeze the mounted editor during a
+pending confirmation. The Desktop `AgentComposerInput` uses these capabilities
+for caller-owned `editing` sessions: it temporarily shows another message in the
+same input, preserves the ordinary rich draft, and restores it on Save or
+Cancel. The caller supplies the edit identity, text, label and save/cancel
+callbacks; the kit owns no queue or native state.
+The caller can set `editing.allowEmpty` when a retained message has other
+content, so clearing its text remains a valid save. Without it, saving requires
+nonblank text. This does not add or remove attachments in the kit.
 
 When using the default attachment cards with host-owned resources such as object URLs, pass `onRemoveAttachment` to release those resources when a card is removed.
 
@@ -168,6 +198,14 @@ commands, or host a plugin registry.
 The current home is `editor/kits/composer` because the API is reusable inside the editor but not yet promoted to a separately versioned package.
 
 ## Validation
+
+Use `/ui/components/composer` as the canonical UI playground. Its default
+Desktop chat example uses the production composer, queued-message previews,
+model picker and chat-tab excerpt component with local fixtures; it needs no
+agent session or provider connection. The Kit and files tab preserves the raw
+kit's file/reference examples. See
+`editor/app/(dev)/ui/components/composer/README.md` for scenarios and its
+isolated browser test command.
 
 Run the pure model, adapter mapping, and transfer tests from `editor` with
 `pnpm exec vitest run kits/composer`. The real-editor command selection tests

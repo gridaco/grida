@@ -1050,15 +1050,17 @@ mod tests {
                 account,
                 organization,
             );
-            let error = host
+            let sent = host
                 .start_prompt(request(session.clone(), vec![text()]))
                 .await
-                .err()
                 .unwrap();
-            assert_eq!(error.code, "session_execution_configuration_changed");
+            let RunResult::Settled(followup) = sent.completion.await.unwrap().unwrap() else {
+                panic!("expected explicitly selected account to accept idle work");
+            };
+            assert_eq!(followup.status, OutcomeStatus::Succeeded);
             host.shutdown().await.unwrap();
         }
-        assert_eq!(requests.lock().unwrap().len(), 1);
+        assert_eq!(requests.lock().unwrap().len(), 3);
 
         // The source path is independent of the image already accepted in chat.
         fs::write(&selected, b"changed source").unwrap();
@@ -1075,10 +1077,14 @@ mod tests {
         drop(host);
         {
             let requests = requests.lock().unwrap();
-            assert_eq!(requests.len(), 2);
+            assert_eq!(requests.len(), 4);
             for body in requests.iter() {
                 assert_eq!(body["model"], RETAINED_PNG_MODEL);
-                assert!(body["tools"].is_null());
+                let tools = body["tools"]
+                    .as_array()
+                    .expect("retained image crop inventory");
+                assert_eq!(tools.len(), 1);
+                assert_eq!(tools[0]["function"]["name"], "crop_retained_image");
                 assert_eq!(
                     body["messages"][1]["content"][1],
                     json!({
@@ -1122,7 +1128,7 @@ mod tests {
                 account.inference_failure.unwrap().code,
                 "retained_image_unavailable"
             );
-            assert_eq!(requests.lock().unwrap().len(), 2);
+            assert_eq!(requests.lock().unwrap().len(), 4);
             host.shutdown().await.unwrap();
         }
     }

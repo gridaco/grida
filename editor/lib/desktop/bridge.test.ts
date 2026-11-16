@@ -5,9 +5,11 @@ import {
   DESKTOP_BRIDGE_PROTOCOL,
   DesktopBridgeMissingError,
   account,
+  app,
   getDesktopBridge,
   getDesktopBridgeStatus,
   modelGeneration,
+  providers,
   rigging,
   secrets,
 } from "./bridge";
@@ -25,6 +27,73 @@ afterEach(() => {
 });
 
 describe("desktop bridge client contract", () => {
+  it("uses the optional consent query and detected-model update without falling back to Save", async () => {
+    const authorization = vi
+      .fn<
+        NonNullable<
+          NonNullable<DesktopBridge["providers"]>["endpoint_authorization"]
+        >
+      >()
+      .mockResolvedValue(true);
+    const update = vi
+      .fn<
+        NonNullable<
+          NonNullable<DesktopBridge["providers"]>["update_endpoint_models"]
+        >
+      >()
+      .mockResolvedValue(undefined);
+    const save =
+      vi.fn<NonNullable<DesktopBridge["providers"]>["set_endpoint"]>();
+    installBridge({
+      grida: {
+        protocol: DESKTOP_BRIDGE_PROTOCOL,
+        providers: {
+          endpoint_authorization: authorization,
+          update_endpoint_models: update,
+          set_endpoint: save,
+        },
+      },
+    });
+    expect(providers.supportsEndpointConsent()).toBe(true);
+    await expect(
+      providers.endpointAuthorization("ollama", "http://localhost:11434/v1")
+    ).resolves.toBe(true);
+    const facts = {
+      id: "ollama",
+      base_url: "http://localhost:11434/v1",
+      models: [{ id: "local-model" }],
+    };
+    await providers.updateEndpointModels(facts);
+    expect(authorization).toHaveBeenCalledExactlyOnceWith(
+      facts.id,
+      facts.base_url
+    );
+    expect(update).toHaveBeenCalledExactlyOnceWith(facts);
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("refuses new consent operations on a legacy host instead of invoking its modal Save", async () => {
+    const save =
+      vi.fn<NonNullable<DesktopBridge["providers"]>["set_endpoint"]>();
+    installBridge({
+      grida: {
+        protocol: DESKTOP_BRIDGE_PROTOCOL,
+        providers: { set_endpoint: save },
+      },
+    });
+    expect(providers.supportsEndpointConsent()).toBe(false);
+    await expect(
+      providers.endpointAuthorization("ollama", "http://localhost:11434/v1")
+    ).rejects.toBeInstanceOf(DesktopBridgeMissingError);
+    await expect(
+      providers.updateEndpointModels({
+        id: "ollama",
+        base_url: "http://localhost:11434/v1",
+        models: [],
+      })
+    ).rejects.toBeInstanceOf(DesktopBridgeMissingError);
+    expect(save).not.toHaveBeenCalled();
+  });
   it("rejects a missing or unsupported bridge protocol", () => {
     installBridge({});
     expect(getDesktopBridge()).toBeNull();
@@ -61,6 +130,27 @@ describe("desktop bridge client contract", () => {
     await account.signOut();
 
     expect(signOut).toHaveBeenCalledOnce();
+  });
+
+  it("opens Settings through the optional native window action without route arguments", async () => {
+    const open = vi.fn<() => Promise<void>>().mockResolvedValue();
+    installBridge({
+      grida: {
+        protocol: DESKTOP_BRIDGE_PROTOCOL,
+        window: { open_settings: open },
+      },
+    });
+    await app.openSettings();
+    expect(open).toHaveBeenCalledExactlyOnceWith();
+  });
+
+  it("refuses Settings window requests on older native hosts", async () => {
+    installBridge({
+      grida: { protocol: DESKTOP_BRIDGE_PROTOCOL, window: {} },
+    });
+    await expect(app.openSettings()).rejects.toBeInstanceOf(
+      DesktopBridgeMissingError
+    );
   });
 
   it("fails closed when the native account controller is absent", async () => {

@@ -1,0 +1,55 @@
+.slider {
+  --effort-thumb-size: calc(var(--spacing) * 7);
+  --effort-snap-duration: 0ms;
+}
+
+/* Radix measures and positions the knob after mount. Only animate movement
+   after an explicit interaction, so opening the popup never slides it in. */
+.slider[data-animated] {
+  --effort-snap-duration: 150ms;
+}
+
+/* Radix positions the thumb's outer span; animate it together with the fill. */
+.slider > span:has(> [role="slider"]),
+.slider [data-effort-range] {
+  transition:
+    left var(--effort-snap-duration) ease-out,
+    right var(--effort-snap-duration) ease-out;
+}
+
+.slider[data-dragging] {
+  --effort-snap-duration: 0ms;
+}
+
+.thumb {
+  transition:
+    scale 150ms ease-out,
+    box-shadow 150ms ease-out;
+}
+
+/* Pointer events on the invisible halo still target the knob, not the track. */
+.thumb::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+}
+
+.thumb:hover {
+  scale: 1.06;
+}
+
+.thumb:active {
+  scale: 1.08;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slider,
+  .slider[data-animated] {
+    --effort-snap-duration: 0ms;
+  }
+
+  .thumb {
+    transition: none;
+  }
+}

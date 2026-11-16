@@ -757,7 +757,7 @@ async fn changed_provider_credential_cannot_resume_a_paused_input() {
     )
     .await;
     assert_eq!(
-        denied["error"]["data"], "retained_authority_changed",
+        denied["error"]["data"], "session_active_route_changed",
         "{denied}"
     );
     assert_eq!(

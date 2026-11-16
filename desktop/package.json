@@ -61,6 +61,7 @@
     "electron-squirrel-startup": "^1.0.1",
     "react": "19.2.5",
     "react-dom": "19.2.5",
+    "smol-toml": "1.8.0",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.2",
     "ts-node": "^10.0.0",

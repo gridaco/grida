@@ -5,11 +5,13 @@ pub mod approval_review;
 pub mod compaction;
 pub mod configuration;
 pub mod conversation_seed;
+pub mod delegation;
 pub mod effort;
 pub mod file_reference;
 pub mod goals;
 pub mod history;
 pub mod hooks;
+pub mod image_attachment;
 pub mod lifecycle_hooks;
 pub mod presentation;
 pub mod questions;
@@ -96,6 +98,8 @@ pub struct Account {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub independent_review: Option<effort::ReviewEvidence>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delegation: Option<delegation::Evidence>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub goal: Option<goals::ProgressAccount>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub completion_checks: Vec<hooks::CheckEvidence>,
@@ -162,6 +166,7 @@ pub struct Master {
     input_limit: Option<NonZeroU64>,
     retained_file_check: Option<Box<dyn Fn() -> BoxFuture<'static, Result<()>> + Send + Sync>>,
     effort: Option<effort::Policy>,
+    delegation: Option<delegation::Policy>,
     goal_verifier: Option<Box<goals::settlement::Verifier>>,
     goal_child_work: Option<Arc<dyn goals::ChildWorkObserver>>,
     completion_checks: Option<CompletionChecksExecution>,
@@ -197,6 +202,8 @@ struct ConfigurationIdentity<'a> {
     input_limit: Option<NonZeroU64>,
     completion_checks: Option<&'a hooks::CompletionChecks>,
     lifecycle_hooks: Option<&'a lifecycle_hooks::LifecycleHooks>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    delegation: Option<&'a delegation::Policy>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -276,6 +283,7 @@ impl Master {
             input_limit: None,
             retained_file_check: None,
             effort: None,
+            delegation: None,
             goal_verifier: None,
             goal_child_work: None,
             completion_checks: None,
@@ -354,6 +362,20 @@ impl Master {
         Ok(self)
     }
 
+    /// Select general delegation independently of reasoning effort. The host
+    /// supplies bounded tools; policy and completion accounting remain here.
+    pub fn with_delegation(mut self, policy: delegation::Policy) -> Result<Self> {
+        if self.delegation.is_some() {
+            return Err(Error::new(
+                ErrorKind::Conflict,
+                "master_delegation_already_bound",
+            ));
+        }
+        policy.apply(&mut self.config)?;
+        self.delegation = Some(policy);
+        Ok(self)
+    }
+
     /// Install the accepted completion policy and its private handler inventory.
     /// The selected revisions are retained separately from live dispatch grants.
     pub fn with_completion_checks(
@@ -398,6 +420,15 @@ impl Master {
     pub async fn run(&self, mut turn: Turn, input: Vec<Message>) -> Result<MasterOutcome> {
         let max_steps = {
             let view = turn.view();
+            if self.delegation.is_some()
+                && !view.state.controls().cancelled
+                && goals::settlement::work_goal(&view.state)?.is_some()
+            {
+                return Err(Error::new(
+                    ErrorKind::Unsupported,
+                    "goal_worker_allowance_unavailable",
+                ));
+            }
             goals::settlement::step_limit(
                 &view.state,
                 self.config.max_steps,
@@ -412,6 +443,7 @@ impl Master {
         self.accept_input(&mut turn, input).await?;
         Self::retain_orphaned_work(&turn, &turn.view()).await?;
         let mut effort_to_verify = self.effort.as_ref();
+        let mut delegation_to_verify = self.delegation.as_ref();
         loop {
             let view = turn.view();
             if view.state.controls().cancelled {
@@ -551,6 +583,13 @@ impl Master {
             }
             if let Some(effort) = effort_to_verify.take() {
                 effort.verify_offer(
+                    &self.tools,
+                    &self.authority.tools,
+                    &self.provider.capabilities(&self.config.model)?,
+                )?;
+            }
+            if let Some(delegation) = delegation_to_verify.take() {
+                delegation.verify_offer(
                     &self.tools,
                     &self.authority.tools,
                     &self.provider.capabilities(&self.config.model)?,
@@ -885,13 +924,32 @@ impl Master {
                     }
                 }
             };
+            // A provider may label an early completion candidate as an answer.
+            // Product completion still requires collected delegated work. Keep
+            // raw inference evidence intact and publish this candidate as work.
+            let provisional_answer = outcome
+                .as_ref()
+                .map(outcome_account)
+                .transpose()?
+                .and_then(|account| account.delegation)
+                .is_some_and(|evidence| evidence.has_pending());
+            let mut history = step.history;
+            if provisional_answer {
+                for HistoryRecord::Message(message) in &mut history {
+                    if message.role == Role::Assistant
+                        && message.phase == Some(agent_kit_core::messages::MessagePhase::Answer)
+                    {
+                        message.phase = Some(agent_kit_core::messages::MessagePhase::Progress);
+                    }
+                }
+            }
             continuation.request = None;
             continuation.request_generation = 0;
             continuation.interrupted = false;
             continuation.outcome = outcome;
             turn.publish_continuation(
                 OperationKey::new(format!("{step_key}/result"))?,
-                step.history,
+                history,
                 encode(CONTINUATION_SCHEMA, &continuation)?,
             )
             .await?;
@@ -1019,6 +1077,7 @@ impl Master {
                 .lifecycle_hooks
                 .as_ref()
                 .map(|execution| &execution.hooks),
+            delegation: self.delegation.as_ref(),
         })?;
         let view = turn.view();
         match view.state.checkpoint() {
@@ -1036,10 +1095,14 @@ impl Master {
             }),
             Some(envelope) => {
                 let value: Continuation = decode(CONTINUATION_SCHEMA, envelope)?;
+                // A durable Stop only retires recorded work. It must remain
+                // possible when the original execution is unavailable; the
+                // cancellation branch never dispatches the retained request.
+                let cancelling = view.state.controls().cancelled;
                 if value.effort != self.effort {
                     return Err(Error::new(ErrorKind::Conflict, "master_effort_changed"));
                 }
-                if value.configuration != fingerprint {
+                if !cancelling && value.configuration != fingerprint {
                     return Err(Error::new(
                         ErrorKind::Conflict,
                         "master_configuration_changed",
@@ -1147,6 +1210,22 @@ impl Master {
                 },
             });
         }
+        if let Some(policy) = &self.delegation {
+            let evidence = policy.evidence(&view.state, &self.authority.tools)?;
+            if let Some(text) = evidence.pending_hint()? {
+                messages.push(Message {
+                    id: MessageId::new("grida-delegation-context")?,
+                    role: Role::System,
+                    phase: None,
+                    content: vec![Content::Text(text)],
+                    provenance: Provenance {
+                        source: "delegation-evidence".into(),
+                        kind: ProvenanceKind::Transformed,
+                        fingerprint: Some(Fingerprint::of(&evidence)?),
+                    },
+                });
+            }
+        }
         if let Some(execution) = &self.lifecycle_hooks {
             let context = execution.hooks.context(view);
             if !context.is_empty() {
@@ -1199,6 +1278,13 @@ impl Master {
                 *content = Content::Text(display);
             }
         }
+        image_attachment::project(
+            &mut messages,
+            self.provider
+                .capabilities(&self.config.model)?
+                .input_modalities
+                .contains(&agent_kit_core::inference::Modality::Image),
+        );
         let request = self.provider.prepare(InferenceRequest {
             model: self.config.model.clone(),
             messages,
@@ -1313,6 +1399,22 @@ impl Master {
         inference_failure: Option<&InferenceFailure>,
     ) -> Result<TurnOutcome> {
         let view = turn.view();
+        let delegation = self
+            .delegation
+            .as_ref()
+            .map(|policy| policy.evidence(&view.state, &self.authority.tools))
+            .transpose();
+        let delegation_failure = delegation.as_ref().err().cloned();
+        let status = if delegation_failure.is_some() && status != OutcomeStatus::Cancelled {
+            OutcomeStatus::Uncertain
+        } else {
+            status
+        };
+        let text = if delegation_failure.is_some() {
+            "A delegated assignment's recorded result could not be verified. Review the child work before continuing."
+        } else {
+            text
+        };
         let evidence = view.state.operations().keys().cloned().collect();
         let unresolved = view
             .state
@@ -1332,15 +1434,17 @@ impl Master {
                     unresolved,
                     tool_activity: ToolActivity::from_turn(&view),
                     stop_reason,
-                    failure: inference_failure.and_then(|failure| {
-                        let kind = match failure.code.as_str() {
-                            "input_measurement_unavailable" | "input_bound_unavailable" => {
-                                ErrorKind::Unsupported
-                            }
-                            "input_token_limit" => ErrorKind::LimitExceeded,
-                            _ => return None,
-                        };
-                        Some(Error::new(kind, &failure.code))
+                    failure: delegation_failure.or_else(|| {
+                        inference_failure.and_then(|failure| {
+                            let kind = match failure.code.as_str() {
+                                "input_measurement_unavailable" | "input_bound_unavailable" => {
+                                    ErrorKind::Unsupported
+                                }
+                                "input_token_limit" => ErrorKind::LimitExceeded,
+                                _ => return None,
+                            };
+                            Some(Error::new(kind, &failure.code))
+                        })
                     }),
                     inference_failure: inference_failure.cloned(),
                     inference_usage: usage::InferenceUsage::from_turn(&view.state)?,
@@ -1350,6 +1454,7 @@ impl Master {
                         .map(|effort| effort.review_evidence(&view.state))
                         .transpose()?
                         .flatten(),
+                    delegation: delegation.ok().flatten(),
                     goal: None,
                     completion_checks: Vec::new(),
                     lifecycle_hooks: self
@@ -1373,6 +1478,51 @@ impl Master {
         mut outcome: TurnOutcome,
         basis: &TurnView,
     ) -> Result<Option<MasterOutcome>> {
+        if outcome.status == OutcomeStatus::Succeeded {
+            let evidence = outcome_account(&outcome)?.delegation;
+            if let Some(evidence) = evidence {
+                if evidence.has_pending() && continuation.step < max_steps {
+                    continuation.request = None;
+                    continuation.outcome = None;
+                    turn.checkpoint(
+                        OperationKey::new(format!(
+                            "delegation/continue/{}",
+                            Fingerprint::of(&outcome)?.to_hex()
+                        ))?,
+                        encode(CONTINUATION_SCHEMA, continuation)?,
+                    )
+                    .await?;
+                    return Ok(None);
+                }
+                if evidence.has_pending() || evidence.has_uncertain() {
+                    let uncertain = evidence.has_uncertain();
+                    outcome.status = if uncertain {
+                        OutcomeStatus::Uncertain
+                    } else {
+                        OutcomeStatus::Failed
+                    };
+                    update_account(&mut outcome, |account| {
+                        account.failure = Some(Error::new(
+                            if uncertain {
+                                ErrorKind::Uncertain
+                            } else {
+                                ErrorKind::LimitExceeded
+                            },
+                            if uncertain {
+                                "delegation_uncertain"
+                            } else {
+                                "delegation_incomplete"
+                            },
+                        ));
+                        account.text = if uncertain {
+                            "A delegated assignment or its owned resources have an uncertain result. Review the recorded child work before continuing."
+                        } else {
+                            "The request allowance ended before all delegated assignment results were collected. Review the outstanding child work before continuing."
+                        }.into();
+                    })?;
+                }
+            }
+        }
         let may_continue = outcome.status == OutcomeStatus::Succeeded;
         if !continuation.hook_diagnostics.is_empty() {
             update_account(&mut outcome, |account| {

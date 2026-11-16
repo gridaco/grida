@@ -20,9 +20,11 @@ import { EditorTabPreviewContent } from "./editor-tab-preview-content";
 import { TabPreviewController } from "./tab-preview-controller";
 import { TabPreviewPosition } from "./tab-preview-position";
 import { WorkspaceTabThumbnail } from "./workspace-tab-thumbnail";
+import { WorkbenchTab } from "./workbench-tab";
+import type { WorkbenchPanel } from "./workbench-panels";
 
 type Placement = {
-  relPath: string;
+  tabKey: string;
   left: number;
   top: number;
   transitionFromPrevious: boolean;
@@ -35,6 +37,7 @@ export function EditorTabPreview({
   dirtyPaths,
   revision,
   thumbnailCache,
+  panels,
 }: {
   controller: TabPreviewController;
   railRef: RefObject<HTMLDivElement | null>;
@@ -42,6 +45,7 @@ export function EditorTabPreview({
   dirtyPaths: ReadonlySet<string>;
   revision: number;
   thumbnailCache: WorkspaceTabThumbnail.Cache;
+  panels: ReadonlyMap<string, WorkbenchPanel>;
 }) {
   const snapshot = useSyncExternalStore(
     controller.subscribe,
@@ -94,7 +98,7 @@ export function EditorTabPreview({
         },
       });
       setPlacement((previous) => ({
-        relPath: target.relPath,
+        tabKey: target.tabKey,
         ...next,
         transitionFromPrevious: previous !== null,
       }));
@@ -124,10 +128,13 @@ export function EditorTabPreview({
     };
   }, [controller, railRef, snapshot]);
 
-  const positioned = snapshot.open && placement?.relPath === snapshot.relPath;
+  const target = snapshot.open ? WorkbenchTab.parse(snapshot.tabKey) : null;
+  const panelPreview =
+    target?.kind === "panel" ? panels.get(target.id)?.preview : undefined;
+  const positioned = snapshot.open && placement?.tabKey === snapshot.tabKey;
   return (
     <PortalPrimitive.Root>
-      {snapshot.open && (
+      {snapshot.open && target && (target.kind === "file" || panelPreview) && (
         <div
           ref={contentRef}
           data-slot="workspace-tab-preview"
@@ -144,16 +151,20 @@ export function EditorTabPreview({
           }}
         >
           <div
-            key={`${workspaceId}:${snapshot.relPath}:${revision}`}
+            key={`${workspaceId}:${snapshot.tabKey}:${target.kind === "file" ? revision : 0}`}
             className="animate-in fade-in-0 duration-150 ease-out motion-reduce:animate-none"
           >
-            <EditorTabPreviewContent
-              workspaceId={workspaceId}
-              relPath={snapshot.relPath}
-              dirty={dirtyPaths.has(snapshot.relPath)}
-              revision={revision}
-              thumbnailCache={thumbnailCache}
-            />
+            {target.kind === "file" ? (
+              <EditorTabPreviewContent
+                workspaceId={workspaceId}
+                relPath={target.relPath}
+                dirty={dirtyPaths.has(target.relPath)}
+                revision={revision}
+                thumbnailCache={thumbnailCache}
+              />
+            ) : (
+              panelPreview
+            )}
           </div>
         </div>
       )}

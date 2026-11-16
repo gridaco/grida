@@ -33,6 +33,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { XIcon } from "lucide-react";
@@ -43,7 +44,6 @@ import {
   type Workspace,
 } from "@/lib/desktop/bridge";
 import { welcome_message } from "@/lib/desktop/welcome-message";
-import type { NativeChatProfileCatalog } from "@grida/desktop-bridge";
 import { dotcanvas } from "dotcanvas";
 import { TitleBar } from "@/scaffolds/desktop/chrome/title-bar";
 import { AgentComposerInput } from "@/scaffolds/desktop/shared/agent-composer-input";
@@ -72,6 +72,7 @@ import { PresetRail } from "@/scaffolds/desktop/home/preset-rail";
 import { PresetChip } from "@/scaffolds/desktop/home/preset-chip";
 import type { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
 import { last_workspace } from "@/lib/desktop/last-workspace";
+import { NativeChatController } from "@/lib/agent-chat/native-chat-controller";
 
 const NOOP = () => {};
 const WELCOME_LIBRARY_SOURCE = { kind: "browse" } as const;
@@ -330,33 +331,33 @@ function WelcomeSurface({
   // Native connection choices for the first chat. Only choices that do not
   // depend on a workspace are offered here; the opened workspace selects the
   // chosen one as a new connection. `null` keeps the workspace default.
-  const [profiles, setProfiles] = useState<NativeChatProfileCatalog | null>(
-    null
+  const modelSelection = useMemo(
+    () => new NativeChatController.ModelSelection(),
+    []
   );
-  const [profileId, setProfileId] = useState<string | null>(null);
+  const {
+    profiles,
+    profileId,
+    error: profileReadError,
+  } = useSyncExternalStore(
+    modelSelection.subscribe,
+    modelSelection.read,
+    modelSelection.read
+  );
   const readProfiles = useCallback(() => {
     const list = getDesktopBridge()?.nativeChat?.welcomeProfiles;
     if (!list) return;
-    void list()
-      .then((next) => {
-        setProfiles(next);
-        // A choice that is no longer offered falls back to the default.
-        setProfileId((current) =>
-          current && next?.choices.some(({ id }) => id === current)
-            ? current
-            : null
-        );
-      })
-      .catch(() => {
-        // Without choices the first chat uses the workspace default.
-      });
-  }, []);
+    void modelSelection.refresh(list);
+  }, [modelSelection]);
   useEffect(() => {
     readProfiles();
     // Settings can add a provider key or endpoint in another window.
     window.addEventListener("focus", readProfiles);
-    return () => window.removeEventListener("focus", readProfiles);
-  }, [readProfiles]);
+    return () => {
+      window.removeEventListener("focus", readProfiles);
+      modelSelection.release();
+    };
+  }, [readProfiles, modelSelection]);
 
   // Open a workspace and, when there is one, leave the first message for its
   // chat. An empty message enters the workspace without starting a turn.
@@ -637,15 +638,14 @@ function WelcomeSurface({
                         profiles={{
                           active: profileId,
                           choices: profiles?.choices ?? [],
-                          saved: [],
+                          saved: profiles?.saved ?? [],
                         }}
                         busy={busy}
                         onSelect={(selection) =>
-                          setProfileId(
-                            selection.kind === "default" ? null : selection.id
-                          )
+                          modelSelection.choose(selection)
                         }
                         onRefresh={readProfiles}
+                        refreshError={profileReadError}
                       />
                     }
                   />

@@ -5,6 +5,12 @@ active development. Chat execution belongs to the native agent; this package
 contains no chat loop, scheduler, session store, prompts, skills or tool
 assembly.
 
+Captured native ChatGPT Responses requests have an 8 MiB aggregate JSON bound,
+including encoded image input and retained history. The host preserves their
+exact bytes, fixed fields, model and OAuth lineage; oversized requests refuse
+before dispatch. Image decoding and per-image preparation remain the native
+agent's responsibility. This changes no media upload, response or chunk bound.
+
 The daemon owns the loopback perimeter and file/workspace services. This package
 supplies the media tenant (shared media HTTP operations, provider credential
 custody and endpoint settings), the native ChatGPT subscription host, the media

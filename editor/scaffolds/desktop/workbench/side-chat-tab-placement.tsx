@@ -1,5 +1,6 @@
 import { MessageSquareTextIcon } from "lucide-react";
 import { NativeSideChatPane } from "./native-agent-pane";
+import { EditorTabChatPreview } from "./editor-tab-chat-preview";
 import type {
   SideChatPlacement,
   SideChatPresentation,
@@ -75,6 +76,9 @@ export class SideChatTabPlacement implements SideChatPlacement {
         title,
         icon: <MessageSquareTextIcon />,
         content: <NativeSideChatPane presentation={presentation} />,
+        preview: (
+          <EditorTabChatPreview title={title} source={presentation.chat} />
+        ),
       },
       () => {
         entry.stop();

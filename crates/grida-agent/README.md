@@ -6,6 +6,10 @@ Agent Client Protocol (ACP) v1 stdio sessions.
 
 ## Reference docs
 
+Start architectural work with the canonical
+[architecture rings and placement rules](https://grida.co/docs/wg/ai/agent#architecture-rings),
+then the [native package mapping and checked dependency budgets](docs/rust-core.md#dependency-budgets).
+
 The [Agent Features catalog](../../docs/agent/features.md) records each
 feature's current behavior, intended outcome, caveats, and availability.
 
@@ -73,6 +77,41 @@ provider and session ID. Use the absolute path to the state directory's
 `attachment-context` as the ACP working directory, then read its settled
 turn summary and any listed artifacts.
 
+A private client can negotiate `co.grida/session/input-image` to read the
+original PNG already recorded with a user message for display. This bounded
+observational read uses the exact message and retained attachment identity;
+it works after restart or context compaction even when the selected model
+does not take images. It never starts inference or changes what the model
+sees. See the [client protocol](docs/rust-client-protocol.md).
+
+For general selected raster input, a private client negotiates
+`co.grida/session/selected-image` and submits a verified source path/digest.
+PNG, JPEG, WebP and GIF originals up to 20 MiB are retained separately from a
+bounded prepared PNG view. The first inference receives actual pixels and the
+verified original path when there is a disk origin. A clipboard snapshot has
+an honest managed identity. Preparation can resize the image and uses one
+still frame; it does not promise inspection of every original pixel or an
+animation. `co.grida/session/input-image-chunks` reads the unchanged original
+for display independently of inference, including after its live path is gone.
+The older inline-PNG and headless `--input-png` modes retain their existing
+bounded exact-PNG behavior.
+
+Waiting messages use the independent private
+`co.grida/session/queued-input-image-chunks` capability. Their complete text and
+attachment metadata are inspectable under an exact queue revision; retained
+original image bytes are read in bounded chunks only while the same input
+remains queued. Inspection never claims the input or starts model work. The
+ordinary input read reports factual `textOnly` eligibility separately from its
+display text.
+
+Negotiate `co.grida/session/replace-text` version 1 to change only a waiting
+input's text while retaining its captured attachments, settings and authority.
+The host reports `textEditable` separately from factual `textOnly`; goals and
+special interactive inputs remain ineligible. Empty captions are accepted when
+another retained part remains. Exact retries replay the original queue control
+receipt after restart. The [client protocol](docs/rust-client-protocol.md#replace-only-queued-user-text)
+defines the request and eligibility; general replacement remains unchanged.
+
 Use `run --input-file FILE` on macOS or Linux to inspect one selected regular
 file up to 256 KiB. With no project selected, the run uses the same private
 attachment context. The host retains the exact original and creates a separate
@@ -81,6 +120,14 @@ name. The turn's `inspect_retained_file` tool returns verified size and SHA-256
 and can request up to 2 KiB of UTF-8 text. Binary inspection returns integrity
 metadata. An unavailable original or working copy stops dependent work after
 reopening and the turn account identifies which input is missing.
+
+A private client can attach a folder by reference using the negotiated
+[resource-link contract](docs/rust-client-protocol.md).
+It sends the local folder URI and `inode/directory` type without a size or
+preview. The folder's contents are neither copied nor listed at attachment.
+The model receives the path and uses only its already-permitted tools; the
+reference adds no directory root or access grant. Queueing, exact retries and
+reopening preserve the same reference, even if the path is temporarily absent.
 
 Select a provider protocol, base URL, and model. HTTPS is accepted for remote
 providers. HTTP is limited to numeric loopback addresses or `localhost`,
@@ -128,8 +175,46 @@ account and organization, and passes an opaque scope with the selected model
 to the child. The child builds the fixed Gateway chat request without a
 bearer. Main attaches the short-lived grant at dispatch. A restart under the
 same scope can continue the chat after a grant refresh. A different scope can
-read the saved transcript through the ordinary workspace boundary, but cannot
-use it to start provider work under the replacement account or organization.
+read the saved transcript through the ordinary workspace boundary. An explicitly
+selected connection can accept a future idle input with portable history;
+accepted current, queued, Goal and child work retain their original authority.
+
+A top-level chat can select a different authorized model or connection between
+completed turns. Accepted work captures its own model, principal and scope;
+queue admission, Pause/Resume, recovery, Goals and reviewers validate that capture
+rather than the chat's creation profile. Compatible history keeps provider
+continuation. A different model, principal or scope receives portable visible
+history with private reasoning and continuation removed. Original journals stay
+intact. Destination input compatibility is checked separately.
+
+Private supervisors may negotiate `co.grida/session/model-change` version 1 to
+inspect blockers and atomically prepare the owning worker for replacement.
+Preparation refuses any retained work across the store, temporary side chats,
+background commands and pending controls or titles, then closes new admission.
+It starts no provider work. After a successful preparation, close the worker;
+restore a failed selection by reopening the prior connection in a new worker.
+An older binary without the capability cannot authorize this transition.
+
+Private supervisors can also negotiate `co.grida/session/selection` version 1
+to inspect and conditionally save a chat's selected connection, wire model and
+visible effort without starting or replacing a provider. These settings are
+versioned product records adjacent to the unchanged session database; accepted
+work keeps its execution capture. New requests can name the saved selection
+revision at admission. Stable create identities and retained mutation receipts
+support Desktop drafts and application-default coordination across restarts.
+For an existing closed store, `chat-selection --state-dir DIRECTORY --cwd
+WORKSPACE --session SESSION_ID` inspects the same metadata without credentials
+or model work. See the [durable selection protocol](docs/rust-client-protocol.md#durable-chat-selection).
+
+The private ChatGPT subscription profile also uses this pipe. Its finite
+model-to-wire mapping comes from the generated
+[subscription compatibility projection](data/chatgpt-subscription-models.json).
+The catalogue generator consumes the dedicated
+[subscription definition](../../data/ai/chatgpt-subscription.json) to emit this
+projection and the trusted host's selection data. Native execution does not infer subscription support
+from all OpenAI API models. A retired or unknown model refuses launch before
+opening session state or provider work. Existing saved metadata can remain
+available to the client without authorizing inference on that retired model.
 
 Responses and Gemini retain opaque model history across restarts when their
 protected credential proof still matches. A changed credential invalidates replay of
@@ -240,6 +325,12 @@ in the same turn stop once the uncertainty is observed. Effects already
 admitted may finish. An uncertain Goal turn retains its work reservation.
 
 ### Configure lifecycle hooks
+
+Desktop users configure global hooks in `~/.grida/config.toml` (or
+`$GRIDA_HOME/config.toml`) and review them in Settings > Hooks. Desktop does not
+discover workspace hook files. See the [Desktop hooks guide](https://grida.co/docs/agent/hooks).
+The native host does not auto-load that Desktop source; the following is its
+trusted supervisor launch contract, not an alternative user configuration file.
 
 The launch-only permission profile can select up to eight ordered `hooks`.
 Each definition has this shape; `executable.sha256` is the canonical program's
@@ -505,6 +596,7 @@ with an underscore.
 | `co.grida/session/snapshot`                       | Read revisions, ordered queue settings, and turn summaries.                         |
 | `co.grida/session/enqueue`, `input`               | Accept waiting work or read an accepted input and its settings.                     |
 | `co.grida/session/replace`, `withdraw`, `reorder` | Edit waiting work with revision checks and retained receipts.                       |
+| `co.grida/session/replace-text`                   | Replace only waiting user text while preserving captured resources and settings.    |
 | `co.grida/session/pause`, `resume`, `steer`       | Pause an exact turn, claim a verified suspension, or add a correction.              |
 | `co.grida/session/stop`, `resume-queue`           | Stop the current turn and pause admission, or reopen queue admission separately.    |
 | `co.grida/session/history`, `fork`, `revise`      | Read message anchors, branch a committed prefix, or revise an earlier user message. |
@@ -567,8 +659,10 @@ An input with workspace file tools (a `--permission-profile` whose primary root
 matches the working directory) also captures the skill catalog's names,
 descriptions and sources and lists them in the instructions. The model reads a
 listed bundled skill with `read_skill` and a listed project skill with its file
-tools at the listed workspace-relative path, then follows it. Subagent and
-funded Goal work list no skills.
+tools at the listed workspace-relative path, then follows it. General delegated
+workers retain the parent's captured catalog and guidance and can read declared
+skills within their delegated permissions. Manual inference-only children,
+independent reviewers and funded Goal work retain their narrower skill contract.
 
 ## Filesystem services
 
@@ -623,21 +717,23 @@ at admission. Executors own quotas for their separate working areas and outputs.
 These private-storage helpers currently support macOS and Linux. The native
 host's tool composition supplies their grants and lifecycle.
 
-Private stdio ACP can submit a single validated PNG as part of an input on a
-Responses connection whose exact OpenAI model id is listed in
-`data/responses-png-models.json`: models whose published model and binding
-facts declare PNG input and tool calls, generated from the released Models
-package. The same connections, and listed OpenRouter PNG models on the saved
-OpenRouter route, offer `view_image`, because they can carry images in tool
-results. The host keeps the original under the
-private state directory and stores its immutable reference with the accepted
-input. Queued input and provider context can use the original after restart.
-An unsupported profile or unavailable original produces an error for the
-whole request.
+Private stdio ACP supports declared image-capable native profiles. The reviewed
+Responses, saved OpenRouter and Grida Gateway bindings, and the subscription
+composition can also carry retained image tool results. Those profiles offer
+`view_image` when a readable workspace is bound. It prepares a bounded view of
+PNG, JPEG, WebP or GIF without altering the original; selected image intake
+does not grant access to its directory. The reviewed Gemini profile retains
+user-image input without tool-image projection. Exact supported native model
+bindings remain generated from catalog facts. An unsupported new image or
+unavailable retained input stops the whole request. A text-only continuation
+explicitly identifies historical pixels omitted from model context while
+retaining the transcript and independent original preview.
 
 The native `crop_retained_image` tool receives only the most recent retained
-PNG in the admitted chat's captured context. It uses the original coordinates
-and atomically saves a bounded derivative in that chat's working area. The
+PNG in the admitted chat's captured context. An older exact-PNG input uses its
+original coordinates; a prepared raster uses coordinates in its bounded view,
+which can be smaller than the retained original. The tool atomically saves a
+bounded derivative in that chat's working area. The
 result records the source and working-copy identities and their digests. The
 copy is retained with the chat state, and an interrupted write with uncertain
 publication requires inspection before a new edit. Publication to a project or
@@ -824,7 +920,7 @@ reservation commit together. Only reserved turns receive the goal tools. See
 the
 [agent client guide](../../docs/agent/clients.md#work-toward-a-persistent-goal).
 
-With `serve --stdio --subagents` and a compatible provider, a private ACP
+With `serve --stdio --subagents` and any supported native model connection, a private ACP
 client can negotiate effort and pass `"effort":"ultra"` on Goal Start. The
 goal needs at least three inference steps. Each eligible turn reserves two
 for one text-only reviewer within the goal's existing allowance. The parent
@@ -833,6 +929,14 @@ the ordinary task Pause, Resume, and Stop controls while the funded turn
 owns work. If the review is still unsettled when the parent finishes, Goal
 Recover can account for it once its outcome is known. See the
 [Goal client contract](docs/rust-client-protocol.md#persistent-goal-operations).
+
+Ultra is a harness allowance, independent of provider reasoning or an optional
+wire output-token limit. The reviewer uses the parent's captured provider,
+model, principal and scope through the same transport. A subscription route
+continues to omit an unsupported output-token field. Generation-step limits,
+deadlines, bounded local output and parent controls still apply; they do not
+promise a remote token or currency ceiling. Only the spending capability below
+provides a monetary bound.
 
 A private supervised Gateway client can negotiate `co.grida/goal/spending`
 version 1 and add `maxCostMills` to Goal Start. This is an exact USD-mills
@@ -1030,6 +1134,39 @@ evidence. A retained handoff without a verified receipt settles as uncertain
 on recovery. A Pause before handoff can resume the same input. A new turn
 opens a new peer process.
 
+## Delegate ordinary work from the model
+
+`run --subagents` and `serve --stdio --subagents` opt the native host into
+general delegation for ordinary Act turns on models supporting JSON tools.
+This is independent of the effort preset. The product master receives
+`spawn_agent`, `send_agent_message`, `wait_agent` and `stop_agent`, backed by
+operation-owned durable child claims and exact assignment result receipts.
+The [native binding](./docs/rust-core.md#model-initiated-child-work) defines
+the tool arguments and ownership contract.
+
+Each parent turn can create up to eight workers, each limited to eight generation
+steps. This is a roster limit: the host shares eight active execution slots
+across parents, children and other chats, so it does not promise eight workers
+running simultaneously. The original parent allowance is preserved beside the
+captured child allowance. Workers retain the parent's connection, reasoning,
+permitted native capabilities, project guidance and skills. They do not inherit the parent
+transcript or live editor handles, edit agent settings, obtain additional
+approval, or delegate recursively. The existing task-spending ledger, where
+selected, remains shared with its original ceiling. Persistent Goals retain
+their existing funded reviewer rather than acquiring another worker budget.
+
+Worker-owned process capability ends with the assignment. A required internal
+completion check records verified resource retirement before successful
+settlement. Terminal failure and explicit Stop also request cleanup; missing
+proof remains uncertain across restart. Ordinary parent chat processes retain
+their existing lifetime.
+
+The parent collects the exact child/input/turn results before successful
+completion. Informational delivery starts no idle work; general workers have
+one bounded assignment. Their retained conversations and activity use the
+existing parent-scoped child observation contracts. Manual reusable children
+and Ultra reviewers keep their own capability and allowance profiles.
+
 ## Run named child work from a private launcher
 
 Use `serve --stdio --subagents` with an Act launch. The trusted launcher can
@@ -1082,7 +1219,8 @@ and history and are absent from ordinary chat listing and load.
 
 The launcher explicitly allocates the child allowance. A claim reserves one
 work turn, including interrupted work. New assignments capture up to two
-generation steps with the selected output-token allowance per step. The
+generation steps. The parent's optional wire output-token limit is retained
+when the selected protocol supports it; its absence does not disable children. The
 assignment receipt exposes `maxGenerationSteps`. The child receives its
 own history and the supplied instructions. It has no workspace tools, MCP, goals,
 scheduled work, or model-driven delegation. The settled parent turn provides

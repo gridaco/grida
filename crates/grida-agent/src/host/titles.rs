@@ -62,8 +62,14 @@ impl Host {
         let Some((session, text)) = candidate else {
             return;
         };
+        self.title_workers.fetch_add(1, Ordering::Relaxed);
+        let lifetime = WorkerLifetime {
+            workers: self.title_workers.clone(),
+            changed: self.changed.clone(),
+        };
         let host = self.clone();
         tokio::spawn(async move {
+            let _lifetime = lifetime;
             // A title is a convenience; failure leaves the chat untitled.
             let _ = host.write_title(session, text).await;
         });
@@ -165,12 +171,15 @@ impl Host {
             #[cfg(unix)]
             guidance_root: None,
             configuration_admission: Arc::default(),
+            delegation_controls: Arc::default(),
             controls: Arc::new(Semaphore::new(MAX_OWNED_CONTROLS)),
             work: Arc::default(),
             wake_lock: Arc::default(),
             workers: Arc::default(),
+            title_workers: Arc::default(),
             changed: Arc::default(),
             live_updates: broadcast::channel(UPDATE_CAPACITY).0,
+            subagent_activity: Arc::default(),
             processes: Arc::default(),
         })
     }

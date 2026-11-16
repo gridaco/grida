@@ -21,6 +21,11 @@ messages.map((m, i) => (
 ## What it renders
 
 - **Text** parts → `MessageResponse` (Streamdown Markdown).
+- **User attachments** → a separate row outside the text bubble. Raster images
+  show only a natural-aspect, bounded thumbnail that opens fullscreen; their
+  filename stays in accessible and download metadata. Videos, ordinary files
+  and folders keep individual named cards. A folder carries no access grant or
+  invented content size. Missing image previews keep a named fallback.
 - **Reasoning** parts → not rendered. Chain-of-thought tokens are internal
   transport/session data, not transcript content. While reasoning is the only
   streamed content, the existing compact `Thinking` indicator remains visible.
@@ -36,6 +41,20 @@ messages.map((m, i) => (
 Transcript-level indicators (rendered by the surface around the turn list, not
 per message): `PendingTurnIndicator` (pre-first-token) and `CompactionNotice`
 (where earlier context was summarized).
+
+Only prose enters the user bubble's height measurement, collapse control,
+copy action and edit flow. Attachment-only messages do not create an empty
+bubble; their time and status note can still be shown.
+
+File context entries can supply a bounded inline `poster` and `caption`.
+An exact raster `mimeType` distinguishes image thumbnails from video posters.
+For retained PNG, JPEG, WebP and GIF originals, entries instead carry an opaque `previewId`; the host supplies
+`loadAttachmentPreview(previewId): Promise<Blob>` to `ChatMessageView`. Its
+thumbnail read starts when visible, shares one bounded original read with fullscreen,
+and releases its object URL on cleanup. A rejected or retired capability keeps
+the named fallback. The kit never resolves a filesystem path or discovers a
+preview URL. Ordinary image FileUIParts use their explicit raster data, blob or
+HTTP(S) source; file and custom schemes are not display capabilities.
 
 ## The agent's question (session-global)
 

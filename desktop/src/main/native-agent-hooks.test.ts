@@ -1,10 +1,8 @@
-// GRIDA-SEC-004 / GRIDA-SEC-014 — trust, captured scope and immutable hook selection.
+// GRIDA-SEC-004 / GRIDA-SEC-014 — global source, explicit trust and captured scope.
 import fs from "node:fs/promises";
-import { createHash } from "node:crypto";
-import { createServer } from "node:http";
-import { once } from "node:events";
 import os from "node:os";
 import path from "node:path";
+import { stringify } from "smol-toml";
 import { afterEach, describe, expect, it } from "vitest";
 import { NativeAgentHooks } from "./native-agent-hooks";
 import { NativeAgentChat } from "./native-agent-chat";
@@ -19,336 +17,345 @@ afterEach(async () => {
 });
 const active = { supportedEvents: ["before_tool"], hooks: [], results: [] };
 
-it.runIf(Boolean(process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES))(
-  "runs an explicitly registered Desktop check through the native worker and reopens it observationally",
-  async () => {
+async function fixture() {
+  const root = await fs.realpath(
+    await fs.mkdtemp(path.join(os.tmpdir(), "native-global-hooks-"))
+  );
+  fixtures.push(root);
+  const home = path.join(root, "grida");
+  const workspace = path.join(root, "project-a");
+  const otherWorkspace = path.join(root, "project-b");
+  await Promise.all(
+    [home, workspace, otherWorkspace].map((file) =>
+      fs.mkdir(file, { mode: 0o700 })
+    )
+  );
+  const definition = {
+    id: "inspect",
+    event: "before_tool",
+    tool: "read_file",
+    executable: await fs.realpath("/usr/bin/printf"),
+    arguments: [],
+    mode: "required",
+    timeout_ms: 2000,
+  };
+  const file = path.join(home, "config.toml");
+  const write = async (hooks: Record<string, unknown>[] = [definition]) =>
+    fs.writeFile(file, stringify({ schema_version: 1, hooks }), {
+      mode: 0o600,
+    });
+  const settings = NativeAgentHooks.settings(home);
+  const trust = async (id = definition.id) => {
+    const configured = (await settings.configuration()).hooks.find(
+      (hook) => hook.id === id
+    )!;
+    await settings.trust(
+      await settings.reviewConfigured(configured.id, configured.revision)
+    );
+  };
+  return {
+    root,
+    home,
+    workspace,
+    otherWorkspace,
+    definition,
+    file,
+    write,
+    settings,
+    trust,
+  };
+}
+
+describe("global config.toml hooks", () => {
+  it("uses one global source across workspaces after explicit trust", async () => {
+    const f = await fixture();
+    await f.write();
+    const before = await f.settings.configuration();
+    expect(before).toMatchObject({
+      configPath: f.file,
+      exists: true,
+      activation: "new_connections",
+      diagnostics: [],
+      hooks: [{ id: "inspect", trusted: false, timeoutMs: 2000 }],
+    });
+    await expect(NativeAgentHooks.open(f.home, f.workspace)).rejects.toThrow(
+      "native_hooks_review_required"
+    );
+    await f.trust();
+    const first = await NativeAgentHooks.open(f.home, f.workspace);
+    const second = await NativeAgentHooks.open(f.home, f.otherWorkspace);
+    expect((await first.inspect(active)).saved).toEqual(
+      (await second.inspect(active)).saved
+    );
+    expect((await f.settings.configuration()).hooks[0].trusted).toBe(true);
+    expect(
+      JSON.parse(
+        await fs.readFile(
+          path.join(f.home, "agent", "hooks-trust.json"),
+          "utf8"
+        )
+      )
+    ).toEqual({ version: 1, revisions: [before.hooks[0].revision] });
+    expect(await fs.readFile(f.file, "utf8")).toContain("[[hooks]]");
+  });
+
+  it("accepts an existing 0755 Grida home and agent directory without a config", async () => {
+    const f = await fixture();
+    await fs.chmod(f.home, 0o755);
+    await fs.mkdir(path.join(f.home, "agent"), { mode: 0o755 });
+    expect(await f.settings.configuration()).toMatchObject({
+      exists: false,
+      hooks: [],
+      diagnostics: [],
+    });
+    await expect(
+      NativeAgentHooks.open(f.home, f.workspace)
+    ).resolves.toBeDefined();
+    await f.write();
+    await f.trust();
+    expect((await f.settings.configuration()).hooks[0].trusted).toBe(true);
+    expect((await fs.stat(f.home)).mode & 0o777).toBe(0o755);
+    expect((await fs.stat(path.join(f.home, "agent"))).mode & 0o777).toBe(
+      0o755
+    );
+  });
+
+  it("does not discover or promote a legacy workspace hooks.json", async () => {
     const f = await fixture();
     await fs.writeFile(
-      f.file,
-      JSON.stringify({
-        ...f.draft,
+      path.join(f.home, "hooks.json"),
+      "malformed legacy data"
+    );
+    await fs.writeFile(
+      path.join(f.workspace, "hooks.json"),
+      "malformed project data"
+    );
+    const owner = await NativeAgentHooks.open(f.home, f.workspace);
+    expect(await owner.inspect(active)).toMatchObject({
+      active: [],
+      saved: [],
+    });
+    expect(await f.settings.configuration()).toMatchObject({
+      exists: false,
+      hooks: [],
+      diagnostics: [],
+    });
+    expect(await fs.readFile(path.join(f.home, "hooks.json"), "utf8")).toBe(
+      "malformed legacy data"
+    );
+  });
+
+  it("creates only the canonical config and never trusts it by opening it", async () => {
+    const f = await fixture();
+    expect(await f.settings.ensureConfig()).toBe(f.file);
+    expect(await f.settings.configuration()).toMatchObject({
+      exists: true,
+      hooks: [],
+      diagnostics: [],
+    });
+    await expect(
+      fs.stat(path.join(f.home, "agent", "hooks-trust.json"))
+    ).rejects.toMatchObject({ code: "ENOENT" });
+    await f.write();
+    await f.settings.ensureConfig();
+    expect((await f.settings.configuration()).hooks[0].trusted).toBe(false);
+    expect((await fs.stat(f.file)).mode & 0o777).toBe(0o600);
+  });
+
+  it("invalidates trust when command arguments change and refuses stale review", async () => {
+    const f = await fixture();
+    await f.write();
+    await f.trust();
+    const initial = (await f.settings.configuration()).hooks[0];
+    const review = await f.settings.reviewConfigured(
+      initial.id,
+      initial.revision
+    );
+    await f.write([{ ...f.definition, arguments: ["changed"] }]);
+    await expect(f.settings.trust(review)).rejects.toThrow(
+      "native_hook_revision_changed"
+    );
+    const changed = (await f.settings.configuration()).hooks[0];
+    expect(changed.trusted).toBe(false);
+    expect(changed.revision).not.toBe(initial.revision);
+    await expect(NativeAgentHooks.open(f.home, f.workspace)).rejects.toThrow(
+      "native_hooks_review_required"
+    );
+    await f.trust();
+    await expect(
+      NativeAgentHooks.open(f.home, f.workspace)
+    ).resolves.toBeDefined();
+  });
+
+  it("rejects review handles from another owner and retired JSON mutation", async () => {
+    const f = await fixture();
+    await f.write();
+    const hook = (await f.settings.configuration()).hooks[0];
+    const review = await f.settings.reviewConfigured(hook.id, hook.revision);
+    await expect(
+      NativeAgentHooks.settings(f.home).trust(review)
+    ).rejects.toThrow("native_hook_review_unavailable");
+    await expect(f.settings.review(f.file)).rejects.toThrow(
+      "native_hooks_config_toml_only"
+    );
+    await expect(f.settings.install(review)).rejects.toThrow(
+      "native_hooks_config_toml_only"
+    );
+    await expect(f.settings.remove(hook.id, hook.revision)).rejects.toThrow(
+      "native_hooks_config_toml_only"
+    );
+  });
+
+  it.each([
+    { event: "unsupported" },
+    { timeout_ms: 0 },
+    { timeout_ms: 30001 },
+    { mode: "optional" },
+    { arguments: [123] },
+    { event: "before_input", tool: "read_file" },
+    { async: true },
+    { matcher: ".*" },
+    { executable: "relative-program" },
+  ])(
+    "refuses malformed/unsupported definitions without partial activation (%j)",
+    async (change) => {
+      const f = await fixture();
+      await f.write([{ ...f.definition, ...change }]);
+      expect((await f.settings.configuration()).diagnostics).not.toEqual([]);
+      await expect(NativeAgentHooks.open(f.home, f.workspace)).rejects.toThrow(
+        "native_hooks_configuration_invalid"
+      );
+      await expect(
+        fs.stat(path.join(f.home, "agent", "hooks-trust.json"))
+      ).rejects.toMatchObject({ code: "ENOENT" });
+    }
+  );
+
+  it("reports malformed TOML, duplicate IDs and excess definitions", async () => {
+    const f = await fixture();
+    await fs.writeFile(f.file, "[broken", { mode: 0o600 });
+    expect((await f.settings.configuration()).diagnostics).toEqual([
+      "config.toml is not valid UTF-8 TOML. Correct its syntax and reload.",
+    ]);
+    await f.write([f.definition, f.definition]);
+    expect((await f.settings.configuration()).diagnostics).not.toEqual([]);
+    await f.write(
+      Array.from({ length: 9 }, (_, index) => ({
+        ...f.definition,
+        id: `hook-${index}`,
+      }))
+    );
+    expect((await f.settings.configuration()).diagnostics).not.toEqual([]);
+  });
+
+  it.skipIf(process.platform === "win32")(
+    "refuses user-owned executables and writable or symlinked configuration",
+    async () => {
+      const f = await fixture();
+      const local = path.join(f.root, "program");
+      await fs.writeFile(local, "#!/bin/sh\nexit 0\n", { mode: 0o700 });
+      await f.write([{ ...f.definition, executable: local }]);
+      expect((await f.settings.configuration()).diagnostics).not.toEqual([]);
+      await f.write();
+      await fs.chmod(f.file, 0o666);
+      expect((await f.settings.configuration()).diagnostics).not.toEqual([]);
+      await fs.chmod(f.file, 0o600);
+      await fs.rename(f.file, f.file + ".real");
+      await fs.symlink(f.file + ".real", f.file);
+      expect((await f.settings.configuration()).diagnostics).not.toEqual([]);
+    }
+  );
+
+  it("keeps a worker selection frozen while fresh connections load a changed trusted source", async () => {
+    const f = await fixture();
+    await f.write();
+    await f.trust();
+    const worker = await NativeAgentHooks.open(f.home, f.workspace);
+    const original = (await worker.inspect(active)).saved[0];
+    await f.write([{ ...f.definition, arguments: ["later"] }]);
+    expect((await worker.inspect(active)).activation).toBe("restart_required");
+    await f.trust();
+    const fresh = await NativeAgentHooks.open(f.home, f.workspace);
+    expect((await fresh.inspect(active)).saved[0].revision).not.toBe(
+      original.revision
+    );
+    // Existing worker reports pending source changes without replacing its selection.
+    expect((await worker.inspect(active)).activation).toBe("restart_required");
+    expect((await fresh.inspect(active)).activation).toBe("current");
+  });
+});
+
+it.runIf(Boolean(process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES))(
+  "runs a trusted global completion policy in a real native workspace worker",
+  async () => {
+    const f = await fixture();
+    await f.write([
+      {
+        ...f.definition,
         event: "before_input",
         tool: undefined,
         executable: "/bin/sh",
         arguments: [
           "-c",
-          `if test -f manifest.json; then printf '%s' '{"decision":"allow"}'; else printf '%s' '{"decision":"deny","reason":"Manifest missing"}'; fi`,
+          'printf \'%s\' \'{"decision":"deny","reason":"Global policy fixture"}\'',
         ],
-      })
-    );
-    await f.owner.install(await f.owner.review(f.file));
-    let requests = 0;
-    const server = createServer((request, response) => {
-      request.resume();
-      request.on("end", () => {
-        requests++;
-        response.writeHead(200, { "content-type": "text/event-stream" });
-        response.end(
-          `data: ${JSON.stringify({ id: "fixture", choices: [{ index: 0, delta: { role: "assistant", content: "Manifest checked." }, finish_reason: null }] })}\n\ndata: ${JSON.stringify({ id: "fixture", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] })}\n\ndata: [DONE]\n\n`
-        );
-      });
+      },
+    ]);
+    await f.trust();
+    const hooks = await NativeAgentHooks.open(f.home, f.workspace);
+    const resourcesPath = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES!;
+    const plan = await hooks.launch(resourcesPath, {
+      id: "global-hook-fixture",
+      primary: { id: "project", name: "Project", path: f.workspace },
+      additionalReadRoots: [],
+      protectedPaths: [f.home],
     });
-    server.listen(0, "127.0.0.1");
-    await once(server, "listening");
-    const address = server.address();
-    if (!address || typeof address === "string")
-      throw new Error("fixture_address");
-    const launch = async () =>
-      NativeAgentChat.start({
-        cwd: f.workspace,
-        resourcesPath: process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES!,
-        stateDirectory: path.join(f.root, "state"),
-        provider: "openai-compatible",
-        endpoint: `http://127.0.0.1:${address.port}/v1`,
-        model: "fixture",
-        hooks: await NativeAgentHooks.open(f.directory, f.workspace),
-        workspace: {
-          id: "hook-fixture",
-          primary: { id: "project", name: "Project", path: f.workspace },
-          additionalReadRoots: [],
-          protectedPaths: [],
-        },
-      });
-    let chat: NativeAgentChat | undefined;
-    const settled = async (
-      owner: NativeAgentChat,
-      session: Awaited<ReturnType<NativeAgentChat["create"]>>
-    ) => {
-      for (let n = 0; n < 400; n++) {
-        const value = await owner.observe(session);
-        if (!value.current && value.latest?.disposition === "settled")
-          return value;
-        await new Promise((resolve) => setTimeout(resolve, 25));
-      }
-      throw new Error("fixture_settlement_timeout");
-    };
+    if (plan) fixtures.push(plan.command.temporaryParent);
+    const chat = await NativeAgentChat.start({
+      resourcesPath,
+      stateDirectory: path.join(f.root, "state"),
+      cwd: f.workspace,
+      provider: "openai-compatible",
+      endpoint: "http://127.0.0.1:1/v1",
+      model: "fixture",
+      hooks,
+      workspace: {
+        id: "global-hook-fixture",
+        primary: { id: "project", name: "Project", path: f.workspace },
+        additionalReadRoots: [],
+        protectedPaths: [f.home],
+      },
+    });
     try {
-      chat = await launch();
-      const denied = await chat.create();
-      await chat.submit(denied, "denied", "Inspect the manifest.");
-      expect((await settled(chat, denied)).latest?.status).toBe("failed");
-      expect(requests).toBe(0);
-      expect(
-        (await chat.inspectHooks(denied.id)).results?.some(
-          (result) => result.status === "denied"
-        )
-      ).toBe(true);
-      await fs.writeFile(path.join(f.workspace, "manifest.json"), "{}");
-      const allowed = await chat.create();
-      await chat.submit(allowed, "allowed", "Inspect the manifest.");
-      expect((await settled(chat, allowed)).latest?.status).toBe("succeeded");
-      expect(requests).toBe(1);
-      const before = await chat.inspectHooks(allowed.id);
-      await chat.close();
-      chat = await launch();
-      const reopened = await chat.load(allowed.id);
-      expect(await chat.inspectHooks(reopened.id)).toEqual(before);
-      expect(requests).toBe(1);
-      const profile = await (
-        await NativeAgentHooks.open(f.directory, f.workspace)
-      ).launch(process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES!);
-      if (profile) fixtures.push(profile.command.temporaryParent);
+      const session = await chat.create();
+      await chat.submit(
+        session,
+        "global-check",
+        "This must be denied before any provider call."
+      );
+      let inspection = await chat.inspectHooks(session.id);
+      const deadline = Date.now() + 5000;
+      while (
+        !inspection.results?.some((result) => result.status === "denied") &&
+        Date.now() < deadline
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        inspection = await chat.inspectHooks(session.id);
+      }
+      expect(inspection.active).toHaveLength(1);
+      expect(inspection.results).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: "inspect",
+            event: "before_input",
+            status: "denied",
+            reason: "Global policy fixture",
+          }),
+        ])
+      );
     } finally {
-      await chat?.close();
-      server.closeAllConnections();
-      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await chat.close();
     }
   },
-  30000
+  15000
 );
-async function fixture() {
-  const root = await fs.realpath(
-    await fs.mkdtemp(path.join(os.tmpdir(), "native-hook-registry-"))
-  );
-  fixtures.push(root);
-  const workspace = path.join(root, "workspace");
-  const directory = path.join(root, "private");
-  await fs.mkdir(workspace, { mode: 0o700 });
-  await fs.mkdir(directory, { mode: 0o700 });
-  const executable = await fs.realpath("/usr/bin/printf");
-  const file = path.join(root, "check.json");
-  const draft = {
-    id: "inspect",
-    event: "before_tool",
-    tool: "read_file",
-    executable,
-    arguments: [],
-    mode: "required",
-    timeoutMs: 2000,
-  };
-  await fs.writeFile(file, JSON.stringify(draft));
-  const owner = await NativeAgentHooks.open(directory, workspace);
-  return { root, workspace, directory, executable, file, draft, owner };
-}
-
-describe("NativeAgentHooks", () => {
-  it("keeps discovery and review observational until explicit trust, then waits for a new connection", async () => {
-    const f = await fixture();
-    const review = await f.owner.review(f.file);
-    expect(await f.owner.inspect(active)).toMatchObject({
-      saved: [],
-      activation: "current",
-    });
-    await expect(
-      fs.stat(path.join(f.directory, "hooks.json"))
-    ).rejects.toMatchObject({ code: "ENOENT" });
-    await f.owner.install(review);
-    const stored = await f.owner.inspect(active);
-    expect(stored).toMatchObject({
-      active: [],
-      activation: "restart_required",
-      saved: [
-        { id: "inspect", source: "user-selected:check.json", enabled: true },
-      ],
-    });
-    const reopened = await NativeAgentHooks.open(f.directory, f.workspace);
-    expect(await reopened.inspect(active)).toMatchObject({
-      activation: "current",
-      saved: [{ revision: stored.saved[0].revision }],
-    });
-    expect(
-      (await fs.stat(path.join(f.directory, "hooks.json"))).mode & 0o777
-    ).toBe(0o600);
-  });
-
-  it("binds review to its owner and consumes it once", async () => {
-    const f = await fixture();
-    const other = await fixture();
-    const review = await f.owner.review(f.file);
-    await expect(other.owner.install(review)).rejects.toThrow(
-      "native_hook_review_unavailable"
-    );
-    await f.owner.install(review);
-    await expect(f.owner.install(review)).rejects.toThrow(
-      "native_hook_review_unavailable"
-    );
-    await expect(f.owner.install({ ...review })).rejects.toThrow(
-      "native_hook_review_unavailable"
-    );
-  });
-
-  it("refuses user-owned executable code instead of granting trust by pathname", async () => {
-    const f = await fixture();
-    const local = path.join(f.workspace, "program");
-    await fs.copyFile(f.executable, local);
-    await fs.writeFile(
-      f.file,
-      JSON.stringify({ ...f.draft, executable: local })
-    );
-    await expect(f.owner.review(f.file)).rejects.toThrow(
-      "native_hook_configuration_invalid"
-    );
-    expect((await f.owner.inspect(active)).saved).toEqual([]);
-  });
-
-  it("requires the exact saved revision when removing and preserves the running selection", async () => {
-    const f = await fixture();
-    await f.owner.install(await f.owner.review(f.file));
-    const owner = await NativeAgentHooks.open(f.directory, f.workspace);
-    const saved = (await owner.inspect(active)).saved[0];
-    await expect(owner.remove(saved.id, "stale")).rejects.toThrow(
-      "native_hook_revision_changed"
-    );
-    await owner.remove(saved.id, saved.revision);
-    expect(await owner.inspect(active)).toMatchObject({
-      activation: "restart_required",
-      saved: [],
-    });
-  });
-
-  it("serializes different registrations without overwriting an adjacent check", async () => {
-    const f = await fixture();
-    const other = await NativeAgentHooks.open(f.directory, f.workspace);
-    const first = await f.owner.review(f.file);
-    await fs.writeFile(f.file, JSON.stringify({ ...f.draft, id: "second" }));
-    const second = await other.review(f.file);
-    await Promise.all([f.owner.install(first), other.install(second)]);
-    expect(
-      (await f.owner.inspect(active)).saved.map((x) => x.id).sort()
-    ).toEqual(["inspect", "second"]);
-  });
-
-  it("refuses malformed, over-scoped and unsupported definitions without a partial write", async () => {
-    const f = await fixture();
-    for (const draft of [
-      { ...f.draft, event: "stop" },
-      { ...f.draft, event: "before_input" },
-      { ...f.draft, timeoutMs: 30001 },
-      { ...f.draft, network: "allow" },
-    ]) {
-      await fs.writeFile(f.file, JSON.stringify(draft));
-      await expect(f.owner.review(f.file)).rejects.toThrow(
-        "native_hook_configuration_invalid"
-      );
-    }
-    await fs.writeFile(f.file, '{"private-marker":');
-    await expect(f.owner.review(f.file)).rejects.toThrow(
-      /^native_hook_configuration_invalid$/
-    );
-    expect((await f.owner.inspect(active)).saved).toEqual([]);
-  });
-
-  it("refuses substituted private registry files and mismatched revisions", async () => {
-    const f = await fixture();
-    await f.owner.install(await f.owner.review(f.file));
-    const file = path.join(f.directory, "hooks.json");
-    const body = JSON.parse(await fs.readFile(file, "utf8"));
-    body.hooks[0].timeoutMs = 1;
-    await fs.writeFile(file, JSON.stringify(body));
-    await expect(f.owner.inspect(active)).rejects.toThrow(
-      "native_hook_configuration_invalid"
-    );
-    await fs.unlink(file);
-    await fs.symlink(f.file, file);
-    await expect(f.owner.inspect(active)).rejects.toBeDefined();
-  });
-
-  it("stages captured pins without replacing unavailable handler authority", async () => {
-    const f = await fixture();
-    await f.owner.install(await f.owner.review(f.file));
-    const owner = await NativeAgentHooks.open(f.directory, f.workspace);
-    const resources = path.join(f.root, "resources");
-    await fs.mkdir(path.join(resources, "native-agent"), { recursive: true });
-    const helper = path.join(
-      resources,
-      "native-agent",
-      "agent-kit-sandbox-helper"
-    );
-    await fs.copyFile(f.executable, helper);
-    const launch = await owner.launch(resources);
-    expect(launch).toMatchObject({
-      hooks: [{ id: "inspect", tool: "read_file" }],
-      command: { hooksOnly: true },
-    });
-    if (launch) fixtures.push(launch.command.temporaryParent);
-    const registry = path.join(f.directory, "hooks.json");
-    const body = JSON.parse(await fs.readFile(registry, "utf8"));
-    const { revision: _revision, ...definition } = body.hooks[0];
-    definition.executable.sha256[0] ^= 1;
-    body.hooks[0] = {
-      ...definition,
-      revision: createHash("sha256")
-        .update(JSON.stringify([f.workspace, definition]))
-        .digest("hex"),
-    };
-    await fs.writeFile(registry, JSON.stringify(body));
-    const changed = await NativeAgentHooks.open(f.directory, f.workspace);
-    const captured = await changed.launch(resources);
-    expect(captured?.hooks[0].executable.sha256).toEqual(
-      definition.executable.sha256
-    );
-    expect(captured?.hooks[0].executable.sha256).not.toEqual(
-      launch?.hooks[0].executable.sha256
-    );
-  });
-
-  it("rejects an oversized combined launch profile before changing saved or active checks", async () => {
-    const f = await fixture();
-    const resources = path.join(f.root, "resources");
-    await fs.mkdir(path.join(resources, "native-agent"), { recursive: true });
-    await fs.copyFile(
-      f.executable,
-      path.join(resources, "native-agent", "agent-kit-sandbox-helper")
-    );
-    await f.owner.launch(resources, {
-      id: "project",
-      primary: { id: "main", name: "Project", path: f.workspace },
-      additionalReadRoots: [],
-      protectedPaths: [],
-    });
-    for (let index = 0; index < 7; index++) {
-      await fs.writeFile(
-        f.file,
-        JSON.stringify({
-          ...f.draft,
-          id: `check_${index}`,
-          arguments: ["x".repeat(8192)],
-        })
-      );
-      await f.owner.install(await f.owner.review(f.file));
-    }
-    const before = await fs.readFile(path.join(f.directory, "hooks.json"));
-    await fs.writeFile(
-      f.file,
-      JSON.stringify({
-        ...f.draft,
-        id: "check_7",
-        arguments: ["x".repeat(8192)],
-      })
-    );
-    await expect(f.owner.install(await f.owner.review(f.file))).rejects.toThrow(
-      "native_agent_permission_profile_invalid"
-    );
-    expect(await fs.readFile(path.join(f.directory, "hooks.json"))).toEqual(
-      before
-    );
-    const inspection = await f.owner.inspect(active);
-    expect(inspection.saved).toHaveLength(7);
-    expect(inspection.activation).toBe("restart_required");
-    expect(await f.owner.launch(resources)).toBeUndefined();
-    const next = await NativeAgentHooks.open(f.directory, f.workspace);
-    const launch = await next.launch(resources);
-    expect(launch?.hooks).toHaveLength(7);
-    if (launch) fixtures.push(launch.command.temporaryParent);
-  });
-});

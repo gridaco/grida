@@ -28,9 +28,12 @@ pub(super) const CAPABILITIES: [&str; 6] = [
 #[request(method = "_co.grida/goal/start", response = SubmitResponse)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Start {
+    #[serde(rename = "_meta")]
+    meta: Option<Meta>,
     session_id: SessionId,
     input_id: ChangeId,
     prompt: Vec<ContentBlock>,
+    selected_image: Option<crate::host::SelectedImage>,
     goal: GoalRequest,
     operating_regime: Option<crate::OperatingRegime>,
     effort: Option<crate::EffortPreset>,
@@ -103,7 +106,15 @@ pub(super) fn handlers(
                     if request.allow_wakeups && !wakeups::available(&start.1) {
                         return Err(unavailable("wakeup_capability_required"));
                     }
-                    let parts = prompt_parts(request.prompt, image_intake, false)?;
+                    let parts = identified_prompt(
+                        request.prompt,
+                        image_intake,
+                        false,
+                        None,
+                        request.selected_image,
+                        &start.1,
+                        false,
+                    )?;
                     let mut goal = request.goal;
                     if goal.named_child.is_some() {
                         require(&start.1, NAMED_CHILD, None)?;
@@ -125,27 +136,18 @@ pub(super) fn handlers(
                         effort: effort(&start.1, request.effort)?,
                         reasoning: Default::default(),
                     };
-                    match request.max_cost_mills {
-                        Some(maximum) => {
-                            start
-                                .0
-                                .start_goal_with_spending(
-                                    prompt,
-                                    goal,
-                                    maximum,
-                                    request.allow_wakeups,
-                                )
-                                .await
-                        }
-                        None => {
-                            start
-                                .0
-                                .start_goal_with_wakeup(prompt, goal, request.allow_wakeups)
-                                .await
-                        }
-                    }
-                    .map(SubmitResponse::from)
-                    .map_err(host_error)
+                    start
+                        .0
+                        .start_goal_with_selection(
+                            prompt,
+                            goal,
+                            request.allow_wakeups,
+                            request.max_cost_mills,
+                            selection::revision(request.meta.as_ref(), &start.1)?,
+                        )
+                        .await
+                        .map(SubmitResponse::from)
+                        .map_err(host_error)
                 }
                 .await;
                 responder.respond_with_result(result)

@@ -11,6 +11,7 @@ import {
   type RefObject,
   useContext,
   useEffect,
+  useLayoutEffect,
   useId,
   useMemo,
   useRef,
@@ -45,6 +46,8 @@ type ComposerContextValue = {
 };
 
 export type ComposerController = {
+  /** Whether the editor is mounted and can accept document operations. */
+  ready: boolean;
   snapshot: ComposerViewSnapshot;
   trigger: ComposerTrigger | null;
   triggerIndex: number;
@@ -62,6 +65,7 @@ export type ComposerController = {
   insertFileReference: (reference: ComposerFileReference) => boolean;
   setTriggerIndex: (index: number) => void;
   moveTriggerIndex: (delta: number) => void;
+  dismissTrigger: () => void;
   selectTriggerItem: (index: number) => boolean;
   submit: (
     input: Parameters<ComposerCore["createMessage"]>[0]
@@ -132,6 +136,7 @@ export function useComposer() {
 
   return useMemo<ComposerController>(
     () => ({
+      ready: editor !== null,
       snapshot: toViewSnapshot(snapshot),
       trigger: snapshot.trigger,
       triggerIndex: snapshot.triggerIndex,
@@ -174,6 +179,9 @@ export function useComposer() {
       moveTriggerIndex(delta) {
         core.moveTriggerIndex(delta);
       },
+      dismissTrigger() {
+        core.dismissTrigger();
+      },
       selectTriggerItem(index) {
         if (!editor) return false;
         return ComposerTiptap.selectTriggerItem(
@@ -212,10 +220,13 @@ export function ComposerContent({
   onTransfer,
   onFiles,
   onDirectories,
+  readOnly = false,
   ...props
 }: Omit<HTMLAttributes<HTMLDivElement>, "onSubmit"> & {
   placeholder?: string;
   autofocus?: boolean;
+  /** Keep the mounted document visible while its submission is being confirmed. */
+  readOnly?: boolean;
   editorClassName?: string;
   triggerMenuId?: string;
   onSubmitRequest?: () => void;
@@ -268,6 +279,7 @@ export function ComposerContent({
   );
   const editor = useEditor({
     immediatelyRender: false,
+    editable: !readOnly,
     extensions,
     editorProps: {
       attributes: {
@@ -341,6 +353,12 @@ export function ComposerContent({
       setEditor(null);
     },
   });
+
+  // Tiptap keeps the current editable flag when updating options on a mounted
+  // editor. Apply read-only changes explicitly before another input event.
+  useLayoutEffect(() => {
+    editor?.setEditable(!readOnly);
+  }, [editor, readOnly]);
 
   // Keep the placeholder reactive. `useEditor` builds the editor once, so a
   // changed `placeholder` prop never reconfigures the Placeholder extension on

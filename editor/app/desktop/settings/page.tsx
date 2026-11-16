@@ -7,6 +7,7 @@ import {
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import {
@@ -20,6 +21,14 @@ import { Button } from "@app/ui/components/button";
 import { Input } from "@app/ui/components/input";
 import { Label } from "@app/ui/components/label";
 import { Switch } from "@app/ui/components/switch";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@app/ui/components/tabs";
+import { SettingsNavigation } from "@/lib/desktop/settings-navigation";
+import { SettingsOllama } from "@/lib/desktop/settings-ollama";
 import {
   Collapsible,
   CollapsibleContent,
@@ -63,26 +72,24 @@ import {
   modelGeneration,
   rigging,
   video,
-  mergeProbedModels,
   providers,
   resolveEndpointModel,
   secrets,
   type ByokProviderId,
   type ByokProviderMetadata,
   type EndpointModelEntry,
-  type EndpointProviderConfig,
 } from "@/lib/desktop/bridge";
 import * as gridaGateway from "@/lib/desktop/gg-session";
 import { useGGModels } from "@/lib/desktop/gg-models";
 import { musicModelChoices } from "@/scaffolds/desktop/audio-gen/music-generation-controls";
 import Link from "next/link";
-import {
-  DesktopPageContent,
-  DesktopPageShell,
-} from "@/scaffolds/desktop/chrome/page-shell";
+import { DesktopPageShell } from "@/scaffolds/desktop/chrome/page-shell";
 import { DesktopMediaTool } from "@/scaffolds/desktop/tools/media-tool-registry";
 import * as chatgptSubscription from "@/lib/desktop/chatgpt-subscription";
 import { useChatGptSubscription } from "@/lib/desktop/chatgpt-subscription-react";
+import { HooksSettings } from "./_components/hooks-settings";
+import { AppearanceSettings } from "./_components/appearance-settings";
+import { ArchivedChatsSettings } from "./_components/archived-chats-settings";
 import { CreditsSection } from "./_components/credits-section";
 import { MediaModelReadiness } from "./_components/media-model-readiness";
 
@@ -102,56 +109,100 @@ import { MediaModelReadiness } from "./_components/media-model-readiness";
  */
 
 export default function DesktopSettingsPage() {
+  const section = useSyncExternalStore(
+    SettingsNavigation.subscribe,
+    SettingsNavigation.getSnapshot,
+    SettingsNavigation.getServerSnapshot
+  );
   const [providerKeysRevision, setProviderKeysRevision] = useState(0);
   const onProviderKeyChanged = () => {
     setProviderKeysRevision((revision) => revision + 1);
   };
   return (
     <DesktopPageShell>
-      <DesktopPageContent className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-8">
-        <header>
-          <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Account, credits, providers, external agents, and app info.
-          </p>
-        </header>
-
-        <AccountSection />
-        <CreditsSection />
-        <SettingsSection
-          title="LLM Providers"
-          description="Text model providers for Grida's native agent."
-        >
-          <ProviderListCard
-            title="Providers"
-            description={
-              <>
-                Connect ChatGPT, an API-key provider, or a local model endpoint.
-                Grida-hosted AI works when you&apos;re signed in and uses your
-                organization&apos;s prepaid AI credit.
-              </>
-            }
-            modalities={["text"]}
-            onKeyChanged={onProviderKeyChanged}
-            leading={<ChatGptProviderRow />}
+      <Tabs
+        orientation="vertical"
+        value={section}
+        onValueChange={SettingsNavigation.select}
+        className="min-h-0 flex-1 gap-0"
+        data-testid="desktop-settings"
+      >
+        <aside className="flex w-40 shrink-0 flex-col border-r bg-muted/20 px-2 py-5 sm:w-44">
+          <header className="px-3 pb-5">
+            <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
+          </header>
+          <TabsList
+            aria-label="Settings categories"
+            className="w-full items-stretch justify-start gap-1 bg-transparent p-0"
           >
-            <OllamaProviderRow />
-          </ProviderListCard>
-        </SettingsSection>
-        <SettingsSection
-          title="Media Providers"
-          description="Generation providers for image, video, 3D, and audio workflows."
-        >
-          <ProviderListCard
-            title="Media Provider Keys"
-            description="Provider keys for image, video, 3D, and audio workflows. Providers that also serve LLMs may appear in both sections."
-            providerIds={MEDIA_PROVIDER_IDS}
-            onKeyChanged={onProviderKeyChanged}
-          />
-          <MediaModelsSection providerKeysRevision={providerKeysRevision} />
-        </SettingsSection>
-        <AboutSection />
-      </DesktopPageContent>
+            {SettingsNavigation.sections.map((item) => (
+              <TabsTrigger
+                key={item.id}
+                value={item.id}
+                className="h-9 flex-none justify-start rounded-lg px-3 py-2 text-left text-xs font-normal data-[state=active]:bg-muted data-[state=active]:shadow-none"
+              >
+                {item.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </aside>
+        <main className="min-w-0 min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-7">
+          <TabsContent value="account" className="m-0">
+            <AccountSection />
+          </TabsContent>
+          <TabsContent value="appearance" className="m-0">
+            <AppearanceSettings />
+          </TabsContent>
+          <TabsContent value="credits" className="m-0">
+            <CreditsSection />
+          </TabsContent>
+          <TabsContent value="models" className="m-0">
+            <SettingsSection
+              title="LLM Providers"
+              description="Text model providers for Grida's native agent."
+            >
+              <ProviderListCard
+                title="Providers"
+                description={
+                  <>
+                    Connect ChatGPT, an API-key provider, or a local model
+                    endpoint. Grida-hosted AI works when you&apos;re signed in
+                    and uses your organization&apos;s prepaid AI credit.
+                  </>
+                }
+                modalities={["text"]}
+                onKeyChanged={onProviderKeyChanged}
+                leading={<ChatGptProviderRow />}
+              >
+                <OllamaProviderRow />
+              </ProviderListCard>
+            </SettingsSection>
+          </TabsContent>
+          <TabsContent value="media" className="m-0">
+            <SettingsSection
+              title="Media Providers"
+              description="Generation providers for image, video, 3D, and audio workflows."
+            >
+              <ProviderListCard
+                title="Media Provider Keys"
+                description="Provider keys for image, video, 3D, and audio workflows. Providers that also serve LLMs may appear in both sections."
+                providerIds={MEDIA_PROVIDER_IDS}
+                onKeyChanged={onProviderKeyChanged}
+              />
+              <MediaModelsSection providerKeysRevision={providerKeysRevision} />
+            </SettingsSection>
+          </TabsContent>
+          <TabsContent value="hooks" className="m-0">
+            <HooksSettings />
+          </TabsContent>
+          <TabsContent value="archived-chats" className="m-0">
+            <ArchivedChatsSettings />
+          </TabsContent>
+          <TabsContent value="about" className="m-0">
+            <AboutSection />
+          </TabsContent>
+        </main>
+      </Tabs>
     </DesktopPageShell>
   );
 }
@@ -1285,170 +1336,23 @@ function mediaToolHref(id: string): string {
  * fire half-formed configs at the host validator.
  */
 
-type LocalState =
-  | { kind: "loading" }
-  | { kind: "unsupported" }
-  | { kind: "ready"; draft: EndpointProviderConfig | null; dirty: boolean }
-  | { kind: "saving"; draft: EndpointProviderConfig | null }
-  | { kind: "error"; message: string; draft: EndpointProviderConfig | null };
-
 function OllamaProviderRow() {
   const [open, setOpen] = useState(false);
-  const [state, setState] = useState<LocalState>({ kind: "loading" });
-  const [newModelId, setNewModelId] = useState("");
-  const [probing, setProbing] = useState(false);
-  const [probeNote, setProbeNote] = useState<string | null>(null);
-  // Whether the endpoint config exists on the host — the API-key slot is
-  // only rendered then (the secrets allowlist accepts CONFIGURED endpoint
-  // ids; a key for an unsaved draft would 400).
-  const [persisted, setPersisted] = useState(false);
-  // Stale-write guard: detection runs async off a SNAPSHOT of the config
-  // while the form stays editable. Any user action that changes what the
-  // draft means (edit, save, remove, re-setup) bumps this; a completion
-  // holding an older number drops its write instead of resurrecting a
-  // deleted endpoint or wiping newer unsaved edits.
-  const opVersion = useRef(0);
-
-  /**
-   * Discover the endpoint's models (agent-host-side fetch of Ollama's
-   * `/api/tags` + `/api/ps`/`/api/show`, or a generic `/models`) and
-   * refresh the DETECTED fields. Detection owns the top-level
-   * `tool_call`/`contextWindow` on each entry — the probe overwrites
-   * them freely; human corrections live in `overrides` (hand-edited
-   * JSON, or the inputs shown when detection has nothing) and are never
-   * touched here.
-   *
-   * `persist: true` (an already-saved config) writes the refreshed
-   * config straight back — detected facts aren't a user choice, so they
-   * don't sit in an unsaved draft. The setup flow passes `false` and
-   * keeps the explicit Save.
-   */
-  const detectInto = useCallback(
-    async (base: EndpointProviderConfig, opts: { persist: boolean }) => {
-      const version = opVersion.current;
-      setProbing(true);
-      setProbeNote(null);
-      try {
-        const result = await providers.probeEndpoint(base.base_url);
-        // `base` is stale once the user edited/saved/removed mid-probe —
-        // applying it would undo their action. Drop the result silently.
-        if (opVersion.current !== version) return;
-        const merged = mergeProbedModels(base.models, result.models);
-        setProbeNote(
-          merged.discovered > 0
-            ? `Found ${merged.discovered} model${merged.discovered === 1 ? "" : "s"}.`
-            : merged.updated > 0
-              ? "Updated model details."
-              : "No new models found."
-        );
-        if (merged.discovered === 0 && merged.updated === 0) return;
-        const next = { ...base, models: merged.models };
-        if (opts.persist) {
-          await providers.setEndpoint(next);
-          if (opVersion.current !== version) return;
-          setState({ kind: "ready", draft: next, dirty: false });
-        } else {
-          setState({ kind: "ready", draft: next, dirty: true });
-        }
-      } catch (err) {
-        if (opVersion.current !== version) return;
-        setProbeNote(
-          `Couldn't reach the endpoint (${describeError(err)}) — add models manually.`
-        );
-      } finally {
-        setProbing(false);
-      }
-    },
-    []
+  const [controller] = useState(() => new SettingsOllama.Controller());
+  const state = useSyncExternalStore(
+    controller.subscribe,
+    controller.read,
+    controller.read
   );
-
-  const refresh = useCallback(async () => {
-    if (!providers.isSupported()) {
-      setState({ kind: "unsupported" });
-      return;
-    }
-    const version = ++opVersion.current;
-    try {
-      const list = await providers.listEndpoints();
-      const ollama = list.find((e) => e.id === OLLAMA_ENDPOINT_PRESET.id);
-      if (opVersion.current !== version) return;
-      setState({ kind: "ready", draft: ollama ?? null, dirty: false });
-      setPersisted(ollama != null);
-      // Detected values converge to the server's truth on every visit —
-      // notably /api/ps starts reporting a model's REAL allocation once
-      // it has been loaded. Fire-and-forget; failures only leave a note.
-      if (ollama) void detectInto(ollama, { persist: true });
-    } catch (err) {
-      if (opVersion.current !== version) return;
-      setState({ kind: "error", message: describeError(err), draft: null });
-    }
-  }, [detectInto]);
-
+  const [newModelId, setNewModelId] = useState("");
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    void controller.refresh();
+    return () => controller.cancel();
+  }, [controller]);
 
-  const draft = "draft" in state ? state.draft : null;
-
-  const edit = useCallback((next: EndpointProviderConfig) => {
-    opVersion.current += 1;
-    setState({ kind: "ready", draft: next, dirty: true });
-  }, []);
-
-  const handleSave = useCallback(async () => {
-    if (!draft) return;
-    const version = ++opVersion.current;
-    setState({ kind: "saving", draft });
-    try {
-      await providers.setEndpoint(draft);
-      const list = await providers.listEndpoints();
-      const saved = list.find((e) => e.id === OLLAMA_ENDPOINT_PRESET.id);
-      setPersisted(saved != null);
-      // An edit made while the save was in flight wins over the read-back.
-      if (opVersion.current !== version) return;
-      setState({ kind: "ready", draft: saved ?? null, dirty: false });
-    } catch (err) {
-      if (opVersion.current !== version) return;
-      setState({ kind: "error", message: describeError(err), draft });
-    }
-  }, [draft]);
-
-  const handleEnable = useCallback(() => {
-    opVersion.current += 1;
-    const base: EndpointProviderConfig = {
-      ...OLLAMA_ENDPOINT_PRESET,
-      models: [],
-    };
-    setState({ kind: "ready", draft: base, dirty: true });
-    // Prefill from the running Ollama right away — the common path is
-    // "models already pulled; nothing to type". Not persisted until the
-    // user confirms with Save (the config doesn't exist yet).
-    void detectInto(base, { persist: false });
-  }, [detectInto]);
-
-  const handleRemove = useCallback(async () => {
-    if (!draft) return;
-    // Bump FIRST: an in-flight detection completing after this click must
-    // not persist its snapshot back and resurrect the deleted endpoint.
-    opVersion.current += 1;
-    let confirmed = false;
-    try {
-      confirmed = await providers.confirmDeleteEndpoint(
-        draft.label ?? draft.id
-      );
-    } catch (err) {
-      setState({ kind: "error", message: describeError(err), draft });
-      return;
-    }
-    if (!confirmed) return;
-    setState({ kind: "saving", draft });
-    try {
-      await providers.deleteEndpoint(draft.id);
-      await refresh();
-    } catch (err) {
-      setState({ kind: "error", message: describeError(err), draft });
-    }
-  }, [draft, refresh]);
+  const { draft, persisted, probing, probeNote } = state;
+  const edit = controller.edit;
+  const needsConnection = SettingsOllama.needsConnection(state);
 
   const addModel = useCallback(() => {
     if (!draft) return;
@@ -1460,7 +1364,7 @@ function OllamaProviderRow() {
 
   const saveDisabled =
     state.kind !== "ready" ||
-    !state.dirty ||
+    (!state.dirty && !needsConnection) ||
     !draft ||
     draft.base_url.trim().length === 0;
 
@@ -1468,7 +1372,7 @@ function OllamaProviderRow() {
   // than render a dead section.
   if (state.kind === "unsupported") return null;
 
-  const connected = persisted && draft != null;
+  const connected = persisted && draft != null && !needsConnection;
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -1550,7 +1454,7 @@ function OllamaProviderRow() {
             <Skeleton className="h-9 w-full" />
           ) : !draft ? (
             <div className="flex justify-start">
-              <Button variant="outline" onClick={handleEnable}>
+              <Button variant="outline" onClick={controller.setup}>
                 Set up Ollama
               </Button>
             </div>
@@ -1573,8 +1477,10 @@ function OllamaProviderRow() {
                   <Button
                     variant="outline"
                     size="sm"
-                    disabled={probing || state.kind === "saving"}
-                    onClick={() => void detectInto(draft, { persist: false })}
+                    disabled={
+                      probing || state.kind !== "ready" || needsConnection
+                    }
+                    onClick={() => void controller.detect()}
                   >
                     {probing ? (
                       <Loader2 className="size-4 animate-spin" />
@@ -1587,13 +1493,18 @@ function OllamaProviderRow() {
                     {probeNote}
                   </p>
                 )}
-                {draft.models.length === 0 && !probing && (
+                {needsConnection ? (
                   <p className="text-xs text-muted-foreground">
-                    Models you pulled in Ollama are detected automatically — or
-                    add one by id (e.g. <code>llama3.1:8b</code>). The first
-                    model is the default.
+                    {persisted
+                      ? "Connect to this address to use it and detect models."
+                      : "Connect to detect the models you pulled in Ollama."}
                   </p>
-                )}
+                ) : draft.models.length === 0 && !probing ? (
+                  <p className="text-xs text-muted-foreground">
+                    Models are detected automatically, or add one by id (e.g.{" "}
+                    <code>llama3.1:8b</code>). The first model is the default.
+                  </p>
+                ) : null}
                 {draft.models.map((model, index) => (
                   <LocalModelRow
                     key={model.id}
@@ -1654,34 +1565,36 @@ function OllamaProviderRow() {
                   variant="ghost"
                   size="sm"
                   className="text-destructive hover:text-destructive"
-                  disabled={state.kind === "saving"}
-                  onClick={() => void handleRemove()}
+                  disabled={state.kind !== "ready"}
+                  onClick={() => void controller.remove()}
                 >
                   Remove
                 </Button>
                 <Button
                   size="default"
                   disabled={saveDisabled}
-                  onClick={() => void handleSave()}
+                  onClick={() => void controller.save()}
                 >
                   {state.kind === "saving" ? (
                     <Loader2 className="size-4 animate-spin" />
                   ) : null}
-                  Save
+                  {needsConnection && (!persisted || !state.dirty)
+                    ? "Connect"
+                    : "Save"}
                 </Button>
               </div>
             </>
           )}
 
-          {state.kind === "error" && (
+          {state.error && (
             <button
               type="button"
               role="alert"
               aria-live="polite"
-              onClick={() => void refresh()}
+              onClick={() => void controller.refresh()}
               className="self-start text-left text-sm text-destructive underline-offset-4 hover:underline"
             >
-              {state.message} (click to retry)
+              {state.error} (click to retry)
             </button>
           )}
 

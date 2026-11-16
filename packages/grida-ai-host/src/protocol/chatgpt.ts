@@ -23,13 +23,36 @@ export type ChatGptAuthStart = {
  * adapter. Session and picker ids stay namespaced; the server-only adapter
  * maps them to the backend's bare wire names.
  */
+/* generated:chatgpt-subscription:start */
+// Product membership: data/ai/chatgpt-subscription.json; wire bindings: @grida/ai-models@1.20261108.1.
 export const CHATGPT_SUBSCRIPTION_MODEL_IDS = [
+  "openai/gpt-6.1-sol",
+  "openai/gpt-6-astra",
+  "openai/gpt-6.1-terra",
+  "openai/gpt-6-luna",
+  "openai/gpt-6-sol",
   "openai/gpt-5.6-sol",
   "openai/gpt-5.6-terra",
   "openai/gpt-5.6-luna",
+] as const;
+export const CHATGPT_SUBSCRIPTION_DEFAULT_MODEL_ID =
+  "openai/gpt-6.1-sol" as const;
+// Retained only for reading saved selections; these IDs grant no execution.
+export const CHATGPT_SUBSCRIPTION_RETIRED_MODEL_IDS = [
   "openai/gpt-5.5",
   "openai/gpt-5.4",
 ] as const;
+export const CHATGPT_SUBSCRIPTION_WIRE_MODEL_BY_ID = {
+  "openai/gpt-6.1-sol": "gpt-6.1-sol",
+  "openai/gpt-6-astra": "gpt-6-astra",
+  "openai/gpt-6.1-terra": "gpt-6.1-terra",
+  "openai/gpt-6-luna": "gpt-6-luna",
+  "openai/gpt-6-sol": "gpt-6-sol",
+  "openai/gpt-5.6-sol": "gpt-5.6-sol",
+  "openai/gpt-5.6-terra": "gpt-5.6-terra",
+  "openai/gpt-5.6-luna": "gpt-5.6-luna",
+} as const;
+/* generated:chatgpt-subscription:end */
 
 export type ChatGptSubscriptionModelId =
   (typeof CHATGPT_SUBSCRIPTION_MODEL_IDS)[number];

@@ -1,20 +1,22 @@
 ---
-title: Change agent settings
+title: Set the context input limit
 description: Set a workspace's context input limit in its configuration file.
 keywords: [agent settings, context limit, configuration, Grida Desktop]
 format: md
 ---
 
-# Change agent settings
+# Set the context input limit
 
 The context input limit caps how much material the agent sends to the model
-in one request. It is the one supported agent setting. Without it, the agent
+in one request. Without it, the agent
 budgets input automatically, and the ring beside the model picker shows how
 full the context is.
 [See how full the context is](./models-and-usage.md#see-how-full-the-context-is)
 
-The setting lives in the workspace's `config.toml`. Grida Desktop has no
-settings control: ask the agent, or edit the file yourself.
+The context budget lives in the workspace's `config.toml`. To change this budget,
+ask the agent or edit that file yourself. Global hooks have their own user-wide
+`~/.grida/config.toml` source and are inspected in **Settings → Hooks**.
+[Configure hooks](./hooks.md) · [Desktop settings](./desktop-settings.md)
 
 ## Ask the agent
 

@@ -310,6 +310,40 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn legacy_inputs_with_no_model_can_only_use_the_exact_original_execution() {
+        let root = tempfile::tempdir().unwrap();
+        let original = fixture_host(&root.path().join("original"), "fixture");
+        let session = original
+            .new_session(root.path().canonicalize().unwrap())
+            .await
+            .unwrap();
+        let view = original.store.inspect(session.clone()).await.unwrap();
+        let request = fixture_prompt(&session, "legacy");
+        let policy = original.submission_policy(&request, false).unwrap();
+        let mut input = original
+            .capture_input(&view, request.id, request.parts, policy)
+            .await
+            .unwrap();
+        let mut stored: StoredPrompt = decode_input(&input).unwrap();
+        stored.model = None;
+        input.payload = encode_stored_prompt(&stored).unwrap();
+        let birth = session_configuration(&view).unwrap().execution;
+        assert!(CapturedRoute::admits(
+            &input,
+            original.execution().unwrap(),
+            birth
+        ));
+        let selected = fixture_host(&root.path().join("selected"), "another-fixture");
+        assert!(!CapturedRoute::admits(
+            &input,
+            selected.execution().unwrap(),
+            birth
+        ));
+        original.shutdown().await.unwrap();
+        selected.shutdown().await.unwrap();
+    }
+
+    #[tokio::test]
     async fn a_chat_keeps_the_route_its_queued_input_was_accepted_under() {
         let root = tempfile::tempdir().unwrap();
         let state = root.path().join("state");
@@ -333,8 +367,8 @@ mod tests {
         let second = fixture_host(&state, "another-fixture");
         let view = second.store.inspect(session.clone()).await.unwrap();
         assert_eq!(
-            second.check_execution(&view).unwrap_err().code,
-            "session_execution_configuration_changed"
+            second.check_execution(&view).await.unwrap_err().code,
+            "session_queued_route_changed"
         );
         let resumed = second
             .resume_queue(
@@ -344,7 +378,7 @@ mod tests {
             )
             .await
             .unwrap_err();
-        assert_eq!(resumed.code, "session_execution_configuration_changed");
+        assert_eq!(resumed.code, "session_queued_route_changed");
 
         // Withdrawing the queued input lets the chat follow the new model.
         second
@@ -360,7 +394,7 @@ mod tests {
             .unwrap();
         let view = second.store.inspect(session.clone()).await.unwrap();
         assert!(view.queued.is_empty());
-        second.check_execution(&view).unwrap();
+        second.check_execution(&view).await.unwrap();
 
         // Work accepted under the new route keeps the chat movable.
         let next = fixture_prompt(&session, "next");
@@ -375,7 +409,7 @@ mod tests {
             .await
             .unwrap();
         let view = second.store.inspect(session.clone()).await.unwrap();
-        second.check_execution(&view).unwrap();
+        second.check_execution(&view).await.unwrap();
         second.shutdown().await.unwrap();
     }
 }
@@ -437,6 +471,7 @@ pub struct InputInspection {
     pub receipt: DurableSubmission,
     pub settings: InputSettings,
     pub parts: Vec<PromptPart>,
+    pub text_editable: bool,
 }
 
 impl InputSettings {
@@ -583,11 +618,12 @@ impl Host {
             return Err(problem(ErrorKind::Unavailable, "host_shutting_down"));
         }
         let view = self.store.inspect(request.session.clone()).await?;
-        self.check_execution(&view)?;
+        self.check_execution(&view).await?;
         if view.current.is_none() && !view.admission_paused {
             self.check_ready_capacity(&request.session).await?;
         }
         let mut policy = self.submission_policy(&request, context.allow_wakeups)?;
+        policy.selection_revision = context.selection_revision;
         self.bind_editor(&mut policy, &request, &context)?;
         let title = self.title_candidate(&view, &request.parts);
         let input = self
@@ -640,6 +676,8 @@ impl Host {
             }
         }
         Ok(InputInspection {
+            text_editable: view.disposition == InputDisposition::Queued
+                && super::queued_text::text_editable(&view.input),
             receipt: DurableSubmission {
                 session,
                 input: id,
@@ -722,7 +760,7 @@ impl Host {
                     previous.input
                 } else {
                     let view = self.store.inspect(session.clone()).await?;
-                    self.check_execution(&view)?;
+                    self.check_execution(&view).await?;
                     let operating_regime = if !self.operating_regime.is_act() {
                         self.operating_regime
                     } else {
@@ -754,6 +792,8 @@ impl Host {
                         replacement,
                         parts,
                         SubmissionPolicy {
+                            selection_revision: None,
+                            selection_goal: false,
                             questions,
                             allow_wakeups: false,
                             allow_library_selection: false,
@@ -810,7 +850,7 @@ impl Host {
             let view = host.store.inspect(session.clone()).await?;
             if view.current.is_none() && super::subagents::queued_work(&view).is_some() {
                 // Queued work this route cannot run is withdrawn, not resumed.
-                host.check_execution(&view)?;
+                host.check_execution(&view).await?;
                 host.check_ready_capacity(&session).await?;
             }
             let receipt = host.store.control(control).await?;
@@ -977,6 +1017,13 @@ impl Host {
                 }
                 last = Some(entry.session.clone());
                 more = index + 1 < page.entries.len() || page.next_after.is_some();
+                if self
+                    .retire_worker_if_owner_finished(&entry.session, &entry.turn)
+                    .await
+                    .is_err()
+                {
+                    self.work.lock().await.missed_stops = true;
+                }
                 let Ok(turn) = self
                     .store
                     .inspect_turn(entry.session.clone(), entry.turn.clone())
@@ -995,11 +1042,10 @@ impl Host {
                 let Ok(view) = self.store.inspect(entry.session.clone()).await else {
                     continue;
                 };
-                if self.check_execution(&view).is_err()
-                    || !view
-                        .current
-                        .as_ref()
-                        .is_some_and(|current| current.binding.turn == entry.turn)
+                if !view
+                    .current
+                    .as_ref()
+                    .is_some_and(|current| current.binding.turn == entry.turn)
                 {
                     continue;
                 }

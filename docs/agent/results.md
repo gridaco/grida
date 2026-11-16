@@ -1,7 +1,7 @@
 ---
 title: Inspect and save results
-description: Read what a turn did, save images the agent produced, and keep copies of generated results.
-keywords: [agent, Desktop, media, results, save]
+description: Inspect attachment previews, read what a turn did, and save images the agent produced.
+keywords: [agent, Desktop, attachment preview, media, results, save]
 format: md
 ---
 
@@ -27,10 +27,34 @@ before asking again, because an action may already have happened. Opening a
 turn only shows what was recorded; it never repeats work or asks the model
 again.
 
+## Inspect an attachment
+
+Sent images appear on their own outside the message's text bubble, without a
+card frame, filename or dimensions caption. Other attachments keep individual
+cards. Select a supported image preview to inspect it fullscreen. The image
+starts fitted to the window; zoom and pan to inspect details, then press
+Escape or choose **Close**. Opening a preview does not ask the model to run
+again.
+
+For an explicitly attached raster image, a compatible Desktop build reads the
+exact retained original, including after reopening or context compaction.
+This works even if the current model does not take images. The model may have
+received a smaller prepared PNG, so zooming into the original does not prove
+that the model inspected those details.
+
+A referenced video can carry a small still preview. Enlarging, copying or
+downloading that still does not open the original referenced file or play the
+video. Previewing changes neither model input nor filesystem permissions.
+
+Files without a supported preview, including PDFs, SVGs and HTML, remain file
+cards. Folder cards have no media preview or total size. An older Desktop
+build without retained-image reading support also keeps the file card.
+
 ## Save a cropped image
 
-When the agent crops an image you attached, the cropped PNG appears below its
-answer while that is the latest finished turn. Choose **Preview cropped PNG
+When the agent crops an image you attached, it crops the prepared pixels the
+model saw; a large original may therefore produce a smaller crop. The cropped
+PNG appears below its answer while that is the latest finished turn. Choose **Preview cropped PNG
 (W × H)** to inspect it, then **Save PNG as…** to save it to a new file. If
 saving fails, choose **Retry save**. Existing files at the destination are
 never replaced. A later crop of the same image can replace the earlier one, so
@@ -51,8 +75,10 @@ turn, and your composer draft stays separate. Choose **Skip** to continue
 without an image; closing the picker leaves the request open. If Grida cannot
 confirm your answer, open it again and choose **Retry answer**.
 
-On such a model, you can also attach one PNG and ask the agent to generate an
-image using it. Desktop asks before sending the attachment to OpenRouter for
+On such a model, you can also attach one unchanged PNG of at most 256 KiB and
+ask the agent to generate an image using it. Raster perception does not broaden
+this generation-transfer contract: resized, converted or animated inputs do
+not automatically become generator references. Desktop asks before sending the attachment to OpenRouter for
 generation. If you cancel, nothing is sent to the image provider; attach the
 PNG again to use it in a later turn.
 

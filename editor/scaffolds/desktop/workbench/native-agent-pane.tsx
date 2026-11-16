@@ -18,13 +18,10 @@ import { Button } from "@app/ui/components/button";
 import { readLibraryAttachment } from "@/app/(library)/library/attachment";
 import { encodeLibraryPng } from "@/lib/agent-chat/image-attachment";
 import {
-  CheckIcon,
-  ShieldIcon,
   PlayIcon,
   SquareIcon,
   LibraryIcon,
   PaperclipIcon,
-  PlusIcon,
   GoalIcon,
   ListChecksIcon,
   ImageIcon,
@@ -61,6 +58,7 @@ import {
   AgentComposerInput,
   type ComposerCommandAction,
 } from "../shared/agent-composer-input";
+import { AgentComposerTools } from "../shared/agent-composer-tools";
 import { useWorkspaceFileMentions } from "../shared/use-workspace-file-mentions";
 import { NativeComposerTray } from "./native-composer-tray";
 import { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
@@ -79,28 +77,9 @@ import { NativeTurnActivity } from "./native-turn-activity";
 import { turn_activity } from "@/lib/agent-chat/turn-activity";
 import { native_message_parts } from "@/lib/agent-chat/native-message-parts";
 import { NativeMessageRevisionPanel } from "./native-message-revision-panel";
-import { NativeHooksPanel } from "./native-hooks-panel";
 import { NativeBackgroundProcesses } from "./native-background-processes";
+import { NativeAgentActivity } from "./native-agent-activity";
 
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@app/ui/components/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-} from "@app/ui/components/dropdown-menu";
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "@app/ui/components/popover";
 import { NativeChatHeader, NativeModelPicker } from "./native-chat-controls";
 
 const NO_COMMANDS: ComposerCatalog["commands"] = [];
@@ -116,6 +95,8 @@ const COMMAND_DESCRIPTIONS = {
 const IMMEDIATE_COMMANDS: ReadonlySet<string> =
   new Set<NativeChatComposerCommand>(["plan", "goal", "side", "stop"]);
 const MAX_DRAFT_BYTES = 512 * 1024;
+const readNoActivity = () => null;
+const subscribeNoActivity = () => () => {};
 const APPROVAL_ACTION = {
   read_file: "Read file",
   list_files: "List folder",
@@ -168,6 +149,7 @@ export function NativeAgentPaneGate({
     bridge: DesktopNativeChat;
     attempt: number;
     readiness: NativeChatReadiness | null;
+    recommendedProfileId?: string;
   }>();
   useEffect(() => {
     // A first message starts on the connection chosen with it, not on the
@@ -181,10 +163,18 @@ export function NativeAgentPaneGate({
         );
     return NativeChatController.watchReadiness(
       bridge,
-      (readiness) => setSelection({ bridge, attempt, readiness }),
-      remembered ? { kind: message ? "new" : "saved", id: remembered } : null
+      (readiness, recommendedProfileId) =>
+        setSelection({ bridge, attempt, readiness, recommendedProfileId }),
+      remembered ? { kind: message ? "new" : "saved", id: remembered } : null,
+      message
+        ? undefined
+        : {
+            memory: selectionMemory,
+            key: selectionKey && `grida.nativeChat.${selectionKey}`,
+            initialSession,
+          }
     );
-  }, [bridge, attempt, selectionKey, firstMessage]);
+  }, [bridge, attempt, selectionKey, firstMessage, initialSession]);
   const readiness =
     selection?.bridge === bridge && selection.attempt === attempt
       ? selection.readiness
@@ -244,6 +234,11 @@ export function NativeAgentPaneGate({
       selectionKey={selectionKey}
       workspaceId={workspaceId}
       initialSession={initialSession}
+      startupProfileId={
+        readiness === "native-ready"
+          ? selection?.recommendedProfileId
+          : undefined
+      }
       editorSurfaces={editorSurfaces}
       sideChatPlacement={sideChatPlacement}
       firstMessage={firstMessage}
@@ -253,6 +248,10 @@ export function NativeAgentPaneGate({
 
 /** Shown only when the person must act outside the chat before choosing. */
 const nativeChatConnectionNote: Partial<Record<NativeChatReadiness, string>> = {
+  "native-hooks-review-required":
+    "A configured hook needs review before chat can start. Open Settings → Hooks to review it, or disable it in config.toml.",
+  "native-hooks-configuration-invalid":
+    "The global hook configuration couldn't be loaded. Open Settings → Hooks to inspect and fix it, then retry.",
   "native-provider-key-required":
     "Add an API key for the selected provider in Desktop settings, or choose another model.",
   "native-provider-model-unavailable":
@@ -273,6 +272,7 @@ export function NativeAgentPane({
   selectionKey,
   workspaceId,
   initialSession,
+  startupProfileId,
   editorSurfaces,
   sideChatPlacement,
   firstMessage,
@@ -286,6 +286,8 @@ export function NativeAgentPane({
   selectionKey?: string;
   workspaceId?: string;
   initialSession: string | null;
+  /** An untouched chat's recommended connection, selected before startup. */
+  startupProfileId?: string;
   editorSurfaces?: NativeChatEditorSurfaces;
   /** Where this chat's side chats are shown; see `side-chat-placement.ts`. */
   sideChatPlacement: SideChatPlacement;
@@ -330,7 +332,7 @@ export function NativeAgentPane({
       if (message) keep(controller.declineMessage(message.take));
     } else if (message && !initialSession)
       void controller.startChat(message.profileId, message.take).then(keep);
-    else controller.connect(initialSession, profile);
+    else controller.connect(initialSession, profile ?? startupProfileId);
     const stopFocus =
       workspaceId &&
       subscribeToNativeNotificationFocus(
@@ -347,6 +349,7 @@ export function NativeAgentPane({
     bridge,
     controller,
     initialSession,
+    startupProfileId,
     firstMessage,
     workspaceId,
     connectionRequired,
@@ -465,6 +468,16 @@ function NativeChatPane({
     controller.read,
     controller.read
   );
+  const subagentActivity = useSyncExternalStore(
+    state.subagents?.subscribe ?? subscribeNoActivity,
+    state.subagents?.read ?? readNoActivity,
+    state.subagents?.read ?? readNoActivity
+  );
+  useEffect(() => {
+    const refresh = () => void controller.readProfiles();
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  }, [controller]);
   // One preview per staged draft; a new draft object means a new attachment.
   const attachmentPreview = useMemo(
     () => (state.attachmentDraft ? controller.attachmentPreview() : null),
@@ -478,6 +491,7 @@ function NativeChatPane({
   const pngPicker = useRef<HTMLInputElement>(null);
   const filePicker = useRef<HTMLInputElement>(null);
   const [libraryScope, setLibraryScope] = useState<number | null>(null);
+  const [activityOpen, setActivityOpen] = useState(false);
   const [libraryRequest, setLibraryRequest] = useState<{
     scope: number;
     selectionId: string;
@@ -556,6 +570,7 @@ function NativeChatPane({
     return (
       <ChatMessageView
         key={message.messageId}
+        loadAttachmentPreview={controller.readAttachmentPreview}
         actions={
           message.role === "user"
             ? {
@@ -595,611 +610,616 @@ function NativeChatPane({
   // A drop anywhere in the pane takes the same intake as one on the composer
   // editor; the composer consumes its own drops first, so each is handled once.
   // (see test/desktop-agent-chat-pane-drop.md)
-  const transferAttachment = ({ resources }: ComposerTransfer.Event) =>
-    void controller.pickTransferredAttachment(state.scope, resources);
+  const transferAttachment = ({ resources }: ComposerTransfer.Event) => {
+    if (!activityOpen)
+      void controller.pickTransferredAttachment(state.scope, resources);
+  };
 
   return (
     <ComposerDropArea
       data-testid={testId}
-      className="flex min-h-0 flex-1 flex-col"
+      className="relative flex min-h-0 flex-1 flex-col"
       onTransfer={transferAttachment}
     >
-      {header(state)}
-      {(state.profileError || state.catalogEntryError) && (
-        <p role="alert" className="px-3 py-1 text-xs text-destructive">
-          {state.profileError ?? state.catalogEntryError}
-        </p>
-      )}
-      {connectionRequired && !state.scope && (
-        <div className="text-muted-foreground px-3 py-1 text-xs">
-          {connectionNote && <p>{connectionNote}</p>}
-          {state.profiles &&
-            state.profiles.choices.length + state.profiles.saved.length ===
-              0 && (
-              <p>Add a provider in Desktop settings, then refresh models.</p>
-            )}
-        </div>
-      )}
-      <workspace_links.Opener.Provider value={openWorkspaceLink}>
-        <Conversation
-          className="min-h-0 flex-1"
-          initial="instant"
-          resize={running ? "smooth" : "instant"}
-        >
-          <ConversationContent
-            className="gap-4 px-3 py-4"
-            scrollClassName={cn(
-              styles.chatScroll,
-              "desktop-native-drag-scroll-viewport scroll-fade-y scroll-fade-4"
-            )}
-          >
-            <NativeEarlierMessages
-              canLoad={state.canReadEarlier}
-              loading={state.readingEarlier}
-              error={state.earlierError}
-              count={state.messages.length}
-              onLoad={() => void controller.loadEarlierMessages()}
-            />
-            {/* See test/desktop-agent-chat-turn-activity.md. */}
-            {blocks.map((block) =>
-              block.kind === "turn" ? (
-                <NativeTurnActivity
-                  key={block.turnId}
-                  block={block}
-                  renderMessage={renderMessage}
-                />
-              ) : block.kind === "compaction" ? (
-                <CompactionNotice
-                  key={block.turnId}
-                  summary={block.summary}
-                  auto={block.automatic}
-                />
-              ) : (
-                renderMessage(block.message)
-              )
-            )}
-            {running &&
-              !retrying &&
-              state.messages.at(-1)?.role !== "assistant" && (
-                <PendingTurnIndicator />
-              )}
-            {/* See test/desktop-agent-chat-transcript-history.md. */}
-            {!turn &&
-              !state.loading &&
-              !state.repairing &&
-              state.turnSummary &&
-              state.turnSummary.turnId === snapshot?.latest?.turnId &&
-              bridge.readArtifact && (
-                <NativeTurnArtifacts
-                  key={state.turnSummary.turnId}
-                  summary={state.turnSummary}
-                  controller={controller}
-                />
-              )}
-          </ConversationContent>
-          <ConversationScrollButton />
-        </Conversation>
-      </workspace_links.Opener.Provider>
-      {state.revisionDraft ? (
-        <NativeMessageRevisionPanel
-          draft={state.revisionDraft}
-          submitting={state.revisionSubmitting}
-          effortAvailable={state.effortAvailable}
-          onChange={(text) => controller.changeRevisionText(text)}
-          onCancel={() => controller.cancelRevision()}
-          onSubmit={() => void controller.submitRevision()}
-        />
-      ) : state.revisionSubmitting ? (
-        <div role="status" className="px-3 pt-2 text-xs text-muted-foreground">
-          Opening edit…
-        </div>
-      ) : null}
-      {error && (
-        <div
-          role="alert"
-          className="flex items-center gap-2 px-3 pt-2 text-xs text-destructive"
-        >
-          <span className="flex-1">{error}</span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="xs"
-            onClick={() => void controller.repair()}
-          >
-            Refresh
-          </Button>
-        </div>
-      )}
-      {approval && (
-        <AgentApprovalPrompt
-          description={
-            approval.tool === "write_file" || approval.tool === "edit_file"
-              ? "The agent is asking to change its settings file."
-              : "The agent is asking for additional read access."
-          }
-          detail={
-            <div className="mt-1 max-h-24 overflow-y-auto break-all font-mono text-xs text-foreground/80">
-              <div>
-                {APPROVAL_ACTION[approval.tool]}{" "}
-                {reviewText(approval.relativePath || ".")}
-              </div>
-              <div>Folder {reviewText(approval.root)}</div>
-              {approval.query !== undefined && (
-                <div>Search {reviewText(approval.query)}</div>
-              )}
-            </div>
-          }
-          acceptLabel="Allow once"
-          declineLabel="Decline"
-          disabled={state.acting}
-          onDecision={(allowed) =>
-            controller.answerApproval(
-              approval.reviewId,
-              allowed ? "approve_once" : "decline"
-            )
-          }
-        />
-      )}
-      {question && (
-        <div className="shrink-0 px-3 py-2">
-          <QuestionPrompt
-            key={question.questionId}
-            input={{
-              questions: [
-                {
-                  question: question.question,
-                  options: question.options.map((label) => ({ label })),
-                },
-              ],
-            }}
-            onSubmit={async (survey) => {
-              const answer = survey.singleAnswer();
-              return answer
-                ? controller.answerQuestion(question.questionId, answer)
-                : false;
-            }}
-            disabled={!state.questionReady || state.acting}
-          />
-        </div>
-      )}
-      {librarySelection && (
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-t px-3 py-2 text-xs">
-          <p>The agent is asking for a Library reference.</p>
-          <Button
-            type="button"
-            size="xs"
-            variant="outline"
-            disabled={state.acting}
-            onClick={() =>
-              setLibraryRequest({
-                scope: state.scope,
-                selectionId: librarySelection.selectionId,
-              })
-            }
-          >
-            {state.librarySelectionRetry ? "Review answer" : "Choose reference"}
-          </Button>
-        </div>
-      )}
-      <Dialog
-        open={state.hooksOpen}
-        onOpenChange={(open) => {
-          if (!open) controller.closeHooks();
-        }}
-      >
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Lifecycle checks</DialogTitle>
-            <DialogDescription>
-              Checks that run with every chat in this workspace.
-            </DialogDescription>
-          </DialogHeader>
-          <NativeHooksPanel controller={controller} state={state} />
-        </DialogContent>
-      </Dialog>
-      <div className="shrink-0 p-3">
-        {state.imageInput && (
-          <input
-            key={`png-${state.scope}`}
-            ref={pngPicker}
-            type="file"
-            accept="image/png,.png"
-            aria-label="Select PNG"
-            className="hidden"
-            onChange={(event) => {
-              const input = event.currentTarget;
-              const file = input.files?.[0];
-              input.value = "";
-              if (file)
-                void controller.pickAttachment(state.scope, "png", file);
-            }}
-          />
-        )}
-        {(state.fileInput || state.fileReferenceInput) && (
-          <input
-            key={`file-${state.scope}`}
-            ref={filePicker}
-            type="file"
-            aria-label="Select file to attach"
-            className="hidden"
-            onChange={(event) => {
-              const input = event.currentTarget;
-              const file = input.files?.[0];
-              input.value = "";
-              // Small files go directly, others by reference.
-              if (file) void controller.pickFile(state.scope, file);
-            }}
-          />
-        )}
-        {state.attachmentReading && (
-          <p role="status" className="text-muted-foreground px-1 pb-1 text-xs">
-            Reading attachment…
+      <div inert={activityOpen} className="flex min-h-0 flex-1 flex-col">
+        <div className="min-w-0 shrink-0 pr-10">{header(state)}</div>
+        {(state.profileError || state.catalogEntryError) && (
+          <p role="alert" className="px-3 py-1 text-xs text-destructive">
+            {state.profileError ?? state.catalogEntryError}
           </p>
         )}
-        {state.attachmentDraft &&
-          (state.attachmentDraft.error ||
-            !(state.attachmentDraft.kind === "png"
-              ? state.imageInput
-              : state.attachmentDraft.kind === "file"
-                ? state.fileInput
-                : state.fileReferenceInput)) && (
+        {connectionRequired && !state.scope && (
+          <div className="text-muted-foreground px-3 py-1 text-xs">
+            {connectionNote && <p>{connectionNote}</p>}
+            {state.profiles &&
+              state.profiles.choices.length + state.profiles.saved.length ===
+                0 && (
+                <p>
+                  Add a provider in Desktop settings, then return here to choose
+                  a model.
+                </p>
+              )}
+          </div>
+        )}
+        <workspace_links.Opener.Provider value={openWorkspaceLink}>
+          <Conversation
+            className="min-h-0 flex-1"
+            initial="instant"
+            resize={running ? "smooth" : "instant"}
+          >
+            <ConversationContent
+              className="gap-4 px-3 py-4"
+              scrollClassName={cn(
+                styles.chatScroll,
+                "desktop-native-drag-scroll-viewport scroll-fade-y scroll-fade-4"
+              )}
+            >
+              <NativeEarlierMessages
+                canLoad={state.canReadEarlier}
+                loading={state.readingEarlier}
+                error={state.earlierError}
+                count={state.messages.length}
+                onLoad={() => void controller.loadEarlierMessages()}
+              />
+              {/* See test/desktop-agent-chat-turn-activity.md. */}
+              {blocks.map((block) =>
+                block.kind === "turn" ? (
+                  <NativeTurnActivity
+                    key={block.turnId}
+                    block={block}
+                    renderMessage={renderMessage}
+                    subagentEvents={subagentActivity?.events.filter(
+                      (event) => event.parentTurnId === block.turnId
+                    )}
+                    onOpenSubagent={(childId, inputId) =>
+                      void state.subagents?.openChild(childId, inputId)
+                    }
+                  />
+                ) : block.kind === "compaction" ? (
+                  <CompactionNotice
+                    key={block.turnId}
+                    summary={block.summary}
+                    auto={block.automatic}
+                  />
+                ) : (
+                  renderMessage(block.message)
+                )
+              )}
+              {subagentActivity?.activityAvailable &&
+                !subagentActivity.eventsComplete && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    className="self-start text-muted-foreground"
+                    onClick={() => state.subagents?.show()}
+                  >
+                    More subagent activity is available in Subagents
+                  </Button>
+                )}
+              {running &&
+                !retrying &&
+                state.messages.at(-1)?.role !== "assistant" && (
+                  <PendingTurnIndicator />
+                )}
+              {/* See test/desktop-agent-chat-transcript-history.md. */}
+              {!turn &&
+                !state.loading &&
+                !state.repairing &&
+                state.turnSummary &&
+                state.turnSummary.turnId === snapshot?.latest?.turnId &&
+                bridge.readArtifact && (
+                  <NativeTurnArtifacts
+                    key={state.turnSummary.turnId}
+                    summary={state.turnSummary}
+                    controller={controller}
+                  />
+                )}
+            </ConversationContent>
+            <ConversationScrollButton />
+          </Conversation>
+        </workspace_links.Opener.Provider>
+        {state.revisionDraft ? (
+          <NativeMessageRevisionPanel
+            draft={state.revisionDraft}
+            submitting={state.revisionSubmitting}
+            effortAvailable={state.effortAvailable}
+            onChange={(text) => controller.changeRevisionText(text)}
+            onCancel={() => controller.cancelRevision()}
+            onSubmit={() => void controller.submitRevision()}
+          />
+        ) : state.revisionSubmitting ? (
+          <div
+            role="status"
+            className="px-3 pt-2 text-xs text-muted-foreground"
+          >
+            Opening edit…
+          </div>
+        ) : null}
+        {error && (
+          <div
+            role="alert"
+            className="flex items-center gap-2 px-3 pt-2 text-xs text-destructive"
+          >
+            <span className="flex-1">{error}</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              onClick={() => void controller.repair()}
+            >
+              Refresh
+            </Button>
+          </div>
+        )}
+        {approval && (
+          <AgentApprovalPrompt
+            description={
+              approval.tool === "write_file" || approval.tool === "edit_file"
+                ? "The agent is asking to change its settings file."
+                : "The agent is asking for additional read access."
+            }
+            detail={
+              <div className="mt-1 max-h-24 overflow-y-auto break-all font-mono text-xs text-foreground/80">
+                <div>
+                  {APPROVAL_ACTION[approval.tool]}{" "}
+                  {reviewText(approval.relativePath || ".")}
+                </div>
+                <div>Folder {reviewText(approval.root)}</div>
+                {approval.query !== undefined && (
+                  <div>Search {reviewText(approval.query)}</div>
+                )}
+              </div>
+            }
+            acceptLabel="Allow once"
+            declineLabel="Decline"
+            disabled={state.acting}
+            onDecision={(allowed) =>
+              controller.answerApproval(
+                approval.reviewId,
+                allowed ? "approve_once" : "decline"
+              )
+            }
+          />
+        )}
+        {question && (
+          <div className="shrink-0 px-3 py-2">
+            <QuestionPrompt
+              key={question.questionId}
+              input={{
+                questions: [
+                  {
+                    question: question.question,
+                    options: question.options.map((label) => ({ label })),
+                  },
+                ],
+              }}
+              onSubmit={async (survey) => {
+                const answer = survey.singleAnswer();
+                return answer
+                  ? controller.answerQuestion(question.questionId, answer)
+                  : false;
+              }}
+              disabled={!state.questionReady || state.acting}
+            />
+          </div>
+        )}
+        {librarySelection && (
+          <div className="flex shrink-0 flex-wrap items-center gap-2 border-t px-3 py-2 text-xs">
+            <p>The agent is asking for a Library reference.</p>
+            <Button
+              type="button"
+              size="xs"
+              variant="outline"
+              disabled={state.acting}
+              onClick={() =>
+                setLibraryRequest({
+                  scope: state.scope,
+                  selectionId: librarySelection.selectionId,
+                })
+              }
+            >
+              {state.librarySelectionRetry
+                ? "Review answer"
+                : "Choose reference"}
+            </Button>
+          </div>
+        )}
+        <div className="shrink-0 p-3">
+          {state.imageInput && (
+            <input
+              key={`png-${state.scope}`}
+              ref={pngPicker}
+              type="file"
+              accept="image/png,.png"
+              aria-label="Select PNG"
+              className="hidden"
+              onChange={(event) => {
+                const input = event.currentTarget;
+                const file = input.files?.[0];
+                input.value = "";
+                if (file)
+                  void controller.pickAttachment(state.scope, "png", file);
+              }}
+            />
+          )}
+          {(state.fileInput || state.fileReferenceInput) && (
+            <input
+              key={`file-${state.scope}`}
+              ref={filePicker}
+              type="file"
+              aria-label="Select file to attach"
+              className="hidden"
+              onChange={(event) => {
+                const input = event.currentTarget;
+                const file = input.files?.[0];
+                input.value = "";
+                // Small files go directly, others by reference.
+                if (file) void controller.pickFile(state.scope, file);
+              }}
+            />
+          )}
+          {state.attachmentReading && (
             <p
               role="status"
               className="text-muted-foreground px-1 pb-1 text-xs"
             >
-              {state.attachmentDraft.error ??
-                (state.attachmentDraft.kind === "png"
-                  ? "This connection cannot use the attached PNG. Remove it from this draft or use a compatible connection."
-                  : "This chat cannot inspect the attached file. Remove it to send the message by itself.")}
+              Reading attachment…
             </p>
           )}
-        {state.attachmentNotice && (
-          <p role="status" className="text-muted-foreground px-1 pb-1 text-xs">
-            {state.attachmentNotice}
-          </p>
-        )}
-        {(state.commandRunning || state.commandNotice) && (
-          <div className="flex items-center gap-2 px-1 pb-1 text-xs">
-            <span role="status">
-              {state.commandRunning === "compact"
-                ? "Compacting…"
-                : state.commandRunning === "fork"
-                  ? "Creating fork…"
-                  : state.commandNotice}
-            </span>
-            {state.commandFork && (
-              <Button
-                type="button"
-                size="xs"
-                variant="ghost"
-                onClick={() => void controller.select(state.commandFork)}
+          {state.attachmentDraft &&
+            (state.attachmentDraft.error ||
+              !(state.attachmentDraft.kind === "image"
+                ? state.selectedImageInput
+                : state.attachmentDraft.kind === "png"
+                  ? state.imageInput
+                  : state.attachmentDraft.kind === "file"
+                    ? state.fileInput
+                    : state.fileReferenceInput)) && (
+              <p
+                role="status"
+                className="text-muted-foreground px-1 pb-1 text-xs"
               >
-                Open fork
-              </Button>
+                {state.attachmentDraft.error ??
+                  (state.attachmentDraft.kind === "png" ||
+                  state.attachmentDraft.kind === "image"
+                    ? "This connection cannot use the attached PNG. Remove it from this draft or use a compatible connection."
+                    : "This chat cannot inspect the attached file. Remove it to send the message by itself.")}
+              </p>
             )}
-          </div>
-        )}
-        <NativeComposerTray
-          controller={controller}
-          view={state}
-          onReturnedText={(text) =>
-            void draft.current?.appendText(text, MAX_DRAFT_BYTES)
-          }
-        />
-        <AgentComposerInput
-          key={state.scope}
-          draft={controller.composerDraft()}
-          autofocus={autofocus}
-          catalog={catalog}
-          className="@container"
-          commandActions={controller.composerCommands.map(
-            (command): ComposerCommandAction => ({
-              id: command,
-              title: command,
-              description: COMMAND_DESCRIPTIONS[command],
-              standalone: true,
-              run: () => controller.runComposerCommand(command),
-            })
+          {state.attachmentNotice && (
+            <p
+              role="status"
+              className="text-muted-foreground px-1 pb-1 text-xs"
+            >
+              {state.attachmentNotice}
+            </p>
           )}
-          onCommandSelect={(command) => {
-            const chosen = controller.composerCommands.find(
-              (listed) => listed === command.id
-            );
-            if (!chosen || !IMMEDIATE_COMMANDS.has(chosen)) return false;
-            void controller.runComposerCommand(chosen).catch(() => {});
-            return true;
-          }}
-          attachments={
-            state.attachmentDraft &&
-            !state.attachmentReading && (
-              <NativeAttachmentCard
-                name={state.attachmentDraft.name}
-                size={state.attachmentDraft.size}
-                png={state.attachmentDraft.kind === "png"}
-                preview={attachmentPreview}
-                mimeType={state.attachmentDraft.mimeType}
-                video={state.attachmentDraft.preview}
-                onRemove={() => controller.removeAttachment(state.scope)}
-              />
-            )
-          }
-          onAttachmentTransfer={transferAttachment}
-          awaitSubmission
-          canSubmit={
-            controller.canSubmit &&
-            (!state.goalIntent || controller.canStartGoal)
-          }
-          busy={!!turn}
-          isStreaming={streamingControlsOnly}
-          emptyAction={
-            resumable || (pausing && !(goalTurn && state.goal?.goal?.paused))
-              ? {
-                  label: "Resume",
-                  icon: <PlayIcon className="size-3.5 fill-current" />,
-                  onClick: () => void controller.resumeTurn(),
-                }
-              : state.acting
-                ? undefined
-                : running && !turn?.paused
-                  ? {
-                      label: "Pause",
-                      icon: <SquareIcon className="size-3.5" />,
-                      onClick: () => void controller.control("pause"),
-                    }
-                  : controller.canResumeQueue && queued > 0 && !state.acting
-                    ? {
-                        label: "Resume queue",
-                        icon: <PlayIcon className="size-3.5 fill-current" />,
-                        onClick: () =>
-                          void controller.editQueue({ action: "resume" }),
-                      }
-                    : undefined
-          }
-          placeholder={
-            connectionRequired && !state.scope
-              ? "Choose a model to start chatting…"
-              : state.goalIntent
-                ? "Describe the goal…"
-                : state.operatingRegime === "plan"
-                  ? "What would you like to plan?"
-                  : state.attachmentDraft
-                    ? "Add a message to send this attachment…"
-                    : turn || snapshot?.admissionPaused || queued
-                      ? "Queue a follow-up…"
-                      : undefined
-          }
-          submissionScope={state.scope}
-          draftRef={draft}
-          onSubmit={(text) => controller.submit(text, state.scope)}
-          onStop={() => void controller.control("stop")}
-          toolbarStart={
-            <>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    aria-label="Add to message"
-                    title="Add to message"
-                    className="shrink-0 rounded-full text-muted-foreground"
-                  >
-                    <PlusIcon className="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent side="top" align="start" className="w-72">
-                  <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-                    Add
-                  </DropdownMenuLabel>
-                  {(state.fileInput || state.fileReferenceInput) && (
-                    <DropdownMenuItem
-                      disabled={
-                        state.goalIntent ||
-                        !(
-                          controller.canAttach("file") ||
-                          controller.canAttach("reference")
-                        )
-                      }
-                      onSelect={() => filePicker.current?.click()}
-                    >
-                      <PaperclipIcon className="size-4" />
-                      Files
-                    </DropdownMenuItem>
-                  )}
-                  {state.imageInput && (
-                    <DropdownMenuItem
-                      disabled={
-                        state.goalIntent || !controller.canAttach("png")
-                      }
-                      onSelect={() => pngPicker.current?.click()}
-                    >
-                      <ImageIcon className="size-4" />
-                      Image
-                    </DropdownMenuItem>
-                  )}
-                  {workspaceId && state.imageInput && (
-                    <DropdownMenuItem
-                      disabled={state.acting || state.goalIntent}
-                      onSelect={() => setLibraryScope(state.scope)}
-                    >
-                      <LibraryIcon className="size-4" />
-                      Library
-                    </DropdownMenuItem>
-                  )}
-                  {bridge.startGoal && controller.offers("goals") && (
-                    <DropdownMenuItem
-                      disabled={
-                        state.acting ||
-                        state.goalIntent ||
-                        !controller.canStartGoal
-                      }
-                      onSelect={() => controller.selectGoalIntent(true)}
-                    >
-                      <GoalIcon className="size-4" />
-                      Goal
-                      <span className="text-muted-foreground">
-                        Set a goal to keep pursuing
-                      </span>
-                    </DropdownMenuItem>
-                  )}
-                  {bridge.submitInRegime && (
-                    <DropdownMenuItem
-                      disabled={state.acting}
-                      onSelect={() =>
-                        controller.selectOperatingRegime(
-                          state.operatingRegime === "plan" ? "act" : "plan"
-                        )
-                      }
-                    >
-                      <ListChecksIcon className="size-4" />
-                      Plan mode
-                      <span className="text-muted-foreground">
-                        {state.operatingRegime === "plan"
-                          ? "Turn plan mode off"
-                          : "Turn plan mode on"}
-                      </span>
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant="ghost"
-                    className="shrink-0 gap-1 px-1.5 text-muted-foreground"
-                    aria-label="Access: Default"
-                  >
-                    <ShieldIcon className="size-3.5" />
-                    <span className="hidden @[26rem]:inline">Default</span>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  side="top"
-                  align="start"
-                  className="w-80 p-1 text-sm"
+          {(state.commandRunning || state.commandNotice) && (
+            <div className="flex items-center gap-2 px-1 pb-1 text-xs">
+              <span role="status">
+                {state.commandRunning === "compact"
+                  ? "Compacting…"
+                  : state.commandRunning === "fork"
+                    ? "Creating fork…"
+                    : state.commandNotice}
+              </span>
+              {state.commandFork && (
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => void controller.select(state.commandFork)}
                 >
-                  <p className="px-2 pt-1.5 pb-1 text-xs text-muted-foreground">
-                    What can the agent access?
-                  </p>
-                  <div className="flex items-start gap-2 rounded-md px-2 py-1.5">
-                    <ShieldIcon className="mt-0.5 size-4 shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p>Default</p>
-                      <p className="text-xs text-muted-foreground">
-                        Reads and edits files in this project and runs commands
-                        in a sandbox. Other folders and the internet are off.
-                      </p>
-                    </div>
-                    <CheckIcon className="mt-0.5 size-4 shrink-0" />
-                  </div>
-                </PopoverContent>
-              </Popover>
-              {state.backgroundProcesses && (
-                <NativeBackgroundProcesses
-                  controller={state.backgroundProcesses}
-                />
+                  Open fork
+                </Button>
               )}
-              {state.operatingRegime === "plan" && (
-                <IntentChip
-                  icon={<ListChecksIcon />}
-                  label="Plan"
-                  disabled={state.acting}
-                  onRemove={() => controller.selectOperatingRegime("act")}
-                />
-              )}
-              {state.goalIntent && (
-                <IntentChip
-                  icon={<GoalIcon />}
-                  label="Goal"
-                  disabled={state.acting}
-                  onRemove={() => controller.selectGoalIntent(false)}
-                />
-              )}
-            </>
-          }
-          toolbarEnd={
-            <>
-              <ContextMeter usage={contextUsage} />
-              <NativeModelPicker
-                profiles={state.profiles}
-                defaultUnavailable={connectionRequired}
-                busy={state.profileBusy || state.acting}
-                onSelect={
-                  bridge.selectProfile && !controller.fixedSession
-                    ? (selection) => void controller.selectProfile(selection)
-                    : undefined
-                }
-                onRefresh={() => void controller.readProfiles()}
-                effort={state.effort}
-                ultraAvailable={state.effortAvailable}
-                ultraOffered={controller.offers("delegation")}
-                goal={state.goalIntent}
-                onEffort={(effort) => controller.selectEffort(effort)}
-              />
-            </>
-          }
-        />
-        {workspaceId && state.imageInput && libraryScope === state.scope && (
-          <AgentLibraryAttachmentPicker
-            open
-            single
-            onOpenChange={(open) => {
-              if (!open) setLibraryScope(null);
-            }}
-            onAttach={([pin]) => {
-              if (!pin) return;
-              void controller.pickLibraryImage(
-                state.scope,
-                `Library: ${pin.title}`,
-                (maxBytes) => readLibraryPng(pin.id, maxBytes)
-              );
-            }}
+            </div>
+          )}
+          <NativeComposerTray
+            controller={controller}
+            view={state}
+            onReturnedText={(text) =>
+              void draft.current?.appendText(text, MAX_DRAFT_BYTES)
+            }
           />
-        )}
-        {librarySelection &&
-          libraryRequest?.scope === state.scope &&
-          libraryRequest.selectionId === librarySelection.selectionId && (
+          {/* Draft binding and submissionScope handle chat changes. Keep the
+            composer mounted so model reattachment preserves its popovers. */}
+          <AgentComposerInput
+            draft={controller.composerDraft()}
+            editing={
+              state.queueDraft
+                ? {
+                    id: `${state.scope}:${state.queueDraft.inputId}`,
+                    text: state.queueDraft.text,
+                    label: "Editing queued message",
+                    busy: state.acting,
+                    allowEmpty: state.queueDraft.allowEmpty,
+                    onSave: (text) => controller.saveQueueDraft(text),
+                    onCancel: () => controller.closeQueueDraft(),
+                  }
+                : undefined
+            }
+            autofocus={autofocus}
+            catalog={catalog}
+            className="@container"
+            commandActions={controller.composerCommands.map(
+              (command): ComposerCommandAction => ({
+                id: command,
+                title: command,
+                description: COMMAND_DESCRIPTIONS[command],
+                standalone: true,
+                run: () => controller.runComposerCommand(command),
+              })
+            )}
+            onCommandSelect={(command) => {
+              const chosen = controller.composerCommands.find(
+                (listed) => listed === command.id
+              );
+              if (!chosen || !IMMEDIATE_COMMANDS.has(chosen)) return false;
+              void controller.runComposerCommand(chosen).catch(() => {});
+              return true;
+            }}
+            attachments={
+              state.attachmentDraft &&
+              !state.attachmentReading && (
+                <NativeAttachmentCard
+                  name={state.attachmentDraft.name}
+                  size={state.attachmentDraft.size}
+                  png={state.attachmentDraft.kind === "png"}
+                  preview={attachmentPreview}
+                  mimeType={state.attachmentDraft.mimeType}
+                  video={state.attachmentDraft.preview}
+                  onRemove={() => controller.removeAttachment(state.scope)}
+                />
+              )
+            }
+            onAttachmentTransfer={transferAttachment}
+            awaitSubmission
+            canSubmit={
+              controller.canSubmit &&
+              (!state.goalIntent || controller.canStartGoal)
+            }
+            busy={!!turn}
+            isStreaming={streamingControlsOnly}
+            emptyAction={
+              resumable || (pausing && !(goalTurn && state.goal?.goal?.paused))
+                ? {
+                    label: "Resume",
+                    icon: <PlayIcon className="size-3.5 fill-current" />,
+                    onClick: () => void controller.resumeTurn(),
+                  }
+                : state.acting
+                  ? undefined
+                  : running && !turn?.paused
+                    ? {
+                        label: "Pause",
+                        icon: <SquareIcon className="size-3.5" />,
+                        onClick: () => void controller.control("pause"),
+                      }
+                    : controller.canResumeQueue && queued > 0 && !state.acting
+                      ? {
+                          label: "Resume queue",
+                          icon: <PlayIcon className="size-3.5 fill-current" />,
+                          onClick: () =>
+                            void controller.editQueue({ action: "resume" }),
+                        }
+                      : undefined
+            }
+            placeholder={
+              connectionRequired && !state.scope
+                ? "Choose a model to start chatting…"
+                : state.goalIntent
+                  ? "Describe the goal…"
+                  : state.operatingRegime === "plan"
+                    ? "What would you like to plan?"
+                    : state.attachmentDraft
+                      ? "Add a message to send this attachment…"
+                      : turn || snapshot?.admissionPaused || queued
+                        ? "Queue a follow-up…"
+                        : undefined
+            }
+            submissionScope={state.scope}
+            draftRef={draft}
+            onSubmit={(text) => controller.submit(text, state.scope)}
+            onStop={() => void controller.control("stop")}
+            toolbarStart={
+              <AgentComposerTools
+                actions={[
+                  ...(state.fileInput || state.fileReferenceInput
+                    ? [
+                        {
+                          id: "files",
+                          title: "Files",
+                          icon: <PaperclipIcon />,
+                          disabled:
+                            state.goalIntent ||
+                            !(
+                              controller.canAttach("file") ||
+                              controller.canAttach("reference")
+                            ),
+                          onSelect: () => filePicker.current?.click(),
+                        },
+                      ]
+                    : []),
+                  ...(state.imageInput
+                    ? [
+                        {
+                          id: "image",
+                          title: "Image",
+                          icon: <ImageIcon />,
+                          disabled:
+                            state.goalIntent || !controller.canAttach("png"),
+                          onSelect: () => pngPicker.current?.click(),
+                        },
+                      ]
+                    : []),
+                  ...(workspaceId && state.imageInput
+                    ? [
+                        {
+                          id: "library",
+                          title: "Library",
+                          icon: <LibraryIcon />,
+                          disabled: state.acting || state.goalIntent,
+                          onSelect: () => setLibraryScope(state.scope),
+                        },
+                      ]
+                    : []),
+                  ...(bridge.startGoal && controller.offers("goals")
+                    ? [
+                        {
+                          id: "goal",
+                          title: "Goal",
+                          description: "Set a goal to keep pursuing",
+                          icon: <GoalIcon />,
+                          disabled:
+                            state.acting ||
+                            state.goalIntent ||
+                            !controller.canStartGoal,
+                          onSelect: () => controller.selectGoalIntent(true),
+                        },
+                      ]
+                    : []),
+                  ...(bridge.submitInRegime
+                    ? [
+                        {
+                          id: "plan",
+                          title: "Plan mode",
+                          description:
+                            state.operatingRegime === "plan"
+                              ? "Turn plan mode off"
+                              : "Turn plan mode on",
+                          icon: <ListChecksIcon />,
+                          disabled: state.acting,
+                          onSelect: () =>
+                            controller.selectOperatingRegime(
+                              state.operatingRegime === "plan" ? "act" : "plan"
+                            ),
+                        },
+                      ]
+                    : []),
+                ]}
+                intents={[
+                  ...(state.operatingRegime === "plan"
+                    ? [
+                        {
+                          id: "plan",
+                          icon: <ListChecksIcon />,
+                          label: "Plan",
+                          disabled: state.acting,
+                          onRemove: () =>
+                            controller.selectOperatingRegime("act"),
+                        },
+                      ]
+                    : []),
+                  ...(state.goalIntent
+                    ? [
+                        {
+                          id: "goal",
+                          icon: <GoalIcon />,
+                          label: "Goal",
+                          disabled: state.acting,
+                          onRemove: () => controller.selectGoalIntent(false),
+                        },
+                      ]
+                    : []),
+                ]}
+              >
+                {state.backgroundProcesses && (
+                  <NativeBackgroundProcesses
+                    controller={state.backgroundProcesses}
+                  />
+                )}
+              </AgentComposerTools>
+            }
+            toolbarEnd={
+              <>
+                <ContextMeter usage={contextUsage} />
+                <NativeModelPicker
+                  profiles={state.profiles}
+                  defaultUnavailable={connectionRequired}
+                  busy={state.profileBusy || state.acting}
+                  onSelect={
+                    bridge.selectProfile && !controller.fixedSession
+                      ? (selection) => void controller.selectProfile(selection)
+                      : undefined
+                  }
+                  onRefresh={() => void controller.readProfiles()}
+                  refreshError={state.profileReadError}
+                  effort={state.effort}
+                  ultraAvailable={controller.ultraAvailability}
+                  ultraOffered={controller.offers("delegation")}
+                  goal={state.goalIntent}
+                  onEffort={(effort) => controller.selectEffort(effort)}
+                />
+              </>
+            }
+          />
+          {workspaceId && state.imageInput && libraryScope === state.scope && (
             <AgentLibraryAttachmentPicker
-              key={librarySelection.selectionId}
               open
               single
               onOpenChange={(open) => {
-                if (!open) setLibraryRequest(null);
+                if (!open) setLibraryScope(null);
               }}
               onAttach={([pin]) => {
-                if (pin)
-                  void controller.answerLibrarySelection(
-                    librarySelection.selectionId,
-                    {
-                      id: pin.id,
-                      readPng: (maxBytes) => readLibraryPng(pin.id, maxBytes),
-                    }
-                  );
-              }}
-              request={{
-                initialQuery: librarySelection.initialSearchQuery,
-                busy: state.acting,
-                error: state.librarySelectionError,
-                skip: () => {
-                  void controller.answerLibrarySelection(
-                    librarySelection.selectionId,
-                    "skip"
-                  );
-                },
-                retry: state.librarySelectionRetry
-                  ? () => {
-                      void controller.answerLibrarySelection(
-                        librarySelection.selectionId,
-                        "retry"
-                      );
-                    }
-                  : undefined,
+                if (!pin) return;
+                void controller.pickLibraryImage(
+                  state.scope,
+                  `Library: ${pin.title}`,
+                  (maxBytes) => readLibraryPng(pin.id, maxBytes)
+                );
               }}
             />
           )}
+          {librarySelection &&
+            libraryRequest?.scope === state.scope &&
+            libraryRequest.selectionId === librarySelection.selectionId && (
+              <AgentLibraryAttachmentPicker
+                key={librarySelection.selectionId}
+                open
+                single
+                onOpenChange={(open) => {
+                  if (!open) setLibraryRequest(null);
+                }}
+                onAttach={([pin]) => {
+                  if (pin)
+                    void controller.answerLibrarySelection(
+                      librarySelection.selectionId,
+                      {
+                        id: pin.id,
+                        readPng: (maxBytes) => readLibraryPng(pin.id, maxBytes),
+                      }
+                    );
+                }}
+                request={{
+                  initialQuery: librarySelection.initialSearchQuery,
+                  busy: state.acting,
+                  error: state.librarySelectionError,
+                  skip: () => {
+                    void controller.answerLibrarySelection(
+                      librarySelection.selectionId,
+                      "skip"
+                    );
+                  },
+                  retry: state.librarySelectionRetry
+                    ? () => {
+                        void controller.answerLibrarySelection(
+                          librarySelection.selectionId,
+                          "retry"
+                        );
+                      }
+                    : undefined,
+                }}
+              />
+            )}
+        </div>
       </div>
+      <NativeAgentActivity
+        subagents={state.subagents}
+        processes={state.backgroundProcesses}
+        onOpenChange={setActivityOpen}
+      />
     </ComposerDropArea>
   );
 }
@@ -1217,33 +1237,5 @@ function reviewText(value: string): string {
   return JSON.stringify(value).replace(
     /[\u007f-\u009f\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069]/g,
     (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`
-  );
-}
-
-/** A removable composer intent. The icon turns into a remove button on hover. */
-function IntentChip({
-  icon,
-  label,
-  disabled,
-  onRemove,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  disabled?: boolean;
-  onRemove: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      aria-label={`Remove ${label.toLowerCase()}`}
-      title={`Remove ${label.toLowerCase()}`}
-      onClick={onRemove}
-      className="group/chip flex h-6 shrink-0 items-center gap-1 rounded-md px-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50 [&_svg]:size-3.5"
-    >
-      <span className="group-hover/chip:hidden">{icon}</span>
-      <XIcon className="hidden group-hover/chip:block" />
-      {label}
-    </button>
   );
 }

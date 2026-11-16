@@ -176,7 +176,7 @@ impl Host {
             }
             let execution = host.execution()?;
             let source = host.store.inspect(parent.clone()).await?;
-            host.check_execution(&source)?;
+            host.check_execution(&source).await?;
             let configuration = session_configuration(&source)?;
             if configuration.side.is_some() {
                 return Err(Refusal::SideChat.error());
@@ -196,6 +196,7 @@ impl Host {
                         execution: execution.configuration,
                         owner: execution.owner,
                         subagent: None,
+                        worker: None,
                         side: Some(SideSession {
                             parent: parent.clone(),
                         }),

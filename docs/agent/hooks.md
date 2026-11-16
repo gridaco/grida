@@ -1,107 +1,139 @@
 ---
-title: Automate lifecycle checks
-description: Review trusted workspace checks, control when they run, and inspect their recorded results.
-keywords: [agent hooks, lifecycle checks, completion checks, permissions, Grida]
+title: Configure hooks
+description: Define global Desktop hooks in config.toml, review their commands, and inspect configuration in Settings.
+keywords: [agent hooks, global config, config.toml, Grida Desktop, automation]
 format: md
 ---
 
-# Automate lifecycle checks
+# Configure hooks
 
-Lifecycle checks can add project context, inspect a proposed tool action, or
-require verification before a task finishes. They are available on macOS and
-Linux, in Grida Desktop workspace chats and in source-built headless hosts. A
-check cannot grant access that the task did not already have.
+Hooks run a configured command at a named point in the agent's work. They can
+supply context, inspect a tool action, or verify a proposed completion.
 
-New projects start with no registered checks. Creating their first chat does
-not require an existing check definition or an earlier chat.
+Grida Desktop on macOS and Linux reads hook definitions from one user-wide file:
 
-## Register a check in Desktop
-
-1. Open a workspace chat and choose **Lifecycle checks…** from the chat options menu.
-2. Choose **Import check…** and select its JSON definition. An agent can help
-   prepare the definition; it cannot trust executable code for you.
-3. Review the event, exact command and arguments, workspace, deadline and
-   required/observational behavior in the dialog. Choose **Trust and save
-   check** only when those match your intent.
-4. Restart Desktop to activate saved changes. Running and paused work keeps
-   its captured checks. Restoring a paused task requires its original selection;
-   a changed selection refuses continuation rather than silently replacing it.
-
-Checks use a pinned canonical system executable, literal reviewed arguments,
-read-only workspace access and no network. Project-local executable programs are
-not accepted. Selecting a project or reading a definition does not execute it.
-For example, this Desktop check definition requires a workspace manifest before
-the agent finishes:
-
-```json
-{
-  "id": "require-manifest",
-  "event": "before_completion",
-  "executable": "/bin/sh",
-  "arguments": [
-    "-c",
-    "if test -f manifest.json; then printf '%s' '{\"decision\":\"allow\"}'; else printf '%s' '{\"decision\":\"deny\",\"reason\":\"Manifest missing\"}'; fi"
-  ],
-  "mode": "required",
-  "timeoutMs": 2000
-}
+```text
+~/.grida/config.toml
 ```
 
-Use a system executable available on the host. The reviewed executable's bytes
-are pinned; a changed executable must be reviewed again. At most eight ordered
-checks can be selected. **Remove** reviews the exact saved revision and applies
-on the next restart. It does not withdraw an active task's checks.
+An absolute `GRIDA_HOME` override changes that location to
+`$GRIDA_HOME/config.toml`. Hooks apply across Desktop workspaces. This first
+version does not discover project files, plugin hooks, or separate JSON hook
+configuration. Existing workspace `hooks.json` files are not loaded or copied
+into the global file.
 
-## Choose when a check runs
+The source-built headless host's explicit permission profile is a separate
+supervisor execution contract; it does not automatically load this Desktop
+configuration.
 
-| Event               | When the check runs                                                                           |
-| ------------------- | --------------------------------------------------------------------------------------------- |
-| `session_start`     | Each turn begins, and again when a paused turn resumes. This is not once per saved chat.      |
-| `before_input`      | Your message is about to reach the model.                                                     |
-| `before_tool`       | The agent has prepared a tool call with complete arguments, before it runs.                   |
-| `after_tool`        | A tool call has finished; the check sees its result, and the result itself is kept unchanged. |
-| `before_completion` | The agent is about to finish successfully, so the check can verify the result.                |
+## Add a hook
 
-Tool events can name one exact `tool`, such as `read_file`. Omitting it selects
-every tool the model can use. Checks do not trigger other checks. Subagents
-that work in the project run the parent's checks too; a text-only reviewer
-does not gain project access to run one, but the parent's checks can inspect
-what it was asked to do. Read-only checks run with or without the **Plan**
-badge.
+Open **Settings → Hooks**, then open the configuration file. Add an ordered
+`[[hooks]]` table for each command. For example, this observational hook supplies
+context when a turn starts:
 
-A check can allow or deny the step and add short context that names its
-source. A completion check can ask for more verification within the task's
-original allowance. A completion check reads a short summary of the proposed
-result on standard input: the first 4 KiB of the final answer, step and tool
-counts, and some of the recorded operations with their total. The summary stays
-the same size however long the task runs. It cannot override Stop, resume a paused task, or extend
-the allowance. Grida offers no check that runs when a task ends or is
-interrupted.
+```toml
+schema_version = 1
 
-## Inspect outcomes and recover
+[[hooks]]
+id = "team-context"
+event = "session_start"
+executable = "/usr/bin/printf"
+arguments = ["%s", '{"decision":"allow","context":"Team conventions: prefer small changes and include verification results."}']
+mode = "observe"
+timeout_ms = 2000
+enabled = true
+```
 
-**Lifecycle checks** shows how many checks are active and saved, and each saved
-check's event, tool, mode, source, executable and deadline. Choose **Refresh
-checks** with a chat selected to see that task's latest check results. A required denial,
-invalid reply, timeout or unavailable handler blocks dependent work. Later
-ordered checks are identified as skipped. Observational failures remain
-recorded without changing the original tool result. An after-tool failure never
-conceals an effect that already happened.
+Use an executable available on your computer. The command uses literal arguments;
+Grida does not expand a command string, environment variables, or `~` in an
+executable path. Programs must meet the native host's system-executable ownership
+and integrity checks. Arbitrary project-local or user-owned executables are not
+supported in this initial version.
 
-Pause and Stop still apply. Reconnect, inspection and history reads execute no
-checks. Restart reuses recorded outcomes; an interrupted command remains
-uncertain until its existing recovery rules permit continuation. Earlier work
-and the check diagnostic stay available for review. If the old executable is no
-longer available, end the unfinished turn (in Desktop, pause it and send a new
-message) and review its replacement for future work; the replacement does not
-authorize replaying the old action.
+Save the file, reload it in **Settings → Hooks**, and review the command before
+trusting it. Configuration is the source of definitions; review records permission
+to execute the exact definition and executable. Editing the file does not grant
+trust to a new or changed command. A stale review cannot approve newer contents.
+An enabled hook awaiting trust, or invalid configuration, prevents new workspace
+connections from starting. Review the command, fix the configuration or disable
+the hook, then retry the connection. Existing work keeps its captured selection.
 
-## Add a check to a headless launch
+Fresh workspace connections capture the current trusted definitions. Existing
+connections keep their captured hooks; restart Desktop to update all connections.
+Running and paused tasks retain their captured selection. Changing hooks cannot
+replace checks for unfinished work or authorize replay of an earlier action.
+After a restart, resuming a paused task can be refused if its captured hook
+selection no longer matches; restore that selection or end the task explicitly.
 
-Source-built headless hosts declare up to eight ordered checks in their trusted
-permission profile, pinning each system executable by path and SHA-256, and
-select it with `--permission-profile` on `run` or `serve`. The Desktop import
-format above does not apply there.
-[Configure lifecycle hooks](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#configure-lifecycle-hooks) ·
-[Check a workspace manifest](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#check-a-workspace-manifest) ·
-[Require a completion check](./clients.md#require-a-completion-check)
+## Definition fields
+
+The file requires `schema_version = 1` at the top level. Its `hooks` array
+contains these fields for each command:
+
+| Field        | Meaning                                                    |
+| ------------ | ---------------------------------------------------------- |
+| `id`         | Unique stable hook identifier.                             |
+| `event`      | One of the five supported events below.                    |
+| `executable` | Absolute path to a supported system executable.            |
+| `arguments`  | Array of literal argument strings.                         |
+| `mode`       | `required` or `observe`.                                   |
+| `timeout_ms` | Deadline in milliseconds, from 1 through 30000.            |
+| `enabled`    | Defaults to `true`; set `false` to disable the definition. |
+| `tool`       | Optional exact tool ID for `before_tool` or `after_tool`.  |
+
+At most eight hooks are supported. They run in configured order, with bounded
+input, output and execution time. There are no regex matchers, background hooks,
+MCP handlers, or model-based handlers in this version. This is Grida's schema;
+Codex hook configuration is not interchangeable with it.
+
+## Events and results
+
+| Event               | When it runs                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------- |
+| `session_start`     | A turn starts or a paused turn explicitly resumes; not merely when a chat view opens. |
+| `before_input`      | The accepted message is about to reach the model.                                     |
+| `before_tool`       | A tool call's complete arguments are ready, before execution.                         |
+| `after_tool`        | A tool call has finished; its recorded result remains unchanged.                      |
+| `before_completion` | The agent proposes finishing successfully.                                            |
+
+A command reads a bounded JSON event on stdin, exits zero, and prints one JSON
+reply on stdout. The smallest successful reply is:
+
+```json
+{ "decision": "allow" }
+```
+
+An allow reply can include a `context` string attributed to the hook. A required
+check can refuse an action with a reason:
+
+```json
+{ "decision": "deny", "reason": "The expected manifest is missing." }
+```
+
+A completion hook can request another bounded verification step with
+`{"decision":"continue","context":"Verify the generated manifest."}`. It cannot
+extend task allowances, override Stop, or resume a paused task.
+
+A required denial, timeout, malformed reply or unavailable handler blocks its
+dependent action. Observational failures are recorded without blocking it.
+An after-tool failure cannot undo or conceal effects that already happened.
+
+Hooks run with the task's read-only workspace scope, private temporary storage
+and no network. Global configuration does not grant access to other projects or
+credentials. Subagents with inherited workspace access inherit the selected
+hooks; text-only reviewers do not gain filesystem access to run them.
+
+## Inspect, change or remove hooks
+
+**Settings → Hooks** shows the configuration path, configured definitions,
+trust state and configuration diagnostics. Opening Settings or reloading the
+configuration does not execute the hooks. Resolve reported errors and review
+new or changed commands before opening a fresh workspace connection.
+
+Edit the TOML to change, disable or remove a hook, then reload and review as
+needed. There is no import workflow or separate workspace hook configuration.
+Removing a definition does not withdraw the selection held by running work.
+
+For the native command event and result protocol, see
+[Configure lifecycle hooks](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#configure-lifecycle-hooks).

@@ -14,10 +14,15 @@ export {
   type ByokProviderMetadata,
   type ProviderId,
 } from "./protocol/provider-ids";
-export type {
-  ChatGptAuthStart,
-  ChatGptSubscriptionAccount,
-  ChatGptSubscriptionStatus,
+export {
+  CHATGPT_PROVIDER_ID,
+  CHATGPT_SUBSCRIPTION_DEFAULT_MODEL_ID,
+  CHATGPT_SUBSCRIPTION_MODEL_IDS,
+  CHATGPT_SUBSCRIPTION_RETIRED_MODEL_IDS,
+  isChatGptSubscriptionModelId,
+  type ChatGptAuthStart,
+  type ChatGptSubscriptionAccount,
+  type ChatGptSubscriptionStatus,
 } from "./protocol/chatgpt";
 // GRIDA-SEC-006 — hosted-session wire shapes (types only; the store is
 // internal daemon state).

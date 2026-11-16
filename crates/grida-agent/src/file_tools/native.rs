@@ -109,8 +109,33 @@ impl FileTools {
             .capture_image
             .as_ref()
             .ok_or_else(|| problem(ErrorKind::Unavailable, "image_view_unavailable"))?;
-        let bytes = self.read_png(directory, path, budget)?;
-        let label = format!("Viewed PNG {} ({} bytes).", path.display(), bytes.len());
+        let (bytes, label) = if self.image_view == ImageView::LegacyPng {
+            let bytes = self.read_png(directory, path, budget)?;
+            crate::host::ImageUpload::from_png(bytes.clone())?;
+            let label = format!("Viewed PNG {} ({} bytes).", path.display(), bytes.len());
+            (bytes, label)
+        } else {
+            let bytes = self.read_image_source(
+                directory,
+                path,
+                budget,
+                crate::host::image_preparation::MAX_SOURCE_BYTES,
+            )?;
+            let prepared = crate::host::image_preparation::prepare(&bytes)?;
+            budget.check()?;
+            let label = format!(
+                "Viewed {} {} ({} source bytes).{}",
+                if prepared.mime == "image/png" {
+                    "PNG"
+                } else {
+                    prepared.mime
+                },
+                path.display(),
+                bytes.len(),
+                prepared.preparation.description()
+            );
+            (prepared.bytes, label)
+        };
         let image = capture(bytes)?;
         bounded_outcome(
             ToolOutcome {
@@ -162,9 +187,19 @@ impl FileTools {
         path: &Path,
         budget: &Budget,
     ) -> Result<Vec<u8>> {
+        self.read_image_source(directory, path, budget, MAX_IMAGE_BYTES)
+    }
+
+    fn read_image_source(
+        &self,
+        directory: Option<&BindingId>,
+        path: &Path,
+        budget: &Budget,
+        maximum: usize,
+    ) -> Result<Vec<u8>> {
         let mut file = self.open(directory, path, Kind::File, budget)?;
         let before = unix::fstat(&file).map_err(open_error)?;
-        let (bytes, limited) = read(&mut file, MAX_IMAGE_BYTES, budget)?;
+        let (bytes, limited) = read(&mut file, maximum, budget)?;
         if limited {
             return Err(problem(ErrorKind::LimitExceeded, "image_size_limit"));
         }

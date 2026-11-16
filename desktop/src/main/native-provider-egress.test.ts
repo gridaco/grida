@@ -198,7 +198,7 @@ it("bounds uploads and projects a bounded response stream with no replay", async
   );
   expect(await egress.exchange(open())).toEqual({ status: "accepted" });
   const encoded = Buffer.alloc(64 * 1024, 42).toString("base64");
-  for (let index = 0; index < 15; index++) {
+  for (let index = 0; index < 127; index++) {
     expect(
       await egress.exchange({ id, action: "append", data: encoded })
     ).toEqual({ status: "accepted" });
@@ -225,6 +225,58 @@ it("bounds uploads and projects a bounded response stream with no replay", async
   });
   expect(fetch).toHaveBeenCalledTimes(1);
   egress.close();
+});
+
+it("carries multiple prepared images without changing 64 KiB upload frames", async () => {
+  const image = (value: number) => ({
+    type: "input_image",
+    image_url: `data:image/png;base64,${Buffer.alloc(384 * 1024, value).toString("base64")}`,
+  });
+  const body = Buffer.from(
+    JSON.stringify({
+      model: "fixture",
+      input: [{ role: "user", content: [image(23), image(41)] }],
+    })
+  );
+  expect(body.length).toBeGreaterThan(1024 * 1024);
+  const dispatch = vi.fn<
+    NonNullable<ReturnType<NativeProviderNetwork["prepare"]>>
+  >(
+    async (_body: Buffer, _signal: AbortSignal) =>
+      new Response(null, { status: 200 })
+  );
+  const egress = new NativeProviderEgress(
+    { prepare: () => dispatch },
+    "responses",
+    endpoint,
+    "fixture"
+  );
+  try {
+    expect(
+      await egress.exchange(
+        open({
+          target: endpoint + "/responses",
+          initial: body.subarray(0, 64 * 1024).toString("base64"),
+        })
+      )
+    ).toEqual({ status: "accepted" });
+    for (let offset = 64 * 1024; offset < body.length; offset += 64 * 1024)
+      expect(
+        await egress.exchange({
+          id,
+          action: "append",
+          data: body.subarray(offset, offset + 64 * 1024).toString("base64"),
+        })
+      ).toEqual({ status: "accepted" });
+    expect(await egress.exchange({ id, action: "dispatch" })).toMatchObject({
+      status: "ready",
+      httpStatus: 200,
+    });
+    expect(dispatch).toHaveBeenCalledOnce();
+    expect(dispatch.mock.calls[0][0]).toEqual(body);
+  } finally {
+    egress.close();
+  }
 });
 
 it("cancels a held network exchange on pipe shutdown", async () => {
@@ -290,7 +342,7 @@ it("restricts subscription egress to credential-free requests for the exact gene
 });
 
 it.skipIf(!resourcesPath)(
-  "runs the private subscription process with provider-managed output and retains encrypted state only within its scope",
+  "retains private subscription state within its scope and carries visible history to an explicitly selected sign-in",
   async () => {
     const root = fs.mkdtempSync(
       path.join(fs.realpathSync(os.tmpdir()), "grida-subscription-process-")
@@ -429,10 +481,14 @@ it.skipIf(!resourcesPath)(
       await connect();
       agent = await start();
       await agent.request("session/load", { sessionId, cwd, mcpServers: [] });
-      await expect(prompt()).rejects.toThrow(
-        "session_execution_configuration_changed"
-      );
       expect(dispatch).toHaveBeenCalledTimes(2);
+      await expect(prompt()).resolves.toMatchObject({ stopReason: "end_turn" });
+      expect(dispatch).toHaveBeenCalledTimes(3);
+      const portable = JSON.parse(dispatch.mock.calls[2][0].toString());
+      expect(JSON.stringify(portable.input)).toContain("A fixture question");
+      expect(JSON.stringify(portable.input)).toContain(reply);
+      expect(JSON.stringify(portable.input)).not.toContain(encrypted);
+      expect(JSON.stringify(portable.input)).not.toContain("reasoning-fixture");
       expect(exchangeToken).toHaveBeenCalledTimes(2);
     } finally {
       try {

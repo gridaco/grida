@@ -71,6 +71,16 @@ export namespace ipc_admission {
   }): boolean {
     switch (role) {
       case "main":
+        if (channel.startsWith("grida:provider:endpoint:"))
+          return pathname === "/desktop/settings";
+        if (
+          channel === IPC_CHANNELS.ARCHIVES_LIST ||
+          channel === IPC_CHANNELS.ARCHIVES_UNARCHIVE
+        ) {
+          return pathname === "/desktop/settings";
+        }
+        if (channel.startsWith("grida:hooks:"))
+          return pathname === "/desktop/settings";
         // A renderer may commit a contained auth/onboarding navigation before
         // Electron's navigation observer runs. Path admission closes that gap
         // without letting URL state grant a role.

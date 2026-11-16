@@ -80,17 +80,33 @@ literal arguments, source, required/observe behavior, timeout and captured
 read-only command scope. Executable and ancestor ownership and ACL checks remain
 mandatory. User-owned programs require a separate custody contract.
 
-Desktop workspace registration uses explicit native trust and a separate private
-registry. Saved changes activate on a new connection; accepted work retains its
-captured policy. A changed capture cannot resume paused work. Stop and inspection
+Desktop reads ordered `[[hooks]]` definitions only from the user-owned global
+`$GRIDA_HOME/config.toml` (default `~/.grida/config.toml`). This global source is
+separate from the per-host context-defaults file described above. The current
+global schema requires `schema_version = 1`; it supports hooks only. Workspace
+`hooks.json` registries are ignored, preserved on disk, and never promoted to
+global authority. Settings > Hooks inspects the source and reviews new or changed
+definitions through native confirmation. Private receipts retain approved
+definition revisions, not a second definition source. Canonical existing Grida
+home directories may be 0755 when owned by the user and not writable by others;
+the config has the same integrity requirement, while trust receipts remain 0600.
+
+Fresh connections load the current configured and trusted definitions. Enabled
+untrusted or invalid definitions block new execution with a recoverable Hooks
+diagnostic. Existing workers retain their selected policy; restarting Desktop
+refreshes all connections. Accepted work retains its captured policy. A changed
+capture cannot resume paused work. Stop and inspection
 remain available without rerunning checks. Checks can run in Plan or Act when
 the task already has the required read scope. A text-only child gains no scope
 merely to execute a check. Project and plugin discovery is deferred to a source
 adapter with review of new or changed executable content.
 
-The user-writable configuration service keeps its scalar setting. Hook
-registration, inspection, and editing through that service require a separate
-field review. Executable trust remains a distinct user or host decision.
+The per-host configuration service keeps its scalar setting. Its model-editable
+file does not install global executable hooks. Desktop's global source uses
+`timeout_ms` and an executable path plus literal `arguments`; it has no project
+discovery, regex matchers, async hooks, or plugin source. Headless supervisors
+retain their explicit low-level launch profiles; the host does not auto-load
+Desktop's global file. Executable trust remains a distinct user or host decision.
 Provider credentials and execution authority retain their separate custody.
 
 ## Effective configuration

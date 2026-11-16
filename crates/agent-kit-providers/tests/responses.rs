@@ -3,8 +3,8 @@ mod support;
 use agent_kit_core::authority::AuthorityBinding;
 use agent_kit_core::inference::{
     DispatchEvidence, FailureKind, InferenceOutcome, InferenceRequest, InferenceStatus,
-    InferenceUpdate, InputMeasurement, MeasurementKind, Modality, ModelCapabilities, Provider,
-    ProviderBinding,
+    InferenceUpdate, InputMeasurement, MeasurementKind, Modality, ModelCapabilities,
+    PreparedRequest, Provider, ProviderBinding,
 };
 use agent_kit_core::messages::{
     Content, MediaRef, Message, MessagePhase, OutcomeStatus, ResultContent, Retention, Role,
@@ -12,8 +12,8 @@ use agent_kit_core::messages::{
 };
 use agent_kit_core::{ArtifactId, BindingId, ModelId, PrincipalId, ProviderId, ScopeId};
 use agent_kit_providers::{
-    Responses, ResponsesEndpoint, ResponsesProfile, ResponsesReasoningEffort, StreamLimits,
-    TransportFailure, TransportOperation,
+    InputImageResolver, Responses, ResponsesEndpoint, ResponsesProfile, ResponsesReasoningEffort,
+    StreamLimits, TransportFailure, TransportOperation,
 };
 use serde_json::{Value, json};
 use std::sync::Arc;
@@ -71,6 +71,54 @@ fn make_adapter(
         limits,
     )
     .unwrap()
+}
+
+fn image_adapter(
+    transport: Arc<FixtureTransport>,
+    endpoint: ResponsesEndpoint,
+    images: Option<Arc<InputImageResolver>>,
+) -> agent_kit_core::Result<Responses> {
+    Responses::with_image_resolver(
+        ProviderBinding {
+            provider: ProviderId::new("responses").unwrap(),
+            authority: AuthorityBinding {
+                principal: PrincipalId::new("principal").unwrap(),
+                binding: BindingId::new("live").unwrap(),
+                scope: ScopeId::new("chat").unwrap(),
+            },
+        },
+        BindingId::new("replay").unwrap(),
+        endpoint,
+        [(
+            ModelId::new("model").unwrap(),
+            ResponsesProfile {
+                wire_model: ModelId::new("wire-model").unwrap(),
+                reasoning_effort: Some(ResponsesReasoningEffort::XHigh),
+                capabilities: ModelCapabilities {
+                    revision: BindingId::new("profile").unwrap(),
+                    input_modalities: [Modality::Text, Modality::Image].into(),
+                    json_tools: true,
+                    text_tools: false,
+                    max_output_tokens: None,
+                    reasoning: Default::default(),
+                },
+            },
+        )]
+        .into(),
+        transport,
+        limits(),
+        images,
+    )
+}
+
+fn image(id: &str) -> MediaRef {
+    MediaRef {
+        id: ArtifactId::new(id).unwrap(),
+        media_type: "image/png".into(),
+        locator: format!("retained-{id}"),
+        access_scope: BindingId::new("local").unwrap(),
+        retention: Retention::Retained,
+    }
 }
 
 fn completed(output: Option<Value>) -> Value {
@@ -386,6 +434,326 @@ async fn only_api_profile_accepts_explicit_output_bound() {
     assert_eq!(body(&transport, 0)["instructions"], "");
 }
 
+#[test]
+fn endpoint_identities_preserve_original_profile_meanings() {
+    let transport = FixtureTransport::new([]);
+    for (endpoint, identity, revision) in [
+        (
+            ResponsesEndpoint::Api,
+            "api",
+            "responses_bdc085bd56a128336951cb9ab8e3f834",
+        ),
+        (
+            ResponsesEndpoint::Restricted,
+            "subscription",
+            "responses_24faa98e088bb181b98857bccb2f5308",
+        ),
+        (
+            ResponsesEndpoint::RestrictedImages,
+            "restricted_images",
+            "responses_9f3885877fbfd30424aa7b319f915856",
+        ),
+    ] {
+        assert_eq!(serde_json::to_value(endpoint).unwrap(), identity);
+        let provider = adapter(transport.clone(), endpoint, "replay", "live");
+        assert_eq!(
+            provider
+                .capabilities(&ModelId::new("model").unwrap())
+                .unwrap()
+                .revision
+                .as_str(),
+            revision
+        );
+    }
+
+    let resolver: Arc<InputImageResolver> = Arc::new(|_, _| panic!("preparation performs no I/O"));
+    // Supplying a resolver cannot opt a text-only endpoint into image input.
+    assert_eq!(
+        image_adapter(
+            transport.clone(),
+            ResponsesEndpoint::Restricted,
+            Some(resolver),
+        )
+        .err()
+        .unwrap()
+        .code,
+        "unsupported_model_profile"
+    );
+    for endpoint in [ResponsesEndpoint::Api, ResponsesEndpoint::RestrictedImages] {
+        assert_eq!(
+            image_adapter(transport.clone(), endpoint, None)
+                .err()
+                .unwrap()
+                .code,
+            "unsupported_model_profile"
+        );
+    }
+    assert!(transport.requests.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn restricted_images_preserve_bounds_and_send_resolved_user_and_tool_media() {
+    let transport = FixtureTransport::new([
+        Ok(response(
+            [call(0, "fc_image", "{}"), completed(None)]
+                .into_iter()
+                .map(frame),
+            false,
+        )),
+        Ok(response(
+            [answer("msg_image", "Observed pixels."), completed(None)]
+                .into_iter()
+                .map(frame),
+            false,
+        )),
+    ]);
+    let calls = Arc::new(AtomicUsize::new(0));
+    let oversized = Arc::new(AtomicBool::new(false));
+    let user = image("user");
+    let view = image("view");
+    let provider = image_adapter(
+        transport.clone(),
+        ResponsesEndpoint::RestrictedImages,
+        Some(Arc::new({
+            let calls = calls.clone();
+            let oversized = oversized.clone();
+            let user = user.clone();
+            let view = view.clone();
+            move |reference, maximum| {
+                calls.fetch_add(1, Ordering::SeqCst);
+                let budget = limits().max_request_bytes / 4 * 3;
+                if reference == &user {
+                    assert_eq!(maximum, budget);
+                    Ok(b"original".to_vec())
+                } else {
+                    assert_eq!(reference, &view);
+                    assert_eq!(maximum, budget - b"original".len());
+                    if oversized.load(Ordering::SeqCst) {
+                        return Ok(vec![0; maximum + 1]);
+                    }
+                    Ok(b"pixels".to_vec())
+                }
+            }
+        })),
+    )
+    .unwrap();
+    let mut input = tool_request();
+    input.messages[0].content.push(Content::Media(user));
+    assert_eq!(
+        provider.prepare(input.clone()).unwrap_err().code,
+        "responses_output_limit_unsupported"
+    );
+    input.max_output_tokens = None;
+    let mut unsupported = input.clone();
+    let Content::Media(media) = unsupported.messages[0].content.last_mut().unwrap() else {
+        unreachable!()
+    };
+    media.media_type = "image/svg+xml".into();
+    assert_eq!(
+        provider.prepare(unsupported).unwrap_err().code,
+        "unsupported_responses_input_image"
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    let earlier = run(&provider, input.clone(), "image-call").await;
+    let call_id = first_call(&earlier).id.clone();
+    input.messages.extend(earlier.messages);
+    input.messages.push(message(
+        "view-result",
+        Role::Tool,
+        vec![Content::ToolResult(ToolResult {
+            call: call_id,
+            status: OutcomeStatus::Succeeded,
+            content: vec![
+                ResultContent::Text("Observed pixels".into()),
+                ResultContent::Media(view),
+            ],
+            structured: None,
+            truncated: false,
+        })],
+    ));
+    let mut unsupported = input.clone();
+    let Content::ToolResult(result) = unsupported
+        .messages
+        .last_mut()
+        .unwrap()
+        .content
+        .last_mut()
+        .unwrap()
+    else {
+        unreachable!()
+    };
+    let ResultContent::Media(media) = result.content.last_mut().unwrap() else {
+        unreachable!()
+    };
+    media.media_type = "image/jpeg".into();
+    assert_eq!(
+        provider.prepare(unsupported).unwrap_err().code,
+        "unsupported_tool_media"
+    );
+    let prepared = provider.prepare(input).unwrap();
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    let retained = serde_json::to_string(&prepared).unwrap();
+    assert!(retained.contains("retained-user"));
+    assert!(retained.contains("retained-view"));
+    assert!(!retained.contains("b3JpZ2luYWw="));
+    assert!(!retained.contains("cGl4ZWxz"));
+    assert_eq!(
+        provider
+            .measure_input_async(&prepared, control("count").request_control())
+            .await
+            .unwrap_err()
+            .code,
+        "input_measurement_unavailable"
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        provider
+            .start(prepared.clone(), control("image"))
+            .unwrap()
+            .finish()
+            .await
+            .status,
+        InferenceStatus::Completed
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), 3);
+    let generation = body(&transport, 1);
+    assert!(generation.get("max_output_tokens").is_none());
+    assert_eq!(
+        generation["input"][0]["content"][1],
+        json!({"type": "input_image", "image_url": "data:image/png;base64,b3JpZ2luYWw=", "detail": "auto"})
+    );
+    assert_eq!(generation["input"][2]["call_id"], "call_remote");
+    assert_eq!(
+        generation["input"][2]["output"][2],
+        json!({"type": "input_image", "image_url": "data:image/png;base64,cGl4ZWxz", "detail": "auto"})
+    );
+    assert!(!generation.to_string().contains("retained-"));
+    oversized.store(true, Ordering::SeqCst);
+    assert_eq!(
+        provider
+            .start(prepared, control("oversized"))
+            .err()
+            .unwrap()
+            .code,
+        "request_byte_limit"
+    );
+    assert_eq!(transport.requests.lock().unwrap().len(), 2);
+}
+
+#[tokio::test]
+async fn image_expansion_replays_legacy_history_without_reinterpreting_prepared_work() {
+    let transport = FixtureTransport::new([
+        Ok(response(
+            [call(0, "fc_legacy", "{}"), completed(None)]
+                .into_iter()
+                .map(frame),
+            false,
+        )),
+        Ok(response(
+            [answer("msg_expanded", "Continued."), completed(None)]
+                .into_iter()
+                .map(frame),
+            false,
+        )),
+    ]);
+    let legacy = adapter(
+        transport.clone(),
+        ResponsesEndpoint::Restricted,
+        "replay",
+        "live",
+    );
+    let expanded = adapter(
+        transport.clone(),
+        ResponsesEndpoint::RestrictedImages,
+        "replay",
+        "live",
+    );
+    let mut input = tool_request();
+    input.max_output_tokens = None;
+    let prepared = legacy.prepare(input.clone()).unwrap();
+    let prepared: PreparedRequest =
+        serde_json::from_slice(&serde_json::to_vec(&prepared).unwrap()).unwrap();
+    assert_eq!(
+        expanded
+            .start(prepared.clone(), control("wrong-profile"))
+            .err()
+            .unwrap()
+            .code,
+        "prepared_provider_binding_changed"
+    );
+    // The original constructor still recovers accepted captures as before.
+    let restored = adapter(
+        transport.clone(),
+        ResponsesEndpoint::Restricted,
+        "replay",
+        "live",
+    );
+    let earlier = restored
+        .start(prepared, control("legacy"))
+        .unwrap()
+        .finish()
+        .await;
+    assert_eq!(earlier.status, InferenceStatus::Completed);
+    let call_id = first_call(&earlier).id.clone();
+    input.messages.extend(earlier.messages);
+    input.messages.push(message(
+        "legacy-result",
+        Role::Tool,
+        vec![Content::ToolResult(ToolResult {
+            call: call_id,
+            status: OutcomeStatus::Succeeded,
+            content: vec![ResultContent::Text("Done.".into())],
+            structured: None,
+            truncated: false,
+        })],
+    ));
+    let mut edited = input.clone();
+    edited.messages[1]
+        .content
+        .insert(0, Content::Text("edited".into()));
+    assert_eq!(
+        expanded.prepare(edited).unwrap_err().code,
+        "provider_state_binding_changed"
+    );
+    for rejected in [
+        adapter(
+            transport.clone(),
+            ResponsesEndpoint::RestrictedImages,
+            "changed",
+            "live",
+        ),
+        make_adapter(
+            transport.clone(),
+            ResponsesEndpoint::RestrictedImages,
+            "replay",
+            "live",
+            "other-model",
+            limits(),
+        ),
+    ] {
+        assert_eq!(
+            rejected.prepare(input.clone()).unwrap_err().code,
+            "provider_state_binding_changed"
+        );
+    }
+    let continued = run(&expanded, input.clone(), "expanded").await;
+    assert_eq!(continued.status, InferenceStatus::Completed);
+    input.messages.extend(continued.messages);
+    // Expansion is one-way: fresh state retains its distinct profile identity.
+    for rejected in [
+        legacy,
+        adapter(transport.clone(), ResponsesEndpoint::Api, "replay", "live"),
+    ] {
+        assert_eq!(
+            rejected.prepare(input.clone()).unwrap_err().code,
+            "provider_state_binding_changed"
+        );
+    }
+    assert!(expanded.prepare(input).is_ok());
+    assert_eq!(body(&transport, 1)["input"][1]["id"], "fc_legacy");
+    assert_eq!(body(&transport, 1)["input"][2]["call_id"], "call_remote");
+}
+
 #[tokio::test]
 async fn incomplete_and_failed_streams_preserve_prefix_usage_and_classify_safe_codes() {
     let secret = "provider-details-to-redact";
@@ -561,6 +929,7 @@ async fn only_a_complete_typed_api_rate_rejection_proves_no_generation() {
         (ResponsesEndpoint::Api, true, "code", None),
         (ResponsesEndpoint::Api, false, "type", None),
         (ResponsesEndpoint::Restricted, false, "code", None),
+        (ResponsesEndpoint::RestrictedImages, false, "code", None),
     ] {
         let body =
             serde_json::to_vec(&json!({"error":{(code_key):"rate_limit_exceeded"}})).unwrap();
@@ -576,7 +945,7 @@ async fn only_a_complete_typed_api_rate_rejection_proves_no_generation() {
         let transport = FixtureTransport::new([Ok(reply)]);
         let provider = adapter(transport.clone(), endpoint, "lineage", "live");
         let mut input = request();
-        if endpoint == ResponsesEndpoint::Restricted {
+        if endpoint != ResponsesEndpoint::Api {
             input.max_output_tokens = None;
         }
         let outcome = run(&provider, input, "attempt").await;

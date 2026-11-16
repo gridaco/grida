@@ -14,6 +14,12 @@ principal types, and states the cross-crate rules those signatures preserve.
 
 ## Crate map
 
+The [architecture rings](https://grida.co/docs/wg/ai/agent#architecture-rings)
+own the responsibility model and placement rules. This binding owns the
+concrete package assignments and dependency budgets below. Application
+presentation remains outside the agent rings; a process boundary or a
+directory name alone does not determine architectural ownership.
+
 Each boundary is a Cargo package. Arrows in the graph below point from a
 consumer to its normal dependency.
 
@@ -52,6 +58,16 @@ The master depends on Runtime and the shared core only. It receives sessions,
 storage, providers, and execution through capabilities its host supplies.
 `grida-auth` provides credential custody to the host and to no neutral crate.
 
+Desktop's native integration in `desktop/src/main/native-*` participates in
+R3 when supervising the host, supplying credentials and capabilities, and
+adapting the client protocol. Application preferences and the Electron shell
+remain application concerns. Renderer controllers in
+`editor/lib/agent-chat/native-*` submit intent and project native state;
+chat presentation in `editor/kits/agent-chat` and
+`editor/scaffolds/desktop` stays outside the agent rings. These directories
+can contain more than one responsibility; classify the behavior rather than
+assigning every file in a process to one ring.
+
 Inside the shared core, these logical import directions hold.
 
 ```mermaid
@@ -79,7 +95,47 @@ flowchart TD
 | Product master    | Runtime and supplied capability contracts                              | Concrete server startup, databases, provider construction, process and terminal state |
 | Native host       | Master, selected adapters, transport and process utilities             | A second task loop or separate unattended agent policy implementation                 |
 
-Cargo enforces these boundaries between packages. Inside a package, a
+The following table is the executable source of package assignments and
+approved direct dependencies. Normal and build dependencies share the same
+budget, including optional and target-specific declarations on every platform.
+Names identify the actual dependency package, including when an import is
+renamed or inherited from the workspace. `external` permits registry or Git
+dependencies only for host composition, not arbitrary local packages.
+External test dependencies are unrestricted; test-only workspace additions
+must be listed explicitly and never authorize a production dependency.
+
+<!-- agent-dependency-budgets:start -->
+
+| Package                  | Ring | Production dependencies                                                                                                                                                           | Test-only workspace additions                  |
+| ------------------------ | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `agent-kit-core`         | R0   | `base64`, `futures-channel`, `futures-core`, `futures-util`, `serde`, `serde_json`, `sha2`, `tokio-util`                                                                          | none                                           |
+| `agent-kit-runtime`      | R1   | `agent-kit-core`, `futures-util`, `serde`, `tokio`                                                                                                                                | none                                           |
+| `agent-kit-sessions`     | R1   | `agent-kit-core`, `serde`                                                                                                                                                         | none                                           |
+| `agent-kit-providers`    | R1   | `agent-kit-core`, `base64`, `futures-core`, `futures-util`, `serde`, `serde_json`                                                                                                 | none                                           |
+| `agent-kit-sandbox`      | R1   | `agent-kit-core`, `libc`, `serde`, `serde_json`, `sha2`, `tempfile`, `tokio`                                                                                                      | none                                           |
+| `agent-kit-store-sqlite` | R1   | `agent-kit-core`, `agent-kit-sessions`, `rusqlite`, `serde`, `serde_json`, `sha2`, `tokio`                                                                                        | none                                           |
+| `grida-agent-master`     | R2   | `agent-kit-core`, `agent-kit-runtime`, `serde`, `serde_json`                                                                                                                      | `agent-kit-sessions`, `agent-kit-store-sqlite` |
+| `grida-agent`            | R3   | `agent-kit-core`, `agent-kit-providers`, `agent-kit-runtime`, `agent-kit-sandbox`, `agent-kit-sessions`, `agent-kit-store-sqlite`, `grida-agent-master`, `grida-auth`, `external` | none                                           |
+
+<!-- agent-dependency-budgets:end -->
+
+[`dependency_boundaries`](../tests/dependency_boundaries.rs) reads this table
+and Cargo metadata in the ordinary Rust test suite and CI. It refuses
+unclassified agent packages, unapproved dependencies, and production edges
+from an inner ring to an outer ring. Run it directly with:
+
+```sh
+cargo test -p grida-agent --locked --test dependency_boundaries
+```
+
+Changing a manifest requires the corresponding budget review; adding an
+allowance is an architectural change, not a way to silence the check. The
+check establishes declared package boundaries, not the absence of product
+assumptions inside an otherwise permitted dependency. Those require owning
+contract review and behavioral conformance evidence.
+
+Cargo restricts imports to declared dependencies; the check restricts which
+dependencies may be declared. Inside a package, a
 `pub(crate)` helper must not become a hidden API between modules with separate
 owners. Each such interaction needs a named capability or shared core contract.
 
@@ -665,6 +721,16 @@ uses ordinary Inference and Tools with explicitly supplied authority. The host
 owns its evidence policy, escalation, retry, and failure handling. These routes
 need no `Human`/`Model` enum or dedicated reviewer interface in the shared core.
 
+Grida's Ultra reviewer reuses the parent's captured execution provider and
+transport, including its model, principal and destination scope. Every
+implemented inference protocol can use this composition; a connection's
+authentication source or vendor name does not select another review route.
+The harness reserves generation steps independently of an optional wire
+output-token limit. Restricted subscription requests keep that field absent.
+Step bounds, deadlines and bounded local output are not remote token or
+currency ceilings. Gateway spending authority remains a separate capability
+with its own allocation and settlement requirements.
+
 `agent-kit-sandbox` is the native confinement adapter. Its platform backends
 compile host-issued execution scope into actual confinement and report whether
 the requested profile can be enforced. A raw command or external agent receives
@@ -961,6 +1027,25 @@ configuration. `submit` acknowledges durable acceptance independently of driver 
 Repeating an input ID with identical content returns its existing disposition.
 Conflicting content under that ID fails.
 
+### Product selection and accepted execution
+
+A mutable chat selection is Grida product metadata, separate from immutable
+session construction provenance and from a turn's accepted execution capture.
+The native product host owns per-chat connection/model/effort records; Desktop
+Main owns the last explicit complete pair used for new chats and durable
+unsent draft identities. Restoring a selection does not start or replace a
+worker. Admission binds the expected selection revision and effective model
+under the same gate as metadata mutation, while accepted retries observe their
+existing receipts first.
+
+The product record is stored adjacent to the existing database under its sole
+process owner. It does not add a neutral SQLite schema migration, repurpose
+catalog labels or put composer preferences in Goal driver state. Conditional
+replacement, outstanding mutation receipts, fork initialization and retirement
+reconciliation remain product contracts. The reusable layers continue to own
+portable values, media resolution, immutable accepted inputs and execution
+semantics. [Selection protocol](./rust-client-protocol.md#durable-chat-selection)
+
 ### Session driver state
 
 In addition to construction configuration, a session can retain one optional
@@ -1045,6 +1130,12 @@ input has not been claimed. Replacement and claim cannot both succeed against
 the same state. Reordering preserves the selected input identities. The claim
 captures the actual selected inputs and any consulted driver-state revision.
 The opaque payload and driver state carry settings according to master policy.
+
+The native host's negotiated `replace-text` operation uses this same generic
+replacement transaction after transforming its own retained payload. It changes
+only user text while preserving every captured non-text part and setting. This
+is host policy, separate from Sessions' opaque whole-input replacement contract;
+neither the core nor the storage adapter interprets captions or attachments.
 
 Deriving an independent conversation uses a captured history seed and leaves
 the source's work and interactions intact. Copied interaction records provide
@@ -1150,6 +1241,52 @@ with cancellation. Independent continuation requires a recorded ownership
 transfer with applicable authority and allowance. This uses the same controls
 and accounting contracts as ordinary child work.
 
+### Model-initiated child work
+
+The product master selects general delegation independently of effort. Its
+serializable policy captures the exact tool definitions and grants, the child
+count and generation allowance, and the completion obligations reconstructed
+from durable receipts. The native host supplies child admission, capabilities
+and observation; it does not run another agent strategy. Existing operation-owned
+claims admit each child from one live source tool operation. Reconciliation reads
+the retained destination before attempting a new admission. One source operation
+has one destination; several spawn calls can create separate children.
+
+| Tool                 | Arguments              | Result                                                                          |
+| -------------------- | ---------------------- | ------------------------------------------------------------------------------- |
+| `spawn_agent`        | `name`, `instructions` | An assignment identifying the child session, accepted input and execution turn. |
+| `send_agent_message` | `child`, `text`        | An informational delivery receipt; this starts no idle work.                    |
+| `wait_agent`         | `children`             | Bounded collected terminal assignment results and explicit pending assignments. |
+| `stop_agent`         | `child`                | A control and the observed assignment result, or explicit pending settlement.   |
+
+A successful tool operation counts as assignment or collection evidence only
+under the captured definition and exact live grant. Collection identifies the
+original child, input and turn; a later child result cannot satisfy earlier work.
+The master supplies remaining decisions to collect or stop outstanding work
+before successful completion. Exhaustion records incomplete work rather than
+silently claiming completion.
+
+Ordinary Act intake can reserve eight workers with eight generation steps each
+beside the parent's allowance. The captured policy, provider, reasoning,
+permission profile and skills survive recovery; old accepted inputs acquire no
+new worker tools. A worker receives only explicitly delegated native capabilities.
+It cannot widen the parent's captured grants, edit agent settings, inherit live
+editor handles, or delegate recursively. Unsupported approval is refused rather
+than creating a hidden wait. Existing inference-only assignments, read-only
+reviewers, Plan, persistent Goals and temporary side chats retain their own
+contracts. Parent controls fence new admission and address owned child work.
+
+One-shot workers end their native process capability with the assignment. The
+host supplies a required internal completion check alongside captured user
+checks; it cannot replace or silently drop a configured check. Successful
+settlement requires a durable verified retirement receipt. Terminal fallback
+and explicit Stop also request resource cleanup. Waiting remains observational.
+Collection reports the immutable child turn status separately from verified or
+uncertain resource retirement. An empty process table after reopening is not
+retirement evidence; only retained proof or the absence of any dispatched
+process launch can establish that fact. Ordinary chat process lifetime is
+unchanged.
+
 ## Persistent adapter and composition
 
 `agent-kit-store-sqlite` implements `SessionStore` and `TurnJournal` with one
@@ -1228,6 +1365,53 @@ above.
 
 `Responses` and `Gemini` also take a replay binding that the host retains only
 while provider account and endpoint continuity is verified.
+
+The Grida host's subscription adapter admits only the generated
+[subscription compatibility projection](../data/chatgpt-subscription-models.json).
+This finite model-to-wire mapping is generated from the dedicated
+[subscription definition](../../../data/ai/chatgpt-subscription.json);
+an ordinary OpenAI API binding is not subscription eligibility. Unsupported
+or retired members fail before the host opens session state or sends provider
+work. Catalogue membership updates do not change owner, route or continuation
+bindings, and do not migrate saved choices to another model.
+
+An idle top-level chat can follow an explicitly selected authorized provider or
+credential connection. Creation configuration records provenance; it does not
+own future inputs. Current turns, queued inputs, delegated sessions and unresolved
+Goals keep their accepted model, principal and scope. Admission and recovery
+validate those accepted identities, including work accepted after a model change.
+A legacy input with no captured model keeps the exact creation-execution
+restriction. A Goal's later turns retain the original Goal Start selection and
+funding rather than the current birth record. Exact Goal retries observe that
+original allocation independently of the currently selected connection; they do
+not allocate again. Billing refresh continues to validate each retained attempt's
+original scope. Explicit cancellation-only recovery can settle an exact durably
+cancelled turn under another connection without dispatching inference or tools,
+and retains uncertain effects and spending holds.
+
+The visible transcript stays intact. For model context, the product host compares
+each earlier turn's prepared model, capabilities, principal and destination scope
+with the selected route. Compatible turns retain their exact provider
+continuation across restart. Incompatible turns supply the visible conversation
+and labeled historical tool calls and results as text; encrypted provider state
+and reasoning are omitted, and tool-result media is identified without replaying
+its bytes. This includes an account change on an otherwise identical model.
+These descriptions do not invoke tools or carry the old remote call identities.
+The original journal and transcript are unchanged. User-supplied media keeps its
+ordinary destination capability checks; incompatible input receives an input
+failure rather than an account lock. Reusable provider adapters still reject
+mismatched opaque state; portable history is product-host policy.
+
+A private supervisor can negotiate `co.grida/session/model-change` version 1 to
+inspect replacement blockers. Whole-worker preparation scans every retained
+session, not only the attached conversation, including temporary side chats,
+unresolved Goals and running background commands. It refuses pending controls,
+turn admission and title work. A clear `prepare: true` result closes native
+admission while holding the control, configuration and worker boundaries; a new
+request cannot enter between preflight and process retirement. Preparation is
+terminal for that worker. The client may still inspect and close it; a failed
+replacement restores the old connection by starting a new worker. No inference
+or credentials are produced by this operation.
 
 Provider credential sources return an identified principal as well as secret
 material. Prepared requests and resumed attempts retain that principal binding.

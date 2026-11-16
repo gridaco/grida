@@ -11,6 +11,13 @@ export type NativeChatAttachment = Readonly<{
   sessionId: string;
 }>;
 
+/** The native destination and first input are durably bound to the draft. */
+export type NativeChatDraftAttachment = NativeChatAttachment &
+  Readonly<{
+    /** Reuse this identity for the first submission and every retry of it. */
+    firstInputId: string;
+  }>;
+
 export type NativeChatOperatingRegime = "act" | "plan";
 /**
  * Effort for one request, from least to most. `low` through `xhigh` set the
@@ -24,6 +31,28 @@ export type NativeChatEffort =
   | "xhigh"
   | "ultra"
   | "standard";
+
+/** Saved choices contain public identities only; never credentials or paths. */
+export type NativeChatSelection = Readonly<{
+  profileId: string | null;
+  /** The exact wire model identity, not its display label. */
+  modelId: string;
+  effort: NativeChatEffort;
+}>;
+
+/** Exactly one logical chat or stable unsent draft, scoped by native Main. */
+export type NativeChatSelectionTarget =
+  | Readonly<{ sessionId: string; draftId?: never }>
+  | Readonly<{ draftId: string; sessionId?: never }>;
+
+export type NativeChatSelectionState = Readonly<{
+  target: NativeChatSelectionTarget;
+  revision: number;
+  /** Null means legacy identity could not be resolved, without a fallback. */
+  selection: NativeChatSelection | null;
+  /** A saved choice can remain selected while its connection is unavailable. */
+  available: boolean;
+}>;
 
 export type NativeHookEvent =
   | "session_start"
@@ -71,6 +100,25 @@ export type NativeHookInspection = Readonly<{
   results?: readonly NativeHookResult[];
 }>;
 
+/** Global user configuration; never a workspace hook-definition registry. */
+export type NativeGlobalHookInspection = Readonly<{
+  configPath: string;
+  exists: boolean;
+  hooks: readonly (NativeHookInfo & { trusted: boolean })[];
+  diagnostics: readonly string[];
+  activation: "new_connections";
+}>;
+
+export type DesktopHooks = Readonly<{
+  inspect(): Promise<NativeGlobalHookInspection>;
+  reload(): Promise<NativeGlobalHookInspection>;
+  review(
+    id: string,
+    revision: string
+  ): Promise<NativeGlobalHookInspection | null>;
+  open_config(): Promise<void>;
+}>;
+
 export type NativeChatCommand = "compact" | "fork";
 export type NativeChatCommandResult =
   | Readonly<{ command: "fork"; sessionId: string }>
@@ -96,6 +144,23 @@ export type NativeChatImageInput = Readonly<{
   png: ArrayBuffer;
   operatingRegime: NativeChatOperatingRegime;
   effort?: NativeChatEffort;
+  selectionRevision?: number;
+}>;
+
+/**
+ * The original selected File, not a preview or a caller-claimed disk path.
+ * Preload and Main verify disk origin or capture the selected bytes once.
+ */
+export type NativeChatSelectedImageInput = Readonly<{
+  action: "submit" | "enqueue";
+  inputId: string;
+  text: string;
+  file: File;
+  /** Optional original picker/drop File, used only to verify native disk origin. */
+  originalFile?: File;
+  operatingRegime: NativeChatOperatingRegime;
+  effort?: NativeChatEffort;
+  selectionRevision?: number;
 }>;
 
 export type NativeChatFileInput = Readonly<{
@@ -106,6 +171,7 @@ export type NativeChatFileInput = Readonly<{
   bytes: ArrayBuffer;
   operatingRegime: NativeChatOperatingRegime;
   effort?: NativeChatEffort;
+  selectionRevision?: number;
 }>;
 
 /**
@@ -121,7 +187,7 @@ export type NativeChatAttachmentPreview = Readonly<{
 }>;
 
 /**
- * A file attached by reference: the agent receives its path and facts, never
+ * A file or folder attached by reference: the agent receives its path and facts, never
  * its bytes. `file` must be the File the person dropped, pasted or picked; the
  * Desktop preload resolves its path, which never reaches the renderer.
  */
@@ -134,6 +200,7 @@ export type NativeChatFileReferenceInput = Readonly<{
   preview?: NativeChatAttachmentPreview;
   operatingRegime: NativeChatOperatingRegime;
   effort?: NativeChatEffort;
+  selectionRevision?: number;
 }>;
 
 export type NativeChatPage = Readonly<{
@@ -146,6 +213,8 @@ export type NativeChatProfileChoice = Readonly<{
   id: string;
   connection: string;
   model: string;
+  /** This exact binding accepts the product's normalized PNG input; no grant. */
+  imageInput?: true;
   /** The model accepts a reasoning level, so every effort stop applies. */
   reasoning?: true;
   /** The connection can run Ultra's extended work and independent review. */
@@ -156,6 +225,12 @@ export type NativeChatProfileChoice = Readonly<{
 
 export type NativeChatProfileCatalog = Readonly<{
   active: string | null;
+  /** Last explicitly saved app default, even when its connection is unavailable. */
+  newChatDefault?: NativeChatSelection;
+  /** Main guards worker replacement and preserves accepted work across chats. */
+  modelChanges?: true;
+  /** A currently offered choice recommended only for an untouched new chat. */
+  recommendedProfileId?: string;
   /** Context window of the default model, when known. */
   defaultContextWindow?: number;
   choices: readonly NativeChatProfileChoice[];
@@ -222,6 +297,8 @@ export type NativeChatReadiness =
   | "native-gateway-unavailable"
   | "native-provider-key-required"
   | "native-provider-model-unavailable"
+  | "native-hooks-review-required"
+  | "native-hooks-configuration-invalid"
   | "native-provider-endpoint-https-required"
   | "native-provider-endpoint-approval-required"
   | "native-workspace-capacity";
@@ -245,6 +322,8 @@ export type NativeChatSnapshot = Readonly<{
   pendingGoalId?: string;
   historyRevisionAvailable?: true;
   subagentsAvailable?: true;
+  /** Parent-scoped status, lifecycle and real child conversation observation. */
+  subagentActivityAvailable?: true;
   goalNamedChildAvailable?: true;
   goalSpendingAvailable?: true;
   goalManualContinuationAvailable?: true;
@@ -460,6 +539,11 @@ export type NativeChatMessageAttachment = Readonly<{
   size?: number;
   /** A file attached by reference, with the preview the composer showed. */
   preview?: NativeChatAttachmentPreview;
+  /**
+   * Opaque Main-issued token for the exact retained image; contains no path.
+   * Queued tokens require the queued-preview reader and observed input basis.
+   */
+  previewId?: string;
 }>;
 
 /** Recorded outcome and wall-clock interval of a turn in a transcript page. */
@@ -511,9 +595,26 @@ export type NativeChatControl = Readonly<{
 export type NativeChatQueueItem = Readonly<{
   inputId: string;
   preview: string | null;
+  /** Exact captured input is one plain text part. Absent on older hosts. */
+  textOnly?: boolean;
+  /** Native host can replace this waiting input's text while retaining its other parts. */
+  textEditable?: boolean;
+  /** Display metadata only; bytes require a current queued-preview read. */
+  attachments?: readonly NativeChatMessageAttachment[];
   goalStart?: NativeChatGoalRequest;
   operatingRegime?: NativeChatOperatingRegime;
   effort?: "ultra";
+}>;
+
+/** Read-only display of one input still waiting in the observed queue. */
+export type NativeChatQueuedMessage = Readonly<{
+  inputId: string;
+  text: string;
+  /** Exact captured input is one plain text part, independently of display. */
+  textOnly?: boolean;
+  /** Factual eligibility for the negotiated text-preserving replacement operation. */
+  textEditable?: boolean;
+  attachments?: readonly NativeChatMessageAttachment[];
 }>;
 
 export type NativeChatQueuePage = Readonly<{
@@ -525,6 +626,8 @@ export type NativeChatQueuePage = Readonly<{
 
 export type NativeChatQueueAction =
   | { action: "replace"; inputId: string; text: string }
+  /** Replace only text, retaining captured resources and settings. Never fall back to replace. */
+  | { action: "replaceText"; inputId: string; text: string }
   | { action: "withdraw"; inputId: string }
   | { action: "move"; inputId: string; direction: "up" | "down" }
   /** Place a waiting message at a position in the whole queue (0 is next). */
@@ -561,6 +664,7 @@ export type NativeChatGoalRequest = Readonly<{
   automatic: boolean;
   operatingRegime?: NativeChatOperatingRegime;
   effort?: NativeChatEffort;
+  selectionRevision?: number;
   namedChildId?: string;
   /** Exact USD mills under a negotiated provider-enforced allocation. */
   maxCostMills?: string;
@@ -579,7 +683,10 @@ export type NativeChatGoalStatus =
     };
 
 export type NativeChatGoal = Readonly<
-  Omit<NativeChatGoalRequest, "operatingRegime" | "allowance"> & {
+  Omit<
+    NativeChatGoalRequest,
+    "operatingRegime" | "allowance" | "selectionRevision"
+  > & {
     goalId: string;
     allowance: NativeChatGoalUsage;
     state: NativeChatGoalStatus;
@@ -788,6 +895,25 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   importHook?(): Promise<NativeHookInspection | null>;
   removeHook?(id: string, revision: string): Promise<NativeHookInspection>;
   selectProfile?(selection: NativeChatProfileSelection): Promise<void>;
+  /** Read saved identity, initializing a new draft from defaults, without a worker. */
+  selection?(
+    target: NativeChatSelectionTarget
+  ): Promise<NativeChatSelectionState>;
+  /**
+   * Explicitly save a complete resulting choice and the new-chat default.
+   * Main resolves the profile's model; a stale revision or invalid choice rejects.
+   * Retrying the same operation id and arguments preserves the original result;
+   * reusing that id for different arguments rejects.
+   */
+  updateSelection?(
+    target: NativeChatSelectionTarget,
+    expectedRevision: number,
+    operationId: string,
+    choice: Readonly<{
+      profileId: string | null;
+      effort: NativeChatEffort;
+    }>
+  ): Promise<NativeChatSelectionState>;
   listArchived?(cursor?: string | null): Promise<NativeChatPage>;
   catalogEntry?(attachmentId: string): Promise<NativeChatCatalogEntry>;
   organize?(
@@ -800,6 +926,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     catalogRevision: number
   ): Promise<boolean>;
   create(): Promise<NativeChatAttachment>;
+  /** Reopening the same draft reuses its durable destination and first input. */
+  createFromDraft?(draftId: string): Promise<NativeChatDraftAttachment>;
   commands?(attachmentId: string): Promise<readonly NativeChatCommand[]>;
   runCommand?(
     attachmentId: string,
@@ -854,7 +982,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     text: string,
     operatingRegime: NativeChatOperatingRegime,
     effort?: NativeChatEffort,
-    editorSvgTargetId?: string
+    editorSvgTargetId?: string,
+    selectionRevision?: number
   ): Promise<NativeChatAcceptance>;
   acceptsEffort?(): Promise<boolean>;
   acceptsGoalEffort?(): Promise<boolean>;
@@ -876,12 +1005,22 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     inputId: string,
     text: string,
     operatingRegime?: NativeChatOperatingRegime,
-    effort?: NativeChatEffort
+    effort?: NativeChatEffort,
+    selectionRevision?: number
   ): Promise<NativeChatAcceptance>;
   acceptsFile?(): Promise<boolean>;
   submitImage?(
     attachmentId: string,
     input: NativeChatImageInput
+  ): Promise<NativeChatAcceptance>;
+  /**
+   * Whether the selected model and host accept selected raster image Files.
+   * False for text-only models; independent of legacy bounded inline PNG intake.
+   */
+  acceptsSelectedImage?(): Promise<boolean>;
+  submitSelectedImage?(
+    attachmentId: string,
+    input: NativeChatSelectedImageInput
   ): Promise<NativeChatAcceptance>;
   submitFile?(
     attachmentId: string,
@@ -889,7 +1028,9 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   ): Promise<NativeChatAcceptance>;
   /** Whether this chat takes files by reference. */
   acceptsFileReference?(): Promise<boolean>;
-  /** Whether this File names a file on disk that can be attached by reference. */
+  /** Native Desktop supports folder references, under the same tool permissions. */
+  acceptsDirectoryReference?(): Promise<boolean>;
+  /** Whether this File names a resource on disk that can be attached by reference. */
   canReferenceFile?(file: File): boolean;
   submitFileReference?(
     attachmentId: string,
@@ -911,6 +1052,11 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     observationId: string,
     artifactId: string
   ): Promise<ArrayBuffer>;
+  /** Read a recorded input image for display. Grants no model or filesystem access. */
+  readAttachmentPreview?(
+    attachmentId: string,
+    previewId: string
+  ): Promise<ArrayBuffer>;
   saveArtifact?(
     attachmentId: string,
     observationId: string,
@@ -921,11 +1067,34 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     observationId: string,
     offset: number
   ): Promise<NativeChatQueuePage>;
+  /**
+   * Whether the native host supports replaceText. Check this optional method
+   * and the input's textEditable fact; neither attachment metadata nor
+   * textOnly grants text-preserving replacement authority.
+   */
+  acceptsQueuedTextReplacement?(): Promise<boolean>;
   queuedText?(
     attachmentId: string,
     observationId: string,
     inputId: string
   ): Promise<string>;
+  /**
+   * Inspect full queued text and attachment metadata without granting edit or
+   * steering authority. Older hosts omit this method. Stale observations and
+   * inputs that are no longer queued reject.
+   */
+  queuedMessage?(
+    attachmentId: string,
+    observationId: string,
+    inputId: string
+  ): Promise<NativeChatQueuedMessage>;
+  /** Read one opaque preview from this exact observed queued input. */
+  readQueuedAttachmentPreview?(
+    attachmentId: string,
+    observationId: string,
+    inputId: string,
+    previewId: string
+  ): Promise<ArrayBuffer>;
   editQueue?(
     attachmentId: string,
     change: NativeChatQueueChange

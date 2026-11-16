@@ -47,6 +47,10 @@ struct Worker {
 
 impl Worker {
     async fn open(state: &Path, home: &Path, endpoint: &str) -> Self {
+        Self::open_scoped(state, home, endpoint, 'a').await
+    }
+
+    async fn open_scoped(state: &Path, home: &Path, endpoint: &str, scope: char) -> Self {
         let mut command = executable();
         command
             .args([
@@ -58,7 +62,7 @@ impl Worker {
             ])
             .arg(state);
         if endpoint == GATEWAY {
-            command.args(["--supervised-gateway-scope", &"a".repeat(64)]);
+            command.args(["--supervised-gateway-scope", &scope.to_string().repeat(64)]);
         } else {
             command.arg("--credential-home").arg(home);
         }
@@ -935,11 +939,124 @@ async fn goal_review_key_rotation_between_upload_and_dispatch_cannot_run_either_
                 )
                 .await;
             reopened.request("_co.grida/goal/start", start).await;
-            reopened
+            let refused = reopened
+                .client
                 .request("_co.grida/goal/recover", json!({"sessionId":session}))
                 .await;
+            assert_eq!(
+                refused["error"]["data"], "session_goal_route_changed",
+                "{refused}"
+            );
             assert!(reopened.dispatches.is_empty());
             reopened.client.close().await;
         }
     }
+}
+
+#[tokio::test]
+async fn an_idle_gateway_account_change_captures_new_goal_funding_and_preserves_old_receipts() {
+    let root = TempDir::new().unwrap();
+    let directory = root.path().canonicalize().unwrap();
+    let state = directory.join("state");
+    let workspace = directory.join("workspace");
+    std::fs::create_dir(&workspace).unwrap();
+    let mut source = Worker::open_scoped(&state, &directory, GATEWAY, 'a').await;
+    let (session, mut start, _) = source.start(&workspace, false, "act").await;
+    let goal = source
+        .wait(
+            "_co.grida/goal/inspect",
+            json!({"sessionId":session}),
+            |v| v["goal"]["spent"]["inference_steps"] == 5 && v["goal"]["reservation"].is_null(),
+        )
+        .await;
+    let settled = source
+        .wait(
+            "_co.grida/session/snapshot",
+            json!({"sessionId":session}),
+            |v| v["current"].is_null(),
+        )
+        .await;
+    let turn = settled["latest"]["turnId"].clone();
+    let summary = source
+        .request(
+            "_co.grida/session/turn-summary",
+            json!({"sessionId":session,"turnId":turn}),
+        )
+        .await;
+    let attempt = summary["gatewayBilling"]["attempts"][0].clone();
+    source.client.close().await;
+    let mut observer = Worker::open_scoped(&state, &directory, GATEWAY, 'b').await;
+    observer
+        .request(
+            "session/load",
+            json!({"sessionId":session,"cwd":workspace,"mcpServers":[]}),
+        )
+        .await;
+    let retained = observer
+        .request(
+            "_co.grida/session/turn-summary",
+            json!({"sessionId":session,"turnId":turn}),
+        )
+        .await;
+    assert_eq!(retained["status"], "succeeded", "{retained}");
+    assert!(retained.get("gatewayBilling").is_none(), "{retained}");
+    assert!(observer.dispatches.is_empty());
+    observer.client.close().await;
+    let mut source = Worker::open_scoped(&state, &directory, GATEWAY, 'a').await;
+    source
+        .request(
+            "session/load",
+            json!({"sessionId":session,"cwd":workspace,"mcpServers":[]}),
+        )
+        .await;
+    source.request("_co.grida/goal/control",json!({
+        "sessionId":session,"requestId":"clear-first-goal","expectedSessionRevision":goal["revision"],
+        "expectedStateRevision":goal["stateRevision"],"basis":goal["goal"]["basis"],"change":{"action":"clear"}
+    })).await;
+    source.client.close().await;
+    let mut selected = Worker::open_scoped(&state, &directory, GATEWAY, 'b').await;
+    selected.parent = session.clone();
+    selected
+        .request(
+            "session/load",
+            json!({"sessionId":session,"cwd":workspace,"mcpServers":[]}),
+        )
+        .await;
+    start["maxCostMills"] = "7.000".into();
+    let old = selected
+        .request("_co.grida/goal/start", start.clone())
+        .await;
+    assert_eq!(old["disposition"], "completed", "{old}");
+    let historical = selected
+        .request("_co.grida/goal/inspect", json!({"sessionId":session}))
+        .await;
+    assert_eq!(historical["goal"]["spending"], goal["goal"]["spending"]);
+    let foreign = selected.request("_co.grida/gateway/billing-status",json!({
+        "sessionId":session,"turnId":turn,"operationId":attempt["operationId"],"attemptId":attempt["attemptId"]
+    })).await;
+    assert_eq!(foreign, json!({"kind":"unavailable"}));
+    assert!(selected.dispatches.is_empty());
+    start["inputId"] = "second-account-goal".into();
+    let accepted = selected.request("_co.grida/goal/start", start).await;
+    assert_eq!(accepted["inputId"], "second-account-goal");
+    let goal = selected
+        .wait(
+            "_co.grida/goal/inspect",
+            json!({"sessionId":session}),
+            |v| {
+                v["goal"]["basis"]["goal"] == "second-account-goal"
+                    && v["goal"]["spent"]["inference_steps"] == 5
+                    && v["goal"]["reservation"].is_null()
+            },
+        )
+        .await;
+    assert_eq!(goal["goal"]["spending"]["chargedMills"], "1.25");
+    assert_eq!(selected.dispatches.len(), 5);
+    assert_eq!(
+        std::fs::read_dir(state.join("task-spending"))
+            .unwrap()
+            .count(),
+        1
+    );
+    selected.client.close().await;
 }

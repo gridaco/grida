@@ -36,6 +36,7 @@ import type {
   NativeChatQuestion,
   NativeChatQuestionAnswer,
   NativeChatQueueChange,
+  NativeChatQueuedMessage,
   NativeChatQueuePage,
   NativeChatQueueReceipt,
   NativeChatSideRefusal,
@@ -52,6 +53,9 @@ import type {
 } from "@grida/desktop-bridge";
 import { NativeAgentArtifacts } from "./native-agent-artifacts";
 import { NativeFileReference } from "./native-file-reference";
+import { NativeInputImages } from "./native-input-images";
+import { NativeQueuedMessages } from "./native-queued-messages";
+import { NativeSelectedImages } from "./native-selected-images";
 import { NativeAgentBackgroundProcesses } from "./native-agent-background-processes";
 import { NativeAgentHooks, type NativeHookReview } from "./native-agent-hooks";
 import type { NativeHookInspection } from "@grida/desktop-bridge";
@@ -65,6 +69,7 @@ import { NativeAgentDeletion } from "./native-agent-deletion";
 import { NativeAgentCommands } from "./native-agent-commands";
 import { NativeAgentRevisions } from "./native-agent-revisions";
 import { NativeAgentSubagents } from "./native-agent-subagents";
+import { NativeSubagentActivity } from "./native-subagent-activity";
 import {
   NativeAgentGoals,
   type NativeGoalInspection,
@@ -79,6 +84,7 @@ import {
   type NativeAgentLaunch,
 } from "./native-agent-process";
 import { NativeGatewayConnection } from "./native-gateway-connection";
+import type { NativeChatSelections } from "./native-chat-selections";
 
 const CAPABILITIES = {
   "co.grida/session/submit": 1,
@@ -91,6 +97,7 @@ const CAPABILITIES = {
   "co.grida/session/steer": 1,
   "co.grida/session/input": 1,
   "co.grida/session/organize": 1,
+  "co.grida/settings/archive-catalog": 1,
   "co.grida/session/snapshot": 1,
   "co.grida/session/turn-summary": 1,
   "co.grida/session/stop": 1,
@@ -197,6 +204,8 @@ export type NativeAgentChatLaunch = Omit<
 > & {
   /** Canonical workspace context selected by main for this process. */
   cwd: string;
+  /** Main-owned private roots for image custody when no workspace is mounted. */
+  protectedPaths?: readonly string[];
   onLifecycle?: (event: NativeChatLifecycle, current: () => boolean) => void;
 };
 
@@ -262,6 +271,9 @@ export class NativeAgentChat {
     (method, params) => this.process.request(method, params),
     turn
   );
+  private readonly subagentActivityReader = new NativeSubagentActivity(
+    (method, params) => this.process.request(method, params)
+  );
   private readonly deletion = new NativeAgentDeletion((method, params) =>
     this.process.request(method, params, 10_000)
   );
@@ -278,6 +290,8 @@ export class NativeAgentChat {
   private readonly attached = new Map<string, NativeChatSession>();
   private readonly loading = new Map<string, Promise<NativeChatSession>>();
   private readonly transcripts = new Map<string, TranscriptCapture>();
+  private readonly inputImages = new NativeInputImages();
+  private readonly queuedMessages = new NativeQueuedMessages();
   private readonly unverifiedTranscripts = new Set<string>();
   private readonly questionReviews = new WeakSet<NativeQuestionReview>();
   private readonly librarySelectionReviews =
@@ -294,6 +308,74 @@ export class NativeAgentChat {
 
   get acceptsPng(): boolean {
     return this.connected && this.process.acceptsPng;
+  }
+
+  get acceptsQueuedTextReplacement(): boolean {
+    return this.connected && this.process.acceptsQueuedTextReplacement;
+  }
+
+  get acceptsSelectedImage(): boolean {
+    return (
+      this.connected &&
+      this.process.acceptsSelectedImage &&
+      this.selectedImages !== undefined
+    );
+  }
+
+  get supportsSelectedImage(): boolean {
+    return (
+      this.connected &&
+      this.process.supportsSelectedImage &&
+      this.selectedImages !== undefined
+    );
+  }
+
+  get acceptsSelection(): boolean {
+    return this.connected && this.process.acceptsSelection;
+  }
+
+  selectionRequest(
+    operation: NativeChatSelections.Operation,
+    sessionId: string,
+    body: Record<string, unknown> = {}
+  ): Promise<unknown> {
+    this.requireOpen();
+    if (!this.acceptsSelection)
+      throw new Error("native_chat_selection_unsupported");
+    return this.process.request(
+      `_co.grida/session/selection${operation === "inspect" ? "" : `/${operation}`}`,
+      { ...body, cwd: this.cwd, sessionId: identity(sessionId) }
+    );
+  }
+
+  async createSelected(input: {
+    sessionId: string;
+    requestId: string;
+    selection: NativeChatSelections.Selection;
+  }): Promise<NativeChatSession> {
+    this.requireOpen();
+    if (!this.acceptsSelection)
+      throw new Error("native_chat_selection_unsupported");
+    const result = object(
+      await this.process.request("_co.grida/session/selection/create", {
+        cwd: this.cwd,
+        sessionId: input.sessionId,
+        requestId: input.requestId,
+        selection: {
+          connectionId: input.selection.connectionId,
+          model: input.selection.model,
+          effort: input.selection.effort,
+        },
+      })
+    );
+    if (
+      result.sessionId !== input.sessionId ||
+      result.operationId !== input.requestId ||
+      result.revision !== 1
+    )
+      throw invalidResponse();
+    // Load supplies the same attached observation contract as ordinary chats.
+    return this.load(input.sessionId);
   }
 
   get acceptsLibrarySelection(): boolean {
@@ -337,13 +419,24 @@ export class NativeAgentChat {
     return this.process.hasExited;
   }
 
+  get modelChangePending(): boolean {
+    return this.process.modelChangePending;
+  }
+
+  prepareModelChange(): Promise<void> {
+    this.requireOpen();
+    return this.process.prepareModelChange();
+  }
+
   private constructor(
     private readonly process: NativeAgentProcess,
     private readonly cwd: string,
     private readonly scope: string,
     private readonly onLifecycle?: NativeAgentChatLaunch["onLifecycle"],
     private readonly hookRegistry?: NativeAgentHooks,
-    private readonly referenceDenials?: readonly string[]
+    private readonly referenceDenials?: readonly string[],
+    readonly modelId?: string,
+    private readonly selectedImages?: NativeSelectedImages
   ) {}
 
   private readonly lifecycleSeen = new Set<string>();
@@ -351,6 +444,7 @@ export class NativeAgentChat {
   static async start({
     cwd,
     onLifecycle,
+    protectedPaths,
     ...launch
   }: NativeAgentChatLaunch): Promise<NativeAgentChat> {
     if (
@@ -360,6 +454,7 @@ export class NativeAgentChat {
       (launch.workspace !== undefined && launch.workspace.primary.path !== cwd)
     )
       throw new Error("native_chat_workspace_invalid");
+    const custodyDenials = launch.workspace?.protectedPaths ?? protectedPaths;
     let client: NativeAgentChat | undefined;
     const process = await NativeAgentProcess.start({
       ...launch,
@@ -377,7 +472,14 @@ export class NativeAgentChat {
       launch.workspace && [
         ...launch.workspace.protectedPaths,
         launch.stateDirectory,
-      ]
+      ],
+      launch.model,
+      custodyDenials !== undefined
+        ? new NativeSelectedImages(
+            path.join(launch.stateDirectory, "desktop-image-custody"),
+            [...custodyDenials, launch.stateDirectory]
+          )
+        : undefined
     );
     return client;
   }
@@ -422,6 +524,24 @@ export class NativeAgentChat {
     )
       throw invalidResponse();
     return { sessionIds, nextCursor, ...(titles.length && { titles }) };
+  }
+
+  /** Metadata-only Settings calls never attach or restore a chat. */
+  async archiveCatalog(cursor: string | null = null): Promise<unknown> {
+    this.requireOpen();
+    return this.process.request("_co.grida/settings/archive-catalog", {
+      cwd: this.cwd,
+      cursor,
+    });
+  }
+
+  async unarchiveCatalog(sessionId: string, revision: number): Promise<void> {
+    this.requireOpen();
+    await this.process.request("_co.grida/settings/unarchive", {
+      cwd: this.cwd,
+      sessionId,
+      revision,
+    });
   }
 
   commands(session: NativeChatSession): readonly NativeChatCommand[] {
@@ -490,6 +610,34 @@ export class NativeAgentChat {
         check(revision);
       },
       { selection: input.effort, available: this.acceptsEffort }
+    );
+  }
+
+  subagentActivity(
+    parent: NativeChatSession,
+    afterChildId: string | undefined,
+    check: () => void
+  ) {
+    return this.subagentActivityReader.activity(
+      parent,
+      afterChildId,
+      this.subagentActivityScope(parent, check)
+    );
+  }
+
+  subagentConversation(
+    attachment: object,
+    parent: NativeChatSession,
+    childId: string,
+    before: string | undefined,
+    check: () => void
+  ) {
+    return this.subagentActivityReader.conversation(
+      attachment,
+      parent,
+      childId,
+      before,
+      this.subagentActivityScope(parent, check)
     );
   }
 
@@ -795,11 +943,13 @@ export class NativeAgentChat {
     text: string,
     operatingRegime?: NativeChatOperatingRegime,
     editorSurfaces?: NativeEditorSurfaceSelection,
-    effort?: NativeChatEffort
+    effort?: NativeChatEffort,
+    selectionRevision?: number
   ): Promise<NativeChatAcceptance> {
     return this.send("submit", session, inputId, text, operatingRegime, {
       editorSurfaces,
       effort,
+      selectionRevision,
     });
   }
 
@@ -809,11 +959,13 @@ export class NativeAgentChat {
     text: string,
     operatingRegime?: NativeChatOperatingRegime,
     editorSurfaces?: NativeEditorSurfaceSelection,
-    effort?: NativeChatEffort
+    effort?: NativeChatEffort,
+    selectionRevision?: number
   ): Promise<NativeChatAcceptance> {
     return this.send("enqueue", session, inputId, text, operatingRegime, {
       editorSurfaces,
       effort,
+      selectionRevision,
     });
   }
 
@@ -846,7 +998,8 @@ export class NativeAgentChat {
     text: string,
     operatingRegime?: NativeChatOperatingRegime,
     editorSurfaces?: NativeEditorSurfaceSelection,
-    effort?: NativeChatEffort
+    effort?: NativeChatEffort,
+    selectionRevision?: number
   ): Promise<NativeChatAcceptance> {
     if (!this.acceptsLibrarySelection)
       return Promise.reject(
@@ -856,6 +1009,7 @@ export class NativeAgentChat {
       allowLibrarySelection: true,
       editorSurfaces,
       effort,
+      selectionRevision,
     });
   }
 
@@ -871,7 +1025,8 @@ export class NativeAgentChat {
         ? undefined
         : choice(input.effort, EFFORT_CHOICES);
     if (
-      Object.keys(input).length !== (effort ? 6 : 5) ||
+      Object.keys(input).length !==
+        (effort ? 6 : 5) + Number(input.selectionRevision !== undefined) ||
       typeof input.text !== "string"
     )
       throw invalidResponse();
@@ -881,8 +1036,96 @@ export class NativeAgentChat {
       identity(input.inputId),
       input.text,
       choice(input.operatingRegime, ["act", "plan"] as const),
-      { image: pngPrompt(input.png), effort }
+      {
+        image: pngPrompt(input.png),
+        effort,
+        selectionRevision: optionalSelectionRevision(input.selectionRevision),
+      }
     );
+  }
+
+  /** Original File custody has already been resolved by preload, never a poster. */
+  async submitSelectedImage(
+    session: NativeChatSession,
+    value: unknown
+  ): Promise<NativeChatAcceptance> {
+    const sessionId = this.requireAttached(session);
+    if (!this.acceptsSelectedImage || !this.selectedImages)
+      throw new Error("image_input_unavailable");
+    const input = object(value);
+    const known = new Set([
+      "action",
+      "inputId",
+      "text",
+      "name",
+      "path",
+      "bytes",
+      "operatingRegime",
+      "effort",
+      "selectionRevision",
+      "sha256",
+      "size",
+      "lastModified",
+    ]);
+    if (
+      Object.keys(input).some((key) => !known.has(key)) ||
+      typeof input.text !== "string"
+    )
+      throw invalidResponse();
+    const action = choice(input.action, ["submit", "enqueue"] as const);
+    const inputId = identity(input.inputId);
+    const regime = choice(input.operatingRegime, ["act", "plan"] as const);
+    const effort =
+      input.effort === undefined
+        ? undefined
+        : choice(input.effort, EFFORT_CHOICES);
+    const selectionRevision = optionalSelectionRevision(
+      input.selectionRevision
+    );
+    if (selectionRevision !== undefined && !this.acceptsSelection)
+      throw new Error("native_chat_selection_invalid");
+    if (effort === "ultra" && !this.acceptsEffort)
+      throw new Error("native_chat_effort_unavailable");
+    textPrompt(input.text);
+    const selectedImage = await this.selectedImages.capture(
+      sessionId,
+      inputId,
+      {
+        name: input.name,
+        path: input.path,
+        bytes: input.bytes,
+        sha256: input.sha256,
+        size: input.size,
+        lastModified: input.lastModified,
+      }
+    );
+    this.requireAttached(session);
+    try {
+      const result = await this.send(
+        action,
+        session,
+        inputId,
+        input.text,
+        regime,
+        {
+          selectedImage,
+          effort,
+          selectionRevision,
+        }
+      );
+      // Cleanup failures must not turn a known accepted input into uncertainty.
+      await this.selectedImages.complete(sessionId, inputId).catch(() => {});
+      return result;
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        /^(?:selected_image_(?:changed|symlink|protected|size_limit|unavailable|identity_invalid|snapshot_unavailable)|image_(?:source_size_limit|decode_limit|preparation_limit|input_unavailable)|invalid_raster_image|unsupported_image_format|protected_root_overlap|unsupported_input_modality)$/.test(
+          error.message
+        )
+      )
+        await this.selectedImages.complete(sessionId, inputId).catch(() => {});
+      throw error;
+    }
   }
 
   async submitFile(
@@ -897,7 +1140,8 @@ export class NativeAgentChat {
         ? undefined
         : choice(input.effort, EFFORT_CHOICES);
     if (
-      Object.keys(input).length !== (effort ? 7 : 6) ||
+      Object.keys(input).length !==
+        (effort ? 7 : 6) + Number(input.selectionRevision !== undefined) ||
       typeof input.text !== "string"
     )
       throw invalidResponse();
@@ -907,12 +1151,16 @@ export class NativeAgentChat {
       identity(input.inputId),
       input.text,
       choice(input.operatingRegime, ["act", "plan"] as const),
-      { file: selectedFile(input.name, input.bytes), effort }
+      {
+        file: selectedFile(input.name, input.bytes),
+        effort,
+        selectionRevision: optionalSelectionRevision(input.selectionRevision),
+      }
     );
   }
 
   /**
-   * GRIDA-SEC-004: send a file the person attached by reference. `path` comes
+   * GRIDA-SEC-004: send a file or folder the person attached by reference. `path` comes
    * from the preload's resolution of their File; it is resolved again here,
    * only its metadata is read, and Grida's protected stores are refused.
    */
@@ -934,6 +1182,7 @@ export class NativeAgentChat {
       "preview",
       "operatingRegime",
       "effort",
+      "selectionRevision",
     ]);
     if (
       Object.keys(input).some((key) => !known.has(key)) ||
@@ -961,6 +1210,7 @@ export class NativeAgentChat {
         preview,
       }),
       effort,
+      selectionRevision: optionalSelectionRevision(input.selectionRevision),
     });
   }
 
@@ -972,23 +1222,34 @@ export class NativeAgentChat {
     operatingRegime?: NativeChatOperatingRegime,
     options: {
       image?: ReturnType<typeof pngPrompt>;
+      selectedImage?: NativeSelectedImages.Descriptor;
       file?: ReturnType<typeof selectedFile>;
       reference?: ReturnType<typeof NativeFileReference.link>;
       allowLibrarySelection?: true;
       editorSurfaces?: NativeEditorSurfaceSelection;
       effort?: NativeChatEffort;
+      selectionRevision?: number;
     } = {}
   ): Promise<NativeChatAcceptance> {
     const sessionId = this.requireAttached(session);
     identity(inputId);
     const {
       image,
+      selectedImage,
       file,
       reference,
       allowLibrarySelection,
       editorSurfaces,
       effort,
+      selectionRevision,
     } = options;
+    if (
+      selectionRevision !== undefined &&
+      (!Number.isSafeInteger(selectionRevision) ||
+        selectionRevision < 1 ||
+        !this.acceptsSelection)
+    )
+      throw new Error("native_chat_selection_invalid");
     if (effort === "ultra" && !this.acceptsEffort)
       throw new Error("native_chat_effort_unavailable");
     return acceptance(
@@ -1001,11 +1262,16 @@ export class NativeAgentChat {
           ...(reference ? [reference] : []),
         ],
         ...(file && { selectedFile: file }),
+        ...(selectedImage && { selectedImage }),
         ...(operatingRegime && { operatingRegime }),
         ...hostEffort(effort),
+        ...(selectionRevision !== undefined && {
+          _meta: { "co.grida/selectionRevision": selectionRevision },
+        }),
         ...(allowLibrarySelection && { allowLibrarySelection }),
         ...(operatingRegime === "act" &&
           !image &&
+          !selectedImage &&
           !file &&
           !reference &&
           editorSurfaces),
@@ -1058,7 +1324,10 @@ export class NativeAgentChat {
       })
     );
     this.requireAttached(session);
-    return acceptance(result.receipt, sessionId, inputId);
+    const accepted = acceptance(result.receipt, sessionId, inputId);
+    // A recovered receipt settles Main's unknown temporary custody as well.
+    await this.selectedImages?.complete(sessionId, inputId).catch(() => {});
+    return accepted;
   }
 
   async observe(session: NativeChatSession): Promise<NativeChatSnapshot> {
@@ -1085,6 +1354,9 @@ export class NativeAgentChat {
       }),
       ...(this.process.acceptsSubagents && {
         subagentsAvailable: true as const,
+      }),
+      ...(this.process.acceptsSubagentActivity && {
+        subagentActivityAvailable: true as const,
       }),
       ...(this.process.acceptsGoalNamedChild && {
         goalNamedChildAvailable: true as const,
@@ -1308,11 +1580,21 @@ export class NativeAgentChat {
     const page = queue.slice(start, start + QUEUE_PAGE_SIZE);
     const items = [];
     for (const row of page) {
-      const input = await this.readQueueInput(sessionId, row);
-      this.requireAttached(session);
-      if (input.receipt.disposition !== "queued")
-        throw new Error("native_chat_queue_changed");
-      const text = row.goalStart?.objective ?? input.text;
+      let display: NativeChatQueuedMessage | undefined;
+      let text: string | null;
+      let textOnly: boolean | undefined;
+      if (this.process.acceptsQueuedMessages && !row.goalStart) {
+        display = await this.queuedMessage(session, snapshot, row.inputId);
+        text = display.text;
+        textOnly = display.textOnly;
+      } else {
+        const input = await this.readQueueInput(sessionId, row);
+        this.requireAttached(session);
+        if (input.receipt.disposition !== "queued")
+          throw new Error("native_chat_queue_changed");
+        text = row.goalStart?.objective ?? input.text;
+        textOnly = row.goalStart ? undefined : input.textOnly;
+      }
       const preview =
         text && text.length > QUEUE_PREVIEW_LENGTH
           ? `${text.slice(0, QUEUE_PREVIEW_LENGTH)}…`
@@ -1320,6 +1602,11 @@ export class NativeAgentChat {
       items.push({
         inputId: row.inputId,
         preview,
+        ...(textOnly !== undefined && { textOnly }),
+        ...(display?.textEditable !== undefined && {
+          textEditable: display.textEditable,
+        }),
+        ...(display?.attachments && { attachments: display.attachments }),
         ...(row.goalStart && { goalStart: row.goalStart }),
         ...(row.operatingRegime && { operatingRegime: row.operatingRegime }),
         ...(row.effort && { effort: row.effort }),
@@ -1352,6 +1639,87 @@ export class NativeAgentChat {
     return input.text;
   }
 
+  async queuedMessage(
+    session: NativeChatSession,
+    snapshot: NativeChatSnapshot,
+    inputId: string
+  ): Promise<NativeChatQueuedMessage> {
+    const sessionId = this.requireObservation(session, snapshot);
+    const row = observed
+      .get(snapshot)!
+      .queue.find((item) => item.inputId === inputId);
+    if (!row || !this.process.acceptsQueuedMessages)
+      throw new Error("native_chat_queued_message_unavailable");
+    if (row.goalStart) {
+      const current = await this.observe(session);
+      if (current.sessionRevision !== snapshot.sessionRevision)
+        throw new Error("native_chat_queue_changed");
+      return Object.freeze({ inputId, text: row.goalStart.objective });
+    }
+    const result = await this.process.request(
+      NativeQueuedMessages.inspectMethod,
+      {
+        sessionId,
+        expectedSessionRevision: snapshot.sessionRevision,
+        inputId: row.inputId,
+      }
+    );
+    this.requireObservation(session, snapshot);
+    return this.queuedMessages.describe(
+      sessionId,
+      snapshot.sessionRevision,
+      row.inputId,
+      result,
+      this.acceptsQueuedTextReplacement
+    );
+  }
+
+  async readQueuedAttachmentPreview(
+    session: NativeChatSession,
+    snapshot: NativeChatSnapshot,
+    inputId: string,
+    previewId: string
+  ): Promise<ArrayBuffer> {
+    const sessionId = this.requireObservation(session, snapshot);
+    if (
+      !this.process.acceptsQueuedMessages ||
+      !observed.get(snapshot)!.queue.some((row) => row.inputId === inputId)
+    )
+      throw new Error("native_chat_queued_message_unavailable");
+    const image = this.queuedMessages.require(
+      sessionId,
+      snapshot.sessionRevision,
+      inputId,
+      previewId
+    );
+    const bytes = await this.queuedMessages.read(image, async (offset) => {
+      this.requireObservation(session, snapshot);
+      const chunk = await this.process.request(
+        NativeQueuedMessages.readMethod,
+        {
+          sessionId,
+          expectedSessionRevision: snapshot.sessionRevision,
+          inputId,
+          attachmentUri: image.attachmentUri,
+          offset,
+        }
+      );
+      this.requireObservation(session, snapshot);
+      if (
+        this.queuedMessages.require(
+          sessionId,
+          snapshot.sessionRevision,
+          inputId,
+          previewId
+        ) !== image
+      )
+        throw new Error("native_chat_queued_message_unavailable");
+      return chunk;
+    });
+    this.requireObservation(session, snapshot);
+    return bytes;
+  }
+
   async editQueue(
     session: NativeChatSession,
     snapshot: NativeChatSnapshot,
@@ -1377,7 +1745,29 @@ export class NativeAgentChat {
       const queue = observed.get(snapshot)!.queue;
       const index = queue.findIndex((item) => item.inputId === change.inputId);
       if (index < 0) throw new Error("native_chat_queue_input_unavailable");
-      if (change.action === "replace") {
+      if (change.action === "replaceText") {
+        if (!this.acceptsQueuedTextReplacement)
+          throw new Error("native_chat_queued_text_replacement_unavailable");
+        if (queue[index].goalStart)
+          throw new Error("queued_goal_requires_withdrawal");
+        if (
+          typeof change.text !== "string" ||
+          Buffer.byteLength(change.text) > MAX_TEXT_BYTES
+        )
+          throw new Error("native_chat_text_invalid");
+        revalidate?.();
+        result = await this.process.request(
+          NativeQueuedMessages.replaceTextMethod,
+          {
+            queue: basis,
+            inputId: change.inputId,
+            replacementInputId: `desktop-replacement-${createHash("sha256")
+              .update(JSON.stringify([sessionId, requestId]))
+              .digest("hex")}`,
+            text: change.text,
+          }
+        );
+      } else if (change.action === "replace") {
         if (queue[index].goalStart)
           throw new Error("queued_goal_requires_withdrawal");
         const prompt = textPrompt(change.text);
@@ -1841,12 +2231,51 @@ export class NativeAgentChat {
     return resumed;
   }
 
+  /** An observational read of an image recorded on this chat's user message. */
+  async readAttachmentPreview(
+    session: NativeChatSession,
+    previewId: string
+  ): Promise<ArrayBuffer> {
+    const sessionId = this.requireAttached(session);
+    if (
+      !this.process.acceptsInputImages &&
+      !this.process.acceptsInputImageChunks
+    )
+      throw new Error("native_chat_input_image_unavailable");
+    const image = this.inputImages.require(sessionId, previewId);
+    if (image.chunked) {
+      const bytes = await this.inputImages.readChunks(image, (offset) =>
+        this.process.request(NativeInputImages.chunkMethod, {
+          sessionId,
+          messageId: image.messageId,
+          attachmentUri: image.attachmentUri,
+          offset,
+        })
+      );
+      this.requireAttached(session);
+      if (this.inputImages.require(sessionId, previewId) !== image)
+        throw new Error("native_chat_input_image_unavailable");
+      return bytes;
+    }
+    const result = await this.process.request(NativeInputImages.readMethod, {
+      sessionId,
+      messageId: image.messageId,
+      attachmentUri: image.attachmentUri,
+    });
+    this.requireAttached(session);
+    if (this.inputImages.require(sessionId, previewId) !== image)
+      throw new Error("native_chat_input_image_unavailable");
+    return this.inputImages.decode(result, image);
+  }
+
   close(): Promise<void> {
     this.closed = true;
     this.sideChats.clear();
     this.attached.clear();
     this.listeners.clear();
     this.lifecycleSeen.clear();
+    this.inputImages.clear();
+    this.queuedMessages.clear();
     return this.process.close();
   }
 
@@ -1956,13 +2385,31 @@ export class NativeAgentChat {
           attribution === undefined
             ? undefined
             : identity(attribution.requestId);
-        if (capture && capture.requestId === requestId)
+        if (capture && capture.requestId === requestId) {
+          const messageId = identity(update.messageId);
+          const entry = attachment(content);
+          const previewId =
+            (this.process.acceptsInputImageChunks &&
+              ["image/png", "image/jpeg", "image/webp", "image/gif"].includes(
+                entry.mimeType ?? ""
+              )) ||
+            (this.process.acceptsInputImages && entry.mimeType === "image/png")
+              ? this.inputImages.offer(
+                  sessionId,
+                  messageId,
+                  content.uri,
+                  entry.size,
+                  entry.mimeType,
+                  this.process.acceptsInputImageChunks
+                )
+              : undefined;
           captureAttachment(
             capture,
-            identity(update.messageId),
+            messageId,
             optionalIdentity(attribution?.turnId),
-            attachment(content)
+            Object.freeze({ ...entry, ...(previewId && { previewId }) })
           );
+        }
         return;
       }
       if (
@@ -2123,12 +2570,18 @@ export class NativeAgentChat {
       throw invalidResponse();
     const part = result.prompt.length === 1 ? object(result.prompt[0]) : null;
     const text =
+      result.textOnly !== false &&
       part?.type === "text" &&
       typeof part.text === "string" &&
       Buffer.byteLength(part.text) <= MAX_TEXT_BYTES
         ? part.text
         : null;
-    return { receipt, text };
+    return {
+      receipt,
+      text,
+      textOnly:
+        typeof result.textOnly === "boolean" ? result.textOnly : undefined,
+    };
   }
 
   private attach(id: string): NativeChatSession {
@@ -2156,6 +2609,18 @@ export class NativeAgentChat {
       if (!this.process.acceptsSubagents)
         throw new Error("native_chat_subagent_unavailable");
       check();
+    };
+  }
+
+  private subagentActivityScope(
+    parent: NativeChatSession,
+    check: () => void
+  ): () => void {
+    const scoped = this.subagentScope(parent, check);
+    return () => {
+      scoped();
+      if (!this.process.acceptsSubagentActivity)
+        throw new Error("native_chat_subagent_activity_unavailable");
     };
   }
 
@@ -2951,4 +3416,11 @@ function hostEffort(effort: NativeChatEffort | undefined): {
     default:
       return { reasoning: effort };
   }
+}
+
+function optionalSelectionRevision(value: unknown): number | undefined {
+  if (value === undefined) return undefined;
+  if (!Number.isSafeInteger(value) || (value as number) < 1)
+    throw new Error("native_chat_selection_invalid");
+  return value as number;
 }

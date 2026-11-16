@@ -337,3 +337,62 @@ fn file_references_keep_their_model_text_through_forks_and_compaction() {
         "{source}"
     );
 }
+
+#[test]
+fn directory_references_keep_their_folder_description_through_forks_and_compaction() {
+    use agent_kit_core::messages::{MediaRef, Retention};
+    use agent_kit_core::{ArtifactId, ModelId};
+    use grida_agent_master::compaction::summary_request;
+    use grida_agent_master::conversation_seed::SeedOmissions;
+    use grida_agent_master::file_reference::{self, FileReference};
+
+    let reference = FileReference {
+        name: "source".into(),
+        path: "/work/project/source".into(),
+        workspace_path: Some("source".into()),
+        mime_type: Some(file_reference::DIRECTORY_MEDIA_TYPE.into()),
+        size: None,
+        preview: None,
+    };
+    let record = message(
+        "folder",
+        Role::User,
+        "fixture",
+        vec![Content::Media(MediaRef {
+            id: ArtifactId::new("file-reference/folder").unwrap(),
+            media_type: file_reference::MEDIA_TYPE.into(),
+            locator: file_reference::locator(&reference),
+            access_scope: BindingId::new("fixture").unwrap(),
+            retention: Retention::Retained,
+        })],
+    );
+    let seed = ConversationSeed::lower(
+        source("source"),
+        ConversationCut::Through(anchor("folder")),
+        None,
+        [record.clone()].into_iter().map(local),
+    )
+    .unwrap();
+    let HistoryRecord::Message(seeded) = &seed.records()[0];
+    assert_eq!(seeded.content, vec![Content::Text(reference.describe())]);
+    assert!(
+        reference
+            .describe()
+            .contains("Attached folder by reference")
+    );
+    let HistoryRecord::Message(original) = record;
+    let request = summary_request(
+        ModelId::new("summary-model").unwrap(),
+        None,
+        vec![original],
+        Vec::new(),
+        SeedOmissions::default(),
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(request.coverage.omissions.media, 0);
+    let supplied = serde_json::to_string(&request.inference.messages[1]).unwrap();
+    assert!(supplied.contains("Attached folder by reference"));
+    assert!(supplied.contains("/work/project/source"));
+    assert!(!supplied.contains("\"size\""));
+}

@@ -1,0 +1,125 @@
+"use client";
+
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { ArchiveRestoreIcon, Loader2, RefreshCwIcon } from "lucide-react";
+import { Button } from "@app/ui/components/button";
+import { getDesktopBridge } from "@/lib/desktop/bridge";
+import { SettingsArchives } from "@/lib/desktop/settings-archives";
+
+export function ArchivedChatsSettings() {
+  const [controller] = useState(
+    () => new SettingsArchives.Controller(() => getDesktopBridge()?.archives)
+  );
+  const state = useSyncExternalStore(
+    controller.subscribe,
+    controller.read,
+    controller.read
+  );
+  useEffect(() => {
+    const refresh = () => void controller.refresh();
+    refresh();
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      controller.cancel();
+    };
+  }, [controller]);
+  const busy = state.loading || state.restoring !== null;
+  return (
+    <section data-testid="settings-archived-chats" className="space-y-5">
+      <header className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">
+            Archived chats
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Restore a chat to its workspace’s chat list.
+          </p>
+        </div>
+        {state.supported && (
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            aria-label="Refresh archived chats"
+            disabled={busy}
+            onClick={() => void controller.refresh()}
+          >
+            <RefreshCwIcon className="size-4" />
+          </Button>
+        )}
+      </header>
+      {state.loading && state.entries.length === 0 ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          Loading archived chats…
+        </p>
+      ) : !state.supported ? (
+        <p className="text-sm text-muted-foreground">
+          Update Desktop to manage archived chats here.
+        </p>
+      ) : (
+        <>
+          {state.unavailableWorkspaces.length > 0 && (
+            <p role="status" className="text-sm text-muted-foreground">
+              Some workspaces couldn&apos;t be checked:{" "}
+              {state.unavailableWorkspaces.join(", ")}. Refresh to try again.
+            </p>
+          )}
+          {state.entries.length === 0 &&
+            !state.error &&
+            state.unavailableWorkspaces.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No archived chats.
+              </p>
+            )}
+          <ul className="divide-y rounded-xl border empty:hidden">
+            {state.entries.map((chat) => (
+              <li key={chat.id} className="flex items-center gap-3 p-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">
+                    {chat.title || "Untitled chat"}
+                  </p>
+                  <p
+                    className="truncate text-xs text-muted-foreground"
+                    title={chat.workspace}
+                  >
+                    {chat.workspace}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  aria-label={`Unarchive ${chat.title || "Untitled chat"}`}
+                  onClick={() => void controller.unarchive(chat.id)}
+                >
+                  {state.restoring === chat.id ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <ArchiveRestoreIcon className="size-3.5" />
+                  )}
+                  Unarchive
+                </Button>
+              </li>
+            ))}
+          </ul>
+          {state.nextCursor && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy}
+              onClick={() => void controller.more()}
+            >
+              {state.loading && <Loader2 className="size-3.5 animate-spin" />}
+              Load more
+            </Button>
+          )}
+        </>
+      )}
+      {state.error && (
+        <p role="alert" className="text-sm text-destructive">
+          {state.error}
+        </p>
+      )}
+    </section>
+  );
+}

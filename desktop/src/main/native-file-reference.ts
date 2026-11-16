@@ -1,11 +1,11 @@
-// GRIDA-SEC-004 — a chat attachment by reference names a person-chosen file
+// GRIDA-SEC-004 — a chat attachment by reference names a person-chosen file or folder
 // and grants nothing.
 //
 // The path comes only from the preload, which resolves it from a File the
 // person dropped, pasted or picked (`webUtils.getPathForFile`); the renderer
 // never supplies a path string. Main resolves it and reads its metadata only,
 // never its bytes, and refuses Grida's own protected stores. The agent then
-// reaches the file only through tools its permissions already allow.
+// reaches the resource only through tools its permissions already allow.
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -24,6 +24,7 @@ const MEDIA_TYPE = /^[a-z0-9.+-]+\/[a-z0-9.+-]+$/;
 const POSTER = /^data:image\/(?:jpeg|png);base64,[A-Za-z0-9+/]+={0,2}$/;
 /** `_meta` key the host reads with a file reference link. */
 const DETAILS = "co.grida/file-reference";
+const DIRECTORY_MEDIA_TYPE = "inode/directory";
 
 export namespace NativeFileReference {
   export const capability = "co.grida/session/file-reference";
@@ -36,18 +37,19 @@ export namespace NativeFileReference {
     protectedPaths: readonly string[];
   }>;
 
-  export type Resolved = Readonly<{
-    name: string;
-    path: string;
-    /** Relative to `cwd`, when the file is inside it. */
-    workspacePath?: string;
-    size: number;
-  }>;
+  export type Resolved = Readonly<
+    {
+      name: string;
+      path: string;
+      /** Relative to `cwd`, when the resource is inside it. */
+      workspacePath?: string;
+    } & ({ kind: "file"; size: number } | { kind: "directory" })
+  >;
 
   /**
-   * Resolve a person-chosen path to the regular file it names. Refuses
-   * anything else: relative or oversized paths, folders, missing files, and
-   * files in Grida's protected stores (also through a link).
+   * Resolve a person-chosen path to a regular file or directory. Reads no
+   * contents. Refuses special files, relative or oversized paths, missing
+   * resources and overlaps with Grida's protected stores (also through a link).
    */
   export async function resolve(
     value: unknown,
@@ -61,12 +63,14 @@ export namespace NativeFileReference {
     )
       throw new Error("native_chat_file_reference_unavailable");
     let real: string;
-    let size: number;
+    let resource: { kind: "file"; size: number } | { kind: "directory" };
     try {
       real = await fs.realpath(value);
       const metadata = await fs.stat(real);
-      if (!metadata.isFile()) throw new Error("not_a_file");
-      size = metadata.size;
+      if (metadata.isDirectory()) resource = { kind: "directory" };
+      else if (metadata.isFile())
+        resource = { kind: "file", size: metadata.size };
+      else throw new Error("not_a_file_or_directory");
     } catch {
       throw new Error("native_chat_file_reference_unavailable");
     }
@@ -77,13 +81,14 @@ export namespace NativeFileReference {
       path.join(os.homedir(), ".grida"),
       ...(home && path.isAbsolute(home) ? [home] : []),
     ]);
-    let protectedFile: boolean;
+    let protectedResource: boolean;
     try {
-      protectedFile = denied.overlaps(real);
+      protectedResource = denied.overlaps(real);
     } catch {
-      protectedFile = true;
+      protectedResource = true;
     }
-    if (protectedFile) throw new Error("native_chat_file_reference_protected");
+    if (protectedResource)
+      throw new Error("native_chat_file_reference_protected");
     const name = path.basename(real);
     if (
       !name ||
@@ -98,7 +103,7 @@ export namespace NativeFileReference {
       ...(inside && {
         workspacePath: path.relative(scope.cwd, real).split(path.sep).join("/"),
       }),
-      size,
+      ...resource,
     });
   }
 
@@ -144,18 +149,26 @@ export namespace NativeFileReference {
     resolved: Resolved,
     options: { mimeType?: string; preview?: NativeChatAttachmentPreview } = {}
   ) {
+    const directory = resolved.kind === "directory";
+    // Main owns resource type. A folder has neither a content byte size nor a
+    // media preview, regardless of what an untrusted page reported.
+    const mimeType = directory
+      ? DIRECTORY_MEDIA_TYPE
+      : options.mimeType === DIRECTORY_MEDIA_TYPE
+        ? undefined
+        : options.mimeType;
     const details = {
       ...(resolved.workspacePath !== undefined && {
         workspacePath: resolved.workspacePath,
       }),
-      ...(options.preview && { preview: options.preview }),
+      ...(!directory && options.preview && { preview: options.preview }),
     };
     return {
       type: "resource_link",
       name: resolved.name,
       uri: pathToFileURL(resolved.path).href,
-      size: resolved.size,
-      ...(options.mimeType && { mimeType: options.mimeType }),
+      ...(resolved.kind === "file" && { size: resolved.size }),
+      ...(mimeType && { mimeType }),
       ...(Object.keys(details).length && { _meta: { [DETAILS]: details } }),
     };
   }

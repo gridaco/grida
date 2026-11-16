@@ -6,8 +6,10 @@ import started from "electron-squirrel-startup";
 import { MediaStore, RecentStore } from "@grida/daemon/server";
 import create_menu, {
   focus_or_open_canvas_window,
+  open_or_focus_settings,
   rebuild_application_menu,
 } from "./menu";
+import { createDesktopArchives } from "./main/native-desktop-archives";
 import { open_document_window } from "./window";
 import { DEEP_LINK_SCHEME, EDITOR_BASE_URL } from "./env";
 import {
@@ -18,10 +20,7 @@ import {
 import {
   startServicesSidecar,
   getServicesSidecarInfo,
-  getServicesSidecarMode,
   stopServicesSidecar,
-  approveAgentProviderEndpoint,
-  describeAgentProviderEndpoint,
   type ServicesSidecarInfo,
 } from "./main/services-sidecar-supervisor";
 import { registerIpcHandlers } from "./main/ipc-handlers";
@@ -42,6 +41,7 @@ import { startup_window } from "./main/startup-window-policy";
 import { DesktopAccountSession } from "./main/account-session";
 import { DesktopEntryWindow } from "./main/desktop-entry-window";
 import { DesktopPreferences } from "./main/desktop-preferences";
+import { NativeChatSelections } from "./main/native-chat-selections";
 import { NativeDesktopAgent } from "./main/native-desktop-agent";
 import { NativeDesktopProfile } from "./main/native-desktop-profile";
 import { NativeMcpLaunch } from "./main/native-mcp-launch";
@@ -522,24 +522,6 @@ app.on("open-url", (event, url) => {
 // menu actions, and the file-handle path. The supervisor maintains
 // the live reference internally for restart-on-crash continuity.
 let servicesSidecarInfo: ServicesSidecarInfo | null = null;
-let providerApprovalStarted = false;
-
-function approveConfiguredProviderEndpointsWhenReady(): void {
-  const mode = getServicesSidecarMode();
-  if (
-    providerApprovalStarted ||
-    mode === null ||
-    mode === "disabled" ||
-    !entryWindow?.isMain
-  ) {
-    return;
-  }
-  providerApprovalStarted = true;
-  void approveConfiguredProviderEndpoints().catch((error) => {
-    console.error("[grida] configured provider approval failed:", error);
-  });
-}
-
 function dispatchPendingLaunchIntents(): void {
   for (const filePath of pendingFiles.splice(0)) {
     handleFilePath(filePath);
@@ -811,10 +793,29 @@ app.on("ready", async () => {
     }
   }
   let desktopPreferences: DesktopPreferences;
+  let chatSelections: NativeChatSelections | undefined;
   try {
     desktopPreferences = await DesktopPreferences.open({
       user_data_path: app.getPath("userData"),
     });
+    if (nativeDesktopAgent) {
+      const native = nativeDesktopAgent;
+      chatSelections = await NativeChatSelections.open({
+        userDataPath: app.getPath("userData"),
+        choice: (workspaceId, profileId) =>
+          native.selectionChoice(workspaceId, profileId),
+        initial: (workspaceId) => native.initialSelection(workspaceId),
+        legacy: (workspaceId, value) =>
+          native.legacySelection(workspaceId, value),
+        query: (workspaceId, sessionId, operation, body) =>
+          native.selectionRequest(workspaceId, sessionId, operation, body),
+      });
+      void chatSelections
+        .recover()
+        .catch(() =>
+          console.error("[grida] pending chat selection needs recovery")
+        );
+    }
   } catch {
     console.error("[grida] desktop preferences could not be read");
     dialog.showErrorBox(
@@ -855,7 +856,6 @@ app.on("ready", async () => {
     on_role_change: (role) => {
       refresh_recent_menu();
       if (role === "main") {
-        approveConfiguredProviderEndpointsWhenReady();
         dispatchPendingLaunchIntents();
       }
     },
@@ -866,8 +866,15 @@ app.on("ready", async () => {
   const native = nativeDesktopAgent;
   registerIpcHandlers({
     resolve_ipc_role: (window) => entryWindow?.ipcRoleFor(window) ?? null,
+    open_settings: () => open_or_focus_settings(app, windowAdmission),
+    archives: createDesktopArchives(
+      native,
+      NativeDesktopProfile.resourcesPath(app)
+    ),
+    global_hooks: native?.globalHooks,
     recent_files: recentFiles,
     native_chat_disabled: !native,
+    native_chat_selections: chatSelections,
     document_files: nativeDocuments,
     native_external_agent: nativeExternalRuns,
     resolve_document_window: (id) => documentWindows.get(id),
@@ -875,7 +882,7 @@ app.on("ready", async () => {
       nativeEditorMcp?.publish(event, snapshot) ?? Promise.resolve(false),
     ...(native && {
       resolve_native_chat: (_window, workspaceId, profileId) =>
-        native.current(workspaceId, profileId),
+        native.currentForWindow(workspaceId, profileId),
       ensure_native_chat: (workspaceId) => native.ensure(workspaceId),
       forget_native_workspace: (workspaceId) =>
         native.forgetWorkspace(workspaceId),
@@ -992,7 +999,6 @@ app.on("ready", async () => {
   // Populate File ▸ Open Recent now that the sidecar can answer `workspaces.list`
   // (the module-top menu was built before it was up).
   refresh_recent_menu();
-  approveConfiguredProviderEndpointsWhenReady();
 
   // Account callbacks are control-plane events: drain them independently of
   // onboarding/work admission. Work files drain from the controller's `main`
@@ -1002,57 +1008,6 @@ app.on("ready", async () => {
     dispatchPendingLaunchIntents();
   }
 });
-
-async function approveConfiguredProviderEndpoints(): Promise<void> {
-  const endpoints = await servicesSidecarClient.listProviderEndpoints();
-  if (endpoints.length === 0) return;
-  const rows: Array<{
-    id: string;
-    baseUrl: string;
-    origin: string;
-    route: string;
-  }> = [];
-  const withheld: string[] = [];
-  for (const endpoint of endpoints) {
-    try {
-      rows.push({
-        id: endpoint.id,
-        baseUrl: endpoint.base_url,
-        ...(await describeAgentProviderEndpoint(endpoint.base_url)),
-      });
-    } catch (error) {
-      withheld.push(
-        `${endpoint.id}: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-  }
-  if (withheld.length > 0) {
-    await dialog.showMessageBox({
-      type: "warning",
-      message: "Some AI provider endpoints are unavailable",
-      detail: withheld.join("\n"),
-      buttons: ["Continue"],
-      defaultId: 0,
-      noLink: true,
-    });
-  }
-  if (rows.length === 0) return;
-  const result = await dialog.showMessageBox({
-    type: "warning",
-    message: "Allow configured AI provider endpoints?",
-    detail:
-      rows.map((row) => `${row.id}: ${row.origin}\n  ${row.route}`).join("\n") +
-      "\n\nThese exact origins will be available to provider requests until Grida closes.",
-    buttons: ["Allow", "Not Now"],
-    defaultId: 1,
-    cancelId: 1,
-    noLink: true,
-  });
-  if (result.response !== 0) return;
-  for (const row of rows) {
-    await approveAgentProviderEndpoint(row.id, row.baseUrl);
-  }
-}
 
 app.on("window-all-closed", () => {
   // macOS keeps the app alive (`activate` re-opens a window); Win/Linux quit.

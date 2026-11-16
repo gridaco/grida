@@ -375,12 +375,12 @@ importers:
       '@formatjs/intl-localematcher':
         specifier: ^0.6.1
         version: 0.6.2
-      '@grida/ai-host':
-        specifier: workspace:*
-        version: link:../packages/grida-ai-host
       '@grida/ai':
         specifier: workspace:*
         version: link:../packages/grida-ai
+      '@grida/ai-host':
+        specifier: workspace:*
+        version: link:../packages/grida-ai-host
       '@grida/bitmap':
         specifier: workspace:*
         version: link:../packages/grida-canvas-bitmap
@@ -804,9 +804,18 @@ importers:
       masonic:
         specifier: ^4.1.0
         version: 4.1.0(react@19.2.5)
+      mdast-util-from-markdown:
+        specifier: 2.0.2
+        version: 2.0.2
+      mdast-util-gfm:
+        specifier: 3.1.0
+        version: 3.1.0
       mdn-data:
         specifier: ^2.8.0
         version: 2.27.0
+      micromark-extension-gfm:
+        specifier: 3.0.0
+        version: 3.0.0
       mime-types:
         specifier: ^3.0.1
         version: 3.0.2

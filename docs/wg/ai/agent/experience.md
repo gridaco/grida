@@ -31,6 +31,12 @@ request and remove an unintended attachment or selection.
 If the selected model or environment cannot use an item, the person can see
 which material will accompany the request and which requires another route.
 
+An explicitly attached supported image is a request to perceive it: its prepared
+pixels accompany the first inference. Ordinary file and folder references are
+inspected on demand. An incompatible image keeps the complete request unsent;
+accepting only its text would change the person's request. The
+[visual perception contract](./vision.md) separates pixels, provenance and preview.
+
 After sending, the conversation shows the accepted request. A later edit becomes
 an explicit revision or a new request so the person can understand which version
 the agent acted on. A confirmed rejection stays visibly unsent and offers retry.
@@ -130,6 +136,30 @@ The selected agent effort and Plan or Act regime still apply. A goal can direct
 an extended investigation or plan as well as execution. Continuing into another
 turn preserves earlier usage and outstanding external work. Ordinary requests
 remain available without starting a persistent goal.
+
+## Remember each conversation's selection
+
+A conversation owns its selected model connection and effort independently of
+any executed turn. The selection survives navigation and restart, including a
+change made without sending. Opening one conversation restores its own pair;
+it does not import the last composer's preference from another conversation.
+
+A new conversation snapshots the last valid explicit user selection as a
+complete pair. Changing only effort in an older conversation therefore makes
+that conversation's current model and new effort the next conversation's
+default. Restoring a conversation, refreshing a catalogue or using an automatic
+fallback does not count as another explicit choice. A context with a fixed model
+keeps that model for a new conversation and inherits the last selected effort.
+
+An unavailable selection remains identifiable and asks for resolution before
+new work is accepted. Uncertain historical identity does not authorize a guess
+based on a model label. A fork captures the source's selected pair once and
+subsequently owns its own selection.
+
+Selection is product state. Accepted work separately captures the effective
+model, connection, effort and authority it will use. Changing a future selection
+cannot rewrite running, queued or suspended work. Restoring a selection starts
+no execution and does not require replacing another conversation's worker.
 
 ## Agent effort
 
@@ -336,6 +366,21 @@ the subagent available for follow-up work within its retained lifetime.
 
 The person can ask the main agent to manage a particular subagent, and can
 inspect its status, current assignment, history, and results.
+
+An activity view separates outstanding child work from settled history and
+keeps completed children reachable when none is working. A readable name and
+stable identity connect the child list, assignment start/finish events and the
+child's conversation. Events identify the parent work turn they belong to;
+an absent timestamp or partial history must not be filled with an invented
+chronology.
+
+Opening a child observes its exposed messages and activity without starting
+work or changing the parent conversation and its unsent input. The child's
+model and effort describe its captured execution, independently of later
+parent preferences. Live output, retained conversation and bounded result
+previews remain distinct. Missing or incomplete output stays explicit, and
+observation never reveals private provider reasoning. Returning to the parent
+or closing the view is separate from stopping a child or a background process.
 
 | Action              | Expected behavior                                                                                             |
 | ------------------- | ------------------------------------------------------------------------------------------------------------- |

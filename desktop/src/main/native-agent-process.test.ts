@@ -10,6 +10,10 @@ import {
   type NativeAgentLaunch,
 } from "./native-agent-process";
 import { NativeGatewayConnection } from "./native-gateway-connection";
+import { NativeInputImages } from "./native-input-images";
+import { NativeQueuedMessages } from "./native-queued-messages";
+import { NativeSelectedImages } from "./native-selected-images";
+import { NativeSubagentActivity } from "./native-subagent-activity";
 
 function state() {
   const root = fs.mkdtempSync(
@@ -37,7 +41,8 @@ function launch(
 function fixture(
   source: string,
   initializationVersion = 1,
-  capabilities?: Record<string, number | null>
+  capabilities?: Record<string, number | null>,
+  imageInput = false
 ) {
   const directory = state();
   const resources = path.join(directory.root, "native-agent");
@@ -58,7 +63,7 @@ lines.on('line', line => {
     const offered = ${JSON.stringify(capabilities ?? null)};
     const meta = offered ? {...requested,...offered} : {'co.grida/session/history':1};
     for (const key of Object.keys(meta)) if (meta[key] === null) delete meta[key];
-    send({id:request.id,result:{protocolVersion:${initializationVersion},agentInfo:{name:'grida-agent'},agentCapabilities:{_meta:meta}}});
+    send({id:request.id,result:{protocolVersion:${initializationVersion},agentInfo:{name:'grida-agent'},agentCapabilities:{_meta:meta,promptCapabilities:{image:${imageInput}}}}});
     return;
   }
   ${source}
@@ -75,47 +80,562 @@ lines.on('close', () => fs.writeFileSync(${JSON.stringify(receipt)}, 'eof'));
 }
 
 describe.skipIf(process.platform === "win32")("Native agent process", () => {
-  it("refuses unreviewed supervised subagent routes", async () => {
-    const test = fixture("");
-    const network = { prepare: () => null };
+  it.each([null, 1, 2])(
+    "keeps caption replacement independently negotiated and never falls back (%s)",
+    async (version) => {
+      const test = fixture(
+        `
+        if (request.method === 'session/new') { send({id:request.id,result:{sessionId:'chat'}}); return; }
+        if (request.method === '_co.grida/session/snapshot') { send({id:request.id,result:{sessionId:'chat',sessionRevision:3,queuedInputs:1,queue:[{inputId:'queued',inputPosition:2,settings:{operatingRegime:'plan'}}],admissionPaused:true,current:null,latest:null}}); return; }
+        if (request.method === '${NativeQueuedMessages.inspectMethod}') { send({id:request.id,result:{inputId:'queued',textOnly:false,textEditable:true,prompt:[{type:'text',text:'Caption'},{type:'resource_link',name:'original.pdf',uri:'urn:grida:retained-attachment:file',mimeType:'application/pdf',size:3}]}}); return; }
+        if (request.method === '${NativeQueuedMessages.replaceTextMethod}') {
+          if(JSON.stringify(Object.keys(request.params).sort())!==JSON.stringify(['inputId','queue','replacementInputId','text'])) throw Error('unexpected replacement fields');
+          if(request.params.queue.expectedSessionRevision!==3 || request.params.inputId!=='queued' || request.params.text!=='') throw Error('wrong replacement basis');
+          if(!/^desktop-replacement-[a-f0-9]{64}$/.test(request.params.replacementInputId)) throw Error('missing stable replacement identity');
+          send({id:request.id,result:{sessionId:'chat',requestId:request.params.queue.requestId,sessionRevision:4}}); return;
+        }
+        throw Error('unexpected operation '+request.method);
+        `,
+        1,
+        { [NativeQueuedMessages.replaceTextCapability]: version }
+      );
+      let chat: NativeAgentChat | undefined;
+      try {
+        chat = await NativeAgentChat.start({
+          ...test.options,
+          cwd: fs.realpathSync(test.root),
+        });
+        expect(chat.acceptsQueuedTextReplacement).toBe(version === 1);
+        const session = await chat.create();
+        const basis = await chat.observe(session);
+        const [item] = (await chat.queue(session, basis, 0)).items;
+        expect(item.textOnly).toBe(false);
+        expect(item.textEditable).toBe(version === 1 ? true : undefined);
+        const change = {
+          action: "replaceText" as const,
+          observationId: "observed",
+          requestId: "caption",
+          inputId: "queued",
+          text: "",
+        };
+        const edit = () =>
+          chat!.editQueue(session, basis, change).then(
+            (receipt) => ({ receipt }),
+            (error: Error) => ({ error: error.message })
+          );
+        const outcome = await edit();
+        expect(outcome).toEqual(
+          version === 1
+            ? {
+                receipt: {
+                  sessionId: "chat",
+                  requestId: "caption",
+                  sessionRevision: 4,
+                },
+              }
+            : { error: "native_chat_queued_text_replacement_unavailable" }
+        );
+        expect(await edit()).toEqual(outcome);
+      } finally {
+        await chat?.close();
+        test.close();
+      }
+    }
+  );
+
+  it("withholds text replacement without queued-message observation support", async () => {
+    const test = fixture("send({id:request.id,result:requested});", 1, {
+      [NativeQueuedMessages.replaceTextCapability]: 1,
+      [NativeQueuedMessages.capability]: null,
+    });
+    const agent = await NativeAgentProcess.start(test.options);
     try {
-      for (const profile of [
+      expect(await agent.request("fixture/requested", {})).toHaveProperty(
+        [NativeQueuedMessages.replaceTextCapability],
+        1
+      );
+      expect(agent.acceptsQueuedTextReplacement).toBe(false);
+    } finally {
+      await agent.close();
+      test.close();
+    }
+  });
+  it.each([null, 1, 2])(
+    "negotiates child activity independently of existing child controls (version %s)",
+    async (version) => {
+      const test = fixture("send({id:request.id,result:requested});", 1, {
+        [NativeSubagentActivity.capability]: version,
+      });
+      let agent: NativeAgentProcess | undefined;
+      try {
+        agent = await NativeAgentProcess.start({
+          ...test.options,
+          providerNetwork: { prepare: () => null },
+          subagents: true,
+        });
+        const requested = await agent.request("fixture/initialize", {});
+        expect(requested).toHaveProperty(
+          [NativeSubagentActivity.capability],
+          1
+        );
+        expect(agent.acceptsSubagents).toBe(true);
+        expect(agent.acceptsSubagentActivity).toBe(version === 1);
+      } finally {
+        await agent?.close();
+        test.close();
+      }
+    }
+  );
+
+  it("does not enable child activity from an unsolicited worker echo", async () => {
+    const test = fixture("send({id:request.id,result:requested});", 1, {
+      [NativeSubagentActivity.capability]: 1,
+    });
+    let agent: NativeAgentProcess | undefined;
+    try {
+      agent = await NativeAgentProcess.start(test.options);
+      const requested = await agent.request("fixture/initialize", {});
+      expect(requested).not.toHaveProperty([NativeSubagentActivity.capability]);
+      expect(agent.acceptsSubagents).toBe(false);
+      expect(agent.acceptsSubagentActivity).toBe(false);
+    } finally {
+      await agent?.close();
+      test.close();
+    }
+  });
+
+  it("inspects queued image text and exact bytes without widening text-only replacement", async () => {
+    const uri = "urn:grida:retained-attachment:queued-image";
+    const test = fixture(
+      `
+      if (request.method === 'session/new') { send({id:request.id,result:{sessionId:'chat'}}); return; }
+      if (request.method === '_co.grida/session/snapshot') { send({id:request.id,result:{sessionId:request.params.sessionId,sessionRevision:3,queuedInputs:1,queue:[{inputId:'queued',inputPosition:2,settings:{}}],admissionPaused:true,current:null,latest:null}}); return; }
+      if (request.method === '${NativeQueuedMessages.inspectMethod}') {
+        if(request.params.sessionId!=='chat'||request.params.inputId!=='queued'||request.params.expectedSessionRevision!==3) throw Error('wrong queue basis');
+        send({id:request.id,result:{inputId:'queued',textOnly:false,prompt:[{type:'text',text:'Full text\\nsecond line'},{type:'resource_link',name:'original.webp',uri:'${uri}',mimeType:'image/webp',size:3}]}});return;
+      }
+      if (request.method === '${NativeQueuedMessages.readMethod}') {
+        if(request.params.sessionId!=='chat'||request.params.inputId!=='queued'||request.params.expectedSessionRevision!==3||request.params.attachmentUri!=='${uri}'||request.params.offset!==0)throw Error('wrong queue image basis');
+        send({id:request.id,result:{inputId:'queued',attachmentUri:'${uri}',mimeType:'image/webp',totalBytes:3,offset:0,data:'YWJj',nextOffset:null}});return;
+      }
+      if (request.method === '_co.grida/session/input') { send({id:request.id,result:{receipt:{sessionId:'chat',inputId:'queued',inputPosition:2,turnId:null,disposition:'queued'},textOnly:false,prompt:[{type:'text',text:'Image attached.'}]}});return; }
+      throw Error('unexpected effect '+request.method);
+    `,
+      1,
+      { [NativeQueuedMessages.capability]: 1 }
+    );
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        ...test.options,
+        cwd: fs.realpathSync(test.root),
+      });
+      const session = await chat.create();
+      const basis = await chat.observe(session);
+      const page = await chat.queue(session, basis, 0);
+      expect(page.items).toEqual([
         {
-          endpoint: "http://127.0.0.1:1/v1",
-          credentialHome: test.root,
-          providerNetwork: network,
+          inputId: "queued",
+          preview: "Full text\nsecond line",
+          textOnly: false,
+          attachments: [
+            {
+              name: "original.webp",
+              mimeType: "image/webp",
+              size: 3,
+              previewId: expect.any(String),
+            },
+          ],
         },
-        { endpoint: "https://openrouter.ai/api/v1", providerNetwork: network },
+      ]);
+      const message = await chat.queuedMessage(session, basis, "queued");
+      expect(message.text).toBe("Full text\nsecond line");
+      expect(JSON.stringify(message)).not.toContain(uri);
+      const token = message.attachments![0].previewId!;
+      expect(
+        Buffer.from(
+          await chat.readQueuedAttachmentPreview(
+            session,
+            basis,
+            "queued",
+            token
+          )
+        )
+      ).toEqual(Buffer.from("abc"));
+      await expect(
+        chat.readQueuedAttachmentPreview(session, basis, "other-input", token)
+      ).rejects.toThrow("queued_message_unavailable");
+      await expect(chat.readAttachmentPreview(session, token)).rejects.toThrow(
+        "input_image_unavailable"
+      );
+      await expect(chat.queuedText(session, basis, "queued")).rejects.toThrow(
+        "queue_input_unavailable"
+      );
+      await expect(
+        chat.editQueue(session, basis, {
+          action: "replace",
+          observationId: "observed",
+          requestId: "replace",
+          inputId: "queued",
+          text: "Replacement",
+        })
+      ).rejects.toThrow("queue_input_unavailable");
+    } finally {
+      await chat?.close();
+      test.close();
+    }
+  });
+
+  it.each([null, 1, 2])(
+    "negotiates queued-image observation separately from sent previews (%s)",
+    async (version) => {
+      const test = fixture("send({id:request.id,result:requested});", 1, {
+        [NativeQueuedMessages.capability]: version,
+      });
+      const agent = await NativeAgentProcess.start(test.options);
+      try {
+        expect(await agent.request("fixture/requested", {})).toMatchObject({
+          [NativeQueuedMessages.capability]: 1,
+        });
+        expect(agent.acceptsQueuedMessages).toBe(version === 1);
+      } finally {
+        await agent.close();
+        test.close();
+      }
+    }
+  );
+  it.each([null, 1, 2])(
+    "keeps selected-image intake and chunk previews independently negotiated (%s)",
+    async (version) => {
+      const test = fixture("send({id:request.id,result:requested});", 1, {
+        [NativeSelectedImages.capability]: version,
+        [NativeInputImages.chunkCapability]: version,
+      });
+      const agent = await NativeAgentProcess.start(test.options);
+      try {
+        expect(await agent.request("fixture/requested", {})).toMatchObject({
+          [NativeSelectedImages.capability]: 1,
+          [NativeInputImages.chunkCapability]: 1,
+        });
+        expect(agent.supportsSelectedImage).toBe(version === 1);
+        expect(agent.acceptsSelectedImage).toBe(false);
+        expect(agent.acceptsInputImageChunks).toBe(version === 1);
+      } finally {
+        await agent.close();
+        test.close();
+      }
+    }
+  );
+
+  it("offers selected-image perception only when the model and optional intake agree", async () => {
+    const test = fixture(
+      "send({id:request.id,result:{}});",
+      1,
+      { [NativeSelectedImages.capability]: 1 },
+      true
+    );
+    const agent = await NativeAgentProcess.start(test.options);
+    try {
+      expect(agent.acceptsSelectedImage).toBe(true);
+    } finally {
+      await agent.close();
+      test.close();
+    }
+  });
+
+  it("replays a large JPEG original through bounded observational chunks without a PNG fallback", async () => {
+    const source = Buffer.alloc(320 * 1024, 9);
+    source.set([255, 216, 255]);
+    const uri = "urn:grida:retained-attachment:jpeg-original";
+    const test = fixture(
+      `
+      if (request.method === 'session/new') { send({id:request.id,result:{sessionId:'chat'}}); return; }
+      if (request.method === '${NativeInputImages.chunkMethod}') {
+        const original=Buffer.from('${source.toString("base64")}','base64');
+        const offset=request.params.offset, bytes=original.subarray(offset,offset+256*1024), next=offset+bytes.length;
+        if(request.params.messageId!=='ask'||request.params.attachmentUri!=='${uri}')throw Error('wrong selector');
+        send({id:request.id,result:{messageId:'ask',attachmentUri:'${uri}',mimeType:'image/jpeg',totalBytes:original.length,offset,data:bytes.toString('base64'),nextOffset:next===original.length?null:next}});return;
+      }
+      const capability='${TRANSCRIPT_WINDOW}',read=request.params._meta?.[capability];
+      if(!read)throw Error('unexpected request');
+      send({method:'session/update',params:{sessionId:'chat',_meta:{[capability]:{requestId:read.requestId}},update:{sessionUpdate:'user_message_chunk',messageId:'ask',content:{type:'resource_link',name:'original.jpg',uri:'${uri}',mimeType:'image/jpeg',size:${source.length}}}}});
+      send({id:request.id,result:{_meta:{[capability]:{requestId:read.requestId,view:1,older:null,turns:[]}}}});
+    `,
+      1,
+      {
+        [TRANSCRIPT_WINDOW]: 1,
+        [NativeInputImages.capability]: null,
+        [NativeInputImages.chunkCapability]: 1,
+      }
+    );
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        ...test.options,
+        cwd: fs.realpathSync(test.root),
+      });
+      const session = await chat.create();
+      const preview = (await chat.transcriptPage(session)).messages[0]
+        .attachments![0].previewId!;
+      expect(preview).toMatch(/^[a-f0-9-]{36}$/);
+      expect(
+        Buffer.from(await chat.readAttachmentPreview(session, preview))
+      ).toEqual(source);
+    } finally {
+      await chat?.close();
+      test.close();
+    }
+  });
+  it.each([null, 2])(
+    "refuses an unnegotiated model change without issuing a private RPC (%s)",
+    async (version) => {
+      const test = fixture("throw new Error('unexpected transition RPC');", 1, {
+        "co.grida/session/model-change": version,
+      });
+      const agent = await NativeAgentProcess.start(test.options);
+      try {
+        await expect(agent.prepareModelChange()).rejects.toThrow(
+          "native_chat_model_change_unsupported"
+        );
+        expect(agent.modelChangePending).toBe(false);
+        expect(agent.connected).toBe(true);
+      } finally {
+        await agent.close();
+        test.close();
+      }
+    }
+  );
+
+  it("seals outbound requests only after an exact native preparation response", async () => {
+    const test = fixture(
+      `
+      if (request.method !== '_co.grida/session/model-change' || JSON.stringify(request.params) !== '{"prepare":true}') throw new Error('wrong transition');
+      send({id:request.id,result:{prepared:true}});
+    `,
+      1,
+      { "co.grida/session/model-change": 1 }
+    );
+    const agent = await NativeAgentProcess.start(test.options);
+    try {
+      await agent.prepareModelChange();
+      expect(agent.modelChangePending).toBe(true);
+      await expect(agent.request("session/new", {})).rejects.toThrow(
+        "native_chat_model_change_busy"
+      );
+      expect(() => agent.notify("session/cancel", {})).toThrow(
+        "native_chat_model_change_busy"
+      );
+      await expect(agent.prepareModelChange()).rejects.toThrow(
+        "native_chat_model_change_busy"
+      );
+    } finally {
+      await agent.close();
+      test.close();
+    }
+  });
+
+  it("does not seal the worker while a prior ACP admission is unresolved", async () => {
+    const test = fixture(
+      `if (request.method !== 'fixture/held') throw new Error('unexpected transition');`,
+      1,
+      { "co.grida/session/model-change": 1 }
+    );
+    const agent = await NativeAgentProcess.start(test.options);
+    const held = agent
+      .request("fixture/held", {})
+      .catch((error: Error) => error.message);
+    try {
+      await expect(agent.prepareModelChange()).rejects.toThrow(
+        "native_chat_model_change_pending_work"
+      );
+      expect(agent.modelChangePending).toBe(false);
+    } finally {
+      await agent.close();
+      await held;
+      test.close();
+    }
+  });
+
+  it("keeps a refused model change usable while a lost preparation stays sealed", async () => {
+    const test = fixture(
+      `
+      if (request.method === '_co.grida/session/model-change') {
+        send({id:request.id,result:globalThis.checked ? {} : {blocker:'queued_input'}});
+        globalThis.checked = true; return;
+      }
+      send({id:request.id,result:{view:true}});
+    `,
+      1,
+      { "co.grida/session/model-change": 1 }
+    );
+    const agent = await NativeAgentProcess.start(test.options);
+    try {
+      await expect(agent.prepareModelChange()).rejects.toThrow(
+        "native_chat_model_change_queued_input"
+      );
+      expect(agent.modelChangePending).toBe(false);
+      await expect(agent.request("fixture/read", {})).resolves.toEqual({
+        view: true,
+      });
+      await expect(agent.prepareModelChange()).rejects.toThrow(
+        "native_chat_model_change_unverified"
+      );
+      expect(agent.modelChangePending).toBe(true);
+    } finally {
+      await agent.close();
+      test.close();
+    }
+  });
+
+  it.each([null, 1, 2])(
+    "negotiates input image preview independently of model perception (%s)",
+    async (version) => {
+      const test = fixture("send({id:request.id,result:requested});", 1, {
+        [NativeInputImages.capability]: version,
+      });
+      let agent: NativeAgentProcess | undefined;
+      try {
+        agent = await NativeAgentProcess.start(test.options);
+        expect(await agent.request("fixture/requested", {})).toHaveProperty(
+          [NativeInputImages.capability],
+          1
+        );
+        expect(agent.acceptsPng).toBe(false);
+        expect(agent.acceptsInputImages).toBe(version === 1);
+      } finally {
+        await agent?.close();
+        test.close();
+      }
+    }
+  );
+
+  it.each([false, true])(
+    "replays and reads exact PNG previews only with the optional capability (%s)",
+    async (enabled) => {
+      const png =
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jU1sAAAAASUVORK5CYII=";
+      const uri = "urn:grida:retained-attachment:image-1";
+      const test = fixture(
+        `
+      if (request.method === 'session/new') { send({id:request.id,result:{sessionId:'chat'}}); return; }
+      if (request.method === '${NativeInputImages.readMethod}') {
+        if (request.params.sessionId !== 'chat' || request.params.messageId !== 'ask' || request.params.attachmentUri !== '${uri}') throw Error('wrong identity');
+        send({id:request.id,result:{messageId:'ask',attachmentUri:'${uri}',mimeType:'image/png',data:'${png}'}}); return;
+      }
+      const capability = '${TRANSCRIPT_WINDOW}';
+      const read = request.params._meta?.[capability];
+      if (!read) { send({id:request.id,result:{}}); return; }
+      for (const [name,uri] of [['retained.png','${uri}'],['reference.png','file:///private/reference.png']])
+        send({method:'session/update',params:{sessionId:'chat',_meta:{[capability]:{requestId:read.requestId}},update:{sessionUpdate:'user_message_chunk',messageId:'ask',content:{type:'resource_link',name,uri,mimeType:'image/png',size:${Buffer.from(png, "base64").length}}}}});
+      send({id:request.id,result:{_meta:{[capability]:{requestId:read.requestId,view:1,older:null,turns:[]}}}});
+    `,
+        1,
         {
-          endpoint: "https://openrouter.ai/api/v1",
-          credentialHome: test.root,
-          providerNetwork: network,
-          configuredEndpointKey: "custom",
-        },
-        {
-          endpoint: "https://openrouter.ai/api/v1/other",
-          credentialHome: test.root,
-          providerNetwork: network,
-        },
-        {
-          endpoint: "https://openrouter.ai/api/v1",
-          provider: "responses" as const,
-          providerNetwork: network,
-          subscriptionScope: "a".repeat(64),
-        },
-      ]) {
+          [TRANSCRIPT_WINDOW]: 1,
+          [NativeInputImages.capability]: enabled ? 1 : null,
+          [NativeInputImages.chunkCapability]: null,
+        }
+      );
+      let chat: NativeAgentChat | undefined;
+      try {
+        chat = await NativeAgentChat.start({
+          ...test.options,
+          cwd: fs.realpathSync(test.root),
+        });
+        const session = await chat.create();
+        const page = await chat.transcriptPage(session);
+        const attachments = page.messages[0].attachments!;
+        expect(attachments[1].previewId).toBeUndefined();
+        expect(JSON.stringify(page)).not.toContain(uri);
+        expect(JSON.stringify(page)).not.toContain("file:///");
+        expect(typeof attachments[0].previewId).toBe(
+          enabled ? "string" : "undefined"
+        );
+        await expect(chat.readAttachmentPreview(session, uri)).rejects.toThrow(
+          "input_image_unavailable"
+        );
+        if (!enabled) return;
+        const token = attachments[0].previewId!;
+        expect(token).toMatch(/^[a-f0-9-]{36}$/);
+        expect(
+          new Uint8Array(await chat.readAttachmentPreview(session, token))
+        ).toEqual(Uint8Array.from(Buffer.from(png, "base64")));
+        await expect(
+          chat.readAttachmentPreview({ id: "chat" }, token)
+        ).rejects.toThrow("native_chat_attachment_required");
+      } finally {
+        await chat?.close();
+        test.close();
+      }
+    }
+  );
+
+  it("requires the captured provider transport before enabling child work", async () => {
+    const test = fixture("");
+    try {
+      for (const provider of [
+        "openai-compatible",
+        "responses",
+        "anthropic",
+        "gemini",
+      ] as const) {
         await expect(
           NativeAgentProcess.start({
             ...test.options,
-            ...profile,
+            provider,
             subagents: true,
           })
-        ).rejects.toThrow("native_agent_subagent_provider_unsupported");
+        ).rejects.toThrow("native_agent_subagent_transport_unavailable");
       }
     } finally {
       test.close();
     }
   });
+
+  it.each([
+    { provider: "openai-compatible", endpoint: "http://127.0.0.1:1/v1" },
+    { provider: "responses", endpoint: "https://api.openai.com/v1" },
+    {
+      provider: "responses",
+      endpoint: "https://chatgpt.com/backend-api/codex",
+      subscriptionScope: "a".repeat(64),
+    },
+    { provider: "anthropic", endpoint: "https://api.anthropic.com/v1" },
+    {
+      provider: "gemini",
+      endpoint: "https://generativelanguage.googleapis.com/v1beta",
+    },
+  ] as const)(
+    "negotiates harness effort independently of the selected $provider connection at $endpoint",
+    async (profile) => {
+      const test = fixture("send({id:request.id,result:requested});", 1, {});
+      let agent: NativeAgentProcess | undefined;
+      try {
+        agent = await NativeAgentProcess.start({
+          ...test.options,
+          ...profile,
+          providerNetwork: { prepare: () => null },
+          subagents: true,
+        });
+        const requested = await agent.request("fixture/initialize", {});
+        expect(requested).toHaveProperty(["co.grida/session/effort"], 1);
+        expect(requested).toHaveProperty(
+          [NativeAgentGoals.fundedReviewCapability],
+          1
+        );
+        expect(agent.acceptsEffort).toBe(true);
+        expect(agent.acceptsGoalEffort).toBe(true);
+        expect(agent.acceptsGoalNamedChild).toBe(true);
+        expect(agent.acceptsGoalSpending).toBe(false);
+      } finally {
+        try {
+          await agent?.close();
+        } finally {
+          test.close();
+        }
+      }
+    }
+  );
 
   it.each([
     { effort: null, funded: 1, named: 1, goal: false, child: false },
@@ -527,7 +1047,12 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
               // The attachment is named for display; its host URI is not kept.
               // A file reference keeps the preview the composer showed.
               attachments: [
-                { name: "image.png", mimeType: "image/png", size: 179 },
+                {
+                  name: "image.png",
+                  mimeType: "image/png",
+                  size: 179,
+                  previewId: expect.any(String),
+                },
                 {
                   name: "clip.mov",
                   mimeType: "video/quicktime",

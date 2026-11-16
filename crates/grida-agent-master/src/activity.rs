@@ -60,7 +60,13 @@ pub fn classify(tool: &ToolId) -> Activity {
         }
         "exec_command" | "write_stdin" | "before_completion_command" => ActivityKind::Execute,
         "generate_image" | "generate_image_from_workspace_reference" => ActivityKind::Generate,
-        "review" | "delegate_review" | "collect_review" => ActivityKind::Delegate,
+        "review"
+        | "delegate_review"
+        | "collect_review"
+        | crate::delegation::SPAWN
+        | crate::delegation::SEND
+        | crate::delegation::WAIT
+        | crate::delegation::STOP => ActivityKind::Delegate,
         "question" | "question_async" => ActivityKind::Ask,
         _ => ActivityKind::Other,
     };
@@ -154,6 +160,14 @@ mod tests {
         assert_eq!(kind("svg_replace_selected_text").kind, ActivityKind::Edit);
         assert_eq!(kind("generate_image").kind, ActivityKind::Generate);
         assert_eq!(kind("question").kind, ActivityKind::Ask);
+        for tool in [
+            crate::delegation::SPAWN,
+            crate::delegation::SEND,
+            crate::delegation::WAIT,
+            crate::delegation::STOP,
+        ] {
+            assert_eq!(kind(tool).kind, ActivityKind::Delegate);
+        }
         assert_eq!(
             kind("mcp_docs_search"),
             Activity {

@@ -5,6 +5,14 @@ accepts an explicit model registry and supports text with client-executed JSON
 function tools. The host selects and configures the adapter for each approved
 provider binding.
 
+## Anti-goals
+
+The adapters do not discover endpoints, select accounts, hold credentials, or
+apply product policy. The host owns those decisions. Image resolvers supply
+bounded immutable bytes; these adapters do not decode or transform images.
+Optional endpoint facets require an explicit profile and never follow from a
+resolver or transport alone. Captured requests do not silently migrate profiles.
+
 ## Host transport
 
 `StreamingTransport` receives a binding, a finite `TransportOperation`, and an
@@ -98,13 +106,18 @@ attempt.
   item order and remote function call IDs for replay. Tool calls become
   eligible after the verified terminal response. `ResponsesEndpoint` names
   the accepted wire facets. The API profile accepts an explicit output-token
-  bound. The restricted profile rejects that field, so a host using it must
+  bound. Both restricted profiles reject that field, so a host using them must
   select an effective output policy before preparing the request. The API
   profile can also accept image references when the host supplies an
-  immutable image resolver. The resolver reads bounded bytes only
+  immutable image resolver. `RestrictedImages` accepts those image references
+  while retaining all other restricted facets: no output-token field,
+  input measurement or admission-rejection evidence. Supplying a resolver
+  does not enable any endpoint facet. Both the endpoint and the model must
+  accept images; user images support PNG, JPEG, WebP and GIF, while tool-result
+  images require PNG. The resolver reads bounded bytes only
   during authorized counting or generation. Both operations send the same
   image content, while the prepared request keeps just the references. The
-  adapter provides protocol fixtures for both profiles.
+  adapter provides protocol fixtures for every profile.
   [Responses migration](https://developers.openai.com/api/docs/guides/migrate-to-responses)
 - `Anthropic` requires an explicit output-token limit and lowers leading
   instructions to the system field. It emits a call after its complete
@@ -127,6 +140,18 @@ also checks the selected endpoint profile and wire model. Replay state is
 trusted history from the host. Fingerprints detect mismatches with that history.
 The adapters check the fresh execution binding independently before dispatch.
 
+Responses endpoint identities are durable: `Api` remains `api` and
+`Restricted` remains `subscription`, with their original capability revisions
+and wire behavior. `RestrictedImages` has the distinct `restricted_images`
+identity and derives a new capability revision. It can replay completed
+`Restricted` assistant items when every other scope field and the original
+message still match. Fresh items use the new identity; legacy restricted and
+API profiles reject them. This compatibility is one-way and does not change
+prepared-request validation. To recover previously accepted prepared work, the
+host must reconstruct the original endpoint and model capabilities, including
+their revision seed and modalities. A prepared request from an old profile
+cannot start under the expanded profile.
+
 Responses streams reasoning summaries separately from answer text. It retains
 completed encrypted reasoning in the provider-state envelope for replay. When a
 stream ends without verified completion, the visible prefix and available
@@ -141,7 +166,7 @@ It sends the same model, input items, instructions, tool definitions, and
 reasoning settings to the input token count endpoint. Generation controls such
 as streaming and the output limit are separate. The adapter reads a bounded
 JSON response and preserves the provider's failure classification. A host must
-authorize this operation at the approved API destination. The restricted
+authorize this operation at the approved API destination. Every restricted
 profile leaves this measurement unavailable. [Token counting guide](https://developers.openai.com/api/docs/guides/token-counting) · [Count endpoint reference](https://developers.openai.com/api/reference/resources/responses/subresources/input_tokens/methods/count)
 
 An OpenAI-compatible endpoint offers input measurement only after the host

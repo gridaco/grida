@@ -20,11 +20,16 @@ pub(super) struct AutomaticReadReview {
 }
 
 impl AutomaticReadReview {
-    pub(super) fn new(host: &Host, profile: &ReadProfile, execution: &Execution) -> Self {
+    pub(super) fn new(
+        host: &Host,
+        profile: &ReadProfile,
+        execution: &Execution,
+        provider: Arc<dyn Provider>,
+    ) -> Self {
         Self {
             host: host.clone(),
             profile: profile.clone(),
-            provider: execution.provider.clone(),
+            provider,
             grants: execution.authority.inference.clone(),
         }
     }

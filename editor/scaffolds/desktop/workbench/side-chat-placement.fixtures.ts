@@ -36,6 +36,7 @@ export function idleSideChat(): NativeChatController {
  */
 export class TitledSideChat {
   private title: string | null = null;
+  private view: Pick<NativeChatView, "messages"> = { messages: [] };
   private readonly listeners = new Set<() => void>();
 
   subscribe = (listener: () => void) => {
@@ -44,6 +45,12 @@ export class TitledSideChat {
   };
 
   sideChatTitle = () => this.title ?? SIDE_CHAT_TITLE;
+  read = () => this.view;
+
+  messages(messages: NativeChatView["messages"]): void {
+    this.view = { messages };
+    for (const listener of this.listeners) listener();
+  }
 
   arrive(title: string): void {
     this.title = title;

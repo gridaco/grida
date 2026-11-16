@@ -215,7 +215,19 @@ fn failure(error: agent_kit_core::Error) -> Error {
             "Use a private profile with the exact reviewed peer and sandbox paths."
         }
         "session_execution_configuration_changed" => {
-            "Select the same provider, model, account, and organization as the saved chat."
+            "Reopen with the original execution settings to resolve work retained by this older host."
+        }
+        "session_active_route_changed" => {
+            "Resume or stop the accepted turn using its captured connection before selecting another."
+        }
+        "session_queued_route_changed" => {
+            "Run or withdraw the queued input using its captured connection before selecting another."
+        }
+        "session_goal_route_changed" => {
+            "Resolve or clear the Goal under its captured connection before selecting another."
+        }
+        "session_delegated_route_changed" => {
+            "Use the parent task's captured connection for delegated work."
         }
         _ => "Grida could not complete this agent command.",
     };

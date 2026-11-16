@@ -8,7 +8,8 @@ import { video_attachment } from "@/lib/agent-chat/video-attachment";
  * The attachment a native chat draft carries, shown with the composer's own
  * attachment card. A PNG shows its thumbnail from a temporary object URL that
  * is released when the attachment changes; a video shows its poster frame,
- * duration and dimensions.
+ * duration and dimensions. A folder reference shows a folder card without a
+ * size or an access-grant claim.
  */
 export function NativeAttachmentCard({
   name,
@@ -20,7 +21,7 @@ export function NativeAttachmentCard({
   onRemove,
 }: {
   name: string;
-  size: number;
+  size?: number;
   png: boolean;
   /** The PNG's bytes, or null for another file. */
   preview: Blob | null;

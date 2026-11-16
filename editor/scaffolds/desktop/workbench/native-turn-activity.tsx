@@ -1,9 +1,13 @@
 import { useState, type ReactNode } from "react";
 import { ChevronDownIcon, ChevronRightIcon } from "lucide-react";
-import type { NativeChatMessage } from "@grida/desktop-bridge";
+import type {
+  NativeChatMessage,
+  NativeSubagentLifecycleEvent,
+} from "@grida/desktop-bridge";
 import { ChatMessageView, ToolCallGroupView } from "@/kits/agent-chat";
 import { native_tool_parts } from "@/lib/agent-chat/native-tool-parts";
 import { turn_activity } from "@/lib/agent-chat/turn-activity";
+import { NativeSubagentIdentity } from "./native-subagent-identity";
 
 /**
  * One turn of the native transcript. While the turn runs, its commentary and
@@ -13,16 +17,21 @@ import { turn_activity } from "@/lib/agent-chat/turn-activity";
 export function NativeTurnActivity({
   block,
   renderMessage,
+  subagentEvents = [],
+  onOpenSubagent,
 }: {
   block: Extract<turn_activity.Block, { kind: "turn" }>;
   renderMessage: (message: NativeChatMessage) => ReactNode;
+  subagentEvents?: readonly NativeSubagentLifecycleEvent[];
+  onOpenSubagent?: (childId: string, inputId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   // A stopped turn shows its partial work as is; there is no answer to keep
   // apart from it.
   const stopped = block.outcome === "cancelled";
   const open = !block.finished || stopped || expanded;
-  const hasWork = block.work.length > 0 && !stopped;
+  const hasWork =
+    (block.work.length > 0 || subagentEvents.length > 0) && !stopped;
   return (
     <div
       data-testid="native-turn-activity"
@@ -33,7 +42,8 @@ export function NativeTurnActivity({
       className="flex flex-col gap-4"
     >
       {block.requests.map(renderMessage)}
-      {turn_activity.showsHeader(block) && (
+      {(turn_activity.showsHeader(block) ||
+        (block.finished && subagentEvents.length > 0)) && (
         <div className="border-b pb-1">
           {hasWork ? (
             <button
@@ -76,6 +86,52 @@ export function NativeTurnActivity({
             />
           )
         )}
+      {open && subagentEvents.length > 0 && (
+        <div className="space-y-2" aria-label="Subagent activity">
+          {[...subagentEvents]
+            .sort(
+              (a, b) => a.atMs - b.atMs || a.eventId.localeCompare(b.eventId)
+            )
+            .map((event) => (
+              <button
+                key={event.eventId}
+                type="button"
+                className="flex w-full items-center gap-2 rounded-md py-1 text-left text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => onOpenSubagent?.(event.childId, event.inputId)}
+                disabled={!onOpenSubagent}
+              >
+                <NativeSubagentIdentity
+                  childId={event.childId}
+                  className="size-5"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="font-medium text-foreground">
+                    {event.name}
+                  </span>{" "}
+                  {event.kind === "started"
+                    ? "started working"
+                    : event.status === "failed"
+                      ? "failed"
+                      : event.status === "cancelled"
+                        ? "stopped"
+                        : event.status === "uncertain"
+                          ? "finished · result uncertain"
+                          : "finished"}
+                </span>
+                <time
+                  className="shrink-0"
+                  dateTime={new Date(event.atMs).toISOString()}
+                  title={new Date(event.atMs).toLocaleString()}
+                >
+                  {new Date(event.atMs).toLocaleTimeString([], {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </time>
+              </button>
+            ))}
+        </div>
+      )}
       {block.answers.map(renderMessage)}
     </div>
   );

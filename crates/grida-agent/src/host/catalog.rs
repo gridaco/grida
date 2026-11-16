@@ -12,7 +12,68 @@ pub struct SessionCatalog {
     pub next_after: Option<SessionId>,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArchiveCatalogEntry {
+    pub session_id: SessionId,
+    pub title: Option<String>,
+    pub revision: u64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArchiveCatalogPage {
+    pub entries: Vec<ArchiveCatalogEntry>,
+    pub next_cursor: Option<SessionId>,
+}
+
 impl Host {
+    /// Settings reads metadata without attaching a session or enabling execution.
+    pub async fn archive_catalog(
+        &self,
+        cwd: PathBuf,
+        after: Option<SessionId>,
+    ) -> Result<ArchiveCatalogPage> {
+        let page = self.list_sessions(cwd, true, after).await?;
+        Ok(ArchiveCatalogPage {
+            entries: page
+                .entries
+                .into_iter()
+                .map(|entry| ArchiveCatalogEntry {
+                    session_id: entry.session,
+                    title: entry.label,
+                    revision: entry.revision,
+                })
+                .collect(),
+            next_cursor: page.next_after,
+        })
+    }
+
+    /// Change only catalog placement, keeping execution, turns and hooks untouched.
+    pub async fn unarchive_catalog(
+        &self,
+        cwd: PathBuf,
+        session: SessionId,
+        revision: u64,
+    ) -> Result<()> {
+        let cwd = tokio::task::spawn_blocking(move || canonical_workspace(&cwd))
+            .await
+            .map_err(|_| problem(ErrorKind::Unavailable, "workspace_unavailable"))??;
+        let mut entry = self
+            .store
+            .scoped_catalog_entry(workspace_scope(&cwd)?, session)
+            .await?;
+        if entry.revision != revision {
+            return Err(problem(
+                ErrorKind::Conflict,
+                "session_catalog_revision_changed",
+            ));
+        }
+        entry.bucket = ACTIVE;
+        self.store.replace_catalog_entry(entry).await?;
+        Ok(())
+    }
+
     pub async fn list_sessions(
         &self,
         cwd: PathBuf,

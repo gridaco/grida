@@ -1,7 +1,7 @@
 import type {
-  NativeHookInspection,
   DesktopNativeChat,
   NativeChatArtifactSaveResult,
+  NativeChatAcceptance,
   NativeChatApproval,
   NativeChatApprovalDecision,
   NativeChatAttachment,
@@ -31,6 +31,7 @@ import type {
   NativeChatPage,
   NativeChatProfileCatalog,
   NativeChatProfileSelection,
+  NativeChatSelectionState,
   NativeChatQuestion,
   NativeChatQuestionAnswer,
   NativeChatQueueAction,
@@ -50,9 +51,10 @@ import type {
   NativeSubagentClient,
 } from "@grida/desktop-bridge";
 import { GoalSpending } from "./goal-spending";
-import { ComposerDrafts } from "./composer-drafts";
+import { ComposerDrafts, type ComposerDraftPending } from "./composer-drafts";
 import { isSupportedImageType } from "./image-attachment";
 import { video_attachment } from "./video-attachment";
+import { image_attachment_preview } from "./image-attachment-preview";
 import { NativeSubagentController } from "./native-subagent-controller";
 import { NativeBackgroundProcessController } from "./native-background-process-controller";
 
@@ -81,27 +83,37 @@ const MESSAGE_NOT_SENT =
 const TITLE_RECHECK_MS = 6_000;
 const MAX_LIVE_BYTES = 1024 * 1024;
 const MAX_ATTACHMENT_BYTES = 256 * 1024;
+const DIRECTORY_MIME_TYPE = "inode/directory";
+const DIRECTORY_REFERENCE_UNAVAILABLE =
+  "Folder references are unavailable in this chat.";
 
 /**
- * How a person's file enters a message. A PNG and a small file go directly:
- * the model sees the PNG, and the host keeps a private copy of the file for
- * inspection. Any other file goes by reference: the agent receives its path
- * and facts and works with it through its own tools and permissions.
+ * Selected raster Files supply original image input. Ordinary disk files and
+ * folders supply references for the model's tools; clipboard files can use the
+ * bounded retained-file API. Library and older hosts retain inline PNG intake.
  */
-type AttachmentKind = "png" | "file" | "reference";
+type AttachmentKind = "png" | "image" | "file" | "reference";
 type BrowserAttachment = Pick<File, "name" | "size" | "arrayBuffer">;
 type TransferredAttachment =
   | { kind: "file"; file: BrowserAttachment & Pick<File, "type"> }
-  | { kind: "directory" };
+  | { kind: "directory"; file: File };
 type AttachmentSource =
+  | { kind: "image"; file: File; originalFile?: File }
   | { kind: "file"; file: BrowserAttachment }
-  | { kind: "reference"; file: File }
+  | { kind: "reference"; file: File; directory?: true }
   | {
       kind: "library";
       name: string;
       readPng: (maxBytes: number) => Promise<ArrayBuffer>;
     };
 type SelectedAttachment =
+  | Readonly<{
+      kind: "image";
+      name: string;
+      file: File;
+      originalFile?: File;
+      mimeType?: string;
+    }>
   | Readonly<{
       kind: "png" | "file";
       name: string;
@@ -110,6 +122,7 @@ type SelectedAttachment =
   | Readonly<{
       kind: "reference";
       name: string;
+      referenceId?: string;
       /** The person's File; Desktop resolves its path when it is sent. */
       file: File;
       mimeType?: string;
@@ -148,6 +161,7 @@ export type NativeChatView = Readonly<{
   profiles: NativeChatProfileCatalog | null;
   profileBusy: boolean;
   profileError: string | null;
+  profileReadError: string | null;
   catalogEntry: NativeChatCatalogEntry | null;
   catalogEntryError: string | null;
   catalogChanging: boolean;
@@ -179,24 +193,23 @@ export type NativeChatView = Readonly<{
   /** Present once the attached chat confirms it lists background processes. */
   backgroundProcesses: NativeBackgroundProcessController | null;
   imageInput: boolean;
+  selectedImageInput: boolean;
   fileInput: boolean;
   /** The chat takes files by reference. */
   fileReferenceInput: boolean;
+  /** Main explicitly supports directory metadata on the reference route. */
+  directoryReferenceInput: boolean;
   attachmentReading: boolean;
   attachmentNotice: string | null;
   attachmentDraft: Readonly<{
     kind: AttachmentKind;
     name: string;
-    size: number;
+    size?: number;
     mimeType?: string;
     /** A video's poster frame, duration and dimensions. */
     preview?: video_attachment.Preview;
     error?: string;
   }> | null;
-  hooksOpen: boolean;
-  hooks: NativeHookInspection | null;
-  hooksBusy: boolean;
-  hooksError: string | null;
   observation: NativeChatObservation | null;
   turnSummary: (NativeChatTurnSummary & { detailsUnavailable?: true }) | null;
   gatewayBillingRefresh:
@@ -218,7 +231,13 @@ export type NativeChatView = Readonly<{
   librarySelectionRetry: boolean;
   queue: NativeChatQueuePage | null;
   queueLoading: boolean;
-  queueDraft: Readonly<{ inputId: string; text: string }> | null;
+  queueDraft: Readonly<{
+    inputId: string;
+    text: string;
+    /** Use the negotiated operation that retains non-text input and settings. */
+    replaceText?: true;
+    allowEmpty?: boolean;
+  }> | null;
   steering: boolean;
   /** The turn a pause was requested for; it may still be settling. */
   pausing: string | null;
@@ -236,6 +255,12 @@ export type NativeChatView = Readonly<{
 }>;
 
 type Scope = {
+  selection?: NativeChatSelectionState;
+  selectionReady?: Promise<void>;
+  selectionChange?: Promise<void>;
+  firstInputId?: string;
+  effortRead?: Promise<void>;
+  effortKnown?: boolean;
   id: number;
   requested: string | null;
   /**
@@ -244,6 +269,8 @@ type Scope = {
    */
   startsWithMessage?: true;
   attachment?: NativeChatAttachment;
+  /** Main retired this handle while recovering a failed connection change. */
+  retiredAttachment?: true;
   stopEditorSurfaceUpdates?: () => void;
   stopEditorSurfaceOpen?: () => void;
   stopEditorSvgText?: () => void;
@@ -285,6 +312,7 @@ type Scope = {
     answer: NativeChatLibrarySelectionAnswer;
   };
   queueBasis?: { revision: number; offset: number; observationId: string };
+  queuedTextReplacement?: boolean;
   queueListing?: Promise<void>;
   pendingQueueChange?: { key: string; change: NativeChatQueueChange };
   steeringTarget?: string;
@@ -292,7 +320,11 @@ type Scope = {
   goalRevision?: number;
   goalNeedsRefresh?: boolean;
   awaitingGoalId?: string;
-  pendingGoalStart?: { key: string; inputId: string };
+  pendingGoalStart?: {
+    key: string;
+    inputId: string;
+    selectionRevision?: number;
+  };
   pendingGoalControl?: {
     key: string;
     change: NativeChatGoalControl;
@@ -301,13 +333,24 @@ type Scope = {
   pendingCommand?: { command: NativeChatCommand; requestId: string };
   pendingRevision?: NativeChatRevisionInput;
   replay: boolean;
+  draftReady?: Promise<void>;
+  draftRestored?: true;
+  pendingRestoreFailed?: true;
+  promotingDraft?: Readonly<{ from: string; to: string }>;
   pending?: {
     text: string;
     inputId: string;
     mode: "submit" | "enqueue";
     operatingRegime?: NativeChatOperatingRegime;
     effort?: NativeChatEffort;
+    selectionRevision?: number;
     attachment?: SelectedAttachment;
+    missingAttachment?: Readonly<{
+      kind: "reference";
+      name: string;
+      mimeType?: string;
+      referenceId: string;
+    }>;
     allowLibrarySelection: boolean;
     editorSvgTargetId?: string;
   };
@@ -361,6 +404,7 @@ const EMPTY: NativeChatView = Object.freeze({
   profiles: null,
   profileBusy: false,
   profileError: null,
+  profileReadError: null,
   catalogEntry: null,
   catalogEntryError: null,
   catalogChanging: false,
@@ -381,15 +425,13 @@ const EMPTY: NativeChatView = Object.freeze({
   subagents: null,
   backgroundProcesses: null,
   imageInput: false,
+  selectedImageInput: false,
   fileInput: false,
   fileReferenceInput: false,
+  directoryReferenceInput: false,
   attachmentReading: false,
   attachmentNotice: null,
   attachmentDraft: null,
-  hooksOpen: false,
-  hooks: null,
-  hooksBusy: false,
-  hooksError: null,
   observation: null,
   turnSummary: null,
   gatewayBillingRefresh: null,
@@ -431,6 +473,7 @@ const SESSION_INDEPENDENT_FIELDS = [
   "profiles",
   "profileBusy",
   "profileError",
+  "profileReadError",
 ] as const satisfies readonly (keyof NativeChatView)[];
 
 function pickSessionIndependent(
@@ -454,11 +497,21 @@ export class NativeChatController {
   private listing?: Promise<NativeChatPage>;
   private recents: readonly string[] = [];
   private profileId: string | null = null;
-  private profileRead?: object;
+  private profileRead?: { connection: object; done: Promise<void> };
   private profileSelection?: Promise<void>;
   private pendingFocus?: { sessionId: string; profileId?: string };
   /** A new chat is opening to send a message chosen before it opened. */
   private startingChat = false;
+  private restoredDraftId?: string;
+
+  private get remembersSelection(): boolean {
+    return (
+      !this.fixed &&
+      !!this.bridge.selection &&
+      !!this.bridge.updateSelection &&
+      !!this.bridge.createFromDraft
+    );
+  }
   /** The current {@link startChat} call, until it sends or declines. */
   private chatStart?: object;
 
@@ -524,15 +577,24 @@ export class NativeChatController {
 
   /** The draft key the composer uses for the selected chat. */
   draftKey(): string | null {
-    return this.drafts
-      ? `${this.drafts.workspace}:${this.view.selected ?? "new"}`
-      : null;
+    return this.scope
+      ? this.scopeDraftKey(this.scope)
+      : this.drafts
+        ? `${this.drafts.workspace}:${this.view.selected ?? "new"}`
+        : null;
   }
 
   /** The draft key of a chat's scope, whichever chat is selected now. */
   private scopeDraftKey(scope: Scope): string | null {
+    if (scope.promotingDraft) return scope.promotingDraft.from;
     const session = scope.attachment?.sessionId ?? scope.requested;
-    return this.drafts ? `${this.drafts.workspace}:${session ?? "new"}` : null;
+    const draftId =
+      scope.selection && "draftId" in scope.selection.target
+        ? scope.selection.target.draftId
+        : undefined;
+    return this.drafts
+      ? `${this.drafts.workspace}:${session ?? (draftId ? `draft/${draftId}` : "new")}`
+      : null;
   }
 
   private saveDraftModes(key = this.draftKey()): void {
@@ -551,31 +613,156 @@ export class NativeChatController {
       void this.drafts.store.writeAttachment(key, attachment);
   }
 
-  /** Bring back what the person left in this chat's composer. */
-  private async restoreDraft(scope: Scope): Promise<void> {
-    const drafts = this.drafts;
-    const key = this.draftKey();
+  /** Bring back one complete retry capture before accepting another send. */
+  private restoreDraft(scope: Scope): Promise<void> {
+    if (!this.drafts) {
+      scope.draftRestored = true;
+      return Promise.resolve();
+    }
+    return (scope.draftReady ??= this.restoreDraftState(scope)
+      .catch(() => {
+        if (this.owns(scope)) {
+          scope.pendingRestoreFailed = true;
+          this.update({
+            error:
+              "Couldn't restore this draft's send identity. Your draft is kept; reopen the chat before sending.",
+          });
+        }
+      })
+      .finally(() => {
+        scope.draftRestored = true;
+        if (this.owns(scope)) this.update({});
+      }));
+  }
+
+  private async restoreDraftState(scope: Scope): Promise<void> {
+    const drafts = this.drafts,
+      key = this.draftKey();
     if (!drafts || !key || !this.owns(scope) || scope.startsWithMessage) return;
+    if (
+      !scope.requested &&
+      scope.selection &&
+      "draftId" in scope.selection.target
+    )
+      await drafts.store.initializeDraft(`${drafts.workspace}:new`, key);
     const modes = drafts.store.readModes(key);
     if (modes.plan && this.bridge.submitInRegime)
       this.update({ operatingRegime: "plan" });
     if (modes.goal && this.bridge.startGoal) this.update({ goalIntent: true });
-    const attachment = await drafts.store.readAttachment(key);
-    if (!attachment || !this.owns(scope) || scope.selectedAttachment) return;
-    if (!this.canAttach(attachment.kind)) {
-      // Never dropped: it stays with the draft for a model that accepts it.
+    const pending = await drafts.store.readPending(key);
+    const saved = await drafts.store.readAttachment(key);
+    if (!this.owns(scope) || scope.selectedAttachment) return;
+    if (pending) {
+      const captured = pending.attachment;
+      const attachment =
+        captured?.kind === "reference"
+          ? saved?.kind === "reference" &&
+            saved.referenceId === captured.referenceId
+            ? saved
+            : undefined
+          : captured;
+      scope.selectedAttachment = attachment;
+      scope.pending = {
+        ...pending,
+        attachment,
+        ...(captured?.kind === "reference" &&
+          !attachment && { missingAttachment: captured }),
+      };
+      if (captured)
+        this.update({
+          attachmentDraft: {
+            kind: captured.kind,
+            name: captured.name,
+            ...(captured.kind === "image" && {
+              size: captured.file.size,
+              mimeType: captured.mimeType,
+            }),
+            ...((captured.kind === "png" || captured.kind === "file") && {
+              size: captured.bytes.byteLength,
+            }),
+            ...(captured.kind === "reference" && {
+              mimeType: captured.mimeType,
+              ...(!attachment && {
+                error:
+                  "The original reference is unavailable. Retry to check the previous send before attaching it again.",
+              }),
+            }),
+          },
+        });
+      return;
+    }
+    if (!saved) return;
+    if (saved.kind === "image") {
+      await this.readAttachment(scope.id, "image", {
+        kind: "image",
+        file: saved.file,
+        originalFile: saved.originalFile,
+      });
+      return;
+    }
+    if (
+      !this.canAttach(saved.kind) ||
+      (saved.kind === "reference" &&
+        saved.mimeType === DIRECTORY_MIME_TYPE &&
+        !this.view.directoryReferenceInput)
+    ) {
+      scope.selectedAttachment = saved;
       this.update({
-        attachmentNotice: `${attachment.name} is kept with this draft. Choose a model that accepts it to send it.`,
+        attachmentDraft: {
+          kind: saved.kind,
+          name: saved.name,
+          ...(saved.kind === "reference"
+            ? {
+                mimeType: saved.mimeType,
+                ...(saved.mimeType === DIRECTORY_MIME_TYPE && {
+                  error: DIRECTORY_REFERENCE_UNAVAILABLE,
+                }),
+              }
+            : { size: saved.bytes.byteLength }),
+        },
+        attachmentNotice: `${saved.name} is kept with this draft. Choose a model that accepts it to send it.`,
       });
       return;
     }
     await this.readAttachment(
       scope.id,
-      attachment.kind,
-      attachment.kind === "reference"
-        ? { kind: "reference", file: attachment.file }
-        : { kind: "file", file: new File([attachment.bytes], attachment.name) }
+      saved.kind,
+      saved.kind === "reference"
+        ? {
+            kind: "reference",
+            file: saved.file,
+            ...(saved.mimeType === DIRECTORY_MIME_TYPE && { directory: true }),
+          }
+        : { kind: "file", file: new File([saved.bytes], saved.name) }
     );
+  }
+
+  private pendingRecord(
+    pending: NonNullable<Scope["pending"]>
+  ): ComposerDraftPending {
+    const { attachment, missingAttachment, ...settings } = pending;
+    let captured: ComposerDraftPending["attachment"] = missingAttachment;
+    if (attachment?.kind === "image") {
+      const { originalFile: _origin, ...frozen } = attachment;
+      captured = frozen;
+    } else if (attachment?.kind === "reference")
+      captured = {
+        kind: "reference",
+        name: attachment.name,
+        referenceId: attachment.referenceId!,
+        ...(attachment.mimeType && { mimeType: attachment.mimeType }),
+      };
+    else if (attachment)
+      captured = { ...attachment, bytes: attachment.bytes.slice(0) };
+    return { ...settings, ...(captured && { attachment: captured }) };
+  }
+
+  private async discardPending(scope: Scope): Promise<void> {
+    const inputId = scope.pending?.inputId;
+    scope.pending = undefined;
+    scope.pendingRestoreFailed = undefined;
+    const key = this.scopeDraftKey(scope);
+    if (key && this.drafts) await this.drafts.store.clearPending(key, inputId);
   }
 
   /** The model last chosen in a workspace, as the pane's memory keeps it. */
@@ -586,6 +773,26 @@ export class NativeChatController {
     return NativeChatController.readMemory(memory, key).profileId;
   }
 
+  /** A recommendation is valid only while its exact choice is offered. */
+  static recommendedProfile(
+    profiles: NativeChatProfileCatalog | null
+  ): string | null {
+    if (profiles?.newChatDefault) {
+      const id = profiles.newChatDefault.profileId;
+      return id &&
+        /^[a-f0-9]{64}$/.test(id) &&
+        profiles.choices.some((choice) => choice.id === id)
+        ? id
+        : null;
+    }
+    const id = profiles?.recommendedProfileId;
+    return id &&
+      /^[a-f0-9]{64}$/.test(id) &&
+      profiles.choices.some((choice) => choice.id === id)
+      ? id
+      : null;
+  }
+
   /**
    * Start the workspace's native chat. With a remembered or newly chosen
    * model, that model is selected first so startup opens it directly instead
@@ -594,8 +801,16 @@ export class NativeChatController {
    */
   static watchReadiness(
     bridge: DesktopNativeChat,
-    publish: (state: NativeChatReadiness | null) => void,
-    selection: NativeChatProfileSelection | null = null
+    publish: (
+      state: NativeChatReadiness | null,
+      recommendedProfileId?: string
+    ) => void,
+    selection: NativeChatProfileSelection | null = null,
+    recommendation?: Readonly<{
+      memory?: Pick<Storage, "getItem">;
+      key?: string;
+      initialSession: string | null;
+    }>
   ): () => void {
     let watching = true;
     const probe = async () => {
@@ -603,11 +818,42 @@ export class NativeChatController {
         const state = await bridge.status();
         if (!watching) return;
         let result: NativeChatReadiness = state;
+        let recommendedProfileId: string | undefined;
         if (state === "native-starting") {
           publish(state);
           if (!watching) return;
-          if (selection && bridge.selectProfile)
-            await bridge.selectProfile(selection).catch(() => {});
+          let preferred = selection;
+          if (
+            !preferred &&
+            recommendation &&
+            !recommendation.initialSession &&
+            bridge.profiles &&
+            bridge.selectProfile &&
+            !NativeChatController.readMemory(
+              recommendation.memory,
+              recommendation.key
+            ).remembered
+          ) {
+            const profiles = await bridge.profiles().catch(() => null);
+            if (!watching) return;
+            // A choice made while the catalogue was loading always wins.
+            if (
+              !NativeChatController.readMemory(
+                recommendation.memory,
+                recommendation.key
+              ).remembered
+            ) {
+              const id = NativeChatController.recommendedProfile(profiles);
+              if (id) {
+                preferred = { kind: "new", id };
+                recommendedProfileId = id;
+              }
+            }
+          }
+          if (preferred && bridge.selectProfile)
+            await bridge.selectProfile(preferred).catch(() => {
+              recommendedProfileId = undefined;
+            });
           if (!watching) return;
           result = await bridge.status(true);
         }
@@ -620,7 +866,9 @@ export class NativeChatController {
           case "native-provider-endpoint-approval-required":
           case "native-gateway-unavailable":
           case "native-workspace-capacity":
-            publish(result);
+            if (result === "native-ready" && recommendedProfileId)
+              publish(result, recommendedProfileId);
+            else publish(result);
             break;
           default:
             publish("native-unavailable");
@@ -655,6 +903,12 @@ export class NativeChatController {
       return;
     }
     const saved = this.beginConnection();
+    if (this.remembersSelection) {
+      this.restoredDraftId = saved.draftId;
+      void this.listChats();
+      void this.select(initial ?? saved.selected);
+      return;
+    }
     if (profileId !== null && profileId !== undefined) {
       if (initial) void this.focusChat(initial, profileId);
       else void this.selectProfile({ kind: "saved", id: profileId });
@@ -683,6 +937,35 @@ export class NativeChatController {
     profileId: string | null,
     take: () => string | null
   ): Promise<string | null> {
+    if (this.remembersSelection) {
+      this.beginConnection();
+      const run = {};
+      this.chatStart = run;
+      this.startingChat = true;
+      let scope: Scope | undefined;
+      try {
+        const opening = this.select(null);
+        scope = this.scope;
+        await opening;
+      } finally {
+        this.startingChat = false;
+      }
+      if (this.chatStart !== run || !scope || !this.owns(scope)) return null;
+      if (scope.selection?.selection?.profileId !== profileId)
+        await this.saveSelection(scope, profileId, this.view.effort);
+      if (this.chatStart !== run || !this.owns(scope)) return null;
+      this.chatStart = undefined;
+      if (!this.canSubmit || this.view.profileError)
+        return this.declineMessage(take);
+      const text = take();
+      if (!text) return null;
+      try {
+        await this.submit(text, scope.id);
+        return null;
+      } catch {
+        return text;
+      }
+    }
     this.beginConnection();
     const run = {};
     this.chatStart = run;
@@ -749,6 +1032,7 @@ export class NativeChatController {
       catalogArchived: false,
       profileBusy: false,
       profileError: null,
+      profileReadError: null,
     });
     void this.readProfiles();
     return saved;
@@ -829,7 +1113,12 @@ export class NativeChatController {
   connectForSelection(): void {
     if (this.scope || this.catalogConnection) return;
     this.catalogConnection = {};
-    this.update({ profiles: null, profileBusy: false, profileError: null });
+    this.update({
+      profiles: null,
+      profileBusy: false,
+      profileError: null,
+      profileReadError: null,
+    });
     void this.readProfiles();
   }
 
@@ -837,6 +1126,25 @@ export class NativeChatController {
   async selectConnection(
     selection: NativeChatProfileSelection
   ): Promise<boolean> {
+    if (this.remembersSelection && !this.scope) {
+      await this.bind(null);
+      let scope = this.scope as Scope | undefined;
+      if (!scope) return false;
+      await this.saveSelection(
+        scope,
+        selection.kind === "default" ? null : selection.id,
+        this.view.effort
+      );
+      if (this.view.profileError || !scope.selection?.selection) return false;
+      try {
+        scope = await this.activateSelection(scope);
+        return this.owns(scope);
+      } catch (error) {
+        if (this.owns(scope))
+          this.update({ profileError: modelChangeRefusal(error) });
+        return false;
+      }
+    }
     const connection = this.catalogConnection;
     if (
       this.scope ||
@@ -849,11 +1157,10 @@ export class NativeChatController {
     try {
       if (!(await this.commitProfile(selection, connection))) return false;
       return this.catalogConnection === connection;
-    } catch {
+    } catch (error) {
       if (this.catalogConnection === connection)
         this.update({
-          profileError:
-            "This model connection is unavailable. Check its saved settings.",
+          profileError: modelChangeRefusal(error),
         });
       return false;
     } finally {
@@ -862,20 +1169,39 @@ export class NativeChatController {
     }
   }
 
-  async readProfiles(): Promise<void> {
+  /** Opening the picker and returning from Settings share a pending read. */
+  readProfiles(): Promise<void> {
     const connection = this.catalogConnection;
-    if (!connection || !this.bridge.profiles) return;
-    const request = {};
+    if (!connection || !this.bridge.profiles) return Promise.resolve();
+    if (this.profileRead?.connection === connection)
+      return this.profileRead.done;
+    const request = { connection, done: Promise.resolve() };
     this.profileRead = request;
     const owns = () =>
       this.catalogConnection === connection && this.profileRead === request;
-    try {
-      const profiles = await this.bridge.profiles();
-      if (owns()) this.update({ profiles, profileError: null });
-    } catch {
-      if (owns())
-        this.update({ profileError: "Couldn't load model connections." });
-    }
+    request.done = (async () => {
+      try {
+        const profiles = await this.bridge.profiles!();
+        if (owns()) {
+          if (this.remembersSelection && profiles)
+            this.profileId = profiles.active;
+          const selected = this.scope?.selection?.selection;
+          this.update({
+            profiles:
+              profiles && selected
+                ? { ...profiles, active: selected.profileId }
+                : profiles,
+            profileReadError: null,
+          });
+        }
+      } catch {
+        if (owns())
+          this.update({ profileReadError: "Couldn't load model connections." });
+      } finally {
+        if (owns()) this.profileRead = undefined;
+      }
+    })();
+    return request.done;
   }
 
   private async commitProfile(
@@ -895,8 +1221,228 @@ export class NativeChatController {
     }
   }
 
+  private async restoreSelection(
+    scope: Scope,
+    sessionId: string | null
+  ): Promise<void> {
+    const draftId = this.restoredDraftId ?? crypto.randomUUID();
+    this.restoredDraftId = undefined;
+    const state = await this.bridge.selection!(
+      sessionId ? { sessionId } : { draftId }
+    );
+    if (!this.owns(scope)) return;
+    scope.selection = state;
+    this.presentSelection(state);
+    this.save();
+  }
+
+  private presentSelection(state: NativeChatSelectionState): void {
+    this.update({
+      ...(state.selection && { effort: state.selection.effort }),
+      ...(this.view.profiles &&
+        state.selection && {
+          profiles: {
+            ...this.view.profiles,
+            active: state.selection.profileId,
+          },
+        }),
+      profileError: state.selection
+        ? state.available
+          ? null
+          : "This chat's selected model connection is unavailable. Choose an available model."
+        : "Choose a model for this chat. Its earlier connection could not be verified.",
+    });
+  }
+
+  private async saveSelection(
+    scope: Scope,
+    profileId: string | null,
+    effort: NativeChatEffort
+  ): Promise<void> {
+    if (
+      !this.owns(scope) ||
+      this.view.profileBusy ||
+      this.view.acting ||
+      this.view.steering
+    )
+      return;
+    const previousEffort = this.view.effort;
+    this.update({ profileBusy: true, profileError: null, effort });
+    const run = (async () => {
+      await scope.selectionReady;
+      if (!this.owns(scope) || !scope.selection) return;
+      const operationId = crypto.randomUUID();
+      const update = () =>
+        this.bridge.updateSelection!(
+          scope.selection!.target,
+          scope.selection!.revision,
+          operationId,
+          { profileId, effort }
+        );
+      let state;
+      try {
+        state = await update();
+      } catch (error) {
+        if (
+          !(error instanceof Error) ||
+          error.message !== "native_chat_draft_creation_pending" ||
+          !this.owns(scope) ||
+          !scope.selection ||
+          !("draftId" in scope.selection.target)
+        )
+          throw error;
+        // Finish the already recorded creation before editing its settings.
+        // This opens the same identity on its current route; it submits no input.
+        await this.open(scope);
+        if (
+          !this.owns(scope) ||
+          !scope.selection ||
+          !("sessionId" in scope.selection.target)
+        )
+          throw new Error("native_chat_scope_changed");
+        state = await update();
+      }
+      if (!this.owns(scope)) return;
+      scope.selection = state;
+      this.presentSelection(state);
+      this.save();
+      void this.readInputCapabilities(scope);
+    })();
+    scope.selectionChange = run;
+    try {
+      await run;
+    } catch (error) {
+      if (this.owns(scope)) {
+        // Reload the head after conflicts or an unknown save outcome. It may
+        // already contain the accepted edit, so do not guess a rollback value.
+        const state =
+          scope.selection &&
+          (await this.bridge.selection!(scope.selection.target).catch(
+            () => null
+          ));
+        if (!this.owns(scope)) return;
+        if (state) {
+          scope.selection = state;
+          this.presentSelection(state);
+        } else this.update({ effort: previousEffort });
+        this.update({
+          profileError:
+            error instanceof Error &&
+            /revision_changed|selection_conflict/.test(error.message)
+              ? "This chat's model settings changed in another window. Review the selection and try again."
+              : "Couldn't confirm the saved model and effort. Your draft is still here; retry the selection.",
+        });
+      }
+    } finally {
+      if (scope.selectionChange === run) scope.selectionChange = undefined;
+      if (this.owns(scope)) this.update({ profileBusy: false });
+    }
+  }
+
+  /** A deliberate send activates its saved route; opening history does not. */
+  private async activateSelection(scope: Scope): Promise<Scope> {
+    if (!this.remembersSelection) return scope;
+    await scope.selectionReady;
+    await scope.selectionChange;
+    await scope.draftReady;
+    if (
+      !this.owns(scope) ||
+      !scope.selection?.selection ||
+      !scope.selection.available
+    )
+      throw new Error("native_chat_selection_unavailable");
+    const id = scope.selection.selection.profileId;
+    await this.readProfiles();
+    if (!this.owns(scope)) throw new Error("native_chat_scope_changed");
+    if (id === this.profileId) return scope;
+    if (!this.bridge.selectProfile)
+      throw new Error("native_chat_selection_unavailable");
+    try {
+      await this.commitProfile(
+        id ? { kind: "new", id } : { kind: "default" },
+        this.catalogConnection!
+      );
+    } catch (error) {
+      if (
+        this.owns(scope) &&
+        error instanceof Error &&
+        /native_chat_model_change_(?:failed_restored|restore_failed|recovery_pending)/.test(
+          error.message
+        )
+      ) {
+        this.replaceRouteScope(scope);
+        this.update({
+          acting: false,
+          commandRunning: null,
+          error: modelChangeRefusal(error),
+        });
+      }
+      throw error;
+    }
+    if (!this.owns(scope)) throw new Error("native_chat_scope_changed");
+    this.profileRead = undefined;
+    this.profileId = id;
+    return this.replaceRouteScope(scope);
+  }
+
+  /** Every asynchronous observer keeps the generation of its worker attachment. */
+  private replaceRouteScope(previous: Scope): Scope {
+    const next: Scope = {
+      id: ++this.generation,
+      requested: previous.attachment?.sessionId ?? previous.requested,
+      sides: [],
+      durable: previous.durable,
+      earlierPages: previous.earlierPages,
+      recentWindow: previous.recentWindow,
+      live: new Map(),
+      gaps: new Set(),
+      observation: null,
+      replay: true,
+      selection: previous.selection,
+      selectionReady: Promise.resolve(),
+      firstInputId: previous.firstInputId,
+      selectedAttachment: previous.selectedAttachment,
+      pending: previous.pending,
+      pendingGoalStart: previous.pendingGoalStart,
+      pendingCommand: previous.pendingCommand,
+      startsWithMessage: previous.startsWithMessage,
+      draftReady: previous.draftRestored ? Promise.resolve() : undefined,
+      draftRestored: previous.draftRestored,
+      pendingRestoreFailed: previous.pendingRestoreFailed,
+      promotingDraft: previous.promotingDraft,
+    };
+    this.scope = next;
+    this.queueRelease(previous);
+    this.update({
+      scope: next.id,
+      observation: null,
+      goal: null,
+      goalReady: false,
+      approvals: [],
+      approvalError: null,
+      questions: [],
+      questionReady: false,
+      questionError: null,
+      librarySelection: null,
+      librarySelectionError: null,
+      queue: null,
+      queueLoading: false,
+      queueDraft: null,
+      steering: false,
+      pausing: null,
+      sideChats: [],
+      subagents: null,
+      backgroundProcesses: null,
+      effortAvailable: false,
+      goalEffortAvailable: false,
+    });
+    void this.readEffortCapability(next);
+    return next;
+  }
+
   async focusChat(sessionId: string, profileId?: string): Promise<void> {
     if (!this.catalogConnection) return;
+    if (this.remembersSelection) return this.select(sessionId);
     if (profileId !== undefined && !/^[a-f0-9]{64}$/.test(profileId)) {
       this.update({ profileError: "This model connection is unavailable." });
       return;
@@ -943,6 +1489,14 @@ export class NativeChatController {
     selection: NativeChatProfileSelection,
     initialSession?: string | null
   ): Promise<void> {
+    if (this.remembersSelection && this.scope) {
+      await this.saveSelection(
+        this.scope,
+        selection.kind === "default" ? null : selection.id,
+        this.view.effort
+      );
+      return;
+    }
     const connection = this.catalogConnection;
     if (
       !connection ||
@@ -952,9 +1506,24 @@ export class NativeChatController {
     )
       return;
     this.profileRead = undefined;
-    if (this.scope?.observation?.snapshot.current) {
+    if (this.view.selected && this.view.profiles?.modelChanges !== true) {
       this.update({
-        profileError: "Change the model after the current turn ends.",
+        profileError: modelChangeRefusal(
+          new Error("native_chat_model_change_unsupported")
+        ),
+      });
+      return;
+    }
+    const current = this.scope?.observation?.snapshot.current;
+    if (current) {
+      this.update({
+        profileError: modelChangeRefusal(
+          new Error(
+            current.paused || current.disposition !== "running"
+              ? "native_chat_model_change_retained_turn"
+              : "native_chat_model_change_active_turn"
+          )
+        ),
       });
       return;
     }
@@ -986,6 +1555,7 @@ export class NativeChatController {
         catalogError: null,
         catalogArchived: false,
         profileBusy: false,
+        profileReadError: null,
       });
       void this.listChats();
       void this.readProfiles();
@@ -996,12 +1566,30 @@ export class NativeChatController {
         initialSession === null ? null : (continuing ?? saved.selected),
         { reattach: !!continuing }
       );
-    } catch {
-      if (this.catalogConnection === connection)
+    } catch (error) {
+      if (this.catalogConnection === connection) {
+        const reason = error instanceof Error ? error.message : "";
+        // A failed destination launch can retire the old handles before Main
+        // restores its route. Reattach only for that explicit outcome; a
+        // refused choice leaves the live chat and its side chats untouched.
+        if (reason.includes("native_chat_model_change_failed_restored")) {
+          await this.select(this.view.selected, { reattach: true });
+          if (this.catalogConnection !== connection) return;
+          void this.readProfiles();
+        }
+        if (
+          /native_chat_model_change_(?:restore_failed|recovery_pending)/.test(
+            reason
+          )
+        ) {
+          if (this.scope) this.scope.retiredAttachment = true;
+          this.update({ profileError: null, error: modelChangeRefusal(error) });
+          return;
+        }
         this.update({
-          profileError:
-            "This model connection is unavailable. Check its saved settings.",
+          profileError: modelChangeRefusal(error),
         });
+      }
     } finally {
       if (this.catalogConnection === connection)
         this.update({ profileBusy: false });
@@ -1057,13 +1645,29 @@ export class NativeChatController {
       ...(this.fixed && { effort: this.fixed.effort }),
       messages: retained?.messages ?? [],
       turnRecords: retained?.turnRecords ?? [],
-      loading: sessionId !== null || !!this.fixed,
+      loading: this.remembersSelection || sessionId !== null || !!this.fixed,
     });
+    if (this.remembersSelection) {
+      const read = this.restoreSelection(scope, sessionId);
+      scope.selectionReady = read;
+      try {
+        await read;
+      } catch {
+        if (this.owns(scope))
+          this.update({
+            loading: false,
+            profileError:
+              "Couldn't read this chat's saved model and effort. Reopen the chat to retry.",
+          });
+        return;
+      }
+      if (!this.owns(scope)) return;
+    }
     void this.readEffortCapability(scope);
     if (sessionId === null && !this.fixed) {
-      void this.readInputCapabilities(scope).then(() =>
-        this.restoreDraft(scope)
-      );
+      this.update({ loading: false });
+      await this.readInputCapabilities(scope);
+      await this.restoreDraft(scope);
       this.save();
       return;
     }
@@ -1087,7 +1691,7 @@ export class NativeChatController {
     } finally {
       if (this.owns(scope)) {
         this.update({ loading: false });
-        void this.restoreDraft(scope);
+        await this.restoreDraft(scope);
       }
     }
   }
@@ -1095,26 +1699,31 @@ export class NativeChatController {
   get canSubmit(): boolean {
     return (
       !!this.scope &&
+      (!this.scope.draftReady || this.scope.draftRestored === true) &&
+      !this.scope.pendingRestoreFailed &&
       !this.view.loading &&
       !this.view.profileBusy &&
+      (!!this.scope.pending ||
+        !this.remembersSelection ||
+        (!!this.scope.selection?.selection &&
+          this.scope.selection.available)) &&
       !this.view.acting &&
       !this.view.commandRunning &&
       !this.view.revisionDraft &&
       !this.view.revisionSubmitting &&
       !this.view.attachmentReading &&
-      !this.view.attachmentDraft?.error &&
+      (!this.view.attachmentDraft?.error || !!this.scope.pending) &&
       (!this.scope.selectedAttachment ||
-        this.acceptsAttachment(this.scope.selectedAttachment.kind) ||
+        this.acceptsSelectedAttachment(this.scope.selectedAttachment) ||
         this.scope.pending?.attachment === this.scope.selectedAttachment) &&
       // A goal start needs no queue support here: the host queues it.
       (this.view.goalIntent ||
+        !!this.scope.pending ||
         (this.view.steering
           ? this.canSteer &&
             this.scope.steeringTarget ===
               this.view.observation?.snapshot.current?.turnId
-          : !this.needsQueue ||
-            !!this.bridge.enqueue ||
-            !!this.scope.pending?.allowLibrarySelection))
+          : !this.needsQueue || !!this.bridge.enqueue))
     );
   }
 
@@ -1133,50 +1742,55 @@ export class NativeChatController {
   private acceptsAttachment(kind: AttachmentKind): boolean {
     return kind === "png"
       ? this.view.imageInput
-      : kind === "file"
-        ? this.view.fileInput
-        : this.view.fileReferenceInput;
+      : kind === "image"
+        ? this.view.selectedImageInput
+        : kind === "file"
+          ? this.view.fileInput
+          : this.view.fileReferenceInput;
+  }
+
+  private acceptsSelectedAttachment(attachment: SelectedAttachment): boolean {
+    return (
+      this.acceptsAttachment(attachment.kind) &&
+      (attachment.kind !== "reference" ||
+        attachment.mimeType !== DIRECTORY_MIME_TYPE ||
+        this.view.directoryReferenceInput)
+    );
   }
 
   /**
-   * The way a person's file enters this chat, or null for an image that must
-   * be a PNG. A small PNG goes to a model that takes images and a small file
-   * keeps the direct path; a video, another image, a larger file or a PNG the
-   * model cannot take goes by reference when this chat takes references and
-   * Desktop can name the file on disk.
-   * (see test/desktop-agent-chat-file-reference.md)
+   * Explicit raster intent stays an image even when its model or host cannot
+   * accept it. Ordinary disk resources use references without eager reads.
    */
-  private intake(
-    file: Pick<File, "name" | "size" | "type">,
-    picked: boolean
-  ): AttachmentKind | null {
+  private intake(file: Pick<File, "name" | "size" | "type">): AttachmentKind {
     const png =
       file.type === "image/png" || (!file.type && /\.png$/i.test(file.name));
     const direct = file.size <= MAX_ATTACHMENT_BYTES;
-    if (png && direct && this.view.imageInput) return "png";
-    const image = isSupportedImageType(file.type);
-    if (
-      direct &&
-      !png &&
-      !image &&
-      !video_attachment.isVideo(file) &&
-      this.view.fileInput
-    )
-      return "file";
+    const image =
+      isSupportedImageType(file.type) ||
+      (/^image\//i.test(file.type) && file.type !== "image/svg+xml") ||
+      /\.(?:png|jpe?g|webp|gif)$/i.test(file.name) ||
+      image_attachment_preview.mediaType(file) !== undefined;
+    if (image) {
+      if (this.bridge.submitSelectedImage && this.bridge.acceptsSelectedImage)
+        return "image";
+      return png && direct && this.view.imageInput ? "png" : "image";
+    }
     if (
       this.view.fileReferenceInput &&
       file instanceof File &&
       this.bridge.canReferenceFile?.(file) === true
     )
       return "reference";
-    if (png) return "png";
-    return image && !picked ? null : "file";
+    return "file";
   }
 
   async pickTransferredAttachment(
     scopeId: number,
     resources: readonly TransferredAttachment[]
   ): Promise<void> {
+    if (this.scope?.draftReady && !this.scope.draftRestored)
+      await this.scope.draftReady;
     if (this.scope?.id !== scopeId || resources.length === 0) return;
     if (resources.length !== 1) {
       this.update({ attachmentNotice: "Attach one file at a time." });
@@ -1184,34 +1798,52 @@ export class NativeChatController {
     }
     const resource = resources[0];
     if (resource.kind === "directory") {
-      this.update({ attachmentNotice: "Choose a file instead of a folder." });
+      if (
+        !this.canAttach("reference") ||
+        !this.view.directoryReferenceInput ||
+        !(resource.file instanceof File) ||
+        this.bridge.canReferenceFile?.(resource.file) !== true
+      ) {
+        this.update({ attachmentNotice: DIRECTORY_REFERENCE_UNAVAILABLE });
+        return;
+      }
+      await this.readAttachment(scopeId, "reference", {
+        kind: "reference",
+        file: resource.file,
+        directory: true,
+      });
       return;
     }
-    await this.attachFile(scopeId, resource.file, false);
+    await this.attachFile(scopeId, resource.file);
   }
 
   /**
-   * A file chosen with the file picker. It takes the same path as a drop,
-   * except that an image other than a PNG is still accepted as a file.
+   * A picked File has the same intent and source custody as a dropped File.
    */
   pickFile(
     scopeId: number,
     file: BrowserAttachment & Pick<File, "type">
   ): Promise<void> {
     if (this.scope?.id !== scopeId) return Promise.resolve();
-    return this.attachFile(scopeId, file, true);
+    return this.attachFile(scopeId, file);
   }
 
   private async attachFile(
     scopeId: number,
-    file: BrowserAttachment & Pick<File, "type">,
-    picked: boolean
+    file: BrowserAttachment & Pick<File, "type">
   ): Promise<void> {
-    const kind = this.intake(file, picked);
-    if (!kind) {
-      this.update({
-        attachmentNotice: "Use a PNG to send an image to this chat.",
-      });
+    if (this.scope?.draftReady && !this.scope.draftRestored)
+      await this.scope.draftReady;
+    const kind = this.intake(file);
+    if (kind === "image") {
+      if (!(file instanceof File)) {
+        this.update({
+          attachmentNotice:
+            "Keep the original image File to attach it in Desktop.",
+        });
+        return;
+      }
+      await this.readAttachment(scopeId, "image", { kind: "image", file });
       return;
     }
     if (!this.canAttach(kind)) {
@@ -1239,7 +1871,11 @@ export class NativeChatController {
     kind: "png" | "file",
     file: BrowserAttachment
   ): Promise<void> {
-    return this.readAttachment(scopeId, kind, { kind: "file", file });
+    return this.scope?.draftReady && !this.scope.draftRestored
+      ? this.scope.draftReady.then(() =>
+          this.readAttachment(scopeId, kind, { kind: "file", file })
+        )
+      : this.readAttachment(scopeId, kind, { kind: "file", file });
   }
 
   pickLibraryImage(
@@ -1247,11 +1883,15 @@ export class NativeChatController {
     name: string,
     readPng: (maxBytes: number) => Promise<ArrayBuffer>
   ): Promise<void> {
-    return this.readAttachment(scopeId, "png", {
-      kind: "library",
-      name,
-      readPng,
-    });
+    const read = () =>
+      this.readAttachment(scopeId, "png", {
+        kind: "library",
+        name,
+        readPng,
+      });
+    return this.scope?.draftReady && !this.scope.draftRestored
+      ? this.scope.draftReady.then(read)
+      : read();
   }
 
   private async readAttachment(
@@ -1260,7 +1900,14 @@ export class NativeChatController {
     source: AttachmentSource
   ): Promise<void> {
     const scope = this.scope;
-    if (!scope || scope.id !== scopeId || !this.canAttach(kind)) return;
+    if (
+      !scope ||
+      scope.id !== scopeId ||
+      (kind !== "image" && !this.canAttach(kind)) ||
+      (kind === "image" &&
+        (this.view.acting || this.view.steering || this.view.goalIntent))
+    )
+      return;
     const read = {};
     scope.attachmentRead = read;
     const name = (
@@ -1273,24 +1920,93 @@ export class NativeChatController {
     });
     const ownsRead = () => this.owns(scope) && scope.attachmentRead === read;
     try {
-      if (source.kind === "reference") {
-        // By reference: nothing is read here but a video's preview.
+      if (source.kind === "image") {
         const { file } = source;
-        const mimeType = video_attachment.mediaType(file);
+        if (!file.size || file.size > 20 * 1024 * 1024)
+          throw new Error("selected_image_size_limit");
+        const mimeType =
+          image_attachment_preview.mediaType(file) ??
+          image_attachment_preview.mediaType({ name: file.name, type: "" });
         const original = scope.selectedAttachment ?? scope.pending?.attachment;
-        const preview =
-          original?.kind === "reference" && original.file === file
+        if (
+          original?.kind === "image" &&
+          (original.file === file || original.originalFile === file)
+        )
+          scope.selectedAttachment = original;
+        else {
+          if (scope.pending || scope.pendingRestoreFailed)
+            await this.discardPending(scope);
+          // Freeze the original at selection, before a mutable disk path can
+          // change. This snapshot is input; display posters never replace it.
+          const sourceBytes = await Blob.prototype.arrayBuffer.call(
+            Blob.prototype.slice.call(file, 0, 20 * 1024 * 1024 + 1)
+          );
+          if (
+            sourceBytes.byteLength !== file.size ||
+            sourceBytes.byteLength > 20 * 1024 * 1024
+          )
+            throw new Error("selected_image_changed");
+          if (!ownsRead()) return;
+          const frozen = new File([sourceBytes], file.name, {
+            type: mimeType ?? file.type,
+            lastModified: file.lastModified,
+          });
+          scope.selectedAttachment = Object.freeze({
+            kind: "image",
+            name,
+            file: frozen,
+            originalFile: source.originalFile ?? file,
+            ...(mimeType && { mimeType }),
+          });
+          if (scope.pending?.attachment) scope.pending = undefined;
+        }
+        this.update({
+          attachmentDraft: {
+            kind,
+            name,
+            size: file.size,
+            ...(mimeType && { mimeType }),
+          },
+          ...(!this.view.selectedImageInput && {
+            attachmentNotice:
+              "This connection cannot use the attached image. Your whole draft is kept; choose a compatible model.",
+          }),
+        });
+        this.saveDraftAttachment(scope.selectedAttachment);
+        return;
+      }
+      if (source.kind === "reference") {
+        // By reference: only a bounded local raster or video still is decoded.
+        const { file } = source;
+        const directory = source.directory === true;
+        const mimeType = directory
+          ? DIRECTORY_MIME_TYPE
+          : (image_attachment_preview.mediaType(file) ??
+            video_attachment.mediaType(file));
+        const original = scope.selectedAttachment ?? scope.pending?.attachment;
+        const preview = directory
+          ? undefined
+          : original?.kind === "reference" && original.file === file
             ? original.preview
             : video_attachment.isVideo(file)
               ? ((await video_attachment.probe(file)) ?? undefined)
-              : undefined;
+              : await image_attachment_preview.probe(file);
         if (!ownsRead()) return;
-        if (original?.kind === "reference" && original.file === file)
-          scope.selectedAttachment = original;
+        if (
+          original?.kind === "reference" &&
+          original.file === file &&
+          (original.mimeType === DIRECTORY_MIME_TYPE) === directory
+        )
+          scope.selectedAttachment = original.referenceId
+            ? original
+            : { ...original, referenceId: crypto.randomUUID() };
         else {
+          if (scope.pending || scope.pendingRestoreFailed)
+            await this.discardPending(scope);
           scope.selectedAttachment = Object.freeze({
             kind: "reference" as const,
             name,
+            referenceId: crypto.randomUUID(),
             file,
             ...(mimeType && { mimeType }),
             ...(preview && { preview }),
@@ -1301,7 +2017,7 @@ export class NativeChatController {
           attachmentDraft: {
             kind,
             name,
-            size: file.size,
+            ...(!directory && { size: file.size }),
             ...(mimeType && { mimeType }),
             ...(preview && { preview }),
           },
@@ -1309,7 +2025,8 @@ export class NativeChatController {
         this.saveDraftAttachment(scope.selectedAttachment);
         return;
       }
-      if (kind === "reference") throw new Error("invalid_file_attachment");
+      if (kind === "reference" || kind === "image")
+        throw new Error("invalid_file_attachment");
       let bytes: ArrayBuffer;
       if (source.kind === "file") {
         const { file } = source;
@@ -1333,7 +2050,7 @@ export class NativeChatController {
       if (!ownsRead()) return;
       const original = scope.selectedAttachment ?? scope.pending?.attachment;
       const previous =
-        original && original.kind !== "reference"
+        original && original.kind !== "reference" && original.kind !== "image"
           ? new Uint8Array(original.bytes)
           : undefined;
       if (
@@ -1342,6 +2059,8 @@ export class NativeChatController {
         previous?.byteLength !== bytes.byteLength ||
         !new Uint8Array(bytes).every((byte, index) => byte === previous[index])
       ) {
+        if (scope.pending || scope.pendingRestoreFailed)
+          await this.discardPending(scope);
         scope.selectedAttachment = { kind, name, bytes };
         if (scope.pending?.attachment) scope.pending = undefined;
       } else scope.selectedAttachment = original;
@@ -1356,6 +2075,7 @@ export class NativeChatController {
           });
           return;
         }
+        await this.discardPending(scope);
         scope.selectedAttachment = undefined;
         this.update({
           attachmentDraft: {
@@ -1379,9 +2099,13 @@ export class NativeChatController {
     }
   }
 
-  /** The staged PNG's bytes, for a preview. Null for a file or no draft. */
+  /** Display bytes only. A large original keeps a card without decoding it here. */
   attachmentPreview(): Blob | null {
     const attachment = this.scope?.selectedAttachment;
+    if (attachment?.kind === "image")
+      return attachment.file.size <= image_attachment_preview.MAX_SOURCE_BYTES
+        ? attachment.file
+        : null;
     return attachment?.kind === "png"
       ? new Blob([attachment.bytes], { type: "image/png" })
       : null;
@@ -1392,7 +2116,7 @@ export class NativeChatController {
     if (!scope || scope.id !== scopeId || this.view.acting) return;
     scope.attachmentRead = undefined;
     scope.selectedAttachment = undefined;
-    if (scope.pending?.attachment) scope.pending = undefined;
+    void this.discardPending(scope).catch(() => {});
     this.saveDraftAttachment(null);
     this.update({
       attachmentDraft: null,
@@ -1404,22 +2128,33 @@ export class NativeChatController {
 
   private async readInputCapabilities(
     scope: Scope
-  ): Promise<Record<AttachmentKind, boolean> | null> {
+  ): Promise<
+    (Record<AttachmentKind, boolean> & { directory: boolean }) | null
+  > {
     const attachment = scope.attachment;
     const read = {};
     scope.attachmentCapabilityRead = read;
-    const [png, file, library, reference] = await Promise.all([
-      this.bridge.submitImage && this.bridge.acceptsPng?.().catch(() => false),
-      this.bridge.submitFile && this.bridge.acceptsFile?.().catch(() => false),
-      this.libraryPicker &&
-        this.bridge.submitWithLibrarySelection &&
-        this.bridge.librarySelections &&
-        this.bridge.answerLibrarySelection &&
-        this.bridge.acceptsLibrarySelection?.().catch(() => false),
-      this.bridge.submitFileReference &&
-        this.bridge.canReferenceFile &&
-        this.bridge.acceptsFileReference?.().catch(() => false),
-    ]);
+    const [png, file, library, reference, directory, image, queuedText] =
+      await Promise.all([
+        this.bridge.submitImage &&
+          this.bridge.acceptsPng?.().catch(() => false),
+        this.bridge.submitFile &&
+          this.bridge.acceptsFile?.().catch(() => false),
+        this.libraryPicker &&
+          this.bridge.submitWithLibrarySelection &&
+          this.bridge.librarySelections &&
+          this.bridge.answerLibrarySelection &&
+          this.bridge.acceptsLibrarySelection?.().catch(() => false),
+        this.bridge.submitFileReference &&
+          this.bridge.canReferenceFile &&
+          this.bridge.acceptsFileReference?.().catch(() => false),
+        this.bridge.submitFileReference &&
+          this.bridge.canReferenceFile &&
+          this.bridge.acceptsDirectoryReference?.().catch(() => false),
+        this.bridge.submitSelectedImage &&
+          this.bridge.acceptsSelectedImage?.().catch(() => false),
+        this.bridge.acceptsQueuedTextReplacement?.().catch(() => false),
+      ]);
     if (
       !this.owns(scope) ||
       scope.attachment !== attachment ||
@@ -1427,16 +2162,49 @@ export class NativeChatController {
     )
       return null;
     scope.librarySelectionAvailable = library === true;
+    scope.queuedTextReplacement = queuedText === true;
+    const directoryAvailable = reference === true && directory === true;
+    const draft = this.view.attachmentDraft;
     this.update({
       imageInput: png === true,
+      selectedImageInput: image === true,
       fileInput: file === true,
       fileReferenceInput: reference === true,
+      directoryReferenceInput: directoryAvailable,
+      ...(directoryAvailable &&
+        draft?.mimeType === DIRECTORY_MIME_TYPE &&
+        draft.error === DIRECTORY_REFERENCE_UNAVAILABLE && {
+          attachmentDraft: { ...draft, error: undefined },
+        }),
     });
     return {
       png: png === true,
+      image: image === true,
       file: file === true,
       reference: reference === true,
+      directory: directoryAvailable,
     };
+  }
+
+  /** A missing new-Main facet must never turn a folder into a byte upload. */
+  private async requireDirectoryReference(
+    scope: Scope,
+    retained: Scope["pending"]
+  ): Promise<boolean> {
+    this.update({ acting: true });
+    try {
+      const capabilities = await this.readInputCapabilities(scope);
+      if (!this.owns(scope)) throw new Error("native_chat_not_ready");
+      if (capabilities?.directory) return true;
+      // A lost response can still be reconciled through its exact existing
+      // receipt. This permits observation only, never another submission.
+      if (retained && scope.pending === retained && scope.attachment)
+        return false;
+      this.update({ error: DIRECTORY_REFERENCE_UNAVAILABLE });
+      throw new Error("native_chat_directory_reference_unavailable");
+    } finally {
+      if (this.owns(scope)) this.update({ acting: false });
+    }
   }
 
   /** The name the model picker shows for the chat's model, when known. */
@@ -1452,13 +2220,22 @@ export class NativeChatController {
     );
   }
 
-  /** The running connection confirms Ultra, or the chosen model offers it. */
+  /** Negotiated harness support; absent while the connection is being checked. */
+  get ultraAvailability(): boolean | undefined {
+    if (!this.offers("delegation")) return false;
+    if (!this.scope?.effortKnown) return undefined;
+    return this.view.goalIntent
+      ? this.view.goalEffortAvailable
+      : this.view.effortAvailable;
+  }
+
+  /** Before negotiation, the product catalogue can offer its installed harness. */
   private ultraOffered(): boolean {
     const profiles = this.view.profiles;
     const active = profiles?.active;
     if (!this.offers("delegation")) return false;
     return (
-      this.view.effortAvailable ||
+      this.ultraAvailability ??
       (!!active &&
         !!(
           profiles?.choices.find((choice) => choice.id === active) ??
@@ -1467,95 +2244,55 @@ export class NativeChatController {
     );
   }
 
-  private async readEffortCapability(scope: Scope): Promise<void> {
-    const [supported, goalSupported] = await Promise.all([
+  private readEffortCapability(scope: Scope): Promise<void> {
+    scope.effortKnown = false;
+    const read: Promise<void> = Promise.all([
       this.bridge.submitInRegime &&
         this.bridge.acceptsEffort?.().catch(() => false),
       this.bridge.startGoal &&
         this.bridge.acceptsGoalEffort?.().catch(() => false),
-    ]);
-    if (!this.owns(scope)) return;
-    this.update({
-      effortAvailable: supported === true,
-      goalEffortAvailable: goalSupported === true,
-      ...(supported !== true &&
-        this.view.effort === "ultra" && {
-          effort: "xhigh",
-          error: "Ultra effort is unavailable on this connection.",
-        }),
+    ]).then(([supported, goalSupported]) => {
+      if (!this.owns(scope) || scope.effortRead !== read) return;
+      scope.effortKnown = true;
+      this.update({
+        effortAvailable: supported === true,
+        goalEffortAvailable: goalSupported === true,
+        ...(this.view.effort === "ultra" &&
+          (this.view.goalIntent
+            ? goalSupported !== true
+            : supported !== true) && {
+            error: "Ultra effort is unavailable on this connection.",
+          }),
+      });
     });
+    scope.effortRead = read;
+    return read;
   }
 
-  get hasHooks(): boolean {
-    return (
-      !this.fixed &&
-      !!this.bridge.inspectHooks &&
-      !!this.bridge.importHook &&
-      !!this.bridge.removeHook
-    );
-  }
-
-  closeHooks(): void {
-    this.update({ hooksOpen: false });
-  }
-
-  async toggleHooks(): Promise<void> {
-    if (!this.hasHooks || this.view.hooksBusy) return;
-    const hooksOpen = !this.view.hooksOpen;
-    this.update({ hooksOpen });
-    if (hooksOpen) await this.refreshHooks();
-  }
-
-  async refreshHooks(): Promise<void> {
-    const scope = this.scope;
-    if (!scope || !this.bridge.inspectHooks || this.view.hooksBusy) return;
-    this.update({ hooksBusy: true, hooksError: null });
+  /** Keep the person's Ultra choice exact; an older host must refuse it. */
+  private async requireUltra(scope: Scope, goal: boolean): Promise<void> {
+    // A delayed capability read must not let the next UI choice rewrite the
+    // request whose Send already began.
+    this.update({ acting: true });
     try {
-      const hooks = await this.bridge.inspectHooks(
-        scope.attachment?.attachmentId
-      );
-      if (this.owns(scope)) this.update({ hooks });
-    } catch {
-      if (this.owns(scope))
-        this.update({ hooksError: "Couldn't inspect lifecycle checks." });
+      let read: Promise<void> | undefined;
+      do {
+        read = scope.effortRead;
+        await read;
+      } while (this.owns(scope) && scope.effortRead !== read);
+      if (!this.owns(scope)) throw new Error("native_chat_not_ready");
+      if (
+        !this.offers("delegation") ||
+        (goal ? !this.view.goalEffortAvailable : !this.view.effortAvailable)
+      ) {
+        const error = goal
+          ? "Ultra is unavailable for goals on this connection."
+          : "Ultra effort is unavailable on this connection.";
+        this.update({ error });
+        throw new Error(error);
+      }
     } finally {
-      if (this.owns(scope)) this.update({ hooksBusy: false });
-    }
-  }
-
-  async importHook(): Promise<void> {
-    if (!this.bridge.importHook) return;
-    await this.changeHooks(() => this.bridge.importHook!());
-  }
-
-  async removeHook(id: string, revision: string): Promise<void> {
-    if (
-      !this.bridge.removeHook ||
-      !this.view.hooks?.saved.some(
-        (hook) => hook.id === id && hook.revision === revision
-      )
-    )
-      return;
-    await this.changeHooks(() => this.bridge.removeHook!(id, revision));
-  }
-
-  private async changeHooks(
-    change: () => Promise<NativeHookInspection | null>
-  ): Promise<void> {
-    const scope = this.scope;
-    if (!scope || this.view.hooksBusy) return;
-    this.update({ hooksBusy: true, hooksError: null });
-    try {
-      const hooks = await change();
-      if (this.owns(scope) && hooks) this.update({ hooks });
-    } catch {
-      if (this.owns(scope))
-        this.update({
-          hooksError:
-            "Couldn't save the lifecycle check. Review its definition and try again.",
-        });
-    } finally {
-      if (this.owns(scope)) this.update({ hooksBusy: false });
+      if (this.owns(scope)) this.update({ acting: false });
     }
   }
 
@@ -1706,6 +2443,39 @@ export class NativeChatController {
     if (this.scope) await this.readCatalogEntry(this.scope);
   }
 
+  readonly readAttachmentPreview = async (previewId: string): Promise<Blob> => {
+    const scope = this.scope;
+    const attachment = scope?.attachment;
+    const read = this.bridge.readAttachmentPreview;
+    const find = () =>
+      this.view.messages
+        .flatMap((message) =>
+          message.role === "user" ? (message.attachments ?? []) : []
+        )
+        .find(
+          (entry) =>
+            entry.previewId === previewId &&
+            isSupportedImageType(entry.mimeType)
+        );
+    const original = find();
+    if (!scope || !attachment || !read || !original)
+      throw new Error("native_chat_input_image_unavailable");
+    const bytes = await read.call(
+      this.bridge,
+      attachment.attachmentId,
+      previewId
+    );
+    if (
+      !this.owns(scope) ||
+      find()?.mimeType !== original.mimeType ||
+      !(bytes instanceof ArrayBuffer) ||
+      bytes.byteLength === 0 ||
+      bytes.byteLength > 20 * 1024 * 1024
+    )
+      throw new Error("native_chat_input_image_unavailable");
+    return new Blob([bytes], { type: original.mimeType });
+  };
+
   async readTurnArtifact(turnId: string, artifactId: string): Promise<Blob> {
     const read = this.bridge.readArtifact;
     if (!read) throw new Error("native_chat_artifact_unavailable");
@@ -1801,12 +2571,23 @@ export class NativeChatController {
    * released. A refused open reports why here and ends that side chat.
    */
   async openSideChat(text?: string): Promise<void> {
-    const scope = this.scope;
-    const parent = scope?.attachment;
+    let scope = this.scope;
+    let parent = scope?.attachment;
     const open = this.bridge.openSideChat;
     if (!scope || !parent || !open || !this.canOpenSideChat) {
       if (scope) this.update({ error: SIDE_CHAT_UNAVAILABLE });
       throw new Error(SIDE_CHAT_UNAVAILABLE);
+    }
+    if (this.remembersSelection) {
+      try {
+        scope = await this.activateSelection(scope);
+        await this.open(scope);
+        parent = this.attachment(scope);
+      } catch (error) {
+        if (this.owns(scope))
+          this.update({ error: describe(error, SIDE_CHAT_UNAVAILABLE) });
+        throw error;
+      }
     }
     const opened = open.call(this.bridge, parent.attachmentId);
     const id = crypto.randomUUID();
@@ -2086,8 +2867,23 @@ export class NativeChatController {
     request: Omit<NativeChatGoalRequest, "operatingRegime">,
     maximumUsd?: string
   ): Promise<boolean> {
-    const scope = this.scope;
+    return !!(await this.startGoalInScope(request, maximumUsd));
+  }
+
+  private async startGoalInScope(
+    request: Omit<NativeChatGoalRequest, "operatingRegime">,
+    maximumUsd?: string
+  ): Promise<Scope | false> {
+    let scope = this.scope;
     if (!scope || !this.canStartGoal || !this.bridge.startGoal) return false;
+    if (!this.remembersSelection && request.effort === "ultra") {
+      try {
+        await this.requireUltra(scope, true);
+      } catch {
+        return false;
+      }
+      if (!this.canStartGoal) return false;
+    }
     try {
       const maxCostMills =
         maximumUsd === undefined
@@ -2101,7 +2897,8 @@ export class NativeChatController {
       if (
         maxCostMills !== undefined &&
         (!GoalSpending.validMills(maxCostMills, true) ||
-          !this.view.observation?.snapshot.goalSpendingAvailable)
+          (!this.remembersSelection &&
+            !this.view.observation?.snapshot.goalSpendingAvailable))
       )
         throw new Error("unavailable");
     } catch {
@@ -2111,7 +2908,11 @@ export class NativeChatController {
       });
       return false;
     }
-    const problem = goalRequestProblem(request, this.view);
+    const problem = goalRequestProblem(
+      request,
+      this.view,
+      !this.remembersSelection
+    );
     if (problem) {
       this.update({ error: problem });
       return false;
@@ -2128,19 +2929,73 @@ export class NativeChatController {
       });
       return false;
     }
-    const pending =
+    if (scope.pendingGoalStart && scope.attachment) {
+      const accepted = await this.bridge
+        .inputReceipt(
+          scope.attachment.attachmentId,
+          scope.pendingGoalStart.inputId
+        )
+        .catch(() => null);
+      if (accepted && this.owns(scope)) {
+        scope.pendingGoalStart = undefined;
+        scope.firstInputId = undefined;
+        scope.awaitingGoalId = accepted.inputId;
+        scope.replay = true;
+        await this.refresh(scope);
+        return scope;
+      }
+    }
+    const pending: NonNullable<Scope["pendingGoalStart"]> =
       scope.pendingGoalStart?.key === key
         ? scope.pendingGoalStart
         : { key, inputId: crypto.randomUUID() };
     scope.pendingGoalStart = pending;
     this.update({ acting: true, error: null });
     try {
+      scope = await this.activateSelection(scope);
       await this.open(scope);
+      if (this.remembersSelection) {
+        // The displayed choice is intentionally lazy. Its route can differ
+        // from the worker whose capabilities were observed while reading chat.
+        await scope.refreshing;
+        await this.readEffortCapability(scope);
+        const attachment = this.attachment(scope);
+        const previous = scope.observation;
+        await this.refresh(scope);
+        if (
+          !this.owns(scope) ||
+          scope.attachment !== attachment ||
+          !scope.observation ||
+          scope.observation === previous
+        )
+          throw new Error("native_chat_goal_observation_unavailable");
+        const routeProblem =
+          request.maxCostMills !== undefined &&
+          !scope.observation.snapshot.goalSpendingAvailable
+            ? "Enter a positive USD spending limit on a connection that supports enforced goal spending."
+            : goalRequestProblem(request, this.view);
+        if (routeProblem) {
+          scope.pendingGoalStart = undefined;
+          this.update({ error: routeProblem });
+          return false;
+        }
+      }
+      if (scope.firstInputId && !pending.selectionRevision)
+        pending.inputId = scope.firstInputId;
+      pending.selectionRevision ??=
+        scope.selection && scope.selection.revision > 0
+          ? scope.selection.revision
+          : undefined;
       const attachment = this.attachment(scope);
       const receipt = await this.bridge.startGoal(
         attachment.attachmentId,
         pending.inputId,
-        payload
+        {
+          ...payload,
+          ...(pending.selectionRevision !== undefined && {
+            selectionRevision: pending.selectionRevision,
+          }),
+        }
       );
       if (
         receipt.disposition === "withdrawn" ||
@@ -2150,6 +3005,7 @@ export class NativeChatController {
         throw new Error("native_chat_goal_start_unavailable");
       }
       scope.pendingGoalStart = undefined;
+      scope.firstInputId = undefined;
       if (!this.owns(scope)) return false;
       scope.awaitingGoalId =
         this.view.goal?.goal?.goalId === receipt.inputId
@@ -2157,7 +3013,7 @@ export class NativeChatController {
           : receipt.inputId;
       scope.replay = true;
       await this.refresh(scope);
-      return true;
+      return scope;
     } catch (error) {
       if (this.owns(scope)) {
         // Only a start the host may have accepted keeps its input id, so a
@@ -2373,6 +3229,26 @@ export class NativeChatController {
   }
 
   selectEffort(effort: NativeChatEffort): void {
+    if (this.remembersSelection && this.scope) {
+      const scope = this.scope;
+      if (
+        (effort !== "ultra" || this.ultraOffered()) &&
+        !this.view.acting &&
+        !this.view.steering
+      ) {
+        const save = () => {
+          if (!this.owns(scope) || !scope.selection?.selection) return;
+          return this.saveSelection(
+            scope,
+            scope.selection.selection.profileId,
+            effort
+          );
+        };
+        if (scope.selection?.selection) void save();
+        else void scope.selectionReady?.then(save).catch(() => {});
+      }
+      return;
+    }
     if (
       (effort !== "ultra" || this.ultraOffered()) &&
       !this.view.acting &&
@@ -2382,9 +3258,46 @@ export class NativeChatController {
   }
 
   async submit(text: string, scopeId = this.view.scope): Promise<void> {
-    const scope = this.scope;
+    let scope = this.scope;
     if (!scope || scope.id !== scopeId || this.view.profileBusy)
       throw new Error("native_chat_not_ready");
+    if (!scope.draftRestored) await this.restoreDraft(scope);
+    if (!this.owns(scope) || scope.pendingRestoreFailed)
+      throw new Error("native_chat_retry_storage_unavailable");
+    const normalized = text
+      .trim()
+      .replace(/^\/(?:plan|goal)\s+/, "")
+      .trim();
+    const original =
+      this.retainedSend(scope, text) ?? this.retainedSend(scope, normalized);
+    if (scope.pending && !original) await this.discardPending(scope);
+    if (original && !this.view.acting && !this.view.loading) {
+      this.update({ acting: true });
+      try {
+        await this.open(scope);
+        const receipt = await this.bridge
+          .inputReceipt(this.attachment(scope).attachmentId, original.inputId)
+          .catch((error: unknown) => {
+            if (error instanceof Error && error.message === "input_unavailable")
+              return null;
+            throw error;
+          });
+        if (receipt) {
+          await this.completeSubmission(scope, original, receipt);
+          return;
+        }
+      } finally {
+        if (this.owns(scope)) this.update({ acting: false });
+      }
+      if (!this.owns(scope)) throw new Error("native_chat_scope_changed");
+      if (original.missingAttachment) {
+        this.update({
+          error:
+            "The previous send wasn't accepted, and its original file reference is unavailable. Attach it again to send this draft.",
+        });
+        throw new Error("native_chat_pending_attachment_unavailable");
+      }
+    }
     const side = /^\/side(?:\s+|$)/.exec(text.trim());
     if (side) {
       const message = text.trim().slice(side[0].length);
@@ -2411,40 +3324,60 @@ export class NativeChatController {
     if (literal === "/stop") return this.stopBackgroundProcesses();
     if (!this.canSubmit || !text.trim())
       throw new Error("native_chat_not_ready");
+    const retained = this.retainedSend(scope, text);
+    const directory =
+      scope.selectedAttachment?.kind === "reference" &&
+      scope.selectedAttachment.mimeType === DIRECTORY_MIME_TYPE;
+    const directoryAvailable = directory
+      ? await this.requireDirectoryReference(scope, retained)
+      : true;
+    if (!this.canSubmit) throw new Error("native_chat_not_ready");
+    if (
+      this.view.effort === "ultra" &&
+      !this.view.steering &&
+      !(this.remembersSelection && this.view.goalIntent)
+    ) {
+      await this.requireUltra(scope, this.view.goalIntent);
+      if (!this.canSubmit) throw new Error("native_chat_not_ready");
+    }
     // A send that cannot go out is refused before anything changes, so a
     // paused turn is only stopped for a message that will be sent.
     this.refuseUnsendable(scope, text);
     // Sending while a turn is paused moves on: that turn ends as stopped and
     // this message runs next. See "Pause, resume, and stop deliberately".
-    const next = !this.view.steering && !!this.pausedTurn;
-    if (next) await this.endPausedTurn(scope);
+    const next = directoryAvailable && !this.view.steering && !!this.pausedTurn;
     if (this.view.goalIntent) {
-      const accepted = await this.startGoal(this.composerGoal(text));
-      if (!accepted)
+      if (next) await this.endPausedTurn(scope);
+      const started = await this.startGoalInScope(this.composerGoal(text));
+      if (!started)
         throw new Error(this.view.error ?? "Couldn't start the goal.");
-      if (this.owns(scope)) this.update({ goalIntent: false });
-      this.drafts?.store.writeModes(this.scopeDraftKey(scope) ?? "", {
-        ...(this.view.operatingRegime === "plan" && { plan: true }),
-      });
-      if (next) await this.playNext(scope, null);
+      scope = started;
+      if (this.owns(scope)) {
+        this.update({ goalIntent: false });
+        this.drafts?.store.writeModes(this.scopeDraftKey(scope) ?? "", {
+          ...(this.view.operatingRegime === "plan" && { plan: true }),
+        });
+        if (next) await this.playNext(scope, null);
+      }
       return;
     }
     if (this.view.steering) return this.submitSteering(scope, text);
-    const mode = this.needsQueue ? "enqueue" : "submit";
+    const mode =
+      next &&
+      this.view.observation?.snapshot.queuedInputs === 0 &&
+      !this.view.observation.snapshot.admissionPaused
+        ? "submit"
+        : this.needsQueue
+          ? "enqueue"
+          : "submit";
     const selectedAttachment = scope.selectedAttachment;
-    const retained = this.retainedSend(scope, text);
     const operatingRegime =
       selectedAttachment || this.bridge.submitInRegime
         ? this.view.operatingRegime
         : undefined;
-    // Medium is the default stop and leaves the model's default in place.
-    // Ultra also needs its extended harness.
-    const effort =
-      this.view.effort === "medium" ||
-      (this.view.effort === "ultra" &&
-        (!this.view.effortAvailable || !this.offers("delegation")))
-        ? undefined
-        : this.view.effort;
+    // Medium leaves the model's default in place. Ultra has already required
+    // the negotiated harness; never silently replace it with ordinary work.
+    const effort = this.view.effort === "medium" ? undefined : this.view.effort;
     // A queued request keeps the editor binding a sent one has.
     const svgTarget =
       !retained &&
@@ -2455,6 +3388,7 @@ export class NativeChatController {
         : undefined;
     this.update({ acting: true, error: null });
     try {
+      scope = await this.activateSelection(scope);
       await this.open(scope);
       const attachment = this.attachment(scope);
       if (retained && retained.operatingRegime !== operatingRegime)
@@ -2471,10 +3405,14 @@ export class NativeChatController {
         await this.readInputCapabilities(scope);
       const pending: NonNullable<Scope["pending"]> = retained ?? {
         text,
-        inputId: crypto.randomUUID(),
+        inputId: scope.firstInputId ?? crypto.randomUUID(),
         mode,
         operatingRegime,
         effort,
+        ...(scope.selection &&
+          scope.selection.revision > 0 && {
+            selectionRevision: scope.selection.revision,
+          }),
         attachment: selectedAttachment,
         allowLibrarySelection:
           mode === "submit" &&
@@ -2487,9 +3425,16 @@ export class NativeChatController {
       try {
         if (pending.attachment) {
           const capabilities = await this.readInputCapabilities(scope);
+          if (
+            pending.attachment.kind === "reference" &&
+            pending.attachment.mimeType === DIRECTORY_MIME_TYPE &&
+            (!directoryAvailable || !capabilities?.directory)
+          )
+            throw new Error("native_chat_directory_reference_unavailable");
           if (!capabilities?.[pending.attachment.kind])
             throw new Error(
-              pending.attachment.kind === "png"
+              pending.attachment.kind === "png" ||
+                pending.attachment.kind === "image"
                 ? "image_input_unavailable"
                 : pending.attachment.kind === "file"
                   ? "file_attachment_unavailable"
@@ -2498,7 +3443,37 @@ export class NativeChatController {
         }
         this.attachment(scope);
         scope.pending = pending;
-        if (pending.attachment?.kind === "png") {
+        const draftKey = this.scopeDraftKey(scope);
+        if (draftKey && this.drafts && !this.fixed)
+          await this.drafts.store.writePending(
+            draftKey,
+            this.pendingRecord(pending)
+          );
+        this.attachment(scope);
+        if (scope.pending !== pending)
+          throw new Error("native_chat_scope_changed");
+        if (next) await this.endPausedTurn(scope);
+        if (pending.attachment?.kind === "image") {
+          if (!this.bridge.submitSelectedImage || !pending.operatingRegime)
+            throw new Error("image_input_unavailable");
+          accepted = await this.bridge.submitSelectedImage(
+            attachment.attachmentId,
+            {
+              action: pending.mode,
+              inputId: pending.inputId,
+              text: pending.text,
+              file: pending.attachment.file,
+              ...(pending.attachment.originalFile && {
+                originalFile: pending.attachment.originalFile,
+              }),
+              operatingRegime: pending.operatingRegime,
+              ...(pending.effort && { effort: pending.effort }),
+              ...(pending.selectionRevision !== undefined && {
+                selectionRevision: pending.selectionRevision,
+              }),
+            }
+          );
+        } else if (pending.attachment?.kind === "png") {
           if (!this.bridge.submitImage || !pending.operatingRegime)
             throw new Error("image_input_unavailable");
           accepted = await this.bridge.submitImage(attachment.attachmentId, {
@@ -2508,6 +3483,9 @@ export class NativeChatController {
             png: pending.attachment.bytes,
             operatingRegime: pending.operatingRegime,
             ...(pending.effort && { effort: pending.effort }),
+            ...(pending.selectionRevision !== undefined && {
+              selectionRevision: pending.selectionRevision,
+            }),
           });
         } else if (pending.attachment?.kind === "reference") {
           if (!this.bridge.submitFileReference || !pending.operatingRegime)
@@ -2524,6 +3502,9 @@ export class NativeChatController {
               ...(preview && { preview }),
               operatingRegime: pending.operatingRegime,
               ...(pending.effort && { effort: pending.effort }),
+              ...(pending.selectionRevision !== undefined && {
+                selectionRevision: pending.selectionRevision,
+              }),
             }
           );
         } else if (pending.attachment) {
@@ -2537,6 +3518,9 @@ export class NativeChatController {
             bytes: pending.attachment.bytes,
             operatingRegime: pending.operatingRegime,
             ...(pending.effort && { effort: pending.effort }),
+            ...(pending.selectionRevision !== undefined && {
+              selectionRevision: pending.selectionRevision,
+            }),
           });
         } else if (pending.allowLibrarySelection) {
           if (!this.bridge.submitWithLibrarySelection)
@@ -2546,17 +3530,30 @@ export class NativeChatController {
             pending.inputId,
             pending.text,
             pending.operatingRegime,
-            pending.effort
+            pending.effort,
+            ...(pending.selectionRevision !== undefined
+              ? [pending.selectionRevision]
+              : [])
           );
         } else if (pending.operatingRegime) {
           if (!this.bridge.submitInRegime)
             throw new Error("native_chat_operating_regime_unavailable");
-          const options: [effort?: NativeChatEffort, svgTargetId?: string] =
-            pending.editorSvgTargetId
-              ? [pending.effort, pending.editorSvgTargetId]
-              : pending.effort
-                ? [pending.effort]
-                : [];
+          const options: [
+            effort?: NativeChatEffort,
+            svgTargetId?: string,
+            selectionRevision?: number,
+          ] =
+            pending.selectionRevision !== undefined
+              ? [
+                  pending.effort,
+                  pending.editorSvgTargetId,
+                  pending.selectionRevision,
+                ]
+              : pending.editorSvgTargetId
+                ? [pending.effort, pending.editorSvgTargetId]
+                : pending.effort
+                  ? [pending.effort]
+                  : [];
           accepted = await this.bridge.submitInRegime(
             pending.mode,
             attachment.attachmentId,
@@ -2585,36 +3582,22 @@ export class NativeChatController {
             throw error;
           });
       }
-      scope.pending = undefined;
-      if (this.owns(scope)) {
-        if (
-          pending.attachment &&
-          scope.selectedAttachment === pending.attachment
-        ) {
-          scope.selectedAttachment = undefined;
-          this.update({ attachmentDraft: null, attachmentNotice: null });
-        }
-        if (pending.attachment)
-          this.saveDraftAttachment(null, this.scopeDraftKey(scope));
-        scope.awaitingTurn = accepted.turnId ?? undefined;
-        scope.replay = true;
-        await this.refresh(scope);
-        if (next) await this.playNext(scope, pending.inputId);
-      }
+      await this.completeSubmission(scope, pending, accepted);
+      if (next && this.owns(scope)) await this.playNext(scope, pending.inputId);
     } catch (error) {
       if (
         error instanceof Error &&
-        /session_(queue_waiting|prompt_in_progress|admission_paused|turn_requires_recovery)/.test(
+        /^(?:session_(?:queue_waiting|prompt_in_progress|admission_paused|turn_requires_recovery)|selected_image_(?:changed|unavailable|identity_invalid|snapshot_unavailable|protected|symlink|size_limit)|image_(?:source_size_limit|decode_limit|preparation_limit)|invalid_raster_image|unsupported_image_format|protected_root_overlap|native_chat_selection_revision_changed)$/.test(
           error.message
         )
       )
-        scope.pending = undefined;
+        await this.discardPending(scope).catch(() => {});
       if (this.owns(scope)) {
         if (
           selectedAttachment &&
           this.acceptsAttachment(selectedAttachment.kind) &&
           error instanceof Error &&
-          /image_input_unavailable|file_attachment_unavailable|file_reference_unavailable/.test(
+          /image_input_unavailable|file_attachment_unavailable|file_reference_unavailable|directory_reference_unavailable/.test(
             error.message
           )
         )
@@ -2686,7 +3669,7 @@ export class NativeChatController {
   }
 
   async runCommand(command: NativeChatCommand): Promise<void> {
-    const scope = this.scope;
+    let scope = this.scope;
     const attachment = scope?.attachment;
     if (
       !scope ||
@@ -2745,8 +3728,14 @@ export class NativeChatController {
       error: null,
     });
     try {
+      let target = attachment;
+      if (this.remembersSelection && command === "compact" && !retained) {
+        scope = await this.activateSelection(scope);
+        await this.open(scope);
+        target = this.attachment(scope);
+      }
       const receipt = this.bridge.runCommand(
-        attachment.attachmentId,
+        target.attachmentId,
         command,
         pending.requestId
       );
@@ -3024,26 +4013,197 @@ export class NativeChatController {
     if (scope) await this.refreshQueue(scope, offset);
   }
 
-  async editQueuedText(inputId: string): Promise<void> {
+  /** Inspect text without entering edit mode or taking the chat's action lock. */
+  readonly readQueuedText = async (inputId: string): Promise<string> => {
     const scope = this.scope;
+    const attachment = scope?.attachment;
+    const basis = scope?.queueBasis;
+    const readMessage = this.bridge.queuedMessage;
+    const readText = this.bridge.queuedText;
+    const item = this.view.queue?.items.find(
+      (entry) => entry.inputId === inputId
+    );
     if (
-      !scope?.attachment ||
-      !scope.queueBasis ||
-      !this.queueCurrent ||
-      !this.bridge.queuedText ||
-      this.view.acting ||
-      this.view.queueDraft ||
-      scope.observation?.snapshot.pendingGoalId === inputId
+      !scope ||
+      !attachment ||
+      !basis ||
+      (!readMessage && !readText) ||
+      !item ||
+      !this.queueCurrent
     )
-      return;
-    this.update({ acting: true, error: null });
-    try {
-      const text = await this.bridge.queuedText(
-        scope.attachment.attachmentId,
-        scope.queueBasis.observationId,
+      throw new Error("native_chat_queue_input_unavailable");
+    let text: string;
+    if (readMessage) {
+      const message = await readMessage.call(
+        this.bridge,
+        attachment.attachmentId,
+        basis.observationId,
         inputId
       );
-      if (this.owns(scope)) this.update({ queueDraft: { inputId, text } });
+      if (message.inputId !== inputId)
+        throw new Error("native_chat_queue_input_unavailable");
+      text = message.text;
+    } else {
+      text = await readText!.call(
+        this.bridge,
+        attachment.attachmentId,
+        basis.observationId,
+        inputId
+      );
+    }
+    if (
+      !this.owns(scope) ||
+      scope.queueBasis !== basis ||
+      !this.queueCurrent ||
+      !this.view.queue?.items.some((entry) => entry.inputId === inputId) ||
+      typeof text !== "string"
+    )
+      throw new Error("native_chat_queue_input_unavailable");
+    return text;
+  };
+
+  /** Image bytes are bound to this still-queued input, separate from sent history. */
+  readonly readQueuedAttachmentPreview = async (
+    inputId: string,
+    previewId: string
+  ): Promise<Blob> => {
+    const scope = this.scope;
+    const attachment = scope?.attachment;
+    const basis = scope?.queueBasis;
+    const read = this.bridge.readQueuedAttachmentPreview;
+    const find = () =>
+      this.view.queue?.items
+        .find((entry) => entry.inputId === inputId)
+        ?.attachments?.find(
+          (entry) =>
+            entry.previewId === previewId &&
+            isSupportedImageType(entry.mimeType)
+        );
+    const image = find();
+    if (
+      !scope ||
+      !attachment ||
+      !basis ||
+      !read ||
+      !image ||
+      !this.queueCurrent
+    )
+      throw new Error("native_chat_queue_input_unavailable");
+    const bytes = await read.call(
+      this.bridge,
+      attachment.attachmentId,
+      basis.observationId,
+      inputId,
+      previewId
+    );
+    if (
+      !this.owns(scope) ||
+      scope.queueBasis !== basis ||
+      !this.queueCurrent ||
+      find() !== image ||
+      !(bytes instanceof ArrayBuffer) ||
+      bytes.byteLength === 0 ||
+      bytes.byteLength > 20 * 1024 * 1024
+    )
+      throw new Error("native_chat_queue_input_unavailable");
+    return new Blob([bytes], { type: image.mimeType });
+  };
+
+  /** A current waiting message whose text this runtime can safely replace. */
+  canEditQueuedText(item: NativeChatQueueItem): boolean {
+    const scope = this.scope;
+    return (
+      !!scope?.attachment &&
+      this.queueCurrent &&
+      !this.view.acting &&
+      !this.view.queueDraft &&
+      this.view.queue?.items.includes(item) === true &&
+      this.supportsQueuedTextEdit(scope, item)
+    );
+  }
+
+  private supportsQueuedTextEdit(
+    scope: Scope,
+    item: NativeChatQueueItem,
+    replaceText = this.canReplaceQueuedText(scope, item)
+  ): boolean {
+    if (
+      !this.bridge.editQueue ||
+      item.textEditable === false ||
+      item.goalStart ||
+      scope.observation?.snapshot.pendingGoalId === item.inputId
+    )
+      return false;
+    return replaceText
+      ? this.canReplaceQueuedText(scope, item)
+      : !!this.bridge.queuedText &&
+          item.preview !== null &&
+          item.textOnly !== false &&
+          !item.attachments?.length;
+  }
+
+  private canReplaceQueuedText(
+    scope: Scope,
+    item: NativeChatQueueItem
+  ): boolean {
+    return (
+      scope.queuedTextReplacement === true &&
+      item.textEditable === true &&
+      !!this.bridge.queuedMessage
+    );
+  }
+
+  async editQueuedText(inputId: string): Promise<void> {
+    const scope = this.scope;
+    const basis = scope?.queueBasis;
+    const item = this.view.queue?.items.find(
+      (entry) => entry.inputId === inputId
+    );
+    if (!scope?.attachment || !basis || !item || !this.canEditQueuedText(item))
+      return;
+    const observationId = basis.observationId;
+    const replaceText = this.canReplaceQueuedText(scope, item);
+    this.update({ acting: true, error: null });
+    try {
+      const message = replaceText
+        ? await this.bridge.queuedMessage!(
+            scope.attachment.attachmentId,
+            observationId,
+            inputId
+          )
+        : undefined;
+      const text = message
+        ? message.text
+        : replaceText
+          ? undefined
+          : await this.bridge.queuedText!(
+              scope.attachment.attachmentId,
+              observationId,
+              inputId
+            );
+      if (!this.owns(scope)) return;
+      if (
+        scope.queueBasis !== basis ||
+        basis.observationId !== observationId ||
+        !this.queueCurrent ||
+        this.view.queue?.items.find((entry) => entry.inputId === inputId) !==
+          item ||
+        typeof text !== "string" ||
+        !this.supportsQueuedTextEdit(scope, item, replaceText) ||
+        (replaceText &&
+          (message?.inputId !== inputId || message.textEditable !== true))
+      )
+        throw new Error("native_chat_queue_input_unavailable");
+      this.update({
+        queueDraft: {
+          inputId,
+          text,
+          ...(replaceText && {
+            replaceText: true,
+            allowEmpty: !!message?.attachments?.length,
+          }),
+        },
+      });
     } catch {
       if (this.owns(scope))
         this.update({ error: "Couldn't open the queued message." });
@@ -3061,10 +4221,39 @@ export class NativeChatController {
     if (!this.view.acting) this.update({ queueDraft: null });
   }
 
-  async saveQueueDraft(): Promise<void> {
+  /** Replace the same waiting input; failed confirmation keeps the edited text. */
+  async saveQueueDraft(text?: string): Promise<boolean> {
+    const scope = this.scope;
     const draft = this.view.queueDraft;
-    if (draft?.text.trim())
-      await this.editQueue({ action: "replace", ...draft });
+    if (!scope || !draft || this.view.acting) return false;
+    const edited = { ...draft, text: text ?? draft.text };
+    if (edited.text !== draft.text) this.update({ queueDraft: edited });
+    if (!edited.allowEmpty && !edited.text.trim()) return false;
+    if (draft.replaceText && scope.queuedTextReplacement !== true) return false;
+    const action: NativeChatQueueAction = {
+      action: draft.replaceText ? "replaceText" : "replace",
+      inputId: draft.inputId,
+      text: edited.text,
+    };
+    const replay = scope.pendingQueueChange?.key === JSON.stringify(action);
+    const queue = this.view.queue;
+    const item = queue?.items.find((entry) => entry.inputId === draft.inputId);
+    // A lost reply can have already replaced the original input. Retry that
+    // exact request for its receipt rather than creating a second replacement.
+    if (
+      !replay &&
+      (!this.queueCurrent ||
+        scope.observation?.snapshot.pendingGoalId === draft.inputId ||
+        (item &&
+          !this.supportsQueuedTextEdit(scope, item, !!draft.replaceText)) ||
+        (!item &&
+          (!queue ||
+            (queue.previousOffset === null && queue.nextOffset === null))))
+    ) {
+      this.update({ error: "This message is no longer available to edit." });
+      return false;
+    }
+    return this.applyQueueChange(action);
   }
 
   get queueCurrent(): boolean {
@@ -3087,16 +4276,22 @@ export class NativeChatController {
   }
 
   async editQueue(action: NativeChatQueueAction): Promise<void> {
+    await this.applyQueueChange(action);
+  }
+
+  private async applyQueueChange(
+    action: NativeChatQueueAction
+  ): Promise<boolean> {
     const scope = this.scope;
     if (
       !scope?.attachment ||
       !scope.observation ||
       !this.bridge.editQueue ||
       this.view.acting ||
-      (action.action === "replace" &&
+      ((action.action === "replace" || action.action === "replaceText") &&
         scope.observation.snapshot.pendingGoalId === action.inputId)
     )
-      return;
+      return false;
     const observationId =
       action.action === "resume"
         ? scope.observation.observationId
@@ -3104,7 +4299,7 @@ export class NativeChatController {
           ? scope.queueBasis?.observationId
           : undefined;
     const key = JSON.stringify(action);
-    if (!observationId && scope.pendingQueueChange?.key !== key) return;
+    if (!observationId && scope.pendingQueueChange?.key !== key) return false;
     const change =
       scope.pendingQueueChange?.key === key
         ? scope.pendingQueueChange.change
@@ -3115,10 +4310,15 @@ export class NativeChatController {
           };
     scope.pendingQueueChange = { key, change };
     this.update({ acting: true, error: null });
+    let confirmed = false;
     try {
       await this.bridge.editQueue(scope.attachment.attachmentId, change);
+      confirmed = true;
       scope.pendingQueueChange = undefined;
-      if (this.owns(scope) && action.action === "replace")
+      if (
+        this.owns(scope) &&
+        (action.action === "replace" || action.action === "replaceText")
+      )
         this.update({ queueDraft: null });
     } catch (error) {
       if (revisionChanged(error)) scope.pendingQueueChange = undefined;
@@ -3133,6 +4333,7 @@ export class NativeChatController {
         if (this.owns(scope)) this.update({ acting: false });
       }
     }
+    return confirmed && this.owns(scope);
   }
 
   /** The goal the composer starts from its text. */
@@ -3148,10 +4349,38 @@ export class NativeChatController {
     };
   }
 
+  private async completeSubmission(
+    scope: Scope,
+    pending: NonNullable<Scope["pending"]>,
+    accepted: NativeChatAcceptance
+  ): Promise<void> {
+    const key = this.scopeDraftKey(scope);
+    if (key && this.drafts)
+      await this.drafts.store
+        .completePending(key, pending.inputId)
+        .catch(() => {});
+    if (scope.pending === pending) scope.pending = undefined;
+    scope.firstInputId = undefined;
+    if (this.owns(scope)) {
+      if (
+        (pending.attachment &&
+          scope.selectedAttachment === pending.attachment) ||
+        (pending.missingAttachment && !scope.selectedAttachment)
+      ) {
+        scope.selectedAttachment = undefined;
+        this.update({ attachmentDraft: null, attachmentNotice: null });
+      }
+      scope.awaitingTurn = accepted.turnId ?? undefined;
+      scope.replay = true;
+      await this.refresh(scope);
+    }
+  }
+
   /** The unconfirmed send this text and attachment would retry. */
   private retainedSend(scope: Scope, text: string) {
     return scope.pending?.text === text &&
-      scope.pending.attachment === scope.selectedAttachment
+      (scope.pending.attachment === scope.selectedAttachment ||
+        (!!scope.pending.missingAttachment && !scope.selectedAttachment))
       ? scope.pending
       : undefined;
   }
@@ -3173,7 +4402,11 @@ export class NativeChatController {
         refuse(
           "Use a shorter goal, or customize its objective and success criteria."
         );
-      const problem = goalRequestProblem(this.composerGoal(text), this.view);
+      const problem = goalRequestProblem(
+        this.composerGoal(text),
+        this.view,
+        !this.remembersSelection
+      );
       if (problem) refuse(problem);
       return;
     }
@@ -3282,9 +4515,12 @@ export class NativeChatController {
       this.canSteer &&
       this.queueCurrent &&
       !this.view.acting &&
+      !this.view.queueDraft &&
       !!this.bridge.queuedText &&
       !!this.bridge.editQueue &&
       item.preview !== null &&
+      item.textOnly !== false &&
+      !item.attachments?.length &&
       !item.goalStart &&
       item.operatingRegime !== "plan" &&
       item.effort !== "ultra"
@@ -3413,6 +4649,10 @@ export class NativeChatController {
     const scope = this.scope;
     if (!scope || (!scope.attachment && !scope.requested && !this.fixed))
       return;
+    if (scope.retiredAttachment) {
+      await this.select(this.view.selected, { reattach: true });
+      return;
+    }
     scope.replay = true;
     void this.readEffortCapability(scope);
     if (scope.summaryRequest?.failed) scope.summaryRequest = undefined;
@@ -3819,16 +5059,51 @@ export class NativeChatController {
   }
 
   private open(scope: Scope): Promise<void> {
-    if (scope.attachment) return Promise.resolve();
+    if (scope.attachment) return this.promoteDraft(scope);
     if (scope.opening) return scope.opening;
     const opening = this.attachments.then(async () => {
       if (!this.owns(scope)) return;
+      const newDraft =
+        scope.requested === null ? this.scopeDraftKey(scope) : null;
       const attachment = this.fixed
         ? await this.fixed.open()
         : scope.requested
           ? await this.bridge.load(scope.requested)
-          : await this.bridge.create();
+          : this.remembersSelection &&
+              scope.selection &&
+              "draftId" in scope.selection.target &&
+              typeof scope.selection.target.draftId === "string"
+            ? await this.bridge.createFromDraft!(scope.selection.target.draftId)
+            : await this.bridge.create();
+      if (newDraft && this.drafts) {
+        scope.promotingDraft = {
+          from: newDraft,
+          to: `${this.drafts.workspace}:${attachment.sessionId}`,
+        };
+      }
+      if (
+        "firstInputId" in attachment &&
+        typeof attachment.firstInputId === "string"
+      )
+        scope.firstInputId = attachment.firstInputId;
+      if (
+        this.remembersSelection &&
+        scope.selection &&
+        "draftId" in scope.selection.target &&
+        typeof scope.selection.target.draftId === "string"
+      ) {
+        const state = await this.bridge.selection!({
+          sessionId: attachment.sessionId,
+        });
+        if (!this.owns(scope)) {
+          await this.bridge.detach(attachment.attachmentId).catch(() => {});
+          return;
+        }
+        scope.selection = state;
+        this.presentSelection(state);
+      }
       scope.attachment = attachment;
+      scope.requested = attachment.sessionId;
       if (!this.owns(scope)) return;
       if (this.editorSurfaces && this.bridge.publishEditorSurfaces) {
         this.subscribeToEditorPresentation(scope, attachment);
@@ -3858,12 +5133,9 @@ export class NativeChatController {
       ].slice(0, RECENTS_LIMIT);
       // A new chat's unsent draft belongs to the chat it just became, so it
       // stays in the composer whatever happens to the send that created it.
-      const newDraft = this.view.selected === null ? this.draftKey() : null;
-      if (newDraft && this.drafts)
-        void this.drafts.store.move(
-          newDraft,
-          `${this.drafts.workspace}:${attachment.sessionId}`
-        );
+      if (newDraft && this.drafts) {
+        await this.promoteDraft(scope);
+      }
       this.update({
         selected: attachment.sessionId,
         sessions: this.sessionChoices(),
@@ -3879,6 +5151,13 @@ export class NativeChatController {
       scope.opening = undefined;
     });
     return scope.opening;
+  }
+
+  private async promoteDraft(scope: Scope): Promise<void> {
+    const promotion = scope.promotingDraft;
+    if (!promotion || !this.drafts) return;
+    await this.drafts.store.move(promotion.from, promotion.to);
+    if (scope.promotingDraft === promotion) scope.promotingDraft = undefined;
   }
 
   private queueRelease(scope: Scope | undefined): void {
@@ -4175,6 +5454,7 @@ export class NativeChatController {
             attachment.attachmentId,
             () => scope.observation
           );
+          scope.subagents.parentUpdated();
         } else {
           scope.subagents?.dispose();
           scope.subagents = undefined;
@@ -4661,7 +5941,8 @@ export class NativeChatController {
       const id = await this.bridge.subscribe(
         attachment.attachmentId,
         (update) => {
-          if (this.owns(scope)) this.receive(scope, update);
+          if (this.owns(scope) && scope.attachment === attachment)
+            this.receive(scope, update);
         }
       );
       if (!this.owns(scope)) await this.bridge.unsubscribe(id).catch(() => {});
@@ -4773,6 +6054,8 @@ export class NativeChatController {
     selected: string | null;
     sessions: string[];
     profileId: string | null;
+    remembered: boolean;
+    draftId?: string;
   } {
     try {
       const value = JSON.parse(key ? (memory?.getItem(key) ?? "null") : "null");
@@ -4780,10 +6063,15 @@ export class NativeChatController {
         const sessions = value.sessions
           .filter(
             (id: unknown): id is string =>
-              typeof id === "string" && /^[a-z0-9-]{1,256}$/i.test(id)
+              typeof id === "string" && /^[A-Za-z0-9_.:@/-]{1,256}$/.test(id)
           )
           .slice(0, RECENTS_LIMIT);
         return {
+          remembered: true,
+          ...(typeof value.draftId === "string" &&
+            /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(
+              value.draftId
+            ) && { draftId: value.draftId }),
           sessions,
           selected: sessions.includes(value.selected) ? value.selected : null,
           profileId:
@@ -4796,7 +6084,12 @@ export class NativeChatController {
     } catch {
       /* Browser storage may be disabled. */
     }
-    return { selected: null, sessions: [], profileId: null };
+    return {
+      selected: null,
+      sessions: [],
+      profileId: null,
+      remembered: false,
+    };
   }
 
   private save(): void {
@@ -4807,6 +6100,10 @@ export class NativeChatController {
           key,
           JSON.stringify({
             selected: this.view.selected,
+            ...(this.scope?.selection &&
+              "draftId" in this.scope.selection.target && {
+                draftId: this.scope.selection.target.draftId,
+              }),
             sessions: this.recents,
             // The model chosen for this workspace; the default when absent.
             ...(this.profileId && { profileId: this.profileId }),
@@ -5004,8 +6301,24 @@ function describeSideRefusal(error: unknown): string {
 
 function describe(error: unknown, fallback: string): string {
   if (!(error instanceof Error)) return fallback;
+  if (error.message.includes("native_chat_model_change_"))
+    return modelChangeRefusal(error);
   if (error.message.includes("session_execution_configuration_changed"))
-    return "This chat continues with models from the account that started it. Choose one of those models, or start a new chat.";
+    return "This Desktop version couldn't safely continue the chat after a model change. Update Desktop and retry.";
+  if (error.message.includes("session_active_route_changed"))
+    return "This unfinished turn needs the model connection that accepted it. Restore that connection, or stop the turn.";
+  if (error.message.includes("session_queued_route_changed"))
+    return "Queued messages need their original model connection. Run or remove them before changing connections.";
+  if (error.message.includes("session_goal_route_changed"))
+    return "This active goal needs its original model connection. Finish or clear the goal before changing connections.";
+  if (error.message.includes("session_delegated_route_changed"))
+    return "Delegated work needs its parent's model connection. Finish or stop that work before changing connections.";
+  if (
+    /retained_(?:model|authority)_changed|continuation_authority_changed|retry_authority_changed/.test(
+      error.message
+    )
+  )
+    return "This unfinished work needs the model connection that accepted it. Restore that connection, or stop the unfinished work.";
   if (error.message.includes("native_chat_transcript_too_large"))
     return "This chat is too large to restore in the workspace pane.";
   if (error.message.includes("history_replay_window_changed"))
@@ -5016,6 +6329,20 @@ function describe(error: unknown, fallback: string): string {
     return "Retry with the original effort, or edit the draft to send a new message.";
   if (error.message.includes("native_chat_effort_unavailable"))
     return "Ultra effort is unavailable on this connection.";
+  if (/selected_image_size_limit|image_source_size_limit/.test(error.message))
+    return "Choose an original raster image of at most 20 MiB.";
+  if (error.message.includes("image_decode_limit"))
+    return "Choose an image within 64 megapixels and the supported decode limits.";
+  if (error.message.includes("image_preparation_limit"))
+    return "This image could not fit the model's image input limit. Choose a smaller image.";
+  if (
+    /selected_image_changed|selected_image_identity_reused/.test(error.message)
+  )
+    return "The selected image changed. Your draft is kept; choose the intended original again.";
+  if (/selected_image_protected|protected_root_overlap/.test(error.message))
+    return "This item is in Grida's private data and can't be attached.";
+  if (/invalid_raster_image|unsupported_image_format/.test(error.message))
+    return "Choose a valid PNG, JPEG, WebP or GIF image. Your draft is kept.";
   if (error.message.includes("image_size_limit"))
     return "Choose a PNG of at most 256 KiB within the supported image dimensions.";
   if (error.message.includes("invalid_png_image"))
@@ -5029,12 +6356,48 @@ function describe(error: unknown, fallback: string): string {
   if (error.message.includes("file_attachment_unavailable"))
     return "This chat cannot inspect attached files.";
   if (error.message.includes("file_reference_protected"))
-    return "This file is in Grida's private data and can't be attached.";
+    return "This item is in Grida's private data and can't be attached.";
+  if (error.message.includes("directory_reference_unavailable"))
+    return DIRECTORY_REFERENCE_UNAVAILABLE;
   if (error.message.includes("file_reference_unavailable"))
     return "Couldn't find this file on disk. Attach it again from its folder.";
   if (error.message.includes("native_agent_frame_limit"))
     return "This message exceeds the connection limit. Shorten it and try again.";
   return fallback;
+}
+
+/** Product-facing reasons for a refused model change; no account inference. */
+function modelChangeRefusal(error: unknown): string {
+  const message = error instanceof Error ? error.message : "";
+  const reasons = {
+    pending_work:
+      "Wait for pending workspace chat work to finish before changing the model.",
+    active_turn:
+      "Finish or stop running chat turns in this workspace before changing the model.",
+    retained_turn:
+      "Resume and finish paused or interrupted turns in this workspace, or stop them, before changing the model.",
+    queued_input:
+      "Run or remove queued messages in this workspace before changing the model.",
+    unresolved_goal:
+      "Finish or clear active goals in this workspace before changing the model.",
+    delegated_session:
+      "Close temporary side chats and finish delegated work before changing the model.",
+    background_process:
+      "Stop background commands in this workspace before changing the model.",
+    unsupported: "Update Desktop to change model connections safely.",
+    busy: "Another model change is in progress. Try again.",
+    unverified:
+      "Couldn't verify that all chat work has finished. Retry the model change.",
+    failed_restored:
+      "Couldn't start that model connection. The previous connection has been restored.",
+    restore_failed:
+      "Couldn't start that model connection or restore the previous one. Retry or choose another connection.",
+    recovery_pending:
+      "The previous connection is recovering. Wait a moment, then retry.",
+  };
+  for (const [reason, label] of Object.entries(reasons))
+    if (message.includes(`native_chat_model_change_${reason}`)) return label;
+  return "This model connection is unavailable. Check its saved settings.";
 }
 
 function supportsSubagents(
@@ -5075,9 +6438,14 @@ function goalRequestProblem(
   view: Pick<
     NativeChatView,
     "goalEffortAvailable" | "observation" | "operatingRegime"
-  >
+  >,
+  checkCapabilities = true
 ): string | null {
-  if (request.effort === "ultra" && !view.goalEffortAvailable)
+  if (
+    checkCapabilities &&
+    request.effort === "ultra" &&
+    !view.goalEffortAvailable
+  )
     return "Ultra is unavailable for goals on this connection.";
   if (
     request.maxCostMills !== undefined &&
@@ -5089,7 +6457,8 @@ function goalRequestProblem(
     request.namedChildId &&
     (request.effort !== "ultra" ||
       view.operatingRegime !== "act" ||
-      !view.observation?.snapshot.goalNamedChildAvailable)
+      (checkCapabilities &&
+        !view.observation?.snapshot.goalNamedChildAvailable))
   )
     return "Choose Act and Ultra to use a named reviewer on a supported connection.";
   const objectiveProblem = goalObjectiveProblem(
@@ -5123,6 +6492,98 @@ function goalObjectiveProblem(
 }
 
 export namespace NativeChatController {
+  /** Welcome's unsent model choice; catalogue refresh never replaces a choice. */
+  export class ModelSelection {
+    private state: Readonly<{
+      profiles: NativeChatProfileCatalog | null;
+      profileId: string | null;
+      error: string | null;
+    }> = { profiles: null, profileId: null, error: null };
+    private explicit = false;
+    private request?: {
+      read: () => Promise<NativeChatProfileCatalog | null>;
+      done: Promise<void>;
+    };
+    private readonly listeners = new Set<() => void>();
+
+    readonly read = () => this.state;
+
+    readonly subscribe = (listener: () => void) => {
+      this.listeners.add(listener);
+      return () => {
+        this.listeners.delete(listener);
+      };
+    };
+
+    choose(selection: NativeChatProfileSelection): void {
+      this.explicit = true;
+      this.update({
+        ...this.state,
+        profileId: selection.kind === "default" ? null : selection.id,
+      });
+    }
+
+    refresh(
+      read: () => Promise<NativeChatProfileCatalog | null>
+    ): Promise<void> {
+      if (this.request?.read === read) return this.request.done;
+      const request = { read, done: Promise.resolve() };
+      this.request = request;
+      request.done = (async () => {
+        try {
+          let profiles = await read();
+          if (this.request !== request) return;
+          const current = this.state.profileId;
+          if (
+            this.explicit &&
+            current &&
+            !profiles?.choices.some(({ id }) => id === current)
+          ) {
+            const previous =
+              this.state.profiles?.choices.find(({ id }) => id === current) ??
+              this.state.profiles?.saved.find(({ id }) => id === current);
+            if (previous)
+              profiles = {
+                ...(profiles ?? { active: null, choices: [], saved: [] }),
+                saved: [
+                  ...(profiles?.saved ?? []).filter(({ id }) => id !== current),
+                  { ...previous, available: false },
+                ],
+              };
+          }
+          this.update({
+            profiles,
+            profileId: this.explicit
+              ? current
+              : profiles?.newChatDefault
+                ? profiles.newChatDefault.profileId
+                : NativeChatController.recommendedProfile(profiles),
+            error: null,
+          });
+        } catch {
+          if (this.request === request)
+            this.update({
+              ...this.state,
+              error: "Couldn't load model connections.",
+            });
+        } finally {
+          if (this.request === request) this.request = undefined;
+        }
+      })();
+      return request.done;
+    }
+
+    /** A closed view must not receive an outstanding catalogue response. */
+    release(): void {
+      this.request = undefined;
+    }
+
+    private update(state: typeof this.state) {
+      this.state = state;
+      for (const listener of this.listeners) listener();
+    }
+  }
+
   /**
    * A session a chat is bound to without choosing it. Its owner opens the
    * session and ends it; the chat only shows and drives it. A side chat is

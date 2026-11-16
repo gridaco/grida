@@ -200,6 +200,100 @@ async fn built_standard_does_not_offer_review_tools() {
     endpoint.done().await;
 }
 
+/// The independent reviewer uses the parent's selected protocol and credential;
+/// Ultra does not require a particular model vendor or funding account.
+#[tokio::test]
+async fn api_protocols_run_the_real_ultra_reviewer_and_collect_its_finding() {
+    fn offered(request: &Value, name: &str) -> bool {
+        request["tools"].as_array().is_some_and(|tools| {
+            tools.iter().any(|tool| {
+                tool["name"] == name
+                    || tool["function"]["name"] == name
+                    || tool["functionDeclarations"]
+                        .as_array()
+                        .is_some_and(|declarations| {
+                            declarations
+                                .iter()
+                                .any(|declaration| declaration["name"] == name)
+                        })
+            })
+        })
+    }
+    for (protocol, credential) in [
+        (ProviderProtocol::OpenAiCompatible, false),
+        (ProviderProtocol::OpenAiCompatible, true),
+        (ProviderProtocol::Responses, true),
+        (ProviderProtocol::Anthropic, true),
+        (ProviderProtocol::Gemini, true),
+    ] {
+        let temporary = TempDir::new().unwrap();
+        let workspace = TempDir::new().unwrap();
+        let next = || {
+            Reply::Choose(Box::new(|request| {
+                if offered(request, "collect_review") {
+                    Reply::Tool("collect_review", "{}")
+                } else {
+                    Reply::Finished(FINDING)
+                }
+            }))
+        };
+        let mut endpoint = Endpoint::start_protocol(
+            protocol,
+            vec![
+                Reply::Tool("delegate_review", ASSIGNMENT_ARGUMENTS),
+                next(),
+                next(),
+                Reply::Finished("Integrated the independently verified finding."),
+            ],
+            credential.then_some(TEST_CREDENTIAL),
+        )
+        .await;
+        let mut command = executable();
+        command.args(["run", "--provider", protocol.as_str()]);
+        if credential {
+            configured(&mut command, &temporary.path().join("state"), &endpoint.url);
+        } else {
+            command
+                .arg("--state-dir")
+                .arg(temporary.path().join("state"))
+                .args(["--endpoint", &endpoint.url, "--model", "fixture-model"]);
+        }
+        command.arg("--cwd").arg(workspace.path()).args([
+            "--effort",
+            "ultra",
+            "--max-output-tokens",
+            "1024",
+            "--prompt",
+            PARENT,
+        ]);
+        let output = timeout(WAIT, command.output()).await.unwrap().unwrap();
+        assert!(
+            output.status.success(),
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stderr),
+            String::from_utf8_lossy(&output.stdout)
+        );
+        let result = records(&output.stdout);
+        assert_eq!(
+            result[1]["account"]["independent_review"]["findings_collected"], true,
+            "{result:?}"
+        );
+        let initial = endpoint.request().await;
+        assert!(offered(&initial, "delegate_review"));
+        let middle = [endpoint.request().await, endpoint.request().await];
+        let child = middle
+            .iter()
+            .find(|request| !offered(request, "collect_review"))
+            .unwrap();
+        assert!(child.to_string().contains(ASSIGNMENT));
+        assert!(!child.to_string().contains(PARENT));
+        assert!(!offered(child, "delegate_review"));
+        let final_request = endpoint.request().await;
+        assert!(final_request.to_string().contains(FINDING));
+        endpoint.done().await;
+    }
+}
+
 /// Headless Ultra selects the highest reasoning level when the model declares
 /// reasoning support, and otherwise leaves the model's own default.
 #[tokio::test]

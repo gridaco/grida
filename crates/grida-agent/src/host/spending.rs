@@ -37,6 +37,10 @@ impl Selection {
     pub(super) fn maximum(&self) -> &str {
         &self.max_cost_mills
     }
+
+    pub(super) fn matches_maximum(&self, maximum: &str) -> Result<bool> {
+        Ok(decimal(amount(maximum)?) == self.max_cost_mills)
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -661,6 +665,7 @@ impl Provider for SpendingProvider {
             PROVIDER_LIMITS,
             self.profile.images.clone(),
         )?
+        .with_retained_png_tool_results()
         .with_admission_rate_limit_evidence();
         match provider.start(request, control.clone()) {
             Ok(run) => Ok(run),

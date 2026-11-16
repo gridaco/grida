@@ -19,6 +19,8 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { MediaTransport } from "@grida/ai-host/media-transport";
 import { FileReferenceRequest } from "./bridge/file-reference-request";
+import { SelectedImageRequest } from "./bridge/selected-image-request";
+import { NativeChatInvoke } from "./bridge/native-chat-invoke";
 import {
   NativeEditorSurfaces,
   NativeEditorSvgText,
@@ -83,6 +85,13 @@ const mediaServiceFetch: MediaTransport.Fetcher = async (path, init) => {
 };
 
 const mediaClient = new MediaTransport.Client({ fetcher: mediaServiceFetch });
+
+const nativeChatInvoke = (channel: string, ...args: unknown[]) =>
+  NativeChatInvoke.invoke(
+    (name, ...input) => ipcRenderer.invoke(name, ...input),
+    channel,
+    ...args
+  );
 
 const nativeChatHandlers = new Map<
   string,
@@ -419,6 +428,14 @@ const bridge: DesktopBridge = {
 
   handshake,
 
+  hooks: {
+    inspect: () => ipcRenderer.invoke(IPC_CHANNELS.GLOBAL_HOOKS_INSPECT),
+    reload: () => ipcRenderer.invoke(IPC_CHANNELS.GLOBAL_HOOKS_RELOAD),
+    review: (id, revision) =>
+      ipcRenderer.invoke(IPC_CHANNELS.GLOBAL_HOOKS_REVIEW, id, revision),
+    open_config: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.GLOBAL_HOOKS_OPEN_CONFIG),
+  },
   nativeExternalAgent: {
     status: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_EXTERNAL_STATUS),
     start: (id, text) =>
@@ -433,93 +450,113 @@ const bridge: DesktopBridge = {
     ...(selectedDocumentChatRoute()
       ? { document: true as const }
       : nativeWorkspaceChatOnly && { documentUnavailable: true as const }),
-    status: (start) =>
-      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_STATUS, start),
+    status: (start) => nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_STATUS, start),
     takeNotificationFocus: async () => {
       if (location.pathname !== "/desktop/workspace") return null;
       const href = location.href;
-      const target = await ipcRenderer.invoke(
+      const target = await nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_TAKE_NOTIFICATION_FOCUS
       );
       return location.href === href ? target : null;
     },
-    list: (cursor) => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_LIST, cursor),
+    list: (cursor) => nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_LIST, cursor),
+    selection: (target) =>
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_SELECTION, target),
+    updateSelection: (target, revision, operationId, choice) =>
+      nativeChatInvoke(
+        IPC_CHANNELS.NATIVE_CHAT_UPDATE_SELECTION,
+        target,
+        revision,
+        operationId,
+        choice
+      ),
+    createFromDraft: (draftId) =>
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_CREATE_FROM_DRAFT, draftId),
     ...(!selectedDocumentChatRoute() && {
-      profiles: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_PROFILES),
+      profiles: () => nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_PROFILES),
       welcomeProfiles: () =>
-        ipcRenderer.invoke(IPC_CHANNELS.WELCOME_CHAT_PROFILES),
+        nativeChatInvoke(IPC_CHANNELS.WELCOME_CHAT_PROFILES),
       selectProfile: (selection) =>
-        ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_SELECT_PROFILE, selection),
+        nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_SELECT_PROFILE, selection),
     }),
     listArchived: (cursor) =>
-      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_LIST_ARCHIVED, cursor),
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_LIST_ARCHIVED, cursor),
     catalogEntry: (attachmentId) =>
-      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_CATALOG_ENTRY, attachmentId),
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_CATALOG_ENTRY, attachmentId),
     organize: (attachmentId, change) =>
-      ipcRenderer.invoke(
-        IPC_CHANNELS.NATIVE_CHAT_ORGANIZE,
-        attachmentId,
-        change
-      ),
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ORGANIZE, attachmentId, change),
     deleteSavedChat: (attachmentId, observationId, catalogRevision) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_DELETE,
         attachmentId,
         observationId,
         catalogRevision
       ),
     commands: (attachmentId) =>
-      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_COMMANDS, attachmentId),
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_COMMANDS, attachmentId),
     runCommand: (attachmentId, command, requestId) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_RUN_COMMAND,
         attachmentId,
         command,
         requestId
       ),
     prepareRevision: (attachmentId, observationId, messageId) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_PREPARE_REVISION,
         attachmentId,
         observationId,
         messageId
       ),
     revise: (attachmentId, input) =>
-      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_REVISE, attachmentId, input),
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_REVISE, attachmentId, input),
+    subagentActivity: (attachmentId, afterChildId) =>
+      nativeChatInvoke(
+        IPC_CHANNELS.NATIVE_CHAT_SUBAGENT_ACTIVITY,
+        attachmentId,
+        afterChildId
+      ),
+    subagentConversation: (attachmentId, childId, before) =>
+      nativeChatInvoke(
+        IPC_CHANNELS.NATIVE_CHAT_SUBAGENT_CONVERSATION,
+        attachmentId,
+        childId,
+        before
+      ),
     listSubagents: (attachmentId, afterChildId) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_LIST_SUBAGENTS,
         attachmentId,
         afterChildId
       ),
     inspectSubagent: (attachmentId, childId, inputId) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_INSPECT_SUBAGENT,
         attachmentId,
         childId,
         inputId
       ),
     createSubagent: (attachmentId, input) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_CREATE_SUBAGENT,
         attachmentId,
         input
       ),
     assignSubagent: (attachmentId, input) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_ASSIGN_SUBAGENT,
         attachmentId,
         input
       ),
     stopSubagent: (attachmentId, stopObservationId, requestId) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_STOP_SUBAGENT,
         attachmentId,
         stopObservationId,
         requestId
       ),
     controlSubagentTurn: (attachmentId, observationId, requestId, control) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_CONTROL_SUBAGENT_TURN,
         attachmentId,
         observationId,
@@ -527,31 +564,31 @@ const bridge: DesktopBridge = {
         control
       ),
     controlSubagentChild: (attachmentId, observationId, requestId, control) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_CONTROL_SUBAGENT_CHILD,
         attachmentId,
         observationId,
         requestId,
         control
       ),
-    create: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_CREATE),
+    create: () => nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_CREATE),
     load: (sessionId) =>
-      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_LOAD, sessionId),
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_LOAD, sessionId),
     openSideChat: (attachmentId) =>
-      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_OPEN_SIDE, attachmentId),
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_OPEN_SIDE, attachmentId),
     closeSideChat: async (sideAttachmentId) => {
       forgetNativeChatAttachment(sideAttachmentId);
-      await ipcRenderer.invoke(
+      await nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_CLOSE_SIDE,
         sideAttachmentId
       );
     },
     detach: async (attachmentId) => {
       forgetNativeChatAttachment(attachmentId);
-      await ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_DETACH, attachmentId);
+      await nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_DETACH, attachmentId);
     },
     publishEditorSurfaces: (attachmentId, snapshot, revision) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_PUBLISH_EDITOR_SURFACES,
         attachmentId,
         snapshot,
@@ -594,7 +631,7 @@ const bridge: DesktopBridge = {
       };
     },
     submit: (attachmentId, inputId, text) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_SUBMIT,
         attachmentId,
         inputId,
@@ -607,9 +644,10 @@ const bridge: DesktopBridge = {
       text,
       operatingRegime,
       effort,
-      editorSvgTargetId
+      editorSvgTargetId,
+      selectionRevision
     ) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         action === "enqueue"
           ? IPC_CHANNELS.NATIVE_CHAT_ENQUEUE
           : IPC_CHANNELS.NATIVE_CHAT_SUBMIT,
@@ -617,86 +655,99 @@ const bridge: DesktopBridge = {
         inputId,
         text,
         operatingRegime,
-        ...(editorSvgTargetId !== undefined
-          ? [effort, editorSvgTargetId]
-          : effort === undefined
-            ? []
-            : [effort])
+        ...(selectionRevision !== undefined
+          ? [effort, editorSvgTargetId, selectionRevision]
+          : editorSvgTargetId !== undefined
+            ? [effort, editorSvgTargetId]
+            : effort === undefined
+              ? []
+              : [effort])
       ),
     enqueue: (attachmentId, inputId, text) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_ENQUEUE,
         attachmentId,
         inputId,
         text
       ),
     inputReceipt: (attachmentId, inputId) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_INPUT_RECEIPT,
         attachmentId,
         inputId
       ),
     observe: (attachmentId) =>
-      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_OBSERVE, attachmentId),
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_OBSERVE, attachmentId),
     acceptsEffort: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_EFFORT),
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_EFFORT),
     acceptsGoalEffort: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_GOAL_EFFORT),
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_GOAL_EFFORT),
     acceptsBackgroundProcesses: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_BACKGROUND_PROCESSES),
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_BACKGROUND_PROCESSES),
     backgroundProcesses: (attachmentId) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_BACKGROUND_PROCESSES,
         attachmentId
       ),
     stopBackgroundProcesses: (attachmentId, processIds) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_STOP_BACKGROUND_PROCESSES,
         attachmentId,
         ...(processIds === undefined ? [] : [[...processIds]])
       ),
-    acceptsPng: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PNG),
+    acceptsPng: () => nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PNG),
     acceptsLibrarySelection: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_LIBRARY_SELECTION),
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_LIBRARY_SELECTION),
     submitWithLibrarySelection: (
       attachmentId,
       inputId,
       text,
       operatingRegime,
-      effort
+      effort,
+      selectionRevision
     ) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_SUBMIT_LIBRARY_SELECTION,
         attachmentId,
         inputId,
         text,
         operatingRegime,
-        effort
+        effort,
+        ...(selectionRevision === undefined ? [] : [selectionRevision])
       ),
-    acceptsFile: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_FILE),
+    acceptsFile: () => nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_FILE),
     ...(!selectedDocumentChatRoute() && {
       inspectHooks: (attachmentId?: string) =>
-        ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_HOOKS, attachmentId),
-      importHook: () =>
-        ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_IMPORT_HOOK),
-      removeHook: (id: string, revision: string) =>
-        ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_REMOVE_HOOK, id, revision),
+        nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_HOOKS, attachmentId),
     }),
     submitImage: (attachmentId, input) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_SUBMIT_IMAGE,
         attachmentId,
         input
       ),
+    acceptsSelectedImage: () =>
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_SELECTED_IMAGE),
+    submitSelectedImage: async (attachmentId, input) =>
+      nativeChatInvoke(
+        IPC_CHANNELS.NATIVE_CHAT_SUBMIT_SELECTED_IMAGE,
+        attachmentId,
+        await SelectedImageRequest.from(input, (file) =>
+          webUtils.getPathForFile(file)
+        )
+      ),
     submitFile: (attachmentId, input) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_SUBMIT_FILE,
         attachmentId,
         input
       ),
     acceptsFileReference: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_FILE_REFERENCE),
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_FILE_REFERENCE),
+    // Main in this binary accepts folders too; the worker uses the same
+    // metadata-only reference contract. Older Main binaries omit this method.
+    acceptsDirectoryReference: () =>
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_FILE_REFERENCE),
     // GRIDA-SEC-004 — the path is resolved here from the person's File and
     // never returned to the page; Main validates it again.
     canReferenceFile: (file) =>
@@ -704,7 +755,7 @@ const bridge: DesktopBridge = {
         webUtils.getPathForFile(each)
       ),
     submitFileReference: async (attachmentId, input) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_SUBMIT_FILE_REFERENCE,
         attachmentId,
         FileReferenceRequest.from(input, (each) =>
@@ -717,128 +768,154 @@ const bridge: DesktopBridge = {
       refreshGatewayAttempt,
       childBillingAfter
     ) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_TURN_SUMMARY,
         attachmentId,
         observationId,
         refreshGatewayAttempt,
         childBillingAfter
       ),
+    readAttachmentPreview: (attachmentId, previewId) =>
+      nativeChatInvoke(
+        IPC_CHANNELS.NATIVE_CHAT_READ_ATTACHMENT_PREVIEW,
+        attachmentId,
+        previewId
+      ),
     readArtifact: (attachmentId, observationId, artifactId) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_READ_ARTIFACT,
         attachmentId,
         observationId,
         artifactId
       ),
     saveArtifact: (attachmentId, observationId, artifactId) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_SAVE_ARTIFACT,
         attachmentId,
         observationId,
         artifactId
       ),
+    acceptsQueuedTextReplacement: () =>
+      nativeChatInvoke(
+        IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_QUEUED_TEXT_REPLACEMENT
+      ),
     queue: (attachmentId, observationId, offset) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_QUEUE,
         attachmentId,
         observationId,
         offset
       ),
     queuedText: (attachmentId, observationId, inputId) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_QUEUED_TEXT,
         attachmentId,
         observationId,
         inputId
       ),
+    queuedMessage: (attachmentId, observationId, inputId) =>
+      nativeChatInvoke(
+        IPC_CHANNELS.NATIVE_CHAT_QUEUED_MESSAGE,
+        attachmentId,
+        observationId,
+        inputId
+      ),
+    readQueuedAttachmentPreview: (
+      attachmentId,
+      observationId,
+      inputId,
+      previewId
+    ) =>
+      nativeChatInvoke(
+        IPC_CHANNELS.NATIVE_CHAT_READ_QUEUED_ATTACHMENT_PREVIEW,
+        attachmentId,
+        observationId,
+        inputId,
+        previewId
+      ),
     editQueue: (attachmentId, change) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_EDIT_QUEUE,
         attachmentId,
         change
       ),
     steer: (attachmentId, input) =>
-      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_STEER, attachmentId, input),
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_STEER, attachmentId, input),
     goal: (attachmentId, observationId) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_GOAL,
         attachmentId,
         observationId
       ),
     startGoal: (attachmentId, inputId, request) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_START_GOAL,
         attachmentId,
         inputId,
         request
       ),
     controlGoal: (attachmentId, change) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_CONTROL_GOAL,
         attachmentId,
         change
       ),
     approvals: (attachmentId, observationId) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_APPROVALS,
         attachmentId,
         observationId
       ),
     answerApproval: (attachmentId, reviewId, decision) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_ANSWER_APPROVAL,
         attachmentId,
         reviewId,
         decision
       ),
     questions: (attachmentId, observationId) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_QUESTIONS,
         attachmentId,
         observationId
       ),
     answerQuestion: (attachmentId, reviewId, answer) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_ANSWER_QUESTION,
         attachmentId,
         reviewId,
         answer
       ),
     librarySelections: (attachmentId, observationId) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_LIBRARY_SELECTIONS,
         attachmentId,
         observationId
       ),
     answerLibrarySelection: (attachmentId, reviewId, answer) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_ANSWER_LIBRARY_SELECTION,
         attachmentId,
         reviewId,
         answer
       ),
     transcript: (attachmentId) =>
-      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_TRANSCRIPT, attachmentId),
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_TRANSCRIPT, attachmentId),
     transcriptPage: (attachmentId, before) =>
-      ipcRenderer.invoke(
+      nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_TRANSCRIPT_PAGE,
         attachmentId,
         before
       ),
     control: (attachmentId, control) =>
-      ipcRenderer.invoke(
-        IPC_CHANNELS.NATIVE_CHAT_CONTROL,
-        attachmentId,
-        control
-      ),
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_CONTROL, attachmentId, control),
     subscribe: async (attachmentId, onUpdate) => {
       if (nativeChatHandlers.size >= 8)
         throw new Error("native_chat_subscription_limit");
       const id = crypto.randomUUID();
       nativeChatHandlers.set(id, { attachmentId, onUpdate });
       try {
-        await ipcRenderer.invoke(
+        await nativeChatInvoke(
           IPC_CHANNELS.NATIVE_CHAT_SUBSCRIBE,
           attachmentId,
           id
@@ -851,8 +928,15 @@ const bridge: DesktopBridge = {
     },
     unsubscribe: async (id) => {
       nativeChatHandlers.delete(id);
-      await ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_UNSUBSCRIBE, id);
+      await nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_UNSUBSCRIBE, id);
     },
+  },
+
+  archives: {
+    list: (cursor) =>
+      ipcRenderer.invoke(IPC_CHANNELS.ARCHIVES_LIST, cursor ?? null),
+    unarchive: (id, revision) =>
+      ipcRenderer.invoke(IPC_CHANNELS.ARCHIVES_UNARCHIVE, id, revision),
   },
 
   account: {
@@ -877,6 +961,7 @@ const bridge: DesktopBridge = {
         filePath
       ),
     close: () => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_CLOSE),
+    open_settings: () => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_OPEN_SETTINGS),
     complete_onboarding: (workspaceId) =>
       ipcRenderer.invoke(IPC_CHANNELS.WINDOW_COMPLETE_ONBOARDING, workspaceId),
     navigation: {
@@ -1111,6 +1196,18 @@ const bridge: DesktopBridge = {
     list_endpoints: () => mediaClient.providers.list_endpoints(),
     set_endpoint: async (config) => {
       await ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_ENDPOINT_SET, config);
+    },
+    endpoint_authorization: (id, baseUrl) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.PROVIDER_ENDPOINT_AUTHORIZATION,
+        id,
+        baseUrl
+      ),
+    update_endpoint_models: async (update) => {
+      await ipcRenderer.invoke(
+        IPC_CHANNELS.PROVIDER_ENDPOINT_UPDATE_MODELS,
+        update
+      );
     },
     delete_endpoint: async (id) => {
       await ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_ENDPOINT_DELETE, id);

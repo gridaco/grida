@@ -28,7 +28,10 @@ async function started(workspace = true) {
     (method: string, params?: Record<string, unknown>) => Promise<unknown>
   >(async (method, params) => {
     if (method === "session/new") return { sessionId };
-    if (method === "_co.grida/session/submit")
+    if (
+      method === "_co.grida/session/submit" ||
+      method === "_co.grida/session/enqueue"
+    )
       return {
         sessionId,
         inputId: params?.inputId,
@@ -173,6 +176,43 @@ it("names a workspace file by its workspace path", async () => {
   }
 });
 
+it("submits and queues folder references without bytes, media facts or new access", async () => {
+  const test = await started();
+  try {
+    for (const [action, folder] of [
+      ["submit", test.cwd],
+      ["enqueue", test.downloads],
+    ] as const) {
+      await test.client.submitFileReference(test.session, {
+        ...input(folder),
+        action,
+        inputId: `folder-${action}`,
+      });
+      const [method, sent] = test.request.mock.lastCall!;
+      expect(method).toBe(`_co.grida/session/${action}`);
+      expect(sent).toEqual({
+        sessionId: "reference-session",
+        inputId: `folder-${action}`,
+        operatingRegime: "act",
+        prompt: [
+          { type: "text", text: "Make a short cut of this." },
+          {
+            type: "resource_link",
+            name: path.basename(folder),
+            uri: `file://${folder}`,
+            mimeType: "inode/directory",
+          },
+        ],
+      });
+      expect(JSON.stringify(sent)).not.toContain("video bytes");
+    }
+    const launch = vi.mocked(NativeAgentProcess.start).mock.calls[0]?.[0];
+    expect(launch?.workspace?.additionalReadRoots).toEqual([]);
+  } finally {
+    await test.close();
+  }
+});
+
 it("refuses protected stores, unknown fields and unnegotiated chats before sending", async () => {
   const test = await started();
   try {
@@ -183,6 +223,13 @@ it("refuses protected stores, unknown fields and unnegotiated chats before sendi
         input(path.join(test.store, "secret.json"))
       )
     ).rejects.toThrow("native_chat_file_reference_protected");
+    const alias = path.join(test.downloads, "store-alias");
+    fs.symlinkSync(test.store, alias);
+    for (const folder of [test.store, test.root, alias]) {
+      await expect(
+        test.client.submitFileReference(test.session, input(folder))
+      ).rejects.toThrow("native_chat_file_reference_protected");
+    }
     await expect(
       test.client.submitFileReference(test.session, {
         ...input(path.join(test.downloads, "clip.mov")),

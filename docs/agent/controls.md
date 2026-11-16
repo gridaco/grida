@@ -32,11 +32,23 @@ example, “When the deck is ready, describe the changes” can run as its own
 turn. Each waiting message keeps the options selected when you sent it; a
 **Plan** or **Ultra** choice is shown on the message, but its model is not.
 
+Hover or focus a waiting message to read its full text, including line breaks.
+Every message keeps its queue icon. An attached image also shows a leading
+thumbnail when its preview is available.
+Opening this preview leaves the message in the queue and does not edit it.
+
 Before a waiting message starts, drag it, or open its **…** menu and choose
-**Move up** or **Move down**, to reorder it. Choose **…** → **Edit** to change
-its text in place, or remove it. Editing changes only the text and keeps the
-other options. A goal or a message with an attachment cannot be edited; remove
-it and send a new one instead.
+**Move up** or **Move down**, to reorder it. Choose **…** → **Edit** to load its
+text into the main composer. The message stays queued and is marked **Editing**.
+Choose **Save changes** or press Enter to replace its text; its other options
+stay the same. **Cancel** or Escape leaves it unchanged. Your unsent draft,
+attachments and selected modes return when editing ends. If saving fails, your
+edit stays in the composer to retry. Steering is unavailable while the composer
+holds an edit. On a supported Desktop runtime, messages with images or files
+can also be edited: only their text changes, and you can clear the caption
+while keeping the attachment. The attached content, captured settings and queue
+position stay the same. Older runtimes offer editing for plain text only.
+Goals cannot be edited; remove the queued goal and send a new one instead.
 
 If the current turn asks a question, answer it in its card. A separate queued
 message leaves the question open.
@@ -82,6 +94,11 @@ composer toolbar shows **N running**. Open it to see each process's command,
 its folder and whether it is running or ended. Choose **Stop** on one process,
 or **Stop all**.
 
+The chat's activity view also has **Processes**. It keeps the host's ended
+entries reachable when no process is running and uses the same list and Stop
+controls. It does not show a live terminal output stream. Closing the view
+does not stop processes.
+
 Type `/stop` on its own, or choose **stop** in the `/` menu, to stop every
 process of the chat without sending a message. It does not stop the current
 turn; use the composer's main button for that.
@@ -91,6 +108,20 @@ list returns when the chat reopens. Closing the window that shows the chat
 stops them, unless another open window also shows that chat. Deleting the
 chat or quitting Desktop stops them too. A side chat lists and stops its own
 processes the same way; they end when it closes.
+
+## Control a subagent's work
+
+Open **Subagents** in the chat's activity controls, then select a child.
+Available controls apply to that child's observed assignment or waiting queue:
+Pause and Resume continue the same assignment; Steer adds a correction; Stop
+ends the current assignment and holds its queue. Resume Queue starts waiting
+work, and a waiting assignment can be withdrawn. A message supplies context
+for the next assignment without starting idle work.
+
+These controls appear only when the connection supports them and the current
+observation permits the action. They do not replace the parent chat's Stop or
+the separate process controls. Closing the child viewer is observational.
+[Work with subagents](./subagents.md)
 
 ## Return to background work
 

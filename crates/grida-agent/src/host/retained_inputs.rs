@@ -1,7 +1,10 @@
 //! GRIDA-SEC-004 / GRIDA-SEC-014 — owner-scoped retained inputs and working copies.
 
 use super::{
-    images::{ImageUpload, MAX_IMAGE_BYTES, NAME, asset_ref, media, retained_unavailable},
+    images::{
+        ImageUpload, MAX_IMAGE_BYTES, NAME, RetainedRaster, asset_ref, media, retained_raster,
+        retained_unavailable,
+    },
     problem,
     retained_file::FileUpload,
 };
@@ -10,6 +13,7 @@ use crate::scratch::{AssetRef, ScratchLimits, ScratchScope, WorkingCopyProof, Wo
 use crate::workspace::ProtectedRoots;
 use agent_kit_core::messages::MediaRef;
 use agent_kit_core::{ArtifactId, ChangeId, ErrorKind, Fingerprint, Result, SessionId, WaitId};
+use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
@@ -19,9 +23,9 @@ pub(super) const WORKSPACE_VIEW: &str = "workspace-view/";
 pub(super) const WORKSPACE_REFERENCE: &str = "workspace-reference/";
 pub(super) const LIBRARY_SELECTION: &str = "library-selection/";
 const LIMITS: ScratchLimits = ScratchLimits {
-    max_assets: 16,
-    max_asset_bytes: MAX_IMAGE_BYTES as u64,
-    max_source_bytes: 2 * 1024 * 1024,
+    max_assets: 32,
+    max_asset_bytes: super::image_preparation::MAX_SOURCE_BYTES as u64,
+    max_source_bytes: 256 * 1024 * 1024,
     max_work_bytes: 2 * 1024 * 1024,
 };
 
@@ -33,6 +37,57 @@ pub(super) struct RetainedInputs {
 }
 
 impl RetainedInputs {
+    pub(super) fn retain_prompt_image(
+        &self,
+        session: &SessionId,
+        cwd: &Path,
+        input: &ChangeId,
+        upload: ImageUpload,
+    ) -> Result<super::PromptPart> {
+        let Some(source) = upload.source.as_ref() else {
+            return Ok(super::PromptPart::RetainedImage {
+                asset: self.retain_image(session, cwd, input, upload)?,
+            });
+        };
+        let source_digest: [u8; 32] = Sha256::digest(&source.bytes).into();
+        let identity = Fingerprint::of(&(input, source_digest, &source.name, &source.selection))?;
+        let id = uuid::Uuid::from_bytes(
+            identity.bytes()[..16]
+                .try_into()
+                .expect("fingerprint prefix"),
+        );
+        let original_name = match source.mime.as_str() {
+            "image/png" => "source.png",
+            "image/jpeg" => "source.jpg",
+            "image/webp" => "source.webp",
+            "image/gif" => "source.gif",
+            _ => return Err(retained_unavailable()),
+        };
+        self.with_intake_scope(session, cwd, |scope| {
+            let original = scope.retain(
+                ArtifactId::new(format!("input/raster/{id}"))?,
+                1,
+                original_name,
+                source.bytes.as_slice(),
+            )?;
+            let prepared = scope.retain(
+                ArtifactId::new(format!("input/raster-prepared/{id}"))?,
+                1,
+                NAME,
+                upload.bytes.as_slice(),
+            )?;
+            Ok(super::PromptPart::PreparedImage {
+                image: Box::new(RetainedRaster {
+                    original,
+                    prepared,
+                    mime_type: source.mime.clone(),
+                    name: source.name.clone(),
+                    preparation: source.preparation.clone(),
+                    selection: source.selection.clone(),
+                }),
+            })
+        })
+    }
     pub(super) fn retirement_identity(
         state_dir: &Path,
         session: &SessionId,
@@ -112,9 +167,20 @@ impl RetainedInputs {
     ) -> Arc<ImageCapture> {
         let storage = self.clone();
         Arc::new(move |bytes| {
-            let image = ImageUpload::from_png(bytes)?;
-            let identity = Fingerprint::of(&image.digest)?;
-            let asset = storage.retain_png(&session, &cwd, namespace, identity, &image.bytes)?;
+            let image = if namespace == WORKSPACE_VIEW {
+                // View receives an already prepared PNG. Generation-reference
+                // capture keeps the older strict original-PNG contract.
+                if bytes.len() > super::image_preparation::MAX_PREPARED_BYTES {
+                    return Err(problem(ErrorKind::LimitExceeded, "image_preparation_limit"));
+                }
+                let digest: [u8; 32] = Sha256::digest(&bytes).into();
+                (bytes, digest)
+            } else {
+                let image = ImageUpload::from_png(bytes)?;
+                (image.bytes, image.digest)
+            };
+            let identity = Fingerprint::of(&image.1)?;
+            let asset = storage.retain_png(&session, &cwd, namespace, identity, &image.0)?;
             media(&asset)
         })
     }
@@ -205,7 +271,14 @@ impl RetainedInputs {
             LIMITS,
             &protected,
             &asset,
-            maximum.min(MAX_IMAGE_BYTES),
+            maximum.min(
+                if retained_raster(media).is_some() || media.id.as_str().starts_with(WORKSPACE_VIEW)
+                {
+                    super::image_preparation::MAX_PREPARED_BYTES
+                } else {
+                    MAX_IMAGE_BYTES
+                },
+            ),
         )
         .map_err(|error| {
             if error.kind == ErrorKind::LimitExceeded {
@@ -225,6 +298,25 @@ impl RetainedInputs {
             return Err(retained_unavailable());
         }
         self.resolve(media, maximum)
+    }
+
+    pub(super) fn resolve_original(&self, media: &MediaRef) -> Result<(String, Vec<u8>)> {
+        let Some(image) = retained_raster(media) else {
+            return self
+                .resolve_selected_image(media, MAX_IMAGE_BYTES)
+                .map(|bytes| ("image/png".into(), bytes));
+        };
+        let _access = self.access.lock().unwrap();
+        let protected = ProtectedRoots::new(vec![])?;
+        let bytes = ScratchScope::read_existing_retained(
+            &self.base,
+            LIMITS,
+            &protected,
+            &image.original,
+            super::image_preparation::MAX_SOURCE_BYTES,
+        )
+        .map_err(|_| retained_unavailable())?;
+        Ok((image.mime_type, bytes))
     }
 
     pub(super) fn read_working(

@@ -17,7 +17,7 @@ use uuid::Uuid;
 pub(crate) const CAPABILITY: &str = "co.grida/provider/egress";
 const UPLOAD_CHUNK: usize = 64 * 1024;
 const READ_CHUNK: usize = 32 * 1024;
-const REQUEST_LIMIT: usize = 1024 * 1024;
+const REQUEST_LIMIT: usize = 8 * 1024 * 1024;
 const RESPONSE_LIMIT: usize = 4 * 1024 * 1024;
 const TIMEOUT: Duration = Duration::from_secs(120);
 

@@ -59,6 +59,17 @@ pub(super) fn attached_image<'a>(
 ) -> Option<&'a AssetRef> {
     let mut attachments = parts.iter().filter_map(|part| match part {
         PromptPart::RetainedImage { asset } => Some(asset),
+        // Preserve the existing small, exact PNG transfer contract. Raster
+        // perception does not authorize a resized derivative or a new source
+        // format to be transferred as an image-generation reference.
+        PromptPart::PreparedImage { image }
+            if image.mime_type == "image/png"
+                && image.original.size() <= super::images::MAX_IMAGE_BYTES as u64
+                && image.original.digest() == image.prepared.digest()
+                && !image.preparation.first_frame =>
+        {
+            Some(&image.prepared)
+        }
         _ => None,
     });
     let asset = attachments.next()?;

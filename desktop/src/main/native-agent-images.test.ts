@@ -272,6 +272,250 @@ function workspaceFrame() {
   };
 }
 
+it
+  .runIf(
+    !!resources &&
+      (process.platform === "darwin" || process.platform === "linux")
+  )
+  .each(["image", "file"] as const)(
+  "replaces and clears a queued %s caption while retaining its exact input and settings",
+  async (kind) => {
+    const root = fs.mkdtempSync(
+      path.join(fs.realpathSync(os.tmpdir()), "grida-native-caption-")
+    );
+    const cwd = path.join(root, "workspace");
+    const stateDirectory = path.join(root, "state");
+    fs.mkdirSync(cwd, { mode: 0o700 });
+    const fixture = await syntheticResponses(kind);
+    const { origin, sender, event } = workspaceFrame();
+    const selectedBytes = new TextEncoder().encode(
+      "Exact retained caption fixture.\r\n"
+    );
+    const start = () =>
+      NativeAgentChat.start({
+        resourcesPath: resources!,
+        stateDirectory,
+        cwd,
+        provider: "responses",
+        endpoint: fixture.endpoint,
+        model: kind === "image" ? "gpt-6.1-sol" : "gpt-5.4-mini",
+      });
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await start();
+      const active = { workspaceId: "workspace", chat };
+      const ipc = new NativeChatIpc(origin, (candidate) =>
+        candidate === sender ? active : null
+      );
+      expect(ipc.acceptsQueuedTextReplacement(event)).toBe(true);
+      const { attachmentId, sessionId } = await ipc.create(event);
+      await ipc.submit(event, attachmentId, "first", "Complete this first.");
+      await vi.waitFor(() => expect(fixture.requests).toHaveLength(1));
+      if (kind === "image") {
+        await ipc.submitImage(event, attachmentId, {
+          action: "enqueue",
+          inputId: "retained",
+          text: "Original caption",
+          png: Uint8Array.from(Buffer.from(PNG, "base64")).buffer,
+          operatingRegime: "plan",
+        });
+      } else {
+        await ipc.submitFile(event, attachmentId, {
+          action: "enqueue",
+          inputId: "retained",
+          text: "Original caption",
+          name: "original.txt",
+          bytes: selectedBytes.buffer,
+          operatingRegime: "plan",
+        });
+      }
+      const observed = await ipc.observe(event, attachmentId);
+      const original = await ipc.queuedMessage(
+        event,
+        attachmentId,
+        observed.observationId,
+        "retained"
+      );
+      expect(original).toMatchObject({
+        text: "Original caption",
+        textOnly: false,
+        textEditable: true,
+      });
+      const metadata = original.attachments!.map(
+        ({ previewId: _previewId, ...facts }) => facts
+      );
+      const change = {
+        action: "replaceText",
+        inputId: "retained",
+        text: "Revised\ncaption",
+        observationId: observed.observationId,
+        requestId: "revise-caption",
+      };
+      const receipt = await ipc.editQueue(event, attachmentId, change);
+      expect(await ipc.editQueue(event, attachmentId, change)).toEqual(receipt);
+      await expect(
+        ipc.editQueue(event, attachmentId, { ...change, text: "Different" })
+      ).rejects.toThrow("request_identity_reused");
+      await expect(
+        ipc.editQueue(event, attachmentId, {
+          ...change,
+          requestId: "stale-caption",
+        })
+      ).rejects.toThrow("queued_text_not_editable");
+      await expect(
+        ipc.queuedMessage(
+          event,
+          attachmentId,
+          observed.observationId,
+          "retained"
+        )
+      ).rejects.toThrow("queued_input_image_unavailable");
+      const prior = await ipc.inputReceipt(event, attachmentId, "retained");
+      expect(prior.disposition).toBe("superseded");
+      const revised = await ipc.observe(event, attachmentId);
+      const [row] = (
+        await ipc.queue(event, attachmentId, revised.observationId, 0)
+      ).items;
+      expect(row).toMatchObject({
+        inputId: prior.replacementInputId,
+        preview: "Revised\ncaption",
+        operatingRegime: "plan",
+        textOnly: false,
+        textEditable: true,
+      });
+      expect(
+        row.attachments!.map(({ previewId: _previewId, ...facts }) => facts)
+      ).toEqual(metadata);
+      const inspected = await ipc.queuedMessage(
+        event,
+        attachmentId,
+        revised.observationId,
+        row.inputId
+      );
+      expect(inspected.text).toBe("Revised\ncaption");
+      await expect(
+        ipc.queuedText(event, attachmentId, revised.observationId, row.inputId)
+      ).rejects.toThrow("queue_input_unavailable");
+      const clear = {
+        ...change,
+        inputId: row.inputId,
+        text: "",
+        requestId: "clear-caption",
+        observationId: revised.observationId,
+      };
+      const clearedReceipt = await ipc.editQueue(event, attachmentId, clear);
+      expect(await ipc.editQueue(event, attachmentId, clear)).toEqual(
+        clearedReceipt
+      );
+      const latest = await ipc.observe(event, attachmentId);
+      const [cleared] = (
+        await ipc.queue(event, attachmentId, latest.observationId, 0)
+      ).items;
+      expect(cleared).toMatchObject({
+        preview: "",
+        operatingRegime: "plan",
+        textOnly: false,
+        textEditable: true,
+      });
+      expect(
+        cleared.attachments!.map(({ previewId: _previewId, ...facts }) => facts)
+      ).toEqual(metadata);
+      expect(
+        (
+          await ipc.queuedMessage(
+            event,
+            attachmentId,
+            latest.observationId,
+            cleared.inputId
+          )
+        ).text
+      ).toBe("");
+      const previewChecks = {
+        image: async () => {
+          expect(
+            Buffer.from(
+              await ipc.readQueuedAttachmentPreview(
+                event,
+                attachmentId,
+                latest.observationId,
+                cleared.inputId,
+                cleared.attachments![0].previewId!
+              )
+            )
+          ).toEqual(Buffer.from(PNG, "base64"));
+          await expect(
+            ipc.readQueuedAttachmentPreview(
+              event,
+              attachmentId,
+              latest.observationId,
+              cleared.inputId,
+              original.attachments![0].previewId!
+            )
+          ).rejects.toThrow("queued_message_unavailable");
+        },
+        file: async () => {},
+      };
+      await previewChecks[kind]();
+      expect(fixture.requests).toHaveLength(1);
+      fixture.release();
+      await vi.waitFor(
+        async () => {
+          expect(
+            (await ipc.inputReceipt(event, attachmentId, cleared.inputId))
+              .disposition
+          ).toBe("completed");
+        },
+        { timeout: 15_000 }
+      );
+      expect(await ipc.editQueue(event, attachmentId, clear)).toEqual(
+        clearedReceipt
+      );
+      expect(JSON.stringify(fixture.requests[1])).toContain("Plan is active");
+      const retainedChecks = {
+        image: () => {
+          expect(JSON.stringify(fixture.requests[1])).toContain(
+            `data:image/png;base64,${PNG}`
+          );
+        },
+        file: () => {
+          expect(JSON.stringify(fixture.requests[2])).toContain(
+            "Exact retained caption fixture."
+          );
+          expect(JSON.stringify(fixture.requests[2])).toContain(
+            createHash("sha256").update(selectedBytes).digest("hex")
+          );
+        },
+      };
+      retainedChecks[kind]();
+      await chat.close();
+      chat = await start();
+      active.chat = chat;
+      const reopened = await ipc.load(event, sessionId);
+      const messages = await ipc.transcript(event, reopened.attachmentId);
+      expect(
+        messages.some((message) =>
+          message.attachments?.some(
+            (attachment) => attachment.name === metadata[0].name
+          )
+        )
+      ).toBe(true);
+      expect(
+        (await ipc.inputReceipt(event, reopened.attachmentId, cleared.inputId))
+          .disposition
+      ).toBe("completed");
+      expect(fixture.requests).toHaveLength(kind === "image" ? 2 : 3);
+    } finally {
+      try {
+        await chat?.close();
+      } finally {
+        await fixture.close();
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    }
+  },
+  30_000
+);
+
 it.runIf(
   !!resources && (process.platform === "darwin" || process.platform === "linux")
 )(
@@ -296,7 +540,7 @@ it.runIf(
           endpoint: fixture.endpoint,
           model,
         });
-      chat = await start("gpt-5.4");
+      chat = await start("gpt-6.1-sol");
       const active = { workspaceId: "workspace", chat };
       const ipc = new NativeChatIpc(origin, (candidate) =>
         candidate === sender ? active : null
@@ -361,12 +605,53 @@ it.runIf(
         })
       ).rejects.toThrow("submission_input_changed");
       const observation = await ipc.observe(event, attachmentId);
-      expect(
-        (await ipc.queue(event, attachmentId, observation.observationId, 0))
-          .items
-      ).toEqual([
-        expect.objectContaining({ inputId: input.inputId, preview: null }),
+      const queue = await ipc.queue(
+        event,
+        attachmentId,
+        observation.observationId,
+        0
+      );
+      expect(queue.items).toEqual([
+        expect.objectContaining({
+          inputId: input.inputId,
+          preview: input.text,
+          textOnly: false,
+          attachments: [
+            {
+              name: "image.png",
+              mimeType: "image/png",
+              size: Buffer.from(PNG, "base64").length,
+              previewId: expect.any(String),
+            },
+          ],
+        }),
       ]);
+      const displayed = await ipc.queuedMessage(
+        event,
+        attachmentId,
+        observation.observationId,
+        input.inputId
+      );
+      expect(displayed.text).toBe(input.text);
+      expect(displayed.attachments).toEqual(queue.items[0].attachments);
+      const queuedPreview = displayed.attachments![0].previewId!;
+      expect(
+        Buffer.from(
+          await ipc.readQueuedAttachmentPreview(
+            event,
+            attachmentId,
+            observation.observationId,
+            input.inputId,
+            queuedPreview
+          )
+        )
+      ).toEqual(Buffer.from(PNG, "base64"));
+      await expect(
+        ipc.readAttachmentPreview(event, attachmentId, queuedPreview)
+      ).rejects.toThrow("input_image_unavailable");
+      expect((await ipc.observe(event, attachmentId)).snapshot).toEqual(
+        observation.snapshot
+      );
       await expect(
         ipc.queuedText(
           event,
@@ -407,13 +692,25 @@ it.runIf(
         expect(latest.snapshot.current).toBeNull();
         expect(latest.snapshot.queuedInputs).toBe(0);
       });
-      const replayed = JSON.stringify(
-        await ipc.transcript(event, attachmentId)
-      );
+      const transcript = await ipc.transcript(event, attachmentId);
+      const replayed = JSON.stringify(transcript);
       expect(replayed).toMatch(
-        /"attachments":\[\{"name":"image\.png","mimeType":"image\/png","size":\d+\}\]/
+        /"attachments":\[\{"name":"image\.png","mimeType":"image\/png","size":\d+,"previewId":"[a-f0-9-]{36}"\}\]/
       );
       expect(replayed).not.toContain("[Retained PNG image]");
+      const selected = transcript.find(
+        (message) => message.attachments?.length
+      )!.attachments![0];
+      expect(
+        new Uint8Array(
+          await ipc.readAttachmentPreview(
+            event,
+            attachmentId,
+            selected.previewId
+          )
+        )
+      ).toEqual(Uint8Array.from(Buffer.from(PNG, "base64")));
+      expect(fixture.requests).toHaveLength(2);
       const next: NativeChatImageInput = {
         ...input,
         action: "submit",
@@ -487,6 +784,25 @@ it.runIf(
       );
       expect(textOnly.acceptsPng(event)).toBe(false);
       const reopened = await textOnly.load(event, sessionId);
+      const reopenedTranscript = await textOnly.transcript(
+        event,
+        reopened.attachmentId
+      );
+      const previews = reopenedTranscript.flatMap(
+        (message) => message.attachments ?? []
+      );
+      expect(previews).toHaveLength(2);
+      for (const [index, data] of [PNG, OTHER_PNG].entries()) {
+        expect(
+          new Uint8Array(
+            await textOnly.readAttachmentPreview(
+              event,
+              reopened.attachmentId,
+              previews[index].previewId
+            )
+          )
+        ).toEqual(Uint8Array.from(Buffer.from(data, "base64")));
+      }
       expect(
         await textOnly.inputReceipt(event, reopened.attachmentId, input.inputId)
       ).toEqual(firstReceipt);
@@ -539,7 +855,7 @@ it.runIf(
         cwd,
         provider: "responses",
         endpoint: fixture.endpoint,
-        model: "gpt-5.4",
+        model: "gpt-6.1-sol",
       });
     const { origin, sender, event } = workspaceFrame();
     let chat: NativeAgentChat | undefined;

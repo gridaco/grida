@@ -1,12 +1,16 @@
-// GRIDA-SEC-004 / GRIDA-SEC-014 — each chat worker binds one approved model route; chats belong to the workspace.
+// GRIDA-SEC-004 / GRIDA-SEC-008 / GRIDA-SEC-014 — each chat worker binds one approved model route; chats belong to the workspace.
 import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import {
   byokProvidersFor,
+  CHATGPT_PROVIDER_ID,
+  CHATGPT_SUBSCRIPTION_MODEL_IDS,
+  CHATGPT_SUBSCRIPTION_RETIRED_MODEL_IDS,
   GG_PROVIDER_ID,
   GG_PROVIDER_METADATA,
+  isChatGptSubscriptionModelId,
   isValidEndpointProviderId,
   type EndpointProviderConfig,
   type GGModelsView,
@@ -79,6 +83,29 @@ export namespace NativeChatProfiles {
       .digest("hex");
   }
 
+  /** OAuth rotation keeps a choice; a new sign-in lineage requires a new one. */
+  export function subscriptionBinding(scope: string, modelId: string): string {
+    return createHash("sha256")
+      .update(JSON.stringify(["desktop-chatgpt-model-chat-v1", scope, modelId]))
+      .digest("hex");
+  }
+
+  export function subscriptionChoices(scope: string): Saved[] {
+    return CHATGPT_SUBSCRIPTION_MODEL_IDS.map((modelId) => {
+      const model =
+        catalog.text.catalog[modelId as keyof typeof catalog.text.catalog];
+      return {
+        id: subscriptionBinding(scope, modelId),
+        providerId: CHATGPT_PROVIDER_ID,
+        modelId,
+        connection: "ChatGPT Subscription",
+        model: model
+          ? catalog.text.displayLabel(model)
+          : modelId.replace(/^openai\/gpt-/, "GPT-"),
+      };
+    });
+  }
+
   export function gatewayOutputLimit(model: GatewayModel | undefined) {
     if (
       !model ||
@@ -123,6 +150,20 @@ export namespace NativeChatProfiles {
       catalog.text.catalog[modelId as keyof typeof catalog.text.catalog]
         ?.contextWindow;
     return positive(window) ? window : undefined;
+  }
+
+  /** Canonical PNG/tool facts intersected with the native route's implemented profile. */
+  export function imageInput(providerId: string, modelId: string): boolean {
+    const model =
+      catalog.text.catalog[modelId as keyof typeof catalog.text.catalog];
+    if (!model?.tool_call || !model.imageInputMimes.includes("image/png"))
+      return false;
+    if (providerId === CHATGPT_PROVIDER_ID)
+      return isChatGptSubscriptionModelId(modelId);
+    if (providerId === "openrouter")
+      return catalog.text.listed_models().some((entry) => entry.id === modelId);
+    // GG's native adapter currently implements only this exact retained-PNG route.
+    return providerId === GG_PROVIDER_ID && modelId === "openai/gpt-5.6-sol";
   }
 
   /**
@@ -361,11 +402,22 @@ function saved(value: unknown): value is NativeChatProfiles.Saved {
     NativeChatProfiles.validId(entry.id) &&
     typeof entry.providerId === "string" &&
     (entry.providerId === GG_PROVIDER_ID ||
+      (entry.providerId === CHATGPT_PROVIDER_ID &&
+        typeof entry.modelId === "string" &&
+        savedSubscriptionModelId(entry.modelId)) ||
       isValidEndpointProviderId(entry.providerId) ||
       NativeProviderSelection.isBuiltInByok(entry.providerId)) &&
     modelId(entry.modelId) &&
     modelId(entry.connection) &&
     modelId(entry.model)
+  );
+}
+
+/** Retired choices remain readable receipts, never new execution authority. */
+function savedSubscriptionModelId(id: string): boolean {
+  return (
+    isChatGptSubscriptionModelId(id) ||
+    CHATGPT_SUBSCRIPTION_RETIRED_MODEL_IDS.some((retired) => retired === id)
   );
 }
 

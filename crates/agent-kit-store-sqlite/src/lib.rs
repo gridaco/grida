@@ -48,6 +48,7 @@ const MAX_HISTORY_TURNS: i64 = 4_096;
 const MAX_HISTORY_RECORDS: usize = 4_096;
 const MAX_HISTORY_BYTES: usize = 8 * 1024 * 1024;
 const MAX_HISTORY_SCAN_BYTES: usize = 128 * 1024 * 1024;
+const SESSION_PAGE_SIZE: usize = 32;
 const ACTIVE_TURN_PAGE_SIZE: usize = 32;
 const OPERATION_CLAIM: &str = "operation-claim";
 
@@ -72,6 +73,14 @@ pub struct ActiveTurnIdentity {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ActiveTurnPage {
     pub entries: Vec<ActiveTurnIdentity>,
+    pub next_after: Option<SessionId>,
+}
+
+/// Stored session identities, across all catalog scopes and buckets.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SessionPage {
+    pub entries: Vec<SessionId>,
+    /// The last returned identity when another page exists.
     pub next_after: Option<SessionId>,
 }
 
@@ -280,6 +289,49 @@ impl SqliteStore {
                 _lock: lock,
             }),
         })
+    }
+
+    /// List at most 32 stored session identities in ascending identity order,
+    /// including sessions outside the catalog. Reads no session state or leases.
+    /// Pages are not a snapshot: recheck before acting and restart a pass to
+    /// observe insertions behind the cursor. A removed cursor remains valid.
+    pub async fn session_page(&self, after: Option<SessionId>) -> Result<SessionPage> {
+        execute(Arc::clone(&self.inner), move |_, connection| {
+            let query = if after.is_some() {
+                "SELECT id FROM sessions WHERE id>?1 ORDER BY id LIMIT ?2"
+            } else {
+                "SELECT id FROM sessions WHERE ?1 IS NULL ORDER BY id LIMIT ?2"
+            };
+            let mut statement = connection.prepare_cached(query).map_err(database_error)?;
+            let mut rows = statement
+                .query(params![
+                    after.as_ref().map(SessionId::as_str),
+                    (SESSION_PAGE_SIZE + 1) as i64
+                ])
+                .map_err(database_error)?;
+            let mut entries = Vec::with_capacity(SESSION_PAGE_SIZE);
+            while let Some(row) = rows.next().map_err(database_error)? {
+                let identity = match row.get_ref(0).map_err(database_error)? {
+                    ValueRef::Text(bytes) if bytes.len() <= 256 => std::str::from_utf8(bytes)
+                        .map_err(|_| error(ErrorKind::InvalidState, "stored_data_invalid"))?,
+                    _ => return Err(error(ErrorKind::InvalidState, "stored_data_invalid")),
+                };
+                let session = SessionId::new(identity)
+                    .map_err(|_| error(ErrorKind::InvalidState, "stored_data_invalid"))?;
+                if entries.len() == SESSION_PAGE_SIZE {
+                    return Ok(SessionPage {
+                        next_after: entries.last().cloned(),
+                        entries,
+                    });
+                }
+                entries.push(session);
+            }
+            Ok(SessionPage {
+                entries,
+                next_after: None,
+            })
+        })
+        .await
     }
 
     /// List a bounded page of active identities without reading turn snapshots

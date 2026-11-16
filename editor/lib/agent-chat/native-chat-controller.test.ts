@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type {
   NativeChatProfileSelection,
+  NativeChatProfileCatalog,
   DesktopNativeChat,
   NativeChatCommand,
   NativeChatCommandResult,
@@ -10,6 +11,7 @@ import type {
   NativeChatMessage,
   NativeChatObservation,
   NativeChatPage,
+  NativeChatQueueItem,
   NativeChatRevisionInput,
   NativeChatRevisionReceipt,
   NativeChatTranscriptPage,
@@ -22,7 +24,163 @@ import type {
 import { NEW_CHAT_TITLE, NativeChatController } from "./native-chat-controller";
 import { native_message_parts } from "./native-message-parts";
 import { video_attachment } from "./video-attachment";
-import { ComposerDrafts, type StoredDraftAttachment } from "./composer-drafts";
+import { image_attachment_preview } from "./image-attachment-preview";
+import { ComposerDrafts, type ComposerDraftBlob } from "./composer-drafts";
+
+function durableDrafts(blobs = new Map<string, ComposerDraftBlob>()) {
+  return new ComposerDrafts(null, {
+    get: async (key) => blobs.get(key) ?? null,
+    put: async (key, value) => {
+      blobs.set(key, value);
+    },
+    delete: async (key) => {
+      blobs.delete(key);
+    },
+  });
+}
+
+it("previews queued text without editing the message or locking chat actions", async () => {
+  const { bridge, controller } = fixture();
+  const observe = bridge.observe.bind(bridge);
+  bridge.observe = async (id) => {
+    const value = await observe(id);
+    return { ...value, snapshot: { ...value.snapshot, queuedInputs: 1 } };
+  };
+  bridge.queue = async () => ({
+    items: [{ inputId: "queued", preview: "First line…" }],
+    offset: 0,
+    previousOffset: null,
+    nextOffset: null,
+  });
+  const read = vi
+    .fn<NonNullable<DesktopNativeChat["queuedText"]>>()
+    .mockResolvedValue("First line\n\nSecond paragraph");
+  bridge.queuedText = read;
+  await controller.select("chat-a");
+  await vi.waitFor(() => expect(controller.queueCurrent).toBe(true));
+  await expect(controller.readQueuedText("queued")).resolves.toBe(
+    "First line\n\nSecond paragraph"
+  );
+  expect(read).toHaveBeenCalledWith("chat-a", "observation-chat-a", "queued");
+  expect(controller.read().queueDraft).toBeNull();
+  expect(controller.read().acting).toBe(false);
+  await expect(controller.readQueuedText("missing")).rejects.toThrow(
+    "native_chat_queue_input_unavailable"
+  );
+  expect(read).toHaveBeenCalledOnce();
+  controller.disconnect();
+});
+
+it("reads image-containing queued messages through the observational capability", async () => {
+  const { bridge, controller } = fixture();
+  const observe = bridge.observe.bind(bridge);
+  bridge.observe = async (id) => {
+    const value = await observe(id);
+    return { ...value, snapshot: { ...value.snapshot, queuedInputs: 1 } };
+  };
+  const attachments = [
+    {
+      name: "reference.jpg",
+      mimeType: "image/jpeg",
+      previewId: "opaque-image",
+    },
+  ];
+  bridge.queue = async () => ({
+    items: [{ inputId: "image-input", preview: "Caption…", attachments }],
+    offset: 0,
+    previousOffset: null,
+    nextOffset: null,
+  });
+  const inspect = vi
+    .fn<NonNullable<DesktopNativeChat["queuedMessage"]>>()
+    .mockResolvedValue({
+      inputId: "image-input",
+      text: "Caption\nSecond line",
+      attachments,
+    });
+  const read = vi
+    .fn<NonNullable<DesktopNativeChat["readQueuedAttachmentPreview"]>>()
+    .mockResolvedValue(new Uint8Array([1, 2, 3]).buffer);
+  const editable = vi.fn<NonNullable<DesktopNativeChat["queuedText"]>>();
+  bridge.queuedMessage = inspect;
+  bridge.readQueuedAttachmentPreview = read;
+  bridge.queuedText = editable;
+  await controller.select("chat-a");
+  await vi.waitFor(() => expect(controller.queueCurrent).toBe(true));
+  await expect(controller.readQueuedText("image-input")).resolves.toBe(
+    "Caption\nSecond line"
+  );
+  expect(inspect).toHaveBeenCalledExactlyOnceWith(
+    "chat-a",
+    "observation-chat-a",
+    "image-input"
+  );
+  expect(editable).not.toHaveBeenCalled();
+  const image = await controller.readQueuedAttachmentPreview(
+    "image-input",
+    "opaque-image"
+  );
+  expect(image.type).toBe("image/jpeg");
+  expect(image.size).toBe(3);
+  expect(read).toHaveBeenCalledExactlyOnceWith(
+    "chat-a",
+    "observation-chat-a",
+    "image-input",
+    "opaque-image"
+  );
+  await expect(
+    controller.readQueuedAttachmentPreview("image-input", "another-image")
+  ).rejects.toThrow("native_chat_queue_input_unavailable");
+  expect(read).toHaveBeenCalledOnce();
+  expect(controller.read().queueDraft).toBeNull();
+  expect(controller.read().acting).toBe(false);
+  controller.disconnect();
+});
+
+it("discards queued image bytes received after selecting another chat", async () => {
+  const { bridge, controller } = fixture();
+  const observe = bridge.observe.bind(bridge);
+  bridge.observe = async (id) => {
+    const value = await observe(id);
+    return { ...value, snapshot: { ...value.snapshot, queuedInputs: 1 } };
+  };
+  bridge.queue = async () => ({
+    items: [
+      {
+        inputId: "image-input",
+        preview: null,
+        attachments: [
+          {
+            name: "photo.png",
+            mimeType: "image/png",
+            previewId: "opaque-image",
+          },
+        ],
+      },
+    ],
+    offset: 0,
+    previousOffset: null,
+    nextOffset: null,
+  });
+  let resolve!: (value: ArrayBuffer) => void;
+  bridge.readQueuedAttachmentPreview = () =>
+    new Promise<ArrayBuffer>((done) => {
+      resolve = done;
+    });
+  await controller.select("chat-a");
+  await vi.waitFor(() => expect(controller.queueCurrent).toBe(true));
+  const preview = controller.readQueuedAttachmentPreview(
+    "image-input",
+    "opaque-image"
+  );
+  const rejected = preview.catch((error: unknown) => error);
+  await controller.select("chat-b");
+  resolve(new Uint8Array([1, 2, 3]).buffer);
+  expect(await rejected).toMatchObject({
+    message: "native_chat_queue_input_unavailable",
+  });
+  controller.disconnect();
+});
 
 function fixture() {
   const updates = new Map<string, (update: NativeChatUpdate) => void>();
@@ -57,6 +215,9 @@ function fixture() {
     async status() {
       return "native-ready";
     },
+    async profiles() {
+      return { active: null, modelChanges: true, choices: [], saved: [] };
+    },
     async takeNotificationFocus() {
       return null;
     },
@@ -82,7 +243,7 @@ function fixture() {
       };
     },
     async inputReceipt() {
-      throw new Error("input_missing");
+      throw new Error("input_unavailable");
     },
     async observe(id) {
       return observed(id);
@@ -120,6 +281,44 @@ function fixture() {
     controller: new NativeChatController(bridge),
   };
 }
+
+it("reads a recorded user PNG without submitting work and drops a stale chat response", async () => {
+  const { bridge, transcripts, controller } = fixture();
+  const bytes = new ArrayBuffer(67);
+  const read = vi
+    .fn<NonNullable<DesktopNativeChat["readAttachmentPreview"]>>()
+    .mockResolvedValue(bytes);
+  bridge.readAttachmentPreview = read;
+  const submit = vi.spyOn(bridge, "submit");
+  transcripts.set("chat-a", [
+    {
+      messageId: "ask",
+      role: "user",
+      text: "See this.",
+      attachments: [
+        { name: "image.png", mimeType: "image/png", previewId: "preview" },
+      ],
+    },
+  ]);
+  await controller.select("chat-a");
+  expect(read).not.toHaveBeenCalled();
+  await expect(controller.readAttachmentPreview("other")).rejects.toThrow(
+    "input_image_unavailable"
+  );
+  expect(read).not.toHaveBeenCalled();
+  const image = await controller.readAttachmentPreview("preview");
+  expect(image.type).toBe("image/png");
+  expect(await image.arrayBuffer()).toEqual(bytes);
+  expect(read).toHaveBeenCalledExactlyOnceWith("chat-a", "preview");
+  const pending = Promise.withResolvers<ArrayBuffer>();
+  read.mockReturnValueOnce(pending.promise);
+  const loading = controller.readAttachmentPreview("preview");
+  await controller.select("chat-b");
+  pending.resolve(bytes);
+  await expect(loading).rejects.toThrow("input_image_unavailable");
+  expect(submit).not.toHaveBeenCalled();
+  controller.disconnect();
+});
 
 it("offers explicit connections before a failed default can open chat or history", async () => {
   const { bridge, controller } = fixture();
@@ -179,6 +378,123 @@ it("ignores late connection recovery after the pane closes", async () => {
   expect(await selecting).toBe(false);
   expect(controller.read().profileBusy).toBe(false);
   controller.disconnect();
+});
+
+describe("model catalogue refresh", () => {
+  const catalog: NativeChatProfileCatalog = {
+    active: null,
+    choices: [{ id: "a".repeat(64), connection: "Provider", model: "Text" }],
+    saved: [],
+  };
+
+  it("shares overlapping reads, retains choices on failure, and recovers without clearing selection errors", async () => {
+    const { bridge, controller } = fixture();
+    const pending = Promise.withResolvers<NativeChatProfileCatalog>();
+    const read = vi.fn<NonNullable<DesktopNativeChat["profiles"]>>(
+      async () => catalog
+    );
+    read.mockResolvedValueOnce(catalog);
+    read.mockImplementationOnce(() => pending.promise);
+    bridge.profiles = read;
+    bridge.selectProfile = async () => {
+      throw new Error("unavailable");
+    };
+    try {
+      controller.connectForSelection();
+      await controller.readProfiles();
+      await controller.selectConnection({
+        kind: "new",
+        id: catalog.choices[0].id,
+      });
+      const selectionError = controller.read().profileError;
+      const first = controller.readProfiles();
+      const second = controller.readProfiles();
+      expect(read).toHaveBeenCalledTimes(2);
+      expect(controller.read().profiles).toBe(catalog);
+      pending.reject(new Error("offline"));
+      await Promise.all([first, second]);
+      expect(controller.read().profiles).toBe(catalog);
+      expect(controller.read().profileReadError).toContain("Couldn't load");
+      expect(controller.read().profileError).toBe(selectionError);
+      await controller.readProfiles();
+      expect(read).toHaveBeenCalledTimes(3);
+      expect(controller.read().profileReadError).toBeNull();
+      expect(controller.read().profileError).toBe(selectionError);
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("ignores a prior connection's read after reconnecting", async () => {
+    const { bridge, controller } = fixture();
+    const pending = Promise.withResolvers<NativeChatProfileCatalog>();
+    const read = vi.fn<NonNullable<DesktopNativeChat["profiles"]>>(
+      async () => catalog
+    );
+    read.mockImplementationOnce(() => pending.promise);
+    bridge.profiles = read;
+    controller.connectForSelection();
+    const old = controller.readProfiles();
+    controller.disconnect();
+    controller.connectForSelection();
+    await controller.readProfiles();
+    pending.resolve({ active: null, choices: [], saved: [] });
+    await old;
+    expect(controller.read().profiles).toBe(catalog);
+    controller.disconnect();
+  });
+
+  it("Welcome shares overlapping reads and retains an explicit choice through failure and retry", async () => {
+    const selection = new NativeChatController.ModelSelection();
+    const id = catalog.choices[0].id;
+    await selection.refresh(async () => catalog);
+    selection.choose({ kind: "new", id });
+    const pending = Promise.withResolvers<NativeChatProfileCatalog>();
+    const read = vi.fn<() => Promise<NativeChatProfileCatalog>>(
+      async () => catalog
+    );
+    read.mockImplementationOnce(() => pending.promise);
+    const first = selection.refresh(read);
+    const second = selection.refresh(read);
+    expect(read).toHaveBeenCalledOnce();
+    expect(selection.read().profiles).toBe(catalog);
+    pending.reject(new Error("offline"));
+    await Promise.all([first, second]);
+    expect(selection.read()).toMatchObject({
+      profiles: catalog,
+      profileId: id,
+      error: expect.any(String),
+    });
+    await selection.refresh(read);
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(selection.read()).toMatchObject({
+      profiles: catalog,
+      profileId: id,
+      error: null,
+    });
+  });
+});
+
+it("explains pending workspace work when a connection-only selection is refused", async () => {
+  const { bridge, controller } = fixture();
+  bridge.selectProfile = vi
+    .fn<NonNullable<DesktopNativeChat["selectProfile"]>>()
+    .mockRejectedValue(new Error("native_chat_model_change_queued_input"));
+  const load = vi.spyOn(bridge, "load");
+  const create = vi.spyOn(bridge, "create");
+  try {
+    controller.connectForSelection();
+    await expect(
+      controller.selectConnection({ kind: "new", id: "b".repeat(64) })
+    ).resolves.toBe(false);
+    expect(controller.read().profileError).toMatch(
+      /queued messages in this workspace/
+    );
+    expect(load).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
+  } finally {
+    controller.disconnect();
+  }
 });
 
 it("activates a recovered profile, then reopens the workspace chat", async () => {
@@ -282,82 +598,6 @@ it("remembers the model chosen for the workspace", async () => {
     expect(JSON.parse(stored.get("project")!).profileId).toBeUndefined();
   } finally {
     controller.disconnect();
-  }
-});
-
-it("inspects the current chat's hooks and removes only an observed saved revision", async () => {
-  const f = fixture();
-  const hook = {
-    id: "check",
-    source: "user-selected:check.json",
-    event: "before_tool",
-    enabled: true,
-    mode: "required",
-    executable: "/usr/bin/printf",
-    arguments: [],
-    timeoutMs: 1000,
-    revision: "a".repeat(64),
-  } as const;
-  const inspection = {
-    supportedEvents: ["before_tool"],
-    active: [],
-    saved: [hook],
-    activation: "restart_required",
-  } as const;
-  const inspect = vi.fn<NonNullable<DesktopNativeChat["inspectHooks"]>>(
-    async () => inspection
-  );
-  const remove = vi.fn<NonNullable<DesktopNativeChat["removeHook"]>>(
-    async () => ({ ...inspection, saved: [] })
-  );
-  f.bridge.inspectHooks = inspect;
-  f.bridge.importHook = async () => null;
-  f.bridge.removeHook = remove;
-  try {
-    await f.controller.select("chat");
-    expect(f.controller.hasHooks).toBe(true);
-    await f.controller.toggleHooks();
-    expect(inspect).toHaveBeenCalledWith("chat");
-    expect(f.controller.read()).toMatchObject({ hooksOpen: true });
-    await f.controller.removeHook(hook.id, "stale");
-    expect(remove).not.toHaveBeenCalled();
-    await f.controller.removeHook(hook.id, hook.revision);
-    expect(remove).toHaveBeenCalledWith(hook.id, hook.revision);
-    expect(f.controller.read().hooks?.saved).toEqual([]);
-    f.controller.closeHooks();
-    expect(f.controller.read().hooksOpen).toBe(false);
-  } finally {
-    f.controller.disconnect();
-  }
-});
-
-it("ignores a hook inspection from a chat that has been replaced", async () => {
-  const f = fixture();
-  const pending =
-    Promise.withResolvers<
-      import("@grida/desktop-bridge").NativeHookInspection
-    >();
-  f.bridge.inspectHooks = async () => pending.promise;
-  f.bridge.importHook = async () => null;
-  f.bridge.removeHook = async () => pending.promise;
-  try {
-    await f.controller.select("first");
-    const read = f.controller.toggleHooks();
-    await f.controller.select("second");
-    pending.resolve({
-      supportedEvents: [],
-      active: [],
-      saved: [],
-      activation: "current",
-    });
-    await read;
-    expect(f.controller.read()).toMatchObject({
-      hooksOpen: false,
-      hooks: null,
-      hooksBusy: false,
-    });
-  } finally {
-    f.controller.disconnect();
   }
 });
 
@@ -1403,6 +1643,440 @@ it("does not send a Library image materialized after changing chats", async () =
   controller.disconnect();
 });
 
+function queuedEditFixture() {
+  const value = fixture();
+  const state = {
+    revision: 2,
+    items: [
+      {
+        inputId: "queued",
+        preview: "Original",
+        textOnly: true,
+        operatingRegime: "plan",
+        effort: "ultra",
+      },
+    ] as readonly NativeChatQueueItem[],
+  };
+  const observe = value.bridge.observe.bind(value.bridge);
+  value.bridge.observe = async (id) => {
+    const current = await observe(id);
+    return {
+      observationId: `${id}-${state.revision}`,
+      snapshot: {
+        ...current.snapshot,
+        sessionRevision: state.revision,
+        queuedInputs: id === "chat-a" ? state.items.length : 0,
+      },
+    };
+  };
+  value.bridge.queue = async () => ({
+    items: state.items,
+    offset: 0,
+    previousOffset: null,
+    nextOffset: null,
+  });
+  const read = vi
+    .fn<NonNullable<DesktopNativeChat["queuedText"]>>()
+    .mockResolvedValue("Original\nSecond line");
+  const edit = vi.fn<NonNullable<DesktopNativeChat["editQueue"]>>(
+    async (sessionId, change) => {
+      state.revision++;
+      if (change.action === "replace" || change.action === "replaceText")
+        state.items = state.items.map((item) =>
+          item.inputId === change.inputId
+            ? { ...item, inputId: "replacement", preview: change.text }
+            : item
+        );
+      return {
+        sessionId,
+        requestId: change.requestId,
+        sessionRevision: state.revision,
+      };
+    }
+  );
+  value.bridge.queuedText = read;
+  value.bridge.editQueue = edit;
+  return { ...value, state, read, edit };
+}
+
+function queuedCaptionFixture(attachment = "photo.jpg") {
+  const value = queuedEditFixture();
+  const attachments = [
+    {
+      name: attachment,
+      mimeType: attachment.endsWith("jpg") ? "image/jpeg" : "text/plain",
+      ...(attachment.endsWith("jpg") && { previewId: "retained-image" }),
+    },
+  ];
+  value.state.items = value.state.items.map((item) => ({
+    ...item,
+    textOnly: false,
+    textEditable: true,
+    attachments,
+  }));
+  const inspect = vi
+    .fn<NonNullable<DesktopNativeChat["queuedMessage"]>>()
+    .mockResolvedValue({
+      inputId: "queued",
+      text: "Original caption\nSecond line",
+      textOnly: false,
+      textEditable: true,
+      attachments,
+    });
+  value.bridge.queuedMessage = inspect;
+  value.bridge.acceptsQueuedTextReplacement = async () => true;
+  return { ...value, inspect, attachments };
+}
+
+it.each(["photo.jpg", "notes.txt"])(
+  "edits only the text of a queued %s through negotiated replacement",
+  async (name) => {
+    const { controller, edit, read, inspect, attachments, state, running } =
+      queuedCaptionFixture(name);
+    running.add("chat-a");
+    await controller.select("chat-a");
+    await vi.waitFor(() => expect(controller.queueCurrent).toBe(true));
+    const item = controller.read().queue!.items[0];
+    expect(controller.canEditQueuedText(item)).toBe(true);
+    expect(controller.canSteerQueued(item)).toBe(false);
+    await controller.editQueuedText("queued");
+    expect(inspect).toHaveBeenCalledExactlyOnceWith(
+      "chat-a",
+      "chat-a-2",
+      "queued"
+    );
+    expect(read).not.toHaveBeenCalled();
+    expect(controller.read().queueDraft).toEqual({
+      inputId: "queued",
+      text: "Original caption\nSecond line",
+      replaceText: true,
+      allowEmpty: true,
+    });
+    await expect(controller.saveQueueDraft("Revised\nCaption")).resolves.toBe(
+      true
+    );
+    expect(edit).toHaveBeenCalledExactlyOnceWith("chat-a", {
+      action: "replaceText",
+      inputId: "queued",
+      text: "Revised\nCaption",
+      observationId: "chat-a-2",
+      requestId: expect.any(String),
+    });
+    expect(state.items[0]).toMatchObject({
+      attachments,
+      preview: "Revised\nCaption",
+      operatingRegime: "plan",
+      effort: "ultra",
+      textOnly: false,
+    });
+    expect(controller.read().queueDraft).toBeNull();
+    controller.disconnect();
+  }
+);
+
+it("can add or clear an image-only message's caption without replacing its image", async () => {
+  const { controller, state, inspect, edit } = queuedCaptionFixture();
+  state.items = state.items.map((item) => ({ ...item, preview: null }));
+  inspect.mockResolvedValue({
+    inputId: "queued",
+    text: "",
+    textEditable: true,
+    attachments: state.items[0].attachments,
+  });
+  await controller.select("chat-a");
+  await vi.waitFor(() => expect(controller.queueCurrent).toBe(true));
+  expect(controller.canEditQueuedText(controller.read().queue!.items[0])).toBe(
+    true
+  );
+  await controller.editQueuedText("queued");
+  await expect(controller.saveQueueDraft("")).resolves.toBe(true);
+  expect(edit.mock.calls[0][1]).toMatchObject({
+    action: "replaceText",
+    text: "",
+  });
+  expect(state.items[0].attachments).toHaveLength(1);
+  controller.disconnect();
+});
+
+it.each(["missing", "false", "rejects", "no-inspection", "no-fact", "refused"])(
+  "never falls back to whole-input replacement for an attachment (%s)",
+  async (reason) => {
+    const { bridge, controller, state, read, inspect, edit } =
+      queuedCaptionFixture();
+    if (reason === "missing") delete bridge.acceptsQueuedTextReplacement;
+    if (reason === "false")
+      bridge.acceptsQueuedTextReplacement = async () => false;
+    if (reason === "rejects")
+      bridge.acceptsQueuedTextReplacement = async () => {
+        throw new Error("old-main");
+      };
+    if (reason === "no-inspection") delete bridge.queuedMessage;
+    if (reason === "no-fact" || reason === "refused")
+      state.items = state.items.map((item) => ({
+        ...item,
+        textEditable: reason === "refused" ? false : undefined,
+      }));
+    await controller.select("chat-a");
+    await vi.waitFor(() => expect(controller.queueCurrent).toBe(true));
+    expect(
+      controller.canEditQueuedText(controller.read().queue!.items[0])
+    ).toBe(false);
+    await controller.editQueuedText("queued");
+    expect(controller.read().queueDraft).toBeNull();
+    expect(read).not.toHaveBeenCalled();
+    expect(inspect).not.toHaveBeenCalled();
+    expect(edit).not.toHaveBeenCalled();
+    controller.disconnect();
+  }
+);
+
+it.each(["wrong-id", "no-fact", "revision", "consumed", "selection"])(
+  "refuses an attachment edit whose inspection is no longer valid (%s)",
+  async (reason) => {
+    const { controller, state, inspect, attachments, edit } =
+      queuedCaptionFixture();
+    const pending =
+      Promise.withResolvers<Awaited<ReturnType<typeof inspect>>>();
+    inspect.mockReturnValue(pending.promise);
+    await controller.select("chat-a");
+    await vi.waitFor(() => expect(controller.queueCurrent).toBe(true));
+    const opening = controller.editQueuedText("queued");
+    if (reason === "selection") await controller.select("chat-b");
+    if (reason === "revision" || reason === "consumed") {
+      state.revision++;
+      if (reason === "consumed") state.items = [];
+      await controller.repair();
+    }
+    pending.resolve({
+      inputId: reason === "wrong-id" ? "other" : "queued",
+      text: "Caption",
+      textEditable: reason !== "no-fact",
+      attachments,
+    });
+    await opening;
+    expect(controller.read().queueDraft).toBeNull();
+    expect(edit).not.toHaveBeenCalled();
+    controller.disconnect();
+  }
+);
+
+it("retains an attachment caption edit and replays the exact request after a lost receipt", async () => {
+  const { bridge, controller, edit, state } = queuedCaptionFixture();
+  let receipt: Awaited<ReturnType<typeof edit>>;
+  const retry = vi.fn<NonNullable<DesktopNativeChat["editQueue"]>>(
+    async (...args) => {
+      if (retry.mock.calls.length === 1) {
+        receipt = await edit(...args);
+        throw new Error("transport_closed");
+      }
+      return receipt!;
+    }
+  );
+  bridge.editQueue = retry;
+  await controller.select("chat-a");
+  await vi.waitFor(() => expect(controller.queueCurrent).toBe(true));
+  await controller.editQueuedText("queued");
+  await expect(controller.saveQueueDraft("")).resolves.toBe(false);
+  expect(controller.read().queueDraft).toMatchObject({
+    text: "",
+    replaceText: true,
+    allowEmpty: true,
+  });
+  expect(state.items[0].inputId).toBe("replacement");
+  await expect(controller.saveQueueDraft()).resolves.toBe(true);
+  expect(retry.mock.calls[1]).toEqual(retry.mock.calls[0]);
+  expect(edit).toHaveBeenCalledOnce();
+  expect(controller.read().queueDraft).toBeNull();
+  controller.disconnect();
+});
+
+it("does not allow clearing an editable input that has only text", async () => {
+  const { bridge, controller, state, inspect, edit } = queuedCaptionFixture();
+  state.items = state.items.map((item) => ({ ...item, attachments: [] }));
+  inspect.mockResolvedValue({
+    inputId: "queued",
+    text: "Two text parts",
+    textEditable: true,
+  });
+  bridge.queuedText = undefined;
+  await controller.select("chat-a");
+  await vi.waitFor(() => expect(controller.queueCurrent).toBe(true));
+  await controller.editQueuedText("queued");
+  expect(controller.read().queueDraft?.allowEmpty).toBe(false);
+  await expect(controller.saveQueueDraft("")).resolves.toBe(false);
+  expect(edit).not.toHaveBeenCalled();
+  controller.disconnect();
+});
+
+it("confirms explicit main-composer edit text while retaining captured queued settings", async () => {
+  const { controller, state, edit } = queuedEditFixture();
+  await controller.select("chat-a");
+  await vi.waitFor(() => expect(controller.queueCurrent).toBe(true));
+  await controller.editQueuedText("queued");
+  expect(controller.read().queueDraft).toEqual({
+    inputId: "queued",
+    text: "Original\nSecond line",
+  });
+  await expect(
+    controller.saveQueueDraft("Updated\n\nSecond paragraph")
+  ).resolves.toBe(true);
+  expect(edit).toHaveBeenCalledExactlyOnceWith("chat-a", {
+    action: "replace",
+    inputId: "queued",
+    text: "Updated\n\nSecond paragraph",
+    observationId: "chat-a-2",
+    requestId: expect.any(String),
+  });
+  expect(controller.read().queueDraft).toBeNull();
+  expect(state.items).toEqual([
+    expect.objectContaining({
+      preview: "Updated\n\nSecond paragraph",
+      operatingRegime: "plan",
+      effort: "ultra",
+    }),
+  ]);
+  controller.disconnect();
+});
+
+it("retains failed and empty main-composer edit text without reporting a save", async () => {
+  const { controller, edit } = queuedEditFixture();
+  edit.mockRejectedValue(new Error("queue_change_refused"));
+  await controller.select("chat-a");
+  await vi.waitFor(() => expect(controller.queueCurrent).toBe(true));
+  await controller.editQueuedText("queued");
+  await expect(controller.saveQueueDraft("Keep my revised text")).resolves.toBe(
+    false
+  );
+  expect(controller.read().queueDraft).toEqual({
+    inputId: "queued",
+    text: "Keep my revised text",
+  });
+  expect(controller.read().acting).toBe(false);
+  await expect(controller.saveQueueDraft("  \n")).resolves.toBe(false);
+  expect(controller.read().queueDraft?.text).toBe("  \n");
+  expect(edit).toHaveBeenCalledOnce();
+  controller.disconnect();
+});
+
+it("replays an unconfirmed edit receipt after the original queued input was replaced", async () => {
+  const { bridge, controller, state, edit } = queuedEditFixture();
+  let receipt: Awaited<ReturnType<typeof edit>>;
+  const retry = vi.fn<NonNullable<DesktopNativeChat["editQueue"]>>(
+    async (...args) => {
+      if (retry.mock.calls.length === 1) {
+        receipt = await edit(...args);
+        throw new Error("transport_closed");
+      }
+      return receipt!;
+    }
+  );
+  bridge.editQueue = retry;
+  await controller.select("chat-a");
+  await vi.waitFor(() => expect(controller.queueCurrent).toBe(true));
+  await controller.editQueuedText("queued");
+  await expect(controller.saveQueueDraft("Revised once")).resolves.toBe(false);
+  expect(state.items[0].inputId).toBe("replacement");
+  expect(controller.read().queueDraft?.text).toBe("Revised once");
+  await expect(controller.saveQueueDraft()).resolves.toBe(true);
+  expect(retry.mock.calls[1]).toEqual(retry.mock.calls[0]);
+  expect(edit).toHaveBeenCalledOnce();
+  expect(controller.read().queueDraft).toBeNull();
+  controller.disconnect();
+});
+
+it("keeps an open edit after its queued input is consumed and refuses a fresh replacement", async () => {
+  const { controller, state, edit } = queuedEditFixture();
+  await controller.select("chat-a");
+  await vi.waitFor(() => expect(controller.queueCurrent).toBe(true));
+  await controller.editQueuedText("queued");
+  state.items = [];
+  state.revision++;
+  await controller.repair();
+  await vi.waitFor(() => expect(controller.read().queue).toBeNull());
+  await expect(
+    controller.saveQueueDraft("Keep the unsaved edit")
+  ).resolves.toBe(false);
+  expect(controller.read().queueDraft?.text).toBe("Keep the unsaved edit");
+  expect(edit).not.toHaveBeenCalled();
+  controller.disconnect();
+});
+
+it.each(["revision", "consumed", "selection"] as const)(
+  "does not open queued text whose %s changed while loading",
+  async (change) => {
+    const { controller, state, read } = queuedEditFixture();
+    const pending = Promise.withResolvers<string>();
+    read.mockReturnValue(pending.promise);
+    await controller.select("chat-a");
+    await vi.waitFor(() => expect(controller.queueCurrent).toBe(true));
+    const opening = controller.editQueuedText("queued");
+    expect(controller.read().acting).toBe(true);
+    if (change === "selection") await controller.select("chat-b");
+    else {
+      state.revision++;
+      if (change === "consumed") state.items = [];
+      await controller.repair();
+    }
+    await vi.waitFor(() => expect(controller.read().queueLoading).toBe(false));
+    pending.resolve("Text from an older read");
+    await opening;
+    expect(controller.read().queueDraft).toBeNull();
+    expect(controller.read().acting).toBe(false);
+    expect(controller.read().error).toBe(
+      change === "selection" ? null : "Couldn't open the queued message."
+    );
+    controller.disconnect();
+  }
+);
+
+it("does not settle a queued save into a newly selected chat", async () => {
+  const { controller, edit } = queuedEditFixture();
+  const pending = Promise.withResolvers<Awaited<ReturnType<typeof edit>>>();
+  edit.mockReturnValue(pending.promise);
+  await controller.select("chat-a");
+  await vi.waitFor(() => expect(controller.queueCurrent).toBe(true));
+  await controller.editQueuedText("queued");
+  const saving = controller.saveQueueDraft("Edited in chat A");
+  await controller.select("chat-b");
+  pending.resolve({
+    sessionId: "chat-a",
+    requestId: edit.mock.calls[0][1].requestId,
+    sessionRevision: 3,
+  });
+  await expect(saving).resolves.toBe(false);
+  expect(controller.read()).toMatchObject({
+    selected: "chat-b",
+    queueDraft: null,
+    acting: false,
+    error: null,
+  });
+  controller.disconnect();
+});
+
+it.each([
+  { inputId: "queued", preview: null },
+  { inputId: "queued", preview: "Other parts", textOnly: false },
+  { inputId: "queued", preview: "Not editable", textEditable: false },
+  { inputId: "queued", preview: "Image", attachments: [{ name: "photo.png" }] },
+  {
+    inputId: "queued",
+    preview: "Goal",
+    goalStart: { objective: "Goal", criteria: ["Goal"], automatic: true },
+  },
+] satisfies NativeChatQueueItem[])(
+  "refuses to load a non-editable queued input: %j",
+  async (item) => {
+    const { controller, state, read } = queuedEditFixture();
+    state.items = [item];
+    await controller.select("chat-a");
+    await vi.waitFor(() => expect(controller.queueCurrent).toBe(true));
+    await controller.editQueuedText("queued");
+    expect(read).not.toHaveBeenCalled();
+    expect(controller.read().queueDraft).toBeNull();
+    controller.disconnect();
+  }
+);
+
 it("keeps a queued edit draft across a stale revision and requires an explicit retry", async () => {
   const { bridge, controller, running } = fixture();
   running.add("chat-a");
@@ -1442,14 +2116,14 @@ it("keeps a queued edit draft across a stale revision and requires an explicit r
   await vi.waitFor(() => expect(controller.queueCurrent).toBe(true));
   await controller.editQueuedText("queued");
   controller.changeQueueDraft("Revised draft");
-  await controller.saveQueueDraft();
+  await expect(controller.saveQueueDraft()).resolves.toBe(false);
   expect(controller.read().queueDraft).toEqual({
     inputId: "queued",
     text: "Revised draft",
   });
   expect(edits).toHaveBeenCalledTimes(1);
   await vi.waitFor(() => expect(controller.queueCurrent).toBe(true));
-  await controller.saveQueueDraft();
+  await expect(controller.saveQueueDraft()).resolves.toBe(true);
   expect(edits).toHaveBeenLastCalledWith(
     "chat-a",
     expect.objectContaining({
@@ -1589,6 +2263,39 @@ it("sending while a turn is paused stops it and plays the new message next", asy
   controller.disconnect();
 });
 
+it("keeps other queued steering out of the composer while it holds an edit", async () => {
+  const { bridge, controller, running, state, read, edit } =
+    queuedEditFixture();
+  running.add("chat-a");
+  state.items = [
+    { inputId: "editing", preview: "Edit this", textOnly: true },
+    { inputId: "other", preview: "Steer this", textOnly: true },
+  ];
+  const steer = vi
+    .fn<NonNullable<DesktopNativeChat["steer"]>>()
+    .mockRejectedValue(new Error("turn refused steering"));
+  bridge.steer = steer;
+  await controller.select("chat-a");
+  await vi.waitFor(() => expect(controller.queueCurrent).toBe(true));
+  const other = controller.read().queue!.items[1];
+  expect(controller.canSteerQueued(other)).toBe(true);
+  await controller.editQueuedText("editing");
+  const draft = controller.read().queueDraft;
+  read.mockClear();
+
+  expect(controller.canSteerQueued(other)).toBe(false);
+  await expect(controller.steerQueued("other")).resolves.toBeNull();
+  expect(read).not.toHaveBeenCalled();
+  expect(edit).not.toHaveBeenCalled();
+  expect(steer).not.toHaveBeenCalled();
+  expect(controller.read().queueDraft).toBe(draft);
+  expect(state.items.map((item) => item.inputId)).toEqual(["editing", "other"]);
+
+  controller.closeQueueDraft();
+  expect(controller.canSteerQueued(other)).toBe(true);
+  controller.disconnect();
+});
+
 it("steers with a queued message only after it leaves the queue, and returns its text if the turn refuses", async () => {
   const { bridge, controller, running } = fixture();
   running.add("chat-a");
@@ -1638,6 +2345,13 @@ it("steers with a queued message only after it leaves the queue, and returns its
     false
   );
   expect(controller.canSteerQueued({ ...item, effort: "ultra" })).toBe(false);
+  expect(controller.canSteerQueued({ ...item, textOnly: false })).toBe(false);
+  expect(
+    controller.canSteerQueued({
+      ...item,
+      attachments: [{ name: "photo.png", mimeType: "image/png" }],
+    })
+  ).toBe(false);
   expect(await controller.steerQueued("queued")).toBeNull();
   expect(order).toEqual(["withdraw", "steer:Use the blue palette"]);
 
@@ -2300,7 +3014,6 @@ it("offers in a side chat only what its snapshot does not refuse", async () => {
   expect(side.canOpenSideChat).toBe(false);
   expect(side.canStartGoal).toBe(false);
   expect(side.canOrganizeChats).toBe(false);
-  expect(side.hasHooks).toBe(false);
   await vi.waitFor(() =>
     expect(side.read().commands).toEqual(["compact", "fork"])
   );
@@ -2883,7 +3596,7 @@ it("keeps Plan and an attachment with each chat's draft across reattachment", as
   bridge.submitImage = vi.fn<NonNullable<DesktopNativeChat["submitImage"]>>();
   bridge.submitInRegime =
     vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>();
-  const blobs = new Map<string, StoredDraftAttachment>();
+  const blobs = new Map<string, ComposerDraftBlob>();
   const drafts = new ComposerDrafts(null, {
     get: async (key) => blobs.get(key) ?? null,
     put: async (key, value) => void blobs.set(key, value),
@@ -2928,7 +3641,7 @@ it("keeps a new chat's draft with the chat its refused first send created", asyn
   bridge.submitImage = vi.fn<NonNullable<DesktopNativeChat["submitImage"]>>();
   bridge.submitInRegime =
     vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>();
-  const blobs = new Map<string, StoredDraftAttachment>();
+  const blobs = new Map<string, ComposerDraftBlob>();
   const drafts = new ComposerDrafts(null, {
     get: async (key) => blobs.get(key) ?? null,
     put: async (key, value) => void blobs.set(key, value),
@@ -3209,13 +3922,15 @@ it("keeps one selected file when a transfer is rejected and replaces it with a P
   });
   await controller.pickTransferredAttachment(scope, [svg, jpeg]);
   expect(controller.read().attachmentNotice).toBe("Attach one file at a time.");
-  await controller.pickTransferredAttachment(scope, [{ kind: "directory" }]);
+  await controller.pickTransferredAttachment(scope, [
+    { kind: "directory", file: new File([], "references") },
+  ]);
   expect(controller.read().attachmentNotice).toBe(
-    "Choose a file instead of a folder."
+    "Folder references are unavailable in this chat."
   );
   await controller.pickTransferredAttachment(scope, [jpeg]);
   expect(controller.read()).toMatchObject({
-    attachmentNotice: "Use a PNG to send an image to this chat.",
+    attachmentNotice: "Keep the original image File to attach it in Desktop.",
     attachmentDraft: { kind: "file", name: "drawing.svg" },
   });
   expect(jpeg.file.arrayBuffer).not.toHaveBeenCalled();
@@ -3285,15 +4000,28 @@ function referenceFixture() {
     (sessionId, input) => bridge.submit(sessionId, input.inputId, input.text)
   );
   bridge.acceptsFileReference = async () => true;
+  bridge.acceptsDirectoryReference = async () => true;
   bridge.canReferenceFile = (file) => onDisk.has(file);
   const sendReference = vi.fn<
     NonNullable<DesktopNativeChat["submitFileReference"]>
   >((sessionId, input) => bridge.submit(sessionId, input.inputId, input.text));
   bridge.submitFileReference = sendReference;
   const dropped = (name: string, type: string, size: number) => {
-    const file = new File([new Uint8Array(Math.min(size, 16))], name, {
-      type,
-    });
+    const file = new File(
+      [
+        new Uint8Array(
+          (type.startsWith("image/") ||
+            /\.(png|jpe?g|webp|gif)$/i.test(name)) &&
+            size <= 20 * 1024 * 1024
+            ? size
+            : Math.min(size, 16)
+        ),
+      ],
+      name,
+      {
+        type,
+      }
+    );
     Object.defineProperty(file, "size", { value: size });
     const read = vi.spyOn(file, "arrayBuffer");
     onDisk.add(file);
@@ -3316,6 +4044,267 @@ function referenceFixture() {
   return { ...context, sendReference, dropped, probe };
 }
 const original = video_attachment.probe;
+
+it("attaches a dropped folder only by its original reference without size, bytes or a media probe", async () => {
+  const { bridge, controller, sendReference, dropped, probe } =
+    referenceFixture();
+  try {
+    await controller.select("chat-a");
+    // A folder whose name looks like media still never enters perception.
+    const directory = dropped("research.mov", "video/quicktime", 4096);
+    await controller.pickTransferredAttachment(controller.read().scope, [
+      { kind: "directory", file: directory.file },
+    ]);
+    expect(controller.read().attachmentDraft).toEqual({
+      kind: "reference",
+      name: "research.mov",
+      mimeType: "inode/directory",
+    });
+    expect(controller.attachmentPreview()).toBeNull();
+    expect(probe).not.toHaveBeenCalled();
+    expect(directory.read).not.toHaveBeenCalled();
+    await controller.submit("Inspect the referenced folder with your tools.");
+    expect(sendReference).toHaveBeenCalledExactlyOnceWith("chat-a", {
+      action: "submit",
+      inputId: expect.any(String),
+      text: "Inspect the referenced folder with your tools.",
+      file: directory.file,
+      mimeType: "inode/directory",
+      operatingRegime: "act",
+    });
+    expect(bridge.submitFile).not.toHaveBeenCalled();
+    expect(bridge.submitImage).not.toHaveBeenCalled();
+    expect(controller.read().attachmentDraft).toBeNull();
+  } finally {
+    vi.restoreAllMocks();
+    controller.disconnect();
+  }
+});
+
+it.each(["missing", "false", "failed"] as const)(
+  "preserves the current draft when Main's separate folder capability is %s",
+  async (support) => {
+    const { bridge, controller, sendReference, dropped, probe } =
+      referenceFixture();
+    if (support === "missing") delete bridge.acceptsDirectoryReference;
+    else
+      bridge.acceptsDirectoryReference = async () => {
+        if (support === "failed") throw new Error("old host unavailable");
+        return false;
+      };
+    try {
+      await controller.select("chat-a");
+      const existing = dropped("archive.zip", "application/zip", 1_000_000);
+      await controller.pickTransferredAttachment(controller.read().scope, [
+        { kind: "file", file: existing.file },
+      ]);
+      const previous = controller.read().attachmentDraft;
+      const directory = dropped("references", "", 4096);
+      await controller.pickTransferredAttachment(controller.read().scope, [
+        { kind: "directory", file: directory.file },
+      ]);
+      expect(controller.read().attachmentDraft).toBe(previous);
+      expect(controller.read().attachmentNotice).toBe(
+        "Folder references are unavailable in this chat."
+      );
+      expect(directory.read).not.toHaveBeenCalled();
+      expect(probe).not.toHaveBeenCalled();
+      expect(sendReference).not.toHaveBeenCalled();
+      expect(bridge.submitFile).not.toHaveBeenCalled();
+    } finally {
+      vi.restoreAllMocks();
+      controller.disconnect();
+    }
+  }
+);
+
+it.each(["new", "paused"] as const)(
+  "rechecks folder support before effects in a %s chat and keeps the selected resource on refusal",
+  async (state) => {
+    const { bridge, controller, sendReference, dropped } = referenceFixture();
+    const create = vi.spyOn(bridge, "create");
+    const control = vi.spyOn(bridge, "control");
+    if (state === "paused") {
+      const observe = bridge.observe.bind(bridge);
+      bridge.observe = async (id) => {
+        const value = await observe(id);
+        return {
+          ...value,
+          snapshot: {
+            ...value.snapshot,
+            current: {
+              turnId: "paused",
+              epoch: 1,
+              journalPosition: 1,
+              historyPosition: 1,
+              controlRevision: 1,
+              paused: true,
+              cancelled: false,
+              disposition: "suspended",
+              status: null,
+            },
+          },
+        };
+      };
+      bridge.enqueue = (attachment, input, text) =>
+        bridge.submit(attachment, input, text);
+    }
+    try {
+      await controller.select(state === "new" ? null : "chat-a");
+      await vi.waitFor(() =>
+        expect(controller.read().directoryReferenceInput).toBe(true)
+      );
+      const directory = dropped("references", "", 4096);
+      await controller.pickTransferredAttachment(controller.read().scope, [
+        { kind: "directory", file: directory.file },
+      ]);
+      bridge.acceptsDirectoryReference = async () => false;
+      await expect(
+        controller.submit("Keep this folder draft.")
+      ).rejects.toThrow("native_chat_directory_reference_unavailable");
+      expect(create).not.toHaveBeenCalled();
+      expect(control).not.toHaveBeenCalled();
+      expect(sendReference).not.toHaveBeenCalled();
+      expect(controller.read().attachmentDraft).toEqual({
+        kind: "reference",
+        name: "references",
+        mimeType: "inode/directory",
+      });
+    } finally {
+      vi.restoreAllMocks();
+      controller.disconnect();
+    }
+  }
+);
+
+it("reconciles a queued folder's exact uncertain input without resending after capability loss", async () => {
+  const { bridge, controller, sendReference, dropped, running } =
+    referenceFixture();
+  bridge.enqueue = (attachment, input, text) =>
+    bridge.submit(attachment, input, text);
+  const receipts = vi.spyOn(bridge, "inputReceipt");
+  sendReference.mockRejectedValueOnce(new Error("lost acceptance response"));
+  try {
+    running.add("chat-a");
+    await controller.select("chat-a");
+    const directory = dropped("references", "", 4096);
+    await controller.pickTransferredAttachment(controller.read().scope, [
+      { kind: "directory", file: directory.file },
+    ]);
+    await expect(
+      controller.submit("Inspect this folder next.")
+    ).rejects.toThrow("lost acceptance response");
+    const sent = sendReference.mock.calls[0][1];
+    expect(sent).toMatchObject({
+      action: "enqueue",
+      file: directory.file,
+      mimeType: "inode/directory",
+    });
+    bridge.acceptsDirectoryReference = async () => false;
+    receipts.mockResolvedValueOnce({
+      sessionId: "chat-a",
+      inputId: sent.inputId,
+      disposition: "queued",
+      inputPosition: 2,
+      turnId: null,
+    });
+    await controller.submit("Inspect this folder next.");
+    expect(sendReference).toHaveBeenCalledTimes(1);
+    expect(receipts).toHaveBeenLastCalledWith("chat-a", sent.inputId);
+    expect(controller.read().attachmentDraft).toBeNull();
+    expect(directory.read).not.toHaveBeenCalled();
+  } finally {
+    vi.restoreAllMocks();
+    controller.disconnect();
+  }
+});
+
+it.each(["file", "directory"] as const)(
+  "keeps a protected %s reference draft with a resource-neutral refusal",
+  async (kind) => {
+    const { bridge, controller, sendReference, dropped, probe } =
+      referenceFixture();
+    sendReference.mockRejectedValueOnce(
+      new Error("native_chat_file_reference_protected")
+    );
+    try {
+      await controller.select("chat-a");
+      const resource = dropped(
+        kind === "directory" ? "private-data" : "private.zip",
+        "",
+        1_000_000
+      );
+      await controller.pickTransferredAttachment(controller.read().scope, [
+        { kind, file: resource.file },
+      ]);
+      const draft = controller.read().attachmentDraft;
+      await expect(controller.submit("Inspect this item.")).rejects.toThrow(
+        "native_chat_file_reference_protected"
+      );
+      expect(controller.read().error).toBe(
+        "This item is in Grida's private data and can't be attached."
+      );
+      expect(controller.read().attachmentDraft).toBe(draft);
+      expect(sendReference.mock.calls[0][1].file).toBe(resource.file);
+      expect(resource.read).not.toHaveBeenCalled();
+      expect(probe).not.toHaveBeenCalled();
+      expect(bridge.submitFile).not.toHaveBeenCalled();
+      expect(bridge.submitImage).not.toHaveBeenCalled();
+    } finally {
+      vi.restoreAllMocks();
+      controller.disconnect();
+    }
+  }
+);
+
+it("keeps a folder draft visible on reattachment to an older Main, without a text-only send", async () => {
+  const { bridge, controller, sendReference, dropped, probe } =
+    referenceFixture();
+  const drafts = durableDrafts();
+  controller.keepDrafts(drafts, "workspace");
+  let reopened: NativeChatController | undefined;
+  try {
+    await controller.select("chat-a");
+    const directory = dropped("references", "", 4096);
+    await controller.pickTransferredAttachment(controller.read().scope, [
+      { kind: "directory", file: directory.file },
+    ]);
+    controller.disconnect();
+    delete bridge.acceptsDirectoryReference;
+    reopened = new NativeChatController(bridge);
+    reopened.keepDrafts(drafts, "workspace");
+    await reopened.select("chat-a");
+    expect(reopened.read().attachmentDraft).toEqual({
+      kind: "reference",
+      name: "references",
+      mimeType: "inode/directory",
+      error: "Folder references are unavailable in this chat.",
+    });
+    expect(reopened.canSubmit).toBe(false);
+    await expect(
+      reopened.submit("Do not discard my resource.")
+    ).rejects.toThrow("native_chat_not_ready");
+    expect(await drafts.readAttachment("workspace:chat-a")).toMatchObject({
+      file: directory.file,
+    });
+    expect(sendReference).not.toHaveBeenCalled();
+    expect(directory.read).not.toHaveBeenCalled();
+    expect(probe).not.toHaveBeenCalled();
+    bridge.acceptsDirectoryReference = async () => true;
+    await reopened.repair();
+    expect(reopened.read().attachmentDraft).not.toHaveProperty(
+      "error",
+      expect.any(String)
+    );
+    expect(reopened.canSubmit).toBe(true);
+    await reopened.submit("Use the preserved folder.");
+    expect(sendReference.mock.calls[0][1].file).toBe(directory.file);
+  } finally {
+    vi.restoreAllMocks();
+    controller.disconnect();
+    reopened?.disconnect();
+  }
+});
 
 it("attaches any file: a large file goes by reference without reading its bytes", async () => {
   const { controller, sendReference, dropped, probe } = referenceFixture();
@@ -3352,29 +4341,25 @@ it("attaches any file: a large file goes by reference without reading its bytes"
   }
 });
 
-it("attaches a PNG by reference when the model cannot take images", async () => {
+it("preserves an explicit image draft on a text-only model without a reference fallback", async () => {
   const { bridge, controller, sendReference, dropped } = referenceFixture();
   bridge.acceptsPng = async () => false;
   try {
     await controller.select("chat-a");
-    const scope = controller.read().scope;
     const png = dropped("poster.png", "image/png", 2048);
-    await controller.pickTransferredAttachment(scope, [
+    await controller.pickTransferredAttachment(controller.read().scope, [
       { kind: "file", file: png.file },
     ]);
-    expect(controller.read()).toMatchObject({
-      attachmentNotice: null,
-      attachmentDraft: { kind: "reference", name: "poster.png" },
+    expect(controller.read().attachmentDraft).toMatchObject({
+      kind: "image",
+      name: "poster.png",
     });
-    await controller.submit("Use this poster.");
-    expect(sendReference).toHaveBeenCalledExactlyOnceWith("chat-a", {
-      action: "submit",
-      inputId: expect.any(String),
-      text: "Use this poster.",
-      file: png.file,
-      mimeType: "image/png",
-      operatingRegime: "act",
-    });
+    expect(controller.read().attachmentNotice).toContain("whole draft is kept");
+    expect(controller.canSubmit).toBe(false);
+    await expect(controller.submit("Use this poster.")).rejects.toThrow(
+      "native_chat_not_ready"
+    );
+    expect(sendReference).not.toHaveBeenCalled();
     expect(png.read).not.toHaveBeenCalled();
   } finally {
     vi.restoreAllMocks();
@@ -3382,7 +4367,7 @@ it("attaches a PNG by reference when the model cannot take images", async () => 
   }
 });
 
-it("names the model when a PNG has no way into the chat", async () => {
+it("keeps an image when its model cannot use the selected-file capability", async () => {
   const { bridge, controller } = fixture();
   const id = "d".repeat(64);
   bridge.acceptsPng = async () => false;
@@ -3392,30 +4377,66 @@ it("names the model when a PNG has no way into the chat", async () => {
     saved: [],
   });
   try {
-    controller.connect("chat-a");
-    await vi.waitFor(() => expect(controller.read().profiles?.active).toBe(id));
-    await vi.waitFor(() => expect(controller.read().loading).toBe(false));
-    const scope = controller.read().scope;
-    await controller.pickTransferredAttachment(scope, [
+    await controller.select("chat-a");
+    await controller.pickTransferredAttachment(controller.read().scope, [
       {
         kind: "file",
-        file: {
-          name: "poster.png",
+        file: new File([new Uint8Array(8)], "poster.png", {
           type: "image/png",
-          size: 8,
-          arrayBuffer: async () => new Uint8Array(8).buffer,
-        },
+        }),
       },
     ]);
-    expect(controller.read()).toMatchObject({
-      attachmentDraft: null,
-      attachmentNotice:
-        "Text Fixture can't take images here. Choose a model that supports images to attach a PNG.",
+    expect(controller.read().attachmentDraft).toMatchObject({
+      kind: "image",
+      name: "poster.png",
     });
+    expect(controller.read().attachmentNotice).toContain("whole draft is kept");
+    expect(controller.canSubmit).toBe(false);
   } finally {
     controller.disconnect();
   }
 });
+
+it.each(["image/jpeg", ""])(
+  "sends the selected raster File itself without materializing a preview or reference (%s)",
+  async (type) => {
+    const { bridge, controller, sendReference, dropped } = referenceFixture();
+    bridge.acceptsSelectedImage = async () => true;
+    const send = vi.fn<NonNullable<DesktopNativeChat["submitSelectedImage"]>>(
+      (session, input) => bridge.submit(session, input.inputId, input.text)
+    );
+    bridge.submitSelectedImage = send;
+    const probe = vi.spyOn(image_attachment_preview, "probe");
+    try {
+      await controller.select("chat-a");
+      const selected = dropped("photo.jpg", type, 64 * 1024);
+      await controller.pickTransferredAttachment(controller.read().scope, [
+        { kind: "file", file: selected.file },
+      ]);
+      expect(controller.read().attachmentDraft).toMatchObject({
+        kind: "image",
+        name: "photo.jpg",
+        mimeType: "image/jpeg",
+      });
+      expect(controller.attachmentPreview()?.type).toBe("image/jpeg");
+      await controller.submit("Describe the original.");
+      expect(send).toHaveBeenCalledExactlyOnceWith("chat-a", {
+        action: "submit",
+        inputId: expect.any(String),
+        text: "Describe the original.",
+        file: expect.any(File),
+        originalFile: selected.file,
+        operatingRegime: "act",
+      });
+      expect(probe).not.toHaveBeenCalled();
+      expect(selected.read).not.toHaveBeenCalled();
+      expect(sendReference).not.toHaveBeenCalled();
+    } finally {
+      vi.restoreAllMocks();
+      controller.disconnect();
+    }
+  }
+);
 
 it("shows a dropped .mov as a video card with its poster frame and duration", async () => {
   const { bridge, controller, sendReference, dropped } = referenceFixture();
@@ -3490,7 +4511,7 @@ it("keeps the video card when the chat is reopened", async () => {
   }
 });
 
-it("keeps PNG and small files on their direct paths when references are available", async () => {
+it("keeps legacy PNG intake while ordinary disk files use references and unsupported images stay in the draft", async () => {
   const { bridge, controller, sendReference, dropped } = referenceFixture();
   try {
     await controller.select("chat-a");
@@ -3506,10 +4527,12 @@ it("keeps PNG and small files on their direct paths when references are availabl
     await controller.pickTransferredAttachment(scope, [
       { kind: "file", file: notes.file },
     ]);
-    expect(controller.read().attachmentDraft).toMatchObject({ kind: "file" });
+    expect(controller.read().attachmentDraft).toMatchObject({
+      kind: "reference",
+    });
     await controller.submit("Summarize it.");
-    expect(bridge.submitFile).toHaveBeenCalledTimes(1);
-    // A non-PNG image and a large PNG now go by reference instead of being refused.
+    expect(bridge.submitFile).not.toHaveBeenCalled();
+    // Explicit images never fall through to reference intake on an older host.
     for (const [name, type, size] of [
       ["photo.jpg", "image/jpeg", 12],
       ["screenshot.png", "image/png", 4 * 1024 * 1024],
@@ -3519,13 +4542,114 @@ it("keeps PNG and small files on their direct paths when references are availabl
         { kind: "file", file: image.file },
       ]);
       expect(controller.read().attachmentDraft).toMatchObject({
-        kind: "reference",
+        kind: "image",
         name,
       });
+      expect(controller.canSubmit).toBe(false);
     }
-    expect(sendReference).not.toHaveBeenCalled();
+    expect(sendReference).toHaveBeenCalledTimes(1);
   } finally {
     vi.restoreAllMocks();
+    controller.disconnect();
+  }
+});
+
+it.each([
+  ["original.png", "image/png"],
+  ["original.jpg", "image/jpeg"],
+  ["original.webp", "image/webp"],
+  ["original.gif", "image/gif"],
+])(
+  "sends an explicit %s original through selected-image intake and retries its exact File and input",
+  async (name, type) => {
+    const { bridge, controller, sendReference, dropped } = referenceFixture();
+    bridge.acceptsSelectedImage = async () => true;
+    const send = vi.fn<NonNullable<DesktopNativeChat["submitSelectedImage"]>>(
+      (session, input) => bridge.submit(session, input.inputId, input.text)
+    );
+    send.mockRejectedValueOnce(new Error("native_agent_request_timeout"));
+    bridge.submitSelectedImage = send;
+    try {
+      await controller.select("chat-a");
+      const selected = dropped(name, type, 5 * 1024 * 1024);
+      await controller.pickTransferredAttachment(controller.read().scope, [
+        { kind: "file", file: selected.file },
+      ]);
+      expect(controller.read().attachmentDraft).toMatchObject({
+        kind: "image",
+        name,
+      });
+      expect(controller.attachmentPreview()).toBeNull();
+      await expect(controller.submit("Describe the original.")).rejects.toThrow(
+        "timeout"
+      );
+      expect(controller.read().attachmentDraft?.name).toBe(name);
+      await controller.submit("Describe the original.");
+      expect(send.mock.calls[1]).toEqual(send.mock.calls[0]);
+      expect(send.mock.calls[0][1].file).not.toBe(selected.file);
+      expect(send.mock.calls[0][1].originalFile).toBe(selected.file);
+      expect(send.mock.calls[0][1]).not.toHaveProperty("preview");
+      expect(bridge.submitImage).not.toHaveBeenCalled();
+      expect(sendReference).not.toHaveBeenCalled();
+      expect(selected.read).not.toHaveBeenCalled();
+    } finally {
+      vi.restoreAllMocks();
+      controller.disconnect();
+    }
+  }
+);
+
+it("keeps an original image with its saved draft when an older host cannot submit it", async () => {
+  const { bridge, controller } = fixture();
+  const store = new ComposerDrafts(null, null);
+  const original = new File(["original-webp"], "same.webp", {
+    type: "image/webp",
+  });
+  await store.writeAttachment("workspace:chat-a", {
+    kind: "image",
+    name: original.name,
+    file: original,
+    mimeType: original.type,
+  });
+  controller.keepDrafts(store, "workspace");
+  try {
+    await controller.select("chat-a");
+    await vi.waitFor(() =>
+      expect(controller.read().attachmentDraft).toMatchObject({
+        kind: "image",
+        name: original.name,
+      })
+    );
+    expect(controller.canSubmit).toBe(false);
+    expect(await store.readAttachment("workspace:chat-a")).toMatchObject({
+      file: original,
+    });
+    expect(bridge.submitSelectedImage).toBeUndefined();
+  } finally {
+    controller.disconnect();
+  }
+});
+
+it("reads a retained original with its recorded MIME and 20 MiB bound", async () => {
+  const { bridge, controller, transcripts } = fixture();
+  const bytes = new Uint8Array(300 * 1024).buffer;
+  bridge.readAttachmentPreview = async () => bytes;
+  transcripts.set("chat-a", [
+    {
+      messageId: "ask",
+      role: "user",
+      text: "Look",
+      attachments: [
+        { name: "photo.jpg", mimeType: "image/jpeg", previewId: "original" },
+      ],
+    },
+  ]);
+  try {
+    await controller.select("chat-a");
+    const image = await controller.readAttachmentPreview("original");
+    expect(image.type).toBe("image/jpeg");
+    expect(await image.arrayBuffer()).toEqual(bytes);
+  } finally {
     controller.disconnect();
   }
 });
@@ -3695,6 +4819,259 @@ it("ignores an older PNG capability result after a newer refresh", async () => {
   await refresh;
   expect(controller.read().imageInput).toBe(false);
   controller.disconnect();
+});
+
+describe("Ultra harness capability", () => {
+  const profile = "d".repeat(64);
+
+  async function offered(
+    bridge: DesktopNativeChat,
+    controller: NativeChatController,
+    connection = "Custom connection"
+  ) {
+    bridge.profiles = async () => ({
+      active: profile,
+      choices: [{ id: profile, connection, model: "Text model", ultra: true }],
+      saved: [],
+    });
+    controller.connectForSelection();
+    await vi.waitFor(() =>
+      expect(controller.read().profiles?.active).toBe(profile)
+    );
+  }
+
+  it.each(["ChatGPT Subscription", "Custom endpoint", "Own provider key"])(
+    "submits exact Ultra effort on a negotiated %s harness without requiring model reasoning",
+    async (connection) => {
+      const { bridge, controller } = fixture();
+      bridge.acceptsEffort = async () => true;
+      const send = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(
+        async (_action, attachment, input, text) =>
+          bridge.submit(attachment, input, text)
+      );
+      bridge.submitInRegime = send;
+      try {
+        await offered(bridge, controller, connection);
+        await controller.select("chat-a");
+        expect(controller.ultraAvailability).toBe(true);
+        expect(controller.read().profiles?.choices[0]).not.toHaveProperty(
+          "reasoning"
+        );
+        controller.selectEffort("ultra");
+        await controller.submit("Complete and independently review the task.");
+        expect(send).toHaveBeenCalledExactlyOnceWith(
+          "submit",
+          "chat-a",
+          expect.any(String),
+          "Complete and independently review the task.",
+          "act",
+          "ultra"
+        );
+      } finally {
+        controller.disconnect();
+      }
+    }
+  );
+
+  it("waits for the installed harness before sending a newly chosen Ultra request", async () => {
+    const { bridge, controller } = fixture();
+    const support = Promise.withResolvers<boolean>();
+    bridge.acceptsEffort = () => support.promise;
+    const create = vi.fn<DesktopNativeChat["create"]>(
+      bridge.create.bind(bridge)
+    );
+    const send = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(
+      async (_action, attachment, input, text) =>
+        bridge.submit(attachment, input, text)
+    );
+    bridge.create = create;
+    bridge.submitInRegime = send;
+    try {
+      await offered(bridge, controller);
+      await controller.select(null);
+      expect(controller.ultraAvailability).toBeUndefined();
+      controller.selectEffort("ultra");
+      const sending = controller.submit("Use the harness.");
+      expect(create).not.toHaveBeenCalled();
+      expect(send).not.toHaveBeenCalled();
+      controller.selectEffort("medium");
+      expect(controller.read().effort).toBe("ultra");
+      support.resolve(true);
+      await sending;
+      expect(send).toHaveBeenCalledExactlyOnceWith(
+        "submit",
+        "new",
+        expect.any(String),
+        "Use the harness.",
+        "act",
+        "ultra"
+      );
+      expect(controller.read().effort).toBe("ultra");
+    } finally {
+      support.resolve(false);
+      controller.disconnect();
+    }
+  });
+
+  it("refuses an unsupported Ultra choice before stopping paused work or sending ordinary work", async () => {
+    const { bridge, controller } = fixture();
+    const support = Promise.withResolvers<boolean>();
+    bridge.acceptsEffort = () => support.promise;
+    const observe = bridge.observe.bind(bridge);
+    bridge.observe = async (id) => {
+      const state = await observe(id);
+      return {
+        ...state,
+        snapshot: {
+          ...state.snapshot,
+          current: {
+            turnId: "paused",
+            epoch: 1,
+            journalPosition: 1,
+            historyPosition: 1,
+            controlRevision: 1,
+            paused: true,
+            cancelled: false,
+            disposition: "suspended",
+            status: null,
+          },
+        },
+      };
+    };
+    const control = vi.fn<DesktopNativeChat["control"]>();
+    const send = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>();
+    bridge.control = control;
+    bridge.submitInRegime = send;
+    bridge.enqueue = (attachment, input, text) =>
+      bridge.submit(attachment, input, text);
+    try {
+      await offered(bridge, controller);
+      await controller.select("chat-a");
+      controller.selectEffort("ultra");
+      const sending = controller.submit("Keep this exact Ultra draft.");
+      support.resolve(false);
+      await expect(sending).rejects.toThrow("Ultra effort is unavailable");
+      expect(controller.read().effort).toBe("ultra");
+      expect(controller.ultraAvailability).toBe(false);
+      expect(controller.read().error).toContain("Ultra effort is unavailable");
+      expect(control).not.toHaveBeenCalled();
+      expect(send).not.toHaveBeenCalled();
+    } finally {
+      support.resolve(false);
+      controller.disconnect();
+    }
+  });
+
+  it.each(["missing", "false", "failed"] as const)(
+    "does not let optimistic catalogue metadata override %s native support",
+    async (kind) => {
+      const { bridge, controller } = fixture();
+      bridge.submitInRegime =
+        vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>();
+      if (kind !== "missing")
+        bridge.acceptsEffort = async () => {
+          if (kind === "failed") throw new Error("host unavailable");
+          return false;
+        };
+      try {
+        await offered(bridge, controller);
+        await controller.select("chat-a");
+        expect(controller.ultraAvailability).toBe(false);
+        controller.selectEffort("ultra");
+        expect(controller.read().effort).toBe("medium");
+        expect(bridge.submitInRegime).not.toHaveBeenCalled();
+      } finally {
+        controller.disconnect();
+      }
+    }
+  );
+
+  it("uses the separate negotiated Goal harness for a composer's Ultra goal", async () => {
+    const { bridge, controller } = fixture();
+    bridge.acceptsEffort = async () => true;
+    bridge.acceptsGoalEffort = async () => true;
+    bridge.goal = async () => ({ observationId: null, goal: null });
+    const start = vi.fn<NonNullable<DesktopNativeChat["startGoal"]>>(
+      async (sessionId, inputId) => ({
+        sessionId,
+        inputId,
+        disposition: "queued",
+        inputPosition: 1,
+        turnId: null,
+      })
+    );
+    bridge.startGoal = start;
+    bridge.submitInRegime =
+      vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>();
+    try {
+      await offered(bridge, controller, "ChatGPT Subscription");
+      await controller.select("chat-a");
+      controller.selectGoalIntent(true);
+      expect(controller.ultraAvailability).toBe(true);
+      controller.selectEffort("ultra");
+      await controller.submit("Finish the deliverable");
+      expect(start).toHaveBeenCalledExactlyOnceWith(
+        "chat-a",
+        expect.any(String),
+        {
+          objective: "Finish the deliverable",
+          criteria: ["Finish the deliverable"],
+          automatic: true,
+          effort: "ultra",
+          operatingRegime: "act",
+        }
+      );
+      expect(bridge.submitInRegime).not.toHaveBeenCalled();
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("does not infer Goal Ultra from ordinary task support", async () => {
+    const { bridge, controller } = fixture();
+    bridge.acceptsEffort = async () => true;
+    bridge.goal = async () => ({ observationId: null, goal: null });
+    const start = vi.fn<NonNullable<DesktopNativeChat["startGoal"]>>();
+    bridge.startGoal = start;
+    bridge.submitInRegime =
+      vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>();
+    try {
+      await offered(bridge, controller);
+      await controller.select("chat-a");
+      controller.selectEffort("ultra");
+      controller.selectGoalIntent(true);
+      expect(controller.ultraAvailability).toBe(false);
+      await expect(controller.submit("Keep the goal draft")).rejects.toThrow(
+        "Ultra is unavailable for goals"
+      );
+      expect(controller.read().effort).toBe("ultra");
+      expect(start).not.toHaveBeenCalled();
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("ignores a retired connection's late harness answer", async () => {
+    const { bridge, controller } = fixture();
+    const stale = Promise.withResolvers<boolean>();
+    const support = vi.fn<NonNullable<DesktopNativeChat["acceptsEffort"]>>();
+    support.mockReturnValueOnce(stale.promise).mockResolvedValueOnce(false);
+    bridge.acceptsEffort = support;
+    bridge.submitInRegime =
+      vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>();
+    try {
+      await offered(bridge, controller);
+      await controller.select("chat-a");
+      await controller.select("chat-b");
+      stale.resolve(true);
+      await stale.promise;
+      expect(controller.ultraAvailability).toBe(false);
+      expect(controller.read().effortAvailable).toBe(false);
+    } finally {
+      stale.resolve(false);
+      controller.disconnect();
+    }
+  });
 });
 
 it("captures effort separately from Plan or Act and preserves it across a lost send", async () => {
@@ -4119,6 +5496,208 @@ function message(id: string, content: string): NativeChatMessage {
 }
 
 describe("Native workspace chat controller", () => {
+  it.each([
+    ["session_active_route_changed", /unfinished turn/],
+    ["session_queued_route_changed", /Queued messages/],
+    ["session_goal_route_changed", /active goal/],
+    ["session_delegated_route_changed", /Delegated work/],
+    ["session_execution_configuration_changed", /Update Desktop/],
+    ["retained_authority_changed", /unfinished work/],
+  ] as const)(
+    "describes saved-work refusal %s without inferring an account change",
+    async (reason, label) => {
+      const { bridge, controller } = fixture();
+      vi.spyOn(bridge, "submit").mockRejectedValue(new Error(reason));
+      try {
+        await controller.select("chat-a");
+        await expect(controller.submit("Continue the work.")).rejects.toThrow(
+          reason
+        );
+        expect(controller.read().error).toMatch(label);
+        expect(controller.read().error).not.toMatch(/account that started/);
+      } finally {
+        controller.disconnect();
+      }
+    }
+  );
+  it.each([
+    ["pending_work", /pending workspace chat work/],
+    ["active_turn", /running chat turns in this workspace/],
+    ["retained_turn", /paused or interrupted turns/],
+    ["queued_input", /queued messages in this workspace/],
+    ["unresolved_goal", /active goals in this workspace/],
+    ["delegated_session", /temporary side chats/],
+    ["background_process", /background commands/],
+    ["unsupported", /Update Desktop/],
+    ["busy", /Another model change/],
+    ["unverified", /Couldn't verify/],
+  ] as const)(
+    "keeps the current chat and selection when model change is blocked by %s",
+    async (reason, label) => {
+      const { bridge, controller, transcripts } = fixture();
+      const id = "b".repeat(64);
+      bridge.profiles = async () => ({
+        active: null,
+        modelChanges: true,
+        choices: [{ id, connection: "Another provider", model: "Other model" }],
+        saved: [],
+      });
+      const choose = vi
+        .fn<NonNullable<DesktopNativeChat["selectProfile"]>>()
+        .mockRejectedValue(new Error(`native_chat_model_change_${reason}`));
+      bridge.selectProfile = choose;
+      transcripts.set("chat-a", [
+        { messageId: "kept", role: "assistant", text: "Kept history" },
+      ]);
+      const load = vi.spyOn(bridge, "load");
+      const drafts = new ComposerDrafts(null, null);
+      const document = {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "Unsent draft" }],
+          },
+        ],
+      };
+      controller.keepDrafts(drafts, "workspace");
+      drafts.write("workspace:chat-a", document);
+      try {
+        controller.connect("chat-a");
+        await vi.waitFor(() =>
+          expect(controller.read().messages[0]?.text).toBe("Kept history")
+        );
+        const scope = controller.read().scope;
+        const before = load.mock.calls.length;
+        await controller.selectProfile({ kind: "new", id });
+        expect(choose).toHaveBeenCalledExactlyOnceWith({ kind: "new", id });
+        expect(controller.read()).toMatchObject({
+          selected: "chat-a",
+          scope,
+          profileBusy: false,
+          profileError: expect.stringMatching(label),
+          profiles: { active: null },
+          messages: [{ messageId: "kept", text: "Kept history" }],
+        });
+        expect(load).toHaveBeenCalledTimes(before);
+        expect(drafts.read("workspace:chat-a")).toEqual(document);
+        expect(controller.read().profileError).not.toMatch(
+          /account that started/
+        );
+      } finally {
+        controller.disconnect();
+      }
+    }
+  );
+
+  it("requires guarded model changes before switching an existing chat on an older Desktop", async () => {
+    const { bridge, controller } = fixture();
+    bridge.profiles = async () => ({ active: null, choices: [], saved: [] });
+    const choose = vi.fn<NonNullable<DesktopNativeChat["selectProfile"]>>(
+      async () => {}
+    );
+    bridge.selectProfile = choose;
+    try {
+      controller.connect("chat-a");
+      await vi.waitFor(() => expect(controller.read().loading).toBe(false));
+      await controller.selectProfile({ kind: "new", id: "b".repeat(64) });
+      expect(choose).not.toHaveBeenCalled();
+      expect(controller.read().profileError).toMatch(/Update Desktop/);
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("reattaches the previous chat only after a failed launch explicitly restores its worker", async () => {
+    const { bridge, controller, transcripts } = fixture();
+    const id = "b".repeat(64);
+    bridge.selectProfile = vi
+      .fn<NonNullable<DesktopNativeChat["selectProfile"]>>()
+      .mockRejectedValue(new Error("native_chat_model_change_failed_restored"));
+    const load = vi.spyOn(bridge, "load");
+    const drafts = new ComposerDrafts(null, null);
+    const document = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Unsent draft" }],
+        },
+      ],
+    };
+    controller.keepDrafts(drafts, "workspace");
+    drafts.write("workspace:chat-a", document);
+    transcripts.set("chat-a", [
+      { messageId: "kept", role: "assistant", text: "Original history" },
+    ]);
+    try {
+      controller.connect("chat-a");
+      await vi.waitFor(() =>
+        expect(controller.read().messages[0]?.text).toBe("Original history")
+      );
+      const scope = controller.read().scope;
+      await controller.selectProfile({ kind: "new", id });
+      expect(load.mock.calls.map(([session]) => session)).toEqual([
+        "chat-a",
+        "chat-a",
+      ]);
+      expect(controller.read()).toMatchObject({
+        selected: "chat-a",
+        profileBusy: false,
+        profileError: expect.stringMatching(
+          /previous connection has been restored/
+        ),
+        messages: [{ messageId: "kept", text: "Original history" }],
+      });
+      expect(controller.read().scope).toBeGreaterThan(scope);
+      expect(drafts.read("workspace:chat-a")).toEqual(document);
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it.each(["restore_failed", "recovery_pending"] as const)(
+    "refreshes a retired attachment after model-change %s without discarding the draft",
+    async (reason) => {
+      const { bridge, controller } = fixture();
+      bridge.selectProfile = vi
+        .fn<NonNullable<DesktopNativeChat["selectProfile"]>>()
+        .mockRejectedValue(new Error(`native_chat_model_change_${reason}`));
+      const load = vi.spyOn(bridge, "load");
+      const drafts = new ComposerDrafts(null, null);
+      const document = {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "Unsent draft" }],
+          },
+        ],
+      };
+      controller.keepDrafts(drafts, "workspace");
+      drafts.write("workspace:chat-a", document);
+      try {
+        controller.connect("chat-a");
+        await vi.waitFor(() => expect(controller.read().loading).toBe(false));
+        await controller.selectProfile({ kind: "new", id: "b".repeat(64) });
+        expect(controller.read().error).toBeTruthy();
+        expect(controller.read().profileError).toBeNull();
+        expect(load).toHaveBeenCalledTimes(1);
+        await controller.repair();
+        expect(load).toHaveBeenCalledTimes(2);
+        expect(controller.read()).toMatchObject({
+          selected: "chat-a",
+          error: null,
+          profileError: null,
+          profileBusy: false,
+        });
+        expect(drafts.read("workspace:chat-a")).toEqual(document);
+      } finally {
+        controller.disconnect();
+      }
+    }
+  );
+
   it("preserves the selected PNG when a different model is chosen", async () => {
     const { bridge, controller } = fixture();
     const id = "b".repeat(64);
@@ -4178,6 +5757,7 @@ describe("Native workspace chat controller", () => {
     ]);
     bridge.profiles = async () => ({
       active: profile,
+      modelChanges: true,
       choices: [{ id, connection: "Local", model: "Fixture" }],
       saved: [{ id, connection: "Local", model: "Fixture", available: true }],
     });
@@ -4216,7 +5796,7 @@ describe("Native workspace chat controller", () => {
       );
       await controller.selectProfile({ kind: "default" });
       expect(choices).toHaveLength(1);
-      expect(controller.read().profileError).toMatch(/current turn/);
+      expect(controller.read().profileError).toMatch(/running chat turns/);
     } finally {
       controller.disconnect();
     }
@@ -4878,7 +6458,7 @@ describe("a first message chosen before the chat opened", () => {
     const startGoal = vi.fn<NonNullable<DesktopNativeChat["startGoal"]>>();
     bridge.submitInRegime = inRegime;
     bridge.startGoal = startGoal;
-    const drafts = new ComposerDrafts(null, null);
+    const drafts = durableDrafts();
     drafts.writeModes("workspace:new", { plan: true, goal: true });
     controller.keepDrafts(drafts, "workspace");
     const message = firstMessage();
@@ -4932,6 +6512,345 @@ it("starts a workspace on a newly chosen connection before the default", async (
     status.mock.invocationCallOrder[1]!
   );
   stop();
+});
+
+describe("recommended model connections", () => {
+  const recommended = "a".repeat(64);
+  const explicit = "b".repeat(64);
+  const catalog = (): NativeChatProfileCatalog => ({
+    active: null,
+    recommendedProfileId: recommended,
+    choices: [
+      { id: recommended, connection: "Subscription", model: "Recommended" },
+      { id: explicit, connection: "Own key", model: "Explicit" },
+    ],
+    saved: [],
+  });
+
+  it("accepts only a currently offered recommendation with a valid identity", () => {
+    expect(NativeChatController.recommendedProfile(catalog())).toBe(
+      recommended
+    );
+    expect(
+      NativeChatController.recommendedProfile({ ...catalog(), choices: [] })
+    ).toBeNull();
+    expect(
+      NativeChatController.recommendedProfile({
+        ...catalog(),
+        recommendedProfileId: "Subscription",
+        choices: [
+          { id: "Subscription", connection: "Subscription", model: "M" },
+        ],
+      })
+    ).toBeNull();
+  });
+
+  it("starts an untouched workspace on the recommendation and remembers that connection", async () => {
+    const { bridge } = fixture();
+    const stored = new Map<string, string>();
+    const memory = {
+      getItem: (key: string) => stored.get(key) ?? null,
+      setItem: (key: string, value: string) => void stored.set(key, value),
+    };
+    const status = vi.fn<DesktopNativeChat["status"]>();
+    status
+      .mockResolvedValueOnce("native-starting")
+      .mockResolvedValue("native-ready");
+    const choose = vi.fn<NonNullable<DesktopNativeChat["selectProfile"]>>(
+      async () => {}
+    );
+    bridge.status = status;
+    bridge.selectProfile = choose;
+    bridge.profiles = async () => catalog();
+    const publish = vi.fn<(state: string | null, profileId?: string) => void>();
+    const stop = NativeChatController.watchReadiness(bridge, publish, null, {
+      memory,
+      key: "workspace",
+      initialSession: null,
+    });
+    const controller = new NativeChatController(bridge, memory, "workspace");
+    try {
+      await vi.waitFor(() =>
+        expect(publish).toHaveBeenLastCalledWith("native-ready", recommended)
+      );
+      expect(choose).toHaveBeenCalledExactlyOnceWith({
+        kind: "new",
+        id: recommended,
+      });
+      expect(choose.mock.invocationCallOrder[0]).toBeLessThan(
+        status.mock.invocationCallOrder[1]!
+      );
+      controller.connect(null, recommended);
+      await vi.waitFor(() =>
+        expect(JSON.parse(stored.get("workspace")!).profileId).toBe(recommended)
+      );
+      expect(choose).toHaveBeenLastCalledWith({
+        kind: "saved",
+        id: recommended,
+      });
+    } finally {
+      stop();
+      controller.disconnect();
+    }
+  });
+
+  it.each([
+    [
+      "remembered Default",
+      JSON.stringify({ selected: null, sessions: [] }),
+      null,
+      null,
+    ],
+    [
+      "remembered key",
+      JSON.stringify({ selected: null, sessions: [], profileId: explicit }),
+      null,
+      { kind: "saved", id: explicit },
+    ],
+    ["an existing chat", null, "earlier-chat", null],
+    ["a Welcome choice", null, null, { kind: "new", id: explicit }],
+  ] as const)(
+    "preserves %s before considering a recommendation",
+    async (_name, stored, initialSession, selection) => {
+      const { bridge } = fixture();
+      const status = vi.fn<DesktopNativeChat["status"]>();
+      status
+        .mockResolvedValueOnce("native-starting")
+        .mockResolvedValue("native-ready");
+      const profiles = vi.fn<NonNullable<DesktopNativeChat["profiles"]>>(
+        async () => catalog()
+      );
+      const choose = vi.fn<NonNullable<DesktopNativeChat["selectProfile"]>>(
+        async () => {}
+      );
+      const publish = vi.fn<(state: string | null) => void>();
+      const stop = NativeChatController.watchReadiness(
+        { ...bridge, status, profiles, selectProfile: choose },
+        publish,
+        selection,
+        {
+          memory: { getItem: () => stored },
+          key: "workspace",
+          initialSession,
+        }
+      );
+      try {
+        await vi.waitFor(() =>
+          expect(publish).toHaveBeenLastCalledWith("native-ready")
+        );
+        expect(profiles).not.toHaveBeenCalled();
+        expect(choose.mock.calls).toEqual(selection ? [[selection]] : []);
+      } finally {
+        stop();
+      }
+    }
+  );
+
+  it("keeps a running worker without reading recommendations", async () => {
+    const { bridge } = fixture();
+    const profiles = vi.fn<NonNullable<DesktopNativeChat["profiles"]>>(
+      async () => catalog()
+    );
+    const choose = vi.fn<NonNullable<DesktopNativeChat["selectProfile"]>>(
+      async () => {}
+    );
+    const publish = vi.fn<(state: string | null) => void>();
+    const stop = NativeChatController.watchReadiness(
+      { ...bridge, profiles, selectProfile: choose },
+      publish,
+      null,
+      { initialSession: null }
+    );
+    try {
+      await vi.waitFor(() =>
+        expect(publish).toHaveBeenCalledExactlyOnceWith("native-ready")
+      );
+      expect(profiles).not.toHaveBeenCalled();
+      expect(choose).not.toHaveBeenCalled();
+    } finally {
+      stop();
+    }
+  });
+
+  it.each(["choice", "closed"] as const)(
+    "does not apply a late recommendation after the view is %s",
+    async (reason) => {
+      const { bridge } = fixture();
+      const pending = Promise.withResolvers<NativeChatProfileCatalog>();
+      let stored: string | null = null;
+      const status = vi.fn<DesktopNativeChat["status"]>();
+      status
+        .mockResolvedValueOnce("native-starting")
+        .mockResolvedValue("native-ready");
+      const profiles = vi.fn<NonNullable<DesktopNativeChat["profiles"]>>(
+        () => pending.promise
+      );
+      const choose = vi.fn<NonNullable<DesktopNativeChat["selectProfile"]>>(
+        async () => {}
+      );
+      const publish = vi.fn<(state: string | null) => void>();
+      const stop = NativeChatController.watchReadiness(
+        { ...bridge, status, profiles, selectProfile: choose },
+        publish,
+        null,
+        {
+          memory: { getItem: () => stored },
+          key: "workspace",
+          initialSession: null,
+        }
+      );
+      await vi.waitFor(() => expect(profiles).toHaveBeenCalledOnce());
+      if (reason === "closed") stop();
+      else stored = JSON.stringify({ selected: null, sessions: [] });
+      pending.resolve(catalog());
+      await pending.promise;
+      await vi.waitFor(() =>
+        expect(status).toHaveBeenCalledTimes(reason === "choice" ? 2 : 1)
+      );
+      expect(publish.mock.calls).toEqual(
+        reason === "choice"
+          ? [["native-starting"], ["native-ready"]]
+          : [["native-starting"]]
+      );
+      expect(choose).not.toHaveBeenCalled();
+      stop();
+    }
+  );
+
+  it("does not retain a recommendation the host refused", async () => {
+    const { bridge } = fixture();
+    const status = vi.fn<DesktopNativeChat["status"]>();
+    status
+      .mockResolvedValueOnce("native-starting")
+      .mockResolvedValue("native-ready");
+    const publish = vi.fn<(state: string | null) => void>();
+    const stop = NativeChatController.watchReadiness(
+      {
+        ...bridge,
+        status,
+        profiles: async () => catalog(),
+        selectProfile: async () => {
+          throw new Error("connection changed");
+        },
+      },
+      publish,
+      null,
+      { initialSession: null }
+    );
+    try {
+      await vi.waitFor(() =>
+        expect(publish).toHaveBeenLastCalledWith("native-ready")
+      );
+    } finally {
+      stop();
+    }
+  });
+
+  it.each([null, explicit])(
+    "Welcome refresh preserves an explicit choice (%s)",
+    async (id) => {
+      const selection = new NativeChatController.ModelSelection();
+      const pending = Promise.withResolvers<NativeChatProfileCatalog>();
+      const refresh = selection.refresh(() => pending.promise);
+      selection.choose(id ? { kind: "new", id } : { kind: "default" });
+      pending.resolve(catalog());
+      await refresh;
+      expect(selection.read().profileId).toBe(id);
+      await selection.refresh(async () => catalog());
+      expect(selection.read().profileId).toBe(id);
+    }
+  );
+
+  it("Welcome follows the current recommendation only until a choice is made", async () => {
+    const selection = new NativeChatController.ModelSelection();
+    await selection.refresh(async () => catalog());
+    expect(selection.read().profileId).toBe(recommended);
+    const { controller, bridge } = fixture();
+    bridge.selectProfile = vi.fn<
+      NonNullable<DesktopNativeChat["selectProfile"]>
+    >(async () => {});
+    const take = vi.fn<() => string>(() => "Use this connection");
+    try {
+      await controller.startChat(selection.read().profileId, take);
+      expect(bridge.selectProfile).toHaveBeenCalledExactlyOnceWith({
+        kind: "new",
+        id: recommended,
+      });
+      expect(take).toHaveBeenCalledOnce();
+    } finally {
+      controller.disconnect();
+    }
+    await selection.refresh(async () => ({
+      ...catalog(),
+      recommendedProfileId: undefined,
+    }));
+    expect(selection.read().profileId).toBeNull();
+  });
+
+  it("Welcome keeps an explicit unavailable connection instead of changing its draft's funding", async () => {
+    const selection = new NativeChatController.ModelSelection();
+    await selection.refresh(async () => catalog());
+    selection.choose({ kind: "new", id: recommended });
+    const original = catalog().choices[0];
+    const replacement = { ...original, id: "c".repeat(64) };
+    const changed: NativeChatProfileCatalog = {
+      active: null,
+      recommendedProfileId: replacement.id,
+      choices: [replacement],
+      saved: [],
+    };
+    for (const next of [
+      { ...catalog(), recommendedProfileId: undefined, choices: [] },
+      changed,
+      { ...changed, saved: [{ ...original, available: false }] },
+    ]) {
+      await selection.refresh(async () => next);
+      expect(selection.read().profileId).toBe(recommended);
+      expect(selection.read().profiles?.saved).toEqual([
+        { ...original, available: false },
+      ]);
+    }
+
+    const { bridge, controller } = fixture();
+    bridge.selectProfile = async () => {
+      throw new Error("native_chat_profile_unavailable");
+    };
+    const take = vi.fn<() => string>(() => "Keep the subscription draft");
+    try {
+      expect(await controller.startChat(selection.read().profileId, take)).toBe(
+        "Keep the subscription draft"
+      );
+      expect(controller.read().error).toContain("wasn't sent");
+    } finally {
+      controller.disconnect();
+    }
+
+    await selection.refresh(async () => catalog());
+    expect(selection.read().profileId).toBe(recommended);
+    expect(selection.read().profiles?.saved).toEqual([]);
+    selection.choose({ kind: "default" });
+    await selection.refresh(async () => changed);
+    expect(selection.read().profileId).toBeNull();
+  });
+
+  it("Welcome ignores a replaced or released catalogue request", async () => {
+    const selection = new NativeChatController.ModelSelection();
+    const first = Promise.withResolvers<NativeChatProfileCatalog>();
+    const pending = selection.refresh(() => first.promise);
+    await selection.refresh(async () => ({
+      ...catalog(),
+      recommendedProfileId: explicit,
+    }));
+    first.resolve(catalog());
+    await pending;
+    expect(selection.read().profileId).toBe(explicit);
+    const last = Promise.withResolvers<NativeChatProfileCatalog>();
+    const closed = selection.refresh(() => last.promise);
+    selection.release();
+    last.resolve(catalog());
+    await closed;
+    expect(selection.read().profileId).toBe(explicit);
+  });
 });
 
 describe("background processes", () => {
@@ -5234,4 +7153,273 @@ describe("slash commands", () => {
     });
     controller.disconnect();
   });
+});
+
+describe("pending sends across a renderer restart", () => {
+  async function capturedImage() {
+    const f = fixture(),
+      blobs = new Map<string, ComposerDraftBlob>();
+    const sends = vi.fn<NonNullable<DesktopNativeChat["submitSelectedImage"]>>(
+      async (id, input) => ({
+        sessionId: id,
+        inputId: input.inputId,
+        inputPosition: 1,
+        turnId: "turn",
+        disposition: "claimed",
+      })
+    );
+    f.bridge.acceptsSelectedImage = async () => true;
+    f.bridge.submitSelectedImage = sends;
+    f.controller.keepDrafts(durableDrafts(blobs), "workspace");
+    await f.controller.select("chat-a");
+    const original = new File(["frozen-image-original"], "same.jpg", {
+      type: "image/jpeg",
+    });
+    await f.controller.pickFile(f.controller.read().scope, original);
+    sends.mockImplementationOnce(async (_id, input) => {
+      expect(blobs.get("\0pending:workspace:chat-a")).toMatchObject({
+        kind: "pending",
+        submission: {
+          inputId: input.inputId,
+          text: input.text,
+          attachment: { kind: "image", file: input.file },
+        },
+      });
+      throw new Error("lost acknowledgement");
+    });
+    await expect(
+      f.controller.submit("Inspect the frozen original.")
+    ).rejects.toThrow("lost acknowledgement");
+    const sent = sends.mock.calls[0][1];
+    f.controller.disconnect();
+    const reopen = async () => {
+      const controller = new NativeChatController(f.bridge);
+      controller.keepDrafts(durableDrafts(blobs), "workspace");
+      await controller.select("chat-a");
+      return controller;
+    };
+    return { ...f, blobs, sends, sent, reopen };
+  }
+
+  it("reconciles the exact accepted input before current image capabilities and never sends twice", async () => {
+    const f = await capturedImage();
+    f.bridge.acceptsSelectedImage = async () => false;
+    const receipt = vi.fn<DesktopNativeChat["inputReceipt"]>(
+      async (id, inputId) => ({
+        sessionId: id,
+        inputId,
+        inputPosition: 1,
+        turnId: "turn",
+        disposition: "claimed",
+      })
+    );
+    f.bridge.inputReceipt = receipt;
+    const reopened = await f.reopen();
+    try {
+      expect(reopened.read().selectedImageInput).toBe(false);
+      expect(reopened.canSubmit).toBe(true);
+      await reopened.submit("Inspect the frozen original.");
+      expect(receipt).toHaveBeenCalledExactlyOnceWith("chat-a", f.sent.inputId);
+      expect(f.sends).toHaveBeenCalledTimes(1);
+      expect(reopened.read().attachmentDraft).toBeNull();
+      expect(f.blobs.has("\0pending:workspace:chat-a")).toBe(false);
+      expect(f.blobs.has("workspace:chat-a")).toBe(false);
+    } finally {
+      reopened.disconnect();
+    }
+  });
+
+  it("resends only after authoritative absence with the original ID and frozen bytes but no invented origin", async () => {
+    const f = await capturedImage(),
+      reopened = await f.reopen();
+    try {
+      await reopened.submit("Inspect the frozen original.");
+      expect(f.sends).toHaveBeenCalledTimes(2);
+      const retried = f.sends.mock.calls[1][1];
+      expect(retried).toEqual({ ...f.sent, originalFile: undefined });
+      expect(retried).not.toHaveProperty("originalFile");
+      expect(await retried.file.text()).toBe("frozen-image-original");
+      expect(retried.inputId).toBe(f.sent.inputId);
+    } finally {
+      reopened.disconnect();
+    }
+  });
+
+  it("preserves the captured identity through another unknown receipt outcome", async () => {
+    const f = await capturedImage();
+    f.bridge.inputReceipt = vi.fn<DesktopNativeChat["inputReceipt"]>(
+      async () => {
+        throw new Error("receipt disconnected");
+      }
+    );
+    const reopened = await f.reopen();
+    try {
+      await expect(
+        reopened.submit("Inspect the frozen original.")
+      ).rejects.toThrow("receipt disconnected");
+      expect(f.sends).toHaveBeenCalledTimes(1);
+      expect(f.blobs.get("\0pending:workspace:chat-a")).toMatchObject({
+        submission: { inputId: f.sent.inputId },
+      });
+      expect(reopened.read().attachmentDraft?.name).toBe("same.jpg");
+    } finally {
+      reopened.disconnect();
+    }
+  });
+
+  it("does not dispatch before durable storage commits and reuses its ID if storage refuses", async () => {
+    const f = fixture(),
+      blobs = new Map<string, ComposerDraftBlob>();
+    const persisted = Promise.withResolvers<void>();
+    let fail = true;
+    const store = new ComposerDrafts(null, {
+      get: async (key) => blobs.get(key) ?? null,
+      put: async (key, value) => {
+        if (value.kind === "pending") {
+          await persisted.promise;
+          if (fail) throw new Error("storage aborted");
+        }
+        blobs.set(key, value);
+      },
+      delete: async (key) => {
+        blobs.delete(key);
+      },
+    });
+    f.controller.keepDrafts(store, "workspace");
+    const send = vi.spyOn(f.bridge, "submit");
+    await f.controller.select("chat-a");
+    const sending = f.controller.submit("Keep the retry identity.");
+    await vi.waitFor(() => expect(f.controller.read().acting).toBe(true));
+    expect(send).not.toHaveBeenCalled();
+    const rejection = sending.catch((error: unknown) => error);
+    await vi.waitFor(async () =>
+      expect(
+        (await store.readPending("workspace:chat-a"))?.inputId
+      ).toBeTruthy()
+    );
+    const pending = await store.readPending("workspace:chat-a");
+    persisted.resolve();
+    expect(await rejection).toMatchObject({ message: "storage aborted" });
+    expect(send).not.toHaveBeenCalled();
+    fail = false;
+    await f.controller.submit("Keep the retry identity.");
+    expect(send).toHaveBeenCalledExactlyOnceWith(
+      "chat-a",
+      pending!.inputId,
+      "Keep the retry identity."
+    );
+    f.controller.disconnect();
+  });
+
+  it("blocks a corrupt stored retry record instead of inventing a new input", async () => {
+    const f = fixture(),
+      blobs = new Map<string, ComposerDraftBlob>();
+    blobs.set("\0pending:workspace:chat-a", {
+      kind: "pending",
+      version: 1,
+      key: "wrong-chat",
+      submission: {
+        inputId: "old",
+        text: "Keep me",
+        mode: "submit",
+        allowLibrarySelection: false,
+      },
+    });
+    f.controller.keepDrafts(durableDrafts(blobs), "workspace");
+    const send = vi.spyOn(f.bridge, "submit");
+    try {
+      await f.controller.select("chat-a");
+      expect(f.controller.canSubmit).toBe(false);
+      await expect(f.controller.submit("Keep me")).rejects.toThrow(
+        "native_chat_retry_storage_unavailable"
+      );
+      expect(send).not.toHaveBeenCalled();
+      expect(blobs.has("\0pending:workspace:chat-a")).toBe(true);
+    } finally {
+      f.controller.disconnect();
+    }
+  });
+});
+
+it("restores only a reference's pending identity and never invents a path or byte upload after restart", async () => {
+  const f = referenceFixture(),
+    blobs = new Map<string, ComposerDraftBlob>();
+  f.controller.keepDrafts(durableDrafts(blobs), "workspace");
+  let reopened: NativeChatController | undefined;
+  try {
+    await f.controller.select("chat-a");
+    const file = f.dropped("notes.txt", "text/plain", 100);
+    await f.controller.pickFile(f.controller.read().scope, file.file);
+    f.sendReference.mockRejectedValueOnce(new Error("lost reference receipt"));
+    await expect(f.controller.submit("Read the notes.")).rejects.toThrow(
+      "lost reference receipt"
+    );
+    const id = f.sendReference.mock.calls[0][1].inputId;
+    const captured = blobs.get("\0pending:workspace:chat-a");
+    expect(captured).toMatchObject({
+      kind: "pending",
+      submission: {
+        inputId: id,
+        attachment: {
+          kind: "reference",
+          name: "notes.txt",
+          referenceId: expect.any(String),
+        },
+      },
+    });
+    if (captured?.kind !== "pending") throw new Error("missing capture");
+    expect(captured.submission.attachment).not.toHaveProperty("file");
+    expect(captured.submission.attachment).not.toHaveProperty("path");
+    f.controller.disconnect();
+    reopened = new NativeChatController(f.bridge);
+    reopened.keepDrafts(durableDrafts(blobs), "workspace");
+    await reopened.select("chat-a");
+    expect(reopened.canSubmit).toBe(true);
+    await expect(reopened.submit("Read the notes.")).rejects.toThrow(
+      "native_chat_pending_attachment_unavailable"
+    );
+    expect(f.sendReference).toHaveBeenCalledTimes(1);
+    expect(f.bridge.submitFile).not.toHaveBeenCalled();
+    expect(reopened.read().attachmentDraft?.name).toBe("notes.txt");
+    f.bridge.inputReceipt = async (sessionId, inputId) => ({
+      sessionId,
+      inputId,
+      inputPosition: 1,
+      turnId: null,
+      disposition: "queued",
+    });
+    await reopened.submit("Read the notes.");
+    expect(reopened.read().attachmentDraft).toBeNull();
+    expect(blobs.has("\0pending:workspace:chat-a")).toBe(false);
+  } finally {
+    f.controller.disconnect();
+    reopened?.disconnect();
+    vi.restoreAllMocks();
+  }
+});
+
+it("keeps an original preview read valid across an equivalent transcript refresh", async () => {
+  const f = fixture(),
+    result = Promise.withResolvers<ArrayBuffer>();
+  const message: NativeChatMessage = {
+    messageId: "image-message",
+    role: "user",
+    text: "Look",
+    attachments: [
+      {
+        name: "photo.jpg",
+        mimeType: "image/jpeg",
+        previewId: "same-capability",
+      },
+    ],
+  };
+  f.transcripts.set("chat-a", [message]);
+  f.bridge.readAttachmentPreview = () => result.promise;
+  await f.controller.select("chat-a");
+  const reading = f.controller.readAttachmentPreview("same-capability");
+  f.transcripts.set("chat-a", [structuredClone(message)]);
+  await f.controller.repair();
+  result.resolve(new Uint8Array([1, 2]).buffer);
+  await expect(reading).resolves.toMatchObject({ type: "image/jpeg", size: 2 });
+  f.controller.disconnect();
 });

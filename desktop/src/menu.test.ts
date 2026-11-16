@@ -21,6 +21,8 @@ const fixture = vi.hoisted(() => ({
   error: vi.fn<(title: string, message: string) => void>(),
   picker: vi.fn<() => Promise<{ canceled: boolean; filePaths: string[] }>>(),
   sidecarReady: true,
+  settings: vi.fn<(options: object) => object>(() => ({})),
+  focusSettings: vi.fn<(pathname: string) => boolean>(() => false),
 }));
 
 vi.mock("electron", () => ({
@@ -38,6 +40,7 @@ vi.mock("electron", () => ({
 vi.mock("./window", () => ({
   open_workspace_window: fixture.open,
   open_canvas_window: fixture.deck,
+  open_settings_window: fixture.settings,
 }));
 vi.mock("./env", () => ({ EDITOR_BASE_URL: "https://fixture.invalid" }));
 vi.mock("./main/services-sidecar-supervisor", () => ({
@@ -50,15 +53,65 @@ vi.mock("./main/services-sidecar-client", () => ({
     reopenWorkspace: fixture.reopen,
   },
 }));
-vi.mock("./main/window-focus", () => ({ focusWindowByUrl: () => false }));
+vi.mock("./main/window-focus", () => ({
+  focusWindowByUrl: fixture.focusSettings,
+}));
 
-import { rebuild_application_menu } from "./menu";
+import { open_or_focus_settings, rebuild_application_menu } from "./menu";
 
 beforeEach(() => {
   vi.clearAllMocks();
   fixture.template = [];
   fixture.list.mockResolvedValue([]);
   fixture.sidecarReady = true;
+  fixture.focusSettings.mockReturnValue(false);
+});
+
+it("opens and focuses Settings through the same admitted action as its native menu", async () => {
+  const app = { name: "Grida fixture" } as App;
+  const admission = {
+    can_open: () => true,
+    register: vi.fn<(window: unknown) => boolean>(() => true),
+    focus_entry: vi.fn<() => void>(),
+  };
+  await rebuild_application_menu(app, {} as Shell, {
+    windowAdmission: admission,
+  });
+  const items = fixture.template.flatMap((item) =>
+    Array.isArray(item.submenu)
+      ? (item.submenu as MenuItemConstructorOptions[])
+      : []
+  );
+  click(items.find((item) => item.label === "Settings…")!);
+  expect(fixture.settings).toHaveBeenCalledExactlyOnceWith({
+    app,
+    base_url: "https://fixture.invalid",
+  });
+  expect(admission.register).toHaveBeenCalledExactlyOnceWith(
+    fixture.settings.mock.results[0].value
+  );
+
+  fixture.focusSettings.mockReturnValue(true);
+  open_or_focus_settings(app, admission);
+  expect(fixture.focusSettings).toHaveBeenLastCalledWith("/desktop/settings");
+  expect(fixture.settings).toHaveBeenCalledTimes(1);
+  expect(admission.register).toHaveBeenCalledTimes(1);
+});
+
+it("withholds Settings until entry admission and retained services are available", () => {
+  const app = {} as App;
+  const admission = {
+    can_open: () => false,
+    register: vi.fn<(window: unknown) => boolean>(() => true),
+    focus_entry: vi.fn<() => void>(),
+  };
+  open_or_focus_settings(app, admission);
+  expect(admission.focus_entry).toHaveBeenCalledOnce();
+  expect(fixture.focusSettings).not.toHaveBeenCalled();
+  fixture.sidecarReady = false;
+  open_or_focus_settings(app, { ...admission, can_open: () => true });
+  expect(fixture.settings).not.toHaveBeenCalled();
+  expect(admission.register).not.toHaveBeenCalled();
 });
 
 it("waits for a recent root to reopen and refuses a replaced root", async () => {

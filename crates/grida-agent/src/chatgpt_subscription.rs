@@ -11,6 +11,8 @@ use agent_kit_providers::{
 };
 use reqwest::Url;
 use reqwest::header::{ACCEPT, CONTENT_TYPE, HeaderMap, HeaderValue};
+use std::collections::BTreeMap;
+use std::sync::OnceLock;
 
 const BASE: &str = "https://chatgpt.com/backend-api/codex";
 const TARGET: &str = "https://chatgpt.com/backend-api/codex/responses";
@@ -46,19 +48,12 @@ impl SupervisedChatGpt {
                 "chatgpt_subscription_scope_invalid",
             ));
         }
-        let wire_model = match model.as_str() {
-            "openai/gpt-5.6-sol" => "gpt-5.6-sol",
-            "openai/gpt-5.6-terra" => "gpt-5.6-terra",
-            "openai/gpt-5.6-luna" => "gpt-5.6-luna",
-            "openai/gpt-5.5" => "gpt-5.5",
-            "openai/gpt-5.4" => "gpt-5.4",
-            _ => {
-                return Err(Error::new(
-                    ErrorKind::Unsupported,
-                    "chatgpt_subscription_model_unavailable",
-                ));
-            }
-        };
+        let wire_model = subscription_wire_model(model).ok_or_else(|| {
+            Error::new(
+                ErrorKind::Unsupported,
+                "chatgpt_subscription_model_unavailable",
+            )
+        })?;
         Ok(Self {
             binding: ProviderBinding {
                 provider: ProviderId::new("chatgpt")?,
@@ -69,7 +64,7 @@ impl SupervisedChatGpt {
                 },
             },
             replay_binding: BindingId::new(scope)?,
-            wire_model: ModelId::new(wire_model)?,
+            wire_model,
             target: Url::parse(TARGET).expect("fixed ChatGPT subscription route"),
             supervisor,
         })
@@ -78,6 +73,22 @@ impl SupervisedChatGpt {
     pub(crate) fn validate(&self) -> Result<()> {
         self.supervisor.validate()
     }
+}
+
+fn subscription_wire_model(model: &ModelId) -> Option<ModelId> {
+    #[derive(serde::Deserialize)]
+    struct Catalogue {
+        wire_models: BTreeMap<ModelId, ModelId>,
+    }
+    static CATALOGUE: OnceLock<Catalogue> = OnceLock::new();
+    CATALOGUE
+        .get_or_init(|| {
+            serde_json::from_str(include_str!("../data/chatgpt-subscription-models.json"))
+                .expect("generated ChatGPT subscription compatibility projection")
+        })
+        .wire_models
+        .get(model)
+        .cloned()
 }
 
 impl StreamingTransport for SupervisedChatGpt {

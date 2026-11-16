@@ -4,6 +4,7 @@ use super::approvals::Stdio as PrivateStdio;
 use super::lifecycle::task_basis;
 use super::summaries::reported_usage_answer;
 use super::*;
+use std::collections::BTreeSet;
 
 const CREATE: &str = "_co.grida/subagent/create";
 const ASSIGN: &str = "_co.grida/subagent/assign";
@@ -20,6 +21,8 @@ const SUMMARY: &str = "_co.grida/session/turn-summary";
 const EFFORT: &str = "_co.grida/session/effort";
 const GATEWAY_BILLING: &str = "_co.grida/gateway/billing-status";
 const GATEWAY_CHILD_BILLING: &str = "co.grida/gateway/child-billing";
+const ACTIVITY: &str = "_co.grida/subagent/activity";
+const CONVERSATION: &str = "_co.grida/subagent/conversation";
 const CAPABILITIES: [&str; 11] = [
     CREATE,
     ASSIGN,
@@ -35,34 +38,15 @@ const CAPABILITIES: [&str; 11] = [
 ];
 
 #[tokio::test]
-async fn supervised_children_refuse_unreviewed_provider_profiles() {
+async fn supervised_children_use_supported_protocols_without_a_provider_name_gate() {
     let temporary = TempDir::new().unwrap();
-    let home = temporary.path().join("credentials");
-    for extra in [
-        vec!["--endpoint", "http://127.0.0.1:1/v1"],
-        vec!["--endpoint", "https://openrouter.ai/api/v1"],
-        vec![
-            "--endpoint",
-            "https://api.openai.com/v1",
-            "--credential-home",
-            home.to_str().unwrap(),
-        ],
-        vec![
-            "--endpoint",
-            "https://openrouter.ai/api/v1",
-            "--credential-home",
-            home.to_str().unwrap(),
-            "--supervised-configured-endpoint-key",
-            "custom",
-        ],
-        vec![
-            "--endpoint",
-            "https://openrouter.ai/api/v1",
-            "--supervised-chatgpt-scope",
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        ],
+    for (protocol, endpoint) in [
+        ("openai-compatible", "http://127.0.0.1:1/v1"),
+        ("responses", "https://api.openai.com/v1"),
+        ("anthropic", "https://api.anthropic.com/v1"),
+        ("gemini", "https://generativelanguage.googleapis.com/v1beta"),
     ] {
-        let output = executable()
+        let child = executable()
             .args([
                 "serve",
                 "--stdio",
@@ -70,20 +54,35 @@ async fn supervised_children_refuse_unreviewed_provider_profiles() {
                 "--supervised-provider",
                 "--state-dir",
             ])
-            .arg(temporary.path().join("state"))
-            .args(["--model", "fixture-model"])
-            .args(extra)
-            .stdin(Stdio::null())
-            .output()
-            .await
+            .arg(temporary.path().join(protocol))
+            .args([
+                "--provider",
+                protocol,
+                "--endpoint",
+                endpoint,
+                "--model",
+                "fixture-model",
+            ])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
             .unwrap();
-        assert!(!output.status.success());
-        assert!(
-            String::from_utf8_lossy(&output.stderr)
-                .contains("subagent_supervised_provider_unsupported"),
-            "{}",
-            String::from_utf8_lossy(&output.stderr)
-        );
+        let mut client = PrivateStdio::from_child(child);
+        let mut initialize = extension_initialize();
+        initialize["clientCapabilities"]["_meta"]["co.grida/provider/egress"] = 1.into();
+        let ready = client.request("initialize", initialize).await;
+        for capability in [
+            "co.grida/session/effort",
+            "co.grida/goal/funded-review",
+            "co.grida/goal/named-child",
+        ] {
+            assert_eq!(
+                ready["result"]["agentCapabilities"]["_meta"][capability], 1,
+                "{ready}"
+            );
+        }
+        client.close().await;
     }
 }
 
@@ -627,8 +626,15 @@ async fn gateway_summary_attributes_the_exact_ordinary_assignment_after_reuse_an
             json!({"sessionId":parent,"turnId":parent_turns[0]}),
         )
         .await;
-    assert!(
-        foreign_summary["result"]["gatewayBilling"].is_null(),
+    let billing = &foreign_summary["result"]["gatewayBilling"];
+    assert_eq!(billing["attempts"], json!([]), "{foreign_summary}");
+    assert_eq!(
+        billing["children"]["assignments"],
+        json!([]),
+        "{foreign_summary}"
+    );
+    assert_eq!(
+        billing["children"]["coverageIncomplete"], true,
         "{foreign_summary}"
     );
     foreign.close().await;
@@ -661,11 +667,11 @@ async fn connect_subagents(mut command: Command) -> PrivateStdio {
         .unwrap();
     let mut client = PrivateStdio::from_child(child);
     let mut request = extension_initialize();
-    for key in CAPABILITIES.into_iter().chain([SUMMARY, EFFORT]) {
+    for key in CAPABILITIES.into_iter().chain([SUMMARY, EFFORT, ACTIVITY]) {
         request["clientCapabilities"]["_meta"][&key[1..]] = 1.into();
     }
     let response = client.request("initialize", request).await;
-    for key in CAPABILITIES.into_iter().chain([SUMMARY, EFFORT]) {
+    for key in CAPABILITIES.into_iter().chain([SUMMARY, EFFORT, ACTIVITY]) {
         assert_eq!(
             response["result"]["agentCapabilities"]["_meta"][&key[1..]],
             1
@@ -1088,6 +1094,269 @@ async fn an_attached_parent_reopens_only_its_named_children_in_bounded_pages() {
     );
     reopened.close().await;
     provider.done().await;
+}
+
+#[tokio::test]
+async fn child_activity_exposes_real_progress_then_retained_transcript_without_an_attachment() {
+    let temporary = TempDir::new().unwrap();
+    let workspace = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let mut provider = Endpoint::start(vec![
+        Reply::Finished("Parent completed."),
+        Reply::Hold("Actual child progress before settlement."),
+    ])
+    .await;
+    let mut client = serve(&state, &provider.url).await;
+    let parent = new_session(&mut client, workspace.path()).await;
+    let parent_turn = settle_parent(&mut client, &parent).await;
+    provider.request().await;
+    let created = client.request(CREATE, create(&parent)).await;
+    let child = created["result"]["childId"].as_str().unwrap().to_owned();
+    let accepted = client
+        .request(
+            ASSIGN,
+            assign(
+                &parent,
+                &child,
+                &parent_turn,
+                "visible-work",
+                "Read this exact assignment text.",
+            ),
+        )
+        .await;
+    assert!(accepted["result"].is_object(), "{accepted}");
+    provider.request().await;
+    let conversation = timeout(WAIT, async {
+        loop {
+            let reply = client
+                .request(
+                    CONVERSATION,
+                    json!({"parentSessionId":parent,"childId":child}),
+                )
+                .await;
+            assert!(reply["result"].is_object(), "{reply}");
+            if reply["result"]["messages"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|message| message["text"] == "Actual child progress before settlement.")
+            {
+                break reply["result"].clone();
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(
+        conversation["execution"],
+        json!({"model":"fixture-model","effort":null})
+    );
+    assert_eq!(conversation["live"]["available"], true);
+    let progress = conversation["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|message| message["role"] == "assistant")
+        .unwrap();
+    assert_eq!(progress["live"], true);
+    let message_id = progress["messageId"].clone();
+    assert!(
+        conversation
+            .to_string()
+            .contains("Read this exact assignment text.")
+    );
+    let activity = client
+        .request(ACTIVITY, json!({"parentSessionId":parent}))
+        .await;
+    assert_eq!(activity["result"]["children"][0]["section"], "active");
+    assert_eq!(activity["result"]["events"][0]["kind"], "started");
+    assert_eq!(activity["result"]["events"][0]["parentTurnId"], parent_turn);
+    assert_eq!(activity["result"]["events"][0]["inputId"], "visible-work");
+    assert!(activity["result"]["events"][0]["status"].is_null());
+    let started_event = activity["result"]["events"][0].clone();
+    let observed = inspect(&mut client, &parent, &child, "visible-work").await;
+    let stopped = client
+        .request(
+            STOP,
+            child_basis(&observed, &parent, &child, "stop-visible-work"),
+        )
+        .await;
+    assert!(stopped["result"].is_object(), "{stopped}");
+    wait_for(&mut client, &parent, &child, "visible-work", |view| {
+        view["assignment"]["disposition"]["kind"] == "completed"
+    })
+    .await;
+    client.close().await;
+    provider.done().await;
+
+    let idle = Endpoint::start(Vec::new()).await;
+    let mut command = executable();
+    command
+        .args(["serve", "--stdio", "--subagents", "--state-dir"])
+        .arg(&state)
+        .args([
+            "--endpoint",
+            &idle.url,
+            "--model",
+            "replacement-parent-model",
+            "--credential-env",
+            "GRIDA_AGENT_PROCESS_TEST_KEY",
+        ])
+        .env("GRIDA_AGENT_PROCESS_TEST_KEY", TEST_CREDENTIAL);
+    let mut reopened = connect_subagents(command).await;
+    let before_attach = reopened
+        .request(
+            CONVERSATION,
+            json!({"parentSessionId":parent,"childId":child}),
+        )
+        .await;
+    assert!(before_attach["error"].is_object(), "{before_attach}");
+    load_parent(&mut reopened, &parent, workspace.path()).await;
+    let transcript = reopened
+        .request(
+            CONVERSATION,
+            json!({"parentSessionId":parent,"childId":child}),
+        )
+        .await;
+    assert!(transcript["result"].is_object(), "{transcript}");
+    assert_eq!(
+        transcript["result"]["execution"],
+        json!({"model":"fixture-model","effort":null})
+    );
+    let messages = transcript["result"]["messages"].as_array().unwrap();
+    assert_eq!(
+        messages
+            .iter()
+            .filter(|message| message["messageId"] == message_id)
+            .count(),
+        1
+    );
+    assert!(messages.iter().any(|message| message["text"]
+        == "Actual child progress before settlement."
+        && message["live"].is_null()));
+    let other = new_session(&mut reopened, workspace.path()).await;
+    let denied = reopened
+        .request(
+            CONVERSATION,
+            json!({"parentSessionId":other,"childId":child}),
+        )
+        .await;
+    assert_eq!(denied["error"]["data"], "subagent_unavailable");
+    let raw = reopened
+        .request(
+            "session/load",
+            json!({"sessionId":child,"cwd":workspace.path(),"mcpServers":[]}),
+        )
+        .await;
+    assert_eq!(raw["error"]["data"], "session_missing");
+    let activity = reopened
+        .request(ACTIVITY, json!({"parentSessionId":parent}))
+        .await;
+    assert_eq!(
+        activity["result"]["counts"],
+        json!({"active":0,"done":1,"complete":true})
+    );
+    assert_eq!(activity["result"]["children"][0]["status"], "cancelled");
+    assert_eq!(activity["result"]["events"].as_array().unwrap().len(), 2);
+    assert_eq!(activity["result"]["events"][1]["kind"], "finished");
+    assert_eq!(activity["result"]["events"][1]["status"], "cancelled");
+    assert_eq!(activity["result"]["events"][0], started_event);
+    reopened.close().await;
+    idle.done().await;
+}
+
+#[tokio::test]
+async fn child_conversation_pages_keep_exact_text_and_reject_a_sibling_cursor() {
+    let temporary = TempDir::new().unwrap();
+    let workspace = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let mut provider = Endpoint::start(vec![
+        Reply::Finished("Parent completed."),
+        Reply::Finished("Finding one."),
+        Reply::Finished("Finding two."),
+        Reply::Finished("Finding three."),
+        Reply::Finished("Finding four."),
+        Reply::Finished("Finding five."),
+    ])
+    .await;
+    let mut client = serve(&state, &provider.url).await;
+    let parent = new_session(&mut client, workspace.path()).await;
+    let parent_turn = settle_parent(&mut client, &parent).await;
+    provider.request().await;
+    let mut request = create(&parent);
+    request["workTurns"] = 5.into();
+    let created = client.request(CREATE, request).await;
+    let child = created["result"]["childId"].as_str().unwrap().to_owned();
+    for index in 0..5 {
+        let input = format!("paged-{index}");
+        let text = format!("Assignment {index}: {}", "x".repeat(60 * 1024));
+        let assigned = client
+            .request(ASSIGN, assign(&parent, &child, &parent_turn, &input, &text))
+            .await;
+        assert!(assigned["result"].is_object(), "{assigned}");
+        provider.request().await;
+        wait_for(&mut client, &parent, &child, &input, |view| {
+            view["assignment"]["disposition"]["kind"] == "completed"
+        })
+        .await;
+    }
+    let latest = client
+        .request(
+            CONVERSATION,
+            json!({"parentSessionId":parent,"childId":child}),
+        )
+        .await;
+    assert!(latest["result"].is_object(), "{latest}");
+    let cursor = latest["result"]["older"].as_str().unwrap().to_owned();
+    let mut ids: BTreeSet<String> = latest["result"]["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|message| message["messageId"].as_str().unwrap().to_owned())
+        .collect();
+    let mut text_bytes: usize = latest["result"]["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|message| message["text"].as_str().unwrap().len())
+        .sum();
+    assert!(text_bytes <= 256 * 1024);
+    let mut sibling = create(&parent);
+    sibling["requestId"] = "sibling".into();
+    let sibling = client.request(CREATE, sibling).await;
+    let denied = client.request(CONVERSATION, json!({"parentSessionId":parent,"childId":sibling["result"]["childId"],"before":cursor})).await;
+    assert_eq!(denied["error"]["data"], "subagent_cursor_invalid");
+    client.close().await;
+    provider.done().await;
+
+    let idle = Endpoint::start(Vec::new()).await;
+    let mut reopened = serve(&state, &idle.url).await;
+    load_parent(&mut reopened, &parent, workspace.path()).await;
+    let earlier = reopened
+        .request(
+            CONVERSATION,
+            json!({"parentSessionId":parent,"childId":child,"before":cursor}),
+        )
+        .await;
+    assert!(earlier["result"].is_object(), "{earlier}");
+    assert!(earlier["result"]["older"].is_null(), "{earlier}");
+    for message in earlier["result"]["messages"].as_array().unwrap() {
+        assert!(
+            ids.insert(message["messageId"].as_str().unwrap().to_owned()),
+            "duplicate history message"
+        );
+        text_bytes += message["text"].as_str().unwrap().len();
+        assert!(message["truncated"].is_null());
+    }
+    assert_eq!(ids.len(), 10);
+    assert!(text_bytes > 300 * 1024);
+    assert_eq!(
+        earlier["result"]["execution"],
+        json!({"model":"fixture-model","effort":null})
+    );
+    reopened.close().await;
+    idle.done().await;
 }
 
 #[tokio::test]
@@ -1519,9 +1788,11 @@ async fn shared_connections_cannot_negotiate_child_discovery_or_message_delivery
     let mut request = extension_initialize();
     request["clientCapabilities"]["_meta"][&SEND_MESSAGE[1..]] = 1.into();
     request["clientCapabilities"]["_meta"][&LIST[1..]] = 1.into();
+    request["clientCapabilities"]["_meta"][&ACTIVITY[1..]] = 1.into();
     let ready = ws_rpc(&mut socket, 1, "initialize", request).await;
     assert!(ready["result"]["agentCapabilities"]["_meta"][&SEND_MESSAGE[1..]].is_null());
     assert!(ready["result"]["agentCapabilities"]["_meta"][&LIST[1..]].is_null());
+    assert!(ready["result"]["agentCapabilities"]["_meta"][&ACTIVITY[1..]].is_null());
     let denied = ws_rpc(
         &mut socket,
         2,
@@ -1532,6 +1803,14 @@ async fn shared_connections_cannot_negotiate_child_discovery_or_message_delivery
     assert_eq!(denied["error"]["code"], -32601, "{denied}");
     let list = ws_rpc(&mut socket, 3, LIST, json!({"parentSessionId":"parent"})).await;
     assert_eq!(list["error"]["code"], -32601, "{list}");
+    let activity = ws_rpc(
+        &mut socket,
+        4,
+        ACTIVITY,
+        json!({"parentSessionId":"parent"}),
+    )
+    .await;
+    assert_eq!(activity["error"]["code"], -32601, "{activity}");
     assert!(provider.requests.try_recv().is_err());
     drop(socket);
     super::lifecycle::terminate_shared_server(child).await;

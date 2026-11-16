@@ -104,6 +104,14 @@ impl CompletionChecks {
         Ok(selected)
     }
 
+    /// Append one selected check without replacing the existing ordered policy.
+    /// The same total bound and unique identities apply to the combined selection.
+    pub fn with_check(mut self, check: CompletionCheck) -> Result<Self> {
+        self.0.push(check);
+        self.validate()?;
+        Ok(self)
+    }
+
     /// Whether `tool` is the private handler of a selected check.
     pub fn is_handler(&self, tool: &ToolId) -> bool {
         self.0.iter().any(|check| &check.handler == tool)
@@ -434,4 +442,65 @@ fn safe_code(text: &str) -> Option<String> {
             .bytes()
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'))
     .then(|| text.into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn check(index: usize) -> CompletionCheck {
+        CompletionCheck {
+            id: BindingId::new(format!("check-{index}")).unwrap(),
+            revision: Fingerprint::of(&index).unwrap(),
+            handler: ToolId::new(format!("handler-{index}")).unwrap(),
+            mode: if index.is_multiple_of(2) {
+                CheckMode::Required
+            } else {
+                CheckMode::Observe
+            },
+        }
+    }
+
+    #[test]
+    fn appending_a_check_preserves_the_existing_order_revisions_and_modes() {
+        let first = check(0);
+        let second = check(1);
+        let appended = check(2);
+        let selected = CompletionChecks::new(vec![first.clone(), second.clone()])
+            .unwrap()
+            .with_check(appended.clone())
+            .unwrap();
+        assert_eq!(
+            selected,
+            CompletionChecks::new(vec![first, second, appended.clone()]).unwrap()
+        );
+        assert!(selected.is_handler(&appended.handler));
+    }
+
+    #[test]
+    fn appending_a_duplicate_identity_refuses_even_when_its_handler_or_revision_changed() {
+        let selected = CompletionChecks::new(vec![check(0)]).unwrap();
+        let mut duplicate = check(1);
+        duplicate.id = check(0).id;
+        assert_eq!(
+            selected.with_check(duplicate).unwrap_err().code,
+            "invalid_completion_checks"
+        );
+    }
+
+    #[test]
+    fn composition_keeps_the_total_check_bound_instead_of_dropping_an_existing_check() {
+        let mut selected = CompletionChecks::new(Vec::new()).unwrap();
+        for index in 0..MAX_CHECKS {
+            selected = selected.with_check(check(index)).unwrap();
+        }
+        assert_eq!(
+            selected,
+            CompletionChecks::new((0..MAX_CHECKS).map(check).collect()).unwrap()
+        );
+        assert_eq!(
+            selected.with_check(check(MAX_CHECKS)).unwrap_err().code,
+            "invalid_completion_checks"
+        );
+    }
 }

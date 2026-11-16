@@ -133,4 +133,32 @@ describe("ComposerTiptap", () => {
     expect(prevented).toBe(false);
     expect(submitted).toBe(false);
   });
+
+  it("dismisses completion on Escape without submitting or editing", () => {
+    const core = new ComposerCore({
+      commands: [{ id: "review", title: "Review" }],
+    });
+    core.inspectCursor("/re", 3);
+    let submitted = false;
+    let prevented = false;
+    const handled = ComposerTiptap.handleKeyDown({
+      core,
+      editor: null,
+      event: {
+        key: "Escape",
+        preventDefault() {
+          prevented = true;
+        },
+      } as KeyboardEvent,
+      triggerIndex: 0,
+      moveTriggerIndex() {},
+      submit() {
+        submitted = true;
+      },
+    });
+    expect(handled).toBe(true);
+    expect(prevented).toBe(true);
+    expect(submitted).toBe(false);
+    expect(core.getSnapshot().trigger).toBeNull();
+  });
 });

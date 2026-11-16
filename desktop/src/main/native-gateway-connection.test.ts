@@ -1362,7 +1362,7 @@ it.skipIf(!resourcesPath)(
 );
 
 it.skipIf(!resourcesPath)(
-  "restarts a native Gateway chat under its captured scope only",
+  "retains same-scope continuation and accepts an explicitly selected scope for an idle Gateway chat",
   async () => {
     const root = await fs.mkdtemp(
       path.join(await fs.realpath(os.tmpdir()), "grida-gateway-scope-")
@@ -1398,10 +1398,14 @@ it.skipIf(!resourcesPath)(
         resourcesPath: resourcesPath!,
         stateDirectory,
       });
-    const prompt = (agent: NativeAgentProcess, sessionId: string) =>
+    const prompt = (
+      agent: NativeAgentProcess,
+      sessionId: string,
+      text: string
+    ) =>
       agent.request("session/prompt", {
         sessionId,
-        prompt: [{ type: "text", text: "Fixture prompt" }],
+        prompt: [{ type: "text", text }],
       });
     let agent: NativeAgentProcess | undefined;
     try {
@@ -1410,24 +1414,54 @@ it.skipIf(!resourcesPath)(
         cwd,
         mcpServers: [],
       })) as { sessionId: string };
-      await expect(prompt(agent, sessionId)).resolves.toMatchObject({
+      await expect(
+        prompt(agent, sessionId, "First captured question")
+      ).resolves.toMatchObject({
         stopReason: "end_turn",
       });
       await agent.close();
       agent = await open(connections[1]);
       await agent.request("session/load", { sessionId, cwd, mcpServers: [] });
-      await expect(prompt(agent, sessionId)).resolves.toMatchObject({
+      await expect(
+        prompt(agent, sessionId, "Same captured owner follow-up")
+      ).resolves.toMatchObject({
         stopReason: "end_turn",
       });
       await agent.close();
       agent = await open(connections[2]);
       await agent.request("session/load", { sessionId, cwd, mcpServers: [] });
-      await expect(prompt(agent, sessionId)).rejects.toThrow(
-        "session_execution_configuration_changed"
-      );
+      expect(changed.dispatch).not.toHaveBeenCalled();
+      await expect(
+        prompt(agent, sessionId, "New explicitly selected owner follow-up")
+      ).resolves.toMatchObject({
+        stopReason: "end_turn",
+      });
       expect(first.dispatch).toHaveBeenCalledTimes(1);
       expect(rotated.dispatch).toHaveBeenCalledTimes(1);
-      expect(changed.dispatch).not.toHaveBeenCalled();
+      expect(changed.dispatch).toHaveBeenCalledTimes(1);
+      const portable = JSON.parse(changed.dispatch.mock.calls[0][0].toString());
+      expect(portable.messages).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            role: "user",
+            content: "First captured question",
+          }),
+          expect.objectContaining({
+            role: "assistant",
+            content: "Scoped reply",
+          }),
+          expect.objectContaining({
+            role: "user",
+            content: "Same captured owner follow-up",
+          }),
+          expect.objectContaining({
+            role: "user",
+            content: "New explicitly selected owner follow-up",
+          }),
+        ])
+      );
+      expect(JSON.stringify(portable)).not.toContain(connections[0].scope);
+      expect(JSON.stringify(portable)).not.toContain("synthetic.fixture");
     } finally {
       try {
         await agent?.close();
@@ -1618,7 +1652,7 @@ it.skipIf(!resourcesPath)(
         "subagent_authority_changed"
       );
       await expect(assign("other-input", "New work")).rejects.toThrow(
-        "session_execution_configuration_changed"
+        "session_delegated_route_changed"
       );
       expect(changed.dispatch).not.toHaveBeenCalled();
       await agent.close();

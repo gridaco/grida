@@ -18,7 +18,7 @@ pub(crate) use tools::{AuthorizedProcess, EXEC_COMMAND, ExecArguments, WRITE_STD
 use crate::command::{cleanup_verified, summarize};
 use crate::host::live::{LiveProcesses, LiveUpdate};
 use agent_kit_core::messages::OutcomeStatus;
-use agent_kit_core::{CancellationToken, Error, ErrorKind, Result, SessionId};
+use agent_kit_core::{AttemptId, CancellationToken, Error, ErrorKind, Result, SessionId};
 use agent_kit_sandbox::{Completion, ProcessEvidence, RunningSession, StopReason};
 use output::Captured;
 use serde::{Deserialize, Serialize};
@@ -40,6 +40,7 @@ pub(crate) const SESSION_LIFETIME: Duration = Duration::from_secs(24 * 60 * 60);
 const MAX_LISTED_COMMAND_BYTES: usize = 1024;
 const WATCH_INTERVAL: Duration = Duration::from_millis(250);
 const STOP_WATCH_INTERVAL: Duration = Duration::from_millis(25);
+const MAX_TRACKED_SCOPES: usize = 64;
 
 /// The last process number each chat was given while this process runs,
 /// shared by every store. A chat's counter starts above the numbers its model
@@ -95,6 +96,9 @@ struct State {
     supervised: BTreeMap<u64, Arc<Entry>>,
     next_serial: u64,
     unverified: bool,
+    unverified_chats: BTreeSet<SessionId>,
+    /// Only bounded one-shot scopes request this incarnation's launch evidence.
+    tracked_attempts: BTreeMap<SessionId, BTreeSet<AttemptId>>,
 }
 
 pub(crate) struct Entry {
@@ -289,6 +293,46 @@ impl ProcessSessions {
         })
     }
 
+    pub(crate) fn track_attempts(&self, session: &SessionId) -> Result<()> {
+        let mut state = self.state();
+        if !state.tracked_attempts.contains_key(session)
+            && state.tracked_attempts.len() >= MAX_TRACKED_SCOPES
+        {
+            return Err(Error::new(ErrorKind::LimitExceeded, "process_scope_limit"));
+        }
+        state.tracked_attempts.entry(session.clone()).or_default();
+        Ok(())
+    }
+
+    pub(crate) fn admit_attempt(
+        self: &Arc<Self>,
+        session: &SessionId,
+        attempt: &AttemptId,
+    ) -> Result<Launch> {
+        let launch = self.admit(session)?;
+        if let Some(attempts) = self.state().tracked_attempts.get_mut(session) {
+            attempts.insert(attempt.clone());
+        }
+        Ok(launch)
+    }
+
+    pub(crate) fn knows_attempt(&self, session: &SessionId, attempt: &AttemptId) -> bool {
+        self.state()
+            .tracked_attempts
+            .get(session)
+            .is_some_and(|attempts| attempts.contains(attempt))
+    }
+
+    pub(crate) fn forget_attempts(&self, session: &SessionId) {
+        self.state().tracked_attempts.remove(session);
+    }
+
+    /// A completion proposal can be reconsidered. Reopening its quiescent
+    /// capability must not reuse numbers already shown to the model.
+    pub(crate) fn continue_after_retirement(&self, session: &SessionId) {
+        self.state().retiring.remove(session);
+    }
+
     /// Supervise an admitted launch's process until it ends. It is not
     /// listed until [`Self::register`] gives it a number.
     pub(crate) fn supervise(
@@ -399,6 +443,9 @@ impl ProcessSessions {
         let mut state = self.state();
         state.supervised.remove(&entry.serial);
         state.unverified |= !verified;
+        if !verified {
+            state.unverified_chats.insert(entry.session.clone());
+        }
         let list = entry.id.get().and_then(|id| {
             let chat = state.chats.get(&entry.session)?;
             chat.get(id)
@@ -496,6 +543,10 @@ impl ProcessSessions {
             .collect()
     }
 
+    pub(crate) fn cleanup_unverified(&self, session: &SessionId) -> bool {
+        self.state().unverified_chats.contains(session)
+    }
+
     /// Stop every process of a chat that is being deleted and keep it from
     /// starting more until [`Self::release`]. Cleanup that native evidence
     /// cannot confirm is recorded for host shutdown.
@@ -509,6 +560,12 @@ impl ProcessSessions {
             return Err(Error::new(ErrorKind::Uncertain, "process_cleanup_pending"));
         }
         let mut state = self.state();
+        if state.unverified_chats.contains(session) {
+            return Err(Error::new(
+                ErrorKind::Uncertain,
+                "process_cleanup_unverified",
+            ));
+        }
         if state.chats.remove(session).is_some() {
             self.publish(session, Vec::new());
         }
@@ -904,6 +961,77 @@ mod tests {
             sessions.admit(&session).err().unwrap().code,
             "process_sessions_closed"
         );
+    }
+
+    #[tokio::test]
+    async fn retirement_reports_unverified_cleanup_only_for_its_own_chat() {
+        let sessions = Arc::new(ProcessSessions::new());
+        let chat = SessionId::new("unverified-owner").unwrap();
+        let process = entry(&sessions, &chat);
+        sessions.register(&process).unwrap();
+        sessions.finalized(&process, false);
+        assert_eq!(
+            sessions
+                .retire(&chat, Instant::now() + Duration::from_secs(1))
+                .await
+                .unwrap_err()
+                .code,
+            "process_cleanup_unverified"
+        );
+        assert!(sessions.cleanup_unverified(&chat));
+        let unrelated = SessionId::new("independent-owner").unwrap();
+        sessions
+            .retire(&unrelated, Instant::now() + Duration::from_secs(1))
+            .await
+            .unwrap();
+        assert!(!sessions.cleanup_unverified(&unrelated));
+    }
+
+    #[test]
+    fn scoped_attempt_evidence_is_owned_bounded_and_released_explicitly() {
+        let sessions = Arc::new(ProcessSessions::new());
+        let chat = SessionId::new("tracked-owner").unwrap();
+        let attempt = AttemptId::new("physical-attempt").unwrap();
+        sessions.track_attempts(&chat).unwrap();
+        let launch = sessions.admit_attempt(&chat, &attempt).unwrap();
+        assert!(sessions.knows_attempt(&chat, &attempt));
+        assert!(!sessions.knows_attempt(&SessionId::new("other").unwrap(), &attempt));
+        drop(launch);
+        for index in 1..MAX_TRACKED_SCOPES {
+            sessions
+                .track_attempts(&SessionId::new(format!("scope-{index}")).unwrap())
+                .unwrap();
+        }
+        let next = SessionId::new("next-scope").unwrap();
+        assert_eq!(
+            sessions.track_attempts(&next).unwrap_err().code,
+            "process_scope_limit"
+        );
+        sessions.forget_attempts(&chat);
+        assert!(!sessions.knows_attempt(&chat, &attempt));
+        sessions.track_attempts(&next).unwrap();
+    }
+
+    #[tokio::test]
+    async fn reconsidering_completion_never_reuses_an_earlier_process_number() {
+        let sessions = Arc::new(ProcessSessions::new());
+        let chat = SessionId::new("reconsidered-completion").unwrap();
+        let first = entry(&sessions, &chat);
+        let first_id = sessions.register(&first).unwrap();
+        sessions
+            .retire(&chat, Instant::now() + Duration::from_secs(1))
+            .await
+            .unwrap();
+        sessions.continue_after_retirement(&chat);
+        let second = entry(&sessions, &chat);
+        let second_id = sessions.register(&second).unwrap();
+        assert!(second_id > first_id);
+        assert!(sessions.get(&chat, first_id).is_none());
+        sessions
+            .retire(&chat, Instant::now() + Duration::from_secs(1))
+            .await
+            .unwrap();
+        sessions.release(&chat);
     }
 
     fn candidate(id: u64, age: u64, ended: bool, locked: bool) -> Candidate {

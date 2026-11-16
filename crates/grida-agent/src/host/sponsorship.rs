@@ -48,7 +48,7 @@ pub(super) struct SponsoredWake {
 }
 
 impl SponsoredWake {
-    fn from_receipt(receipt: &ControlReceipt) -> Result<Self> {
+    pub(super) fn from_receipt(receipt: &ControlReceipt) -> Result<Self> {
         let record = receipt.turn.as_ref().ok_or_else(related_changed)?.record();
         let state = receipt.driver_state_revision.ok_or_else(related_changed)?;
         let digest = Fingerprint::of(&("sponsored-wake", &record.binding, &receipt.request))?;
@@ -392,14 +392,15 @@ impl Host {
     }
 
     pub(crate) fn sponsorship_available(&self) -> bool {
+        // The harness reserves generation steps for the reviewer. An optional
+        // provider wire token limit is a separate facet of the selected route.
         self.sponsorship_enabled
             && self.subagents_enabled
             && self.execution.as_ref().is_some_and(|execution| {
-                execution.config.max_output_tokens.is_some()
-                    && execution
-                        .provider
-                        .capabilities(&execution.config.model)
-                        .is_ok_and(|model| model.json_tools)
+                execution
+                    .provider
+                    .capabilities(&execution.config.model)
+                    .is_ok_and(|model| model.json_tools)
             })
     }
 
@@ -674,7 +675,7 @@ impl Host {
         let unavailable = || problem(ErrorKind::Unavailable, "sponsored_primary_read_unavailable");
         let sponsor = profile.sponsorship().ok_or_else(unavailable)?;
         let parent_view = self.store.inspect(profile.parent().clone()).await?;
-        self.check_execution(&parent_view)?;
+        self.check_execution(&parent_view).await?;
         if session_configuration(&parent_view)?.cwd != cwd {
             return Err(unavailable());
         }
@@ -733,7 +734,7 @@ impl Host {
     ) -> Result<SponsoredClaim> {
         let execution = self.execution()?;
         let view = self.store.inspect(source.binding.session.clone()).await?;
-        self.check_execution(&view)?;
+        self.check_execution(&view).await?;
         let mut config = session_configuration(&view)?;
         let mut captured = self
             .sponsored_parent_prompt(&source.binding.session, &source.binding.turn)
@@ -744,7 +745,6 @@ impl Host {
                 .effort
                 .as_ref()
                 .is_none_or(|effort| effort.preset() != EffortPreset::Ultra)
-            || captured.max_output_tokens.is_none()
         {
             return Err(problem(
                 ErrorKind::Unsupported,
@@ -793,6 +793,8 @@ impl Host {
         }];
         captured.max_steps = Some(subagents::INFERENCE_STEPS_PER_ASSIGNMENT);
         captured.effort = None;
+        captured.delegation = None;
+        captured.worker = None;
         captured.goal = None;
         captured.questions = false;
         captured.allow_library_selection = false;
@@ -830,7 +832,7 @@ impl Host {
         };
         if let Some(target) = target {
             let view = self.store.inspect(child.clone()).await?;
-            self.check_execution(&view)?;
+            self.check_execution(&view).await?;
             require_idle(&view)?;
             if !view.queued.is_empty() {
                 return Err(problem(ErrorKind::Conflict, "session_queue_waiting"));
@@ -942,14 +944,20 @@ impl Host {
             .as_ref()
             .map(|capture| self.prepare_sponsored_primary_read(capture, &session, &turn))
             .transpose()?;
-        let provider = self.spending_provider(execution, prepared.spending.as_ref())?;
-        let spending_runtime = prepared
-            .spending
-            .as_ref()
-            .map(|_| {
-                execution
-                    .runtime
-                    .with_provider(ProviderId::new("gg")?, provider.clone())
+        let captured_provider =
+            execution.subscription_provider_for_capture(prepared.subscription_image_input);
+        let legacy_subscription = captured_provider.is_some();
+        let provider = if let Some(provider) = captured_provider {
+            provider
+        } else {
+            self.spending_provider(execution, prepared.spending.as_ref())?
+        };
+        let spending_runtime = (legacy_subscription || prepared.spending.is_some())
+            .then(|| {
+                execution.runtime.with_provider(
+                    ProviderId::new(if legacy_subscription { "chatgpt" } else { "gg" })?,
+                    provider.clone(),
+                )
             })
             .transpose()?;
         let base_runtime = spending_runtime.as_ref().unwrap_or(&execution.runtime);
@@ -975,6 +983,7 @@ impl Host {
                 &mut authority.tools,
                 None,
                 prepared.operating_regime.is_act(),
+                prepared.image_view,
             )?;
             let owner = permissions::ToolAuthority::bind(
                 execution.authorization.clone(),
@@ -991,7 +1000,10 @@ impl Host {
                     lifecycle: hooks.clone(),
                 },
                 Vec::new(),
-                None,
+                permissions::DelegationTools {
+                    review: None,
+                    workers: None,
+                },
             )
             .ok_or_else(|| {
                 problem(
@@ -1046,6 +1058,48 @@ impl Host {
     }
 
     pub(super) async fn control_sponsorship(
+        &self,
+        request: ControlRequest,
+    ) -> Result<OperationPairReceipt> {
+        let _tree = self.delegation_controls.lock().await;
+        let related = match &request.action {
+            SessionControl::Turn {
+                turn, directive, ..
+            } if matches!(
+                directive,
+                ControlDirective::Pause | ControlDirective::Cancel
+            ) =>
+            {
+                Some((turn.clone(), *directive))
+            }
+            SessionControl::PauseAndCancel { turn, .. } => {
+                Some((turn.clone(), ControlDirective::Cancel))
+            }
+            _ => None,
+        };
+        let parent = request.session.clone();
+        let receipt = self.control_review_sponsorship(request).await?;
+        if let Some((turn, _)) = related {
+            // A replayed receipt can precede a newer Resume or Stop. Repair
+            // children from today's durable parent state, never that old action.
+            let current = self
+                .store
+                .inspect_turn(parent.clone(), turn.clone())
+                .await?;
+            if current.controls.cancelled || current.disposition == TurnDisposition::Settled {
+                self.control_workers(&parent, &turn, ControlDirective::Cancel)
+                    .await?;
+            } else if current.controls.paused {
+                self.control_workers(&parent, &turn, ControlDirective::Pause)
+                    .await?;
+            } else {
+                self.resume_workers(&parent, &turn).await?;
+            }
+        }
+        Ok(receipt)
+    }
+
+    async fn control_review_sponsorship(
         &self,
         request: ControlRequest,
     ) -> Result<OperationPairReceipt> {
@@ -1169,6 +1223,18 @@ impl Host {
         request: ClaimRequest,
         turn: &TurnId,
     ) -> Result<ClaimOutcome> {
+        let _tree = self.delegation_controls.lock().await;
+        let parent = request.session.clone();
+        let claimed = self.claim_review_parent_resume(request, turn).await?;
+        self.resume_workers(&parent, turn).await?;
+        Ok(claimed)
+    }
+
+    async fn claim_review_parent_resume(
+        &self,
+        request: ClaimRequest,
+        turn: &TurnId,
+    ) -> Result<ClaimOutcome> {
         let target = named::Target::load(&self.store, &request.session, turn).await?;
         let slot = match &target {
             Some(target) => target.child.clone(),
@@ -1236,6 +1302,7 @@ impl Host {
     }
 
     pub(super) async fn resume_receipt(&self, request: ClaimRequest) -> Result<Option<TurnView>> {
+        let _tree = self.delegation_controls.lock().await;
         if !matches!(&request.selection, TurnSelection::ResumePaused { .. }) {
             return self.store.claim_receipt(request).await;
         }
@@ -1263,6 +1330,13 @@ impl Host {
                 }
                 self.wake_ready().await;
             }
+        }
+        self.resume_workers(&receipt.turn.binding.session, &receipt.turn.binding.turn)
+            .await?;
+        let has_workers = !self.worker_ids(&receipt.turn.binding).await?.is_empty();
+        drop(_tree);
+        if has_workers {
+            self.wake_ready().await;
         }
         Ok(Some(receipt.turn))
     }
@@ -1406,7 +1480,7 @@ impl Host {
 }
 
 impl Work {
-    fn check_sponsored_capacity(&self, child: &SessionId) -> Result<()> {
+    pub(super) fn check_sponsored_capacity(&self, child: &SessionId) -> Result<()> {
         if self.closed {
             return Err(problem(ErrorKind::Unavailable, "host_shutting_down"));
         }
@@ -1420,7 +1494,7 @@ impl Work {
         Ok(())
     }
 
-    fn queue_sponsored(&mut self, wake: SponsoredWake) {
+    pub(super) fn queue_sponsored(&mut self, wake: SponsoredWake) {
         if self.ready.iter().any(|item| {
             matches!(item, ReadyWork::Sponsored(pending)
                 if pending.binding.session == wake.binding.session && pending.state.0 >= wake.state.0)
@@ -1509,6 +1583,8 @@ mod tests {
                     text: "Private parent context".into(),
                 }],
                 SubmissionPolicy {
+                    selection_revision: None,
+                    selection_goal: false,
                     questions: true,
                     allow_wakeups: false,
                     allow_library_selection: false,
@@ -1808,7 +1884,7 @@ mod tests {
         .with_subagents()
         .without_goal_sponsorship();
         let before = reopened.store.inspect(child.clone()).await.unwrap();
-        reopened.check_execution(&before).unwrap();
+        reopened.check_execution(&before).await.unwrap();
         let observed = reopened.resume_receipt(request).await.unwrap().unwrap();
         assert_eq!(observed.binding.turn, turn.binding.turn);
         {

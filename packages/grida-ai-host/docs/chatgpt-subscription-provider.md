@@ -20,7 +20,7 @@ One host process constructs the subscription host with three options:
   by that configured client profile;
 - the exact subscription Responses endpoint;
 - the configured product originator;
-- the default model, from the package's closed subscription model set.
+- the default model, from the generated subscription compatibility projection.
 
 No client secret is accepted. The package generates PKCE verifier/challenge
 and state values for each launch-scoped attempt.
@@ -122,17 +122,46 @@ a new capture yields a different scope.
 
 Grida session and renderer ids remain namespaced (`openai/gpt-…`). The native
 host maps the closed supported set to the bare model names required by the
-subscription backend and refuses any other model:
+subscription backend and refuses any other model. The current default is
+**GPT-6.1 Sol**. The offered set also includes GPT-6 Astra, GPT-6.1 Terra,
+GPT-6 Luna, GPT-6 Sol and the compatible GPT-5.6 Sol, Terra and Luna models.
 
-- `openai/gpt-5.6-sol`;
-- `openai/gpt-5.6-terra`;
-- `openai/gpt-5.6-luna`;
-- `openai/gpt-5.5`;
-- `openai/gpt-5.4`.
+### Update membership and the default
 
-This allowlist reflects the models the subscription backend currently accepts.
-It is not authenticated model discovery, may drift, and cannot prove that a
-particular account is entitled to every listed model.
+[`data/ai/chatgpt-subscription.json`](../../../data/ai/chatgpt-subscription.json)
+is the single authoring home for subscription membership and the default,
+validated by
+[`chatgpt-subscription.schema.json`](../../../data/ai/schemas/chatgpt-subscription.schema.json).
+The standard AI catalogue generator projects it into the marked block in
+[`src/protocol/chatgpt.ts`](../src/protocol/chatgpt.ts) and the native
+[`chatgpt-subscription-models.json`](../../../crates/grida-agent/data/chatgpt-subscription-models.json)
+asset. Neither projection is edited independently. Canonical model facts remain
+owned by the pinned public Models dependency. Runtime consumers use the bundled
+generated projections.
+
+Keep withdrawn IDs in the source's `retired_model_ids` so older saved choices
+remain readable. The generated retired-ID list grants no picker availability
+or inference authority.
+
+After changing the product source, run from the repository root:
+
+```sh
+node scripts/ai-catalogue/generate.mjs
+pnpm --filter @grida/ai build
+node scripts/ai-catalogue/generate.mjs --bundle
+node scripts/ai-catalogue/generate.mjs --bundle --check
+```
+
+Commit the source and generated projections together, and run the affected
+host, Desktop and native selection tests. The list is Grida's subscription
+compatibility projection rather than authenticated account discovery. Access
+depends on the ChatGPT plan and workspace; API model availability does not
+establish subscription access.
+
+GPT-5.5 and GPT-5.4 have been withdrawn from subscription offerings. Existing
+saved choices remain visible as unavailable and require an explicit replacement.
+Neither a catalogue update nor the new default silently changes a saved model,
+the chat's account connection or its funding.
 
 ## Network authority
 

@@ -26,9 +26,6 @@ export function NativeBackgroundProcesses({
     controller.read
   );
   if (view.running === 0) return null;
-  const stopping = (id: number) =>
-    view.stopping === "all" ||
-    (Array.isArray(view.stopping) && view.stopping.includes(id));
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -37,16 +34,43 @@ export function NativeBackgroundProcesses({
           size="xs"
           variant="ghost"
           data-testid="native-background-processes"
-          className="shrink-0 gap-1 px-1.5 text-muted-foreground"
+          className="shrink-0 gap-1 rounded-xl px-1.5 text-muted-foreground"
           aria-label={`${view.running} background ${view.running === 1 ? "process" : "processes"} running`}
         >
           <TerminalIcon className="size-3.5" />
           <span>{view.running} running</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent side="top" align="start" className="w-80 p-1 text-sm">
-        <div className="flex items-center justify-between gap-2 px-2 pt-1 pb-1">
-          <p className="text-xs text-muted-foreground">Background processes</p>
+      <PopoverContent
+        side="top"
+        align="start"
+        className="w-80 rounded-xl p-1 text-sm"
+      >
+        <NativeBackgroundProcessList controller={controller} />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/** The same process list in a popover or the chat's activity view. */
+export function NativeBackgroundProcessList({
+  controller,
+}: {
+  controller: NativeBackgroundProcessController;
+}) {
+  const view = useSyncExternalStore(
+    controller.subscribe,
+    controller.read,
+    controller.read
+  );
+  const stopping = (id: number) =>
+    view.stopping === "all" ||
+    (Array.isArray(view.stopping) && view.stopping.includes(id));
+  return (
+    <section data-testid="native-background-process-list">
+      <div className="flex items-center justify-between gap-2 px-2 pt-1 pb-1">
+        <p className="text-xs text-muted-foreground">Background processes</p>
+        {view.running > 0 && (
           <Button
             type="button"
             size="xs"
@@ -56,49 +80,51 @@ export function NativeBackgroundProcesses({
           >
             Stop all
           </Button>
-        </div>
-        <ul className="max-h-64 overflow-y-auto">
-          {view.processes.map((process) => (
-            <li
-              key={process.processId}
-              className="flex items-start gap-2 rounded-md px-2 py-1.5"
-            >
-              <div className="min-w-0 flex-1">
-                <p
-                  className="truncate font-mono text-xs"
-                  title={process.command}
-                >
-                  {process.command}
-                </p>
-                <p
-                  className="truncate text-xs text-muted-foreground"
-                  title={process.cwd}
-                >
-                  {directoryTail(process.cwd)} · {status(process)}
-                </p>
-              </div>
-              {process.state === "running" && (
-                <Button
-                  type="button"
-                  size="xs"
-                  variant="ghost"
-                  disabled={!!view.stopping}
-                  aria-label={`Stop ${process.command}`}
-                  onClick={() => void controller.stop([process.processId])}
-                >
-                  {stopping(process.processId) ? "Stopping…" : "Stop"}
-                </Button>
-              )}
-            </li>
-          ))}
-        </ul>
-        {view.error && (
-          <p role="alert" className="px-2 pb-1 text-xs text-muted-foreground">
-            {view.error}
-          </p>
         )}
-      </PopoverContent>
-    </Popover>
+      </div>
+      {view.processes.length === 0 && (
+        <p className="px-2 py-4 text-sm text-muted-foreground">
+          No background processes.
+        </p>
+      )}
+      <ul className="max-h-64 overflow-y-auto">
+        {view.processes.map((process) => (
+          <li
+            key={process.processId}
+            className="flex items-start gap-2 rounded-md px-2 py-1.5"
+          >
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-mono text-xs" title={process.command}>
+                {process.command}
+              </p>
+              <p
+                className="truncate text-xs text-muted-foreground"
+                title={process.cwd}
+              >
+                {directoryTail(process.cwd)} · {status(process)}
+              </p>
+            </div>
+            {process.state === "running" && (
+              <Button
+                type="button"
+                size="xs"
+                variant="ghost"
+                disabled={!!view.stopping}
+                aria-label={`Stop ${process.command}`}
+                onClick={() => void controller.stop([process.processId])}
+              >
+                {stopping(process.processId) ? "Stopping…" : "Stop"}
+              </Button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {view.error && (
+        <p role="alert" className="px-2 pb-1 text-xs text-muted-foreground">
+          {view.error}
+        </p>
+      )}
+    </section>
   );
 }
 

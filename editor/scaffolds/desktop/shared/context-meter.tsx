@@ -95,14 +95,14 @@ export function ContextMeter({
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                className="size-7 shrink-0 text-muted-foreground"
+                className="size-7 shrink-0 rounded-xl text-muted-foreground"
                 aria-label={`Context: ${pct} used`}
               >
                 <Ring ratio={ratio} />
               </Button>
             </PopoverTrigger>
           </TooltipTrigger>
-          <TooltipContent className="text-center text-nowrap">
+          <TooltipContent className="rounded-xl text-center text-nowrap">
             <div className="text-background/70">Context window:</div>
             <div className="text-background/70">{pct} full</div>
             <div className="mt-0.5">
@@ -114,7 +114,7 @@ export function ContextMeter({
         </Tooltip>
       </TooltipProvider>
 
-      <PopoverContent align="start" className="w-72 p-0">
+      <PopoverContent align="start" className="w-72 rounded-xl p-0">
         <div className="space-y-2 p-3">
           <div className="flex items-center justify-between text-xs">
             <span className="font-medium">

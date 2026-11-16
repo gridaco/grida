@@ -164,7 +164,17 @@ For each individual package, refer to the README of its own.
 
 ## Agent-system contract work
 
-For agent behavior and its host/client boundaries, read the
+For any agent feature work, including its host/client integration, load the
+[agent-system skill](.agents/skills/agent-system/SKILL.md) before choosing
+implementation files. Start with the canonical
+[architecture rings and placement rules](docs/wg/ai/agent/index.md#architecture-rings),
+then the [native package mapping and checked dependency budgets](crates/grida-agent/docs/rust-core.md#dependency-budgets).
+Classify the behavior's owner (including application behavior outside the
+rings), execution surface, retained-state owner, and affected contracts.
+The ring definitions live only in that WG section; the native binding owns
+the executable package budgets. Skills and local instructions link to them.
+
+For current behavior and required evidence, read the
 [feature catalog](docs/agent/features.md) and the
 [coverage model and regression obligations](crates/grida-agent/docs/rust-core-pressure-test.md#coverage-model).
 

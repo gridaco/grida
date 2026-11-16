@@ -35,7 +35,13 @@ afterEach(() => {
 
 function child(
   version: number,
-  options: { closeOnEof?: boolean; closeOnKill?: boolean } = {}
+  options: {
+    closeOnEof?: boolean;
+    closeOnKill?: boolean;
+    modelChange?: false;
+    blocker?: string;
+    modelChangeResponse?: unknown;
+  } = {}
 ) {
   const events = new EventEmitter();
   const stdout = new PassThrough();
@@ -47,20 +53,32 @@ function child(
     if (options.closeOnKill) close(signal);
     return true;
   });
+  const requests: { method: string; params: unknown }[] = [];
   const stdin = new Writable({
     write(chunk, _encoding, done) {
       const request = JSON.parse(chunk.toString());
+      requests.push(request);
+      const capabilities = { ...request.params.clientCapabilities?._meta };
+      if (options.modelChange === false)
+        delete capabilities["co.grida/session/model-change"];
       stdout.write(
         JSON.stringify({
           jsonrpc: "2.0",
           id: request.id,
-          result: {
-            protocolVersion: version,
-            agentInfo: { name: "grida-agent" },
-            agentCapabilities: {
-              _meta: request.params.clientCapabilities._meta,
-            },
-          },
+          result:
+            request.method === "_co.grida/session/model-change"
+              ? Object.hasOwn(options, "modelChangeResponse")
+                ? options.modelChangeResponse
+                : options.blocker
+                  ? { blocker: options.blocker }
+                  : { prepared: true }
+              : {
+                  protocolVersion: version,
+                  agentInfo: { name: "grida-agent" },
+                  agentCapabilities: {
+                    _meta: capabilities,
+                  },
+                },
         }) + "\n"
       );
       done();
@@ -78,6 +96,7 @@ function child(
     close,
     kill,
     events,
+    requests,
   };
 }
 
@@ -123,6 +142,7 @@ function fixture() {
     owners,
     release,
     signals,
+    store,
   };
 }
 
@@ -269,6 +289,341 @@ it("keeps one worker per workspace store and drains it on Forget without touchin
   } finally {
     ordinary.close();
     saved.close();
+    await owners.close();
+  }
+});
+
+it.each([
+  "pending_work",
+  "active_turn",
+  "retained_turn",
+  "queued_input",
+  "unresolved_goal",
+  "delegated_session",
+  "background_process",
+])(
+  "keeps the original worker and selection when the store reports %s",
+  async (blocker) => {
+    const { launch, workspace, owners } = fixture();
+    const original = child(1, { closeOnEof: true, blocker });
+    spawn.mockReturnValueOnce(original.handle);
+    const release = vi.fn<() => void>();
+    const commit = vi.fn<() => Promise<void>>();
+    try {
+      const before = await owners.open(workspace);
+      await expect(
+        owners.open(workspace, {
+          id: "other",
+          prepare: async () => ({ launch, release }),
+          commit,
+        })
+      ).rejects.toThrow(`native_chat_model_change_${blocker}`);
+      expect(owners.current(workspace.id)).toBe(before);
+      expect((before.chat as NativeAgentChat).connected).toBe(true);
+      expect((before.chat as NativeAgentChat).modelChangePending).toBe(false);
+      expect(spawn).toHaveBeenCalledOnce();
+      expect(release).toHaveBeenCalledOnce();
+      expect(commit).not.toHaveBeenCalled();
+      expect(original.requests.at(-1)).toMatchObject({
+        method: "_co.grida/session/model-change",
+        params: { prepare: true },
+      });
+    } finally {
+      await owners.close();
+    }
+  }
+);
+
+it("refuses older native workers without sending a speculative transition RPC", async () => {
+  const { launch, workspace, owners } = fixture();
+  const original = child(1, { closeOnEof: true, modelChange: false });
+  spawn.mockReturnValueOnce(original.handle);
+  try {
+    const before = await owners.open(workspace);
+    await expect(
+      owners.open(workspace, { id: "other", prepare: async () => ({ launch }) })
+    ).rejects.toThrow("native_chat_model_change_unsupported");
+    expect(owners.current(workspace.id)).toBe(before);
+    expect(original.requests.map(({ method }) => method)).toEqual([
+      "initialize",
+    ]);
+    expect(spawn).toHaveBeenCalledOnce();
+  } finally {
+    await owners.close();
+  }
+});
+
+it("prepares the destination before sealing work and leaves the old worker usable on failure", async () => {
+  const { workspace, owners } = fixture();
+  const original = child(1, { closeOnEof: true });
+  spawn.mockReturnValueOnce(original.handle);
+  try {
+    const before = await owners.open(workspace);
+    await expect(
+      owners.open(workspace, {
+        id: "other",
+        prepare: async () => {
+          throw new Error("provider_unavailable");
+        },
+      })
+    ).rejects.toThrow("provider_unavailable");
+    expect(owners.current(workspace.id)).toBe(before);
+    expect(original.requests.map(({ method }) => method)).toEqual([
+      "initialize",
+    ]);
+    expect((before.chat as NativeAgentChat).modelChangePending).toBe(false);
+  } finally {
+    await owners.close();
+  }
+});
+
+it("restores the previous route when a destination launch fails and publishes no choice", async () => {
+  const { launch, workspace, owners, store, release, signals } = fixture();
+  const original = child(1, { closeOnEof: true });
+  const restored = child(1, { closeOnEof: true });
+  spawn
+    .mockReturnValueOnce(original.handle)
+    .mockReturnValueOnce(restored.handle);
+  const candidateRelease = vi.fn<() => void>();
+  const commit = vi.fn<() => Promise<void>>();
+  try {
+    const before = await owners.open(workspace);
+    vi.spyOn(store, "startWorkspace").mockRejectedValueOnce(
+      new Error("launch_failed")
+    );
+    await expect(
+      owners.open(workspace, {
+        id: "other",
+        prepare: async () => ({ launch, release: candidateRelease }),
+        commit,
+      })
+    ).rejects.toThrow("native_chat_model_change_failed_restored");
+    expect(owners.current(workspace.id)).not.toBeNull();
+    expect(owners.current(workspace.id)).not.toBe(before);
+    expect(owners.current(workspace.id, "other")).toBeNull();
+    expect((before.chat as NativeAgentChat).hasExited).toBe(true);
+    expect(signals.map(({ aborted }) => aborted)).toEqual([true, false]);
+    expect(release).toHaveBeenCalledOnce();
+    expect(candidateRelease).toHaveBeenCalledOnce();
+    expect(commit).not.toHaveBeenCalled();
+  } finally {
+    await owners.close();
+  }
+});
+
+it("serializes every profile opener while a shared-store transition is preparing", async () => {
+  const { launch, workspace, owners } = fixture();
+  const original = child(1, { closeOnEof: true });
+  const next = child(1, { closeOnEof: true });
+  spawn.mockReturnValueOnce(original.handle).mockReturnValueOnce(next.handle);
+  const preparing = Promise.withResolvers<void>();
+  const ready = Promise.withResolvers<void>();
+  try {
+    await owners.open(workspace);
+    const switching = owners.open(workspace, {
+      id: "other",
+      prepare: async () => {
+        preparing.resolve();
+        await ready.promise;
+        return { launch };
+      },
+    });
+    await preparing.promise;
+    await expect(owners.open(workspace)).rejects.toThrow(
+      "native_chat_model_change_busy"
+    );
+    await expect(
+      owners.open(workspace, { id: "third", prepare: async () => ({ launch }) })
+    ).rejects.toThrow("native_chat_model_change_busy");
+    expect(original.requests.map(({ method }) => method)).toEqual([
+      "initialize",
+    ]);
+    ready.resolve();
+    await switching;
+  } finally {
+    ready.resolve();
+    await owners.close();
+  }
+});
+
+it("shares same-route startup across windows while revalidating each waiting frame and directory", async () => {
+  const { launch, workspace, owners } = fixture();
+  spawn.mockReturnValueOnce(child(1, { closeOnEof: true }).handle);
+  const ready = Promise.withResolvers<void>();
+  const prepare = vi.fn<() => Promise<{ launch: typeof launch }>>(async () => {
+    await ready.promise;
+    return { launch };
+  });
+  const valid = vi.fn<() => void>();
+  let current = true;
+  const requireFrame = () => {
+    if (!current) throw new Error("frame_changed");
+  };
+  const identity = { device: "1", inode: "2", birthTimeNs: "3" };
+  try {
+    const first = owners.open(
+      { ...workspace, identity },
+      { id: "same", prepare }
+    );
+    const second = owners.open(
+      { ...workspace, identity },
+      { id: "same", prepare, admit: valid }
+    );
+    const stale = owners
+      .open(
+        { ...workspace, identity },
+        { id: "same", prepare, admit: requireFrame }
+      )
+      .catch((error: unknown) => error);
+    await expect(
+      owners.open(
+        { ...workspace, root: `${workspace.root}-other`, identity },
+        { id: "same", prepare }
+      )
+    ).rejects.toThrow("native_workspace_root_changed");
+    await expect(
+      owners.open(
+        { ...workspace, identity: { ...identity, inode: "4" } },
+        { id: "same", prepare }
+      )
+    ).rejects.toThrow("native_workspace_root_changed");
+    current = false;
+    ready.resolve();
+    const active = await first;
+    expect(await second).toBe(active);
+    expect(await stale).toMatchObject({ message: "frame_changed" });
+    expect(prepare).toHaveBeenCalledOnce();
+    expect(valid).toHaveBeenCalledTimes(2);
+    expect(spawn).toHaveBeenCalledOnce();
+  } finally {
+    ready.resolve();
+    await owners.close();
+  }
+});
+
+it("keeps replacement exclusive until an unverified candidate exits and rollback finishes", async () => {
+  const { launch, workspace, owners, store } = fixture();
+  spawn
+    .mockReturnValueOnce(child(1, { closeOnEof: true }).handle)
+    .mockReturnValueOnce(child(1, { closeOnEof: true }).handle);
+  const exited = Promise.withResolvers<void>();
+  const pending = new NativeAgentTerminationPending(exited.promise);
+  try {
+    await owners.open(workspace);
+    vi.spyOn(store, "startWorkspace").mockRejectedValueOnce(pending);
+    await expect(
+      owners.open(workspace, { id: "other", prepare: async () => ({ launch }) })
+    ).rejects.toThrow("native_chat_model_change_recovery_pending");
+    await expect(owners.open(workspace)).rejects.toThrow(
+      "native_chat_model_change_busy"
+    );
+    expect(owners.current(workspace.id)).toBeNull();
+    exited.resolve();
+    await pending.terminated;
+    await vi.waitFor(() => expect(owners.current(workspace.id)).not.toBeNull());
+    expect(owners.current(workspace.id, "other")).toBeNull();
+    expect(spawn).toHaveBeenCalledTimes(2);
+  } finally {
+    exited.resolve();
+    await owners.close();
+  }
+});
+
+it("never resurrects a closed workspace when an unverified candidate exits later", async () => {
+  const { launch, workspace, owners, store } = fixture();
+  spawn.mockReturnValueOnce(child(1, { closeOnEof: true }).handle);
+  const exited = Promise.withResolvers<void>();
+  const pending = new NativeAgentTerminationPending(exited.promise);
+  try {
+    await owners.open(workspace);
+    vi.spyOn(store, "startWorkspace").mockRejectedValueOnce(pending);
+    await expect(
+      owners.open(workspace, { id: "other", prepare: async () => ({ launch }) })
+    ).rejects.toThrow("native_chat_model_change_recovery_pending");
+    await expect(owners.closeWorkspace(workspace.id)).rejects.toThrow(
+      "native_workspace_shutdown_unverified"
+    );
+    exited.resolve();
+    await pending.terminated;
+    await vi.advanceTimersByTimeAsync(0);
+    expect(owners.current(workspace.id)).toBeNull();
+    expect(owners.current(workspace.id, "other")).toBeNull();
+    expect(spawn).toHaveBeenCalledOnce();
+  } finally {
+    exited.resolve();
+    await owners.close();
+  }
+});
+
+it("does not restore an old route after the workspace closes during failed preparation cleanup", async () => {
+  const { launch, workspace, owners } = fixture();
+  const original = child(1, { modelChangeResponse: {} });
+  spawn.mockReturnValueOnce(original.handle);
+  try {
+    await owners.open(workspace);
+    const switching = owners
+      .open(workspace, {
+        id: "other",
+        prepare: async () => ({ launch }),
+      })
+      .catch((error: unknown) => error);
+    await original.eof;
+    const closed = owners.closeWorkspace(workspace.id);
+    original.close();
+    expect(await switching).toMatchObject({
+      message: "native_workspace_closing",
+    });
+    await closed;
+    expect(owners.current(workspace.id)).toBeNull();
+    expect(spawn).toHaveBeenCalledOnce();
+  } finally {
+    original.close();
+    await owners.close();
+  }
+});
+
+it("publishes a profile only after launch and rolls the route back when publication fails", async () => {
+  const { launch, workspace, owners } = fixture();
+  spawn
+    .mockReturnValueOnce(child(1, { closeOnEof: true }).handle)
+    .mockReturnValueOnce(child(1, { closeOnEof: true }).handle)
+    .mockReturnValueOnce(child(1, { closeOnEof: true }).handle);
+  const commit = vi.fn<() => Promise<void>>(async () => {
+    expect(spawn).toHaveBeenCalledTimes(2);
+    throw new Error("publication_failed");
+  });
+  try {
+    await owners.open(workspace);
+    await expect(
+      owners.open(workspace, {
+        id: "other",
+        prepare: async () => ({ launch }),
+        commit,
+      })
+    ).rejects.toThrow("native_chat_model_change_failed_restored");
+    expect(commit).toHaveBeenCalledOnce();
+    expect(owners.current(workspace.id)).not.toBeNull();
+    expect(owners.current(workspace.id, "other")).toBeNull();
+    expect(spawn).toHaveBeenCalledTimes(3);
+  } finally {
+    await owners.close();
+  }
+});
+
+it("reports rollback failure separately from a restored prior connection", async () => {
+  const { launch, workspace, owners, store } = fixture();
+  spawn.mockReturnValueOnce(child(1, { closeOnEof: true }).handle);
+  try {
+    await owners.open(workspace);
+    vi.spyOn(store, "startWorkspace")
+      .mockRejectedValueOnce(new Error("candidate_failed"))
+      .mockRejectedValueOnce(new Error("prior_credentials_unavailable"));
+    await expect(
+      owners.open(workspace, { id: "other", prepare: async () => ({ launch }) })
+    ).rejects.toThrow("native_chat_model_change_restore_failed");
+    expect(owners.current(workspace.id)).toBeNull();
+    expect(owners.current(workspace.id, "other")).toBeNull();
+  } finally {
     await owners.close();
   }
 });

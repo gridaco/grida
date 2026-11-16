@@ -1,6 +1,6 @@
-//! Model-facing display of a file a person attached by reference.
+//! Model-facing display of a local resource a person attached by reference.
 //!
-//! A reference names a local file by its path and describes it (name, type,
+//! A reference names a local file or directory by its path and describes it (name, type,
 //! size). Its bytes never enter the conversation, and the reference grants
 //! nothing: the agent reaches the file only through tools its permissions
 //! already allow.
@@ -9,6 +9,7 @@ use agent_kit_core::messages::{MediaRef, Retention};
 use serde::{Deserialize, Serialize};
 
 pub const MEDIA_TYPE: &str = "application/vnd.grida.file-reference+json";
+pub const DIRECTORY_MEDIA_TYPE: &str = "inode/directory";
 pub const LOCATOR_PREFIX: &str = "file-reference:";
 pub const MAX_NAME_BYTES: usize = 256;
 pub const MAX_PATH_BYTES: usize = 4096;
@@ -20,14 +21,14 @@ const MAX_DURATION_MS: u64 = 7 * 24 * 60 * 60 * 1000;
 const MAX_DIMENSION: u32 = 16_384;
 const POSTER_PREFIXES: [&str; 2] = ["data:image/jpeg;base64,", "data:image/png;base64,"];
 
-/// One local file named by the person for this message.
+/// One local file or directory named by the person for this message.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct FileReference {
     pub name: String,
-    /// Absolute path of the file on the person's computer.
+    /// Absolute path of the resource on the person's computer.
     pub path: String,
-    /// The path relative to the chat's working directory, when the file is
+    /// The path relative to the chat's working directory, when the resource is
     /// inside it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workspace_path: Option<String>,
@@ -116,6 +117,12 @@ impl FileReference {
             height: preview.and_then(|preview| preview.height),
         };
         let facts = serde_json::to_string(&facts).expect("serializable reference");
+        if self.mime_type.as_deref() == Some(DIRECTORY_MEDIA_TYPE) {
+            return format!(
+                "\n\nAttached folder by reference: {facts}. Its contents are not in this message. \
+                 List or inspect it at this path with your tools; your permissions still apply."
+            );
+        }
         format!(
             "\n\nAttached file by reference: {facts}. Its contents are not in this message. \
              Read or inspect it at this path with your tools; your permissions still apply."
@@ -230,11 +237,34 @@ mod tests {
     #[test]
     fn the_model_reads_path_and_facts_but_never_the_poster() {
         let text = display(&media(&video())).unwrap();
+        assert!(text.starts_with("\n\nAttached file by reference:"));
         assert!(text.contains(r#""path":"/Users/someone/Movies/clip.mov""#));
         assert!(text.contains(r#""mimeType":"video/quicktime""#));
         assert!(text.contains(r#""size":3221225472"#));
         assert!(text.contains(r#""durationMs":12500"#));
         assert!(!text.contains("data:image"));
+    }
+
+    #[test]
+    fn a_directory_reference_describes_a_folder_without_contents_or_size() {
+        let reference = FileReference {
+            name: "source".into(),
+            path: "/work/project/source".into(),
+            workspace_path: Some("source".into()),
+            mime_type: Some(DIRECTORY_MEDIA_TYPE.into()),
+            size: None,
+            preview: None,
+        };
+        reference.validate().unwrap();
+        let text = display(&media(&reference)).unwrap();
+        assert!(text.contains("Attached folder by reference"));
+        assert!(text.contains(r#""workspacePath":"source""#));
+        assert!(text.contains(r#""mimeType":"inode/directory""#));
+        assert!(!text.contains("\"size\""));
+        assert!(!text.contains("\"poster\""));
+        assert!(text.contains("Its contents are not in this message."));
+        assert!(text.contains("your permissions still apply"));
+        assert_eq!(super::reference(&media(&reference)), Some(reference));
     }
 
     #[test]

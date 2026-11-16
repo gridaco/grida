@@ -1,7 +1,7 @@
-//! GRIDA-SEC-004 — a file reference names a local file and grants nothing.
+//! GRIDA-SEC-004 — a resource reference names a local path and grants nothing.
 //!
 //! The host records the reference with the person's message and shows the
-//! model its path and facts. It never opens the file: the agent reaches it
+//! model its path and facts. It never opens or lists the resource: the agent reaches it
 //! only through tools its permissions already allow, so a reference cannot
 //! widen what the agent may read.
 
@@ -33,7 +33,7 @@ pub(super) fn media(reference: &FileReference) -> Result<MediaRef> {
     })
 }
 
-/// A workspace path must name the same file as the absolute path, inside the
+/// A workspace path must name the same resource as the absolute path, inside the
 /// chat's working directory. The host compares the two strings only.
 pub(super) fn check_workspace_path(reference: &FileReference, cwd: &Path) -> Result<()> {
     let Some(relative) = &reference.workspace_path else {

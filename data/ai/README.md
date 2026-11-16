@@ -10,8 +10,10 @@ This directory contains only Grida-owned choices and executable native contracts
 | Source | Responsibility |
 | --- | --- |
 | `presets.json` | Product membership, listed/staged and legacy choices, defaults, tiers and Library embedding storage pins. |
+| `chatgpt-subscription.json` | Subscription model membership, order, default and retired saved identities. No credentials or entitlement data. |
 | `native-inputs.json` | Input schemas implemented by the native/BYOK client adapters. GG operation schemas remain GG-owned. |
 | `schemas/presets.schema.json` | Structural envelope for product definitions. |
+| `schemas/chatgpt-subscription.schema.json` | Structural envelope for subscription compatibility. |
 
 A provider binding in Models does not implement an adapter. The generator selects
 product members and projects only the fields and binding shapes implemented by
@@ -45,6 +47,23 @@ updates do not require changing product defaults or native adapters.
 The generator also projects context windows for exact OpenAI model bindings used
 by the native Responses profile. The host uses them only for the canonical
 OpenAI route.
+
+`chatgpt-subscription.json` owns the closed subscription model membership,
+order and default. These are product compatibility choices, separate from
+account entitlement and the general OpenAI API catalogue. The standard generator
+projects its TypeScript constants in `packages/grida-ai-host/src/protocol/chatgpt.ts`
+and the native `crates/grida-agent/data/chatgpt-subscription-models.json` asset.
+Exact wire IDs come from the pinned public Models OpenAI bindings; labels and
+other model facts stay there too. Do not edit either generated projection.
+
+`retired_model_ids` permits reading older saved selections without invalidating
+the rest of their settings. It grants no inference or picker availability.
+Retiring a subscription model requires current subscription-specific evidence;
+API retirement and subscription retirement can differ. The current subscription
+choices follow [OpenAI's model guidance](https://learn.chatgpt.com/docs/models),
+including the separate GPT-5.5 and GPT-5.4 subscription retirements. Existing
+GPT-5.6 selections stay compatible; GPT-6.1 Sol is the default for new untouched
+selections. Account and plan availability is still checked by the service.
 
 The generator lists the OpenRouter models that take PNG input: listed product
 models whose exact public OpenRouter binding declares tool calls and PNG input.

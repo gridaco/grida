@@ -180,14 +180,26 @@ it.runIf(Boolean(packaged)).each([false, true])(
       );
       await ipc.enqueue(event, attachmentId, "c", "Gamma next.");
       expect((await page()).items).toEqual([
-        { inputId: "a", preview: "Alpha next." },
+        {
+          inputId: "a",
+          preview: "Alpha next.",
+          textOnly: true,
+          textEditable: true,
+        },
         {
           inputId: "b",
           preview: "Beta next.",
+          textOnly: true,
+          textEditable: true,
           operatingRegime: "plan",
           ...(effortEnabled && { effort: "ultra" }),
         },
-        { inputId: "c", preview: "Gamma next." },
+        {
+          inputId: "c",
+          preview: "Gamma next.",
+          textOnly: true,
+          textEditable: true,
+        },
       ]);
       const captured = await snapshot();
       await expect(

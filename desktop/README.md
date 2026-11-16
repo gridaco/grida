@@ -23,6 +23,12 @@ integration: it defaults to the public native Codex OAuth client identity,
 never starts Codex/ACP, and is still gated for stable release on a
 legal/support contract with OpenAI.
 
+Native agent hooks are configured only in the user's global
+`~/.grida/config.toml` (`GRIDA_HOME` overrides the home). Settings > Hooks
+inspects the source and reviews new or changed definitions. Workspace hook
+files and JSON import management are not used. See [Hooks](../docs/agent/hooks.md)
+for the minimal schema, supported events, trust and activation behavior.
+
 ## Architecture
 
 ```text
@@ -89,6 +95,26 @@ renderer onboarding-completion flag through one fixed hidden same-origin probe
 and records the migration before selecting an authenticated role. That legacy
 flag is never consulted again.
 
+AI endpoint settings use explicit **Connect/Save** as consent for the displayed
+endpoint ID and full canonical base URL. Main stores this receipt separately
+from sidecar-writable endpoint config under the browser profile's
+`provider-authority/` directory. The retained sidecar cannot read or write that
+directory, and file/workspace admission and native commands exclude it.
+Matching saved consent survives app restarts without dialogs; a new or
+externally changed destination requires Connect/Save. Startup and service
+recovery recheck the receipt, current config and eligible route before restoring
+network access. An unchanged live native chat keeps its network binding after
+a service crash. Localhost and IP literals remain the supported destinations;
+remote custom hostnames remain unavailable.
+
+Probes consume existing consent. Background metadata refresh merges only
+reported model fields into the latest saved config, preserving overrides and
+the default model. It cannot create config or authorize a new URL. Delete
+revokes durable and live consent before deleting config; publication and
+revocation still await the service's grant acknowledgement. Hosted renderers
+must feature-detect the optional consent inspection and metadata bridge methods
+and skip automatic discovery on older native builds.
+
 The [client authentication blueprint](https://grida.co/docs/reference/authentication)
 maps the separate web, Desktop, CLI and provider lifecycles. Current account
 cookies are not configured as HttpOnly; this is not a guarantee of isolation
@@ -141,6 +167,88 @@ operations, add the first test in `packages/grida-daemon` or
 agent crates. Not here. Desktop tests should prove the host
 adapter still wires the core.
 
+## Chat attachments
+
+Selecting, dropping or pasting a raster image freezes its original bytes in the
+composer. The optional selected-image bridge resolves its genuine native File
+origin only in preload. Main checks the selected digest, size and timestamp
+against a bounded, pinned source read before publishing a descriptor; a changed
+source refuses the whole draft. A File without a native origin becomes a private
+snapshot under protected `desktop-image-custody/snapshots` state. Display posters
+never become model input. Images stay attached when the selected model or an
+older host cannot accept them. Ordinary disk files and folders use references.
+
+Before an ordinary saved-chat submit or enqueue leaves the renderer, one durable
+record binds its input identity, text, settings and frozen attachment. Restart
+restores that exact request. Retry reads its native receipt before current model
+capabilities or source checks; only authoritative absence permits another send.
+Unknown outcomes retain the capture, and storage failure prevents dispatch. A
+restored reference retains its identity and name but cannot invent a native File;
+its receipt can still be recovered. Modern blank drafts use their distinct draft
+UUIDs and move only their own row when native creates the chat.
+
+Dropping a local folder in the chat pane or composer stages the original
+operating-system `File` for Main to resolve. Main determines the real resource
+type and supplies a canonical local resource link with `inode/directory` and
+no size or preview. Staging does not read entries or bytes, copy or archive
+contents, register a workspace or grant filesystem access. Protected-directory
+overlap checks reject private roots, their containing ancestors and canonical
+aliases. This metadata route does not mint a directory read scope.
+
+The renderer checks the optional `acceptsDirectoryReference` bridge capability
+before effects. Older Main builds report folder references unavailable and
+leave the draft and current attachment intact. One attachment per message
+still applies. Accepted folder links retain their facts through queues and
+reopen; observation starts no provider call or directory read. The agent uses
+its existing file-tool and command permissions for later inspection. Plan
+withholds commands; attaching an outside folder changes no root or grant.
+
+Sent attachments render outside the user's text bubble. Supported images show
+only the image, with no card frame, filename or dimensions caption; files,
+folders and videos keep individual cards.
+Supported reference rasters and videos can carry bounded still previews made
+from the person's original `File`; a video still is not a playback promise.
+Raster stills admit PNG/JPEG/WebP/GIF sources up to 4 MiB and 16 Mi-pixels,
+within the existing dimension bound, with a five-second deadline. Their
+PNG/JPEG display metadata fits the same 48 KiB poster limit as video.
+Retained original preview reads negotiate `co.grida/session/input-image-chunks`
+for PNG/JPEG/WebP/GIF up to 20 MiB, in decoded chunks of at most 256 KiB. The
+legacy `co.grida/session/input-image` capability keeps its PNG-only 256 KiB
+contract. Each read is limited to an image owned by the attached chat's recorded
+user message. Main keeps the native attachment URI and supplies an opaque
+renderer token. The renderer receives original bytes with their recorded MIME,
+never a source path or a general file reader. Older binaries without these read
+capabilities keep plain file cards. PDF, SVG
+and HTML have no chat preview, and folder cards remain free of size and
+preview metadata. Presentation changes neither
+provider perception nor filesystem authority.
+
+Queued attachment display separately negotiates
+`co.grida/session/queued-input-image-chunks`. `queuedMessage` returns full text
+and bounded display metadata for an input still in the exact observed queue;
+its opaque preview token works only with `readQueuedAttachmentPreview` and the
+same attachment, input and observation. Native verifies current queued ownership
+and session revision before and after each bounded original-image chunk. Reads
+create no model work and reject claimed, withdrawn or changed inputs. The
+existing `queuedText` edit preflight remains text-only, including for an
+image-only input whose legacy inspection is a textual placeholder. Older
+Desktop binaries keep their existing queue display without these methods.
+
+Caption editing separately negotiates version 1 of
+`co.grida/session/replace-text`. The optional
+`acceptsQueuedTextReplacement()` bridge method and the waiting input's factual
+`textEditable` flag must both permit the action. Main sends `replaceText` as a
+text-only mutation of the retained input, preserving its attachments, captured
+model and settings. An empty caption is valid when non-text parts remain. The
+original input becomes superseded; retries retain the same observation, request
+and derived replacement identities. Main never reconstructs or reuploads
+attachments, and never falls back to whole-input replacement. `textOnly` and
+the older `queuedText` path stay strict for legacy editing and steering. Older
+preloads omit the capability method, while older native hosts return false.
+Shipping this path requires a native Desktop release with the matching preload,
+Main adapter and Rust host; the hosted renderer withholds caption editing until
+the installed host advertises support.
+
 ## Distributions
 
 The package and installer entrypoints build the native agent with the
@@ -183,13 +291,23 @@ local image references are not available through this ordinary path. Native
 startup failures surface as errors; retained non-chat services keep their
 existing owners.
 
-In the packaged native workspace pane, **Model connection** can start a new
-chat on an approved saved compatible endpoint and reopen its own saved chat
-list. Chats keep the model connection they started with. The workspace's
-active context-limit setting applies to new inputs across its connections.
-Up to eight workspace and connection workers can be live per Desktop owner.
-Changing the viewed connection keeps previous workers and their work active.
-Desktop closes those workers on quit or account change.
+In the packaged native workspace pane, **Model connection** selects an
+authorized connection for new work. Chats share the workspace's saved chat
+list. An idle chat can change its model, provider or credential for a future
+input, retaining visible conversation as portable context. Accepted turns,
+queued inputs, unfinished Goals and delegated work retain their captured
+execution and funding. Provider-private continuation and reasoning do not
+cross to another connection.
+
+Desktop checks eligibility before replacing a worker or committing a model
+selection. A refusal identifies the retained work to resolve and preserves
+the previous selection and draft. Replacement must also preserve other chats
+owned by the worker, including temporary side chats and running commands.
+The workspace's active context-limit setting applies to new inputs across
+its connections. Up to eight native workers can be live per Desktop owner.
+Desktop closes those workers on quit or account change. The
+[model-transition interaction case](../test/desktop-agent-chat-model-transition.md)
+remains untested in the app.
 
 For a disposable native chat run, launch a development or Insiders build
 with `--native-chat` and `--user-data-dir` set to a precreated owner-only
@@ -253,12 +371,33 @@ admitted workbench frame for that exact folder can publish. Navigating away,
 closing the frame, or signing out withdraws the view for this launch. The
 listener offers `surface_list_open` independently of any model session.
 
-Add `--native-chat-provider=chatgpt` to explicitly select the experimental
-ChatGPT subscription profile for that disposable run. Use the existing Desktop
-ChatGPT sign-in with an eligible account. The launch uses its reviewed default
-model and keeps that subscription separate from the Grida account and Gateway.
-Signing out of ChatGPT stops its native workspace work before a replacement can
-start. The experimental availability limits also apply to this profile.
+Ordinary macOS and Linux launches offer connected subscription models in the
+Welcome and workspace model pickers. Sign in under **Settings → LLM Providers
+→ ChatGPT Subscription**. A new chat without a saved or explicit model choice
+prefers a ready subscription; explicit choices and existing chats retain their
+connection. The subscription's current default is **GPT-6.1 Sol**. Its closed
+membership and default are authored in `data/ai/chatgpt-subscription.json`,
+validated by `data/ai/schemas/chatgpt-subscription.schema.json`, and generated
+for TypeScript and the native host. Runtime consumers use those bundled
+projections. The catalogue does not use authenticated discovery, and access
+depends on the ChatGPT plan and
+workspace. Withdrawn GPT-5.5 and GPT-5.4 selections appear unavailable and
+require an explicit replacement. Text, tools and reasoning settings are supported;
+subscription image input and provider-native compaction are unavailable.
+
+Ultra is available on every supported native model connection. It extends the
+inference-step allowance and permits one independent reviewer through the
+parent's captured connection. Supported reasoning controls and output-token
+fields remain provider capabilities. A subscription connection keeps its
+restricted Responses request shape, and Ultra supplies no subscription-quota
+or monetary ceiling. Gateway spending guarantees retain their existing owner.
+
+The integration remains experimental independently of its ordinary Desktop
+availability. The account and service constraints in the
+[OAuth binding](./docs/chatgpt-subscription-oauth.md) still apply.
+For a disposable run, `--native-chat-provider=chatgpt` alongside `--native-chat`
+selects the subscription's reviewed default model. Signing out withdraws native
+subscription work before a replacement connection can start.
 
 The source-built native process owner accepts workspace selections from Electron
 main. On macOS and Linux it writes a private launch profile that allows reads

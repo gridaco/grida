@@ -6,27 +6,35 @@ mod bundled_skills;
 mod catalog;
 pub(crate) mod compaction;
 mod completion_checks;
+mod delegation;
 pub(crate) mod deletion;
 mod file_references;
 mod goals;
 mod history;
 mod host_tools;
+#[cfg(test)]
+mod image_compatibility;
 pub(crate) mod image_generation;
+pub(crate) mod image_preparation;
 mod image_tools;
 mod images;
 pub(crate) mod library;
 mod lifecycle;
 mod lifecycle_hooks;
 pub(crate) mod live;
+pub(crate) mod model_change;
 mod permissions;
 mod questions;
+mod queued_text;
 mod retained_file;
 mod retained_inputs;
 mod selected_file;
+mod selection;
 pub(crate) mod side_chats;
 mod skills;
 mod spending;
 mod sponsorship;
+pub(crate) mod subagent_activity;
 mod subagents;
 mod titles;
 mod wakeups;
@@ -37,15 +45,19 @@ pub use goals::{GoalAction, GoalControl, GoalInspection, GoalRequest, GoalView};
 pub(crate) use history::RevisionTarget;
 pub use history::{ConversationDerivation, HistoryPage, HistoryQuery};
 pub(crate) use image_tools::{CropArtifact, CropArtifacts};
-pub use images::ImageUpload;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 pub(crate) use images::MAX_IMAGE_BYTES;
-pub(crate) use images::{is_retained_image, retained_image_size};
+pub use images::{ImageSource, ImageUpload, RetainedRaster, SelectedImage};
+pub(crate) use images::{is_retained_image, retained_image_size, retained_raster};
 pub use lifecycle::{InputInspection, InputSettings, QueueEdit, TurnControl};
 pub use lifecycle_hooks::HookInspection;
 pub use permissions::{Approvals, PendingApproval};
 pub use questions::{PendingQuestion, Questions};
 pub use retained_file::FileUpload;
+pub use selection::{
+    ChatSelection, LegacySelection, SelectionEffort, SelectionOutcome, SelectionReceipt,
+    SelectionSnapshot, SelectionUpdate,
+};
 pub use spending::SpendingInspection;
 pub use subagents::{
     SubagentAssignment, SubagentInspection, SubagentMessage, SubagentMessageReceipt, SubagentWork,
@@ -150,7 +162,7 @@ const PROCESS_STOP_WAIT: Duration = Duration::from_secs(5);
 const SETTLING_WORKER_WAIT: Duration = Duration::from_secs(10);
 const MODEL_TIMEOUT: Duration = Duration::from_secs(120);
 const PROVIDER_LIMITS: StreamLimits = StreamLimits {
-    max_request_bytes: 1024 * 1024,
+    max_request_bytes: 8 * 1024 * 1024,
     max_response_bytes: 4 * 1024 * 1024,
     max_event_bytes: 256 * 1024,
     // Parallel calls in one reply are unbounded: the response byte limit
@@ -185,12 +197,15 @@ pub struct Host {
     #[cfg(unix)]
     guidance_root: Option<Arc<skills::HeadlessGuidance>>,
     configuration_admission: Arc<Mutex<()>>,
+    delegation_controls: Arc<Mutex<()>>,
     controls: Arc<Semaphore>,
     work: Arc<Mutex<Work>>,
     wake_lock: Arc<Mutex<()>>,
     workers: Arc<AtomicUsize>,
+    title_workers: Arc<AtomicUsize>,
     changed: Arc<Notify>,
     live_updates: broadcast::Sender<live::LiveUpdate>,
+    subagent_activity: Arc<subagent_activity::State>,
     /// The chats' long-running command processes.
     processes: Arc<crate::processes::ProcessSessions>,
 }
@@ -201,6 +216,9 @@ struct Execution {
     runtime: Runtime,
     config: MasterConfig,
     provider: Arc<dyn Provider>,
+    /// Preserved text-only subscription profile for work accepted before the
+    /// image capability was introduced. Its durable identity is unchanged.
+    legacy_subscription_provider: Option<Arc<dyn Provider>>,
     spending_profile: Option<Arc<spending::ProviderProfile>>,
     authority: MasterAuthority,
     authorization: Arc<ExecutionAuthority>,
@@ -210,12 +228,14 @@ struct Execution {
     /// The connection returns images in tool results, so `view_image` and
     /// Library selection can show the model what they found.
     tool_result_images: bool,
+    legacy_tool_result_images: bool,
     retained_inputs: Option<Arc<retained_inputs::RetainedInputs>>,
 }
 
 #[derive(Default)]
 struct Work {
     closed: bool,
+    model_change_prepared: bool,
     unverified: bool,
     active: BTreeMap<SessionId, Active>,
     retiring: BTreeSet<SessionId>,
@@ -329,8 +349,15 @@ pub enum PromptPart {
     Image {
         image: ImageUpload,
     },
+    #[serde(skip)]
+    SelectedImage {
+        selection: SelectedImage,
+    },
     RetainedImage {
         asset: crate::scratch::AssetRef,
+    },
+    PreparedImage {
+        image: Box<RetainedRaster>,
     },
     #[serde(skip)]
     File {
@@ -339,7 +366,7 @@ pub enum PromptPart {
     RetainedFile {
         work: crate::scratch::WorkingCopyReceipt,
     },
-    /// A local file named by path. The host records it and never opens it.
+    /// A local resource named by path. The host records it and never opens or lists it.
     FileReference {
         reference: grida_agent_master::file_reference::FileReference,
     },
@@ -387,6 +414,17 @@ impl DurableSubmission {
 
 #[derive(Serialize, Deserialize)]
 struct StoredPrompt {
+    #[serde(
+        default,
+        skip_serializing_if = "crate::file_tools::ImageView::is_legacy"
+    )]
+    image_view: crate::file_tools::ImageView,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    subscription_image_input: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    image_tool_results: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    selection: Option<SelectionSnapshot>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     lifecycle_hooks: Option<grida_agent_master::lifecycle_hooks::LifecycleHooks>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -397,6 +435,10 @@ struct StoredPrompt {
     max_steps: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     effort: Option<EffortPolicy>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    delegation: Option<grida_agent_master::delegation::Policy>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    worker: Option<delegation::Worker>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     reasoning: Option<agent_kit_core::inference::ReasoningEffort>,
     model: Option<agent_kit_core::ModelId>,
@@ -460,7 +502,7 @@ struct CapturedRoute {
 impl CapturedRoute {
     /// Whether a retained input would run under this execution, by the same
     /// model and authority rules that admission applies to it.
-    fn admits(input: &Submission, execution: &Execution) -> bool {
+    fn admits(input: &Submission, execution: &Execution, legacy_execution: Fingerprint) -> bool {
         if !is_stored_input(&input.payload) {
             return false;
         }
@@ -468,7 +510,9 @@ impl CapturedRoute {
         decode_input::<Self>(input).is_ok_and(|route| {
             route
                 .model
-                .is_none_or(|model| model == execution.config.model)
+                .map_or(legacy_execution == execution.configuration, |model| {
+                    model == execution.config.model
+                })
                 && route.authority.is_some_and(|captured| {
                     captured.principal == live.principal && captured.scope == live.scope
                 })
@@ -477,6 +521,8 @@ impl CapturedRoute {
 }
 
 struct SubmissionPolicy {
+    selection_revision: Option<u64>,
+    selection_goal: bool,
     questions: bool,
     allow_wakeups: bool,
     allow_library_selection: bool,
@@ -529,6 +575,7 @@ enum Launch {
     /// An optional revision limits recovery to an unchanged accepted Resume.
     Queued(Option<Acceptance>, Option<SessionRevision>),
     Sponsored(Box<sponsorship::SponsoredClaim>),
+    Delegated(Box<agent_kit_store_sqlite::OperationClaim>),
     Compact(ChangeId),
     RecoverCompaction(RecoveryRequest),
     Resume(ClaimRequest),
@@ -573,10 +620,15 @@ enum TurnWork {
 }
 
 struct PreparedInput {
+    image_view: crate::file_tools::ImageView,
+    subscription_image_input: bool,
+    image_tool_results: bool,
     lifecycle_hooks: Option<grida_agent_master::lifecycle_hooks::LifecycleHooks>,
     spending: Option<spending::Selection>,
     config: MasterConfig,
     effort: Option<EffortPolicy>,
+    delegation: Option<grida_agent_master::delegation::Policy>,
+    worker: bool,
     subagent: bool,
     operating_regime: OperatingRegime,
     messages: Vec<Message>,
@@ -607,6 +659,7 @@ pub struct PendingInteractions {
 
 #[derive(Default)]
 pub(crate) struct SubmissionContext {
+    pub selection_revision: Option<u64>,
     pub allow_wakeups: bool,
     pub allow_library_selection: bool,
     pub editor_endpoint: Option<BindingId>,
@@ -626,11 +679,12 @@ pub enum RunResult {
 struct SessionConfiguration {
     cwd: PathBuf,
     execution: Fingerprint,
-    /// Who holds the credential the chat runs under. A chat can change model
-    /// between turns only within the same owner.
+    /// Credential-owner provenance at creation; accepted work captures its own authority.
     owner: Fingerprint,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     subagent: Option<grida_agent_master::subagents::Profile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    worker: Option<delegation::Worker>,
     /// Present on a temporary side chat (see `side_chats`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     side: Option<side_chats::SideSession>,
@@ -721,7 +775,7 @@ impl Host {
         )?);
         Self::open_with(
             state_dir,
-            Some(|_| Execution::new_chatgpt(model, connection)),
+            Some(|images| Execution::new_chatgpt(model, connection, images)),
             workspace_configuration,
         )
     }
@@ -813,15 +867,18 @@ impl Host {
             #[cfg(unix)]
             guidance_root: None,
             configuration_admission: Arc::default(),
+            delegation_controls: Arc::default(),
             controls: Arc::new(Semaphore::new(MAX_OWNED_CONTROLS)),
             work: Arc::default(),
             wake_lock: Arc::default(),
             workers: Arc::default(),
+            title_workers: Arc::default(),
             changed: Arc::default(),
             processes: Arc::new(crate::processes::ProcessSessions::with_live(
                 live_updates.clone(),
             )),
             live_updates,
+            subagent_activity: Arc::default(),
         })
     }
 
@@ -871,6 +928,7 @@ impl Host {
             execution: execution.configuration,
             owner: execution.owner,
             subagent: None,
+            worker: None,
             side: None,
         };
         let session = SessionId::new(uuid())?;
@@ -941,7 +999,7 @@ impl Host {
         if let Some(child) = child {
             self.require_gateway_billing_parent(&session).await.ok()?;
             let child_view = self.store.inspect(child.child_id.clone()).await.ok()?;
-            self.check_execution(&child_view).ok()?;
+            self.check_execution(&child_view).await.ok()?;
             subagents::child_profile(&session, &child_view.configuration)
                 .ok()?
                 .require_authority(&gateway.binding.authority)
@@ -1076,7 +1134,7 @@ impl Host {
 
     async fn require_gateway_billing_parent(&self, session: &SessionId) -> Result<()> {
         let view = self.store.inspect(session.clone()).await?;
-        self.check_execution(&view)?;
+        self.check_execution(&view).await?;
         if session_configuration(&view)?.subagent.is_some() {
             return Err(problem(
                 ErrorKind::Unavailable,
@@ -1095,9 +1153,12 @@ impl Host {
     ) -> Result<Option<GatewayChildBillingPage>> {
         if let Err(error) = self.require_gateway_billing_parent(&session).await {
             return match error.code.as_str() {
-                "session_execution_configuration_changed" | "gateway_child_billing_unavailable" => {
-                    Ok(None)
-                }
+                "session_execution_configuration_changed"
+                | "session_active_route_changed"
+                | "session_queued_route_changed"
+                | "session_goal_route_changed"
+                | "session_delegated_route_changed"
+                | "gateway_child_billing_unavailable" => Ok(None),
                 _ => Err(error),
             };
         }
@@ -1348,7 +1409,7 @@ impl Host {
                 host.wake_ready().await;
             }
             let mut completion_tx = Some(completion_tx);
-            let result = match admitted.work {
+            let mut result = match admitted.work {
                 TurnWork::Conversation {
                     master,
                     input,
@@ -1361,6 +1422,7 @@ impl Host {
                         input,
                         updates_tx,
                         live,
+                        host.subagent_activity.clone(),
                     )
                     .await;
                     if let Some(command) = command {
@@ -1383,6 +1445,20 @@ impl Host {
             };
             let settled = matches!(&result, Ok(RunResult::Settled(_)));
             if settled || result.is_err() {
+                if let Err(error) = host
+                    .finish_worker_resources(&worker_session, &mut completion_tx)
+                    .await
+                {
+                    result = Err(error);
+                }
+                // A terminal parent cannot silently leave owned workers running.
+                if host
+                    .stop_workers_after_turn(&worker_session, &worker_turn)
+                    .await
+                    .is_err()
+                {
+                    host.work.lock().await.missed_stops = true;
+                }
                 host.release_timer(&worker_session, &worker_turn).await;
             }
             let suspended = matches!(
@@ -1454,10 +1530,11 @@ impl Host {
         }
         let launch = match launch {
             Launch::Sponsored(request) => return self.admit_sponsored(*request).await,
+            Launch::Delegated(request) => return self.admit_delegated(*request).await,
             Launch::Identified { id, parts, policy } => {
                 let _admission = self.configuration_admission.lock().await;
                 let view = self.store.inspect(session.clone()).await?;
-                self.check_execution(&view)?;
+                self.check_execution(&view).await?;
                 require_idle(&view)?;
                 if !view.queued.is_empty() {
                     return Err(problem(ErrorKind::Conflict, "session_queue_waiting"));
@@ -1523,7 +1600,16 @@ impl Host {
         {
             return Ok(None);
         }
-        self.check_execution(&view)?;
+        // Only an already-cancelled retained turn may cross execution routes
+        // for local finalization. Its recovery cannot dispatch new work.
+        let cancellation_only = matches!(&launch, Launch::RecoverStopped(_))
+            && view
+                .current
+                .as_ref()
+                .is_some_and(|current| current.binding.turn == *turn && current.controls.cancelled);
+        if !cancellation_only {
+            self.check_execution(&view).await?;
+        }
         let SessionConfiguration {
             cwd,
             subagent,
@@ -1635,7 +1721,7 @@ impl Host {
             Launch::Compact(_) | Launch::RecoverCompaction(_) => {
                 return Err(problem(ErrorKind::InvalidState, "compaction_plan_missing"));
             }
-            Launch::Sponsored(_) | Launch::Identified { .. } => {
+            Launch::Sponsored(_) | Launch::Delegated(_) | Launch::Identified { .. } => {
                 unreachable!("launch handled before session lookup")
             }
         };
@@ -1661,6 +1747,15 @@ impl Host {
                 "subagent_assignment_mismatch",
             ));
         }
+        if prepared.as_ref().is_some_and(|prepared| prepared.worker) {
+            let input = input
+                .as_ref()
+                .ok_or_else(|| problem(ErrorKind::InvalidState, "worker_input_missing"))?;
+            self.require_worker_origin(session, turn, input).await?;
+            if !self.reconcile_worker_owner(input).await? {
+                return Ok(None);
+            }
+        }
         let mut sponsored_permissions = None;
         if prepared.is_some()
             && let Some(profile) = &subagent
@@ -1674,7 +1769,8 @@ impl Host {
                 prepared
                     .as_ref()
                     .and_then(|input| input.permission_capture.as_ref()),
-            ) {
+            ) && !prepared.as_ref().is_some_and(|prepared| prepared.worker)
+            {
                 self.require_committed_primary_reviewer(profile, session, turn)
                     .await?;
                 self.require_sponsored_primary_read(profile, &cwd, &input.id, capture)
@@ -1770,6 +1866,35 @@ impl Host {
             messages.append(&mut prepared.messages);
             prepared.messages = messages;
         }
+        self.compose_admitted(
+            execution,
+            session,
+            turn,
+            cwd,
+            claim,
+            prepared,
+            history,
+            sponsored_permissions,
+            cancellation_only,
+            acceptance,
+        )
+        .await
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn compose_admitted(
+        &self,
+        execution: &Execution,
+        session: &SessionId,
+        turn: &TurnId,
+        cwd: PathBuf,
+        claim: agent_kit_sessions::ClaimedTurn,
+        mut prepared: PreparedInput,
+        history: history::PriorContext,
+        sponsored_permissions: Option<Arc<crate::permissions::TurnPermissions>>,
+        cancellation_only: bool,
+        acceptance: Option<Acceptance>,
+    ) -> Result<Option<Admitted>> {
         let permission_scope = if let Some(permissions) = sponsored_permissions {
             permissions.bind_claim(claim.lease.binding().clone())?;
             Some(permissions)
@@ -1778,17 +1903,25 @@ impl Host {
                 .permission_capture
                 .as_ref()
                 .map(|capture| {
-                    self.bind_permissions(capture, claim.lease.binding().clone())
-                        .map_err(|_| {
-                            problem(ErrorKind::Uncertain, "admitted_permission_unavailable")
-                        })
+                    (if prepared.worker {
+                        self.bind_worker_permissions(capture, claim.lease.binding().clone())
+                    } else {
+                        self.bind_permissions(capture, claim.lease.binding().clone())
+                    })
+                    .map_err(|_| problem(ErrorKind::Uncertain, "admitted_permission_unavailable"))
                 })
                 .transpose()?
         };
         let image = execution
             .image_tools
             .as_ref()
-            .filter(|_| prepared.operating_regime.is_act() && !prepared.subagent)
+            .filter(|_| {
+                prepared.operating_regime.is_act()
+                    && !prepared.subagent
+                    && (execution.legacy_subscription_provider.is_none()
+                        || prepared.subscription_image_input)
+                    && (execution.spending_profile.is_none() || prepared.image_tool_results)
+            })
             .map(|images| {
                 image_tools::TurnImage::bind(
                     images.clone(),
@@ -1812,7 +1945,11 @@ impl Host {
         let skill_reader = prepared
             .skills
             .as_ref()
-            .filter(|_| !cancellation_only && !prepared.subagent && !self.inference_only)
+            .filter(|_| {
+                !cancellation_only
+                    && (!prepared.subagent || prepared.worker)
+                    && !self.inference_only
+            })
             .map(|listing| bundled_skills::TurnSkills::bind(listing, claim.lease.binding()))
             .transpose()?
             .flatten();
@@ -1825,7 +1962,7 @@ impl Host {
         let capture_image = execution
             .image_tools
             .as_ref()
-            .filter(|_| execution.tool_result_images && !prepared.subagent)
+            .filter(|_| prepared.image_tool_results && !prepared.subagent)
             .map(|images| {
                 images.workspace_image_capture(claim.lease.binding().session.clone(), cwd.clone())
             });
@@ -1838,7 +1975,10 @@ impl Host {
                 images.workspace_reference_capture(claim.lease.binding().session.clone(), cwd)
             });
         let command = match &permission_scope {
-            Some(permissions) if prepared.operating_regime.is_act() && !prepared.subagent => {
+            Some(permissions)
+                if prepared.operating_regime.is_act()
+                    && (!prepared.subagent || prepared.worker) =>
+            {
                 let chat = &claim.lease.binding().session;
                 if self.processes.needs_number_floor(chat) {
                     let floor = self.process_number_floor(chat).await?;
@@ -1850,6 +1990,7 @@ impl Host {
                     &self.processes,
                     capture_image,
                     capture_reference,
+                    prepared.image_view,
                 )?
             }
             Some(permissions) => {
@@ -1860,6 +2001,7 @@ impl Host {
                     &mut authority.tools,
                     capture_image,
                     prepared.operating_regime.is_act(),
+                    prepared.image_view,
                 )?;
                 None
             }
@@ -1891,19 +2033,22 @@ impl Host {
                     prepared.operating_regime,
                     permission_scope.as_ref(),
                     command.as_ref(),
+                    prepared.worker,
                 )
             })
             .transpose()?;
-        let before_tool =
-            if prepared.operating_regime.is_act() && !prepared.subagent && !cancellation_only {
-                before_tool::BeforeToolCheck::bind(
-                    claim.lease.binding(),
-                    permission_scope.as_ref(),
-                    command.as_ref(),
-                )?
-            } else {
-                None
-            };
+        let before_tool = if prepared.operating_regime.is_act()
+            && (!prepared.subagent || prepared.worker)
+            && !cancellation_only
+        {
+            before_tool::BeforeToolCheck::bind(
+                claim.lease.binding(),
+                permission_scope.as_ref(),
+                command.as_ref(),
+            )?
+        } else {
+            None
+        };
         if let Some(image_generation) = prepared.image_generation.take() {
             let workspace_capture = authority.tools.get(&agent_kit_core::ToolId::new(
                 crate::file_tools::CAPTURE_IMAGE_REFERENCE,
@@ -1923,6 +2068,12 @@ impl Host {
         let delegation = (!cancellation_only && prepared.effort.is_some())
             .then(|| sponsorship::DelegationAccess::bind(self, claim.lease.binding()))
             .transpose()?;
+        let workers = prepared
+            .delegation
+            .as_ref()
+            .filter(|_| !cancellation_only)
+            .map(|policy| delegation::Access::bind(self, claim.lease.binding(), policy.clone()))
+            .transpose()?;
         let tool_authority = permissions::ToolAuthority::bind(
             execution.authorization.clone(),
             permission_scope.clone(),
@@ -1938,7 +2089,10 @@ impl Host {
                 lifecycle: lifecycle_hooks.clone(),
             },
             host_tools.clone(),
-            delegation.clone(),
+            permissions::DelegationTools {
+                review: delegation.clone(),
+                workers: workers.clone(),
+            },
         );
         let goal_authority = if prepared.goal.is_some() {
             let (validator, gate): (Arc<dyn AuthorityValidator>, Arc<dyn ToolGate>) =
@@ -1965,17 +2119,26 @@ impl Host {
         } else {
             None
         };
-        let provider = self.spending_provider(
-            execution,
-            prepared.spending.as_ref().filter(|_| !cancellation_only),
-        )?;
-        let spending_runtime = (!cancellation_only && prepared.spending.is_some())
-            .then(|| {
-                execution
-                    .runtime
-                    .with_provider(ProviderId::new("gg")?, provider.clone())
-            })
-            .transpose()?;
+        let captured_provider =
+            execution.subscription_provider_for_capture(prepared.subscription_image_input);
+        let legacy_subscription = captured_provider.is_some();
+        let provider = if let Some(provider) = captured_provider {
+            provider
+        } else {
+            self.spending_provider(
+                execution,
+                prepared.spending.as_ref().filter(|_| !cancellation_only),
+            )?
+        };
+        let spending_runtime = (legacy_subscription
+            || (!cancellation_only && prepared.spending.is_some()))
+        .then(|| {
+            execution.runtime.with_provider(
+                ProviderId::new(if legacy_subscription { "chatgpt" } else { "gg" })?,
+                provider.clone(),
+            )
+        })
+        .transpose()?;
         let base_runtime = spending_runtime.as_ref().unwrap_or(&execution.runtime);
         let runtime = self
             .inference_only
@@ -2035,6 +2198,16 @@ impl Host {
         if let Some(delegation) = &delegation {
             delegation.insert(operations.clone(), &mut inventory, &mut authority.tools)?;
         }
+        if let Some(workers) = &workers {
+            workers.insert(operations.clone(), &mut inventory, &mut authority.tools)?;
+        }
+        if prepared.worker
+            && authority.tools.contains_key(&agent_kit_core::ToolId::new(
+                crate::processes::EXEC_COMMAND,
+            )?)
+        {
+            self.processes.track_attempts(session)?;
+        }
         let selected = authority.tools.keys().cloned().collect::<Vec<_>>();
         if self.inference_only && !selected.is_empty() {
             return Err(problem(ErrorKind::InvalidState, "title_tools_unavailable"));
@@ -2042,6 +2215,9 @@ impl Host {
         let tools = inventory.snapshot(&selected)?;
         if !closing && let Some(delegation) = &delegation {
             delegation.reconcile(&operations, &tools).await?;
+        }
+        if !closing && let Some(workers) = &workers {
+            workers.reconcile(&operations, &tools).await?;
         }
         if !closing && (prepared.questions || prepared.allow_library_selection) {
             execution.questions.reconcile(&operations, &tools).await?;
@@ -2057,7 +2233,7 @@ impl Host {
         }
         let mut prior = history.messages;
         prior.extend(prepared.guidance);
-        let mut master = Master::new(prepared.config, provider, tools, authority)?
+        let mut master = Master::new(prepared.config, provider.clone(), tools, authority)?
             .with_history(prior)
             .with_input_limit(prepared.limit);
         if let Some(file) = file {
@@ -2073,7 +2249,7 @@ impl Host {
                 .and_then(|profile| profile.automatic_read_review())
         {
             master = master.with_approval_reviewer(Arc::new(
-                approval_review::AutomaticReadReview::new(self, profile, execution),
+                approval_review::AutomaticReadReview::new(self, profile, execution, provider),
             ));
         }
         if let Some(effort) = prepared.effort {
@@ -2081,6 +2257,10 @@ impl Host {
                 .with_effort(effort)?
                 .with_goal_child_work(Arc::new(sponsorship::GoalChildWork(self.store.clone())));
         }
+        if let Some(policy) = prepared.delegation {
+            master = master.with_delegation(policy)?;
+        }
+
         if prepared.goal.is_some()
             && let Some(permissions) = &permission_scope
             && let Some(verifier) = permissions.goal_read_verifier()
@@ -2120,16 +2300,6 @@ impl Host {
         }))
     }
 
-    async fn open_owned_turn(
-        &self,
-        session: &SessionId,
-        turn: &TurnId,
-        lease: agent_kit_core::turn::TurnLease,
-    ) -> Result<(agent_kit_runtime::OpenedTurn, bool)> {
-        self.open_owned_turn_with_runtime(session, turn, lease, &self.execution()?.runtime)
-            .await
-    }
-
     async fn open_owned_turn_with_runtime(
         &self,
         session: &SessionId,
@@ -2158,41 +2328,67 @@ impl Host {
         Ok((opened, closing))
     }
 
-    fn check_execution(&self, view: &SessionView) -> Result<()> {
+    /// Accepted work owns its route; creation configuration is provenance.
+    /// Only a new idle input may deliberately capture a different connection.
+    async fn check_execution(&self, view: &SessionView) -> Result<()> {
         let execution = self.execution()?;
         let configuration = session_configuration(view)?;
-        if configuration.execution != execution.configuration
-            && !(configuration.owner == execution.owner
-                && Self::route_movable(view, &configuration, execution))
-        {
+        if configuration.subagent.is_some() && configuration.execution != execution.configuration {
             return Err(problem(
                 ErrorKind::Conflict,
-                "session_execution_configuration_changed",
+                "session_delegated_route_changed",
             ));
         }
-        Ok(())
-    }
-
-    /// A chat follows the person's model selection between turns, within the
-    /// credential owner that created it. A turn
-    /// always finishes under the route that claimed it, delegated sessions
-    /// keep their parent's route, and an active Goal keeps the route its
-    /// allowance and spending were measured against. Queued inputs keep the
-    /// model and authority they were accepted under, so a chat holding one
-    /// captured under another route stays on that route until the input runs
-    /// or is withdrawn.
-    fn route_movable(
-        view: &SessionView,
-        configuration: &SessionConfiguration,
-        execution: &Execution,
-    ) -> bool {
-        view.current.is_none()
-            && configuration.subagent.is_none()
-            && goals::require_resolved_goal(&view.driver_state).is_ok()
+        if let Some(current) = &view.current {
+            let inputs = self
+                .store
+                .turn_submissions(view.session.clone(), current.binding.turn.clone())
+                .await?;
+            let matches = if inputs.is_empty() {
+                // Unprompted maintenance captures a prepared provider request.
+                match self
+                    .compaction_plan(view.session.clone(), current.binding.turn.clone())
+                    .await?
+                {
+                    Some(plan) => self.compaction_matches_execution(&plan),
+                    None => false,
+                }
+            } else {
+                let routes = inputs
+                    .iter()
+                    .filter(|input| {
+                        !(configuration.subagent.is_some() && subagents::is_message(input))
+                    })
+                    .collect::<Vec<_>>();
+                !routes.is_empty()
+                    && routes.into_iter().all(|input| {
+                        CapturedRoute::admits(input, execution, configuration.execution)
+                    })
+            };
+            if !matches {
+                return Err(problem(ErrorKind::Conflict, "session_active_route_changed"));
+            }
+        }
+        if view.current.is_none()
             && view
                 .queued
                 .iter()
-                .all(|queued| CapturedRoute::admits(&queued.input, execution))
+                .filter(|queued| {
+                    !(configuration.subagent.is_some() && subagents::is_message(&queued.input))
+                })
+                .any(|queued| {
+                    !CapturedRoute::admits(&queued.input, execution, configuration.execution)
+                })
+        {
+            return Err(problem(ErrorKind::Conflict, "session_queued_route_changed"));
+        }
+        if configuration.subagent.is_none()
+            && goals::require_resolved_goal(&view.driver_state).is_err()
+            && !self.goal_matches_execution(view).await?
+        {
+            return Err(problem(ErrorKind::Conflict, "session_goal_route_changed"));
+        }
+        Ok(())
     }
 
     fn submission_policy(
@@ -2212,6 +2408,8 @@ impl Host {
             .as_ref()
             .filter(|_| operating_regime.is_act() && !allow_wakeups);
         Ok(SubmissionPolicy {
+            selection_revision: None,
+            selection_goal: false,
             questions: request.questions,
             allow_wakeups,
             allow_library_selection: false,
@@ -2239,6 +2437,8 @@ impl Host {
         policy: SubmissionPolicy,
     ) -> Result<Submission> {
         let SubmissionPolicy {
+            selection_revision,
+            selection_goal,
             questions,
             allow_wakeups,
             allow_library_selection,
@@ -2263,8 +2463,30 @@ impl Host {
             if let PromptPart::FileReference { reference } = part {
                 file_references::check_workspace_path(reference, &cwd)?;
             }
+            if let PromptPart::SelectedImage { selection } = part {
+                selection.validate()?;
+                let path = Path::new(&selection.path);
+                if selection.source == ImageSource::Snapshot {
+                    images::check_snapshot_path(self.state_dir.as_deref(), path)?;
+                } else {
+                    if let Some(state) = &self.state_dir {
+                        crate::workspace::ProtectedRoots::new(vec![state.to_path_buf()])?
+                            .check(path)?;
+                    }
+                    if let Some(permissions) = &self.permissions {
+                        permissions.check_selected_image(path)?;
+                    }
+                }
+            }
         }
         let execution = self.execution()?;
+        let selection = self.capture_chat_selection(
+            session,
+            selection_revision,
+            effort.as_ref(),
+            reasoning,
+            selection_goal,
+        )?;
         let configuration = self.with_configuration(Configuration::snapshot).await?;
         let child_work = subagent.is_some();
         if allow_library_selection && (!execution.tool_result_images || child_work) {
@@ -2323,14 +2545,20 @@ impl Host {
         } else {
             Some(skills::capture_listing(self.guidance_scope(session)?).await?)
         };
-        let parts = if parts
-            .iter()
-            .any(|part| matches!(part, PromptPart::Image { .. } | PromptPart::File { .. }))
-        {
-            if parts
-                .iter()
-                .any(|part| matches!(part, PromptPart::Image { .. }))
-                && !self.accepts_images()
+        let parts = if parts.iter().any(|part| {
+            matches!(
+                part,
+                PromptPart::Image { .. }
+                    | PromptPart::SelectedImage { .. }
+                    | PromptPart::File { .. }
+            )
+        }) {
+            if parts.iter().any(|part| {
+                matches!(
+                    part,
+                    PromptPart::Image { .. } | PromptPart::SelectedImage { .. }
+                )
+            }) && !self.accepts_images()
             {
                 return Err(problem(ErrorKind::Unsupported, "image_input_unavailable"));
             }
@@ -2345,9 +2573,12 @@ impl Host {
                 parts
                     .into_iter()
                     .map(|part| match part {
-                        PromptPart::Image { image } => Ok(PromptPart::RetainedImage {
-                            asset: storage.retain_image(&session, &cwd, &input, image)?,
-                        }),
+                        PromptPart::Image { image } => {
+                            storage.retain_prompt_image(&session, &cwd, &input, image)
+                        }
+                        PromptPart::SelectedImage { selection } => {
+                            storage.retain_prompt_image(&session, &cwd, &input, selection.read()?)
+                        }
                         PromptPart::File { file } => Ok(PromptPart::RetainedFile {
                             work: storage.retain_file(&session, &cwd, &input, file)?,
                         }),
@@ -2378,9 +2609,20 @@ impl Host {
         } else {
             None
         };
+        let delegation = self.capture_delegation(
+            operating_regime,
+            child_work,
+            selection_goal,
+            session_configuration(session)?.side.is_some(),
+        )?;
         Ok(Submission {
             id,
             payload: encode_stored_prompt(&StoredPrompt {
+                image_view: crate::file_tools::ImageView::Raster,
+                subscription_image_input: execution.legacy_subscription_provider.is_some()
+                    && execution.accepts_selected_png,
+                image_tool_results: Some(execution.tool_result_images),
+                selection,
                 lifecycle_hooks,
                 spending,
                 parts,
@@ -2391,6 +2633,8 @@ impl Host {
                 } else {
                     execution.config.max_steps
                 }),
+                delegation,
+                worker: None,
                 effort,
                 reasoning,
                 model: Some(execution.config.model.clone()),
@@ -2436,6 +2680,9 @@ impl Host {
         authority: InputAuthority,
     ) -> Result<PreparedInput> {
         let mut config = execution.config.clone();
+        let subscription_image_input;
+        let image_tool_results;
+        let image_view;
         let lifecycle_hooks;
         let spending;
         let cancellation_only = matches!(authority, InputAuthority::CancellationOnly);
@@ -2443,6 +2690,8 @@ impl Host {
         let mut image_generation = None;
         let subagent;
         let effort;
+        let delegation;
+        let worker;
         let mut retained_file = None;
         let skills;
         let (
@@ -2459,6 +2708,11 @@ impl Host {
         ) = match input.payload.version() {
             INPUT_VERSION if input.payload.schema().as_str() == INPUT_SCHEMA => {
                 let stored: StoredPrompt = decode_input(input)?;
+                image_view = stored.image_view;
+                subscription_image_input = stored.subscription_image_input;
+                image_tool_results = stored
+                    .image_tool_results
+                    .unwrap_or(execution.legacy_tool_result_images);
                 lifecycle_hooks = stored.lifecycle_hooks.clone();
                 spending = stored.spending.clone();
                 if !cancellation_only
@@ -2486,6 +2740,26 @@ impl Host {
                     }
                 }
                 effort = stored.effort.clone();
+                delegation = stored.delegation.clone();
+                worker = stored.worker.is_some();
+                if !cancellation_only && stored.delegation.is_some() {
+                    if stored.subagent.is_some()
+                        || stored.goal.is_some()
+                        || side
+                        || !stored.operating_regime.is_act()
+                    {
+                        return Err(problem(ErrorKind::InvalidState, "invalid_delegation_scope"));
+                    }
+                    if self
+                        .capture_delegation(stored.operating_regime, false, false, false)?
+                        .is_none()
+                    {
+                        return Err(problem(
+                            ErrorKind::Unavailable,
+                            "worker_delegation_unavailable",
+                        ));
+                    }
+                }
                 if !cancellation_only
                     && side
                     && (stored.allow_wakeups
@@ -2518,7 +2792,9 @@ impl Host {
                         return Err(goals::funded_review_unavailable());
                     }
                     if !cancellation_only
-                        && !(if profile.sponsorship().is_some()
+                        && !(if worker {
+                            self.subagents_available()
+                        } else if profile.sponsorship().is_some()
                             || assignment.named_sponsorship.is_some()
                         {
                             self.sponsorship_available()
@@ -2528,40 +2804,49 @@ impl Host {
                     {
                         return Err(problem(ErrorKind::Unsupported, "subagents_unavailable"));
                     }
-                    if stored.questions
-                        || stored.allow_wakeups
-                        || stored.allow_library_selection
-                        || stored.allow_reviewer_primary_read
-                        || (stored.permission_capture.is_some() && profile.sponsorship().is_none())
-                        || stored.host_tools_capture.is_some()
-                        || stored.desktop_image_generation.is_some()
-                        || stored.allow_image_reference
-                        || stored.allow_attachment_reference
-                        || stored.allow_workspace_reference
-                        || stored.allow_image_placement
-                        || stored.editor_endpoint.is_some()
-                        || stored.editor_presentation
-                        || stored.editor_svg_target.is_some()
-                        || stored.guidance.is_some()
-                        || stored.skills.is_some()
-                        || stored.goal.is_some()
-                        || stored.effort.is_some()
-                        || stored.completion_checks.is_some()
-                        || !matches!(
+                    if !worker
+                        && (stored.questions
+                            || stored.allow_wakeups
+                            || stored.allow_library_selection
+                            || stored.allow_reviewer_primary_read
+                            || (stored.permission_capture.is_some()
+                                && profile.sponsorship().is_none())
+                            || stored.host_tools_capture.is_some()
+                            || stored.desktop_image_generation.is_some()
+                            || stored.allow_image_reference
+                            || stored.allow_attachment_reference
+                            || stored.allow_workspace_reference
+                            || stored.allow_image_placement
+                            || stored.editor_endpoint.is_some()
+                            || stored.editor_presentation
+                            || stored.editor_svg_target.is_some()
+                            || stored.guidance.is_some()
+                            || stored.skills.is_some()
+                            || stored.goal.is_some()
+                            || stored.effort.is_some()
+                            || stored.completion_checks.is_some()
+                            || !matches!(
                             stored.max_steps,
                             Some(1..=grida_agent_master::subagents::INFERENCE_STEPS_PER_ASSIGNMENT)
-                        )
-                        || !matches!(stored.parts.as_slice(), [PromptPart::Text { .. }])
+                        ) || !matches!(stored.parts.as_slice(), [PromptPart::Text { .. }]))
                     {
                         return Err(problem(
                             ErrorKind::InvalidState,
                             "invalid_subagent_authority",
                         ));
                     }
-                    config.instructions.push_str("\n\n");
-                    config
-                        .instructions
-                        .push_str(grida_agent_master::subagents::INSTRUCTIONS);
+                    if worker {
+                        delegation::validate_worker_shape(&stored)?;
+                        config.instructions.push_str("\n\n");
+                        config
+                            .instructions
+                            .push_str(grida_agent_master::delegation::WORKER_INSTRUCTIONS);
+                    } else {
+                        config.instructions.push_str("\n\n");
+                        config
+                            .instructions
+                            .push_str(grida_agent_master::subagents::INSTRUCTIONS);
+                    }
                 }
                 if !cancellation_only
                     && stored.allow_library_selection
@@ -2682,10 +2967,11 @@ impl Host {
                     stored.authority.as_ref(),
                     &execution.authority.inference.authority,
                 )?;
-                if stored
-                    .model
-                    .as_ref()
-                    .is_some_and(|model| *model != config.model)
+                if !cancellation_only
+                    && stored
+                        .model
+                        .as_ref()
+                        .is_some_and(|model| *model != config.model)
                 {
                     return Err(problem(ErrorKind::Conflict, "retained_model_changed"));
                 }
@@ -2781,7 +3067,7 @@ impl Host {
                 .permissions
                 .as_ref()
                 .ok_or_else(|| problem(ErrorKind::Unavailable, "permission_profile_unavailable"))?;
-            if subagent {
+            if subagent && !worker {
                 permissions.validate_primary_review(capture)?;
             } else {
                 permissions.validate_capture(capture)?;
@@ -2794,19 +3080,29 @@ impl Host {
             grida_agent_master::side_chat::apply(&mut config.instructions);
         }
         let completion_authorized = completion_checks.is_some() && !cancellation_only;
-        if completion_authorized
-            && completion_checks != self.capture_completion_checks(operating_regime)?
-        {
+        let expected_completion = if worker {
+            Some(completion_checks::worker_checks(
+                self.capture_completion_checks(operating_regime)?,
+            )?)
+        } else {
+            self.capture_completion_checks(operating_regime)?
+        };
+        if completion_authorized && completion_checks != expected_completion {
             return Err(problem(
                 ErrorKind::Unavailable,
                 "completion_check_profile_unavailable",
             ));
         }
         Ok(PreparedInput {
+            image_view,
+            subscription_image_input,
+            image_tool_results,
             lifecycle_hooks,
             spending,
             config,
             effort,
+            delegation,
+            worker,
             subagent,
             operating_regime,
             messages,
@@ -2999,6 +3295,7 @@ impl Host {
             return Ok(accepted);
         }
         let mut policy = self.submission_policy(&request, context.allow_wakeups)?;
+        policy.selection_revision = context.selection_revision;
         self.bind_editor(&mut policy, &request, &context)?;
         policy.allow_library_selection = context.allow_library_selection;
         let result = async {
@@ -3309,6 +3606,28 @@ impl From<TurnLinkCursor> for GatewayChildBillingRef {
 }
 
 impl Execution {
+    fn subscription_provider_for_capture(&self, image_input: bool) -> Option<Arc<dyn Provider>> {
+        if image_input {
+            None
+        } else {
+            self.legacy_subscription_provider.clone()
+        }
+    }
+
+    fn subscription_provider_for_request(
+        &self,
+        request: &agent_kit_core::inference::PreparedRequest,
+    ) -> Option<Arc<dyn Provider>> {
+        self.legacy_subscription_provider
+            .as_ref()
+            .filter(|provider| {
+                provider
+                    .capabilities(&request.request().model)
+                    .is_ok_and(|capabilities| &capabilities == request.capabilities())
+            })
+            .cloned()
+    }
+
     fn supports_reasoning(&self, level: agent_kit_core::inference::ReasoningEffort) -> bool {
         self.provider
             .capabilities(&self.config.model)
@@ -3447,6 +3766,7 @@ impl Execution {
         execution.accepts_selected_png = images.is_some();
         execution.image_tools = images;
         execution.tool_result_images = tool_result_images;
+        execution.legacy_tool_result_images = tool_result_images;
         Ok(execution)
     }
 
@@ -3468,7 +3788,7 @@ impl Execution {
         let image_resolver = images.as_ref().map(|images| {
             let images = images.clone();
             Arc::new(move |media: &agent_kit_core::messages::MediaRef, maximum| {
-                images.resolve_selected_image(media, maximum)
+                images.resolve(media, maximum)
             }) as Arc<agent_kit_providers::InputImageResolver>
         });
         if image_resolver.is_some() {
@@ -3494,6 +3814,7 @@ impl Execution {
             PROVIDER_LIMITS,
             image_resolver,
         )?
+        .with_retained_png_tool_results()
         // The first-party chat route uses this typed rejection only for
         // its pre-dispatch throttle. Downstream 429s have a different type.
         .with_admission_rate_limit_evidence();
@@ -3506,6 +3827,8 @@ impl Execution {
             credential,
         )?;
         execution.accepts_selected_png = images.is_some();
+        execution.tool_result_images = images.is_some();
+        execution.image_tools = images;
         execution.spending_profile = Some(spending_profile);
         Ok(execution)
     }
@@ -3513,6 +3836,7 @@ impl Execution {
     fn new_chatgpt(
         model: ModelId,
         connection: Arc<crate::chatgpt_subscription::SupervisedChatGpt>,
+        images: Option<Arc<retained_inputs::RetainedInputs>>,
     ) -> Result<Self> {
         let configuration = Fingerprint::of(&(
             "chatgpt-subscription-selection-v1",
@@ -3520,34 +3844,60 @@ impl Execution {
             &model,
         ))?;
         let binding = connection.binding.clone();
-        let provider = Arc::new(Responses::new(
+        let legacy_profile = ResponsesProfile {
+            capabilities: ModelCapabilities {
+                reasoning: agent_kit_core::inference::ReasoningEffort::ALL
+                    .into_iter()
+                    .collect(),
+                ..text_capabilities("chatgpt-subscription")?
+            },
+            wire_model: connection.wire_model.clone(),
+            reasoning_effort: Some(agent_kit_providers::ResponsesReasoningEffort::Medium),
+        };
+        let legacy = Arc::new(Responses::new(
             binding.clone(),
             connection.replay_binding.clone(),
             ResponsesEndpoint::Restricted,
-            BTreeMap::from([(
-                model.clone(),
-                ResponsesProfile {
-                    capabilities: ModelCapabilities {
-                        reasoning: agent_kit_core::inference::ReasoningEffort::ALL
-                            .into_iter()
-                            .collect(),
-                        ..text_capabilities("chatgpt-subscription")?
-                    },
-                    wire_model: connection.wire_model.clone(),
-                    reasoning_effort: Some(agent_kit_providers::ResponsesReasoningEffort::Medium),
-                },
-            )]),
+            BTreeMap::from([(model.clone(), legacy_profile.clone())]),
             connection.clone(),
             PROVIDER_LIMITS,
         )?);
-        Self::compose(
+        let provider: Arc<dyn Provider> = if let Some(images) = &images {
+            let mut profile = legacy_profile;
+            profile.capabilities.revision = BindingId::new("chatgpt-subscription-image-tools-v1")?;
+            profile
+                .capabilities
+                .input_modalities
+                .insert(Modality::Image);
+            let images = images.clone();
+            Arc::new(Responses::with_image_resolver(
+                binding.clone(),
+                connection.replay_binding.clone(),
+                ResponsesEndpoint::RestrictedImages,
+                BTreeMap::from([(model.clone(), profile)]),
+                connection.clone(),
+                PROVIDER_LIMITS,
+                Some(Arc::new(move |media, maximum| {
+                    images.resolve(media, maximum)
+                })),
+            )?)
+        } else {
+            legacy.clone()
+        };
+        let mut execution = Self::compose(
             configuration,
             model,
             None,
             provider,
             binding,
             Credential::SupervisedChatGpt(connection),
-        )
+        )?;
+        execution.legacy_subscription_provider =
+            images.as_ref().map(|_| legacy as Arc<dyn Provider>);
+        execution.accepts_selected_png = images.is_some();
+        execution.tool_result_images = images.is_some();
+        execution.image_tools = images;
+        Ok(execution)
     }
 
     fn compose(
@@ -3586,7 +3936,9 @@ impl Execution {
             limits: ExecutionLimits {
                 max_operations: MAX_TURN_OPERATIONS,
                 max_concurrent_inferences: MAX_ACTIVE_RUNS,
-                max_concurrent_tools: 1,
+                // An observing parent must not monopolize the only tool slot
+                // while independently owned children need tools to finish.
+                max_concurrent_tools: MAX_ACTIVE_RUNS,
                 max_output_bytes: 512 * 1024,
                 operation_timeout: MODEL_TIMEOUT,
                 observer_capacity: UPDATE_CAPACITY,
@@ -3604,6 +3956,7 @@ impl Execution {
                 reasoning: Default::default(),
             },
             provider,
+            legacy_subscription_provider: None,
             spending_profile: None,
             authority: MasterAuthority {
                 inference,
@@ -3614,6 +3967,7 @@ impl Execution {
             accepts_selected_png: false,
             image_tools: None,
             tool_result_images: false,
+            legacy_tool_result_images: false,
             retained_inputs: None,
         })
     }
@@ -3682,6 +4036,7 @@ async fn drive(
     input: Vec<Message>,
     updates: broadcast::Sender<TurnUpdate>,
     live: Option<broadcast::Sender<live::LiveUpdate>>,
+    activity: Arc<subagent_activity::State>,
 ) -> Result<RunResult> {
     let agent_kit_runtime::OpenedTurn { turn, mut observer } = opened;
     let binding = observer.snapshot().state.binding().clone();
@@ -3695,6 +4050,7 @@ async fn drive(
         {
             return;
         }
+        activity.update(&binding, &update);
         if let Some(live) = &mut live {
             live.update(&update);
         }
@@ -3864,6 +4220,10 @@ pub(crate) fn validate_prompt_parts(parts: &[PromptPart]) -> Result<()> {
     for part in parts {
         match part {
             PromptPart::Image { .. } => uploads += 1,
+            PromptPart::SelectedImage { selection } => {
+                selection.validate()?;
+                uploads += 1;
+            }
             PromptPart::File { .. } => files += 1,
             PromptPart::FileReference { reference } => {
                 reference
@@ -3871,7 +4231,7 @@ pub(crate) fn validate_prompt_parts(parts: &[PromptPart]) -> Result<()> {
                     .map_err(|code| problem(ErrorKind::InvalidInput, code))?;
                 references += 1;
             }
-            PromptPart::RetainedImage { .. } => {
+            PromptPart::RetainedImage { .. } | PromptPart::PreparedImage { .. } => {
                 return Err(problem(
                     ErrorKind::InvalidInput,
                     "retained_image_not_supplied",
@@ -3910,7 +4270,14 @@ fn validate_prompt_record(parts: &[PromptPart]) -> Result<()> {
     }
     let metadata: Vec<_> = parts
         .iter()
-        .filter(|part| !matches!(part, PromptPart::Image { .. } | PromptPart::File { .. }))
+        .filter(|part| {
+            !matches!(
+                part,
+                PromptPart::Image { .. }
+                    | PromptPart::SelectedImage { .. }
+                    | PromptPart::File { .. }
+            )
+        })
         .collect();
     let bytes = serde_json::to_vec(&metadata)
         .map_err(|_| problem(ErrorKind::InvalidInput, "prompt_encoding_failed"))?;
@@ -3935,13 +4302,14 @@ fn prompt_input(id: &ChangeId, parts: &[PromptPart]) -> Result<Vec<Message>> {
                 PromptPart::Skill { reference } => {
                     Content::Text(format!("\n\nSelected skill {}.", reference.name()))
                 }
-                PromptPart::Image { .. } => {
+                PromptPart::Image { .. } | PromptPart::SelectedImage { .. } => {
                     return Err(problem(
                         ErrorKind::InvalidInput,
                         "image_input_requires_acceptance",
                     ));
                 }
                 PromptPart::RetainedImage { asset } => Content::Media(images::media(asset)?),
+                PromptPart::PreparedImage { image } => Content::Media(images::raster_media(image)?),
                 PromptPart::File { .. } => {
                     return Err(problem(
                         ErrorKind::InvalidInput,

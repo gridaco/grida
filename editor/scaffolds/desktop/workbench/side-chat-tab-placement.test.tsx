@@ -41,11 +41,14 @@ describe("SideChatTabPlacement", () => {
       .getSnapshot()
       .get(SideChatTabPlacement.panel(side.id))!;
     expect(panel.title).toBe("Side chat");
+    const preview = renderToStaticMarkup(<>{panel.preview}</>);
+    expect(preview).toContain('data-testid="chat-tab-preview"');
+    expect(preview).toContain("No messages yet");
     const html = renderToStaticMarkup(<>{panel.content}</>);
     expect(html).toContain('data-testid="native-side-chat"');
     expect(html).toContain('aria-label="Close side chat"');
     // The same transcript and composer as any chat, without choosing chats.
-    expect(html).toContain('aria-label="Add to message"');
+    expect(html).toContain('aria-label="Send"');
     expect(html).not.toContain('aria-label="Open chat list"');
     expect(html).not.toContain('aria-label="New chat"');
     expect(html).not.toContain('aria-label="Chat options"');
@@ -144,5 +147,32 @@ describe("SideChatTabPlacement", () => {
     expect(group.getSnapshot().tabs).toContain(tabOf(side.id));
     stop();
     expect(titled.listening).toBe(0);
+  });
+
+  it("previews its existing transcript without focusing the chat or starting work", () => {
+    const { group, panels, parent, stop } = fixture();
+    const chat = new TitledSideChat();
+    const side = parent.open(chat as unknown as NativeChatController);
+    group.open(file("a.svg"));
+    const preview = () =>
+      renderToStaticMarkup(
+        <>
+          {
+            panels.getSnapshot().get(SideChatTabPlacement.panel(side.id))
+              ?.preview
+          }
+        </>
+      );
+    expect(preview()).toContain("No messages yet");
+    chat.messages([
+      { messageId: "user", role: "user", text: "Compare the layouts" },
+      { messageId: "answer", role: "assistant", text: "The second is clearer" },
+    ]);
+    expect(preview()).toContain("Compare the layouts");
+    expect(preview()).toContain("The second is clearer");
+    expect(group.getSnapshot().active).toBe(file("a.svg"));
+    expect(chat.listening).toBe(1);
+    stop();
+    expect(chat.listening).toBe(0);
   });
 });

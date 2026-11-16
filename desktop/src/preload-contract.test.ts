@@ -8,6 +8,60 @@ const preloadSource = fs.readFileSync(
 );
 
 describe("Desktop preload agent seam", () => {
+  it("adapts every native-chat invoke without wrapping the bridge object or synchronous registrations", () => {
+    const native = preloadSource.slice(
+      preloadSource.indexOf("  nativeChat: {"),
+      preloadSource.indexOf("\n  archives: {")
+    );
+    expect(native).not.toContain("ipcRenderer.invoke(");
+    expect(preloadSource).toMatch(
+      /const nativeChatInvoke = \(channel: string, \.\.\.args: unknown\[\]\) =>\s*NativeChatInvoke\.invoke\(\s*\(name, \.\.\.input\) => ipcRenderer\.invoke\(name, \.\.\.input\),\s*channel,\s*\.\.\.args/
+    );
+    expect(native).toMatch(
+      /inputReceipt: \(attachmentId, inputId\) =>\s*nativeChatInvoke\(\s*IPC_CHANNELS\.NATIVE_CHAT_INPUT_RECEIPT,\s*attachmentId,\s*inputId/
+    );
+    expect(native).toMatch(
+      /subscribe: async[\s\S]*?nativeChatHandlers\.set\(id, \{ attachmentId, onUpdate \}\);\s*try \{\s*await nativeChatInvoke\(\s*IPC_CHANNELS\.NATIVE_CHAT_SUBSCRIBE/
+    );
+    expect(native).toMatch(/onEditorSurfaceOpen: \(attachmentId, open\) => \{/);
+    expect(native).toMatch(/onEditorSvgText: \(attachmentId, invoke\) => \{/);
+    expect(preloadSource).toContain("contextBridge.exposeInMainWorld");
+    expect(preloadSource).not.toContain("new Proxy(");
+  });
+  it("routes child activity and conversation through parent attachment channels", () => {
+    expect(preloadSource).toMatch(
+      /IPC_CHANNELS\.NATIVE_CHAT_SUBAGENT_ACTIVITY,\s*attachmentId,\s*afterChildId/
+    );
+    expect(preloadSource).toMatch(
+      /IPC_CHANNELS\.NATIVE_CHAT_SUBAGENT_CONVERSATION,\s*attachmentId,\s*childId,\s*before/
+    );
+  });
+  it("keeps queued inspection and queued image reads on their own observation-bound channels", () => {
+    expect(preloadSource).toMatch(
+      /acceptsQueuedTextReplacement:\s*\(\) =>\s*nativeChatInvoke\(\s*IPC_CHANNELS\.NATIVE_CHAT_ACCEPTS_QUEUED_TEXT_REPLACEMENT\s*\)/
+    );
+    expect(preloadSource).toMatch(
+      /IPC_CHANNELS\.NATIVE_CHAT_QUEUED_MESSAGE,\s*attachmentId,\s*observationId,\s*inputId/
+    );
+    expect(preloadSource).toMatch(
+      /IPC_CHANNELS\.NATIVE_CHAT_READ_QUEUED_ATTACHMENT_PREVIEW,\s*attachmentId,\s*observationId,\s*inputId,\s*previewId/
+    );
+  });
+  it("publishes non-minting endpoint consent inspection and metadata operations through Main IPC", () => {
+    expect(preloadSource).toMatch(
+      /IPC_CHANNELS\.PROVIDER_ENDPOINT_AUTHORIZATION,\s*id,\s*baseUrl/
+    );
+    expect(preloadSource).toMatch(
+      /IPC_CHANNELS\.PROVIDER_ENDPOINT_UPDATE_MODELS,\s*update/
+    );
+    expect(preloadSource).not.toContain("mediaClient.providers.set_endpoint");
+    expect(preloadSource).not.toContain("mediaClient.providers.probe_endpoint");
+  });
+  it("requests the fixed native Settings action without a destination argument", () => {
+    expect(preloadSource).toMatch(
+      /open_settings:\s*\(\)\s*=>\s*ipcRenderer\.invoke\(IPC_CHANNELS\.WINDOW_OPEN_SETTINGS\)/
+    );
+  });
   it("keeps native selected-file reads and saves separate from the chat offer", () => {
     expect(preloadSource).toContain(
       "files: response.capabilities.files || selectedDocumentRoute()"
@@ -117,13 +171,28 @@ describe("Desktop preload agent seam", () => {
     );
   });
 
-  it("preserves the optional effort slot when forwarding an SVG target", () => {
+  it("preserves effort and SVG slots when forwarding the selection revision", () => {
     const submission = preloadSource.match(
-      /submitInRegime:\s*\(([^)]*)\)\s*=>\s*ipcRenderer\.invoke\(([\s\S]*?)\),/
+      /submitInRegime:\s*\(([^)]*)\)\s*=>\s*nativeChatInvoke\(([\s\S]*?)\),/
     );
-    expect(submission?.[1]).toMatch(/\beffort,\s*editorSvgTargetId\s*$/);
+    expect(submission?.[1]).toMatch(
+      /\beffort,\s*editorSvgTargetId,\s*selectionRevision\s*$/
+    );
+    expect(submission?.[2]).toMatch(
+      /selectionRevision !== undefined\s*\?\s*\[effort, editorSvgTargetId, selectionRevision\]/
+    );
     expect(submission?.[2]).toMatch(
       /editorSvgTargetId !== undefined\s*\?\s*\[effort, editorSvgTargetId\]\s*:\s*effort === undefined\s*\?\s*\[\]\s*:\s*\[effort\]/
+    );
+  });
+
+  it("forwards a Library selection revision only when supplied, preserving the effort slot", () => {
+    const submission = preloadSource.match(
+      /submitWithLibrarySelection:\s*\(([^)]*)\)\s*=>\s*nativeChatInvoke\(([\s\S]*?)\),/
+    );
+    expect(submission?.[1]).toMatch(/effort,\s*selectionRevision\s*$/);
+    expect(submission?.[2]).toMatch(
+      /IPC_CHANNELS\.NATIVE_CHAT_SUBMIT_LIBRARY_SELECTION,\s*attachmentId,\s*inputId,\s*text,\s*operatingRegime,\s*effort,\s*\.\.\.\(selectionRevision === undefined \? \[\] : \[selectionRevision\]\)/
     );
   });
 

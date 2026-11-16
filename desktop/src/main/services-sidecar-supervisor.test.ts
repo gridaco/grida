@@ -36,12 +36,18 @@ import { ProviderNetworkPolicy } from "../provider-network-policy";
 import { NativeDesktopProfile } from "./native-desktop-profile";
 import { DesktopMediaRoot } from "./media-root";
 import { RetainedServiceSandbox } from "./retained-service-sandbox";
+import { ProviderEndpointConsent } from "./provider-endpoint-consent";
 
 const supportsNativeChat =
   process.platform === "darwin" || process.platform === "linux";
 
 describe("ServicesSidecarSupervisor recovery", () => {
   beforeEach(() => {
+    // This suite owns process/ACK mechanics; receipt persistence and the real
+    // startup composition are exercised in provider-endpoint-startup.test.ts.
+    vi.spyOn(ProviderEndpointConsent, "open").mockResolvedValue({
+      restore: async () => {},
+    } as unknown as ProviderEndpointConsent);
     vi.stubEnv("GRIDA_AGENT_USER_DATA", "/synthetic/compatibility-agent");
     vi.useFakeTimers();
     vi.spyOn(console, "log").mockImplementation(() => undefined);
@@ -394,70 +400,19 @@ describe("ServicesSidecarSupervisor recovery", () => {
     supervisor.stop();
   });
 
-  it("propagates temporary-endpoint validation failures", async () => {
-    const supervisor = new ServicesSidecarSupervisor();
-    const operation = vi.fn<() => Promise<string>>(async () => "never");
-
-    await expect(
-      supervisor.withTemporaryProviderEndpoint("not a URL", operation)
-    ).rejects.toThrow(/valid URL/);
-
-    expect(operation).not.toHaveBeenCalled();
-    supervisor.stop();
-  });
-
-  it("rolls back a temporary grant when initial publication fails", async () => {
-    const supervisor = new ServicesSidecarSupervisor();
-    const running = installRunningState(supervisor, [
-      new Error("grant acknowledgement timed out"),
-    ]);
-    const operation = vi.fn<() => Promise<string>>(async () => "never");
-
-    await expect(
-      supervisor.withTemporaryProviderEndpoint(
-        "http://localhost:11434/v1",
-        operation
-      )
-    ).rejects.toThrow(/acknowledgement timed out/);
-
-    expect(operation).not.toHaveBeenCalled();
-    expect(customGrants(supervisor)).toHaveLength(0);
-    expect(running.child.kill).toHaveBeenCalledWith("SIGTERM");
-    supervisor.stop();
-  });
-
-  it("revokes a temporary grant when the operation fails", async () => {
-    const supervisor = new ServicesSidecarSupervisor();
-    const running = installRunningState(supervisor, [null, null]);
-
-    await expect(
-      supervisor.withTemporaryProviderEndpoint(
-        "http://localhost:11434/v1",
-        async () => {
-          throw new Error("probe failed");
-        }
-      )
-    ).rejects.toThrow("probe failed");
-
-    expect(running.networkHost.updateGrants).toHaveBeenCalledTimes(2);
-    expect(customGrants(supervisor)).toHaveLength(0);
-    supervisor.stop();
-  });
-
-  it("keeps cleanup revocation committed when its ACK fails", async () => {
+  it("commits revocation and retires the service if its ACK fails", async () => {
     const supervisor = new ServicesSidecarSupervisor();
     const running = installRunningState(supervisor, [
       null,
-      new Error("cleanup acknowledgement timed out"),
+      new Error("revocation acknowledgement timed out"),
     ]);
-
-    await expect(
-      supervisor.withTemporaryProviderEndpoint(
-        "http://localhost:11434/v1",
-        async () => "probe result"
-      )
-    ).rejects.toThrow(/cleanup acknowledgement timed out/);
-
+    await supervisor.approveProviderEndpoint(
+      "ollama",
+      "http://localhost:11434/v1"
+    );
+    await expect(supervisor.revokeProviderEndpoint("ollama")).rejects.toThrow(
+      "revocation acknowledgement timed out"
+    );
     expect(customGrants(supervisor)).toHaveLength(0);
     expect(running.child.kill).toHaveBeenCalledWith("SIGTERM");
     supervisor.stop();

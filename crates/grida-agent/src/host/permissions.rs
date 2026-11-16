@@ -35,6 +35,7 @@ pub(super) struct ToolAuthority {
     hooks: HookTools,
     host_tools: Vec<Arc<host_tools::TurnTools>>,
     delegation: Option<Arc<sponsorship::DelegationAccess>>,
+    workers: Option<Arc<delegation::Access>>,
 }
 
 /// Tools that read material the host holds for this turn, each under its own
@@ -51,6 +52,11 @@ pub(super) struct HookTools {
     pub(super) lifecycle: Option<Arc<lifecycle_hooks::LifecycleAccess>>,
 }
 
+pub(super) struct DelegationTools {
+    pub(super) review: Option<Arc<sponsorship::DelegationAccess>>,
+    pub(super) workers: Option<Arc<delegation::Access>>,
+}
+
 impl ToolAuthority {
     pub(super) fn bind(
         base: Arc<ExecutionAuthority>,
@@ -59,8 +65,12 @@ impl ToolAuthority {
         wakeups: Option<Arc<wakeups::WakeupAccess>>,
         hooks: HookTools,
         host_tools: Vec<Arc<host_tools::TurnTools>>,
-        delegation: Option<Arc<sponsorship::DelegationAccess>>,
+        delegation: DelegationTools,
     ) -> Option<Arc<Self>> {
+        let DelegationTools {
+            review: delegation,
+            workers,
+        } = delegation;
         if permissions.is_none()
             && material.image.is_none()
             && material.file.is_none()
@@ -71,6 +81,7 @@ impl ToolAuthority {
             && hooks.lifecycle.is_none()
             && host_tools.is_empty()
             && delegation.is_none()
+            && workers.is_none()
         {
             return None;
         }
@@ -82,6 +93,7 @@ impl ToolAuthority {
             hooks,
             host_tools,
             delegation,
+            workers,
         }))
     }
 }
@@ -95,6 +107,13 @@ impl AuthorityValidator for ToolAuthority {
             .is_some_and(|check| check.is_fenced())
         {
             return Box::pin(async { Err(before_tool::uncertain()) });
+        }
+        if self
+            .workers
+            .as_ref()
+            .is_some_and(|scope| scope.accepts(&request.selection))
+        {
+            return Box::pin(async { Ok(()) });
         }
         if self
             .delegation
@@ -177,6 +196,13 @@ impl ToolAuthority {
             && let Err(error) = check.require_unfenced(&context)
         {
             return Box::pin(async { Err(error) });
+        }
+        if let Some(workers) = self
+            .workers
+            .as_ref()
+            .filter(|scope| scope.accepts(&admission.grants))
+        {
+            return workers.decide(admission, context);
         }
         if let Some(delegation) = self
             .delegation
@@ -348,6 +374,17 @@ impl Host {
             true,
             self.configuration.clone(),
         )
+    }
+
+    pub(super) fn bind_worker_permissions(
+        &self,
+        capture: &PermissionCapture,
+        binding: agent_kit_core::turn::TurnBinding,
+    ) -> Result<Arc<TurnPermissions>> {
+        self.permissions
+            .as_ref()
+            .ok_or_else(|| problem(ErrorKind::Unavailable, "permission_profile_unavailable"))?
+            .bind_worker(capture, binding, self.store.clone())
     }
 
     pub async fn approvals(&self, session: SessionId, turn: TurnId) -> Result<Approvals> {

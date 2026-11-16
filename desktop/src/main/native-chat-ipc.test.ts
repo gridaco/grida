@@ -10,7 +10,12 @@ import type {
 } from "@grida/desktop-bridge";
 import { describe, expect, it, vi } from "vitest";
 import { IPC_CHANNELS } from "../bridge/contract";
-import { NativeChatIpc, type ActiveNativeChat } from "./native-chat-ipc";
+import {
+  NativeChatIpc,
+  type ActiveNativeChat,
+  type NativeChatProfileOwner,
+} from "./native-chat-ipc";
+import type { NativeChatSelections } from "./native-chat-selections";
 import type { NativeChatSession } from "./native-agent-chat";
 import type { NativeSavedChatDeletionPreview } from "./native-agent-deletion";
 import { NativeEditorSurfaceEndpoints } from "./native-editor-surfaces";
@@ -50,6 +55,139 @@ const HOOKS = {
   activation: "current",
   results: [],
 } as const;
+
+it("reports desired-binding image eligibility without borrowing another active model or activating it", async () => {
+  const text = "a".repeat(64),
+    image = "b".repeat(64);
+  let state = {
+    target: { sessionId: "saved" },
+    revision: 1,
+    selection: {
+      profileId: text,
+      modelId: "text-model",
+      effort: "high" as const,
+    },
+    available: true,
+  };
+  const list = vi.fn<NativeChatProfileOwner["list"]>(async () => ({
+    choices: [
+      { id: text, model: "Text", connection: "A" },
+      { id: image, model: "Image", connection: "B", imageInput: true as const },
+    ],
+    saved: [],
+    modelChanges: true as const,
+  }));
+  const select = vi.fn<NativeChatProfileOwner["select"]>(async () => {});
+  const selections = {
+    read: async () => state,
+    readDefaults: () => null,
+  } as unknown as NonNullable<ConstructorParameters<typeof NativeChatIpc>[11]>;
+  const { ipc, first, chat } = setup(
+    undefined,
+    undefined,
+    undefined,
+    { list, select },
+    selections
+  );
+  Object.defineProperties(chat, {
+    acceptsSelectedImage: { value: true, configurable: true },
+    supportsSelectedImage: { value: true },
+  });
+  await ipc.selection(first.event, { sessionId: "saved" });
+  expect(await ipc.acceptsSelectedImage(first.event)).toBe(false);
+  state = {
+    ...state,
+    revision: 2,
+    selection: { ...state.selection, profileId: image, modelId: "image-model" },
+  };
+  Object.defineProperty(chat, "acceptsSelectedImage", { value: false });
+  await ipc.selection(first.event, { sessionId: "saved" });
+  expect(await ipc.acceptsSelectedImage(first.event)).toBe(true);
+  state = { ...state, available: false };
+  await ipc.selection(first.event, { sessionId: "saved" });
+  expect(await ipc.acceptsSelectedImage(first.event)).toBe(false);
+  expect(select).not.toHaveBeenCalled();
+});
+
+it("binds selected-image custody to its admitted attachment and refuses late delivery", async () => {
+  const { ipc, first, second, chat } = setup();
+  chat.inputReceipt = vi.fn<typeof chat.inputReceipt>(async () => {
+    throw new Error("input_unavailable");
+  });
+  const reply =
+    Promise.withResolvers<
+      Awaited<ReturnType<NonNullable<typeof chat.submitSelectedImage>>>
+    >();
+  const submit = vi.fn<NonNullable<typeof chat.submitSelectedImage>>(
+    () => reply.promise
+  );
+  Object.defineProperty(chat, "acceptsSelectedImage", { value: true });
+  chat.submitSelectedImage = submit;
+  const opened = await ipc.create(first.event);
+  const input = {
+    action: "submit",
+    inputId: "selected-input",
+    text: "Inspect",
+    name: "original.jpg",
+    bytes: new ArrayBuffer(12),
+    operatingRegime: "act",
+  };
+  await expect(
+    ipc.submitSelectedImage(second.event, opened.attachmentId, input)
+  ).rejects.toThrow("attachment_unavailable");
+  expect(submit).not.toHaveBeenCalled();
+  const pending = ipc.submitSelectedImage(
+    first.event,
+    opened.attachmentId,
+    input
+  );
+  await vi.waitFor(() =>
+    expect(submit).toHaveBeenCalledExactlyOnceWith(
+      { id: opened.sessionId },
+      input
+    )
+  );
+  first.contents.emit("did-start-navigation", { isMainFrame: true });
+  reply.resolve({
+    sessionId: opened.sessionId,
+    inputId: input.inputId,
+    inputPosition: 1,
+    turnId: null,
+    disposition: "queued",
+  });
+  await expect(pending).rejects.toThrow("attachment_unavailable");
+});
+
+it("reuses an accepted image receipt without revisions or current model support and preserves an unknown lookup", async () => {
+  const { ipc, first, chat } = setup();
+  const opened = await ipc.create(first.event);
+  const receipt = {
+    sessionId: opened.sessionId,
+    inputId: "original-input",
+    inputPosition: 1,
+    turnId: null,
+    disposition: "queued" as const,
+  };
+  const read = vi.fn<typeof chat.inputReceipt>();
+  read
+    .mockResolvedValueOnce(receipt)
+    .mockRejectedValueOnce(new Error("native_agent_request_timeout"))
+    .mockRejectedValueOnce(new Error("input_unavailable"));
+  chat.inputReceipt = read;
+  const submit = vi.fn<NonNullable<typeof chat.submitSelectedImage>>();
+  chat.submitSelectedImage = submit;
+  const request = { inputId: receipt.inputId };
+  await expect(
+    ipc.submitSelectedImage(first.event, opened.attachmentId, request)
+  ).resolves.toEqual(receipt);
+  await expect(
+    ipc.submitSelectedImage(first.event, opened.attachmentId, request)
+  ).rejects.toThrow("timeout");
+  await expect(
+    ipc.submitSelectedImage(first.event, opened.attachmentId, request)
+  ).rejects.toThrow("image_input_unavailable");
+  expect(submit).not.toHaveBeenCalled();
+});
 
 it("inspects hook results only for an attachment owned by the current frame", async () => {
   const f = setup();
@@ -416,7 +554,9 @@ function setup(
     ownedChildren?: number
   ) => Promise<boolean>,
   selectArtifactDestination?: (sender: WebContents) => Promise<string | null>,
-  hookReview?: ConstructorParameters<typeof NativeChatIpc>[10]
+  hookReview?: ConstructorParameters<typeof NativeChatIpc>[10],
+  profiles?: ConstructorParameters<typeof NativeChatIpc>[5],
+  selections?: ConstructorParameters<typeof NativeChatIpc>[11]
 ) {
   const first = windowAt();
   const second = windowAt();
@@ -641,12 +781,13 @@ function setup(
       undefined,
       confirmDeletion,
       selectArtifactDestination,
-      undefined,
+      profiles,
       undefined,
       false,
       undefined,
       undefined,
-      hookReview
+      hookReview,
+      selections
     ),
     emit: (sessionId: string, update: NativeChatStreamUpdate) => {
       for (const listener of listeners.get(sessionId) ?? []) listener(update);
@@ -655,6 +796,317 @@ function setup(
 }
 
 describe("native chat IPC", () => {
+  it("scopes richer child reads to the exact parent attachment and rejects late navigation", async () => {
+    const { ipc, first, second, chat } = setup();
+    const opened = await ipc.create(first.event);
+    const activity = vi.fn<NonNullable<typeof chat.subagentActivity>>(
+      async (_parent, _after, check) => {
+        check();
+        return {
+          children: [],
+          nextAfterChildId: null,
+          counts: { active: 0, done: 0, complete: true },
+          events: [],
+          eventsComplete: true,
+          observedAtMs: 1,
+        };
+      }
+    );
+    const reply =
+      Promise.withResolvers<
+        Awaited<ReturnType<NonNullable<typeof chat.subagentConversation>>>
+      >();
+    const conversation = vi.fn<NonNullable<typeof chat.subagentConversation>>(
+      async (_attachment, _parent, _child, _before, check) => {
+        check();
+        return reply.promise;
+      }
+    );
+    chat.subagentActivity = activity;
+    chat.subagentConversation = conversation;
+    await expect(
+      ipc.subagentActivity(second.event, opened.attachmentId, undefined)
+    ).rejects.toThrow("attachment_unavailable");
+    await expect(
+      ipc.subagentConversation(
+        second.event,
+        opened.attachmentId,
+        "child",
+        undefined
+      )
+    ).rejects.toThrow("attachment_unavailable");
+    expect(activity).not.toHaveBeenCalled();
+    expect(conversation).not.toHaveBeenCalled();
+    await ipc.subagentActivity(first.event, opened.attachmentId, "page-anchor");
+    expect(activity).toHaveBeenCalledExactlyOnceWith(
+      { id: opened.sessionId },
+      "page-anchor",
+      expect.any(Function)
+    );
+    const pending = ipc.subagentConversation(
+      first.event,
+      opened.attachmentId,
+      "child",
+      "opaque-page"
+    );
+    expect(conversation).toHaveBeenCalledExactlyOnceWith(
+      expect.any(Object),
+      { id: opened.sessionId },
+      "child",
+      "opaque-page",
+      expect.any(Function)
+    );
+    first.contents.emit("did-start-navigation", { isMainFrame: true });
+    reply.resolve({
+      childId: "child",
+      name: "Child",
+      kind: "named",
+      view: 1,
+      messages: [],
+      turns: [],
+      execution: null,
+      older: null,
+      live: { available: false, truncated: false },
+      observedAtMs: 1,
+    });
+    await expect(pending).rejects.toThrow("attachment_unavailable");
+  });
+
+  it("keeps old-host child reads unavailable and refuses non-string selectors", async () => {
+    const { ipc, first, chat } = setup();
+    const opened = await ipc.create(first.event);
+    await expect(
+      ipc.subagentActivity(first.event, opened.attachmentId, undefined)
+    ).rejects.toThrow("activity_unavailable");
+    await expect(
+      ipc.subagentConversation(
+        first.event,
+        opened.attachmentId,
+        "child",
+        undefined
+      )
+    ).rejects.toThrow("activity_unavailable");
+    const activity = vi.fn<NonNullable<typeof chat.subagentActivity>>();
+    const conversation = vi.fn<NonNullable<typeof chat.subagentConversation>>();
+    chat.subagentActivity = activity;
+    chat.subagentConversation = conversation;
+    await expect(
+      ipc.subagentActivity(first.event, opened.attachmentId, {})
+    ).rejects.toThrow("activity_unavailable");
+    await expect(
+      ipc.subagentConversation(first.event, opened.attachmentId, {}, undefined)
+    ).rejects.toThrow("activity_unavailable");
+    await expect(
+      ipc.subagentConversation(first.event, opened.attachmentId, "child", {})
+    ).rejects.toThrow("activity_unavailable");
+    expect(activity).not.toHaveBeenCalled();
+    expect(conversation).not.toHaveBeenCalled();
+  });
+
+  it("scopes queued display and preview reads to the exact frame and observed queue", async () => {
+    const { ipc, first, second, chat } = setup();
+    const opened = await ipc.create(first.event);
+    const other = await ipc.load(second.event, opened.sessionId);
+    const basis = await ipc.observe(first.event, opened.attachmentId);
+    const previewId = randomUUID();
+    const message = {
+      inputId: "queued",
+      text: "Full\nmultiline text",
+      attachments: [{ name: "image.webp", mimeType: "image/webp", previewId }],
+    };
+    const inspect = vi
+      .fn<NonNullable<typeof chat.queuedMessage>>()
+      .mockResolvedValue(message);
+    const read = vi
+      .fn<NonNullable<typeof chat.readQueuedAttachmentPreview>>()
+      .mockResolvedValue(new ArrayBuffer(3));
+    chat.queuedMessage = inspect;
+    chat.readQueuedAttachmentPreview = read;
+    await expect(
+      ipc.queuedMessage(
+        second.event,
+        opened.attachmentId,
+        basis.observationId,
+        "queued"
+      )
+    ).rejects.toThrow("attachment_unavailable");
+    await expect(
+      ipc.queuedMessage(
+        second.event,
+        other.attachmentId,
+        basis.observationId,
+        "queued"
+      )
+    ).rejects.toThrow("observation_unavailable");
+    await expect(
+      ipc.readQueuedAttachmentPreview(
+        first.event,
+        opened.attachmentId,
+        basis.observationId,
+        "queued",
+        "/private/image.webp"
+      )
+    ).rejects.toThrow("queued_message_unavailable");
+    expect(read).not.toHaveBeenCalled();
+    await expect(
+      ipc.queuedMessage(
+        first.event,
+        opened.attachmentId,
+        basis.observationId,
+        "queued"
+      )
+    ).resolves.toEqual(message);
+    await expect(
+      ipc.readQueuedAttachmentPreview(
+        first.event,
+        opened.attachmentId,
+        basis.observationId,
+        "queued",
+        previewId
+      )
+    ).resolves.toHaveProperty("byteLength", 3);
+    expect(inspect).toHaveBeenCalledExactlyOnceWith(
+      { id: opened.sessionId },
+      basis.snapshot,
+      "queued"
+    );
+    expect(read).toHaveBeenCalledExactlyOnceWith(
+      { id: opened.sessionId },
+      basis.snapshot,
+      "queued",
+      previewId
+    );
+    vi.spyOn(chat, "observe").mockResolvedValueOnce({
+      ...basis.snapshot,
+      sessionRevision: basis.snapshot.sessionRevision + 1,
+    });
+    await ipc.observe(first.event, opened.attachmentId);
+    await expect(
+      ipc.queuedMessage(
+        first.event,
+        opened.attachmentId,
+        basis.observationId,
+        "queued"
+      )
+    ).rejects.toThrow("queue_changed");
+    await expect(
+      ipc.readQueuedAttachmentPreview(
+        first.event,
+        opened.attachmentId,
+        basis.observationId,
+        "queued",
+        previewId
+      )
+    ).rejects.toThrow("queue_changed");
+    expect(read).toHaveBeenCalledOnce();
+  });
+
+  it("rejects late queued preview delivery after navigation and supports absent optional readers", async () => {
+    const { ipc, first, chat } = setup();
+    const opened = await ipc.create(first.event);
+    const basis = await ipc.observe(first.event, opened.attachmentId);
+    const previewId = randomUUID();
+    await expect(
+      ipc.queuedMessage(
+        first.event,
+        opened.attachmentId,
+        basis.observationId,
+        "queued"
+      )
+    ).rejects.toThrow("queued_message_unavailable");
+    await expect(
+      ipc.readQueuedAttachmentPreview(
+        first.event,
+        opened.attachmentId,
+        basis.observationId,
+        "queued",
+        previewId
+      )
+    ).rejects.toThrow("queued_message_unavailable");
+    const reply = Promise.withResolvers<ArrayBuffer>();
+    const read = vi
+      .fn<NonNullable<typeof chat.readQueuedAttachmentPreview>>()
+      .mockReturnValue(reply.promise);
+    chat.readQueuedAttachmentPreview = read;
+    const pending = ipc.readQueuedAttachmentPreview(
+      first.event,
+      opened.attachmentId,
+      basis.observationId,
+      "queued",
+      previewId
+    );
+    first.contents.emit("did-start-navigation", { isMainFrame: true });
+    reply.resolve(new ArrayBuffer(3));
+    await expect(pending).rejects.toThrow("attachment_unavailable");
+  });
+
+  it("reads an input preview only through its attached frame and rechecks navigation", async () => {
+    const { ipc, first, second, chat } = setup();
+    const opened = await ipc.create(first.event);
+    const previewId = randomUUID();
+    const bytes = new ArrayBuffer(67);
+    const read = vi
+      .fn<NonNullable<typeof chat.readAttachmentPreview>>()
+      .mockResolvedValue(bytes);
+    chat.readAttachmentPreview = read;
+    await expect(
+      ipc.readAttachmentPreview(second.event, opened.attachmentId, previewId)
+    ).rejects.toThrow("native_chat_attachment_unavailable");
+    await expect(
+      ipc.readAttachmentPreview(first.event, opened.attachmentId, {
+        path: "/private/file.png",
+      })
+    ).rejects.toThrow("input_image_unavailable");
+    expect(read).not.toHaveBeenCalled();
+    await expect(
+      ipc.readAttachmentPreview(first.event, opened.attachmentId, previewId)
+    ).resolves.toBe(bytes);
+    expect(read).toHaveBeenCalledExactlyOnceWith(
+      { id: opened.sessionId },
+      previewId
+    );
+    const reply = Promise.withResolvers<ArrayBuffer>();
+    read.mockReturnValueOnce(reply.promise);
+    const pending = ipc.readAttachmentPreview(
+      first.event,
+      opened.attachmentId,
+      previewId
+    );
+    first.contents.emit("did-start-navigation", { isMainFrame: true });
+    reply.resolve(bytes);
+    await expect(pending).rejects.toThrow("native_chat_attachment_unavailable");
+  });
+
+  it("bounds concurrent preview reads per frame and supports old workers without the reader", async () => {
+    const { ipc, first, chat } = setup();
+    const opened = await ipc.create(first.event);
+    const previewId = randomUUID();
+    await expect(
+      ipc.readAttachmentPreview(first.event, opened.attachmentId, previewId)
+    ).rejects.toThrow("input_image_unavailable");
+    const reply = Promise.withResolvers<ArrayBuffer>();
+    const read = vi
+      .fn<NonNullable<typeof chat.readAttachmentPreview>>()
+      .mockReturnValue(reply.promise);
+    chat.readAttachmentPreview = read;
+    const reads = Array.from({ length: 8 }, () =>
+      ipc.readAttachmentPreview(first.event, opened.attachmentId, previewId)
+    );
+    await expect(
+      ipc.readAttachmentPreview(first.event, opened.attachmentId, previewId)
+    ).rejects.toThrow("input_image_busy");
+    expect(read).toHaveBeenCalledTimes(8);
+    reply.resolve(new ArrayBuffer(67));
+    await Promise.all(reads);
+    await expect(
+      ipc.readAttachmentPreview(first.event, opened.attachmentId, previewId)
+    ).resolves.toHaveProperty("byteLength", 67);
+    await ipc.detach(first.event, opened.attachmentId);
+    await expect(
+      ipc.readAttachmentPreview(first.event, opened.attachmentId, previewId)
+    ).rejects.toThrow("native_chat_attachment_unavailable");
+  });
+
   it("isolates sibling deck attachments and revokes a replaced or forgotten nested deck", async () => {
     const { chat, emit, listeners } = setup();
     const workspaceId = "eac20941e6a410aa";
@@ -1347,9 +1799,11 @@ describe("native chat IPC", () => {
     ).rejects.toThrow("native_chat_attachment_unavailable");
     expect(submit).not.toHaveBeenCalled();
     const pending = ipc.submitImage(first.event, opened.attachmentId, payload);
-    expect(submit).toHaveBeenCalledExactlyOnceWith(
-      { id: opened.sessionId },
-      payload
+    await vi.waitFor(() =>
+      expect(submit).toHaveBeenCalledExactlyOnceWith(
+        { id: opened.sessionId },
+        payload
+      )
     );
     first.contents.emit("did-start-navigation", { isMainFrame: true });
     reply.resolve({
@@ -1774,50 +2228,95 @@ describe("native chat IPC", () => {
     ).rejects.toThrow("native_chat_attachment_unavailable");
   });
 
-  it("rechecks navigation after queued replacement preflight and keeps steering scoped", async () => {
-    const { ipc, first, second, chat } = setup();
-    const one = await ipc.create(first.event);
-    const two = await ipc.load(second.event, one.sessionId);
-    const basis = await ipc.observe(first.event, one.attachmentId);
-    const change = {
-      action: "replace",
-      inputId: "queued",
-      text: "draft",
-      requestId: "replace",
-      observationId: basis.observationId,
-    };
-    const beforeDispatch = Promise.withResolvers<void>();
-    let dispatched = false;
-    vi.spyOn(chat, "editQueue").mockImplementation(
-      async (session, snapshot, edit, revalidate) => {
-        await beforeDispatch.promise;
-        revalidate?.();
-        dispatched = true;
-        return {
-          sessionId: session.id,
-          requestId: edit.requestId,
-          sessionRevision: snapshot.sessionRevision,
-        };
-      }
-    );
-    await expect(
-      ipc.editQueue(first.event, one.attachmentId, {
-        ...change,
-        inputIds: ["injected"],
-      })
-    ).rejects.toThrow("native_chat_queue_change_invalid");
-    await expect(
-      ipc.steer(second.event, two.attachmentId, {
+  it.each(["replace", "replaceText"])(
+    "rechecks navigation after %s preflight and keeps steering scoped",
+    async (action) => {
+      const { ipc, first, second, chat } = setup();
+      const one = await ipc.create(first.event);
+      const two = await ipc.load(second.event, one.sessionId);
+      const basis = await ipc.observe(first.event, one.attachmentId);
+      const change = {
+        action,
+        inputId: "queued",
+        text: "draft",
+        requestId: "replace",
         observationId: basis.observationId,
-        requestId: "steer",
-        text: "Correction",
+      };
+      const beforeDispatch = Promise.withResolvers<void>();
+      let dispatched = false;
+      vi.spyOn(chat, "editQueue").mockImplementation(
+        async (session, snapshot, edit, revalidate) => {
+          await beforeDispatch.promise;
+          revalidate?.();
+          dispatched = true;
+          return {
+            sessionId: session.id,
+            requestId: edit.requestId,
+            sessionRevision: snapshot.sessionRevision,
+          };
+        }
+      );
+      await expect(
+        ipc.editQueue(first.event, one.attachmentId, {
+          ...change,
+          inputIds: ["injected"],
+        })
+      ).rejects.toThrow("native_chat_queue_change_invalid");
+      await expect(
+        ipc.steer(second.event, two.attachmentId, {
+          observationId: basis.observationId,
+          requestId: "steer",
+          text: "Correction",
+        })
+      ).rejects.toThrow("native_chat_observation_unavailable");
+      const pending = ipc.editQueue(first.event, one.attachmentId, change);
+      first.contents.emit("did-start-navigation", { isMainFrame: true });
+      beforeDispatch.resolve();
+      await expect(pending).rejects.toThrow(
+        "native_chat_attachment_unavailable"
+      );
+      expect(dispatched).toBe(false);
+    }
+  );
+
+  it("keeps replacement capability factual and binds empty-caption edits to the admitted frame", async () => {
+    const { ipc, first, second, chat } = setup();
+    expect(ipc.acceptsQueuedTextReplacement(first.event)).toBe(false);
+    Object.defineProperty(chat, "acceptsQueuedTextReplacement", {
+      value: true,
+    });
+    expect(ipc.acceptsQueuedTextReplacement(first.event)).toBe(true);
+    const opened = await ipc.create(first.event);
+    const other = await ipc.load(second.event, opened.sessionId);
+    const basis = await ipc.observe(first.event, opened.attachmentId);
+    const edit = vi.spyOn(chat, "editQueue");
+    const change = {
+      action: "replaceText",
+      inputId: "queued",
+      text: "",
+      observationId: basis.observationId,
+      requestId: "empty-caption",
+    };
+    await expect(
+      ipc.editQueue(second.event, opened.attachmentId, change)
+    ).rejects.toThrow("attachment_unavailable");
+    await expect(
+      ipc.editQueue(second.event, other.attachmentId, change)
+    ).rejects.toThrow("observation_unavailable");
+    await expect(
+      ipc.editQueue(first.event, opened.attachmentId, {
+        ...change,
+        settings: {},
       })
-    ).rejects.toThrow("native_chat_observation_unavailable");
-    const pending = ipc.editQueue(first.event, one.attachmentId, change);
-    first.contents.emit("did-start-navigation", { isMainFrame: true });
-    beforeDispatch.resolve();
-    await expect(pending).rejects.toThrow("native_chat_attachment_unavailable");
-    expect(dispatched).toBe(false);
+    ).rejects.toThrow("queue_change_invalid");
+    expect(edit).not.toHaveBeenCalled();
+    await ipc.editQueue(first.event, opened.attachmentId, change);
+    expect(edit).toHaveBeenCalledExactlyOnceWith(
+      { id: opened.sessionId },
+      basis.snapshot,
+      change,
+      expect.any(Function)
+    );
   });
 
   it("binds question answers to their attachment and rejects approval and malformed inputs", async () => {
@@ -2066,6 +2565,11 @@ describe("native chat IPC", () => {
   it.each([
     ["native_provider_byok_key_missing", "native-provider-key-required"],
     ["native_provider_model_unavailable", "native-provider-model-unavailable"],
+    ["native_hooks_review_required", "native-hooks-review-required"],
+    [
+      "native_hooks_configuration_invalid",
+      "native-hooks-configuration-invalid",
+    ],
     [
       "native_provider_endpoint_https_required",
       "native-provider-endpoint-https-required",
@@ -2645,4 +3149,194 @@ describe("background processes", () => {
     await expect(ipc.create(first.event)).resolves.toBeDefined();
     expect(stop).not.toHaveBeenCalled();
   });
+});
+
+describe("saved selection IPC", () => {
+  const profile = "a".repeat(64);
+  const state = (sessionId = "fork/0123456789abcdef0123456789abcdef") => ({
+    target: { sessionId },
+    revision: 2,
+    selection: {
+      profileId: profile,
+      modelId: "model-a",
+      effort: "high" as const,
+    },
+    available: true,
+  });
+  function owner(
+    read = vi.fn<NativeChatSelections["read"]>(async () => state())
+  ) {
+    return {
+      read,
+      update: vi.fn<NativeChatSelections["update"]>(async () => state()),
+      readDefaults: () => null,
+      prepareCreation: vi.fn<NativeChatSelections["prepareCreation"]>(),
+      finishCreation: vi.fn<NativeChatSelections["finishCreation"]>(),
+    } as unknown as NativeChatSelections;
+  }
+
+  it("reads and edits fork selection metadata without opening a chat or provider", async () => {
+    const selections = owner();
+    const f = setup(undefined, undefined, undefined, undefined, selections);
+    const create = vi.spyOn(f.chat, "create"),
+      load = vi.spyOn(f.chat, "load");
+    const target = state().target;
+    expect(await f.ipc.selection(f.first.event, target)).toEqual(state());
+    const operation = randomUUID();
+    await f.ipc.updateSelection(f.first.event, target, 2, operation, {
+      profileId: profile,
+      effort: "high",
+    });
+    expect(selections.update).toHaveBeenCalledExactlyOnceWith(
+      WORKSPACE,
+      target,
+      2,
+      operation,
+      { profileId: profile, effort: "high" },
+      expect.any(Function)
+    );
+    expect(create).not.toHaveBeenCalled();
+    expect(load).not.toHaveBeenCalled();
+    await expect(
+      f.ipc.selection(f.first.event, { ...target, draftId: randomUUID() })
+    ).rejects.toThrow("selection_invalid");
+  });
+
+  it("does not lend a delayed settings response to a navigated frame", async () => {
+    const pending = Promise.withResolvers<ReturnType<typeof state>>();
+    const selections = owner(
+      vi.fn<NativeChatSelections["read"]>(() => pending.promise)
+    );
+    const f = setup(undefined, undefined, undefined, undefined, selections);
+    const request = f.ipc.selection(f.first.event, state().target);
+    f.first.frame.url = `${ORIGIN}/desktop/settings`;
+    pending.resolve(state());
+    await expect(request).rejects.toThrow("native_chat_scope_changed");
+  });
+
+  it("refuses fresh input on a different actual route even when the window remembers that profile", async () => {
+    const selections = owner();
+    const f = setup(undefined, undefined, undefined, undefined, selections);
+    f.scopes.set(f.first.sender, {
+      workspaceId: WORKSPACE,
+      chat: f.chat,
+      profileId: "b".repeat(64),
+    });
+    f.chat.inputReceipt = vi.fn<typeof f.chat.inputReceipt>(async () => {
+      throw new Error("input_unavailable");
+    });
+    const attachment = await f.ipc.create(f.first.event);
+    const submit = vi.spyOn(f.chat, "submit");
+    await expect(
+      f.ipc.submit(
+        f.first.event,
+        attachment.attachmentId,
+        "input",
+        "Hello",
+        "act",
+        "high",
+        undefined,
+        2
+      )
+    ).rejects.toThrow("selection_revision_changed");
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  it("observes an accepted input before consulting newer settings or route", async () => {
+    const read = vi.fn<NativeChatSelections["read"]>(async () => state());
+    const selections = owner(read);
+    const f = setup(undefined, undefined, undefined, undefined, selections);
+    f.scopes.set(f.first.sender, {
+      workspaceId: WORKSPACE,
+      chat: f.chat,
+      profileId: "b".repeat(64),
+    });
+    const attachment = await f.ipc.create(f.first.event);
+    const accepted = {
+      sessionId: attachment.sessionId,
+      inputId: "original",
+      disposition: "completed" as const,
+      inputPosition: 1,
+      turnId: "old-turn",
+    };
+    f.chat.inputReceipt = vi.fn<typeof f.chat.inputReceipt>(
+      async () => accepted
+    );
+    const submit = vi.spyOn(f.chat, "submit");
+    expect(
+      await f.ipc.submit(
+        f.first.event,
+        attachment.attachmentId,
+        "original",
+        "Hello",
+        "act",
+        "high",
+        undefined,
+        1
+      )
+    ).toEqual(accepted);
+    expect(read).not.toHaveBeenCalled();
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  it("forwards a validated fresh selection revision in its own argument slot", async () => {
+    const selections = owner(
+      vi.fn<NativeChatSelections["read"]>(async () => state("session-0"))
+    );
+    const f = setup(undefined, undefined, undefined, undefined, selections);
+    f.scopes.set(f.first.sender, {
+      workspaceId: WORKSPACE,
+      chat: f.chat,
+      profileId: profile,
+    });
+    f.chat.inputReceipt = vi.fn<typeof f.chat.inputReceipt>(async () => {
+      throw new Error("input_unavailable");
+    });
+    const attachment = await f.ipc.create(f.first.event);
+    const submit = vi.spyOn(f.chat, "submit");
+    await f.ipc.submit(
+      f.first.event,
+      attachment.attachmentId,
+      "fresh",
+      "Hello",
+      "act",
+      "high",
+      undefined,
+      2
+    );
+    expect(submit).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ id: attachment.sessionId }),
+      "fresh",
+      "Hello",
+      "act",
+      undefined,
+      "high",
+      2
+    );
+  });
+});
+
+it("uses the verified fixed route's image capability for a default-profile subscription", async () => {
+  const selections = {
+    read: async () => ({
+      target: { sessionId: "fixed-chat" },
+      revision: 1,
+      selection: { profileId: null, modelId: "gpt-6.1-sol", effort: "medium" },
+      available: true,
+    }),
+    readDefaults: () => null,
+  } as unknown as NativeChatSelections;
+  const f = setup(undefined, undefined, undefined, undefined, selections);
+  Object.defineProperties(f.chat, {
+    modelId: { value: "gpt-6.1-sol" },
+    supportsSelectedImage: { value: true },
+    acceptsSelectedImage: { value: true },
+  });
+  f.scopes.set(f.first.sender, {
+    workspaceId: WORKSPACE,
+    chat: f.chat,
+    profileId: null,
+  });
+  await f.ipc.selection(f.first.event, { sessionId: "fixed-chat" });
+  expect(await f.ipc.acceptsSelectedImage(f.first.event)).toBe(true);
 });

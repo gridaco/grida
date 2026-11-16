@@ -1,6 +1,10 @@
 // GRIDA-SEC-008 — authorization URL origin, query, and attempt correlation.
 import { describe, expect, it } from "vitest";
 import {
+  CHATGPT_SUBSCRIPTION_DEFAULT_MODEL_ID,
+  CHATGPT_SUBSCRIPTION_MODEL_IDS,
+} from "@grida/ai-host";
+import {
   CHATGPT_AUTHORIZE_URL,
   CHATGPT_CALLBACK_PATH,
   CHATGPT_CALLBACK_PORTS,
@@ -38,6 +42,18 @@ function authorizationUrl(overrides: Record<string, string> = {}): string {
 }
 
 describe("validateChatGptAuthorizationUrl", () => {
+  it("uses the current offered subscription default", () => {
+    expect(CHATGPT_SUBSCRIPTION_CONFIG.default_model_id).toBe(
+      "openai/gpt-6.1-sol"
+    );
+    expect(CHATGPT_SUBSCRIPTION_CONFIG.default_model_id).toBe(
+      CHATGPT_SUBSCRIPTION_DEFAULT_MODEL_ID
+    );
+    expect(CHATGPT_SUBSCRIPTION_MODEL_IDS).toContain(
+      CHATGPT_SUBSCRIPTION_CONFIG.default_model_id
+    );
+  });
+
   it("derives every registered callback from the port and path contract", () => {
     expect(CHATGPT_CALLBACK_URIS).toEqual(
       CHATGPT_CALLBACK_PORTS.map(

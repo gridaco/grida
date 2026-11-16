@@ -1,8 +1,9 @@
 //! Attached conversation history controls and portable context capture.
-//! GRIDA-SEC-004 separates retained context from workspace and execution authority.
+//! GRIDA-SEC-004 / GRIDA-SEC-008 separate retained context from execution authority.
 
 use super::*;
 use agent_kit_core::messages::ResultContent;
+use agent_kit_core::turn::{OperationInput, OperationOutcome};
 use agent_kit_store_sqlite::history::{
     HistoryBasis, HistoryRevised, HistoryRevision, HistorySeed, HistorySelection, ReplayCursor,
     ReplayWindow, RetainedHistory, SeededSession,
@@ -197,9 +198,15 @@ impl Host {
         before_turn: Option<TurnId>,
         side: bool,
     ) -> Result<PriorContext> {
+        let execution = self.execution()?;
+        let model = execution.config.model.clone();
+        let capabilities = execution.provider.capabilities(&model)?;
+        let authority = execution.authority.inference.authority.clone();
         let retained = self
             .store
-            .context_history_with(session.clone(), before_turn, model_context)
+            .context_history_with(session.clone(), before_turn, move |state| {
+                model_context_for_route(state, &model, &capabilities, &authority)
+            })
             .await?;
         // The boundary follows the records copied from another chat. A
         // revision can fold the side chat's own earlier records into its seed;
@@ -506,6 +513,16 @@ impl Host {
                 )
                 .simple()
             ))?;
+            let _admission = host.configuration_admission.lock().await;
+            let cut = ConversationCut::Through(derivation.anchor);
+            let (selection, inheritance) = host
+                .prepare_fork_selection(
+                    &source,
+                    &destination,
+                    &derivation.request,
+                    Fingerprint::of(&cut)?,
+                )
+                .await?;
             let configuration = match host.store.inspect(destination.clone()).await {
                 Ok(existing) => existing.configuration,
                 Err(error) if error.code == "session_missing" => {
@@ -516,13 +533,13 @@ impl Host {
                         execution: execution.configuration,
                         owner: execution.owner,
                         subagent: None,
+                        worker: None,
                         side: None,
                     };
                     encode(SESSION_SCHEMA, SESSION_VERSION, &configuration)?
                 }
                 Err(error) => return Err(error),
             };
-            let cut = ConversationCut::Through(derivation.anchor);
             let created = host
                 .store
                 .create_seeded(
@@ -534,12 +551,17 @@ impl Host {
                         },
                         source: source.clone(),
                         expected_history: derivation.basis,
-                        intent: Fingerprint::of(&cut)?,
+                        intent: if inheritance {
+                            Fingerprint::of(&(&cut, selection))?
+                        } else {
+                            Fingerprint::of(&cut)?
+                        },
                     },
                     project,
                     move |history| lower_seed(source, cut, history),
                 )
                 .await?;
+            host.finish_fork_selection(&created.session).await?;
             Ok(created.session)
         })
         .await
@@ -601,7 +623,7 @@ impl Host {
                     }
                 }
                 let view = host.store.inspect(session.clone()).await?;
-                host.check_execution(&view)?;
+                host.check_execution(&view).await?;
                 super::goals::require_goal_resolved_for_revision(&view)?;
                 if !view.admission_paused {
                     host.check_ready_capacity(&session).await?;
@@ -632,6 +654,92 @@ impl Host {
         })
         .await
     }
+}
+
+/// A different model route receives the portable conversation, never another
+/// route's encrypted continuation or protocol-owned tool-call identities.
+/// A different principal or scope also receives portable context, even when
+/// the visible model name and provider capabilities are unchanged.
+fn model_context_for_route(
+    state: &agent_kit_core::turn::TurnState,
+    model: &ModelId,
+    capabilities: &ModelCapabilities,
+    authority: &AuthorityBinding,
+) -> Vec<HistoryRecord> {
+    let records = model_context(state);
+    let visible: BTreeSet<_> = records
+        .iter()
+        .map(|HistoryRecord::Message(message)| &message.id)
+        .collect();
+    let changed = state.operations().values().any(|operation| {
+        let (OperationInput::Inference(request), Some(OperationOutcome::Inference(outcome))) =
+            (&operation.record.input, operation.outcome())
+        else {
+            return false;
+        };
+        (request.request().model != *model
+            || request.capabilities() != capabilities
+            || request.binding().authority.principal != authority.principal
+            || request.binding().authority.scope != authority.scope)
+            && outcome
+                .messages
+                .iter()
+                .any(|message| visible.contains(&message.id))
+    });
+    if !changed {
+        return records;
+    }
+    records
+        .into_iter()
+        .filter_map(|HistoryRecord::Message(mut message)| {
+            if !matches!(message.role, Role::Assistant | Role::Tool) {
+                return Some(HistoryRecord::Message(message));
+            }
+            message.content = message
+                .content
+                .into_iter()
+                .filter_map(|part| match part {
+                    Content::Text(text) => Some(Content::Text(text)),
+                    Content::ToolCall(call) => Some(Content::Text(format!(
+                        "Earlier tool call (history only): {}",
+                        serde_json::json!({
+                            "call": call.id,
+                            "tool": call.tool,
+                            "arguments": call.arguments,
+                        })
+                    ))),
+                    Content::ToolResult(result) => Some(Content::Text(format!(
+                        "Earlier tool result (history only): {}",
+                        serde_json::json!({
+                            "call": result.call,
+                            "status": result.status,
+                            "content": result.content.into_iter().map(|part| match part {
+                                ResultContent::Text(text) => serde_json::json!({"text": text}),
+                                ResultContent::Media(media) => serde_json::json!({
+                                    "mediaType": media.media_type,
+                                    "omitted": "Media bytes are not portable between model routes.",
+                                }),
+                            }).collect::<Vec<_>>(),
+                            "structured": result.structured,
+                            "truncated": result.truncated,
+                        })
+                    ))),
+                    Content::Media(media) => Some(Content::Media(media)),
+                    Content::Reasoning(_) | Content::ProviderState(_) => None,
+                })
+                .collect();
+            if message.content.is_empty() {
+                return None;
+            }
+            message.role = Role::Assistant;
+            message.provenance = Provenance {
+                source: "retained_model_context".into(),
+                kind: ProvenanceKind::Transformed,
+                fingerprint: None,
+            };
+            Some(HistoryRecord::Message(message))
+        })
+        .collect()
 }
 
 /// Where a transcript begins within a seed: after the inherited records of
@@ -763,10 +871,18 @@ fn visible_message(message: &Message) -> bool {
         })
 }
 
-/// A file attached by reference, named in a history preview without its path.
+/// A resource attached by reference, named in a history preview without its path.
 fn attachment_label(media: &agent_kit_core::messages::MediaRef) -> Option<String> {
-    grida_agent_master::file_reference::reference(media)
-        .map(|reference| format!("\n\nAttached file {}.", reference.name))
+    grida_agent_master::file_reference::reference(media).map(|reference| {
+        let kind = if reference.mime_type.as_deref()
+            == Some(grida_agent_master::file_reference::DIRECTORY_MEDIA_TYPE)
+        {
+            "folder"
+        } else {
+            "file"
+        };
+        format!("\n\nAttached {kind} {}.", reference.name)
+    })
 }
 
 fn revision_target_unavailable() -> Error {

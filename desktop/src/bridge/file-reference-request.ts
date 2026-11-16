@@ -8,7 +8,7 @@
 type PathForFile = (file: File) => string;
 
 export namespace FileReferenceRequest {
-  /** Whether `file` names a file on disk. Reveals nothing but that. */
+  /** Whether `file` names a file or directory on disk. Reveals nothing but that. */
   export function available(file: unknown, pathFor: PathForFile): boolean {
     return pathOf(file, pathFor) !== null;
   }

@@ -1,7 +1,7 @@
 // GRIDA-SEC-004 / GRIDA-SEC-008 / GRIDA-SEC-014 — bounded native provider HTTP.
 import { allowsLlamaCppInputCounting } from "@grida/ai-host";
 import { CHATGPT_RESPONSES_URL } from "../chatgpt-configuration";
-const UPLOAD_LIMIT = 1024 * 1024;
+const UPLOAD_LIMIT = 8 * 1024 * 1024;
 const RESPONSE_LIMIT = 4 * 1024 * 1024;
 const UPLOAD_CHUNK = 64 * 1024;
 const READ_CHUNK = 32 * 1024;

@@ -38,6 +38,10 @@ pub enum ResponsesEndpoint {
     /// admission-rejection evidence.
     #[serde(rename = "subscription")]
     Restricted,
+    /// Accepts images through a resolver, but still requires an omitted output
+    /// limit and supplies neither input measurement nor admission evidence.
+    /// This distinct identity can replay legacy restricted text history.
+    RestrictedImages,
 }
 
 /// A model's default wire reasoning effort. A per-request portable reasoning
@@ -104,8 +108,8 @@ impl Responses {
         )
     }
 
-    /// Permit retained images only on the API endpoint and on model profiles
-    /// with the image modality.
+    /// Permit retained images only on endpoints that accept images and on model
+    /// profiles with the image modality. A resolver enables no endpoint facets.
     pub fn with_image_resolver(
         binding: ProviderBinding,
         replay_binding: BindingId,
@@ -121,7 +125,10 @@ impl Responses {
                 let capabilities = &profile.capabilities;
                 !(text_profile(capabilities)
                     || (images.is_some()
-                        && endpoint == ResponsesEndpoint::Api
+                        && matches!(
+                            endpoint,
+                            ResponsesEndpoint::Api | ResponsesEndpoint::RestrictedImages
+                        )
                         && image_profile(capabilities)))
             })
         {
@@ -182,7 +189,7 @@ impl Responses {
                 "unsupported_request_extension",
             ));
         }
-        if self.endpoint == ResponsesEndpoint::Restricted && request.max_output_tokens.is_some() {
+        if self.endpoint != ResponsesEndpoint::Api && request.max_output_tokens.is_some() {
             return Err(Error::new(
                 ErrorKind::Unsupported,
                 "responses_output_limit_unsupported",
@@ -485,7 +492,7 @@ impl Provider for Responses {
 
 const REPLAY_SCHEMA: &str = "openai.responses.item";
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 struct ReplayScope {
     producer: ProviderId,
     binding: BindingId,
@@ -517,7 +524,7 @@ impl ReplayScope {
             || state.binding != self.binding
             || state.payload.schema().as_str() != REPLAY_SCHEMA
             || state.payload.version() != 1
-            || state.validity != self.fingerprint(message, projection, &state.payload)?
+            || !self.matches_fingerprint(message, projection, state)?
         {
             return Err(Error::new(
                 ErrorKind::Conflict,
@@ -536,6 +543,28 @@ impl ReplayScope {
         payload: &Envelope,
     ) -> Result<Fingerprint> {
         Fingerprint::of(&(self, &message.id, message.phase, projection, payload))
+    }
+
+    fn matches_fingerprint(
+        &self,
+        message: &Message,
+        projection: &[Content],
+        state: &ProviderState,
+    ) -> Result<bool> {
+        if state.validity == self.fingerprint(message, projection, &state.payload)? {
+            return Ok(true);
+        }
+        // Adding image input does not change the wire representation of any
+        // completed text item. Only this expansion accepts the original scope;
+        // fresh state and prepared capability identities remain distinct.
+        if self.endpoint == ResponsesEndpoint::RestrictedImages {
+            let legacy = Self {
+                endpoint: ResponsesEndpoint::Restricted,
+                ..self.clone()
+            };
+            return Ok(state.validity == legacy.fingerprint(message, projection, &state.payload)?);
+        }
+        Ok(false)
     }
 }
 

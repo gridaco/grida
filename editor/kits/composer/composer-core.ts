@@ -257,6 +257,12 @@ export class ComposerCore {
   private readonly listeners = new Set<Listener>();
   private attachmentSequence = 0;
   private cursor: { textBeforeCursor: string; position: number } | null = null;
+  private documentRevision = 0;
+  private dismissedTrigger: {
+    kind: ComposerTrigger["kind"];
+    from: number;
+    revision: number;
+  } | null = null;
 
   constructor(catalog: Partial<ComposerCatalog> = {}) {
     this.catalog = {
@@ -300,7 +306,7 @@ export class ComposerCore {
       mentions: next.mentions,
     };
     const trigger = this.cursor
-      ? this.matchTrigger(this.cursor.textBeforeCursor, this.cursor.position)
+      ? this.inspectTrigger(this.cursor.textBeforeCursor, this.cursor.position)
       : this.snapshot.trigger;
     this.snapshot = {
       ...this.snapshot,
@@ -323,6 +329,7 @@ export class ComposerCore {
     ) {
       return;
     }
+    this.documentRevision += 1;
     this.snapshot = {
       ...this.snapshot,
       text: input.text,
@@ -333,11 +340,25 @@ export class ComposerCore {
 
   inspectCursor(textBeforeCursor: string, cursorPosition: number): void {
     this.cursor = { textBeforeCursor, position: cursorPosition };
-    const trigger = this.matchTrigger(textBeforeCursor, cursorPosition);
+    const trigger = this.inspectTrigger(textBeforeCursor, cursorPosition);
     if (this.triggerEquals(this.snapshot.trigger, trigger)) {
       return;
     }
     this.snapshot = { ...this.snapshot, trigger, triggerIndex: 0 };
+    this.publish();
+  }
+
+  /** Hide this completion without changing its text, even when a blur/focus or
+   * catalog refresh inspects the same token again. Editing or leaving it reopens. */
+  dismissTrigger(): void {
+    const trigger = this.snapshot.trigger;
+    if (!trigger) return;
+    this.dismissedTrigger = {
+      kind: trigger.kind,
+      from: trigger.range.from,
+      revision: this.documentRevision,
+    };
+    this.snapshot = { ...this.snapshot, trigger: null, triggerIndex: 0 };
     this.publish();
   }
 
@@ -386,6 +407,9 @@ export class ComposerCore {
   }
 
   clear(): void {
+    this.cursor = null;
+    this.dismissedTrigger = null;
+    this.documentRevision += 1;
     this.snapshot = {
       ...this.snapshot,
       text: "",
@@ -427,6 +451,23 @@ export class ComposerCore {
 
   private hasUserContent(parts: ComposerPart[]): boolean {
     return parts.some((part) => part.type !== "editor-context");
+  }
+
+  private inspectTrigger(
+    textBeforeCursor: string,
+    cursorPosition: number
+  ): ComposerTrigger | null {
+    const trigger = this.matchTrigger(textBeforeCursor, cursorPosition);
+    const dismissed = this.dismissedTrigger;
+    if (
+      trigger &&
+      dismissed?.kind === trigger.kind &&
+      dismissed.from === trigger.range.from &&
+      dismissed.revision === this.documentRevision
+    )
+      return null;
+    this.dismissedTrigger = null;
+    return trigger;
   }
 
   private matchTrigger(

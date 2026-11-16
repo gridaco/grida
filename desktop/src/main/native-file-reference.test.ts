@@ -1,7 +1,9 @@
 import fs from "node:fs";
+import fsp from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NativeFileReference } from "./native-file-reference";
 
 // GRIDA-SEC-004 — Main reads only metadata and refuses protected stores.
@@ -26,7 +28,10 @@ beforeEach(() => {
   fs.writeFileSync(path.join(store, "credentials.json"), "secret");
 });
 
-afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+afterEach(() => {
+  vi.restoreAllMocks();
+  fs.rmSync(root, { recursive: true, force: true });
+});
 
 const scope = () => ({ cwd, protectedPaths: [store] });
 
@@ -38,6 +43,7 @@ describe("NativeFileReference.resolve", () => {
         scope()
       )
     ).toEqual({
+      kind: "file",
       name: "clip.mov",
       path: path.join(cwd, "nested", "clip.mov"),
       workspacePath: "nested/clip.mov",
@@ -49,17 +55,38 @@ describe("NativeFileReference.resolve", () => {
     const link = path.join(root, "alias.mov");
     fs.symlinkSync(path.join(outside, "clip.mov"), link);
     expect(await NativeFileReference.resolve(link, scope())).toEqual({
+      kind: "file",
       name: "clip.mov",
       path: path.join(outside, "clip.mov"),
       size: 13,
     });
   });
 
-  it("refuses paths that are not a person's regular file", async () => {
+  it("names a folder from metadata without reading its contents or inventing a size", async () => {
+    const read = vi.spyOn(fsp, "readFile");
+    const list = vi.spyOn(fsp, "readdir");
+    const folder = path.join(cwd, "nested");
+    expect(await NativeFileReference.resolve(folder, scope())).toEqual({
+      kind: "directory",
+      name: "nested",
+      path: folder,
+      workspacePath: "nested",
+    });
+    const alias = path.join(cwd, "outside-folder");
+    fs.symlinkSync(outside, alias);
+    expect(await NativeFileReference.resolve(alias, scope())).toEqual({
+      kind: "directory",
+      name: "downloads",
+      path: outside,
+    });
+    expect(read).not.toHaveBeenCalled();
+    expect(list).not.toHaveBeenCalled();
+  });
+
+  it("refuses paths that are not a person's regular file or directory", async () => {
     for (const value of [
       "relative/clip.mov",
       path.join(outside, "missing.mov"),
-      outside,
       `${outside}/a\nb`,
       `/${"a".repeat(4097)}`,
       42,
@@ -70,11 +97,33 @@ describe("NativeFileReference.resolve", () => {
       );
   });
 
+  it.runIf(process.platform !== "win32")(
+    "refuses a special file without opening it",
+    async () => {
+      const fifo = path.join(outside, "pipe");
+      execFileSync("mkfifo", [fifo]);
+      await expect(NativeFileReference.resolve(fifo, scope())).rejects.toThrow(
+        "native_chat_file_reference_unavailable"
+      );
+    }
+  );
+
   it("refuses Grida's protected stores, also through a link", async () => {
     const secret = path.join(store, "credentials.json");
     const alias = path.join(outside, "innocent.mov");
     fs.symlinkSync(secret, alias);
-    for (const value of [secret, alias])
+    const folderAlias = path.join(outside, "innocent-folder");
+    const ancestorAlias = path.join(outside, "innocent-parent");
+    fs.symlinkSync(store, folderAlias);
+    fs.symlinkSync(root, ancestorAlias);
+    for (const value of [
+      secret,
+      alias,
+      store,
+      folderAlias,
+      root,
+      ancestorAlias,
+    ])
       await expect(NativeFileReference.resolve(value, scope())).rejects.toThrow(
         "native_chat_file_reference_protected"
       );
@@ -149,6 +198,7 @@ describe("NativeFileReference.link", () => {
     expect(
       NativeFileReference.link(
         {
+          kind: "file",
           name: "my clip #1.mov",
           path: "/Users/someone/my clip #1.mov",
           size: 9,
@@ -169,5 +219,39 @@ describe("NativeFileReference.link", () => {
       },
     });
     expect(NativeFileReference.mediaType("not a type")).toBeUndefined();
+  });
+
+  it("derives folder type and strips byte size and media preview", () => {
+    expect(
+      NativeFileReference.link(
+        {
+          kind: "directory",
+          name: "source #1",
+          path: "/project/source #1",
+          workspacePath: "source #1",
+        },
+        {
+          mimeType: "video/quicktime",
+          preview: { poster: POSTER, durationMs: 1000 },
+        }
+      )
+    ).toEqual({
+      type: "resource_link",
+      name: "source #1",
+      uri: "file:///project/source%20%231",
+      mimeType: "inode/directory",
+      _meta: { "co.grida/file-reference": { workspacePath: "source #1" } },
+    });
+    expect(
+      NativeFileReference.link(
+        {
+          kind: "file",
+          name: "clip.mov",
+          path: "/project/clip.mov",
+          size: 9,
+        },
+        { mimeType: "inode/directory" }
+      )
+    ).not.toHaveProperty("mimeType");
   });
 });

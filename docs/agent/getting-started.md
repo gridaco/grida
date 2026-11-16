@@ -1,6 +1,6 @@
 ---
 title: Start an agent task with files and folders
-description: Start from Welcome or a project, mention or attach files, and work with a deck, an SVG or a single file.
+description: Start from Welcome or a project, mention files, attach files or folder references, and work with a deck or an SVG.
 keywords:
   [
     agent workspace,
@@ -8,6 +8,7 @@ keywords:
     slides template,
     PNG attachment,
     file attachment,
+    folder reference,
     project files,
     Grida Desktop,
   ]
@@ -26,12 +27,15 @@ default project folder, or the project chosen at the top left, and sends your
 message as the first message of a new chat there. Your message is sent once:
 reloading the window does not send it again.
 
-The model picker on Welcome lists **Default** and the models available
-through your saved provider keys and endpoints. The chat in the project uses
-the model you choose; more Grida models appear in the project's own picker
-once its chat is running. If the chosen model cannot start, or the project
-needs a model choice first, the chat says your message wasn't sent and puts
-it in the composer so you can send it yourself.
+The model picker on Welcome lists **Default**, models from a connected
+**ChatGPT Subscription**, and models available through your saved provider
+keys and endpoints. New chats use your last explicitly chosen model and
+effort together. With no saved choice, a new chat prefers a ready subscription.
+The chat in the project uses the model you choose; more
+Grida models appear in the project's own picker once its chat is running. If
+the chosen model cannot start, or the project needs a model choice first,
+the chat says your message wasn't sent and puts it in the composer so you
+can send it yourself. [Choose a model](./models-and-usage.md#choose-a-model)
 
 To start from a slides template, choose **Slides** on the left, pick a
 template and send, with or without a description. Grida copies the template
@@ -58,35 +62,72 @@ reach only the files within the deck.
 
 ## Attach an image
 
-Choose **+ → Image**, or drop or paste one PNG up to 256 KiB into the
-composer, then describe what you want, for example “Crop this to the
-subject.” **+ → Library** adds a Library image as a PNG. **Image** and
-**Library** appear only when the selected model accepts images, such as the
-default Grida model or an OpenRouter model that takes images.
+Choose **+ → Image**, or drop or paste one PNG, JPEG, WebP or GIF into the
+composer, then describe what you want. **+ → Library** adds a selected Library
+image. A message accepts one attachment.
 
-The message and the image enter the chat together, also when the message
-joins the queue. After you send, the message shows the attachment as a chip
-with its name; the chip does not show a preview of the image. A crop appears
-below the turn's answer, where you can preview and save it.
+On a model that takes images, the first request includes actual prepared
+pixels. An image picked from disk also includes its verified original path;
+a pasted image without a disk origin has a retained snapshot identity instead.
+You can ask what the image shows without first asking the agent to open it.
+An incompatible model or older host keeps the entire draft unsent so you can
+choose a compatible model or remove the image.
+
+Raster sources can be up to 20 MiB, within decoded-image limits. Grida keeps
+the exact original and prepares a bounded PNG for the model, up to 2,048 pixels
+on either side, 2 megapixels and 384 KiB. Larger images may be resized. An
+animated image supplies one still frame, not the whole animation. Seeing the
+prepared image does not promise inspection of every original pixel.
+
+Images appear on their own outside the message's text bubble, without a card
+frame or caption. Select one to preview the retained original, including after
+reopening the chat; previewing starts no model request. A crop uses the image
+the model saw, so its resolution can be lower than the original.
 [Inspect and save results](./results.md)
 
 ## Attach a file
 
-Choose **+ → Files**, or drop or paste one file into the composer, and ask
-the agent to inspect it. A file of up to 256 KiB goes with the message: the
-agent can check its size and digest and read a short text excerpt, and the
-chat keeps a private copy. Dropping a folder or several files shows a message
-and keeps your draft. To work on a project file instead, mention it with `@`.
+Choose **+ → Files**, or drop or paste one file into the composer. A file from
+disk is a reference: the agent receives its verified path, name, type and size
+and inspects its contents on demand with its existing tools and permissions.
+Small disk files follow the same rule. No text extraction or file read happens
+just because you attached it. Mention a project file with `@` for the same
+on-demand workflow.
 
-Any other file, of any type or size, is attached by reference: the agent
-receives its name, type, size and location, not its contents, and works with
-it through its tools under the same permissions as any other file, for
-example running a command to inspect a video outside the project. Grida does
-not copy the file, so the agent sees it as it is when it reads it; moving or
-deleting it makes it unavailable. A video (such as MP4, MOV or WebM) shows a
-frame, its duration and its size on the attachment card, and the sent message
-keeps that card after you reopen the chat. Files in Grida's own data can't be
-attached.
+A reference is not a copy. The agent sees the current file when a permitted
+tool reads it; moving or deleting the source can make it unavailable. A video
+can show a poster frame and duration on its card, but its contents are still
+inspected on demand. The poster does not become automatic video perception or
+playback. PDF, SVG and HTML keep file cards without an invented rendering.
+
+Pasted ordinary files with no usable disk path can use the bounded retained
+file workflow when available. This retains a private copy and leaves content
+inspection to tools. It never invents an original path.
+
+Dropping several files or folders keeps the existing draft and attachment.
+Files in Grida's own protected data cannot be attached.
+
+## Attach a folder
+
+Drop one folder from your file manager onto the chat pane or composer. Grida
+attaches a reference with the folder's name, location and type. Its card has
+no total size or media preview. Attaching it does not copy, list or archive
+its contents.
+
+The agent uses its existing permissions to inspect the folder. Within an
+already permitted project, its file tools can list or search it. A reference
+to another folder does not extend those tools' access. Plan cannot run a
+command to inspect it; Act keeps the command access already allowed for that
+chat. Grida's private folders, folders containing that private data, and
+filesystem aliases to either cannot be attached.
+[Understand agent permissions](./permissions.md)
+
+The folder reference stays with a queued or saved message. Reopening the chat
+shows it without inspecting the folder or sending another model request.
+The agent sees the current contents when it uses a permitted tool; a reference
+is not a saved copy, so moving or deleting the folder can make it unavailable.
+If your installed Desktop build cannot accept folder references, the drop
+shows an update message and keeps the draft and current attachment.
 
 ## Edit selected text in an SVG or slide
 

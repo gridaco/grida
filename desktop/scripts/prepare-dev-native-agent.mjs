@@ -40,13 +40,15 @@ if (process.platform !== "win32") {
       );
       const file = path.join(output, name);
       fs.chmodSync(file, 0o755);
-      // Keep the original debug binary for Rust debugging. The host copy follows
-      // the same bounded resource checks as a distributed executable.
+      // Keep the original debug binary for Rust debugging. Strip symbols only
+      // from the host copy, as the release build does: retaining Rust's global
+      // debug symbol table can exceed the executable resource limit. macOS
+      // keeps undefined and dynamically referenced symbols for runtime linking.
       execFileSync(
         "strip",
         process.platform === "darwin"
-          ? ["-S", "-x", file]
-          : ["--strip-debug", file]
+          ? ["-u", "-r", file]
+          : ["--strip-all", file]
       );
       if (process.platform === "darwin") {
         execFileSync("/usr/bin/codesign", ["--force", "--sign", "-", file]);

@@ -58,7 +58,7 @@ export function ComposerDropOverlay({ label }: { label: string }) {
     <div
       aria-hidden
       data-composer-drop-overlay=""
-      className="pointer-events-none absolute inset-1 z-50 flex items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/40 bg-muted/80 text-sm text-muted-foreground"
+      className="pointer-events-none absolute inset-1 z-50 flex items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/40 bg-muted/80 text-sm text-muted-foreground"
     >
       {label}
     </div>

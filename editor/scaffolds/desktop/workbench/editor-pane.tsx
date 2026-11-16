@@ -31,6 +31,7 @@ import { useWorkspaceChanges } from "./workspace-changes";
 import { WorkspaceFileIcon } from "./workspace-file-icon";
 import { WorkspaceTabThumbnail } from "./workspace-tab-thumbnail";
 import { WorkbenchTab } from "./workbench-tab";
+import { WorkbenchPanelTab } from "./workbench-panel-tab";
 import type { WorkbenchPanel, WorkbenchPanels } from "./workbench-panels";
 import type { WorkspaceSvgText } from "./workspace-svg-text";
 import { FileContextMenu } from "./workbench-file-context-menu";
@@ -279,11 +280,14 @@ function EditorTitleBar({
   const [previewRevision, setPreviewRevision] = useState(0);
 
   useEffect(() => {
-    // Hover previews are file thumbnails; panels have none.
+    // Files have semantic thumbnails; a panel may supply informational content.
     previewController.reconcile(
-      tabs.flatMap((tab) => WorkbenchTab.relPath(tab) ?? [])
+      tabs.filter((tab) => {
+        const target = WorkbenchTab.parse(tab);
+        return target.kind === "file" || !!panels.get(target.id)?.preview;
+      })
     );
-  }, [previewController, tabs]);
+  }, [previewController, tabs, panels]);
 
   useEffect(() => {
     const dismiss = () => previewController.dismiss();
@@ -376,6 +380,7 @@ function EditorTitleBar({
               key={tab}
               tabKey={tab}
               panel={panels.get(target.id)}
+              previewController={previewController}
               active={tab === activeTab}
               onSelect={() => {
                 previewController.dismiss();
@@ -426,6 +431,7 @@ function EditorTitleBar({
         dirtyPaths={dirtyPaths}
         revision={previewRevision}
         thumbnailCache={thumbnailCache}
+        panels={panels}
       />
       {!treeVisible && (
         <WorkspaceExplorerToggleButton
@@ -522,12 +528,12 @@ function TabItem({
       data-tab-native-drag-region-target={tabKey}
       onPointerEnter={(event) =>
         previewController.pointerEnter(
-          { relPath, anchor: event.currentTarget },
+          { tabKey, anchor: event.currentTarget },
           event.pointerType
         )
       }
       onPointerLeave={(event) =>
-        previewController.pointerLeave(relPath, event.pointerType)
+        previewController.pointerLeave(tabKey, event.pointerType)
       }
       onClick={() => {
         previewController.dismiss();
@@ -623,19 +629,21 @@ function PanelTabContent({
   );
 }
 
-/** A panel's strip tab: no file menu, preview or dirty state. */
+/** A panel's strip tab, with its owner's optional informational preview. */
 function PanelTabItem({
   tabKey,
   panel,
   active,
   onSelect,
   onClose,
+  previewController,
 }: {
   tabKey: string;
   panel: WorkbenchPanel | undefined;
   active: boolean;
   onSelect: () => void;
   onClose: () => void;
+  previewController: TabPreviewController;
 }) {
   const tabRef = useRef<HTMLDivElement | null>(null);
   const title = panel?.title ?? "";
@@ -646,49 +654,25 @@ function PanelTabItem({
   }, [active]);
 
   return (
-    <div
+    <WorkbenchPanelTab
       ref={tabRef}
-      role="tab"
-      tabIndex={0}
-      aria-selected={active}
+      title={title}
+      icon={panel?.icon}
+      active={active}
+      onSelect={onSelect}
+      onClose={onClose}
       data-tab-native-drag-region-target={tabKey}
-      onClick={onSelect}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onSelect();
-        }
+      onPointerEnter={(event) => {
+        if (panel?.preview)
+          previewController.pointerEnter(
+            { tabKey, anchor: event.currentTarget },
+            event.pointerType
+          );
+        else previewController.dismiss();
       }}
-      onMouseDown={(e) => {
-        if (e.button === 1) {
-          e.preventDefault();
-          onClose();
-        }
-      }}
-      className={cn(
-        "group flex h-7 shrink-0 cursor-pointer select-none items-center gap-1.5 rounded-md px-2 text-xs outline-none transition-colors [&_svg:not([class*='size-'])]:size-3.5",
-        active
-          ? "bg-muted text-foreground shadow-xs"
-          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-        "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
-      )}
-    >
-      {panel?.icon}
-      <span className="max-w-[180px] truncate">{title}</span>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onClose();
-        }}
-        className={cn(
-          "ml-1 grid size-4 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground",
-          active ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-        )}
-        aria-label={`Close ${title}`}
-      >
-        <XIcon className="size-3" />
-      </button>
-    </div>
+      onPointerLeave={(event) =>
+        previewController.pointerLeave(tabKey, event.pointerType)
+      }
+    />
   );
 }

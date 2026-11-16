@@ -11,6 +11,13 @@ Available in Grida Desktop on macOS and Linux. Clients can fork, compact and
 revise chats through the
 [client guide](./clients.md#branch-or-revise-a-chat).
 
+Each saved chat keeps its own model connection and effort. Opening it restores
+that pair without changing the preference used by the next new chat. A fork
+starts with the source chat's selected pair and remembers later changes
+independently. Retained running or queued work keeps its accepted settings.
+If an older chat's original connection cannot be verified, choose one
+explicitly; Grida does not borrow a different chat's current composer choice.
+
 ## Reopen or organize a chat
 
 Open the chat list at the top left of the chat pane. It shows every chat in
@@ -23,8 +30,13 @@ interruption before continuing. [Guide and interrupt work](./controls.md)
 Long chats open at the latest messages. Scroll up to read earlier messages:
 they load above as you go, without moving what you are reading. Reading
 earlier messages leaves ongoing work running, and new replies arrive at the
-bottom. A message you sent with a file shows the file's name as a chip; the
-chip has no image preview.
+bottom. Attachments appear outside the message's text bubble. A supported
+image shows just the image, without a card frame or caption; other files keep
+individual cards. Supported images and retained video poster frames offer a
+preview after you reopen the chat. An older Desktop build without retained
+image support keeps the file card. An unavailable retained image shows an
+unavailable notice.
+[Inspect attachments](./results.md#inspect-an-attachment)
 
 A new chat gets a short title from its first request while the agent starts
 working. To change it, double-click the title, or open **Chat options** (the
@@ -33,8 +45,11 @@ Enter, or click elsewhere; Escape keeps the old one. A title you set is never
 replaced.
 
 **Archive chat** moves a chat out of the active list and lets any ongoing
-work continue. Open **Archived chats** to find it again, and choose **Restore
-chat** to return it to the active list. When **Delete chat** is available, it
+work continue. Open **Settings → Archived chats** to find archived chats across
+your workspaces, then choose **Unarchive** to return one to its workspace's
+active list. Restoring a chat does not open it or resume its work, and does not
+require a working model connection. The chat picker shows active chats only.
+When **Delete chat** is available, it
 removes the chat's private data and its named subagents. Saved project files
 and independent forks stay in place. A chat with running, paused, queued or
 uncertain work, or an unfinished goal, cannot be deleted; Desktop explains why
@@ -46,8 +61,11 @@ After an update, reopening a chat shows its saved messages and work without
 asking the model to repeat anything.
 
 If chat is unavailable after an update, keep your application data in place,
-reinstall the current Desktop version, and restore the chat's original model
-connection. Deleting data does not reset a connection.
+reinstall the current Desktop version, and restore the connection used by any
+unfinished work. A settled chat can use an explicitly selected model
+connection for its next message while keeping its visible history. Deleting
+data does not reset a connection.
+[Choose a model](./models-and-usage.md#choose-a-model)
 
 ## Try a different direction
 
@@ -76,8 +94,10 @@ open.
 A side chat starts empty. It knows this chat's saved conversation, but shows
 only its own messages, and continues as its own chat with the same model and
 effort. After your first message, the side chat gets a title the same way a
-new chat does, and its tab shows that title instead of **Side chat**. It looks
-and works like any chat: replies stream in, and you can queue, steer, pause or
+new chat does, and its tab shows that title instead of **Side chat**. Hovering
+its tab shows the latest visible messages from you and Grida without selecting
+the tab or starting work. It works like any chat: replies stream in, and you
+can queue, steer, pause or
 stop it, answer its questions and approvals, use **Plan**, edit a message you
 sent there, and see its background processes. Ask as many follow-up questions
 as you like in the tab. It treats this chat's conversation as background: it

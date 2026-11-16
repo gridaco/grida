@@ -15,6 +15,20 @@ The continuation identity covers this projection, the master configuration,
 the input limit, and any completion checks or lifecycle hooks, so recovery
 cannot silently replace the context or policy on which the turn was based.
 
+Image attachment policy stays in the product composition. The host accepts an
+explicit image as immutable prepared media and retains its original separately.
+The master projects the product image context into source-path or managed
+snapshot provenance and bounded-view/frame disclosure without adding those
+descriptions to the person's transcript. For a text-only continuation, earlier
+image pixels become an explicit uninspected-image note; tool call/result
+correlation is preserved and retained originals remain available to clients.
+New unsupported image intake is refused by the host before acceptance.
+An exact durably cancelled turn can still settle when that execution is no
+longer available: it reuses the retained continuation only to retire recorded
+work and publish cancellation, without dispatching provider or tool work.
+Recorded effects, uncertainty and funding remain accounted under their original
+identities.
+
 Pause-origin interruptions remain distinguishable after a rapid resumption.
 Only a person's Pause or Stop replaces a cut-off response in model context; a
 deadline or provider interruption leaves the published response in place. A
@@ -71,6 +85,28 @@ An Ultra Goal reservation divides the same inference allowance between the
 parent and one funded review. Settlement charges their recorded attempts
 once. An unsettled review retains the reservation until both turns can be
 accounted.
+
+General delegation is a separate captured product policy, independent of effort.
+The host supplies bounded spawn, informational message, wait and stop tools and
+retains their selected definitions and authority with the accepted input. The
+master adds assignment and integration instructions without constructing child
+sessions or their adapters. It derives completion evidence from recorded tool
+receipts: a child session, accepted input and execution turn identify one
+assignment, and only a matching authoritative terminal result satisfies it.
+A premature answer receives the remaining model steps to collect or stop
+outstanding work. Exhaustion produces an incomplete account; uncertain child
+effects remain uncertain. Task outcomes and owned-resource retirement have
+separate evidence: a later authoritative retirement proof can resolve resource
+uncertainty without rewriting the task outcome. Failed or cancelled child work
+can still be integrated honestly by the parent. The policy captures a separate bounded child allowance,
+which does not reset with names or new children. The host enforces that allowance
+and supplies the children's declared capabilities; the policy adds no grants.
+Worker processes belong to their assignment and stop before its result can be
+collected. The host supplies that settlement barrier; the parent must own any
+work intended to continue beyond the assignment.
+General worker policy is unavailable for reserved Goal work until its worker
+share has an explicit cumulative accounting contract. An existing Stop still
+settles without admitting further work.
 
 Completion accounts expose typed output-limit, refusal, and step-limit reasons
 for client adapters. Provider failure classifications remain available in the

@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import type {
   NativeChatGoal,
   NativeChatQueueItem,
+  NativeChatQueuePage,
 } from "@grida/desktop-bridge";
 import {
   DndContext,
@@ -47,7 +48,6 @@ import {
   EllipsisIcon,
   GoalIcon,
   GripVerticalIcon,
-  ListEndIcon,
   PauseIcon,
   PencilIcon,
   PlayIcon,
@@ -58,6 +58,7 @@ import type {
   NativeChatController,
   NativeChatView,
 } from "@/lib/agent-chat/native-chat-controller";
+import { NativeQueuedMessagePreview } from "./native-queued-message-preview";
 
 /**
  * The stack attached above the composer: a held-queue notice, waiting
@@ -113,9 +114,11 @@ export function NativeComposerTray({
         </div>
       )}
       {queue && items.length > 0 && (
-        <QueueList
+        <NativeComposerQueue
           controller={controller}
           view={view}
+          queue={queue}
+          count={view.observation?.snapshot.queuedInputs ?? queue.items.length}
           onReturnedText={onReturnedText}
         />
       )}
@@ -126,24 +129,28 @@ export function NativeComposerTray({
   );
 }
 
-function QueueList({
+/** Production queued rows and drag behavior, also usable with a local UI fixture. */
+export function NativeComposerQueue({
   controller,
   view,
+  queue,
+  count,
   onReturnedText,
-}: {
-  controller: NativeChatController;
-  view: NativeChatView;
-  onReturnedText: (text: string) => void;
-}) {
-  const queue = view.queue!;
+}: NativeComposerQueue.Props) {
   const ids = queue.items.map((item) => item.inputId);
   // Show a drop immediately; the next queue page replaces it.
   const [order, setOrder] = useState<{
     basis: readonly string[];
     ids: string[];
   } | null>(null);
+  const authoritativeOrder = ids.join("\n");
+  useEffect(() => {
+    // Once the host acknowledges or replaces the page, that optimistic order
+    // is retired. A later return to its old basis must not revive a stale drag.
+    if (order && order.basis.join("\n") !== authoritativeOrder) setOrder(null);
+  }, [order, authoritativeOrder]);
   const shown =
-    order && order.basis.join("\n") === ids.join("\n") ? order.ids : ids;
+    order && order.basis.join("\n") === authoritativeOrder ? order.ids : ids;
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, {
@@ -152,7 +159,13 @@ function QueueList({
   );
   const locked = view.acting || !controller.queueCurrent;
   const drop = ({ active, over }: DragEndEvent) => {
-    if (!over || active.id === over.id) return;
+    if (
+      locked ||
+      !over ||
+      active.id === over.id ||
+      String(active.id) === view.queueDraft?.inputId
+    )
+      return;
     const from = shown.indexOf(String(active.id));
     const to = shown.indexOf(String(over.id));
     if (from < 0 || to < 0) return;
@@ -164,7 +177,10 @@ function QueueList({
     });
   };
   return (
-    <div className="max-h-48 overflow-y-auto">
+    <div
+      data-testid="native-composer-queue"
+      className="max-h-48 overflow-y-auto"
+    >
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -180,8 +196,13 @@ function QueueList({
                 controller={controller}
                 view={view}
                 item={item}
-                position={queue.offset + queue.items.indexOf(item)}
-                sortable={!locked && shown.length > 1}
+                position={queue.offset + shown.indexOf(inputId)}
+                queued={count}
+                sortable={
+                  !locked &&
+                  shown.length > 1 &&
+                  view.queueDraft?.inputId !== inputId
+                }
                 onReturnedText={onReturnedText}
               />
             );
@@ -220,18 +241,48 @@ function QueueList({
   );
 }
 
+export namespace NativeComposerQueue {
+  export type Controller = Pick<
+    NativeChatController,
+    | "queueCurrent"
+    | "editQueue"
+    | "showQueuePage"
+    | "readQueuedText"
+    | "readQueuedAttachmentPreview"
+    | "canSteer"
+    | "canSteerQueued"
+    | "steerQueued"
+    | "editQueuedText"
+    | "canEditQueuedText"
+  >;
+  export type View = Pick<
+    NativeChatView,
+    "acting" | "queueDraft" | "queueLoading"
+  >;
+  export type Props = Readonly<{
+    controller: Controller;
+    view: View;
+    queue: NativeChatQueuePage;
+    /** Size of the entire queue, including rows on other pages. */
+    count: number;
+    onReturnedText: (text: string) => void;
+  }>;
+}
+
 function QueueRow({
   controller,
   view,
   item,
   position,
+  queued,
   sortable,
   onReturnedText,
 }: {
-  controller: NativeChatController;
-  view: NativeChatView;
+  controller: NativeComposerQueue.Controller;
+  view: NativeComposerQueue.View;
   item: NativeChatQueueItem;
   position: number;
+  queued: number;
   sortable: boolean;
   onReturnedText: (text: string) => void;
 }) {
@@ -243,74 +294,28 @@ function QueueRow({
     transition,
     isDragging,
   } = useSortable({ id: item.inputId, disabled: !sortable });
-  const queued = view.observation?.snapshot.queuedInputs ?? 0;
   const locked = view.acting || !controller.queueCurrent;
-  const draft =
-    view.queueDraft?.inputId === item.inputId ? view.queueDraft : null;
+  const editing = view.queueDraft?.inputId === item.inputId;
+  const rowLocked = locked || editing;
+  const summary =
+    item.preview ||
+    item.attachments?.map((entry) => entry.name).join(", ") ||
+    "Message with other content";
   const label = item.goalStart
     ? `Goal: ${item.preview ?? item.goalStart.objective}`
-    : `${item.operatingRegime === "plan" ? "Plan · " : ""}${item.effort === "ultra" ? "Ultra · " : ""}${item.preview ?? "Message with other content"}`;
+    : `${item.operatingRegime === "plan" ? "Plan · " : ""}${item.effort === "ultra" ? "Ultra · " : ""}${summary}`;
   const editable =
-    !locked && !view.queueDraft && !item.goalStart && item.preview !== null;
+    !locked && !view.queueDraft && controller.canEditQueuedText(item);
   const style = {
     transform: CSS.Translate.toString(transform),
     transition,
   };
 
-  if (draft)
-    return (
-      <form
-        ref={setNodeRef}
-        style={style}
-        aria-label="Edit queued message"
-        className="space-y-1 p-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void controller.saveQueueDraft();
-        }}
-      >
-        <Textarea
-          aria-label="Queued message"
-          autoFocus
-          value={draft.text}
-          disabled={view.acting}
-          className="min-h-12 resize-none border-0 bg-transparent p-1 shadow-none focus-visible:ring-0"
-          onChange={(event) =>
-            controller.changeQueueDraft(event.currentTarget.value)
-          }
-          onKeyDown={(event) => {
-            if (event.key === "Escape") controller.closeQueueDraft();
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              event.currentTarget.form?.requestSubmit();
-            }
-          }}
-        />
-        <div className="flex justify-end gap-1">
-          <Button
-            type="button"
-            size="xs"
-            variant="ghost"
-            disabled={view.acting}
-            onClick={() => controller.closeQueueDraft()}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            size="xs"
-            disabled={view.acting || !draft.text.trim()}
-          >
-            Save
-          </Button>
-        </div>
-      </form>
-    );
-
   return (
     <div
       ref={setNodeRef}
       style={style}
+      aria-current={editing ? "true" : undefined}
       className={cn(
         "group/row relative flex items-center gap-2 bg-background py-1 pr-1.5 pl-3",
         isDragging && "z-10 shadow-sm"
@@ -320,37 +325,57 @@ function QueueRow({
         <button
           type="button"
           aria-label="Reorder queued message"
-          className="text-muted-foreground absolute left-0 hidden h-full w-3 cursor-grab items-center justify-center group-hover/row:flex active:cursor-grabbing"
+          className="text-muted-foreground absolute left-0 flex h-full w-3 cursor-grab items-center justify-center opacity-0 outline-none transition-opacity group-hover/row:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
           {...attributes}
           {...listeners}
         >
           <GripVerticalIcon className="size-3" />
         </button>
       )}
-      <ListEndIcon className="text-muted-foreground size-4 shrink-0" />
-      <span className="min-w-0 flex-1 truncate" title={label}>
-        {label}
-      </span>
+      <NativeQueuedMessagePreview
+        inputId={item.inputId}
+        preview={item.goalStart?.objective ?? item.preview}
+        label={label}
+        attachments={item.attachments}
+        readImage={(previewId) =>
+          controller.readQueuedAttachmentPreview(item.inputId, previewId)
+        }
+        readText={
+          item.goalStart
+            ? undefined
+            : () => controller.readQueuedText(item.inputId)
+        }
+      />
+      {editing && (
+        <span className="shrink-0 text-xs text-muted-foreground">Editing</span>
+      )}
       {controller.canSteer && (
-        <Button
-          type="button"
-          size="xs"
-          variant="ghost"
-          className="text-muted-foreground shrink-0"
-          disabled={!controller.canSteerQueued(item)}
-          onClick={() =>
-            void controller
-              .steerQueued(item.inputId)
-              .then((text) => text && onReturnedText(text))
-          }
-        >
-          <CornerDownRightIcon className="size-3.5" />
-          Steer
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              size="xs"
+              variant="ghost"
+              className="text-muted-foreground shrink-0"
+              disabled={
+                locked || !!view.queueDraft || !controller.canSteerQueued(item)
+              }
+              onClick={() =>
+                void controller
+                  .steerQueued(item.inputId)
+                  .then((text) => text && onReturnedText(text))
+              }
+            >
+              <CornerDownRightIcon className="size-3.5" />
+              Steer
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Submit without interrupting the model</TooltipContent>
+        </Tooltip>
       )}
       <TrayIcon
         label="Remove from queue"
-        disabled={locked}
+        disabled={rowLocked}
         onClick={() =>
           void controller.editQueue({
             action: "withdraw",
@@ -368,12 +393,12 @@ function QueueRow({
             variant="ghost"
             className="text-muted-foreground shrink-0"
             aria-label="More queue actions"
-            disabled={locked}
+            disabled={rowLocked}
           >
             <EllipsisIcon />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent align="end" className="rounded-xl">
           <DropdownMenuItem
             disabled={!editable}
             onSelect={() => void controller.editQueuedText(item.inputId)}
@@ -382,7 +407,7 @@ function QueueRow({
             Edit
           </DropdownMenuItem>
           <DropdownMenuItem
-            disabled={position === 0}
+            disabled={rowLocked || position === 0}
             onSelect={() =>
               void controller.editQueue({
                 action: "move",
@@ -395,7 +420,7 @@ function QueueRow({
             Move up
           </DropdownMenuItem>
           <DropdownMenuItem
-            disabled={position + 1 >= queued}
+            disabled={rowLocked || position + 1 >= queued}
             onSelect={() =>
               void controller.editQueue({
                 action: "move",

@@ -32,6 +32,25 @@ describe("ProviderNetworkAuthority", () => {
     expect(authority.revision).toBe(revision);
   });
 
+  it("withholds suspended grants from bootstrap and restores only an exact unchanged native binding", () => {
+    const authority = new ProviderNetworkAuthority("https://grida.co");
+    const base = "http://localhost:11434/v1";
+    authority.approveCustomEndpoint("ollama", base);
+    const captured = authority.approvedEndpointGrant("ollama", base);
+    authority.suspendCustomEndpoints();
+    expect(authority.approvedEndpointGrant("ollama", base)).toBeNull();
+    expect(authority.nativeGrants().some(({ id }) => id === captured)).toBe(
+      false
+    );
+    expect(authority.grants().some(({ id }) => id === captured)).toBe(false);
+    authority.approveCustomEndpoint("ollama", base);
+    expect(authority.approvedEndpointGrant("ollama", base)).toBe(captured);
+    authority.suspendCustomEndpoints();
+    authority.discardSuspendedEndpoints();
+    authority.approveCustomEndpoint("ollama", base);
+    expect(authority.approvedEndpointGrant("ollama", base)).not.toBe(captured);
+  });
+
   it("invalidates a native launch when the approved base path changes", () => {
     const authority = new ProviderNetworkAuthority("https://grida.co");
     const base = "http://localhost:11434/v1";

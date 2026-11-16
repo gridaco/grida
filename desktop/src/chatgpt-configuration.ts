@@ -13,6 +13,7 @@
  * environment override is the replacement seam for a Grida registration.
  */
 
+import { CHATGPT_SUBSCRIPTION_DEFAULT_MODEL_ID } from "@grida/ai-host";
 import type { ChatGptProviderConfig } from "@grida/ai-host/chatgpt-host";
 
 export const CHATGPT_CALLBACK_PATH = "/auth/callback" as const;
@@ -52,7 +53,7 @@ export const CHATGPT_SUBSCRIPTION_CONFIG: ChatGptProviderConfig = {
   },
   responses_url: CHATGPT_RESPONSES_URL,
   originator: "grida",
-  default_model_id: "openai/gpt-5.6-sol",
+  default_model_id: CHATGPT_SUBSCRIPTION_DEFAULT_MODEL_ID,
 };
 
 export type ChatGptAuthorizationExpectation = Readonly<{

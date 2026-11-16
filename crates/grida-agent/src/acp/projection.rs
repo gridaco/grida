@@ -516,7 +516,7 @@ fn visible_parts(message: &Message) -> impl Iterator<Item = Cow<'_, str>> {
 
 /// URI scheme naming an attachment the host retains for a chat. Clients
 /// cannot resolve it; it identifies the attachment within the transcript.
-const RETAINED_ATTACHMENT_URI: &str = "urn:grida:retained-attachment:";
+pub(crate) const RETAINED_ATTACHMENT_URI: &str = "urn:grida:retained-attachment:";
 
 fn attachment_links(message: &Message) -> impl Iterator<Item = ResourceLink> + '_ {
     message.content.iter().filter_map(move |content| {
@@ -527,6 +527,22 @@ fn attachment_links(message: &Message) -> impl Iterator<Item = ResourceLink> + '
             return None;
         }
         let uri = format!("{RETAINED_ATTACHMENT_URI}{}", media.id);
+        if let Some(image) = crate::host::retained_raster(media) {
+            let mut details = serde_json::Map::new();
+            if let Some(path) = image.source_path() {
+                details.insert("sourcePath".into(), json!(path));
+            }
+            details.insert("preparation".into(), json!(image.preparation));
+            return Some(
+                ResourceLink::new(image.name, uri)
+                    .mime_type(image.mime_type)
+                    .size(i64::try_from(image.original.size()).ok())
+                    .meta(serde_json::Map::from_iter([(
+                        "co.grida/image-attachment".into(),
+                        Value::Object(details),
+                    )])),
+            );
+        }
         if crate::host::is_retained_image(media) {
             let size =
                 crate::host::retained_image_size(media).and_then(|size| i64::try_from(size).ok());
@@ -547,8 +563,8 @@ fn attachment_links(message: &Message) -> impl Iterator<Item = ResourceLink> + '
 /// client showed for it.
 pub(crate) const FILE_REFERENCE_META: &str = "co.grida/file-reference";
 
-/// A file a person attached by reference, as the link they sent. The link
-/// names a local file; reading it still needs the agent's own permissions.
+/// A resource a person attached by reference, as the link they sent. The link
+/// names a local path; inspecting it still needs the agent's own permissions.
 pub(crate) fn file_reference_link(
     reference: &grida_agent_master::file_reference::FileReference,
 ) -> ResourceLink {

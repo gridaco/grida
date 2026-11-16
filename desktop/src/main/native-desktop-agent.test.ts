@@ -71,6 +71,271 @@ beforeEach(() => {
   sidecar.listGatewayModels.mockResolvedValue([]);
 });
 
+it.skipIf(process.platform === "win32")(
+  "restores verified legacy model settings for fixed document and nested deck owners",
+  async () => {
+    const base = await fs.mkdtemp(
+      path.join(await fs.realpath(os.tmpdir()), "grida-fixed-legacy-selection-")
+    );
+    const root = path.join(base, "workspace");
+    const source = {
+      userDataPath: path.join(base, "agent"),
+      desktopUserDataPath: path.join(base, "desktop"),
+      providerHome: path.join(base, "providers"),
+      mediaRoot: path.join(base, "media"),
+    };
+    const workspace = {
+      id: "work",
+      root,
+      name: "Work",
+      opened_at: 0,
+      pinned: false,
+    };
+    const origin = "https://editor.example.test";
+    const network = { prepare: () => null };
+    let agent: import("./native-desktop-agent").NativeDesktopAgent | undefined;
+    const { NativeAgentChat } = await import("./native-agent-chat");
+    const launch = vi
+      .spyOn(NativeAgentChat, "start")
+      .mockImplementation(async (options) => {
+        let connected = true;
+        return {
+          modelId: options.model,
+          get connected() {
+            return connected;
+          },
+          get hasExited() {
+            return !connected;
+          },
+          close: async () => {
+            connected = false;
+          },
+        } as unknown as import("./native-agent-chat").NativeAgentChat;
+      });
+    try {
+      await Promise.all(
+        [root, ...Object.values(source)].map((directory) =>
+          fs.mkdir(directory, { mode: 0o700 })
+        )
+      );
+      await fs.writeFile(path.join(root, ".canvas.json"), "{}");
+      await fs.mkdir(path.join(root, "slides.canvas"), { mode: 0o700 });
+      sidecar.selectNativeChat.mockReturnValue(source);
+      sidecar.findWorkspace.mockResolvedValue(workspace);
+      sidecar.nativeAgentSubscriptionSettings.mockResolvedValue({
+        userDataPath: source.userDataPath,
+        network,
+      });
+      sidecar.nativeAgentGatewayConnection.mockImplementation((account) =>
+        NativeGatewayConnection.open({ origin, account, network })
+      );
+      const { NativeDesktopAgent } = await import("./native-desktop-agent");
+      agent = await NativeDesktopAgent.prepareOrdinary(
+        new DesktopAccountSession({
+          base_url: origin,
+          fetch: async () =>
+            Response.json({
+              token: "fixture.gg.key",
+              account_subject: "fixture-user",
+              organization: { id: 1 },
+              expires_at: new Date(Date.now() + 120_000).toISOString(),
+            }),
+        }),
+        base,
+        [],
+        { openExternal: async () => {} }
+      );
+      const document = "11111111-1111-4111-8111-111111111111";
+      await agent.ensureDocument(document, () => {});
+      const nested = await agent.nestedDeck(workspace.id, "slides.canvas");
+      await agent.ensureNestedDeck(nested, () => {});
+      for (const [key, owner] of [
+        [document, agent.currentDocument(document)],
+        [
+          nested.workspaceId,
+          agent.currentNestedDeck(workspace.id, nested.workspaceId),
+        ],
+      ] as const) {
+        expect(owner?.chat.modelId).toBe(TIER_MODEL_IDS[AGENT_DEFAULT_TIER]);
+        expect(agent.currentForWindow(key)).toBeNull();
+        const legacy = {
+          model: owner!.chat.modelId!,
+          effort: "high" as const,
+          principal: null,
+          scope: null,
+          matchesCurrent: true,
+        };
+        await expect(agent.legacySelection(key, legacy)).resolves.toEqual({
+          connectionId: null,
+          model: legacy.model,
+          effort: "high",
+        });
+        await expect(
+          agent.legacySelection(key, { ...legacy, matchesCurrent: false })
+        ).resolves.toBeNull();
+        await expect(
+          agent.legacySelection(key, { ...legacy, model: "different-model" })
+        ).resolves.toBeNull();
+      }
+    } finally {
+      await agent?.close();
+      launch.mockRestore();
+      await fs.rm(base, { recursive: true, force: true });
+    }
+  }
+);
+
+it.skipIf(process.platform === "win32")(
+  "keeps Gateway catalogue identity after a different connection retires its worker",
+  async () => {
+    const base = await fs.mkdtemp(
+      path.join(await fs.realpath(os.tmpdir()), "grida-model-catalogue-")
+    );
+    const root = path.join(base, "workspace");
+    const source = {
+      userDataPath: path.join(base, "agent"),
+      desktopUserDataPath: path.join(base, "desktop"),
+      providerHome: path.join(base, "providers"),
+      mediaRoot: path.join(base, "media"),
+    };
+    let agent: import("./native-desktop-agent").NativeDesktopAgent | undefined;
+    const { NativeAgentChat } = await import("./native-agent-chat");
+    const launch = vi
+      .spyOn(NativeAgentChat, "start")
+      .mockImplementation(async () => {
+        let connected = true;
+        let sealed = false;
+        return {
+          get connected() {
+            return connected;
+          },
+          get hasExited() {
+            return !connected;
+          },
+          get modelChangePending() {
+            return sealed;
+          },
+          prepareModelChange: async () => {
+            sealed = true;
+          },
+          close: async () => {
+            connected = false;
+          },
+        } as unknown as import("./native-agent-chat").NativeAgentChat;
+      });
+    try {
+      await Promise.all(
+        [root, ...Object.values(source)].map((directory) =>
+          fs.mkdir(directory, { mode: 0o700 })
+        )
+      );
+      sidecar.selectNativeChat.mockReturnValue(source);
+      sidecar.findWorkspace.mockResolvedValue({
+        id: "work",
+        root,
+        name: "Work",
+        opened_at: 0,
+        pinned: false,
+      });
+      sidecar.listProviderEndpoints.mockResolvedValue([
+        {
+          id: "local",
+          base_url: "http://127.0.0.1:1/v1",
+          models: [{ id: "fixture-local" }],
+        },
+      ]);
+      sidecar.nativeConfiguredEndpoint.mockImplementation(
+        async (_id, model) => ({
+          provider: "openai-compatible",
+          endpoint: "http://127.0.0.1:1/v1",
+          model: model ?? "fixture-local",
+          providerNetwork: { prepare: () => null },
+        })
+      );
+      sidecar.nativeBuiltInByok.mockRejectedValue(
+        new Error("fixture_key_absent")
+      );
+      sidecar.listGatewayModels.mockResolvedValue([
+        {
+          id: "fixture/alternate-chat",
+          label: "Alternate",
+          kind: "text",
+          created: 0,
+          owned_by: "fixture",
+          interfaces: ["chat.completions"],
+          input_modalities: ["text"],
+          output_modalities: ["text"],
+          operation_ids: [],
+          capabilities: { tools: true },
+          limits: { context_tokens: 8192, max_output_tokens: 1024 },
+        },
+      ]);
+      const origin = "https://editor.example.test";
+      sidecar.nativeAgentGatewayConnection.mockImplementation(
+        (account, organizationId, signal) =>
+          NativeGatewayConnection.open({
+            origin,
+            account,
+            organizationId,
+            signal,
+            network: { prepare: () => null },
+          })
+      );
+      const { NativeDesktopAgent } = await import("./native-desktop-agent");
+      agent = await NativeDesktopAgent.prepareFresh(
+        new DesktopAccountSession({
+          base_url: origin,
+          fetch: async () =>
+            Response.json({
+              token: "fixture.gg.key",
+              account_subject: "fixture-user",
+              organization: { id: 17 },
+              expires_at: new Date(Date.now() + 120_000).toISOString(),
+            }),
+        }),
+        base,
+        {
+          provider: "gateway",
+          openExternal: async () => {},
+          selectableProfiles: true,
+        }
+      );
+      await agent.ensure("work");
+      const before = await agent.profiles("work");
+      const gateway = before.choices.find(
+        ({ connection }) => connection === "Grida"
+      )!;
+      const local = before.choices.find(
+        ({ connection }) => connection === "local"
+      )!;
+      expect(before.modelChanges).toBe(true);
+      await agent.selectProfile(
+        "work",
+        { kind: "new", id: local.id },
+        () => {}
+      );
+      expect(agent.current("work")).toBeNull();
+      expect((await agent.profiles("work")).choices).toEqual(before.choices);
+      expect(sidecar.nativeAgentGatewayConnection).toHaveBeenCalledOnce();
+      await agent.selectProfile(
+        "work",
+        { kind: "new", id: gateway.id },
+        () => {}
+      );
+      expect(agent.current("work", gateway.id)).not.toBeNull();
+      expect((await agent.profiles("work")).choices).toEqual(before.choices);
+      await agent.clearAccount();
+      expect((await agent.profiles("work")).choices).not.toContainEqual(
+        gateway
+      );
+    } finally {
+      await agent?.close();
+      launch.mockRestore();
+      await fs.rm(base, { recursive: true, force: true });
+    }
+  }
+);
+
 it.runIf(Boolean(resources) && process.platform === "darwin")(
   "refuses a private home root and never reuses a replaced ordinary workspace",
   async () => {
@@ -583,6 +848,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       // Welcome offers the same workspace-independent choices before any
       // workspace opens, with nothing saved or active.
       expect(await agent.welcomeProfiles()).toEqual({
+        modelChanges: true,
         defaultContextWindow: expect.any(Number),
         choices,
       });
@@ -620,6 +886,30 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       ).toEqual([[undefined, 4096]]);
       expect(counts).toEqual([]);
 
+      // Harness effort also works on an anonymous compatible connection whose
+      // model has no reasoning setting. It keeps that connection's wire form.
+      expect(newChat.acceptsEffort).toBe(true);
+      expect(newChat.acceptsGoalEffort).toBe(true);
+      const standardTurn = (await newChat.observe(session)).latest!.turnId;
+      await newChat.submit(
+        session,
+        "compatible-ultra",
+        "Use the extended harness allowance.",
+        undefined,
+        undefined,
+        "ultra"
+      );
+      await vi.waitFor(async () => {
+        const latest = (await newChat.observe(session)).latest;
+        expect(latest?.turnId).not.toBe(standardTurn);
+        expect(latest?.status).toBe("succeeded");
+      });
+      expect(requests[1]).toMatchObject({ model: "fixture", max_tokens: 4096 });
+      expect(requests[1]).not.toHaveProperty("max_completion_tokens");
+      expect(requests[1]).not.toHaveProperty("reasoning");
+      expect(requests[1]).not.toHaveProperty("reasoning_effort");
+      expect(generated).toHaveLength(2);
+
       // Set the workspace's input limit in its settings file. It applies once
       // Desktop starts the workspace's agent again.
       const settings = path.join(
@@ -656,9 +946,9 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         )
       );
       expect(counts).toHaveLength(1);
-      expect(generated).toHaveLength(2);
-      expect(counts[0]).toEqual(generated[1]);
-      expect(requests[1]).toMatchObject({ model: "fixture", max_tokens: 4096 });
+      expect(generated).toHaveLength(3);
+      expect(counts[0]).toEqual(generated[2]);
+      expect(requests[2]).toMatchObject({ model: "fixture", max_tokens: 4096 });
 
       measuredTokens = 1001;
       const tooLarge = await countedChat.create();
@@ -673,7 +963,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         )
       );
       expect(counts).toHaveLength(2);
-      expect(generated).toHaveLength(2);
+      expect(generated).toHaveLength(3);
 
       await agent.close();
       savedConfig = config;
@@ -695,7 +985,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         )
       ).rejects.toThrow("native_chat_profile_changed");
       expect(counts).toHaveLength(2);
-      expect(generated).toHaveLength(2);
+      expect(generated).toHaveLength(3);
       expect(sidecar.nativeAgentGatewayConnection).toHaveBeenCalledTimes(1);
     } finally {
       await agent?.close();
@@ -844,6 +1134,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         },
       ]);
       expect(await agent.profiles(workspace.id)).toEqual({
+        modelChanges: true,
         defaultContextWindow: expect.any(Number),
         choices,
         saved: [],
@@ -1501,7 +1792,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
 );
 
 it.runIf(Boolean(resources) && process.platform !== "win32")(
-  "keeps saved OpenRouter and Vercel model chats with their exact workers and custody",
+  "preserves retained work before selecting saved OpenRouter and Vercel connections for idle chats",
   async () => {
     const base = await fs.mkdtemp(
       path.join(await fs.realpath(os.tmpdir()), "grida-native-provider-picker-")
@@ -1630,6 +1921,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       agent = await launch();
       const desktop = agent;
       expect(await desktop.profiles(workspace.id)).toEqual({
+        modelChanges: true,
         defaultContextWindow: expect.any(Number),
         choices: [],
         saved: [],
@@ -1646,6 +1938,36 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       );
 
       const choices = (await desktop.profiles(workspace.id)).choices;
+      const firstProfile = choices.find(
+        (choice) => choice.connection === "OpenRouter"
+      )!;
+      await expect(
+        desktop.selectProfile(
+          workspace.id,
+          { kind: "new", id: firstProfile.id },
+          () => {}
+        )
+      ).rejects.toThrow("native_chat_model_change_retained_turn");
+      expect(desktop.current(workspace.id)?.chat).toBe(original);
+      expect((await desktop.profiles(workspace.id)).saved).toEqual([]);
+      expect(requested).toHaveLength(1);
+      await original.stop(
+        pending,
+        await original.observe(pending),
+        "resolve-original-turn"
+      );
+      await vi.waitFor(async () =>
+        expect(await original.observe(pending)).toMatchObject({
+          current: null,
+          latest: { status: "cancelled" },
+        })
+      );
+      await original.editQueue(pending, await original.observe(pending), {
+        action: "resume",
+        requestId: "resume-after-original-stop",
+        observationId: "main-owned-observation",
+      });
+      expect(requested).toHaveLength(1);
       const sessions = new Map<
         string,
         { profileId: string; sessionId: string }
@@ -1661,21 +1983,25 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
           () => {}
         );
         const chat = desktop.current(workspace.id, id)!.chat;
-        // Chats belong to the workspace: choosing a connection retires the
-        // previous worker and lists every chat. A chat started under the Grida
-        // account opens here, but a local key cannot continue it.
+        // Once retained work is resolved, the next deliberate input uses the
+        // selected connection and the same chat's visible history.
         expect(desktop.current(workspace.id)).toBeNull();
         expect((await chat.list()).sessionIds).toEqual([
           ...[...sessions.values()].map(({ sessionId }) => sessionId).reverse(),
           pending.id,
         ]);
         const gateway = await chat.load(pending.id);
-        expect((await chat.observe(gateway)).current?.disposition).toBe(
-          "suspended"
+        await chat.submit(
+          gateway,
+          `continue-${sessions.size}`,
+          "Continue here."
         );
-        await expect(
-          chat.submit(gateway, `continue-${sessions.size}`, "Continue here.")
-        ).rejects.toThrow("session_execution_configuration_changed");
+        await vi.waitFor(async () =>
+          expect(await chat.observe(gateway)).toMatchObject({
+            current: null,
+            latest: { status: "succeeded" },
+          })
+        );
         const session = await chat.create();
         await chat.submit(session, "byok-input", "Use the selected model.");
         await vi.waitFor(
@@ -1690,15 +2016,17 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       expect(
         new Set([...sessions.values()].map(({ profileId }) => profileId)).size
       ).toBe(2);
-      // The retired default worker is closed; its waiting turn is kept.
+      // The resolved original worker is retired, with its chat still saved.
       await expect(original.observe(pending)).rejects.toThrow(
         "native_chat_closed"
       );
       expect(requested.slice(1)).toEqual(
-        providers.map(([, , endpoint]) => ({
-          target: endpoint + "/chat/completions",
-          model,
-        }))
+        providers.flatMap(([, , endpoint]) =>
+          Array.from({ length: 2 }, () => ({
+            target: endpoint + "/chat/completions",
+            model,
+          }))
+        )
       );
 
       await desktop.close();
@@ -1738,7 +2066,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       ).rejects.toThrow("native_provider_byok_key_missing");
       expect(reopened.current(workspace.id)).toBeNull();
       expect(reopened.current(workspace.id, vercel.profileId)).toBeNull();
-      expect(requested).toHaveLength(3);
+      expect(requested).toHaveLength(5);
 
       await reopened.ensure(workspace.id);
       const defaultChat = reopened.current(workspace.id)!.chat;
@@ -1791,7 +2119,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         openrouter.sessionId,
         pending.id,
       ]);
-      expect(requested).toHaveLength(3);
+      expect(requested).toHaveLength(5);
     } finally {
       await agent?.close();
       await fs.rm(base, { recursive: true, force: true });

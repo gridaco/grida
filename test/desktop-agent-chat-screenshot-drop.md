@@ -61,4 +61,4 @@ is the failure mode to capture here. **Run this case early.**
   screenshot to the clipboard, then paste (TC-DESKTOP-AGENT-CHAT-001), which
   never touches a temp file.
 
-- Retired with the previous chat. Native Desktop chat accepts one PNG or file of at most 256 KiB per message; see TC-DESKTOP-AGENT-CHAT-021 for pasting or dropping it and TC-DESKTOP-AGENT-CHAT-009 for an oversize file. The covered_by tests exercise the previous chat.
+- Retired with the previous chat. Native Desktop chat accepts one attachment with separate raster and reference workflows; see TC-DESKTOP-AGENT-CHAT-021 for pasting or dropping it and TC-DESKTOP-AGENT-CHAT-009 for an oversize file. The covered_by tests exercise the previous chat.

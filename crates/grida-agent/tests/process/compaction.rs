@@ -1335,7 +1335,7 @@ async fn interrupted_compaction_requires_explicit_recovery_and_failed_candidates
     )
     .await;
     assert_eq!(
-        denied["error"]["data"], "session_execution_configuration_changed",
+        denied["error"]["data"], "session_active_route_changed",
         "{denied}"
     );
     assert_eq!(

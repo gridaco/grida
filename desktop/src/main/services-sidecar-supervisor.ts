@@ -26,6 +26,8 @@ import { NativeGatewayConnection } from "./native-gateway-connection";
 import { ProviderNetworkPolicy } from "../provider-network-policy";
 import { NativeDesktopProfile } from "./native-desktop-profile";
 import { RetainedServiceSandbox } from "./retained-service-sandbox";
+import { ProviderEndpointConsent } from "./provider-endpoint-consent";
+import { MediaTransport } from "@grida/ai-host/media-transport";
 
 export type ServicesSidecarInfo = {
   /** Electron-main-owned TCP listener port (exact 127.0.0.1, ephemeral). */
@@ -72,6 +74,8 @@ export class ServicesSidecarSupervisor {
   private workspaceCatalog?: string;
   private protectedStateRoots: readonly string[] = [];
   private protectedFileRoots: readonly string[] = [];
+  private endpointConsent?: ProviderEndpointConsent;
+  private endpointTransport: MediaTransport.Client | null = null;
   private readonly networkAuthority = new ProviderNetworkAuthority(
     new URL(EDITOR_BASE_URL).origin
   );
@@ -208,6 +212,12 @@ export class ServicesSidecarSupervisor {
     );
   }
 
+  providerEndpointSettings(): ProviderEndpointConsent {
+    if (!this.info || !this.endpointConsent)
+      throw new Error("agent provider network is not ready");
+    return this.endpointConsent;
+  }
+
   nativeByokSettings() {
     return {
       credentialHome: this.provider_home,
@@ -259,30 +269,6 @@ export class ServicesSidecarSupervisor {
     });
   }
 
-  async withTemporaryProviderEndpoint<T>(
-    baseUrl: string,
-    operation: () => Promise<T>
-  ): Promise<T> {
-    const endpointId = `probe_${crypto.randomUUID().replaceAll("-", "")}`;
-    let approved = false;
-    let published = false;
-    try {
-      this.networkAuthority.approveCustomEndpoint(endpointId, baseUrl);
-      approved = true;
-      await this.publishGrants();
-      published = true;
-      return await operation();
-    } finally {
-      if (approved) {
-        this.networkAuthority.revokeCustomEndpoint(endpointId);
-        // If initial publication or the operation retired the generation, its
-        // replacement bootstraps the already-rolled-back snapshot. When the
-        // same generation is alive, explicitly revoke and await its ACK.
-        if (published && this.networkHost) await this.publishGrants();
-      }
-    }
-  }
-
   async describeProviderEndpoint(baseUrl: string): Promise<{
     origin: string;
     route: string;
@@ -320,6 +306,7 @@ export class ServicesSidecarSupervisor {
     if (!RetainedServiceSandbox.isSupportedPlatform()) {
       if (chat) throw new Error("native_retained_sidecar_sandbox_unavailable");
       this.protectedFileRoots = [
+        ProviderEndpointConsent.directory(app.getPath("userData")),
         path.join(
           app.getPath("userData"),
           NativeDesktopProfile.chatStateDirectory
@@ -364,6 +351,7 @@ export class ServicesSidecarSupervisor {
       ...new Set([
         ...this.protectedStateRoots,
         nativeStateRoot,
+        ProviderEndpointConsent.directory(app.getPath("userData")),
         ...(this.workspaceCatalog ? [path.dirname(this.workspaceCatalog)] : []),
       ]),
     ];
@@ -372,7 +360,10 @@ export class ServicesSidecarSupervisor {
       providerRoot: path.join(this.provider_home, "providers"),
       mediaRoot: this.media_root,
       desktopStateRoot: nativeStateRoot,
-      protectedStateRoots: protectedPolicyRoots,
+      protectedStateRoots: [
+        ...protectedPolicyRoots,
+        ProviderEndpointConsent.directory(app.getPath("userData")),
+      ],
       workspaceCatalogRoot: this.workspaceCatalog
         ? path.dirname(this.workspaceCatalog)
         : undefined,
@@ -419,6 +410,12 @@ export class ServicesSidecarSupervisor {
 
   private async spawnOne(): Promise<ServicesSidecarInfo> {
     const generation = ++this.nextGeneration;
+    await this.initializeEndpointConsent();
+    if (generation !== this.nextGeneration || this.isShuttingDown)
+      throw new Error("services sidecar startup was cancelled");
+    // Never bootstrap an old generation's grants before reading this service's
+    // current config. Exact unchanged matches retain native chat bindings.
+    this.networkAuthority.suspendCustomEndpoints();
     const scriptPath = this.sidecarScriptPath();
     const password = crypto.randomBytes(32).toString("base64url");
 
@@ -558,6 +555,16 @@ export class ServicesSidecarSupervisor {
         if (!this.isCurrentGeneration(child, generation) || resolved) return;
         daemonSocketHost.markReady(readyPort);
         const connection = { port: daemonPort, password };
+        const origin = new URL(EDITOR_BASE_URL).origin;
+        this.endpointTransport = new MediaTransport.Client({
+          base_url: MediaTransport.baseUrl(daemonPort),
+          password,
+          origin,
+          referer: `${origin}/desktop`,
+        });
+        await this.endpointConsent!.restore();
+        if (!this.isCurrentGeneration(child, generation) || resolved) return;
+        this.networkAuthority.discardSuspendedEndpoints();
         this.info = { connection, mode };
         this.restartBackoffMs = BACKOFF_INITIAL_MS;
         this.note("sup", `ready main-owned port=${daemonPort}`);
@@ -638,10 +645,35 @@ export class ServicesSidecarSupervisor {
   }
 
   private closeCurrentHosts(): void {
+    this.endpointTransport = null;
     this.networkHost?.close();
     this.networkHost = null;
     this.daemonSocketHost?.close();
     this.daemonSocketHost = null;
+  }
+
+  private async initializeEndpointConsent(): Promise<void> {
+    if (this.endpointConsent) return;
+    const transport = () => {
+      if (!this.endpointTransport)
+        throw new Error("agent provider network is not ready");
+      return this.endpointTransport.providers;
+    };
+    this.endpointConsent = await ProviderEndpointConsent.open({
+      directory: ProviderEndpointConsent.directory(app.getPath("userData")),
+      configuration: {
+        list: () => transport().list_endpoints(),
+        set: (config) => transport().set_endpoint(config),
+        delete: (id) => transport().delete_endpoint(id),
+        probe: (baseUrl) => transport().probe_endpoint(baseUrl),
+      },
+      describe: (baseUrl) => this.describeProviderEndpoint(baseUrl),
+      approve: (id, baseUrl) => this.approveProviderEndpoint(id, baseUrl),
+      revoke: (id) => this.revokeProviderEndpoint(id),
+      approved: (id, baseUrl) =>
+        this.networkAuthority.approvedEndpointGrant(id, baseUrl) !== null,
+      generation: () => this.activeGeneration,
+    });
   }
 
   private retireGeneration(
@@ -741,26 +773,6 @@ export function stopServicesSidecar() {
   supervisor?.stop();
 }
 
-export async function approveAgentProviderEndpoint(
-  id: string,
-  baseUrl: string
-): Promise<void> {
-  await sidecar().approveProviderEndpoint(id, baseUrl);
-}
-
-export async function revokeAgentProviderEndpoint(id: string): Promise<void> {
-  await sidecar().revokeProviderEndpoint(id);
-}
-
-export async function withTemporaryAgentProviderEndpoint<T>(
-  baseUrl: string,
-  operation: () => Promise<T>
-): Promise<T> {
-  return await sidecar().withTemporaryProviderEndpoint(baseUrl, operation);
-}
-
-export async function describeAgentProviderEndpoint(
-  baseUrl: string
-): Promise<{ origin: string; route: string }> {
-  return await sidecar().describeProviderEndpoint(baseUrl);
+export function agentProviderEndpointSettings(): ProviderEndpointConsent {
+  return sidecar().providerEndpointSettings();
 }

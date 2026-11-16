@@ -261,7 +261,7 @@ impl Host {
         let _admission = self.configuration_admission.lock().await;
         let execution = self.execution()?;
         let view = self.store.inspect(session.clone()).await?;
-        self.check_execution(&view)?;
+        self.check_execution(&view).await?;
         require_idle(&view)?;
         if !view.queued.is_empty() {
             return Err(problem(ErrorKind::Conflict, "session_queue_waiting"));
@@ -372,7 +372,7 @@ impl Host {
             Err(error) => return Err(error),
         }
         let execution = self.execution()?;
-        self.check_execution(view)?;
+        self.check_execution(view).await?;
         let input = self.prepare_input(
             execution,
             &view.session,
@@ -558,7 +558,14 @@ impl Host {
         plan: CompactionPlan,
     ) -> Result<Option<Admitted>> {
         let view = self.store.inspect(session.clone()).await?;
-        self.check_execution(&view)?;
+        let cancelling = matches!(&claim, WorkerClaim::Recover(_))
+            && view
+                .current
+                .as_ref()
+                .is_some_and(|current| current.binding.turn == *turn && current.controls.cancelled);
+        if !cancelling {
+            self.check_execution(&view).await?;
+        }
         let claim = match claim {
             WorkerClaim::Select(request) => self.store.claim(request).await?,
             WorkerClaim::Recover(request) => self.store.recover(request).await?,
@@ -576,7 +583,23 @@ impl Host {
         let ClaimOutcome::Acquired(claim) = claim else {
             return Ok(None);
         };
-        let (opened, _) = self.open_owned_turn(session, turn, claim.lease).await?;
+        let execution = self.execution()?;
+        let runtime = execution
+            .subscription_provider_for_request(&plan.request)
+            .map(|provider| {
+                execution
+                    .runtime
+                    .with_provider(ProviderId::new("chatgpt")?, provider)
+            })
+            .transpose()?;
+        let (opened, _) = self
+            .open_owned_turn_with_runtime(
+                session,
+                turn,
+                claim.lease,
+                runtime.as_ref().unwrap_or(&execution.runtime),
+            )
+            .await?;
         Ok(Some(Admitted {
             opened,
             work: TurnWork::Compaction(Box::new(plan)),
@@ -735,6 +758,16 @@ impl Host {
         Err(problem(ErrorKind::Conflict, "compaction_control_changed"))
     }
 
+    pub(super) fn compaction_matches_execution(&self, plan: &CompactionPlan) -> bool {
+        self.execution().is_ok_and(|execution| {
+            plan.request.request().model == execution.config.model
+                && plan.request.binding().authority.principal
+                    == execution.authority.inference.authority.principal
+                && plan.request.binding().authority.scope
+                    == execution.authority.inference.authority.scope
+        })
+    }
+
     fn current_compaction_request(&self, plan: &CompactionPlan) -> Result<Option<PreparedRequest>> {
         let execution = self.execution()?;
         let old = plan.request.binding();
@@ -743,7 +776,10 @@ impl Host {
         {
             return Ok(None);
         }
-        let mut prepared = execution.provider.prepare(plan.request.request().clone())?;
+        let provider = execution
+            .subscription_provider_for_request(&plan.request)
+            .unwrap_or_else(|| execution.provider.clone());
+        let mut prepared = provider.prepare(plan.request.request().clone())?;
         if prepared.binding().provider != old.provider || &prepared.binding().authority != authority
         {
             return Ok(None);
@@ -771,7 +807,7 @@ impl Host {
             OutcomeStatus::Succeeded => {
                 let (records, provenance) = account.replacement(plan.source.fingerprint)?;
                 let view = self.store.inspect(session.clone()).await?;
-                self.check_execution(&view)?;
+                self.check_execution(&view).await?;
                 match self
                     .store
                     .install_context(ContextInstall {

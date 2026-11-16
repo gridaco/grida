@@ -177,6 +177,7 @@ impl Host {
         request: DeleteSession,
         children: Vec<SessionId>,
     ) -> Result<SessionDeleted> {
+        self.validate_chat_selection_retirement(&request.session)?;
         let owner = request.session.clone();
         let parent = owner.clone();
         let child_cwd = cwd.clone();
@@ -230,6 +231,8 @@ impl Host {
     }
 
     async fn finish_deletion(&self, mut receipt: SessionDeleted) -> Result<SessionDeleted> {
+        self.retire_chat_selection(&receipt.session)
+            .map_err(|_| problem(ErrorKind::Uncertain, "session_deletion_unverified"))?;
         let spending = self.spending.clone();
         let owner = receipt.session.clone();
         tokio::task::spawn_blocking(move || spending.retire(&owner))
@@ -268,6 +271,9 @@ impl Host {
     pub(crate) async fn recover_retired_chat_data(&self) {
         if !self.deletion_available() {
             return;
+        }
+        if self.reconcile_chat_selections().await.is_err() {
+            eprintln!("grida-agent: retired chat selection cleanup is pending");
         }
         let _ = self
             .owned_control(|host| async move {

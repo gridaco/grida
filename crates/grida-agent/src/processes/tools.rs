@@ -456,7 +456,10 @@ impl ExecCommand {
         };
         let spec = arguments.spec(&root, &environment);
         let cwd = spec.cwd.clone();
-        let launch = match shared.sessions.admit(&shared.session) {
+        let launch = match shared
+            .sessions
+            .admit_attempt(&shared.session, &context.attempt)
+        {
             Ok(launch) => launch,
             Err(error) => return ToolOutcome::failed(&error.code),
         };

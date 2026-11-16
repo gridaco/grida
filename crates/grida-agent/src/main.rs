@@ -79,6 +79,8 @@ fn command() -> Command {
                         .help("Attach one explicitly selected regular file for bounded local inspection"),
                 )
                 .arg(Arg::new("session").long("session").value_name("SESSION_ID"))
+                .arg(Arg::new("subagents").long("subagents").action(ArgAction::SetTrue)
+                    .help("Allow bounded general-purpose delegated work"))
                 .arg(Arg::new("effort").long("effort").value_parser(["standard", "ultra"])
                     .default_value("standard").help("Select bounded agent effort independently of Plan or Act."))
                 .arg(
@@ -119,7 +121,7 @@ fn command() -> Command {
                         .long("subagents")
                         .requires("stdio")
                         .action(ArgAction::SetTrue)
-                        .help("Allow the private launcher to own bounded text-only subagents"),
+                        .help("Allow bounded general-purpose delegated work and private child controls"),
                 )
                 .arg(
                     Arg::new("chat-titles")
@@ -259,6 +261,24 @@ fn command() -> Command {
                 .about("Read a persisted session without running a prompt")
                 .arg(state_dir())
                 .arg(Arg::new("session").value_name("SESSION_ID").required(true)),
+        )
+        .subcommand(
+            Command::new("chat-selection")
+                .hide(true)
+                .arg(state_dir())
+                .arg(Arg::new("cwd").long("cwd").value_parser(value_parser!(PathBuf)).required(true))
+                .arg(Arg::new("session").long("session").required(true))
+                .arg(Arg::new("operation").long("operation").value_parser(["inspect", "update", "receipt", "ack"]).default_value("inspect"))
+                .arg(Arg::new("request-json").long("request-json")),
+        )
+        .subcommand(
+            Command::new("archive-catalog")
+                .hide(true)
+                .arg(state_dir())
+                .arg(Arg::new("cwd").long("cwd").value_parser(value_parser!(PathBuf)).required(true))
+                .arg(Arg::new("cursor").long("cursor"))
+                .arg(Arg::new("unarchive").long("unarchive").requires("revision"))
+                .arg(Arg::new("revision").long("revision").value_parser(value_parser!(u64)).requires("unarchive")),
         );
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     let command = command
@@ -456,6 +476,118 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
     let state_dir = args
         .get_one::<PathBuf>("state-dir")
         .expect("required state dir");
+    if name == "chat-selection" {
+        let host = Host::open(state_dir, None)?;
+        let cwd = args
+            .get_one::<PathBuf>("cwd")
+            .expect("required cwd")
+            .clone();
+        let session = SessionId::new(args.get_one::<String>("session").expect("required session"))?;
+        let operation = args
+            .get_one::<String>("operation")
+            .expect("default operation");
+        let raw = args.get_one::<String>("request-json");
+        if raw.is_some_and(|raw| raw.len() > 16 * 1024) {
+            return Err(agent_kit_core::Error::new(
+                agent_kit_core::ErrorKind::InvalidInput,
+                "chat_selection_invalid",
+            ));
+        }
+        match operation.as_str() {
+            "inspect" => process::write_record(&host.chat_selection(cwd, session).await?).await?,
+            "update" => {
+                let request: grida_agent::host::SelectionUpdate =
+                    serde_json::from_str(raw.ok_or_else(|| {
+                        agent_kit_core::Error::new(
+                            agent_kit_core::ErrorKind::InvalidInput,
+                            "chat_selection_request_required",
+                        )
+                    })?)
+                    .map_err(|_| {
+                        agent_kit_core::Error::new(
+                            agent_kit_core::ErrorKind::InvalidInput,
+                            "chat_selection_invalid",
+                        )
+                    })?;
+                if request.cwd != cwd || request.session_id != session {
+                    return Err(agent_kit_core::Error::new(
+                        agent_kit_core::ErrorKind::InvalidInput,
+                        "chat_selection_invalid",
+                    ));
+                }
+                process::write_record(&host.update_chat_selection(request).await?).await?;
+            }
+            "receipt" | "ack" => {
+                #[derive(serde::Deserialize)]
+                #[serde(rename_all = "camelCase", deny_unknown_fields)]
+                struct Identity {
+                    operation_id: agent_kit_core::ChangeId,
+                    cwd: Option<PathBuf>,
+                    session_id: Option<SessionId>,
+                }
+                let identity: Identity = serde_json::from_str(raw.ok_or_else(|| {
+                    agent_kit_core::Error::new(
+                        agent_kit_core::ErrorKind::InvalidInput,
+                        "chat_selection_request_required",
+                    )
+                })?)
+                .map_err(|_| {
+                    agent_kit_core::Error::new(
+                        agent_kit_core::ErrorKind::InvalidInput,
+                        "chat_selection_invalid",
+                    )
+                })?;
+                if identity.cwd.as_ref().is_some_and(|value| value != &cwd)
+                    || identity
+                        .session_id
+                        .as_ref()
+                        .is_some_and(|value| value != &session)
+                {
+                    return Err(agent_kit_core::Error::new(
+                        agent_kit_core::ErrorKind::InvalidInput,
+                        "chat_selection_invalid",
+                    ));
+                }
+                if operation == "receipt" {
+                    process::write_record(
+                        &host
+                            .chat_selection_receipt(cwd, session, identity.operation_id)
+                            .await?,
+                    )
+                    .await?;
+                } else {
+                    host.acknowledge_chat_selection(cwd, session, identity.operation_id)
+                        .await?;
+                    process::write_record(&serde_json::Value::Null).await?;
+                }
+            }
+            _ => unreachable!("validated operation"),
+        }
+        return Ok(0);
+    }
+    if name == "archive-catalog" {
+        let host = Host::open(state_dir, None)?;
+        let cwd = args
+            .get_one::<PathBuf>("cwd")
+            .expect("required cwd")
+            .clone();
+        if let Some(session) = args.get_one::<String>("unarchive") {
+            host.unarchive_catalog(
+                cwd,
+                SessionId::new(session)?,
+                *args.get_one::<u64>("revision").expect("required revision"),
+            )
+            .await?;
+            process::write_record(&json!({ "restored": true })).await?;
+        } else {
+            let cursor = args
+                .get_one::<String>("cursor")
+                .map(SessionId::new)
+                .transpose()?;
+            process::write_record(&host.archive_catalog(cwd, cursor).await?).await?;
+        }
+        return Ok(0);
+    }
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     if name == "run-external" {
         let options = process::external::RunOptions {
@@ -601,22 +733,7 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
     } else {
         None
     };
-    let subagents = name == "serve" && args.get_flag("subagents");
-    // Only `serve` defines the supervised options; `run` has none to read.
-    let stored_subagents = provider.permits_stored_subagents()
-        && (name != "serve"
-            || args
-                .get_one::<String>("supervised-configured-endpoint-key")
-                .is_none());
-    if subagents
-        && supervisor.is_some()
-        && (chatgpt_scope.is_some() || (gateway_scope.is_none() && !stored_subagents))
-    {
-        return Err(problem(
-            ErrorKind::Unsupported,
-            "subagent_supervised_provider_unsupported",
-        ));
-    }
+    let subagents = args.get_flag("subagents");
     let regime = if args
         .get_one::<String>("mode")
         .is_some_and(|mode| mode == "plan")

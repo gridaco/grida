@@ -8,6 +8,7 @@ use agent_kit_core::tools::{
 };
 use agent_kit_core::{BindingId, BoxFuture, CancellationToken, Error, ErrorKind, Result, ToolId};
 use serde::Deserialize;
+use serde::Serialize;
 use serde_json::{Map, json};
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
@@ -35,6 +36,24 @@ const SETTINGS_NOTE: &str = " Directory \"agent-settings\" holds only config.tom
 const MAX_OUTPUT_BYTES: usize = 64 * 1024;
 const WORKERS: usize = 2;
 const TIME_LIMIT: Duration = Duration::from_secs(3);
+/// Raster decode/normalization has a bounded CPU cost beyond a text read.
+const IMAGE_TIME_LIMIT: Duration = Duration::from_secs(30);
+
+/// Captured product tool contract. Missing fields in older accepted inputs
+/// retain the exact PNG-only definition and bounds.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ImageView {
+    #[default]
+    LegacyPng,
+    Raster,
+}
+
+impl ImageView {
+    pub(crate) fn is_legacy(&self) -> bool {
+        *self == Self::LegacyPng
+    }
+}
 
 /// One coherent view of current host authority. Membership confers no grant.
 #[derive(Clone)]
@@ -65,6 +84,7 @@ pub struct FileTools {
     current: Arc<InvocationAuthority>,
     capture_image: Option<Arc<ImageCapture>>,
     capture_reference: Option<Arc<ImageCapture>>,
+    image_view: ImageView,
     settings: Option<Arc<SettingsAuthority>>,
     workers: Arc<Semaphore>,
     /// Mutations are serialized so an edit always reads what it replaces.
@@ -99,6 +119,7 @@ impl FileTools {
             current,
             capture_image,
             capture_reference,
+            image_view: ImageView::LegacyPng,
             settings: None,
             workers: Arc::new(Semaphore::new(WORKERS)),
             mutations: std::sync::Mutex::new(()),
@@ -109,6 +130,11 @@ impl FileTools {
     /// authority decides each action; writes need an approved action.
     pub(crate) fn with_settings(mut self, settings: Arc<SettingsAuthority>) -> Self {
         self.settings = Some(settings);
+        self
+    }
+
+    pub(crate) fn with_image_view(mut self, image_view: ImageView) -> Self {
+        self.image_view = image_view;
         self
     }
 
@@ -185,7 +211,11 @@ impl FileTool {
             ),
             Operation::View => (
                 VIEW_IMAGE,
-                "See the pixels of one PNG in a readable workspace directory. Use a relative path and an optional directory ID. The primary directory is the default. The PNG must be at most 256 KiB. This tool leaves the source untouched.",
+                if scope.image_view == ImageView::LegacyPng {
+                    "See the pixels of one PNG in a readable workspace directory. Use a relative path and an optional directory ID. The primary directory is the default. The PNG must be at most 256 KiB. This tool leaves the source untouched."
+                } else {
+                    "See a bounded whole-image view of one PNG, JPEG, WebP or GIF in a readable workspace directory. Use a relative path and an optional directory ID. The primary directory is the default. The source can be up to 20 MiB; preparation can resize it and uses one still frame. The original is untouched."
+                },
                 vec!["path"],
             ),
             Operation::CaptureReference => {
@@ -255,12 +285,18 @@ impl FileTool {
         } else {
             description.into()
         };
+        let image_view = scope.image_view;
         Ok(Self {
             scope,
             operation,
             definition: ToolDefinition {
                 id: ToolId::new(id)?,
-                version: 1,
+                version: if matches!(operation, Operation::View) && image_view == ImageView::Raster
+                {
+                    2
+                } else {
+                    1
+                },
                 description,
                 input: InputFormat::Json(json!({
                     "type": "object", "properties": properties,
@@ -300,7 +336,14 @@ impl Tool for FileTool {
                 Ok(request) => request,
                 Err(error) => return ToolOutcome::failed(&error.code),
             };
-            let limit = Instant::now() + TIME_LIMIT;
+            let limit = Instant::now()
+                + if matches!(self.operation, Operation::View)
+                    && self.scope.image_view == ImageView::Raster
+                {
+                    IMAGE_TIME_LIMIT
+                } else {
+                    TIME_LIMIT
+                };
             let deadline = context.deadline.unwrap_or(limit).min(limit);
             let cancellation = context.cancellation.child_token();
             let _stop_on_drop = cancellation.clone().drop_guard();
@@ -527,6 +570,121 @@ pub(crate) use native::{open_root_directory, open_root_file, verify_open_path};
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    #[tokio::test]
+    async fn serialized_legacy_view_invocation_uses_its_exact_definition_after_raster_upgrade() {
+        use crate::workspace::DirectorySpec;
+        use agent_kit_core::messages::{OutcomeStatus, Retention};
+        use agent_kit_core::tools::Inventory;
+        use agent_kit_core::{ArtifactId, AttemptId, OperationId};
+        use image::{DynamicImage, ImageBuffer, ImageFormat, Rgb};
+        use std::io::Cursor;
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().canonicalize().unwrap();
+        let protected = Arc::new(ProtectedRoots::new(vec![]).unwrap());
+        let primary = BindingId::new("primary").unwrap();
+        let workspace = Arc::new(
+            WorkspaceSnapshot::capture(
+                BindingId::new("legacy-view-workspace").unwrap(),
+                1,
+                vec![DirectorySpec {
+                    id: primary.clone(),
+                    name: "Primary".into(),
+                    path: path.clone(),
+                    generation: BindingId::new("initial").unwrap(),
+                }],
+                Some(primary.clone()),
+                &protected,
+            )
+            .unwrap(),
+        );
+        let authority = FileAuthority {
+            grants: vec![DirectoryGrant::bind(&workspace, &primary, true, false).unwrap()].into(),
+            workspace: workspace.clone(),
+            protected,
+        };
+        let mut bytes = Cursor::new(Vec::new());
+        DynamicImage::ImageRgb8(ImageBuffer::from_pixel(2, 1, Rgb([12, 34, 56])))
+            .write_to(&mut bytes, ImageFormat::Png)
+            .unwrap();
+        let bytes = bytes.into_inner();
+        std::fs::write(path.join("image.png"), &bytes).unwrap();
+        let capture: Arc<ImageCapture> = Arc::new({
+            let bytes = bytes.clone();
+            move |actual| {
+                assert_eq!(actual, bytes, "legacy input stays the exact PNG");
+                Ok(MediaRef {
+                    id: ArtifactId::new("legacy-view-image")?,
+                    media_type: "image/png".into(),
+                    locator: "retained-test-image".into(),
+                    access_scope: BindingId::new("legacy-view")?,
+                    retention: Retention::Retained,
+                })
+            }
+        });
+        let tools = |view| {
+            Arc::new(
+                FileTools::with_authority(
+                    workspace.clone(),
+                    Arc::new({
+                        let authority = authority.clone();
+                        move |_| Ok(authority.clone())
+                    }),
+                    Some(capture.clone()),
+                    None,
+                )
+                .unwrap()
+                .with_image_view(view),
+            )
+        };
+        let old = tools(ImageView::LegacyPng).view_adapter().unwrap().unwrap();
+        assert_eq!(old.definition().version, 1);
+        assert_eq!(
+            old.definition().description,
+            "See the pixels of one PNG in a readable workspace directory. Use a relative path and an optional directory ID. The primary directory is the default. The PNG must be at most 256 KiB. This tool leaves the source untouched."
+        );
+        let mut inventory = Inventory::new();
+        inventory.insert(old.clone()).unwrap();
+        let selected = inventory
+            .snapshot(&[ToolId::new(VIEW_IMAGE).unwrap()])
+            .unwrap();
+        let prepared = selected
+            .prepare(
+                OperationId::new("old-view-operation").unwrap(),
+                &ToolId::new(VIEW_IMAGE).unwrap(),
+                ToolArguments::Json(json!({"path":"image.png"})),
+            )
+            .unwrap();
+        let invocation: Invocation =
+            serde_json::from_slice(&serde_json::to_vec(prepared.invocation()).unwrap()).unwrap();
+        let rebuilt = tools(ImageView::default()).view_adapter().unwrap().unwrap();
+        assert_eq!(rebuilt.definition(), invocation.definition());
+        let context = || InvocationContext {
+            attempt: AttemptId::new("legacy-view-attempt").unwrap(),
+            cancellation: CancellationToken::new(),
+            deadline: None,
+            max_output_bytes: MAX_OUTPUT_BYTES,
+        };
+        let outcome = rebuilt.invoke(invocation.clone(), context()).await;
+        assert_eq!(outcome.status, OutcomeStatus::Succeeded, "{outcome:?}");
+        assert_eq!(
+            outcome.content[0],
+            agent_kit_core::messages::ResultContent::Text(format!(
+                "Viewed PNG image.png ({} bytes).",
+                bytes.len()
+            ))
+        );
+        let modern = tools(ImageView::Raster).view_adapter().unwrap().unwrap();
+        assert_eq!(modern.definition().version, 2);
+        assert_ne!(modern.definition(), invocation.definition());
+        let incompatible = modern.invoke(invocation, context()).await;
+        assert_eq!(incompatible.status, OutcomeStatus::Failed);
+        assert_eq!(
+            incompatible.content[0],
+            agent_kit_core::messages::ResultContent::Text("file_definition_changed".into())
+        );
+    }
 
     #[test]
     fn generation_reference_requires_one_unambiguous_primary_path() {

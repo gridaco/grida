@@ -141,6 +141,12 @@ impl PermissionCapture {
 }
 
 impl PermissionProfile {
+    /// Explicit image ingestion names one file, but cannot bypass the host's
+    /// fixed protected roots. It does not add that path to workspace grants.
+    pub(crate) fn check_selected_image(&self, path: &Path) -> Result<()> {
+        self.protected.check(path)
+    }
+
     pub fn new(
         revision: BindingId,
         workspace: Arc<WorkspaceSnapshot>,
@@ -559,6 +565,26 @@ impl PermissionProfile {
         Ok(owner)
     }
 
+    /// Delegation narrows the captured profile: approvals and settings mutation
+    /// remain with the parent rather than becoming hidden child interactions.
+    pub(crate) fn bind_worker(
+        self: &Arc<Self>,
+        capture: &PermissionCapture,
+        binding: TurnBinding,
+        store: Arc<SqliteStore>,
+    ) -> Result<Arc<TurnPermissions>> {
+        let owner = self.prepare_scope(
+            capture,
+            (&binding.session, &binding.turn),
+            store,
+            false,
+            false,
+            None,
+        )?;
+        owner.bind_claim(binding)?;
+        Ok(owner)
+    }
+
     pub(crate) fn prepare_primary_review(
         self: &Arc<Self>,
         capture: &PermissionCapture,
@@ -936,11 +962,12 @@ impl TurnPermissions {
         grants: &mut BTreeMap<ToolId, GrantSelection>,
         capture_image: Option<Arc<ImageCapture>>,
         allow_writes: bool,
+        image_view: crate::file_tools::ImageView,
     ) -> Result<()> {
         if !allow_writes {
             self.state()?.read_only = true;
         }
-        self.insert_file_tools_with_images(inventory, grants, capture_image, None)
+        self.insert_file_tools_with_images(inventory, grants, capture_image, None, image_view)
     }
 
     fn insert_file_tools_with_images(
@@ -949,6 +976,7 @@ impl TurnPermissions {
         grants: &mut BTreeMap<ToolId, GrantSelection>,
         capture_image: Option<Arc<ImageCapture>>,
         capture_reference: Option<Arc<ImageCapture>>,
+        image_view: crate::file_tools::ImageView,
     ) -> Result<()> {
         let (capture_image, capture_reference) = if self.primary_review {
             (None, None)
@@ -967,7 +995,8 @@ impl TurnPermissions {
                 Arc::new(move |invocation| owner.file_authority(invocation)),
                 capture_image,
                 capture_reference.filter(|_| self.profile.supports_workspace_image_reference()),
-            )?;
+            )?
+            .with_image_view(image_view);
             if self.settings.is_some() {
                 let owner = self.clone();
                 files = files.with_settings(Arc::new(move |invocation| {
@@ -1010,7 +1039,14 @@ impl TurnPermissions {
         grants: &mut BTreeMap<ToolId, GrantSelection>,
         processes: &Arc<ProcessSessions>,
     ) -> Result<Option<Arc<CommandSupervisor>>> {
-        self.insert_with_images(inventory, grants, processes, None, None)
+        self.insert_with_images(
+            inventory,
+            grants,
+            processes,
+            None,
+            None,
+            crate::file_tools::ImageView::LegacyPng,
+        )
     }
 
     pub(crate) fn insert_with_images(
@@ -1020,8 +1056,15 @@ impl TurnPermissions {
         processes: &Arc<ProcessSessions>,
         capture_image: Option<Arc<ImageCapture>>,
         capture_reference: Option<Arc<ImageCapture>>,
+        image_view: crate::file_tools::ImageView,
     ) -> Result<Option<Arc<CommandSupervisor>>> {
-        self.insert_file_tools_with_images(inventory, grants, capture_image, capture_reference)?;
+        self.insert_file_tools_with_images(
+            inventory,
+            grants,
+            capture_image,
+            capture_reference,
+            image_view,
+        )?;
         if self.primary_review {
             return Ok(None);
         }

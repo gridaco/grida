@@ -70,20 +70,15 @@ struct RetainedMessage {
 }
 
 impl Host {
-    /// Allow the trusted private launcher to own bounded inference-only
-    /// children. This adds no model-facing delegation authority.
+    /// Enable private child controls and bounded model-facing delegation for
+    /// newly accepted ordinary Act inputs. Existing captures retain their scope.
     pub fn with_subagents(mut self) -> Self {
         self.subagents_enabled = true;
         self
     }
 
     pub(crate) fn subagents_available(&self) -> bool {
-        self.subagents_enabled
-            && self.operating_regime.is_act()
-            && self
-                .execution
-                .as_ref()
-                .is_some_and(|execution| execution.config.max_output_tokens.is_some())
+        self.subagents_enabled && self.operating_regime.is_act() && self.execution.is_some()
     }
 
     pub(crate) async fn list_subagents(
@@ -121,7 +116,7 @@ impl Host {
             host.require_subagents()?;
             let _admission = host.configuration_admission.lock().await;
             let view = host.store.inspect(parent.clone()).await?;
-            host.check_execution(&view)?;
+            host.check_execution(&view).await?;
             let mut configuration = session_configuration(&view)?;
             if configuration.side.is_some() {
                 return Err(side_chats::Refusal::Subagents.error());
@@ -199,7 +194,7 @@ impl Host {
                 ));
             }
             if previous.input.disposition == InputDisposition::Queued
-                && self.check_execution(&view).is_ok()
+                && self.check_execution(&view).await.is_ok()
                 && profile
                     .require_authority(&self.execution()?.authority.inference.authority)
                     .is_ok()
@@ -209,7 +204,7 @@ impl Host {
             return self.subagent_work(child, previous, stored).await;
         }
 
-        self.check_execution(&view)?;
+        self.check_execution(&view).await?;
         profile.require_authority(&self.execution()?.authority.inference.authority)?;
         let allocation = profile.allocation(&view.driver_state)?;
         if usize::from(allocation.reserved)
@@ -247,6 +242,8 @@ impl Host {
                 input.clone(),
                 parts,
                 SubmissionPolicy {
+                    selection_revision: None,
+                    selection_goal: false,
                     questions: false,
                     allow_wakeups: false,
                     allow_library_selection: false,
@@ -325,7 +322,7 @@ impl Host {
             }
             return Ok(message_receipt(child, previous.input, retained));
         }
-        self.check_execution(&view)?;
+        self.check_execution(&view).await?;
         profile.require_authority(&self.execution()?.authority.inference.authority)?;
         if view
             .queued
@@ -823,6 +820,7 @@ mod tests {
                     execution: Fingerprint::of(&"execution").unwrap(),
                     owner: Fingerprint::of(&"owner").unwrap(),
                     subagent: Some(profile),
+                    worker: None,
                     side: None,
                 },
             )

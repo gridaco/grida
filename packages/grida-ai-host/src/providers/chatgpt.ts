@@ -11,6 +11,7 @@
 
 import { createHash } from "node:crypto";
 import {
+  CHATGPT_SUBSCRIPTION_WIRE_MODEL_BY_ID,
   isChatGptSubscriptionModelId,
   type ChatGptSubscriptionModelId,
 } from "../protocol/chatgpt";
@@ -23,7 +24,7 @@ import {
 import type { ProviderHttp } from "./http";
 
 const RESPONSES_SUFFIX = "/responses";
-const MAX_NATIVE_REQUEST_BYTES = 1024 * 1024;
+const MAX_NATIVE_REQUEST_BYTES = 8 * 1024 * 1024;
 const NATIVE_FIELDS = new Set([
   "model",
   "input",
@@ -116,7 +117,7 @@ export namespace ChatGptProvider {
         ])
       )
       .digest("hex");
-    const wireModel = toWireModelId(model);
+    const wireModel = CHATGPT_SUBSCRIPTION_WIRE_MODEL_BY_ID[model];
     return Object.freeze({
       scope,
       target,
@@ -168,18 +169,6 @@ export namespace ChatGptProvider {
       },
     });
   }
-}
-
-const CHATGPT_WIRE_MODEL_BY_ID: Record<ChatGptSubscriptionModelId, string> = {
-  "openai/gpt-5.6-sol": "gpt-5.6-sol",
-  "openai/gpt-5.6-terra": "gpt-5.6-terra",
-  "openai/gpt-5.6-luna": "gpt-5.6-luna",
-  "openai/gpt-5.5": "gpt-5.5",
-  "openai/gpt-5.4": "gpt-5.4",
-};
-
-function toWireModelId(modelId: ChatGptSubscriptionModelId): string {
-  return CHATGPT_WIRE_MODEL_BY_ID[modelId];
 }
 
 async function requestWithRetry(

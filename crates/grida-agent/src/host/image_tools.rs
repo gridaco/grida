@@ -229,7 +229,11 @@ impl TurnImage {
         let definition = ToolDefinition {
             id: ToolId::new(CROP_TOOL)?,
             version: 1,
-            description: "Crop the most recent retained PNG attachment in this chat and save its working copy. Use pixel coordinates in the original image. The original and project files are preserved.".into(),
+            description: if source.id().as_str().starts_with("input/raster-prepared/") {
+                "Crop the retained bounded PNG view of the most recent image attachment and save its working copy. Use pixel coordinates in the supplied prepared view, which can be smaller than the original. The retained original and project files are preserved."
+            } else {
+                "Crop the most recent retained PNG attachment in this chat and save its working copy. Use pixel coordinates in the original image. The original and project files are preserved."
+            }.into(),
             input: InputFormat::Json(json!({
                 "type": "object",
                 "properties": {

@@ -1,4 +1,4 @@
-//! GRIDA-SEC-004 — a file reference names a local file and grants nothing.
+//! GRIDA-SEC-004 — a resource reference names a local path and grants nothing.
 
 use super::approvals::{Fixture, Stdio as PrivateStdio};
 use super::*;
@@ -66,6 +66,37 @@ fn submit(session: &Value, input: &str, prompt: Value) -> Value {
     json!({"sessionId":session,"inputId":input,"prompt":prompt})
 }
 
+fn directory_link(path: &Path, workspace_path: Option<&str>) -> Value {
+    let mut reference = json!({
+        "type":"resource_link","name":path.file_name().unwrap().to_str().unwrap(),
+        "uri":reqwest::Url::from_file_path(path).unwrap().as_str(),
+        "mimeType":"inode/directory",
+    });
+    if let Some(relative) = workspace_path {
+        reference["_meta"] = json!({DETAILS:{"workspacePath":relative}});
+    }
+    reference
+}
+
+async fn idle(client: &mut PrivateStdio, session: &Value) -> Value {
+    timeout(WAIT, async {
+        loop {
+            let snapshot = read(
+                client,
+                "_co.grida/session/snapshot",
+                json!({"sessionId":session}),
+            )
+            .await;
+            if snapshot["current"].is_null() {
+                break snapshot;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap()
+}
+
 fn tool_result(request: &Value) -> String {
     request["messages"]
         .as_array()
@@ -75,6 +106,214 @@ fn tool_result(request: &Value) -> String {
         .find(|message| message["role"] == "tool")
         .unwrap_or_else(|| panic!("no tool result in {request}"))["content"]
         .to_string()
+}
+
+#[tokio::test]
+async fn directory_reference_queue_restarts_and_lists_only_under_existing_workspace_access() {
+    let fixture = Fixture::new(false);
+    let directory = fixture.primary.join("assets");
+    fs::create_dir(&directory).unwrap();
+    fs::write(directory.join("old-unlisted-file.txt"), "not captured").unwrap();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Hold("Waiting for the next input."),
+        Reply::Tool("list_files", r#"{"path":"assets"}"#),
+        Reply::Finished("Listed the referenced folder."),
+    ])
+    .await;
+    let mut client = negotiated(&fixture, &endpoint.url).await;
+    let session = read(
+        &mut client,
+        "session/new",
+        json!({"cwd":fixture.primary,"mcpServers":[]}),
+    )
+    .await["sessionId"]
+        .clone();
+    read(
+        &mut client,
+        "_co.grida/session/submit",
+        submit(&session, "first", json!([{"type":"text","text":"Wait."}])),
+    )
+    .await;
+    endpoint.request().await;
+    let reference = directory_link(&directory, Some("assets"));
+    let request = submit(
+        &session,
+        "folder",
+        json!([{"type":"text","text":"List this folder."},reference]),
+    );
+    let accepted = read(&mut client, "_co.grida/session/enqueue", request.clone()).await;
+    assert_eq!(accepted["disposition"], "queued");
+    let snapshot = read(
+        &mut client,
+        "_co.grida/session/snapshot",
+        json!({"sessionId":session}),
+    )
+    .await;
+    read(
+        &mut client,
+        "_co.grida/session/stop",
+        super::lifecycle::task_basis(&snapshot, session.as_str().unwrap(), "hold-folder-queue"),
+    )
+    .await;
+    let stopped = idle(&mut client, &session).await;
+    assert_eq!(stopped["admissionPaused"], true);
+    assert!(endpoint.requests.try_recv().is_err());
+    client.close().await;
+
+    // A reference stores the path, not a snapshot or a new directory grant.
+    // Reopening and retrying it do not even require that folder to exist.
+    fs::remove_dir_all(&directory).unwrap();
+    let mut reopened = negotiated(&fixture, &endpoint.url).await;
+    read(
+        &mut reopened,
+        "session/load",
+        json!({"sessionId":session,"cwd":fixture.primary,"mcpServers":[]}),
+    )
+    .await;
+    let retained = read(
+        &mut reopened,
+        "_co.grida/session/input",
+        json!({"sessionId":session,"inputId":"folder"}),
+    )
+    .await;
+    assert_eq!(retained["prompt"][1], reference);
+    assert_eq!(
+        retained["receipt"]["inputPosition"],
+        accepted["inputPosition"]
+    );
+    let repeated = read(&mut reopened, "_co.grida/session/enqueue", request.clone()).await;
+    assert_eq!(repeated, retained["receipt"]);
+    assert!(endpoint.requests.try_recv().is_err());
+    fs::create_dir(&directory).unwrap();
+    fs::write(directory.join("visible-now.txt"), "current contents").unwrap();
+    let snapshot = read(
+        &mut reopened,
+        "_co.grida/session/snapshot",
+        json!({"sessionId":session}),
+    )
+    .await;
+    read(
+        &mut reopened,
+        "_co.grida/session/resume-queue",
+        super::lifecycle::queue_basis(&snapshot, session.as_str().unwrap(), "release-folder-queue"),
+    )
+    .await;
+    let first = endpoint.request().await.to_string();
+    assert!(first.contains("Attached folder by reference"), "{first}");
+    assert!(first.contains(directory.to_str().unwrap()));
+    assert!(first.contains("inode/directory"));
+    assert!(!first.contains("old-unlisted-file.txt"));
+    assert!(!first.contains("visible-now.txt"));
+    let followup = endpoint.request().await;
+    assert!(
+        tool_result(&followup).contains("visible-now.txt"),
+        "{followup}"
+    );
+    assert!(!tool_result(&followup).contains("old-unlisted-file.txt"));
+    completed(&mut reopened, &session, "folder").await;
+    let history = read(
+        &mut reopened,
+        "_co.grida/session/history",
+        json!({"sessionId":session}),
+    )
+    .await;
+    assert!(
+        history.to_string().contains("Attached folder assets."),
+        "{history}"
+    );
+    reopened.close().await;
+
+    let mut replayed = negotiated(&fixture, &endpoint.url).await;
+    let id = replayed
+        .send(
+            "session/load",
+            json!({"sessionId":session,"cwd":fixture.primary,"mcpServers":[]}),
+        )
+        .await;
+    let mut links = Vec::new();
+    loop {
+        let frame = replayed.read_frame().await;
+        if frame["id"] == id {
+            assert!(frame["result"].is_object(), "{frame}");
+            break;
+        }
+        let update = &frame["params"]["update"];
+        if update["sessionUpdate"] == "user_message_chunk"
+            && update["content"]["type"] == "resource_link"
+        {
+            links.push(update["content"].clone());
+        }
+    }
+    assert_eq!(links, vec![reference]);
+    let retained = read(
+        &mut replayed,
+        "_co.grida/session/input",
+        json!({"sessionId":session,"inputId":"folder"}),
+    )
+    .await;
+    assert_eq!(retained["receipt"]["disposition"], "completed");
+    assert!(retained["prompt"][1].get("size").is_none());
+    assert!(
+        retained["prompt"][1]["_meta"][DETAILS]
+            .get("preview")
+            .is_none()
+    );
+    let repeated = read(&mut replayed, "_co.grida/session/enqueue", request).await;
+    assert_eq!(repeated, retained["receipt"]);
+    assert!(endpoint.requests.try_recv().is_err());
+    replayed.close().await;
+    endpoint.done().await;
+}
+
+#[tokio::test]
+async fn directory_references_cannot_grant_outside_or_protected_directory_access() {
+    for protected in [false, true] {
+        let fixture = Fixture::new(false);
+        let elsewhere = TempDir::new().unwrap();
+        let directory = elsewhere.path().canonicalize().unwrap();
+        fs::write(
+            directory.join("unrevealed-entry.txt"),
+            "private folder contents",
+        )
+        .unwrap();
+        let arguments = if protected {
+            let mut profile: Value =
+                serde_json::from_slice(&fs::read(&fixture.profile).unwrap()).unwrap();
+            profile["protectedPaths"] = json!([directory]);
+            fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
+            std::os::unix::fs::symlink(&directory, fixture.primary.join("forbidden-alias"))
+                .unwrap();
+            json!({"path":"forbidden-alias"})
+        } else {
+            json!({"path":directory})
+        };
+        let arguments: &'static str = Box::leak(arguments.to_string().into_boxed_str());
+        let mut endpoint = Endpoint::start(vec![
+            Reply::Tool("list_files", arguments),
+            Reply::Finished("The existing scope refused the folder read."),
+        ])
+        .await;
+        let mut client = negotiated(&fixture, &endpoint.url).await;
+        let session = read(
+            &mut client,
+            "session/new",
+            json!({"cwd":fixture.primary,"mcpServers":[]}),
+        )
+        .await["sessionId"]
+            .clone();
+        read(&mut client, "_co.grida/session/submit", submit(&session, "restricted-folder", json!([{"type":"text","text":"Inspect this folder only if permitted."},directory_link(&directory,None)]))).await;
+        let first = endpoint.request().await.to_string();
+        assert!(first.contains("Attached folder by reference"));
+        assert!(first.contains(directory.to_str().unwrap()));
+        assert!(!first.contains("unrevealed-entry.txt"));
+        let result = tool_result(&endpoint.request().await);
+        assert!(result.contains("failed"), "{result}");
+        assert!(!result.contains("unrevealed-entry.txt"));
+        assert!(!result.contains("private folder contents"));
+        completed(&mut client, &session, "restricted-folder").await;
+        client.close().await;
+        endpoint.done().await;
+    }
 }
 
 #[tokio::test]

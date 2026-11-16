@@ -40,7 +40,8 @@ export class NativeChatStore {
 
   private constructor(
     private readonly stateDirectory: string,
-    readonly protectedPaths: readonly string[]
+    readonly protectedPaths: readonly string[],
+    readonly hooksHome: string
   ) {}
 
   /** Main-owned identity receipts for selected standalone documents. */
@@ -114,7 +115,8 @@ export class NativeChatStore {
     }
     return new NativeChatStore(
       stateDirectory,
-      Object.freeze([desktop, ...separate, ...(ordinaryProtectedPaths ?? [])])
+      Object.freeze([desktop, ...separate, ...(ordinaryProtectedPaths ?? [])]),
+      paths.providerHome
     );
   }
 
@@ -142,6 +144,24 @@ export class NativeChatStore {
       await ensureState(directory);
     }
     return directory;
+  }
+
+  /** Existing private store only; catalog inspection must never initialize a chat. */
+  async archiveDirectory(
+    workspaceId: string,
+    root: string
+  ): Promise<string | null> {
+    const directory = await this.workspaceDirectory(workspaceId, root);
+    try {
+      checkDirectory(await fs.lstat(directory), true);
+      const database = await fs.lstat(path.join(directory, "agent.sqlite"));
+      if (!database.isFile() || database.isSymbolicLink())
+        throw new Error("native_archive_store_invalid");
+      return directory;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw error;
+    }
   }
 
   async startWorkspace(
@@ -206,7 +226,11 @@ export class NativeChatStore {
     launch: Launch,
     stateDirectory: string
   ): Promise<Ready> {
-    const chat = await NativeAgentChat.start({ ...launch, stateDirectory });
+    const chat = await NativeAgentChat.start({
+      ...launch,
+      stateDirectory,
+      protectedPaths: this.protectedPaths,
+    });
     return { chat, stateDirectory };
   }
 }

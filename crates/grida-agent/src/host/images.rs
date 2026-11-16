@@ -1,26 +1,504 @@
 //! GRIDA-SEC-004 / GRIDA-SEC-014 — validate PNG intake and its retained identity.
 
-use super::{PromptPart, problem};
+use super::{Host, PromptPart, StoredPrompt, decode_input, problem};
 use crate::scratch::AssetRef;
-use agent_kit_core::messages::{MediaRef, Retention};
-use agent_kit_core::{BindingId, ErrorKind, Result, SessionId};
+use agent_kit_core::history::HistoryRecord;
+use agent_kit_core::messages::{Content, MediaRef, Retention, Role};
+use agent_kit_core::{ArtifactId, BindingId, ChangeId, ErrorKind, MessageId, Result, SessionId};
+use agent_kit_sessions::{InputDisposition, SessionRevision};
 use base64::{Engine, engine::general_purpose::STANDARD};
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fmt;
 use std::io::{BufRead, Cursor, Seek};
 use std::path::Path;
+use std::sync::Arc;
 
 const MIME: &str = "image/png";
 pub(super) const NAME: &str = "image.png";
 const LOCATOR: &str = "retained-input:";
+const RASTER_LOCATOR: &str = "retained-raster:";
 pub(crate) const MAX_IMAGE_BYTES: usize = 256 * 1024;
 pub(super) const MAX_PIXELS: u64 = 4 * 1024 * 1024;
 pub(super) const MAX_DECODED_BYTES: usize = 8 * 1024 * 1024;
+
+impl Host {
+    /// Inspect an exact waiting input without claiming it or granting access to
+    /// paths named in its prompt. A newer queue view retires this observation.
+    pub(crate) async fn queued_message_parts(
+        &self,
+        session: &SessionId,
+        input: &ChangeId,
+        expected: SessionRevision,
+    ) -> Result<Vec<PromptPart>> {
+        let view = self
+            .inspect(session.clone())
+            .await
+            .map_err(|_| queued_image_unavailable())?;
+        if view.revision != expected {
+            return Err(queued_image_unavailable());
+        }
+        let selected = view
+            .queued
+            .iter()
+            .find(|row| &row.input.id == input && row.disposition == InputDisposition::Queued)
+            .ok_or_else(queued_image_unavailable)?;
+        decode_input::<StoredPrompt>(&selected.input)
+            .map(|prompt| prompt.parts)
+            .map_err(|_| queued_image_unavailable())
+    }
+
+    /// Read one bounded chunk from an original retained by this exact queued
+    /// input. Membership and revision are checked around the byte read.
+    pub(crate) async fn read_queued_input_image_chunk(
+        &self,
+        session: SessionId,
+        input: ChangeId,
+        expected: SessionRevision,
+        attachment: ArtifactId,
+        offset: usize,
+    ) -> Result<(String, usize, Vec<u8>, Option<usize>)> {
+        let media = self
+            .queued_image_reference(&session, &input, expected, &attachment)
+            .await?;
+        let selected = media.clone();
+        let state_dir = self
+            .state_dir
+            .clone()
+            .ok_or_else(queued_image_unavailable)?;
+        let images = self
+            .execution
+            .as_ref()
+            .and_then(|execution| execution.retained_inputs.clone());
+        let (mime, bytes) = tokio::task::spawn_blocking(move || {
+            let images = match images {
+                Some(images) => images,
+                None => Arc::new(super::retained_inputs::RetainedInputs::open(&state_dir)?),
+            };
+            images.resolve_original(&selected)
+        })
+        .await
+        .map_err(|_| queued_image_unavailable())?
+        .map_err(|_| queued_image_unavailable())?;
+        if self
+            .queued_image_reference(&session, &input, expected, &attachment)
+            .await?
+            != media
+            || offset >= bytes.len()
+            || !offset.is_multiple_of(256 * 1024)
+        {
+            return Err(queued_image_unavailable());
+        }
+        let total = bytes.len();
+        let end = offset.saturating_add(256 * 1024).min(total);
+        Ok((
+            mime,
+            total,
+            bytes[offset..end].to_vec(),
+            (end < total).then_some(end),
+        ))
+    }
+
+    async fn queued_image_reference(
+        &self,
+        session: &SessionId,
+        input: &ChangeId,
+        expected: SessionRevision,
+        attachment: &ArtifactId,
+    ) -> Result<MediaRef> {
+        let parts = self.queued_message_parts(session, input, expected).await?;
+        let mut selected = None;
+        for part in parts {
+            let media = match part {
+                PromptPart::RetainedImage { asset } => media(&asset),
+                PromptPart::PreparedImage { image } => raster_media(&image),
+                _ => continue,
+            }
+            .map_err(|_| queued_image_unavailable())?;
+            if &media.id != attachment {
+                continue;
+            }
+            if selected.is_some() || !asset_ref(&media).is_ok_and(|asset| asset.owner() == session)
+            {
+                return Err(queued_image_unavailable());
+            }
+            selected = Some(media);
+        }
+        selected.ok_or_else(queued_image_unavailable)
+    }
+
+    /// Read one original PNG already represented by this chat's visible local
+    /// user message. The selection comes from the journal, never a supplied
+    /// path or serialized asset. Model input eligibility is unrelated.
+    pub(crate) async fn read_input_image(
+        &self,
+        session: SessionId,
+        message: MessageId,
+        attachment: ArtifactId,
+    ) -> Result<Vec<u8>> {
+        let media = self
+            .input_image_reference(&session, &message, &attachment)
+            .await?;
+        let selected = media.clone();
+        if retained_raster(&media).is_some() {
+            // The original-only PNG operation predates richer raster input;
+            // never return a resized derivative or a different MIME through it.
+            return Err(input_image_unavailable());
+        }
+        let state_dir = self.state_dir.clone().ok_or_else(input_image_unavailable)?;
+        let images = self
+            .execution
+            .as_ref()
+            .and_then(|execution| execution.retained_inputs.clone());
+        let bytes = tokio::task::spawn_blocking(move || {
+            let images = match images {
+                Some(images) => images,
+                None => Arc::new(super::retained_inputs::RetainedInputs::open(&state_dir)?),
+            };
+            images.resolve_selected_image(&selected, MAX_IMAGE_BYTES)
+        })
+        .await
+        .map_err(|_| input_image_unavailable())?
+        .map_err(|_| input_image_unavailable())?;
+        // A concurrent revision or deletion cannot leave a retired message's
+        // input readable through a formerly valid selection.
+        if self
+            .input_image_reference(&session, &message, &attachment)
+            .await?
+            != media
+        {
+            return Err(input_image_unavailable());
+        }
+        Ok(bytes)
+    }
+
+    pub(crate) async fn read_input_image_chunk(
+        &self,
+        session: SessionId,
+        message: MessageId,
+        attachment: ArtifactId,
+        offset: usize,
+    ) -> Result<(String, usize, Vec<u8>, Option<usize>)> {
+        let media = self
+            .input_image_reference(&session, &message, &attachment)
+            .await?;
+        let selected = media.clone();
+        let state_dir = self.state_dir.clone().ok_or_else(input_image_unavailable)?;
+        let images = self
+            .execution
+            .as_ref()
+            .and_then(|execution| execution.retained_inputs.clone());
+        let (mime, bytes) = tokio::task::spawn_blocking(move || {
+            let images = match images {
+                Some(images) => images,
+                None => Arc::new(super::retained_inputs::RetainedInputs::open(&state_dir)?),
+            };
+            images.resolve_original(&selected)
+        })
+        .await
+        .map_err(|_| input_image_unavailable())?
+        .map_err(|_| input_image_unavailable())?;
+        if self
+            .input_image_reference(&session, &message, &attachment)
+            .await?
+            != media
+            || offset >= bytes.len()
+            || !offset.is_multiple_of(256 * 1024)
+        {
+            return Err(input_image_unavailable());
+        }
+        let total = bytes.len();
+        let end = offset.saturating_add(256 * 1024).min(total);
+        Ok((
+            mime,
+            total,
+            bytes[offset..end].to_vec(),
+            (end < total).then_some(end),
+        ))
+    }
+
+    async fn input_image_reference(
+        &self,
+        session: &SessionId,
+        message: &MessageId,
+        attachment: &ArtifactId,
+    ) -> Result<MediaRef> {
+        let mut replay = self
+            .store
+            .open_history_replay(
+                session.clone(),
+                grida_agent_master::history::project,
+                |seed| Ok(seed.records.len()),
+            )
+            .await
+            .map_err(|_| input_image_unavailable())?;
+        let mut selected = None;
+        // Bounded transcript pages include old local turns after context
+        // compaction. Inherited seed records are skipped: those are not this
+        // session's original inputs.
+        while let Some(records) = replay.next().await.map_err(|_| input_image_unavailable())? {
+            for HistoryRecord::Message(record) in records {
+                if record.role != Role::User || &record.id != message {
+                    continue;
+                }
+                for content in record.content {
+                    if let Content::Media(media) = content
+                        && &media.id == attachment
+                        && is_retained_image(&media)
+                    {
+                        if selected.is_some()
+                            || !asset_ref(&media).is_ok_and(|asset| asset.owner() == session)
+                        {
+                            return Err(input_image_unavailable());
+                        }
+                        selected = Some(media);
+                    }
+                }
+            }
+        }
+        selected.ok_or_else(input_image_unavailable)
+    }
+}
+
+fn input_image_unavailable() -> agent_kit_core::Error {
+    problem(ErrorKind::Unavailable, "input_image_unavailable")
+}
+
+fn queued_image_unavailable() -> agent_kit_core::Error {
+    problem(ErrorKind::Unavailable, "queued_input_image_unavailable")
+}
+
+/// A private launcher can ingest a clipboard snapshot only from this one
+/// staging root. Ordinary tools still deny the whole native state directory.
+/// Merely claiming `snapshot` cannot turn an arbitrary protected path into input.
+pub(super) fn check_snapshot_path(state: Option<&Path>, path: &Path) -> Result<()> {
+    let denied = || {
+        problem(
+            ErrorKind::Unavailable,
+            "selected_image_snapshot_unavailable",
+        )
+    };
+    let state = state.ok_or_else(denied)?;
+    let custody = state.join("desktop-image-custody");
+    let root = custody.join("snapshots");
+    if path.parent() != Some(root.as_path()) || path.canonicalize().map_err(|_| denied())? != path {
+        return Err(denied());
+    }
+    for directory in [&custody, &root] {
+        if directory.canonicalize().map_err(|_| denied())? != *directory {
+            return Err(denied());
+        }
+        crate::scratch::check_private_directory(directory).map_err(|_| denied())?;
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let metadata = std::fs::symlink_metadata(path).map_err(|_| denied())?;
+        if !metadata.is_file()
+            || metadata.nlink() != 1
+            || metadata.mode() & 0o777 != 0o600
+            || metadata.uid() != rustix::process::geteuid().as_raw()
+        {
+            return Err(denied());
+        }
+    }
+    Ok(())
+}
 /// Transient supplied PNG. Only the retained asset identity is serializable.
 #[derive(Clone, PartialEq, Eq)]
 pub struct ImageUpload {
     pub(super) bytes: Vec<u8>,
     pub(super) digest: [u8; 32],
+    pub(super) source: Option<Box<RasterSource>>,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub(super) struct RasterSource {
+    pub bytes: Vec<u8>,
+    pub mime: String,
+    pub name: String,
+    pub preparation: super::image_preparation::Preparation,
+    pub selection: Option<SelectedImage>,
+}
+
+/// Private-launcher identity of the exact user-selected snapshot. The digest
+/// binds the bytes selected by Main; `source` controls provenance, never grants.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SelectedImage {
+    pub path: String,
+    pub sha256: [u8; 32],
+    pub name: String,
+    pub source: ImageSource,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImageSource {
+    Disk,
+    Snapshot,
+}
+
+impl SelectedImage {
+    pub(crate) fn validate(&self) -> Result<()> {
+        crate::workspace::validate_absolute(Path::new(&self.path))?;
+        if self.path.len() > 4096
+            || self.path.chars().any(char::is_control)
+            || self.name.is_empty()
+            || self.name.len() > 255
+            || self
+                .name
+                .chars()
+                .any(|c| c.is_control() || c == '/' || c == '\\')
+        {
+            return Err(problem(
+                ErrorKind::InvalidInput,
+                "selected_image_identity_invalid",
+            ));
+        }
+        Ok(())
+    }
+
+    pub(super) fn read(&self) -> Result<ImageUpload> {
+        self.validate()?;
+        let bytes = super::selected_file::read_selected(
+            Path::new(&self.path),
+            super::image_preparation::MAX_SOURCE_BYTES,
+            "selected_image_unavailable",
+            "selected_image_changed",
+            "image_source_size_limit",
+        )?;
+        if <[u8; 32]>::from(Sha256::digest(&bytes)) != self.sha256 {
+            return Err(problem(ErrorKind::Conflict, "selected_image_changed"));
+        }
+        ImageUpload::from_raster(bytes, self.name.clone(), Some(self.clone()))
+    }
+}
+
+/// Product metadata that links one retained original to one frozen model still.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RetainedRaster {
+    pub original: AssetRef,
+    pub prepared: AssetRef,
+    pub mime_type: String,
+    pub name: String,
+    pub preparation: super::image_preparation::Preparation,
+    pub selection: Option<SelectedImage>,
+}
+
+impl RetainedRaster {
+    pub(crate) fn source_path(&self) -> Option<&str> {
+        self.selection
+            .as_ref()
+            .filter(|s| s.source == ImageSource::Disk)
+            .map(|s| s.path.as_str())
+    }
+
+    pub(super) fn context(&self) -> grida_agent_master::image_attachment::Context {
+        use grida_agent_master::image_attachment::{Context, Source};
+        Context {
+            source: match self.source_path() {
+                Some(path) => Source::Disk { path: path.into() },
+                None => Source::Snapshot {
+                    name: self.name.clone(),
+                    resource: self.original.id().as_str().into(),
+                },
+            },
+            source_width: self.preparation.source_width,
+            source_height: self.preparation.source_height,
+            width: self.preparation.width,
+            height: self.preparation.height,
+            first_frame: self.preparation.first_frame,
+        }
+    }
+
+    fn validate(&self) -> Result<()> {
+        self.preparation.validate()?;
+        if self.original.owner() != self.prepared.owner()
+            || !self.original.id().as_str().starts_with("input/raster/")
+            || !self
+                .prepared
+                .id()
+                .as_str()
+                .starts_with("input/raster-prepared/")
+            || self.original.version() != 1
+            || self.prepared.version() != 1
+            || self.prepared.name() != NAME
+            || self.original.size() == 0
+            || self.original.size() > super::image_preparation::MAX_SOURCE_BYTES as u64
+            || self.prepared.size() == 0
+            || self.prepared.size() > super::image_preparation::MAX_PREPARED_BYTES as u64
+            || !["image/png", "image/jpeg", "image/webp", "image/gif"]
+                .contains(&self.mime_type.as_str())
+            || self.name.is_empty()
+            || self.name.len() > 255
+            || self.name.chars().any(char::is_control)
+        {
+            return Err(retained_unavailable());
+        }
+        if let Some(selection) = &self.selection {
+            selection.validate()?;
+            if &selection.sha256 != self.original.digest() || selection.name != self.name {
+                return Err(retained_unavailable());
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn matches_selection(&self, selected: &SelectedImage) -> bool {
+        self.selection.as_ref() == Some(selected) && self.original.digest() == &selected.sha256
+    }
+
+    pub(super) fn matches_upload(&self, upload: &ImageUpload) -> bool {
+        upload.source.as_ref().is_some_and(|source| {
+            source.selection == self.selection
+                && source.name == self.name
+                && source.mime == self.mime_type
+                && self.prepared.digest() == &upload.digest
+                && self.original.digest() == &<[u8; 32]>::from(Sha256::digest(&source.bytes))
+                && self.preparation == source.preparation
+        })
+    }
+}
+
+pub(crate) fn retained_raster(media: &MediaRef) -> Option<RetainedRaster> {
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Descriptor {
+        image: RetainedRaster,
+        context: grida_agent_master::image_attachment::Context,
+    }
+    let raw = media.locator.strip_prefix(RASTER_LOCATOR)?;
+    if raw.len() > 16 * 1024 {
+        return None;
+    }
+    let descriptor: Descriptor = serde_json::from_str(raw).ok()?;
+    let image = descriptor.image;
+    image.validate().ok()?;
+    if descriptor.context != image.context() {
+        return None;
+    }
+    (media.id == *image.original.id()
+        && media.media_type == MIME
+        && media.retention == Retention::Retained
+        && media.access_scope == scope_id(image.original.owner()).ok()?)
+    .then_some(image)
+}
+
+pub(super) fn raster_media(image: &RetainedRaster) -> Result<MediaRef> {
+    image.validate()?;
+    Ok(MediaRef {
+        id: image.original.id().clone(),
+        media_type: MIME.into(),
+        locator: format!(
+            "{RASTER_LOCATOR}{}",
+            serde_json::to_string(&serde_json::json!({"image":image,"context":image.context()}))
+                .map_err(|_| retained_unavailable())?
+        ),
+        access_scope: scope_id(image.original.owner())?,
+        retention: Retention::Retained,
+    })
 }
 
 impl fmt::Debug for ImageUpload {
@@ -44,7 +522,7 @@ impl ImageUpload {
         Self::from_png(bytes)
     }
 
-    pub(super) fn from_png(bytes: Vec<u8>) -> Result<Self> {
+    pub(crate) fn from_png(bytes: Vec<u8>) -> Result<Self> {
         if bytes.len() > MAX_IMAGE_BYTES {
             return Err(image_too_large());
         }
@@ -52,6 +530,26 @@ impl ImageUpload {
         Ok(Self {
             digest: Sha256::digest(&bytes).into(),
             bytes,
+            source: None,
+        })
+    }
+
+    pub(super) fn from_raster(
+        bytes: Vec<u8>,
+        name: String,
+        selection: Option<SelectedImage>,
+    ) -> Result<Self> {
+        let prepared = super::image_preparation::prepare(&bytes)?;
+        Ok(Self {
+            digest: Sha256::digest(&prepared.bytes).into(),
+            bytes: prepared.bytes,
+            source: Some(Box::new(RasterSource {
+                bytes,
+                mime: prepared.mime.into(),
+                name,
+                preparation: prepared.preparation,
+                selection,
+            })),
         })
     }
 
@@ -71,6 +569,9 @@ impl ImageUpload {
 }
 
 pub(super) fn asset_ref(media: &MediaRef) -> Result<AssetRef> {
+    if let Some(image) = retained_raster(media) {
+        return Ok(image.prepared);
+    }
     let asset: AssetRef = media
         .locator
         .strip_prefix(LOCATOR)
@@ -101,13 +602,15 @@ pub(super) fn media(asset: &AssetRef) -> Result<MediaRef> {
 
 /// The byte size of a retained image, when its asset identity is intact.
 pub(crate) fn retained_image_size(media: &MediaRef) -> Option<u64> {
-    asset_ref(media).ok().map(|asset| asset.size())
+    retained_raster(media)
+        .map(|image| image.original.size())
+        .or_else(|| asset_ref(media).ok().map(|asset| asset.size()))
 }
 
 pub(crate) fn is_retained_image(media: &MediaRef) -> bool {
     media.media_type == MIME
         && media.retention == Retention::Retained
-        && media.locator.starts_with(LOCATOR)
+        && (media.locator.starts_with(LOCATOR) || retained_raster(media).is_some())
 }
 
 pub(super) fn same_prompt(left: &[PromptPart], right: &[PromptPart]) -> bool {
@@ -118,6 +621,12 @@ pub(super) fn same_prompt(left: &[PromptPart], right: &[PromptPart]) -> bool {
             .all(|(stored, supplied)| match (stored, supplied) {
                 (PromptPart::RetainedImage { asset }, PromptPart::Image { image }) => {
                     image.matches(asset)
+                }
+                (PromptPart::PreparedImage { image }, PromptPart::SelectedImage { selection }) => {
+                    image.matches_selection(selection)
+                }
+                (PromptPart::PreparedImage { image }, PromptPart::Image { image: upload }) => {
+                    image.matches_upload(upload)
                 }
                 (PromptPart::RetainedFile { work }, PromptPart::File { file }) => {
                     file.matches(work.asset())
