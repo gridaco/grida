@@ -126,10 +126,17 @@ impl Fixture {
         }
     }
 
-    fn stream_command(&self, executable: &TrustedExecutable) -> ProcessSpec {
+    fn stream_command(&self, executable: &TrustedExecutable, script: &str) -> ProcessSpec {
+        // Coreutils aliases may resolve outside reviewed system directories.
+        // Pin the system shell; these literal scripts exec the binary stream peer.
+        assert!(
+            [Path::new("/bin"), Path::new("/usr/bin")].contains(&executable.path.parent().unwrap()),
+            "reviewed fixture executable: {:?}",
+            executable.path
+        );
         ProcessSpec {
             executable: executable.path.clone(),
-            arguments: vec![],
+            arguments: vec!["-c".into(), script.into()],
             cwd: self.workspace.clone(),
             environment: BTreeMap::new(),
             stdin: vec![],
@@ -674,32 +681,35 @@ async fn native_output_and_cancellation_are_bounded() {
 async fn reviewed_streaming_stdio_exchanges_binary_data_and_closes() {
     let fixture = Fixture::new();
     let sandbox = fixture.sandbox();
-    let cat = trusted("/bin/cat");
+    let shell = trusted("/bin/bash");
     let scope = fixture.scope();
-    let mut wrong = cat.clone();
+    let mut wrong = shell.clone();
     wrong.sha256[0] ^= 1;
     let error = sandbox
-        .prepare(fixture.stream_command(&cat), scope.clone())
+        .prepare(
+            fixture.stream_command(&shell, "exec /bin/cat"),
+            scope.clone(),
+        )
         .unwrap()
         .spawn_streaming(&wrong, CancellationToken::new())
         .err()
         .unwrap();
     assert_eq!(error.code, "reviewed_executable_changed");
 
-    let mut fixed = fixture.stream_command(&cat);
+    let mut fixed = fixture.stream_command(&shell, "exec /bin/cat");
     fixed.stdin = b"fixed".to_vec();
     let error = sandbox
         .prepare(fixed, scope.clone())
         .unwrap()
-        .spawn_streaming(&cat, CancellationToken::new())
+        .spawn_streaming(&shell, CancellationToken::new())
         .err()
         .unwrap();
     assert_eq!(error.code, "sandbox_fixed_stdin_present");
 
     let (running, mut stream) = sandbox
-        .prepare(fixture.stream_command(&cat), scope)
+        .prepare(fixture.stream_command(&shell, "exec /bin/cat"), scope)
         .unwrap()
-        .spawn_streaming(&cat, CancellationToken::new())
+        .spawn_streaming(&shell, CancellationToken::new())
         .unwrap();
     // Each response must arrive before the writer reaches EOF.
     for message in [[0xff, 0, 0x0a], [0, 0x0d, 0x80]] {
@@ -727,13 +737,13 @@ async fn reviewed_streaming_stdio_exchanges_binary_data_and_closes() {
 async fn reviewed_streaming_stdio_retains_bounds_and_stop_ownership() {
     let fixture = Fixture::new();
     let sandbox = fixture.sandbox();
-    let cat = trusted("/bin/cat");
-    let mut output = fixture.stream_command(&cat);
+    let shell = trusted("/bin/bash");
+    let mut output = fixture.stream_command(&shell, "exec /bin/cat");
     output.max_output_bytes = 8;
     let (running, mut stream) = sandbox
         .prepare(output, fixture.scope())
         .unwrap()
-        .spawn_streaming(&cat, CancellationToken::new())
+        .spawn_streaming(&shell, CancellationToken::new())
         .unwrap();
     stream.write_all(b"123456789").await.unwrap();
     let mut received = Vec::new();
@@ -743,13 +753,11 @@ async fn reviewed_streaming_stdio_retains_bounds_and_stop_ownership() {
     assert_eq!(result.stopped, Some(StopReason::OutputLimit), "{result:?}");
     assert!(result.output_truncated && result.temporary_removed);
 
-    let wc = trusted("/usr/bin/wc");
-    let mut input = fixture.stream_command(&wc);
-    input.arguments.push("-c".into());
+    let input = fixture.stream_command(&shell, "exec /usr/bin/wc -c");
     let (running, mut stream) = sandbox
         .prepare(input, fixture.scope())
         .unwrap()
-        .spawn_streaming(&wc, CancellationToken::new())
+        .spawn_streaming(&shell, CancellationToken::new())
         .unwrap();
     let _ = stream.write_all(&vec![0; 1024 * 1024 + 1]).await;
     let result = running.finish().await.unwrap();
@@ -757,9 +765,12 @@ async fn reviewed_streaming_stdio_retains_bounds_and_stop_ownership() {
     assert!(result.temporary_removed);
 
     let (running, mut stream) = sandbox
-        .prepare(fixture.stream_command(&cat), fixture.scope())
+        .prepare(
+            fixture.stream_command(&shell, "exec /bin/cat"),
+            fixture.scope(),
+        )
         .unwrap()
-        .spawn_streaming(&cat, CancellationToken::new())
+        .spawn_streaming(&shell, CancellationToken::new())
         .unwrap();
     stream.write_all(b"ready").await.unwrap();
     let mut ready = [0; 5];
@@ -1755,13 +1766,29 @@ async fn unconfined_stop_cancellation_and_deadlines_keep_cleanup_evidence() {
     );
     assert!(evidence.temporary_removed);
     let mut scope = fixture.unconfined_scope();
-    scope.valid_until = Instant::now() + Duration::from_millis(250);
+    // Scope lifetime includes preparation and trusted-helper verification.
+    // Leave time for admission, then prove the payload started before testing
+    // its scope deadline; a short pre-admission expiry tests a different rule.
+    scope.valid_until = Instant::now() + Duration::from_secs(5);
+    let deadline = scope.valid_until;
     let session = sandbox
-        .prepare_unconfined(fixture.session_command("exec /bin/sleep 100"), scope)
+        .prepare_unconfined(
+            fixture.session_command("printf ready; exec /bin/sleep 100"),
+            scope,
+        )
         .unwrap()
         .spawn_session(session_options(true), CancellationToken::new())
         .unwrap();
-    let evidence = session.finish().await.unwrap();
+    let (output, _) = read_until(&session, Duration::from_secs(5), |output| {
+        contains(output, "ready")
+    })
+    .await;
+    assert!(contains(&output, "ready"));
+    let evidence =
+        tokio::time::timeout_at((deadline + Duration::from_secs(5)).into(), session.finish())
+            .await
+            .expect("the session did not stop after its scope deadline")
+            .unwrap();
     assert_eq!(evidence.stopped, Some(StopReason::Deadline), "{evidence:?}");
     assert_eq!(
         evidence.descendants,
