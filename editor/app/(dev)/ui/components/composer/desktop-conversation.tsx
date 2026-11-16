@@ -11,6 +11,7 @@ import {
   ChatMessageView,
   CompactionNotice,
   PendingTurnIndicator,
+  type ChatMessageEdit,
 } from "@/kits/agent-chat";
 import { native_message_parts } from "@/lib/agent-chat/native-message-parts";
 import { turn_activity } from "@/lib/agent-chat/turn-activity";
@@ -23,10 +24,14 @@ export function DesktopConversation({
   scenario,
   messages,
   running,
+  edit,
+  onEdit,
 }: {
   scenario: fixtures.Scenario;
   messages: readonly NativeChatMessage[];
   running: boolean;
+  edit?: ChatMessageEdit & { messageId: string };
+  onEdit?: (messageId: string) => void;
 }) {
   const example = fixtures.get(scenario);
   const blocks = turn_activity.group(messages, example.records ?? [], null);
@@ -44,8 +49,12 @@ export function DesktopConversation({
           parts: native_message_parts.of(message),
         }}
         isStreaming={isStreaming}
+        edit={edit?.messageId === message.messageId ? edit : undefined}
         actions={{
           sentAtMs: fixtures.startedAtMs + messages.indexOf(message) * 30_000,
+          ...(message.role === "user" &&
+            !message.attachments?.length &&
+            message.text?.trim() && { onEdit }),
         }}
         loadAttachmentPreview={fixtures.readImage}
       />

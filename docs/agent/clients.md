@@ -828,10 +828,19 @@ Desktop offers, see [Use a chat command](./skills-and-tools.md#use-a-chat-comman
 
 ### Branch or revise a chat
 
-In Desktop, use `/fork` or **Edit and resubmit**.
-[Try a different direction](./history.md#try-a-different-direction) The host
-keeps the view an edit replaced; ACP history can read it, and Desktop does not
-show it.
+In Desktop, use `/fork` to [try a different direction](./history.md#try-a-different-direction).
+To revise a sent message, hover over it and choose **Edit and resubmit**. The
+message becomes a multiline editor in its original place in the conversation.
+Choose **Cancel** to restore the original bubble or **Send** to resubmit the
+replacement. Enter sends the edit; Shift+Enter inserts a new line. Your unsent
+composer draft stays in place.
+
+Editing is available for retained text messages without attachments, in an idle
+chat with an empty queue and a resolved Goal. A message that started a Goal
+cannot be edited. While sending the edit, its text and Cancel action are locked.
+If the reply cannot be confirmed, **Retry edit** checks the same request; keep
+using that action until the outcome is known. The host keeps the view an edit
+replaced; ACP history can read it, and Desktop does not show it.
 
 Read a history page to select a committed message and its basis. A fork creates
 a separate chat from that prefix while the source can continue running. Open

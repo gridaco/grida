@@ -68,6 +68,37 @@ export function DesktopComposerDemo() {
   const [messages, setMessages] = useState<readonly NativeChatMessage[]>(
     () => conversations.get("text").messages
   );
+  const [edit, setEdit] = useState<{
+    messageId: string;
+    text: string;
+    submitting: boolean;
+    error?: string;
+  } | null>(null);
+  const laterMessages = edit
+    ? messages.length -
+      messages.findIndex((message) => message.messageId === edit.messageId) -
+      1
+    : 0;
+  const submitEdit = async () => {
+    if (!edit || edit.submitting || !edit.text.trim()) return;
+    const { messageId, text } = edit;
+    setEdit({ ...edit, submitting: true, error: undefined });
+    try {
+      await submission.wait();
+      setMessages((current) => {
+        const index = current.findIndex(
+          (message) => message.messageId === messageId
+        );
+        if (index < 0) return current;
+        return [...current.slice(0, index), { ...current[index], text }];
+      });
+      setEdit(null);
+    } catch (error) {
+      setEdit((current) =>
+        current ? { ...current, submitting: false, error: String(error) } : null
+      );
+    }
+  };
   const draft = useRef<Pick<ComposerController, "appendText" | "focus">>(null);
   const reset = () => {
     setGeneration((value) => value + 1);
@@ -84,6 +115,7 @@ export function DesktopComposerDemo() {
     queue.reset();
     setScenario("text");
     setMessages(conversations.get("text").messages);
+    setEdit(null);
   };
   const submit = async (text: string) => {
     await submission.wait();
@@ -162,9 +194,11 @@ export function DesktopComposerDemo() {
             <select
               aria-label="Composer surface"
               value={home ? "home" : "workspace"}
+              disabled={edit?.submitting}
               className="h-8 rounded-md border bg-background px-2 text-sm"
               onChange={(event) => {
                 queue.closeQueueDraft();
+                setEdit(null);
                 setHome(event.currentTarget.value === "home");
               }}
             >
@@ -177,11 +211,13 @@ export function DesktopComposerDemo() {
             <select
               aria-label="Conversation example"
               value={scenario}
+              disabled={edit?.submitting}
               className="h-8 rounded-md border bg-background px-2 text-sm"
               onChange={(event) => {
                 const next = event.currentTarget
                   .value as conversations.Scenario;
                 setScenario(next);
+                setEdit(null);
                 setMessages(conversations.get(next).messages);
               }}
             >
@@ -196,7 +232,7 @@ export function DesktopComposerDemo() {
             <input
               type="checkbox"
               checked={busy}
-              disabled={home}
+              disabled={home || !!edit}
               onChange={(event) => queue.setRunning(event.target.checked)}
             />
             Running turn (send to queue)
@@ -261,6 +297,44 @@ export function DesktopComposerDemo() {
               scenario={scenario}
               messages={messages}
               running={busy}
+              onEdit={
+                !busy &&
+                !edit &&
+                !queueView.queueDraft &&
+                !submissionView.pending
+                  ? (messageId) => {
+                      const message = messages.find(
+                        (entry) => entry.messageId === messageId
+                      );
+                      if (message)
+                        setEdit({
+                          messageId,
+                          text: message.text ?? "",
+                          submitting: false,
+                        });
+                    }
+                  : undefined
+              }
+              edit={
+                edit
+                  ? {
+                      ...edit,
+                      note: edit.error ? (
+                        <span role="alert">{edit.error}</span>
+                      ) : (
+                        <p>
+                          {laterMessages > 0
+                            ? `Replaces this and ${laterMessages} later ${laterMessages === 1 ? "message" : "messages"}.`
+                            : "Replaces this message."}{" "}
+                          Completed work isn’t undone.
+                        </p>
+                      ),
+                      onChange: (text) => setEdit({ ...edit, text }),
+                      onCancel: () => setEdit(null),
+                      onSubmit: () => void submitEdit(),
+                    }
+                  : undefined
+              }
             />
           )}
           {!home && queueView.steered.length > 0 && (
@@ -323,7 +397,7 @@ export function DesktopComposerDemo() {
             isStreaming={false}
             busy={busy}
             className="@container"
-            canSubmit={!goal || canStartGoal}
+            canSubmit={!edit && (!goal || canStartGoal)}
             emptyAction={
               busy
                 ? {

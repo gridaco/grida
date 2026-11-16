@@ -64,7 +64,7 @@ import { NativeEarlierMessages } from "./native-earlier-messages";
 import { NativeTurnActivity } from "./native-turn-activity";
 import { turn_activity } from "@/lib/agent-chat/turn-activity";
 import { native_message_parts } from "@/lib/agent-chat/native-message-parts";
-import { NativeMessageRevisionPanel } from "./native-message-revision-panel";
+import { NativeMessageRevision } from "./native-message-revision";
 import { NativeSubagentActivityPanel } from "./native-agent-activity";
 import { SubagentPlacement } from "./subagent-placement";
 import type { NativeBackgroundProcessController } from "@/lib/agent-chat/native-background-process-controller";
@@ -578,7 +578,20 @@ function NativeChatPane({
       !firstRequest.has(message.turnId)
     )
       firstRequest.set(message.turnId, message.messageId);
+  const revisionEditor = state.revisionDraft && (
+    <NativeMessageRevision
+      key={state.revisionDraft.messageId}
+      draft={state.revisionDraft}
+      submitting={state.revisionSubmitting}
+      effortAvailable={state.effortAvailable}
+      onChange={(text) => controller.changeRevisionText(text)}
+      onCancel={() => controller.cancelRevision()}
+      onSubmit={() => void controller.submitRevision()}
+    />
+  );
   const renderMessage = (message: NativeChatMessage) => {
+    if (message.messageId === state.revisionDraft?.messageId)
+      return revisionEditor;
     const record = message.turnId ? records.get(message.turnId) : undefined;
     const goalStart =
       record?.goalStart &&
@@ -689,6 +702,14 @@ function NativeChatPane({
                 onLoad={() => void controller.loadEarlierMessages()}
               />
               {/* See test/desktop-agent-chat-turn-activity.md. */}
+              {/* A refresh may replace the target before a lost receipt is
+                  confirmed. Keep its editor in the transcript for Retry. */}
+              {state.revisionDraft &&
+                !state.messages.some(
+                  (message) =>
+                    message.messageId === state.revisionDraft?.messageId
+                ) &&
+                revisionEditor}
               {blocks.map((block) =>
                 block.kind === "turn" ? (
                   <NativeTurnActivity
@@ -746,16 +767,7 @@ function NativeChatPane({
             <ConversationScrollButton />
           </Conversation>
         </workspace_links.Opener.Provider>
-        {state.revisionDraft ? (
-          <NativeMessageRevisionPanel
-            draft={state.revisionDraft}
-            submitting={state.revisionSubmitting}
-            effortAvailable={state.effortAvailable}
-            onChange={(text) => controller.changeRevisionText(text)}
-            onCancel={() => controller.cancelRevision()}
-            onSubmit={() => void controller.submitRevision()}
-          />
-        ) : state.revisionSubmitting ? (
+        {!state.revisionDraft && state.revisionSubmitting ? (
           <div
             role="status"
             className="px-3 pt-2 text-xs text-muted-foreground"

@@ -4,10 +4,10 @@ title: The unsent composer state survives everything except removal or an accept
 module: desktop
 area: agent-chat
 tags: [chat, composer, draft, reliability]
-status: verified
+status: untested
 severity: critical
 date: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-17
 automatable: partial
 covered_by:
   [
@@ -38,8 +38,25 @@ the agent accepted, clears it. A failed send keeps it. See the
 5. Delete all the text, reload: the composer is empty.
 6. Type again and send. Once the message appears in the chat, the composer is
    empty and stays empty after a reload.
+7. In an idle chat with an empty queue and no unresolved Goal, prepare another
+   unsent composer draft. Hover over an earlier plain-text user message and
+   choose **Edit and resubmit**. Confirm that message becomes an editor in its
+   original position, with Cancel and Send, while the composer keeps its draft.
+8. Add several lines with Shift+Enter in the inline editor and choose Cancel. The original
+   message returns and the composer draft remains unchanged. Open the same edit
+   again, change the text, and press Enter to send (the Send button performs the
+   same action). While sending, confirm the inline editor
+   cannot change or cancel, and the composer draft is still preserved after the
+   replacement appears.
+9. With a provider-free fixture that leaves the edit's receipt unconfirmed,
+   confirm the inline editor remains reachable with **Retry edit**, even if the
+   refreshed transcript already shows the replacement. The replacement text and
+   Cancel stay locked; retry checks the same request and preserves the unsent
+   composer draft.
 
 ## Notes
 
 Attachment bytes are kept on this device only. A model that cannot use the
 attachment shows a notice; the attachment is not dropped.
+
+The inline-edit scenarios added on 2026-11-17 have not been manually verified.

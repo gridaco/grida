@@ -89,6 +89,7 @@ import { AnsweredQuestionSummary, isQuestionEntry } from "./question-card";
 import { workspace_links } from "./workspace-links";
 import { FullscreenImagePreview } from "@/kits/image-preview";
 import { AttachmentImagePreview } from "./attachment-image-preview";
+import { ChatMessageEditor, type ChatMessageEdit } from "./message-editor";
 import {
   hasOpenTabsResult,
   isSurfaceToolEntry,
@@ -146,12 +147,15 @@ export function ChatMessageView({
   message,
   isStreaming,
   actions,
+  edit,
   loadAttachmentPreview,
 }: {
   message: ChatMessage;
   isStreaming?: boolean;
   /** Per-turn affordances under a message. User bubbles show copy without them. */
   actions?: ChatMessageActions;
+  /** Replaces the user bubble in place without borrowing the composer draft. */
+  edit?: ChatMessageEdit;
   /** Read-only retained PNG display, supplied by the owning host. */
   loadAttachmentPreview?: AttachmentImagePreview.Loader;
 }) {
@@ -189,51 +193,56 @@ export function ChatMessageView({
           images={images}
           loadAttachmentPreview={loadAttachmentPreview}
         />
-        {hasText && (
-          <MessageContent
-            className={CHAT_TEXT}
-            role="group"
-            aria-label="Message text"
-          >
-            <CollapsibleBubbleBody>
-              <MessageResponse
-                plugins={markdown.plugins}
-                rehypePlugins={markdown.rehypePlugins}
-                components={markdown.components}
-              >
-                {text}
-              </MessageResponse>
-            </CollapsibleBubbleBody>
-          </MessageContent>
+        {edit ? (
+          <ChatMessageEditor edit={edit} />
+        ) : (
+          hasText && (
+            <MessageContent
+              className={CHAT_TEXT}
+              role="group"
+              aria-label="Message text"
+            >
+              <CollapsibleBubbleBody>
+                <MessageResponse
+                  plugins={markdown.plugins}
+                  rehypePlugins={markdown.rehypePlugins}
+                  components={markdown.components}
+                >
+                  {text}
+                </MessageResponse>
+              </CollapsibleBubbleBody>
+            </MessageContent>
+          )
         )}
         {/* Subtle until hover so the transcript stays clean; right-aligned
             to sit under the user bubble. Copy is always available (a pure
             clipboard action, never disabled). History controls appear only
             when the host wires them. */}
-        {(hasText || actions?.sentAtMs !== undefined || actions?.note) && (
-          <div className="ml-auto flex items-center gap-2">
-            <MessageActions className={revealOnHoverActions}>
-              {actions?.sentAtMs !== undefined && (
-                <MessageTime at={actions.sentAtMs} />
+        {!edit &&
+          (hasText || actions?.sentAtMs !== undefined || actions?.note) && (
+            <div className="ml-auto flex items-center gap-2">
+              <MessageActions className={revealOnHoverActions}>
+                {actions?.sentAtMs !== undefined && (
+                  <MessageTime at={actions.sentAtMs} />
+                )}
+                {hasText && <CopyMessageAction text={text} />}
+                {hasText && actions?.onEdit && (
+                  <MessageAction
+                    tooltip="Edit and resubmit"
+                    disabled={actions.disabled}
+                    onClick={() => actions.onEdit?.(message.id)}
+                  >
+                    <PencilIcon />
+                  </MessageAction>
+                )}
+              </MessageActions>
+              {actions?.note && (
+                <span className="text-muted-foreground flex items-center gap-1 text-xs [&_svg]:size-3.5">
+                  {actions.note}
+                </span>
               )}
-              {hasText && <CopyMessageAction text={text} />}
-              {hasText && actions?.onEdit && (
-                <MessageAction
-                  tooltip="Edit and resubmit"
-                  disabled={actions.disabled}
-                  onClick={() => actions.onEdit?.(message.id)}
-                >
-                  <PencilIcon />
-                </MessageAction>
-              )}
-            </MessageActions>
-            {actions?.note && (
-              <span className="text-muted-foreground flex items-center gap-1 text-xs [&_svg]:size-3.5">
-                {actions.note}
-              </span>
-            )}
-          </div>
-        )}
+            </div>
+          )}
       </Message>
     );
   }

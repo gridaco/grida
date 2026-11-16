@@ -165,6 +165,126 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+async function editSentMessage(container: HTMLElement) {
+  const transcript = conversation(container);
+  const trigger = Array.from(
+    transcript.querySelectorAll<HTMLButtonElement>("button")
+  ).find((button) => button.textContent?.trim() === "Edit and resubmit")!;
+  await act(async () => {
+    await userEvent.hover(trigger.closest(".is-user")!);
+    await userEvent.click(trigger);
+  });
+  return transcript.querySelector<HTMLTextAreaElement>(
+    'textarea[aria-label="Replacement message"]'
+  )!;
+}
+
+it("edits the sent bubble inline, cancels without changing it and resubmits multiline text without replacing the composer draft", async () => {
+  const container = await mountConversationDemo();
+  await act(async () => userEvent.click(runningTurn(container)));
+  const composer = container.querySelector<HTMLElement>(
+    '[contenteditable="true"]'
+  )!;
+  await act(async () => userEvent.fill(composer, "Keep this unsent draft"));
+  const original = conversation(container).textContent;
+  let editor = await editSentMessage(container);
+  expect(editor).not.toBeNull();
+  expect(conversation(container).contains(editor)).toBe(true);
+  expect(editor.closest("form")?.textContent).toContain(
+    "Replaces this and 1 later message. Completed work isn’t undone."
+  );
+  expect(document.activeElement).toBe(editor);
+  expect(editor.selectionStart).toBe(editor.value.length);
+  expect(editor.selectionEnd).toBe(editor.value.length);
+  await act(async () => {
+    editor.setSelectionRange(7, 7);
+    await userEvent.keyboard(" inserted ");
+  });
+  expect(editor.selectionStart).toBe(17);
+  expect(editor.selectionEnd).toBe(17);
+  await act(async () => userEvent.fill(editor, "Discard this edit"));
+  const form = editor.closest("form")!;
+  await act(async () => userEvent.click(textButton(form, "Cancel")));
+  expect(conversation(container).querySelector("textarea")).toBeNull();
+  expect(conversation(container).textContent).toBe(original);
+  expect(composer.textContent).toBe("Keep this unsent draft");
+
+  editor = await editSentMessage(container);
+  await act(async () => {
+    await userEvent.fill(editor, "A revised request");
+    await userEvent.keyboard("{End}{Shift>}{Enter}{/Shift}With a second line");
+  });
+  expect(editor.value).toBe("A revised request\nWith a second line");
+  await act(async () => userEvent.keyboard("{Enter}"));
+  await expect
+    .poll(() => conversation(container).querySelector("textarea"))
+    .toBeNull();
+  expect(conversation(container).textContent).toContain("A revised request");
+  expect(conversation(container).textContent).toContain("With a second line");
+  expect(conversation(container).textContent).not.toContain("Composer review");
+  expect(composer.textContent).toBe("Keep this unsent draft");
+});
+
+it("keeps the inline editor open when Enter confirms IME composition", async () => {
+  const container = await mountConversationDemo();
+  await act(async () => userEvent.click(runningTurn(container)));
+  const editor = await editSentMessage(container);
+  await act(async () => {
+    await userEvent.fill(editor, "Composition in progress");
+    editor.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Enter",
+        bubbles: true,
+        cancelable: true,
+        isComposing: true,
+      })
+    );
+  });
+  expect(conversation(container).querySelector("textarea")).toBe(editor);
+  expect(editor.value).toBe("Composition in progress");
+  await act(async () => userEvent.keyboard("{Enter}"));
+  await expect
+    .poll(() => conversation(container).querySelector("textarea"))
+    .toBeNull();
+  expect(conversation(container).textContent).toContain(
+    "Composition in progress"
+  );
+});
+
+it("keeps inline edits on refusal and shows pending Send before acknowledgement", async () => {
+  const container = await mountConversationDemo();
+  await act(async () => userEvent.click(runningTurn(container)));
+  const hold = Array.from(container.querySelectorAll("label"))
+    .find((label) => label.textContent?.includes("Hold submission"))!
+    .querySelector<HTMLInputElement>("input")!;
+  await act(async () => userEvent.click(hold));
+  const editor = await editSentMessage(container);
+  await act(async () => userEvent.fill(editor, "Keep the revised request"));
+  const form = editor.closest("form")!;
+  await act(async () => userEvent.click(textButton(form, "Send")));
+  expect(editor.readOnly).toBe(true);
+  expect(textButton(form, "Cancel").disabled).toBe(true);
+  expect(form.getAttribute("aria-busy")).toBe("true");
+  await act(async () =>
+    userEvent.click(textButton(container, "Refuse submission"))
+  );
+  await expect.poll(() => editor.readOnly).toBe(false);
+  expect(editor.value).toBe("Keep the revised request");
+  expect(form.querySelector('[role="alert"]')?.textContent).toContain(
+    "Fixture submission refused"
+  );
+  await act(async () => userEvent.click(textButton(form, "Send")));
+  await act(async () =>
+    userEvent.click(textButton(container, "Accept submission"))
+  );
+  await expect
+    .poll(() => conversation(container).querySelector("textarea"))
+    .toBeNull();
+  expect(conversation(container).textContent).toContain(
+    "Keep the revised request"
+  );
+});
+
 it("mounts the production composer without a native bridge and offers full queued text locally", async () => {
   (
     globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }

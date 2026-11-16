@@ -46,6 +46,14 @@ Only prose enters the user bubble's height measurement, collapse control,
 copy action and edit flow. Attachment-only messages do not create an empty
 bubble; their time and status note can still be shown.
 
+Sent-message editing is controlled through `ChatMessageView.edit`. It replaces
+the user bubble with a multiline editor and Cancel/Send actions in place; the
+composer keeps its independent draft. The consumer supplies the text and
+callbacks, submission state, optional read-only retry state and any explanation
+of resubmission effects. The kit owns no history or transport. Escape cancels
+an unlocked edit; Enter sends and Shift+Enter inserts a line break. Pending sends show a spinner and
+lock the editor, and a read-only retry can retain its submitted text.
+
 File context entries can supply a bounded inline `poster` and `caption`.
 An exact raster `mimeType` distinguishes image thumbnails from video posters.
 For retained PNG, JPEG, WebP and GIF originals, entries instead carry an opaque `previewId`; the host supplies

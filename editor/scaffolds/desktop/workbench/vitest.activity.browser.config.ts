@@ -55,6 +55,7 @@ export default defineConfig(async () => {
     },
     test: {
       include: [
+        "scaffolds/desktop/workbench/native-message-revision.browser.tsx",
         "scaffolds/desktop/workbench/native-permission-mode.browser.tsx",
         "scaffolds/desktop/workbench/native-agent-activity.browser.tsx",
         "scaffolds/desktop/workbench/native-activity-timeline.browser.tsx",

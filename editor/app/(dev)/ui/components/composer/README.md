@@ -35,6 +35,16 @@ Useful scenarios:
   code; image captions and image-only messages; file/folder cards and unavailable
   previews; settled tool activity; partial streaming and an empty conversation.
   Image thumbnails use the real preview/fullscreen components with local bytes.
+- Turn **Running turn** off and hover a text user bubble to choose **Edit and
+  resubmit**. The production inline message editor replaces that bubble with
+  a multiline input and **Cancel** / **Send**; the composer and its unsent draft
+  stay in place. Enter sends, Shift+Enter adds a line, and Cancel or Escape
+  restores the bubble. Send updates the local
+  request and removes its later example messages. **Hold submission** also
+  applies to inline Send: inspect its spinner, refuse it to retain the edit, or
+  accept it to return to the transcript. Attachment messages keep editing
+  unavailable. These are local presentation examples; retained history and
+  retry receipts remain the native integration's responsibility.
 - Type `/` or `@`; dismiss outside or with Escape; continue editing to reopen.
 - Open `+` and compare its full-composer placement and keyboard behavior.
 - Choose **Goal** or **Plan mode** from `+`, or select `/goal` and `/plan`.
@@ -86,9 +96,9 @@ provider calls.
 and submission callbacks. Desktop keeps its real capability
 and permission conditions, while this page supplies deterministic example state.
 Streaming is a frozen partial answer controlled by **Running turn**, and tool
-results are deterministic records. No timer simulates model work. History
-revision and native file actions require their owning integration rather than
-fake host callbacks in this page.
+results are deterministic records. No timer simulates model work. The inline
+edit fixture changes only its local messages; native history revision and
+file actions remain covered by their owning integration.
 Production attachment authorization and queue mutation semantics remain covered
 by their native/controller tests, rather than being simulated as security
 claims here.
