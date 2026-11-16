@@ -69,9 +69,12 @@ describe("ChatGptProvider", () => {
     await expect(
       bound.request(body, new AbortController().signal)
     ).resolves.toMatchObject({ status: 200 });
-    expect(Buffer.from(request.mock.calls[0][1]!.body as ArrayBuffer)).toEqual(
-      Buffer.from(body)
-    );
+    // Compare bytes natively; a deep equality walk over megabytes is slow.
+    expect(
+      Buffer.from(request.mock.calls[0][1]!.body as ArrayBuffer).equals(
+        Buffer.from(body)
+      )
+    ).toBe(true);
     const maximum = 8 * 1024 * 1024;
     const overhead = nativeBody({ instructions: "" }).length;
     const exact = nativeBody({ instructions: "x".repeat(maximum - overhead) });
