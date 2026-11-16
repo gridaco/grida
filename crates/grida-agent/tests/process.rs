@@ -135,6 +135,7 @@ fn is_title_request(request: &Value) -> bool {
 }
 
 enum Reply {
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     Credential(&'static str, Box<Reply>),
     Finished(&'static str),
     InputCount(u64),
@@ -405,6 +406,7 @@ async fn fixture_request(
     protocol: ProviderProtocol,
     credential: Option<&str>,
 ) {
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     let (reply, credential) = match reply {
         Reply::Credential(credential, reply) => (*reply, Some(credential)),
         reply => (reply, credential),
@@ -550,6 +552,7 @@ fn fixture_body(reply: Reply, protocol: ProviderProtocol) -> String {
     #[cfg_attr(not(any(target_os = "linux", target_os = "macos")), allow(unused_mut))]
     let mut signed = false;
     let (text, finish) = match reply {
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         Reply::Credential(_, _) => unreachable!("credential override is handled before the body"),
         Reply::Finished(text) => (text, Some("stop")),
         Reply::Hold(text) => (text, None),
