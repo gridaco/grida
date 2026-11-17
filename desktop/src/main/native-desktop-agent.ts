@@ -1320,7 +1320,8 @@ function publicProfile({
   modelId,
   contextWindow,
 }: NativeChatProfiles.Saved) {
-  const window = contextWindow ?? NativeChatProfiles.contextWindow(modelId);
+  const window =
+    contextWindow ?? NativeChatProfiles.contextWindow(modelId, providerId);
   return {
     id,
     connection,

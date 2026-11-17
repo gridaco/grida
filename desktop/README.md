@@ -392,7 +392,7 @@ Ordinary macOS and Linux launches offer connected subscription models in the
 Welcome and workspace model pickers. Sign in under **Settings → LLM Providers
 → ChatGPT Subscription**. A new chat without a saved or explicit model choice
 prefers a ready subscription; explicit choices and existing chats retain their
-connection. The subscription's current default is **GPT-6.1 Sol**. Its closed
+connection. The subscription's current default is **GPT-6.2 Sol**. Its closed
 membership and default are authored in `data/ai/chatgpt-subscription.json`,
 validated by `data/ai/schemas/chatgpt-subscription.schema.json`, and generated
 for TypeScript and the native host. Runtime consumers use those bundled

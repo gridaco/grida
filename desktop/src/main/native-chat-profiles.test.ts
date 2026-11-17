@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { catalog } from "@grida/ai/catalogue";
 import {
+  CHATGPT_PROVIDER_ID,
   CHATGPT_SUBSCRIPTION_DEFAULT_MODEL_ID,
   CHATGPT_SUBSCRIPTION_MODEL_IDS,
   CHATGPT_SUBSCRIPTION_RETIRED_MODEL_IDS,
@@ -88,6 +89,8 @@ describe("NativeChatProfiles subscription identity", () => {
     );
     expect(choices[0].modelId).toBe(CHATGPT_SUBSCRIPTION_DEFAULT_MODEL_ID);
     expect(choices.map(({ model }) => model)).toEqual([
+      "GPT-6.2 Sol",
+      "GPT-6.2 Astra",
       "GPT-6.1 Sol",
       "GPT-6 Astra",
       "GPT-6.1 Terra",
@@ -97,6 +100,15 @@ describe("NativeChatProfiles subscription identity", () => {
       "GPT-5.6 Terra",
       "GPT-5.6 Luna",
     ]);
+    for (const { modelId } of choices.slice(0, 2)) {
+      expect(
+        NativeChatProfiles.contextWindow(modelId, CHATGPT_PROVIDER_ID)
+      ).toBe(1_050_000);
+      expect(NativeChatProfiles.imageInput(CHATGPT_PROVIDER_ID, modelId)).toBe(
+        true
+      );
+      expect(catalog.text.modelSpecById(modelId)).toBeUndefined();
+    }
   });
 
   it.runIf(process.platform !== "win32")(

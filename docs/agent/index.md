@@ -14,7 +14,7 @@ Ask the agent about a project, plan a change, or have it carry out a task.
 - **Grida Desktop on macOS and Linux.** Chat in a workspace folder or in a
   deck's own window. On macOS you can also chat about a standalone SVG. A
   new chat with no saved or explicit model choice prefers a ready ChatGPT
-  subscription, currently defaulting to GPT-6.1 Sol. You can also choose a
+  subscription, currently defaulting to GPT-6.2 Sol. You can also choose a
   Grida account model, your own OpenRouter or Vercel AI Gateway key, or an
   approved endpoint.
   [Choose models and understand usage](./models-and-usage.md)

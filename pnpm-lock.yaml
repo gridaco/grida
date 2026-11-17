@@ -1162,8 +1162,8 @@ importers:
         specifier: 3.0.10
         version: 3.0.10
       '@grida/ai-models':
-        specifier: 1.20261108.1
-        version: 1.20261108.1
+        specifier: 2.20261117.0
+        version: 2.20261117.0
       ai:
         specifier: 6.0.197
         version: 6.0.197(zod@4.3.6)
@@ -3996,8 +3996,8 @@ packages:
   '@github/keytar@7.10.6':
     resolution: {integrity: sha512-mRW6cUsSG+nj4jp5gp8e91zPySaT73r+2JM6VyMZfrEgksjPmjSMr+tPGNOK3HUHV+GUU9B1LAiiYy/wmAnIxA==}
 
-  '@grida/ai-models@1.20261108.1':
-    resolution: {integrity: sha512-5V1lnEYeGGsZNB/XzClK1uQO5sbDAruQ7KrRlYu+NhRNtQCKayoQnks1R7MrSbIyhu4NT73gAZOSjeaOwRI9xg==}
+  '@grida/ai-models@2.20261117.0':
+    resolution: {integrity: sha512-vNmPaVXXiXZFj1nrOnEirHDOz3DeEXkO8WGM18GxVilyNMXA7HheSIEBUjuINSvZLt2LL+G1gh7LmLC1bf5xTQ==}
 
   '@grida/canvas-wasm@0.91.0-canary.22':
     resolution: {integrity: sha512-w+jjgAqWV/zj21RG2BKqMvdddiZLT5ONSFOQSFwMhq++AGcY5glLYTkX4ga8fTqViiufLBZTXE4NNPDWDjA8Hg==}
@@ -19661,7 +19661,7 @@ snapshots:
       node-addon-api: 8.9.2
     optional: true
 
-  '@grida/ai-models@1.20261108.1': {}
+  '@grida/ai-models@2.20261117.0': {}
 
   '@grida/canvas-wasm@0.91.0-canary.22': {}
 

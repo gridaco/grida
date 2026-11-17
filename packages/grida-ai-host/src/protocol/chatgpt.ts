@@ -24,8 +24,10 @@ export type ChatGptAuthStart = {
  * maps them to the backend's bare wire names.
  */
 /* generated:chatgpt-subscription:start */
-// Product membership: data/ai/chatgpt-subscription.json; wire bindings: @grida/ai-models@1.20261108.1.
+// Product membership: data/ai/chatgpt-subscription.json; wire bindings: @grida/ai-models@2.20261117.0.
 export const CHATGPT_SUBSCRIPTION_MODEL_IDS = [
+  "openai/gpt-6.2-sol",
+  "openai/gpt-6.2-astra",
   "openai/gpt-6.1-sol",
   "openai/gpt-6-astra",
   "openai/gpt-6.1-terra",
@@ -36,13 +38,67 @@ export const CHATGPT_SUBSCRIPTION_MODEL_IDS = [
   "openai/gpt-5.6-luna",
 ] as const;
 export const CHATGPT_SUBSCRIPTION_DEFAULT_MODEL_ID =
-  "openai/gpt-6.1-sol" as const;
+  "openai/gpt-6.2-sol" as const;
 // Retained only for reading saved selections; these IDs grant no execution.
 export const CHATGPT_SUBSCRIPTION_RETIRED_MODEL_IDS = [
   "openai/gpt-5.5",
   "openai/gpt-5.4",
 ] as const;
+export const CHATGPT_SUBSCRIPTION_MODEL_METADATA = {
+  "openai/gpt-6.2-sol": {
+    label: "GPT-6.2 Sol",
+    context_window: 1050000,
+    image_input: true,
+  },
+  "openai/gpt-6.2-astra": {
+    label: "GPT-6.2 Astra",
+    context_window: 1050000,
+    image_input: true,
+  },
+  "openai/gpt-6.1-sol": {
+    label: "GPT-6.1 Sol",
+    context_window: 1050000,
+    image_input: true,
+  },
+  "openai/gpt-6-astra": {
+    label: "GPT-6 Astra",
+    context_window: 1050000,
+    image_input: true,
+  },
+  "openai/gpt-6.1-terra": {
+    label: "GPT-6.1 Terra",
+    context_window: 1050000,
+    image_input: true,
+  },
+  "openai/gpt-6-luna": {
+    label: "GPT-6 Luna",
+    context_window: 1050000,
+    image_input: true,
+  },
+  "openai/gpt-6-sol": {
+    label: "GPT-6 Sol",
+    context_window: 1050000,
+    image_input: true,
+  },
+  "openai/gpt-5.6-sol": {
+    label: "GPT-5.6 Sol",
+    context_window: 1050000,
+    image_input: true,
+  },
+  "openai/gpt-5.6-terra": {
+    label: "GPT-5.6 Terra",
+    context_window: 1050000,
+    image_input: true,
+  },
+  "openai/gpt-5.6-luna": {
+    label: "GPT-5.6 Luna",
+    context_window: 1050000,
+    image_input: true,
+  },
+} as const;
 export const CHATGPT_SUBSCRIPTION_WIRE_MODEL_BY_ID = {
+  "openai/gpt-6.2-sol": "gpt-6.2-sol",
+  "openai/gpt-6.2-astra": "gpt-6.2-astra",
   "openai/gpt-6.1-sol": "gpt-6.1-sol",
   "openai/gpt-6-astra": "gpt-6-astra",
   "openai/gpt-6.1-terra": "gpt-6.1-terra",

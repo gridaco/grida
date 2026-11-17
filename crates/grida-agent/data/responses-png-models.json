@@ -1,5 +1,5 @@
 {
-  "models_release": "1.20261108.1",
+  "models_release": "2.20261117.0",
   "models": [
     "gpt-5.5",
     "gpt-5.5-pro",
@@ -10,6 +10,8 @@
     "gpt-6-luna",
     "gpt-6-sol",
     "gpt-6.1-sol",
-    "gpt-6.1-terra"
+    "gpt-6.1-terra",
+    "gpt-6.2-astra",
+    "gpt-6.2-sol"
   ]
 }

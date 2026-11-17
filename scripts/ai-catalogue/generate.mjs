@@ -87,6 +87,7 @@ write(
       `export const CHATGPT_SUBSCRIPTION_DEFAULT_MODEL_ID = ${JSON.stringify(subscription.default_model_id)} as const;`,
       "// Retained only for reading saved selections; these IDs grant no execution.",
       `export const CHATGPT_SUBSCRIPTION_RETIRED_MODEL_IDS = ${JSON.stringify(subscription.retired_model_ids)} as const;`,
+      `export const CHATGPT_SUBSCRIPTION_MODEL_METADATA = ${JSON.stringify(subscription.metadata)} as const;`,
       `export const CHATGPT_SUBSCRIPTION_WIRE_MODEL_BY_ID = ${JSON.stringify(subscription.wire_models)} as const;`,
       "/* generated:chatgpt-subscription:end */",
     ].join("\n")

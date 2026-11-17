@@ -339,25 +339,33 @@ export function projectChatGptSubscription(source, profile) {
     profile.retired_model_ids.some((id) => profile.model_ids.includes(id))
   )
     throw Error("Invalid ChatGPT subscription membership or default");
-  const wireModels = Object.fromEntries(
-    profile.model_ids.map((id) => {
-      const model = source["text.catalog"]?.[id];
-      const binding = model?.providers?.openai;
-      if (
-        model?.id !== id ||
-        binding?.provider !== "openai" ||
-        typeof binding.id !== "string" ||
-        !/^[A-Za-z0-9_.-]+$/.test(binding.id) ||
-        binding.capabilities?.tools !== true ||
-        binding.capabilities?.reasoning !== true ||
-        binding.capabilities?.streaming !== true
-      )
-        throw Error(
-          `Missing compatible public OpenAI binding for subscription model: ${id}`
-        );
-      return [id, binding.id];
-    })
-  );
+  const wireModels = {};
+  const metadata = {};
+  for (const id of profile.model_ids) {
+    const model = source["text.catalog"]?.[id];
+    const binding = model?.providers?.openai;
+    if (
+      model?.id !== id ||
+      binding?.provider !== "openai" ||
+      typeof binding.id !== "string" ||
+      !/^[A-Za-z0-9_.-]+$/.test(binding.id) ||
+      binding.capabilities?.tools !== true ||
+      binding.capabilities?.reasoning !== true ||
+      binding.capabilities?.streaming !== true
+    )
+      throw Error(
+        `Missing compatible public OpenAI binding for subscription model: ${id}`
+      );
+    wireModels[id] = binding.id;
+    metadata[id] = {
+      label: model.short_label ?? model.label,
+      context_window: model.context_window ?? null,
+      image_input:
+        model.tool_call === true &&
+        model.image_input_mimes?.includes("image/png") === true &&
+        binding.capabilities.image_input === true,
+    };
+  }
   if (new Set(Object.values(wireModels)).size !== profile.model_ids.length)
     throw Error("Duplicate ChatGPT subscription wire binding");
   return {
@@ -365,5 +373,6 @@ export function projectChatGptSubscription(source, profile) {
     model_ids: [...profile.model_ids],
     retired_model_ids: [...profile.retired_model_ids],
     wire_models: wireModels,
+    metadata,
   };
 }

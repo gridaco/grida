@@ -66,7 +66,7 @@
   "dependencies": {
     "@ai-sdk/gateway": "3.0.125",
     "@ai-sdk/provider": "3.0.10",
-    "@grida/ai-models": "1.20261108.1",
+    "@grida/ai-models": "2.20261117.0",
     "ai": "6.0.197"
   },
   "devDependencies": {

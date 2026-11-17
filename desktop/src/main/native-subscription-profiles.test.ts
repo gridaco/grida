@@ -49,6 +49,8 @@ vi.mock("./services-sidecar-client", () => ({
 
 const resources = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
 const supportedModels = [
+  "GPT-6.2 Sol",
+  "GPT-6.2 Astra",
   "GPT-6.1 Sol",
   "GPT-6 Astra",
   "GPT-6.1 Terra",
@@ -81,9 +83,9 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       expect(workspace.saved).toEqual([]);
       expect(welcome.recommendedProfileId).toBe(welcome.choices[0].id);
       expect(CHATGPT_SUBSCRIPTION_CONFIG.default_model_id).toBe(
-        "openai/gpt-6.1-sol"
+        "openai/gpt-6.2-sol"
       );
-      expect(welcome.choices[0].model).toBe("GPT-6.1 Sol");
+      expect(welcome.choices[0].model).toBe("GPT-6.2 Sol");
       expect(workspace.recommendedProfileId).toBe(welcome.recommendedProfileId);
       for (const choice of welcome.choices) {
         expect(choice).toMatchObject({
@@ -108,7 +110,9 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
           ].sort()
         );
       }
-      expect(new Set(welcome.choices.map(({ id }) => id)).size).toBe(8);
+      expect(new Set(welcome.choices.map(({ id }) => id)).size).toBe(
+        supportedModels.length
+      );
       const publicCatalog = JSON.stringify({ welcome, workspace });
       for (const privateValue of [
         fixture.base,
