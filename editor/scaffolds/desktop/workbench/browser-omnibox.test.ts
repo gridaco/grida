@@ -103,6 +103,65 @@ describe("BrowserOmnibox.Controller", () => {
     controller.dispose();
   });
 
+  it.each([
+    ["wanted search", "https://www.google.com/search?q=wanted%20search"],
+    ["https://wanted.test/app", "https://wanted.test/app"],
+  ])("preserves edited input across guest navigation: %s", (draft, url) => {
+    const { controller, commands, history } = fixture();
+    controller.focus();
+    controller.change(draft);
+    controller.sync("https://current.test/#updated-by-site", true, 0);
+    expect(controller.read().draft).toBe(draft);
+    expect(history.read().query).toBe(draft);
+    controller.key("Enter");
+    expect(commands.navigate).toHaveBeenCalledExactlyOnceWith(url);
+    controller.dispose();
+  });
+
+  it("retains an IME draft while keeping Escape's page location current", () => {
+    const { controller, commands } = fixture();
+    controller.focus();
+    controller.composition(true);
+    controller.sync("https://current.test/redirect", true, 0);
+    expect(controller.read().draft).toBe("https://current.test/path");
+    controller.change("한글");
+    controller.sync("https://current.test/#updated-by-site", true, 0);
+    expect(controller.read()).toMatchObject({
+      draft: "한글",
+      composing: true,
+    });
+    expect(controller.submit()).toBe(false);
+    expect(commands.navigate).not.toHaveBeenCalled();
+    controller.composition(false);
+    controller.key("Escape");
+    expect(controller.read().draft).toBe(
+      "https://current.test/#updated-by-site"
+    );
+    expect(commands.focusPage).toHaveBeenCalledOnce();
+    controller.dispose();
+  });
+
+  it("continues displaying page URL changes without an active edit", () => {
+    const { controller, commands } = fixture();
+    controller.focus();
+    controller.sync("https://current.test/redirect", true, 0);
+    expect(controller.read().draft).toBe("https://current.test/redirect");
+    controller.change("unfinished query");
+    controller.blur();
+    controller.sync("https://current.test/background", true, 0);
+    expect(controller.read().draft).toBe("https://current.test/background");
+    controller.focus();
+    controller.change("hidden edit");
+    controller.sync("https://current.test/hidden", false, 0);
+    expect(controller.read()).toMatchObject({
+      draft: "https://current.test/hidden",
+      focused: false,
+      expanded: false,
+    });
+    expect(commands.navigate).not.toHaveBeenCalled();
+    controller.dispose();
+  });
+
   it("keeps IME Enter/Escape and composition updates out of navigation", () => {
     const { controller, commands } = fixture(null, false);
     controller.focus();

@@ -66,10 +66,15 @@ export namespace BrowserOmnibox {
     sync(url: string | null, active: boolean, locationRevision: number): void {
       const next = url ?? "";
       if (next !== this.currentUrl) {
+        const editing =
+          active && this.state.focused && (this.typed || this.state.composing);
         this.currentUrl = next;
-        this.patch({ draft: next });
-        this.typed = false;
-        if (this.state.focused) this.query();
+        // Guest navigation updates the page location, not an active edit.
+        if (!editing) {
+          this.patch({ draft: next });
+          this.typed = false;
+          if (this.state.focused) this.query();
+        }
       }
       if (!active) {
         this.cancel();

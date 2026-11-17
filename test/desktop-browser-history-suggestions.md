@@ -27,6 +27,8 @@ workspaces and windows. Suggestions compose over the live page, preserve
 keyboard and text-composition behavior, and are never remote type-ahead
 requests. Removing an entry forgets it across views without closing the page
 or clearing website sign-ins. Global browsing-data cleanup also removes history.
+An active address edit or IME composition owns its draft while the page updates
+its URL. Escape restores the latest page address.
 
 ## Steps
 
@@ -66,3 +68,7 @@ or clearing website sign-ins. Global browsing-data cleanup also removes history.
      show an update requirement without invoking unsupported native methods. An
      older v3 host instead shows the browser update requirement and preserves
      saved HTTP(S) addresses without receiving v4 calls.
+10. Begin entering a search or address while the controlled page redirects or
+    updates its URL through browser history. Repeat during IME composition.
+    Expected: typed text and its suggestions remain intact, and Enter submits
+    that text. Escape instead restores the page's latest URL.

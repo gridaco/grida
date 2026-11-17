@@ -10,6 +10,7 @@ date: 2026-11-17
 updated: 2026-11-18
 automatable: partial
 covered_by:
+  - desktop/src/main/browser-host.test.ts
   - editor/scaffolds/desktop/workbench/workspace-browser-tabs.test.ts
   - editor/lib/desktop/workspace-view-state.test.ts
   - desktop/src/main/browser-host.electron.test.ts
@@ -25,6 +26,8 @@ restart use recorded HTTP(S) addresses without promising form values or history.
 Generated live locations are transient and are not restore/reopen addresses.
 Page-focused application shortcuts address the workbench, while ordinary text
 editing and composition remain website input.
+A later successful full-document navigation retires an earlier navigation
+error; starting, canceling or failing another load does not claim recovery.
 
 ## Steps
 
@@ -69,3 +72,8 @@ editing and composition remain website input.
 11. Exercise an older native build with browser protocol1/2/3 or no support.
     Expected: saved HTTP(S) addresses survive, an update message explains the
     unavailable presentation, no v4 calls are made, and file tabs remain usable.
+12. Visit a working page, then navigate to an unreachable address. Press Back,
+    and repeat with Forward or a site-triggered successful navigation. Expected:
+    the recovered page is visible and interactive without an extra Reload.
+    A pending/canceled load, another failure or an iframe commit must not
+    dismiss the top-page error as if recovery had completed.

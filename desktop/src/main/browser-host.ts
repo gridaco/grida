@@ -1004,6 +1004,18 @@ export class DesktopBrowserHost {
     });
     contents.on("did-navigate", (_event, url, status) => {
       if (!current()) return;
+      // Electron emits this only for a non-error full main-frame commit.
+      // Wait for that commit: a started navigation can still fail or be kept
+      // on the current document by beforeunload. HTTP error responses remain
+      // ordinary website documents, unlike Chromium's network error pages.
+      if (
+        page.state.failure?.kind === "navigation" &&
+        this.#live(owner) &&
+        !this.#clearing &&
+        this.#location(url) &&
+        contents.getURL() === url
+      )
+        page.state.failure = null;
       documentVisit =
         status >= 200 &&
         status < 400 &&

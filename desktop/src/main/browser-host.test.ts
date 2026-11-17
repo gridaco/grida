@@ -727,6 +727,166 @@ it("keeps native history and guest identity through active changes, then recreat
   f.host.closeAll();
 });
 
+it.each([
+  { action: "back", url: "https://example.com/previous", status: 200 },
+  { action: "forward", url: "https://example.com/next", status: 200 },
+  { action: "website", url: "https://example.com/recovered", status: 200 },
+  { action: "website", url: "https://example.com/not-found", status: 404 },
+  { action: "website", url: "data:text/html,Recovered", status: -1 },
+])(
+  "recovers a navigation failure after $action commits $url",
+  async ({ action, url, status }) => {
+    const f = await fixture();
+    const page = f.create();
+    const guest = mock.guests.at(-1)!;
+    guest.emit(
+      "did-fail-load",
+      {},
+      -105,
+      "ERR_NAME_NOT_RESOLVED",
+      guest.url,
+      true
+    );
+    const failure = f.host.snapshot(f.event, f.attached.attachmentId).pages[0]
+      .failure;
+    expect(failure).toMatchObject({ kind: "navigation", code: "-105" });
+    if (action === "back") {
+      vi.spyOn(guest.navigationHistory, "canGoBack").mockReturnValue(true);
+      f.host.back(f.event, f.target(page));
+    } else if (action === "forward") {
+      vi.spyOn(guest.navigationHistory, "canGoForward").mockReturnValue(true);
+      f.host.forward(f.event, f.target(page));
+    }
+    expect(guest.navigationHistory.goBack).toHaveBeenCalledTimes(
+      action === "back" ? 1 : 0
+    );
+    expect(guest.navigationHistory.goForward).toHaveBeenCalledTimes(
+      action === "forward" ? 1 : 0
+    );
+    guest.emit("did-start-navigation", {
+      url,
+      isMainFrame: true,
+      isSameDocument: false,
+      initiator: action === "website" ? guest.mainFrame : null,
+    });
+    // A pending navigation can still be canceled by beforeunload or fail.
+    expect(
+      f.host.snapshot(f.event, f.attached.attachmentId).pages[0].failure
+    ).toEqual(failure);
+    guest.url = url;
+    guest.emit("did-navigate", {}, url, status);
+    guest.emit("did-finish-load");
+    guest.emit("did-stop-loading");
+    expect(
+      f.host.snapshot(f.event, f.attached.attachmentId).pages[0]
+    ).toMatchObject({
+      url,
+      mounted: true,
+      loading: false,
+      failure: null,
+    });
+    expect(guest.close).not.toHaveBeenCalled();
+    f.host.closeAll();
+  }
+);
+
+it("retains a navigation failure through Stay, aborts, subframes and another failed load", async () => {
+  const f = await fixture();
+  f.create();
+  const guest = mock.guests.at(-1)!;
+  guest.emit(
+    "did-fail-load",
+    {},
+    -105,
+    "ERR_NAME_NOT_RESOLVED",
+    guest.url,
+    true
+  );
+  const failure = f.host.snapshot(f.event, f.attached.attachmentId).pages[0]
+    .failure;
+  const url = "https://example.com/retry";
+  guest.emit("did-start-navigation", {
+    url,
+    isMainFrame: true,
+    isSameDocument: false,
+  });
+  const stay = vi.fn<() => void>();
+  guest.emit("will-prevent-unload", { preventDefault: stay });
+  expect(stay).not.toHaveBeenCalled();
+  guest.emit("did-fail-load", {}, -3, "ERR_ABORTED", url, true);
+  guest.emit("did-start-navigation", {
+    url,
+    isMainFrame: false,
+    isSameDocument: false,
+  });
+  guest.emit("did-frame-navigate", {}, url, 200, "OK", false);
+  guest.emit("did-navigate-in-page", {}, guest.url, false);
+  guest.emit("did-fail-load", {}, -102, "ERR_CONNECTION_REFUSED", url, false);
+  guest.emit("did-finish-load");
+  guest.emit("did-stop-loading");
+  expect(
+    f.host.snapshot(f.event, f.attached.attachmentId).pages[0].failure
+  ).toEqual(failure);
+  guest.emit("did-start-navigation", {
+    url,
+    isMainFrame: true,
+    isSameDocument: false,
+  });
+  guest.emit("did-fail-load", {}, -102, "ERR_CONNECTION_REFUSED", url, true);
+  guest.emit("did-stop-loading");
+  expect(
+    f.host.snapshot(f.event, f.attached.attachmentId).pages[0].failure
+  ).toMatchObject({
+    kind: "navigation",
+    code: "-102",
+  });
+  expect(guest.close).not.toHaveBeenCalled();
+  f.host.closeAll();
+});
+
+it("does not recover from a stale commit or revive a private document's retired guest", async () => {
+  const f = await fixture();
+  f.create();
+  const guest = mock.guests.at(-1)!;
+  guest.emit(
+    "did-fail-load",
+    {},
+    -105,
+    "ERR_NAME_NOT_RESOLVED",
+    guest.url,
+    true
+  );
+  const failure = f.host.snapshot(f.event, f.attached.attachmentId).pages[0]
+    .failure;
+  guest.emit("did-navigate", {}, "https://stale.example/", 200);
+  expect(
+    f.host.snapshot(f.event, f.attached.attachmentId).pages[0].failure
+  ).toEqual(failure);
+  const blocked = vi.fn<() => void>();
+  const privateUrl = "file:///tmp/private.html";
+  guest.emit("will-navigate", { preventDefault: blocked }, privateUrl);
+  expect(blocked).toHaveBeenCalledOnce();
+  expect(
+    f.host.snapshot(f.event, f.attached.attachmentId).pages[0].failure
+  ).toMatchObject({
+    kind: "navigation",
+    code: "blocked",
+  });
+  guest.url = privateUrl;
+  guest.emit("did-navigate", {}, privateUrl, -1);
+  const retired = f.host.snapshot(f.event, f.attached.attachmentId).pages[0];
+  expect(retired).toMatchObject({
+    mounted: false,
+    failure: { code: "blocked" },
+  });
+  guest.url = "https://example.com/";
+  guest.emit("did-navigate", {}, guest.url, 200);
+  expect(f.host.snapshot(f.event, f.attached.attachmentId).pages[0]).toEqual(
+    retired
+  );
+  f.host.closeAll();
+});
+
 it.each(["did-navigate", "did-fail-provisional-load", "did-fail-load"])(
   "ends late-attached pages when an already-started document navigation finishes via %s",
   async (eventName) => {

@@ -46,6 +46,10 @@ navigation, reload and tab closure honor a site's `beforeunload` request through
 loss, workbench document replacement, window shutdown and full browser reset
 force teardown; a website cannot veto those lifecycle operations.
 
+A successful full-document navigation clears an earlier navigation error,
+including recovery through Back, Forward or website navigation. A pending or
+canceled load, another failure or an iframe navigation does not claim recovery.
+
 Reopening, workbench reload and application restart reconstruct eligible recorded
 HTTP(S) URLs with fresh page identities. They do not restore the running
 document, its Back/Forward history, form contents or scroll. Moving a tab to
@@ -66,6 +70,11 @@ descriptors and history,
 and cannot be reopened as recorded addresses. File, executable, credential-bearing
 and private application destinations remain refused. A generated document does
 not gain an application role by inheriting or displaying a familiar URL.
+
+The current page URL and a focused address edit have separate lifetimes.
+Redirects and same-document URL changes update the page location without
+replacing typed text or IME composition. Escape restores the latest page URL;
+URL changes continue displaying normally when no edit is active.
 
 Website external-app links use a separate Main-owned handoff. A real
 top-document `mailto:`, `tel:` or `sms:` anchor click opens the operating system's

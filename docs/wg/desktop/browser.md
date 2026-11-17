@@ -78,6 +78,11 @@ creating an unmanaged context.
 Input can be a website address or ordinary search text. Submitting search text
 opens a Google search. Typing alone makes no remote suggestion request. Local
 suggestions match shared browsing history; selecting one explicitly navigates.
+While an address edit or composition is active, website URL changes preserve
+that draft. Escape restores the latest page address. A prior navigation
+error ends when a later allowed full-document navigation succeeds, including
+Back/Forward recovery; pending, canceled or failed loads and subframe changes
+do not imply recovery.
 
 A live document location and a recorded destination are different values.
 Ordinary generated blank, inline, blob and data documents can remain usable
