@@ -123,8 +123,8 @@ a new capture yields a different scope.
 Grida session and renderer ids remain namespaced (`openai/gpt-…`). The native
 host maps the closed supported set to the bare model names required by the
 subscription backend and refuses any other model. The current default is
-**GPT-6.1 Sol**. The offered set also includes GPT-6 Astra, GPT-6.1 Terra,
-GPT-6 Luna, GPT-6 Sol and the compatible GPT-5.6 Sol, Terra and Luna models.
+**GPT-6.2 Sol**. The picker also offers GPT-6.2 Astra and earlier compatible
+models from the subscription list below.
 
 ### Update membership and the default
 
@@ -136,8 +136,15 @@ The standard AI catalogue generator projects it into the marked block in
 [`src/protocol/chatgpt.ts`](../src/protocol/chatgpt.ts) and the native
 [`chatgpt-subscription-models.json`](../../../crates/grida-agent/data/chatgpt-subscription-models.json)
 asset. Neither projection is edited independently. Canonical model facts remain
-owned by the pinned public Models dependency. Runtime consumers use the bundled
-generated projections.
+owned by the pinned public Models dependency, including the labels and input
+capabilities used by the picker. Runtime consumers use the bundled projections.
+
+Use the relevant `gridaco/models` PR to identify candidate IDs and OpenAI's
+ChatGPT Work or Codex release notes to verify subscription availability and
+plan restrictions. Check that the pinned Models release has the exact OpenAI
+wire binding for each addition. When a new binding is missing, follow the
+[catalogue update workflow](../../../data/ai/README.md) to update the pin.
+Review picker order and the default separately from membership.
 
 Keep withdrawn IDs in the source's `retired_model_ids` so older saved choices
 remain readable. The generated retired-ID list grants no picker availability
@@ -158,10 +165,25 @@ compatibility projection rather than authenticated account discovery. Access
 depends on the ChatGPT plan and workspace; API model availability does not
 establish subscription access.
 
+For a live check, connect an eligible account through Grida Desktop and send
+a short turn with each added model. Check that a fresh chat offers the
+intended default and that a withdrawn saved selection asks for an explicit
+replacement. Record the tested plan and build, and flag any live checks that
+remain pending.
+
 GPT-5.5 and GPT-5.4 have been withdrawn from subscription offerings. Existing
 saved choices remain visible as unavailable and require an explicit replacement.
 Neither a catalogue update nor the new default silently changes a saved model,
 the chat's account connection or its funding.
+
+Copy this prompt for a manual update.
+
+```text
+Use $ai-models to update Grida Desktop's ChatGPT subscription model list for
+<release or PR>. Follow “Update membership and the default” in
+packages/grida-ai-host/docs/chatgpt-subscription-provider.md. Report membership
+and default changes, subscription evidence, and which checks passed.
+```
 
 ## Network authority
 

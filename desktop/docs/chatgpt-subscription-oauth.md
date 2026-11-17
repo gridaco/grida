@@ -39,11 +39,11 @@ The authorization query also pins
 `codex_cli_simplified_flow=true`, and `originator=grida`. Inference sends
 `originator: grida`.
 
-The current closed model compatibility projection offers **GPT-6.1 Sol** as
-its default, plus GPT-6 Astra, GPT-6.1 Terra, GPT-6 Luna, GPT-6 Sol and the
-compatible GPT-5.6 Sol, Terra and Luna models. Access depends on the person's
-ChatGPT plan and workspace. This is a subscription compatibility projection;
-public API availability does not establish subscription entitlement.
+The current closed model compatibility projection offers **GPT-6.2 Sol** as
+its default, alongside GPT-6.2 Astra and earlier compatible models. Access
+depends on the person's ChatGPT plan and workspace. This is a subscription
+compatibility projection; public API availability does not establish
+subscription entitlement.
 
 Membership and the default are authored once in
 [`data/ai/chatgpt-subscription.json`](../../data/ai/chatgpt-subscription.json),

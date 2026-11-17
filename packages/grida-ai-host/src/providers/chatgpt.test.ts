@@ -92,6 +92,8 @@ describe("ChatGptProvider", () => {
   });
   it("offers current subscription models and keeps retired IDs outside execution", () => {
     expect(CHATGPT_SUBSCRIPTION_MODEL_IDS).toEqual([
+      "openai/gpt-6.2-sol",
+      "openai/gpt-6.2-astra",
       "openai/gpt-6.1-sol",
       "openai/gpt-6-astra",
       "openai/gpt-6.1-terra",
@@ -101,7 +103,7 @@ describe("ChatGptProvider", () => {
       "openai/gpt-5.6-terra",
       "openai/gpt-5.6-luna",
     ]);
-    expect(CHATGPT_SUBSCRIPTION_DEFAULT_MODEL_ID).toBe("openai/gpt-6.1-sol");
+    expect(CHATGPT_SUBSCRIPTION_DEFAULT_MODEL_ID).toBe("openai/gpt-6.2-sol");
     expect(CHATGPT_SUBSCRIPTION_MODEL_IDS).toContain(
       CHATGPT_SUBSCRIPTION_DEFAULT_MODEL_ID
     );
@@ -120,6 +122,8 @@ describe("ChatGptProvider", () => {
   });
 
   it.each([
+    ["openai/gpt-6.2-sol", "gpt-6.2-sol"],
+    ["openai/gpt-6.2-astra", "gpt-6.2-astra"],
     ["openai/gpt-6.1-sol", "gpt-6.1-sol"],
     ["openai/gpt-6-astra", "gpt-6-astra"],
     ["openai/gpt-6.1-terra", "gpt-6.1-terra"],
