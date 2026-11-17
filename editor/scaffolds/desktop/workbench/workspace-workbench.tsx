@@ -58,7 +58,7 @@ import {
   workspaces as workspacesNs,
   type Workspace,
 } from "@/lib/desktop/bridge";
-import { WorkspaceViewState } from "@/lib/desktop/workspace-view-state";
+import { WorkspaceBrowserTabs } from "./workspace-browser-tabs";
 import {
   confirmAndTrashEntry,
   copyAbsolutePath,
@@ -166,6 +166,10 @@ export function WorkspaceWorkbench({
     []
   );
   const panels = useMemo(() => new WorkbenchPanels(group), [group]);
+  const browsers = useMemo(
+    () => new WorkspaceBrowserTabs(workspace.id, group),
+    [workspace.id, group]
+  );
   const sideChatPlacement = useMemo(
     () => new SideChatTabPlacement(panels),
     [panels]
@@ -199,38 +203,24 @@ export function WorkspaceWorkbench({
       );
   }, [restoreSettled, surfaceHost]);
 
-  // Workspace continuity is a one-shot host action. The persisted renderer
-  // state supplies order + focus; the surface host still checks every path
-  // against live bridge truth before restoring the editor group.
-  //
-  // `initialActiveRelPath` is the legacy v1 last-workspace handoff. It seeds a
-  // one-tab state only when this workspace has no newer view-state record.
+  // File admission and native page attachment settle before the Start surface.
   useEffect(() => {
     let current = true;
-    const tabs = WorkspaceViewState.initialTabs(
-      window.localStorage,
-      workspace.id,
-      initialActiveRelPath
-    );
-    void surfaceHost.restoreRelative(tabs).finally(() => {
-      if (current) setRestoreSettled(true);
-    });
+    setRestoreSettled(false);
+    void browsers
+      .start(
+        window.localStorage,
+        (paths) => surfaceHost.resolveRelativePaths(paths),
+        initialActiveRelPath
+      )
+      .finally(() => {
+        if (current) setRestoreSettled(true);
+      });
     return () => {
       current = false;
+      browsers.stop();
     };
-  }, [initialActiveRelPath, surfaceHost, workspace.id]);
-
-  // Manual regression: test/desktop-startup-restore-last-workspace.md
-  useEffect(() => {
-    if (!restoreSettled) return;
-    const remember = () => {
-      WorkspaceViewState.remember(window.localStorage, workspace.id, {
-        tabs: surfaceHost.rememberedTabs(),
-      });
-    };
-    remember();
-    return group.subscribe(remember);
-  }, [group, restoreSettled, surfaceHost, workspace.id]);
+  }, [browsers, initialActiveRelPath, surfaceHost]);
 
   // Do not flash Start while a remembered artifact is still being validated.
   // Once restoration settles, an actually-empty editor group owns the faux tab.
@@ -409,13 +399,15 @@ export function WorkspaceWorkbench({
     [group]
   );
   const createCanvas = useCallback(
-    async (editor: WorkspaceCanvasCreation.Editor) => {
+    async (editor: WorkspaceCanvasCreation.Editor, replaceTab?: string) => {
       const relPath = await WorkspaceCanvasCreation.create(
         workspace.id,
         editor
       );
       bumpTreeRefresh();
-      group.open(WorkbenchTab.file(relPath));
+      const key = WorkbenchTab.file(relPath);
+      if (replaceTab) group.replace(replaceTab, key);
+      group.open(key);
     },
     [workspace.id, group, bumpTreeRefresh]
   );
@@ -497,6 +489,7 @@ export function WorkspaceWorkbench({
                         workspace={workspace}
                         svgText={surfaceHost.svgText}
                         panels={panels}
+                        browsers={browsers}
                         openTabs={openTabs}
                         activeTab={activeTab}
                         onSelectTab={activateTab}

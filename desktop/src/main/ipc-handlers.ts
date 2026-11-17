@@ -8,6 +8,7 @@ import {
   type WebContents,
 } from "electron";
 import path from "node:path";
+import { DesktopBrowserHost } from "./browser-host";
 import { URL } from "node:url";
 import type { RecentStore } from "@grida/daemon/server";
 import {
@@ -136,10 +137,22 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   const recentFiles = options.recent_files ?? servicesSidecarClient.recent;
   const admittedWindow = (sender: WebContents) => {
     const window = BrowserWindow.fromWebContents(sender);
-    return window && options.resolve_ipc_role(window) === "main"
+    return window &&
+      window.webContents === sender &&
+      options.resolve_ipc_role(window) === "main"
       ? window
       : null;
   };
+  const browserHost = new DesktopBrowserHost({
+    editorOrigin: EDITOR_ORIGIN,
+    admitWindow: (window) => options.resolve_ipc_role(window) === "main",
+    workspaceExists: async (id) =>
+      !!(await servicesSidecarClient.findWorkspace(id)),
+    resolveWorkspace: async (id) => {
+      const workspace = await servicesSidecarClient.findWorkspace(id);
+      return workspace ? { name: workspace.name, root: workspace.root } : null;
+    },
+  });
   const nativeChat = new NativeChatIpc(
     EDITOR_ORIGIN,
     (sender, workspaceId, profileId) => {
@@ -264,6 +277,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       const selectedDocument = docId !== null;
       const nestedDeck = ipc_sender.nestedDeck(senderUrl) !== null;
       if (
+        // GRIDA-SEC-016 — a guest may visit a Desktop URL; URL and owning
+        // BrowserWindow alone must never turn it into the privileged shell.
+        !window ||
+        window.webContents !== event.sender ||
+        event.senderFrame !== event.sender.mainFrame ||
         !ipc_sender.isAllowed(senderUrl, EDITOR_ORIGIN) ||
         !role ||
         !pathname ||
@@ -295,6 +313,56 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       return invoke();
     });
   }
+
+  guarded(IPC_CHANNELS.BROWSER_ATTACH, (event, workspaceId: unknown) =>
+    browserHost.attach(event, workspaceId)
+  );
+  guarded(IPC_CHANNELS.BROWSER_THUMBNAIL, (event, request: unknown) =>
+    browserHost.thumbnail(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_SNAPSHOT, (event, attachmentId: unknown) =>
+    browserHost.snapshot(event, attachmentId)
+  );
+  guarded(IPC_CHANNELS.BROWSER_DETACH, (event, attachmentId: unknown) =>
+    browserHost.detach(event, attachmentId)
+  );
+  guarded(IPC_CHANNELS.BROWSER_CREATE, (event, request: unknown) =>
+    browserHost.create(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_NAVIGATE, (event, request: unknown) =>
+    browserHost.navigate(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_BACK, (event, request: unknown) =>
+    browserHost.back(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_FORWARD, (event, request: unknown) =>
+    browserHost.forward(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_RELOAD, (event, request: unknown) =>
+    browserHost.reload(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_STOP, (event, request: unknown) =>
+    browserHost.stop(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_FOCUS, (event, request: unknown) =>
+    browserHost.focus(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_LAYOUT, (event, request: unknown) =>
+    browserHost.layout(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_CLOSE, (event, request: unknown) =>
+    browserHost.close(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_OPEN_EXTERNAL, (event, request: unknown) =>
+    browserHost.openExternal(event, request)
+  );
+  guarded(
+    IPC_CHANNELS.BROWSER_CLEAR_WORKSPACE_DATA,
+    (event, request: unknown) => browserHost.clearWorkspaceData(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_CLEAR_SESSION, (event, request: unknown) =>
+    browserHost.clearSession(event, request)
+  );
 
   const archives = new NativeArchiveIpc(
     options.archives,
@@ -1523,6 +1591,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   guarded(IPC_CHANNELS.WORKSPACE_UNSUBSCRIBE_CHANGES, (_event, id: string) => {
     unsubscribeWorkspaceChanges(id);
   });
+  return browserHost;
 }
 
 async function findWorkspaceOrThrow(workspaceId: string) {

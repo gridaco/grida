@@ -70,6 +70,7 @@ describe("ipc_admission", () => {
     expect(allowedFor("main", "/desktop/tools")).toEqual(
       allChannels.filter(
         (channel) =>
+          !channel.startsWith("grida:browser:") &&
           !channel.startsWith("grida:provider:endpoint:") &&
           !channel.startsWith("grida:hooks:") &&
           !channel.startsWith("grida:archives:") &&
@@ -79,6 +80,52 @@ describe("ipc_admission", () => {
           channel !== IPC_CHANNELS.WELCOME_CHAT_PROFILES &&
           !(documentFiles as readonly IpcChannel[]).includes(channel)
       )
+    );
+  });
+
+  it("admits browser control only from the main workspace shell", () => {
+    const browser = allChannels.filter(
+      (channel) =>
+        channel.startsWith("grida:browser:") &&
+        channel !== IPC_CHANNELS.BROWSER_CLEAR_WORKSPACE_DATA
+    );
+    expect(browser.length).toBeGreaterThan(0);
+    for (const channel of browser) {
+      expect(allowedFor("main", "/desktop/workspace")).toContain(channel);
+      for (const route of [
+        "/desktop/settings",
+        "/desktop/welcome",
+        "/desktop/tools",
+        "/desktop/file",
+        "/desktop/auth/sign-in",
+      ]) {
+        expect(allowedFor("main", route)).not.toContain(channel);
+      }
+      expect(allowedFor("sign-in", "/desktop/auth/sign-in")).not.toContain(
+        channel
+      );
+      expect(allowedFor("onboarding", "/desktop/onboarding")).not.toContain(
+        channel
+      );
+    }
+  });
+
+  it("admits named workspace website-data clearing only from native Settings", () => {
+    const channel = IPC_CHANNELS.BROWSER_CLEAR_WORKSPACE_DATA;
+    expect(allowedFor("main", "/desktop/settings")).toContain(channel);
+    for (const pathname of [
+      "/desktop/workspace",
+      "/desktop/welcome",
+      "/desktop/file",
+      "/desktop/tools",
+      "/desktop/settings/other",
+    ])
+      expect(allowedFor("main", pathname)).not.toContain(channel);
+    expect(allowedFor("sign-in", "/desktop/auth/sign-in")).not.toContain(
+      channel
+    );
+    expect(allowedFor("onboarding", "/desktop/onboarding")).not.toContain(
+      channel
     );
   });
 

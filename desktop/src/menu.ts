@@ -412,6 +412,19 @@ function close_tab_or_window(baseWindow?: BaseWindow): void {
   focusedWindow.close();
 }
 
+function open_browser_tab(baseWindow?: BaseWindow): void {
+  const window =
+    baseWindow instanceof BrowserWindow
+      ? baseWindow
+      : BrowserWindow.getFocusedWindow();
+  if (!window || !is_workspace_window(window)) return;
+  window.webContents.focus();
+  window.webContents.send(
+    IPC_CHANNELS.WORKSPACE_COMMAND,
+    "workspace.browser.new"
+  );
+}
+
 function toggle_workspace_terminal(baseWindow?: BaseWindow): void {
   const focusedWindow =
     baseWindow instanceof BrowserWindow
@@ -613,6 +626,12 @@ export default function create_menu(
     {
       label: "File",
       submenu: [
+        {
+          label: "Open Browser",
+          accelerator: "CmdOrCtrl+T",
+          enabled: opts?.windowAdmission?.can_open() ?? true,
+          click: (_item, window) => open_browser_tab(window),
+        },
         {
           label: "New Window",
           accelerator: "CmdOrCtrl+Shift+N",

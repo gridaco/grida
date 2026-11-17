@@ -1,3 +1,4 @@
+// GRIDA-SEC-016 — browser channels carry no guest authority.
 // GRIDA-SEC-004 / GRIDA-SEC-008 — narrow native IPC channel vocabulary.
 export {
   DESKTOP_BRIDGE_PROTOCOL,
@@ -38,6 +39,23 @@ export const NATIVE_DOCUMENT_CHAT_ARGUMENT = "grida-native-document-chat";
 export const NATIVE_WORKSPACE_CHAT_ARGUMENT = "grida-native-workspace-chat";
 
 export const IPC_CHANNELS = {
+  BROWSER_ATTACH: "grida:browser:attach",
+  BROWSER_THUMBNAIL: "grida:browser:thumbnail",
+  BROWSER_SNAPSHOT: "grida:browser:snapshot",
+  BROWSER_DETACH: "grida:browser:detach",
+  BROWSER_CREATE: "grida:browser:create",
+  BROWSER_NAVIGATE: "grida:browser:navigate",
+  BROWSER_BACK: "grida:browser:back",
+  BROWSER_FORWARD: "grida:browser:forward",
+  BROWSER_RELOAD: "grida:browser:reload",
+  BROWSER_STOP: "grida:browser:stop",
+  BROWSER_FOCUS: "grida:browser:focus",
+  BROWSER_LAYOUT: "grida:browser:layout",
+  BROWSER_CLOSE: "grida:browser:close",
+  BROWSER_OPEN_EXTERNAL: "grida:browser:open-external",
+  BROWSER_CLEAR_WORKSPACE_DATA: "grida:browser:clear-workspace-data",
+  BROWSER_CLEAR_SESSION: "grida:browser:clear-session",
+  BROWSER_CHANGED: "grida:browser:changed",
   WINDOW_SET_DOCUMENT_EDITED: "grida:window:set-document-edited",
   WINDOW_SET_REPRESENTED_FILENAME: "grida:window:set-represented-filename",
   WINDOW_CLOSE: "grida:window:close",

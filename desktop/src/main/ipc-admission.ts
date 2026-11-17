@@ -71,6 +71,12 @@ export namespace ipc_admission {
   }): boolean {
     switch (role) {
       case "main":
+        // GRIDA-SEC-016 — this management action grants no page lease.
+        if (channel === IPC_CHANNELS.BROWSER_CLEAR_WORKSPACE_DATA)
+          return pathname === "/desktop/settings";
+        // GRIDA-SEC-016 — browser controls belong only to the workspace shell.
+        if (channel.startsWith("grida:browser:"))
+          return pathname === "/desktop/workspace";
         if (channel.startsWith("grida:provider:endpoint:"))
           return pathname === "/desktop/settings";
         if (

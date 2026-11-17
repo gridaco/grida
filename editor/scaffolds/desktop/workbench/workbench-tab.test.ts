@@ -70,4 +70,12 @@ describe("WorkbenchTab.trashed", () => {
     g.closeMatching(WorkbenchTab.trashed("a", false));
     expect(g.getSnapshot().tabs).toEqual([file("a/b"), panel]);
   });
+  it("gives browser tabs reopenable identities without file operations", () => {
+    const key = WorkbenchTab.browser("page-id");
+    expect(WorkbenchTab.parse(key)).toEqual({ kind: "browser", id: "page-id" });
+    expect(WorkbenchTab.key({ kind: "browser", id: "page-id" })).toBe(key);
+    expect(WorkbenchTab.relPath(key)).toBeNull();
+    expect(WorkbenchTab.reopenable(key)).toBe(true);
+    expect(WorkbenchTab.trashed("page-id", true)(key)).toBe(false);
+  });
 });

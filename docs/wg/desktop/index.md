@@ -1,6 +1,6 @@
 ---
 title: Desktop (WG)
-description: Grida Desktop is one host implementation of the agent RFC. These docs are delta-only — every fact here depends on the Electron + macOS/Linux/Windows host shape.
+description: Architecture and behavior contracts for Grida Desktop's native shell, browser, renderer and hosted services.
 keywords: [desktop, electron, native agent host, ServicesSidecar, grida-sec-004]
 format: md
 tags:
@@ -11,10 +11,9 @@ tags:
 
 # Desktop (WG)
 
-Grida Desktop is one host implementation of the
-[agent RFC](../ai/agent/index.md). These docs are **delta-only** — every
-fact here is something you cannot derive from the RFC because it depends
-on the Electron + macOS/Linux/Windows host shape.
+These documents own Desktop-specific contracts: native presentation, the
+renderer bridge, browser pages and host services. Agent-related pages describe
+the Desktop binding of the [agent RFC](../ai/agent/index.md).
 
 For the abstract contract:
 
@@ -32,6 +31,9 @@ For the user-facing app and the security boundary:
 - [`GRIDA-SEC-004` in `SECURITY.md`](https://github.com/gridaco/grida/blob/main/SECURITY.md)
 
 ## Pages
+
+The [built-in browser](./browser.md) defines standalone page ownership,
+profile isolation, lifetime and native presentation.
 
 | Page                                               | Covers                                                                                                                                                           |
 | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |

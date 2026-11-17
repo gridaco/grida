@@ -92,4 +92,57 @@ describe("WorkspaceViewState", () => {
       active: "current.svg",
     });
   });
+  it("migrates version-one file state without inventing browser descriptors", () => {
+    const storage = new MemoryStorage();
+    storage.setItem(
+      "grida.workspaceViewState:workspace-a",
+      JSON.stringify({ version: 1, tabs: { open: ["a.svg"], active: "a.svg" } })
+    );
+    expect(WorkspaceViewState.read(storage, "workspace-a")).toEqual({
+      tabs: { open: ["a.svg"], active: "a.svg" },
+    });
+  });
+
+  it("preserves mixed ordering while discarding unsafe browser descriptors", () => {
+    const storage = new MemoryStorage();
+    WorkspaceViewState.remember(storage, "workspace-a", {
+      tabs: { open: ["a.svg"], active: "a.svg" },
+      content: {
+        open: [
+          {
+            kind: "browser",
+            id: "page",
+            pageId: "native",
+            url: "https://example.com/",
+          },
+          { kind: "file", relPath: "a.svg" },
+          {
+            kind: "browser",
+            id: "unsafe",
+            pageId: "native2",
+            url: "file:///private/data",
+          },
+          {
+            kind: "browser",
+            id: "credentials",
+            pageId: "native3",
+            url: "https://user:pass@example.com/",
+          },
+        ],
+        active: 0,
+      },
+    });
+    expect(WorkspaceViewState.read(storage, "workspace-a")?.content).toEqual({
+      open: [
+        {
+          kind: "browser",
+          id: "page",
+          pageId: "native",
+          url: "https://example.com/",
+        },
+        { kind: "file", relPath: "a.svg" },
+      ],
+      active: 0,
+    });
+  });
 });

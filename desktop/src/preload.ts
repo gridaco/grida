@@ -22,6 +22,7 @@ import { FileReferenceRequest } from "./bridge/file-reference-request";
 import { SelectedImageRequest } from "./bridge/selected-image-request";
 import { NativeChatInvoke } from "./bridge/native-chat-invoke";
 import {
+  DesktopBrowser,
   NativeEditorSurfaces,
   NativeEditorSvgText,
   type NativeEditorSurfaceOpen,
@@ -404,6 +405,15 @@ function installDesktopNavigationGuard(): void {
   window.addEventListener("hashchange", clearNativeChatDelivery);
 }
 
+// GRIDA-SEC-016 — only the shell preload exposes browser controls. Guest
+// contents are constructed without any preload or additional native arguments.
+const browserHandlers = new Set<(event: DesktopBrowser.Event) => void>();
+ipcRenderer.on(IPC_CHANNELS.BROWSER_CHANGED, (_event, raw: unknown) => {
+  const event = DesktopBrowser.parseEvent(raw);
+  if (event) for (const handler of browserHandlers) handler(event);
+});
+window.addEventListener("pagehide", () => browserHandlers.clear());
+
 const bridge: DesktopBridge = {
   protocol: DESKTOP_BRIDGE_PROTOCOL,
   app: { version: appVersion, platform: appPlatform },
@@ -423,10 +433,49 @@ const bridge: DesktopBridge = {
       terminal: true,
       // Workspace file-change watcher.
       workspace_watch: true,
+      browser: true,
     },
   },
 
   handshake,
+
+  browser: {
+    version: 1,
+    attach: (workspaceId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_ATTACH, workspaceId),
+    thumbnail: (request) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_THUMBNAIL, request),
+    snapshot: (attachmentId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_SNAPSHOT, attachmentId),
+    detach: (attachmentId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_DETACH, attachmentId),
+    create: (request) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_CREATE, request),
+    navigate: (request) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_NAVIGATE, request),
+    back: (request) => ipcRenderer.invoke(IPC_CHANNELS.BROWSER_BACK, request),
+    forward: (request) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_FORWARD, request),
+    reload: (request) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_RELOAD, request),
+    stop: (request) => ipcRenderer.invoke(IPC_CHANNELS.BROWSER_STOP, request),
+    focus: (request) => ipcRenderer.invoke(IPC_CHANNELS.BROWSER_FOCUS, request),
+    layout: (request) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_LAYOUT, request),
+    close: (request) => ipcRenderer.invoke(IPC_CHANNELS.BROWSER_CLOSE, request),
+    openExternal: (request) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_OPEN_EXTERNAL, request),
+    clearWorkspaceData: (request) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_CLEAR_WORKSPACE_DATA, request),
+    clearSession: (request) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_CLEAR_SESSION, request),
+    subscribe: (handler) => {
+      browserHandlers.add(handler);
+      return () => {
+        browserHandlers.delete(handler);
+      };
+    },
+  },
 
   hooks: {
     inspect: () => ipcRenderer.invoke(IPC_CHANNELS.GLOBAL_HOOKS_INSPECT),

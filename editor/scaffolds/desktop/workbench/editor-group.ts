@@ -86,6 +86,28 @@ export class EditorGroup {
   }
 
   /**
+   * Substitute a fresh key at one open tab's index in one publication. An
+   * active source selects its replacement; an inactive source keeps focus.
+   * Refuses a missing source or a key already used by another open tab.
+   * Replacing an existing key with itself succeeds without publishing.
+   *
+   * This changes the collection only: callers own content teardown and any
+   * dirty guards. It adds no close-history record and preserves prior history.
+   */
+  replace(previousId: string, nextId: string): boolean {
+    const index = this._tabs.indexOf(previousId);
+    if (index < 0) return false;
+    if (previousId === nextId) return true;
+    if (this._tabs.includes(nextId)) return false;
+    this._tabs = this._tabs.map((id, position) =>
+      position === index ? nextId : id
+    );
+    if (this._active === previousId) this._active = nextId;
+    this.commit();
+    return true;
+  }
+
+  /**
    * Replace the group with a validated persisted snapshot in one mutation.
    *
    * Restoration is intentionally a first-class model operation rather than a

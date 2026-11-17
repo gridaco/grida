@@ -131,6 +131,7 @@ registerWorkspaceMediaScheme();
 // main. Auxiliary document/settings/workspace windows are admitted and
 // registered through this controller only after it reaches `main`.
 let entryWindow: DesktopEntryWindow | null = null;
+let browserHost: ReturnType<typeof registerIpcHandlers> | undefined;
 const workspaceReview = new NativeWorkspaceReview(
   new URL(EDITOR_BASE_URL).origin,
   (window) => entryWindow?.ipcRoleFor(window) === "main"
@@ -190,7 +191,8 @@ app.on("web-contents-created", (_event, contents) => {
 
     const controller = entryWindow;
     const source = BrowserWindow.fromWebContents(contents);
-    if (!controller || !source) return;
+    // GRIDA-SEC-016 — browsing /desktop/auth in a guest cannot alter the shell.
+    if (!controller || !source || source.webContents !== contents) return;
 
     // A contained auth navigation is only a signal to re-probe the cookie
     // session; the URL itself never grants or selects a native role. Hide the
@@ -854,6 +856,7 @@ app.on("ready", async () => {
       ]);
     },
     on_role_change: (role) => {
+      if (role !== "main") browserHost?.closeAll();
       refresh_recent_menu();
       if (role === "main") {
         dispatchPendingLaunchIntents();
@@ -864,7 +867,7 @@ app.on("ready", async () => {
   // Native-OS IPC handlers are needed before any window opens —
   // otherwise the renderer's first bridge call races the registration.
   const native = nativeDesktopAgent;
-  registerIpcHandlers({
+  browserHost = registerIpcHandlers({
     resolve_ipc_role: (window) => entryWindow?.ipcRoleFor(window) ?? null,
     open_settings: () => open_or_focus_settings(app, windowAdmission),
     archives: createDesktopArchives(

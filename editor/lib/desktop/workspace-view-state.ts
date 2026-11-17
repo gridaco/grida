@@ -1,9 +1,10 @@
+import { DesktopBrowser } from "@grida/desktop-bridge";
 import { WorkspaceArtifact } from "./workspace-artifact";
 
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 const STORAGE_KEY_PREFIX = "grida.workspaceViewState:";
-const VERSION = 1;
+const VERSION = 2;
 
 /**
  * Optional, workspace-scoped renderer state.
@@ -23,8 +24,24 @@ export namespace WorkspaceViewState {
     active: string | null;
   }>;
 
+  export type ContentTab =
+    | Readonly<{ kind: "file"; relPath: string }>
+    | Readonly<{
+        kind: "browser";
+        id: string;
+        pageId: string;
+        url: string | null;
+      }>;
+
+  export type Content = Readonly<{
+    open: readonly ContentTab[];
+    active: number | null;
+  }>;
+
   export type State = Readonly<{
     tabs: Tabs;
+    /** Mixed presentation order. Page IDs only reconnect live native pages. */
+    content?: Content;
   }>;
 
   export function remember(
@@ -58,7 +75,10 @@ export namespace WorkspaceViewState {
 
     try {
       const value = JSON.parse(raw) as Record<string, unknown>;
-      if (value.version !== VERSION || !isRecord(value.tabs)) {
+      if (
+        (value.version !== VERSION && value.version !== 1) ||
+        !isRecord(value.tabs)
+      ) {
         forget(storage, workspaceId);
         return null;
       }
@@ -68,6 +88,9 @@ export namespace WorkspaceViewState {
         return null;
       }
       const state = normalize({
+        ...(value.version === VERSION && isRecord(value.content)
+          ? { content: value.content as unknown as Content }
+          : {}),
         tabs: {
           open: tabs.open.filter(
             (path): path is string => typeof path === "string"
@@ -131,7 +154,42 @@ export namespace WorkspaceViewState {
       requestedActive !== null && seen.has(requestedActive)
         ? requestedActive
         : (open.at(-1) ?? null);
-    return { tabs: { open, active } };
+    const result: State = { tabs: { open, active } };
+    if (!state.content || !Array.isArray(state.content.open)) return result;
+    const content: ContentTab[] = [];
+    const identities = new Set<string>();
+    let contentActive: number | null = null;
+    state.content.open.slice(0, 200).forEach((entry, index) => {
+      if (!isRecord(entry)) return;
+      let tab: ContentTab;
+      let identity: string;
+      if (entry.kind === "file" && typeof entry.relPath === "string") {
+        const relPath = WorkspaceArtifact.normalizeRelativePath(entry.relPath);
+        if (relPath === null) return;
+        tab = { kind: "file", relPath };
+        identity = `file:${relPath}`;
+      } else if (
+        entry.kind === "browser" &&
+        DesktopBrowser.isIdentity(entry.id) &&
+        DesktopBrowser.isIdentity(entry.pageId)
+      ) {
+        const url = browserUrl(entry.url);
+        if (url === undefined) return;
+        tab = { kind: "browser", id: entry.id, pageId: entry.pageId, url };
+        identity = `browser:${entry.id}`;
+      } else return;
+      if (identities.has(identity)) return;
+      identities.add(identity);
+      if (index === state.content?.active) contentActive = content.length;
+      content.push(tab);
+    });
+    return {
+      ...result,
+      content: {
+        open: content,
+        active: contentActive ?? (content.length ? content.length - 1 : null),
+      },
+    };
   }
 }
 
@@ -141,4 +199,9 @@ function storageKey(workspaceId: string): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function browserUrl(value: unknown): string | null | undefined {
+  if (value === null) return null;
+  return DesktopBrowser.normalizeUrl(value) ?? undefined;
 }

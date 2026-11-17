@@ -4317,9 +4317,117 @@ incident investigations out of the architectural guarantee.
 
 ---
 
+### `GRIDA-SEC-016` — Desktop browser guest boundary
+
+**What it protects.** Untrusted browser pages remain ordinary sandboxed web
+content. They cannot obtain the privileged Desktop bridge, application account
+cookies, provider networking, private workspace protocol or authority over
+another window's pages. Native page ownership remains with Main across
+workbench navigation, reload and account-role changes.
+
+**Vulnerable scenario (prevented).** A website navigates a guest to a
+`/desktop/*` URL and is mistaken for the application renderer because it shares
+an owning window or URL shape. It then invokes native IPC, triggers an account
+reconciliation or loads private workspace resources. A stale workbench document
+could also act on pages owned by its replacement, or race storage clearing to
+keep authenticated website state alive.
+
+**Why it's specifically risky here.** The privileged workbench is hosted web
+content and browser guests are native child views in the same window. Origin,
+pathname and `BrowserWindow.fromWebContents` are insufficient evidence that a
+caller is the actual privileged top-level workbench document.
+
+**How the code prevents it.**
+
+1. **Separate guest contexts.** Main creates page views with fixed sandbox,
+   context isolation, disabled Node integration and disabled webview support.
+   Guests receive neither the application preload nor its additional
+   arguments. Main creates explicit browser session partitions; it never uses
+   the default account session or provider-network session and installs no
+   private workspace protocol on them.
+2. **Exact shell admission.** Common native IPC requires the exact window
+   `webContents` and its current top-level sender frame, in addition to the
+   existing origin, route and native role checks. Browser IPC is limited to
+   workspace shells, with one Settings-only workspace-data clearing operation
+   that grants no attachment or page-control authority. Global
+   account-navigation reconciliation likewise checks
+   exact shell identity before acting. Guest navigation to a Desktop URL grants
+   no native authority and cannot hide or reconcile the owning shell.
+3. **Attachment and page ownership.** Main verifies the workspace against the
+   registered workspace catalog and rechecks frame, URL and role after that
+   asynchronous admission. Each attach rotates an opaque lease bound to the
+   current document. Commands validate that lease and page ownership. Reload
+   hides pages and invalidates the lease; stale or canceled attachments cannot
+   replace a newer one. Window destruction and role withdrawal revoke the
+   lease and remove the owner before closing its pages. Notifications and
+   focus use the retained live shell identity, since a window wrapper can
+   outlive its destroyed contents.
+   A committed document replacement also revokes a browser attachment created
+   after that navigation had already started, so a late attachment cannot
+   leave a native child visible over a different application route.
+4. **Destination and browser policy.** Main validates HTTP(S) navigation and
+   external handoff, refusing credential-bearing, file, executable and private
+   top-level URLs. Subframes retain ordinary web content schemes without
+   gaining native authority. Popups, sensitive permissions, device access,
+   JavaScript dialogs and HTTP auth are denied. Certificates use the engine's
+   verdict. Downloads require a native save destination under a live owning
+   attachment and are never opened automatically.
+5. **Profile lifetime.** Workspace-persistent browser profiles and per-page
+   ephemeral profiles have separate identities. Clearing a workspace locks
+   admission and page operations for that scope, closes its pages across
+   windows and clears storage, connections, cache and auth state before
+   unlocking. Ephemeral closure releases its retained session state. These
+   operations never clear the Desktop or provider sessions.
+   The Settings action resolves its selected workspace from the registered
+   catalog, shows a native confirmation naming that workspace with Cancel as
+   the default, and rechecks the exact Settings document and catalog identity
+   after asynchronous admission and confirmation before clearing begins.
+   It shares the existing workspace lock, page teardown and storage cleanup.
+6. **Bounded observations and geometry.** The bridge carries bounded page
+   metadata and revisioned snapshots, not raw Electron objects, credentials,
+   scripts or debugger commands. Main obtains zoom itself, bounds geometry to
+   the owning window, clamps the bounded CSS corner radius and rejects stale
+   layout sequences. Website metadata remains untrusted display data. The
+   optional thumbnail operation returns only a bounded JPEG of an owned
+   page's rendered viewport to the admitted hosted shell. Callers cannot
+   choose capture regions, formats, scripts or native options. Capture keeps
+   hidden pages hidden, limits concurrency and rechecks attachment, page and
+   navigation lifetime before publishing pixels. Hover images are transient
+   display data; the presentation neither persists them nor polls for updates.
+
+**Limits.** Browser pages retain normal web networking, including reachable
+local services; this is not the native command sandbox. Local services must
+continue enforcing their own authentication and browser perimeter, including
+GRIDA-SEC-004. A selected upload or accepted download is an explicit user file
+operation. Profile separation does not prevent a user from separately signing
+into the same website in multiple profiles. The admitted shell may read its
+own pages' thumbnail pixels; the bridge does not prove a physical hover event.
+Agent observation, page scripts,
+debugger access and automated interaction are not supplied by this boundary.
+
+**Files bound by this id.**
+
+- `desktop/src/main/browser-host.ts` — fixed guest preferences, profiles,
+  admission, leases, navigation, downloads, geometry and teardown.
+- `desktop/src/main/ipc-handlers.ts` and `desktop/src/main/ipc-admission.ts` —
+  exact shell/frame and operation-specific workspace or Settings admission.
+- `desktop/src/main/ipc-sender.ts` — navigation and teardown revocation for
+  pending Settings confirmations.
+- `desktop/src/main.ts` — exact account-navigation observer and role teardown.
+- `desktop/src/preload.ts` and `desktop/src/bridge/contract.ts` — purpose-scoped
+  browser IPC and event projection for the shell only.
+- `packages/grida-desktop-bridge/src/browser.ts` and `browser.test.ts` — bounded
+  browser values and URL, geometry and observation validation.
+- `desktop/src/main/browser-host.test.ts` and
+  `desktop/src/main/browser-host.electron.test.ts` with its
+  `browser-host.electron.cjs` fixture — ownership, storage and destroyed-shell
+  regressions, including real isolated Chromium composition.
+
+---
+
 ## Adding a new GRIDA-SEC entry
 
-1. Allocate the next sequential id (`GRIDA-SEC-016` for the next one).
+1. Allocate the next sequential id (`GRIDA-SEC-017` for the next one).
 2. Add an "Active boundaries" subsection here with the same shape as
    GRIDA-SEC-001: what it protects, vulnerable scenario, why it's risky
    here, how the code prevents it, files bound.

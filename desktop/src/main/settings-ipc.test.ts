@@ -142,9 +142,9 @@ it("denies endpoint authority outside the exact Settings main frame", async () =
   );
   f.mainFrame.url = "https://fixture.invalid/desktop/settings";
   f.event.senderFrame = { url: f.mainFrame.url };
-  await expect(
-    f.hook(IPC_CHANNELS.PROVIDER_ENDPOINT_SET, config)
-  ).rejects.toThrow("denied");
+  expect(() => f.hook(IPC_CHANNELS.PROVIDER_ENDPOINT_SET, config)).toThrow(
+    "denied"
+  );
   f.event.senderFrame = f.mainFrame;
   f.role(null);
   expect(() => f.hook(IPC_CHANNELS.PROVIDER_ENDPOINT_SET, config)).toThrow(
@@ -188,6 +188,7 @@ function setup(hooks?: NativeAgentHooks) {
     sender: { mainFrame, isDestroyed: () => false },
     senderFrame: mainFrame as typeof mainFrame | null,
   };
+  Object.assign(fixture.window, { webContents: event.sender });
   const invoke = (...args: unknown[]) =>
     fixture.handlers.get(IPC_CHANNELS.WINDOW_OPEN_SETTINGS)!(
       event as unknown as IpcMainInvokeEvent,
@@ -220,7 +221,7 @@ it("opens native Settings from an admitted main frame without navigating its cal
 it("rejects same-origin subframes, missing frames, destroyed senders, and arguments", () => {
   const { event, mainFrame, invoke, open } = setup();
   event.senderFrame = { url: mainFrame.url };
-  expect(invoke).toThrow("settings window request denied");
+  expect(invoke).toThrow("denied");
   event.senderFrame = null;
   expect(invoke).toThrow("denied");
   event.senderFrame = mainFrame;

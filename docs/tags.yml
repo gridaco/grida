@@ -41,6 +41,11 @@ cli:
   permalink: /cli
   description: Grida command-line interface, capability composition, and terminal workflows.
 
+desktop:
+  label: Desktop
+  permalink: /desktop
+  description: Native shell, browser pages, renderer integration, and Desktop host services.
+
 routing:
   label: Routing
   permalink: /routing
