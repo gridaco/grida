@@ -279,81 +279,109 @@ export namespace toolDisplay {
     }
   }
 
-  export function summarize(entries: ReadonlyArray<ToolCallEntry>): string {
-    if (entries.length === 0) return "No tool calls";
-
+  /** Ranked by call frequency, then by the most recent occurrence on ties. */
+  export function group(entries: ReadonlyArray<ToolCallEntry>): {
+    action: ToolDisplayAction;
+    summary: string;
+  } {
+    const ranking = new Map<
+      ToolDisplayAction,
+      { count: number; last: number }
+    >();
     const counts = new Map<ToolDisplayAction, number>();
     const files = new Map<ToolDisplayAction, Set<string>>();
     const runningCounts = new Map<ToolDisplayAction, number>();
-    let failed = 0;
-    for (const entry of entries) {
+    const failedCounts = new Map<ToolDisplayAction, number>();
+    entries.forEach((entry, index) => {
       const desc = describe(entry);
+      ranking.set(desc.action, {
+        count: (ranking.get(desc.action)?.count ?? 0) + 1,
+        last: index,
+      });
       if (desc.tone === "running") {
         runningCounts.set(
           desc.action,
           (runningCounts.get(desc.action) ?? 0) + 1
         );
-        continue;
-      }
-      if (desc.tone === "warn" || desc.tone === "error") {
-        failed += 1;
-        continue;
-      }
-      if (isFileAction(desc.action) && desc.target) {
+      } else if (desc.tone === "warn" || desc.tone === "error") {
+        failedCounts.set(desc.action, (failedCounts.get(desc.action) ?? 0) + 1);
+      } else if (isFileAction(desc.action) && desc.target) {
         const targets = files.get(desc.action) ?? new Set<string>();
         targets.add(desc.target);
         files.set(desc.action, targets);
-        continue;
+      } else {
+        counts.set(desc.action, (counts.get(desc.action) ?? 0) + 1);
       }
-      counts.set(desc.action, (counts.get(desc.action) ?? 0) + 1);
-    }
+    });
     for (const [action, targets] of files) {
       counts.set(action, (counts.get(action) ?? 0) + targets.size);
     }
-
+    const actions = [...ranking]
+      .sort(([, a], [, b]) => b.count - a.count || b.last - a.last)
+      .map(([action]) => action);
     const clauses: string[] = [];
-    pushClause(clauses, counts, "edit", "edited");
-    pushClause(clauses, counts, "write", "wrote");
-    pushClause(clauses, counts, "read", "read");
-    pushClause(clauses, counts, "generate_image", "generated", "image");
-    pushClause(clauses, counts, "view_image", "viewed", "image");
-    pushReferencePickerClause(clauses, counts, "picked");
-    pushClause(clauses, counts, "search", "searched");
-    pushClause(clauses, counts, "list", "listed");
-    pushClause(clauses, counts, "command", "ran");
-    pushClause(clauses, counts, "process", "used");
-    pushClause(clauses, counts, "plan", "updated", "plan update");
-    pushClause(clauses, counts, "question", "asked");
-    pushClause(clauses, counts, "skill", "loaded", "skill");
-    pushClause(clauses, counts, "open_tab", "opened", "tab");
-    pushTabsCheckClause(clauses, counts, "checked");
-    pushClause(clauses, counts, "tool", "used");
-    pushClause(clauses, runningCounts, "edit", "editing");
-    pushClause(clauses, runningCounts, "write", "writing");
-    pushClause(clauses, runningCounts, "read", "reading");
-    pushClause(clauses, runningCounts, "generate_image", "generating", "image");
-    pushClause(clauses, runningCounts, "view_image", "viewing", "image");
-    pushReferencePickerClause(clauses, runningCounts, "picking");
-    pushClause(clauses, runningCounts, "search", "searching");
-    pushClause(clauses, runningCounts, "list", "listing");
-    pushClause(clauses, runningCounts, "command", "running");
-    pushClause(clauses, runningCounts, "process", "using");
-    pushClause(clauses, runningCounts, "plan", "updating", "plan update");
-    pushClause(clauses, runningCounts, "question", "asking");
-    pushClause(clauses, runningCounts, "skill", "loading", "skill");
-    pushClause(clauses, runningCounts, "open_tab", "opening", "tab");
-    pushTabsCheckClause(clauses, runningCounts, "checking");
-    pushStatusClause(clauses, runningCounts.get("tool") ?? 0, "running");
-    pushStatusClause(clauses, failed, "failed");
-
-    return capitalize(clauses.join(", "));
+    for (const action of actions) {
+      const [done, running, failed] = GROUP_VERBS[action];
+      pushGroupClause(clauses, counts, action, done);
+      if (action === "tool") {
+        pushStatusClause(clauses, runningCounts.get(action) ?? 0, "running");
+        pushStatusClause(clauses, failedCounts.get(action) ?? 0, "failed");
+      } else {
+        pushGroupClause(clauses, runningCounts, action, running);
+        pushGroupClause(clauses, failedCounts, action, `failed to ${failed}`);
+      }
+    }
+    return {
+      action: actions[0] ?? "tool",
+      summary: clauses.length
+        ? capitalize(clauses.join(", "))
+        : "No tool calls",
+    };
   }
+
+  export function summarize(entries: ReadonlyArray<ToolCallEntry>): string {
+    return group(entries).summary;
+  }
+}
+
+const GROUP_VERBS: Record<
+  ToolDisplayAction,
+  readonly [string, string, string]
+> = {
+  edit: ["edited", "editing", "edit"],
+  write: ["wrote", "writing", "write"],
+  read: ["read", "reading", "read"],
+  generate_image: ["generated", "generating", "generate"],
+  view_image: ["viewed", "viewing", "view"],
+  pick_references: ["picked", "picking", "pick"],
+  search: ["searched", "searching", "search"],
+  list: ["listed", "listing", "list"],
+  command: ["ran", "running", "run"],
+  process: ["used", "using", "use"],
+  plan: ["updated", "updating", "update"],
+  question: ["asked", "asking", "ask"],
+  skill: ["loaded", "loading", "load"],
+  open_tab: ["opened", "opening", "open"],
+  list_tabs: ["checked", "checking", "check"],
+  tool: ["used", "using", "use"],
+};
+
+function pushGroupClause(
+  clauses: string[],
+  counts: Map<ToolDisplayAction, number>,
+  action: ToolDisplayAction,
+  verb: string
+) {
+  if (action === "pick_references")
+    pushReferencePickerClause(clauses, counts, verb);
+  else if (action === "list_tabs") pushTabsCheckClause(clauses, counts, verb);
+  else pushClause(clauses, counts, action, verb);
 }
 
 function pushReferencePickerClause(
   clauses: string[],
   counts: Map<ToolDisplayAction, number>,
-  verb: "picked" | "picking"
+  verb: string
 ) {
   if (!counts.has("pick_references")) return;
   clauses.push(`${verb} references`);
@@ -362,7 +390,7 @@ function pushReferencePickerClause(
 function pushTabsCheckClause(
   clauses: string[],
   counts: Map<ToolDisplayAction, number>,
-  verb: "checked" | "checking"
+  verb: string
 ) {
   const count = counts.get("list_tabs");
   if (!count) return;

@@ -39,6 +39,33 @@ describe("EditorGroup — open / activate", () => {
     expect(g.getSnapshot()).toBe(before);
   });
 
+  it("inserts beside an existing opener with one background publication", () => {
+    const g = new EditorGroup();
+    g.restore({ tabs: ["a", "b"], active: "b" });
+    const published: ReturnType<typeof snap>[] = [];
+    g.subscribe(() => published.push(snap(g)));
+    g.open("child", { after: "a", activate: false });
+    expect(published).toEqual([{ tabs: ["a", "child", "b"], active: "b" }]);
+    const before = g.getSnapshot();
+    g.open("child", { after: "b", activate: false });
+    expect(g.getSnapshot()).toBe(before);
+  });
+
+  it("falls back to append, selects the first background tab and preserves close history", () => {
+    const g = new EditorGroup();
+    g.open("historic");
+    g.close("historic");
+    g.open("a", { after: "missing", activate: false });
+    expect(snap(g)).toEqual({ tabs: ["a"], active: "a" });
+    g.open("b", { after: "missing", activate: false });
+    expect(snap(g)).toEqual({ tabs: ["a", "b"], active: "a" });
+    g.reopenClosed();
+    expect(snap(g)).toEqual({
+      tabs: ["a", "b", "historic"],
+      active: "historic",
+    });
+  });
+
   it("activate focuses an open tab; ignores unknown or already-active", () => {
     const g = new EditorGroup();
     g.open("a");
@@ -49,6 +76,90 @@ describe("EditorGroup — open / activate", () => {
     g.subscribe(listener);
     g.activate("a"); // already active
     g.activate("nope"); // not open
+    expect(listener).not.toHaveBeenCalled();
+  });
+});
+
+describe("EditorGroup — replace", () => {
+  it("replaces the active tab at its index with one atomic publication", () => {
+    const g = new EditorGroup();
+    g.restore({ tabs: ["a", "b", "c"], active: "b" });
+    const previous = g.getSnapshot();
+    const published: ReturnType<typeof snap>[] = [];
+    g.subscribe(() => published.push(snap(g)));
+
+    expect(g.replace("b", "replacement")).toBe(true);
+
+    expect(snap(g)).toEqual({
+      tabs: ["a", "replacement", "c"],
+      active: "replacement",
+    });
+    expect(published).toEqual([
+      { tabs: ["a", "replacement", "c"], active: "replacement" },
+    ]);
+    expect(previous).toEqual({ tabs: ["a", "b", "c"], active: "b" });
+  });
+
+  it("keeps the active selection when replacing an inactive tab", () => {
+    const g = new EditorGroup();
+    g.restore({ tabs: ["a", "b", "c"], active: "c" });
+    expect(g.replace("b", "replacement")).toBe(true);
+    expect(snap(g)).toEqual({ tabs: ["a", "replacement", "c"], active: "c" });
+  });
+
+  it("preserves unrelated reopen history and never records the replaced source", () => {
+    const g = new EditorGroup();
+    g.open("historic");
+    g.close("historic");
+    g.open("source");
+    expect(g.replace("source", "replacement")).toBe(true);
+
+    g.reopenClosed();
+    expect(snap(g)).toEqual({
+      tabs: ["replacement", "historic"],
+      active: "historic",
+    });
+    g.reopenClosed();
+    expect(snap(g)).toEqual({
+      tabs: ["replacement", "historic"],
+      active: "historic",
+    });
+  });
+
+  it("leaves earlier legitimate close records unchanged", () => {
+    const g = new EditorGroup();
+    g.open("source");
+    g.close("source");
+    g.open("source");
+    g.replace("source", "replacement");
+    g.reopenClosed();
+    expect(snap(g)).toEqual({
+      tabs: ["replacement", "source"],
+      active: "source",
+    });
+  });
+
+  it("accepts the same existing identity without changing the snapshot", () => {
+    const g = new EditorGroup();
+    g.open("a");
+    const before = g.getSnapshot();
+    const listener = vi.fn<() => void>();
+    g.subscribe(listener);
+    expect(g.replace("a", "a")).toBe(true);
+    expect(g.getSnapshot()).toBe(before);
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("refuses missing sources and collisions without mutating or publishing", () => {
+    const g = new EditorGroup();
+    g.restore({ tabs: ["a", "b"], active: "a" });
+    const before = g.getSnapshot();
+    const listener = vi.fn<() => void>();
+    g.subscribe(listener);
+    expect(g.replace("missing", "fresh")).toBe(false);
+    expect(g.replace("missing", "missing")).toBe(false);
+    expect(g.replace("a", "b")).toBe(false);
+    expect(g.getSnapshot()).toBe(before);
     expect(listener).not.toHaveBeenCalled();
   });
 });

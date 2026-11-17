@@ -195,6 +195,8 @@ export type NativeChatView = Readonly<{
     basis: NativeChatCatalogEntry;
   }> | null;
   messages: readonly NativeChatMessage[];
+  /** Advances only for new visible live output, not observation or history reads. */
+  progressRevision: number;
   /** Recorded outcome and timing for turns in the displayed messages. */
   turnRecords: readonly NativeChatTurnRecord[];
   /** Older pages exist above the loaded messages. */
@@ -329,6 +331,7 @@ type Scope = {
   earlierPages: NativeChatTranscriptPage[];
   earlierRead?: object;
   live: Map<string, NativeChatMessage & { turnId: string; bytes: number }>;
+  progressRevision: number;
   gaps: Set<string>;
   observation: NativeChatObservation | null;
   summaryRequest?: {
@@ -456,6 +459,7 @@ const EMPTY: NativeChatView = Object.freeze({
   revisionSubmitting: false,
   catalogDraft: null,
   messages: [],
+  progressRevision: 0,
   turnRecords: [],
   canReadEarlier: false,
   titleArrived: null,
@@ -1566,6 +1570,7 @@ export class NativeChatController {
       earlierPages: previous.earlierPages,
       recentWindow: previous.recentWindow,
       live: new Map(),
+      progressRevision: 0,
       gaps: new Set(),
       observation: null,
       replay: true,
@@ -1587,6 +1592,7 @@ export class NativeChatController {
     this.queueRelease(previous);
     this.update({
       scope: next.id,
+      progressRevision: next.progressRevision,
       observation: null,
       goal: null,
       goalReady: false,
@@ -1801,6 +1807,7 @@ export class NativeChatController {
       durable: [],
       earlierPages: [],
       live: new Map(),
+      progressRevision: 0,
       gaps: new Set(),
       observation: null,
       replay: true,
@@ -2693,6 +2700,12 @@ export class NativeChatController {
     return title ?? NEW_CHAT_TITLE;
   }
 
+  chatLastActivityAtMs(sessionId: string): number | undefined {
+    return this.catalog?.lastActivity?.find(
+      (entry) => entry.sessionId === sessionId
+    )?.atMs;
+  }
+
   beginRename(): void {
     const basis = this.view.catalogEntry;
     if (basis && !this.view.catalogChanging)
@@ -2747,14 +2760,25 @@ export class NativeChatController {
     });
   }
 
-  async setChatArchived(archived: boolean): Promise<void> {
+  async setChatArchived(archived: boolean): Promise<boolean> {
+    const scope = this.scope;
     const entry = this.view.catalogEntry;
-    if (!entry || this.view.catalogDraft || entry.archived === archived) return;
-    await this.organize({
+    if (
+      !scope ||
+      !entry ||
+      this.view.catalogDraft ||
+      entry.archived === archived
+    )
+      return false;
+    const changed = await this.organize({
       revision: entry.revision,
       title: entry.title,
       archived,
     });
+    // A late reply must not replace another chat the person already opened.
+    if (!changed || !this.owns(scope)) return false;
+    if (archived) await this.select(null);
+    return true;
   }
 
   get canDeleteSavedChat(): boolean {
@@ -2851,6 +2875,46 @@ export class NativeChatController {
     )
       throw new Error("native_chat_input_image_unavailable");
     return new Blob([bytes], { type: original.mimeType });
+  };
+
+  /** Display the captured tool result, never the current contents of its path. */
+  readonly readToolImage = async (previewId: string): Promise<Blob> => {
+    const scope = this.scope;
+    const attachment = scope?.attachment;
+    const read = this.bridge.readToolImage;
+    const find = () =>
+      this.view.messages
+        .flatMap((message) => message.activity ?? [])
+        .filter((call) => call.outcome === "succeeded")
+        .flatMap((call) => call.output?.images ?? [])
+        .find((image) => image.previewId === previewId);
+    const image = find();
+    if (
+      !scope ||
+      !attachment ||
+      !read ||
+      !image ||
+      image.mimeType !== "image/png" ||
+      !Number.isSafeInteger(image.size) ||
+      image.size <= 0 ||
+      image.size > 384 * 1024
+    )
+      throw new Error("native_chat_tool_image_unavailable");
+    const bytes = await read.call(
+      this.bridge,
+      attachment.attachmentId,
+      previewId
+    );
+    const current = find();
+    if (
+      !this.owns(scope) ||
+      current?.mimeType !== image.mimeType ||
+      current?.size !== image.size ||
+      !(bytes instanceof ArrayBuffer) ||
+      bytes.byteLength !== image.size
+    )
+      throw new Error("native_chat_tool_image_unavailable");
+    return new Blob([bytes], { type: image.mimeType });
   };
 
   async readTurnArtifact(turnId: string, artifactId: string): Promise<Blob> {
@@ -5784,7 +5848,7 @@ export class NativeChatController {
     return entry;
   }
 
-  private async organize(change: NativeChatCatalogChange): Promise<void> {
+  private async organize(change: NativeChatCatalogChange): Promise<boolean> {
     const scope = this.scope;
     const attachment = scope?.attachment;
     if (
@@ -5793,24 +5857,25 @@ export class NativeChatController {
       !this.bridge.organize ||
       this.view.catalogChanging
     )
-      return;
+      return false;
     this.update({ catalogChanging: true, catalogEntryError: null });
     try {
       const saved = await this.bridge.organize(attachment.attachmentId, change);
-      if (!this.owns(scope)) return;
+      if (!this.owns(scope)) return false;
       if (saved.sessionId !== attachment.sessionId)
         throw new Error("native_chat_catalog_entry_mismatch");
       this.installCatalogEntry(saved);
       this.update({ catalogDraft: null });
       void this.listChats();
+      return true;
     } catch (error) {
-      if (!this.owns(scope)) return;
+      if (!this.owns(scope)) return false;
       if (
         error instanceof Error &&
         error.message.includes("session_catalog_revision_changed")
       ) {
         const entry = await this.readCatalogEntry(scope);
-        if (!this.owns(scope)) return;
+        if (!this.owns(scope)) return false;
         const draft = this.view.catalogDraft;
         this.update({
           ...(draft && entry && { catalogDraft: { ...draft, basis: entry } }),
@@ -5825,6 +5890,7 @@ export class NativeChatController {
     } finally {
       if (this.owns(scope)) this.update({ catalogChanging: false });
     }
+    return false;
   }
 
   private refresh(scope: Scope): Promise<void> {
@@ -6300,6 +6366,8 @@ export class NativeChatController {
     }
     scope.gaps.delete(update.messageId);
     scope.live.set(update.messageId, patch);
+    if (update.role === "assistant" && patch.text !== (previous?.text ?? ""))
+      scope.progressRevision++;
     this.publishMessages(scope);
     if (!known) void this.refresh(scope);
   }
@@ -6325,6 +6393,17 @@ export class NativeChatController {
       (item) => item.callId === update.activity.callId
     );
     if (index < 0 && recorded.length >= MAX_LIVE_ACTIVITY) return;
+    const prior = recorded[index];
+    if (
+      !prior ||
+      prior.title !== update.activity.title ||
+      prior.kind !== update.activity.kind ||
+      prior.source !== update.activity.source ||
+      prior.outcome !== update.activity.outcome ||
+      !activityPayloadEqual(prior.input, update.activity.input) ||
+      !activityPayloadEqual(prior.output, update.activity.output)
+    )
+      scope.progressRevision++;
     const activity =
       index < 0
         ? [...recorded, update.activity]
@@ -6388,6 +6467,7 @@ export class NativeChatController {
       for (const turn of page?.turns ?? []) turns.set(turn.turnId, turn);
     this.update({
       messages,
+      progressRevision: scope.progressRevision,
       turnRecords: turns.size ? [...turns.values()] : EMPTY_TURNS,
       canReadEarlier: !!(pages[0] ?? scope.recentWindow)?.older,
       repairing,
@@ -6648,6 +6728,34 @@ function historyPosition(
     observation?.snapshot.current?.historyPosition ??
     observation?.snapshot.latest?.historyPosition
   );
+}
+
+/** Wire JSON keys such as valueOf and toString are data, never methods. */
+function activityPayloadEqual(left: unknown, right: unknown): boolean {
+  const pending: [unknown, unknown][] = [[left, right]];
+  while (pending.length) {
+    const [a, b] = pending.pop()!;
+    if (a === b) continue;
+    if (
+      a === null ||
+      b === null ||
+      typeof a !== "object" ||
+      typeof b !== "object" ||
+      Array.isArray(a) !== Array.isArray(b)
+    )
+      return false;
+    if (Array.isArray(a) && a.length !== (b as unknown[]).length) return false;
+    const keys = Object.keys(a);
+    if (keys.length !== Object.keys(b).length) return false;
+    for (const key of keys) {
+      if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
+      pending.push([
+        (a as Record<string, unknown>)[key],
+        (b as Record<string, unknown>)[key],
+      ]);
+    }
+  }
+  return true;
 }
 
 function applyText(

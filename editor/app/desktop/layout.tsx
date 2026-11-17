@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@app/ui/components/tooltip";
+import { Toaster } from "@app/ui/components/sonner";
 import { DesktopBridgeGate } from "@/scaffolds/desktop/desktop-bridge-gate";
 import "../editor.css";
 
@@ -58,6 +59,7 @@ export default async function DesktopRootLayout({
         <ThemeProvider nonce={nonce}>
           <TooltipProvider>
             <DesktopBridgeGate>{children}</DesktopBridgeGate>
+            <Toaster />
           </TooltipProvider>
         </ThemeProvider>
       </body>

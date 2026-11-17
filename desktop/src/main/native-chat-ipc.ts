@@ -12,6 +12,7 @@ import {
 } from "@grida/desktop-bridge";
 import { NativeEditorSvgTextReplies } from "./native-editor-svg-text-replies";
 import { NativeDocumentIdentityBusy } from "./native-document-files";
+import { NativeToolImages } from "./native-tool-images";
 import type {
   NativeChatAcceptance,
   NativeChatAttachment,
@@ -152,6 +153,7 @@ export type ActiveNativeChat = Readonly<{
         | "controlSubagentChild"
         | "readArtifact"
         | "readAttachmentPreview"
+        | "readToolImage"
         | "queuedMessage"
         | "acceptsQueuedTextReplacement"
         | "readQueuedAttachmentPreview"
@@ -332,6 +334,7 @@ export class NativeChatIpc {
   private readonly deleting = new WeakSet<NativeChatSession>();
   private readonly savingArtifact = new WeakSet<WebContents>();
   private readonly readingInputImages = new WeakMap<Owner, number>();
+  private readonly readingToolImages = new WeakMap<Owner, number>();
   private readonly selectedProfiles = new WeakMap<
     WebContents,
     SelectedProfile
@@ -2410,6 +2413,40 @@ export class NativeChatIpc {
       this.readingInputImages.set(
         owner,
         (this.readingInputImages.get(owner) ?? 1) - 1
+      );
+    }
+  }
+
+  async readToolImage(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    previewId: unknown
+  ): Promise<ArrayBuffer> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const read = owner.active.chat.readToolImage;
+    if (typeof previewId !== "string" || !TOKEN.test(previewId) || !read)
+      throw new Error("native_chat_tool_image_unavailable");
+    const reading = this.readingToolImages.get(owner) ?? 0;
+    if (reading >= 8) throw new Error("native_chat_tool_image_busy");
+    this.readingToolImages.set(owner, reading + 1);
+    try {
+      const bytes = await read.call(
+        owner.active.chat,
+        attachment.session,
+        previewId
+      );
+      this.revalidate(owner, attachment);
+      if (
+        !(bytes instanceof ArrayBuffer) ||
+        bytes.byteLength < 33 ||
+        bytes.byteLength > NativeToolImages.maxBytes
+      )
+        throw new Error("native_chat_tool_image_unavailable");
+      return bytes;
+    } finally {
+      this.readingToolImages.set(
+        owner,
+        (this.readingToolImages.get(owner) ?? 1) - 1
       );
     }
   }

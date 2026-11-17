@@ -52,4 +52,4 @@ minimumReleaseAgeExclude:
   - "@grida/fx-linux-arm64-gnu@0.9.0"
   - "@grida/fx-linux-x64-gnu@0.9.0"
   - "@grida/fx@0.9.0"
-  - "@grida/ai-models@1.20261108.1"
+  - "@grida/ai-models@2.20261117.0"

@@ -21,7 +21,7 @@ Desktop can run chat on:
 - an approved compatible endpoint, which can use a key saved under its own ID.
 
 For a new chat with no saved or explicit model choice, Desktop prefers a ready
-ChatGPT subscription, currently with **GPT-6.1 Sol** as its default. Your saved
+ChatGPT subscription, currently with **GPT-6.2 Sol** as its default. Your saved
 or explicit choice takes precedence, including a saved model that has become
 unavailable.
 

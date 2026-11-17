@@ -11,19 +11,47 @@ import os from "node:os";
 import path from "node:path";
 import { beforeEach, expect, it, vi } from "vitest";
 
-const fixture = vi.hoisted(() => ({
-  template: [] as MenuItemConstructorOptions[],
-  open: vi.fn<(options: { workspace_id: string }) => object>(() => ({})),
-  deck: vi.fn<(options: { workspace_id: string }) => object>(() => ({})),
-  openWorkspace: vi.fn<(root: string) => Promise<Workspace>>(),
-  reopen: vi.fn<(root: string) => Promise<Workspace>>(),
-  list: vi.fn<() => Promise<Workspace[]>>(),
-  error: vi.fn<(title: string, message: string) => void>(),
-  picker: vi.fn<() => Promise<{ canceled: boolean; filePaths: string[] }>>(),
-  sidecarReady: true,
-  settings: vi.fn<(options: object) => object>(() => ({})),
-  focusSettings: vi.fn<(pathname: string) => boolean>(() => false),
-}));
+const fixture = vi.hoisted(() => {
+  const appSession = {};
+  class Window {
+    static focused: Window | null = null;
+    static getFocusedWindow() {
+      return Window.focused;
+    }
+    webContents: {
+      getURL(): string;
+      session: object;
+      send(...args: unknown[]): void;
+    };
+    constructor(
+      readonly url: string,
+      readonly profile: object = appSession
+    ) {
+      this.webContents = {
+        getURL: () => this.url,
+        session: this.profile,
+        send: vi.fn<(...args: unknown[]) => void>(),
+      };
+    }
+    close = vi.fn<() => void>();
+    isDestroyed = () => false;
+  }
+  return {
+    Window,
+    appSession,
+    template: [] as MenuItemConstructorOptions[],
+    open: vi.fn<(options: { workspace_id: string }) => object>(() => ({})),
+    deck: vi.fn<(options: { workspace_id: string }) => object>(() => ({})),
+    openWorkspace: vi.fn<(root: string) => Promise<Workspace>>(),
+    reopen: vi.fn<(root: string) => Promise<Workspace>>(),
+    list: vi.fn<() => Promise<Workspace[]>>(),
+    error: vi.fn<(title: string, message: string) => void>(),
+    picker: vi.fn<() => Promise<{ canceled: boolean; filePaths: string[] }>>(),
+    sidecarReady: true,
+    settings: vi.fn<(options: object) => object>(() => ({})),
+    focusSettings: vi.fn<(pathname: string) => boolean>(() => false),
+  };
+});
 
 vi.mock("electron", () => ({
   Menu: {
@@ -34,7 +62,8 @@ vi.mock("electron", () => ({
       fixture.template = template;
     },
   },
-  BrowserWindow: { getFocusedWindow: () => null },
+  BrowserWindow: fixture.Window,
+  session: { defaultSession: fixture.appSession },
   dialog: { showErrorBox: fixture.error, showOpenDialog: fixture.picker },
 }));
 vi.mock("./window", () => ({
@@ -62,6 +91,7 @@ import { open_or_focus_settings, rebuild_application_menu } from "./menu";
 beforeEach(() => {
   vi.clearAllMocks();
   fixture.template = [];
+  fixture.Window.focused = null;
   fixture.list.mockResolvedValue([]);
   fixture.sidecarReady = true;
   fixture.focusSettings.mockReturnValue(false);
@@ -298,3 +328,38 @@ function fileMenuItem(label: string): MenuItemConstructorOptions {
 function click(item: MenuItemConstructorOptions): void {
   item.click!({} as MenuItem, undefined, {} as Electron.KeyboardEvent);
 }
+
+// GRIDA-SEC-016 — URL paths cannot promote isolated website windows to shell UI.
+it.each([
+  [
+    "https://fixture.invalid/desktop/workspace?id=eac20941e6a410aa",
+    false,
+    false,
+  ],
+  [
+    "https://foreign.invalid/desktop/workspace?id=eac20941e6a410aa",
+    true,
+    false,
+  ],
+  ["https://fixture.invalid/desktop/workspace?id=eac20941e6a410aa", true, true],
+] as const)(
+  "routes native Close by configured editor origin and actual application Session: %s/%s",
+  async (url, applicationSession, workbench) => {
+    await rebuild_application_menu({ name: "Fixture" } as App, {} as Shell);
+    const window = new fixture.Window(
+      url,
+      applicationSession ? fixture.appSession : {}
+    );
+    fixture.Window.focused = window;
+    const items = fixture.template.flatMap((item) =>
+      Array.isArray(item.submenu) ? item.submenu : []
+    );
+    click(items.find((item) => item.label === "Close")!);
+    expect(window.close).toHaveBeenCalledTimes(workbench ? 0 : 1);
+    expect(vi.mocked(window.webContents.send).mock.calls).toEqual(
+      workbench
+        ? [["grida:workspace:command", "workspace.tabs.close-active"]]
+        : []
+    );
+  }
+);

@@ -94,6 +94,15 @@ describe("cmath.aspectRatio", () => {
     expect(cmath.aspectRatio(4, 3)).toEqual([4, 3]);
   });
 
+  test.each([
+    [750, 1334, [375, 667]],
+    [1366, 768, [683, 384]],
+    [1170, 2532, [195, 422]],
+    [1179, 2556, [131, 284]],
+  ])("preserves the exact ratio of %i by %i", (width, height, expected) => {
+    expect(cmath.aspectRatio(width, height)).toEqual(expected);
+  });
+
   test("should be robust to scaled inputs", () => {
     expect(cmath.aspectRatio(1600, 900)).toEqual([16, 9]);
     expect(cmath.aspectRatio(3200, 1800)).toEqual([16, 9]);
@@ -114,6 +123,22 @@ describe("cmath.aspectRatio", () => {
     const [p, q] = result!;
     expect(q).toBeLessThanOrEqual(8);
     expect(Math.abs(p / q - 1 / Math.PI)).toBeLessThan(0.1);
+  });
+});
+
+describe("cmath.principalAngle", () => {
+  test.each([
+    [-190, 170],
+    [-450, -90],
+    [-720, 0],
+    [-540, -180],
+    [-180, -180],
+    [180, -180],
+    [270, -90],
+    [540, -180],
+    [179.99999999999997, 179.99999999999997],
+  ])("wraps %s degrees to %s", (angle, expected) => {
+    expect(cmath.principalAngle(angle)).toBe(expected);
   });
 });
 

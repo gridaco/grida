@@ -3,7 +3,8 @@ name: ai-models
 description: >
   Update Grida product model presets, native adapter compatibility and the pinned
   public Models dependency; distinguish canonical facts from live GG offerings.
-  Use for model selection, client catalogue updates and model-discovery drift.
+  Use for model selection, ChatGPT subscription updates, client catalogue
+  updates and model-discovery drift.
 ---
 
 # AI model ownership and client updates
@@ -28,6 +29,11 @@ Its `models` values come from the external release; its `catalog` adds product
 choices and the retained schema-1 installed-client protocol. It is not a second
 facts authoring home. Unknown prices/estimates remain unknown, never zero.
 Historical client estimates cannot authorize or settle hosted spending.
+
+Grida Desktop's ChatGPT subscription model list is a closed compatibility list
+with its own membership, order and default in
+[`data/ai/chatgpt-subscription.json`](../../../data/ai/chatgpt-subscription.json).
+For manual updates, follow the [subscription provider runbook](../../../packages/grida-ai-host/docs/chatgpt-subscription-provider.md#update-membership-and-the-default).
 
 ## Updating the public dependency or product presets
 

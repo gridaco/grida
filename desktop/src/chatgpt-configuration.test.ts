@@ -44,7 +44,7 @@ function authorizationUrl(overrides: Record<string, string> = {}): string {
 describe("validateChatGptAuthorizationUrl", () => {
   it("uses the current offered subscription default", () => {
     expect(CHATGPT_SUBSCRIPTION_CONFIG.default_model_id).toBe(
-      "openai/gpt-6.1-sol"
+      "openai/gpt-6.2-sol"
     );
     expect(CHATGPT_SUBSCRIPTION_CONFIG.default_model_id).toBe(
       CHATGPT_SUBSCRIPTION_DEFAULT_MODEL_ID

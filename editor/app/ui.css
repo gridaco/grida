@@ -21,45 +21,59 @@
 @source "../node_modules/@streamdown/math/dist/*.js";
 @source "../node_modules/@streamdown/mermaid/dist/*.js";
 
+.grida-ai-response-markdown {
+  color: color-mix(in srgb, var(--foreground) 90%, var(--background));
+}
+
 .grida-ai-response-markdown p {
-  @apply my-2 leading-6;
+  @apply my-4 leading-[23px] font-[375];
 }
 
 .grida-ai-response-markdown [data-streamdown="heading-1"] {
-  @apply mt-4 mb-2 text-xl font-semibold;
+  @apply mt-4 mb-2 text-xl leading-7 font-semibold text-inherit;
 }
 
 .grida-ai-response-markdown [data-streamdown="heading-2"] {
-  @apply mt-4 mb-2 text-lg font-semibold text-muted-foreground;
+  @apply mt-4 mb-2 text-[17px] leading-[26px] font-semibold text-inherit;
 }
 
 .grida-ai-response-markdown [data-streamdown="heading-3"] {
-  @apply mt-3 mb-1.5 text-base font-semibold;
+  @apply mt-4 mb-2 text-[15px] leading-6 font-semibold text-inherit;
 }
 
 .grida-ai-response-markdown [data-streamdown="heading-4"] {
-  @apply mt-3 mb-1.5 text-base font-semibold;
+  @apply mt-3 mb-1 text-sm leading-[23px] font-semibold text-inherit;
 }
 
 .grida-ai-response-markdown [data-streamdown="heading-5"] {
-  @apply mt-3 mb-1 text-sm font-semibold;
+  @apply mt-3 mb-1 text-sm leading-[23px] font-semibold text-inherit;
 }
 
 .grida-ai-response-markdown [data-streamdown="heading-6"] {
-  @apply mt-3 mb-1 text-sm font-semibold text-muted-foreground;
+  @apply mt-3 mb-1 text-sm leading-[23px] font-semibold text-inherit;
+}
+
+.grida-ai-response-markdown
+  :is([data-streamdown="heading-4"], [data-streamdown="heading-5"])
+  + :is([data-streamdown="heading-5"], [data-streamdown="heading-6"]) {
+  margin-top: 0;
 }
 
 .grida-ai-response-markdown [data-streamdown="unordered-list"],
 .grida-ai-response-markdown [data-streamdown="ordered-list"] {
-  @apply my-1 space-y-0.5 pl-4 leading-6;
+  @apply my-3 list-outside space-y-0 pl-7 leading-[23px];
 }
 
 .grida-ai-response-markdown [data-streamdown="list-item"] {
-  @apply my-0 pl-0 leading-6;
+  @apply my-0 p-0 leading-[23px] font-[375];
 }
 
 .grida-ai-response-markdown [data-streamdown="list-item"] > p {
-  @apply my-0 leading-4;
+  @apply my-0 block leading-[23px];
+}
+
+.grida-ai-response-markdown [data-streamdown="list-item"] > p + p {
+  @apply mt-4;
 }
 
 .grida-ai-response-markdown
@@ -68,7 +82,28 @@
 .grida-ai-response-markdown
   [data-streamdown="list-item"]
   > [data-streamdown="ordered-list"] {
-  @apply mt-0.5 mb-0;
+  @apply my-0;
+}
+
+.grida-ai-response-markdown
+  [data-streamdown="unordered-list"]
+  [data-streamdown="unordered-list"] {
+  list-style-type: circle;
+}
+
+.grida-ai-response-markdown
+  [data-streamdown="unordered-list"]
+  [data-streamdown="unordered-list"]
+  [data-streamdown="unordered-list"] {
+  list-style-type: square;
+}
+
+.grida-ai-response-markdown [data-streamdown="list-item"].task-list-item {
+  @apply -ml-7 list-none;
+}
+
+.grida-ai-response-markdown .task-list-item input[type="checkbox"] {
+  @apply mr-2 size-3.5 align-middle accent-current;
 }
 
 .grida-ai-response-markdown [data-streamdown="blockquote"] {
@@ -149,15 +184,15 @@
 .grida-ai-response-markdown
   [data-streamdown="table-wrapper"]
   > div:has(> [data-streamdown="table"]) {
-  @apply rounded-md border-border/60 bg-transparent;
+  @apply rounded-none border-0 bg-transparent;
 }
 
 .grida-ai-response-markdown [data-streamdown="table"] {
-  @apply text-xs;
+  @apply text-[13px];
 }
 
 .grida-ai-response-markdown [data-streamdown="table-header"] {
-  @apply bg-muted/40;
+  @apply bg-transparent;
 }
 
 .grida-ai-response-markdown [data-streamdown="table-body"] {
@@ -165,11 +200,19 @@
 }
 
 .grida-ai-response-markdown [data-streamdown="table-header-cell"] {
-  @apply px-2 py-1 text-xs leading-5;
+  @apply px-3 py-3 text-[13px] leading-5 font-semibold first:pl-0 last:pr-0;
 }
 
 .grida-ai-response-markdown [data-streamdown="table-cell"] {
-  @apply px-2 py-1 text-xs leading-5;
+  @apply px-3 py-3 text-[13px] leading-5 first:pl-0 last:pr-0;
+}
+
+.grida-ai-response-markdown > :first-child {
+  margin-top: 0;
+}
+
+.grida-ai-response-markdown > :last-child {
+  margin-bottom: 0;
 }
 
 /* Line numbers for the Shiki code viewer (workspace file text tab).

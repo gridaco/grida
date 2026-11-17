@@ -1,0 +1,28 @@
+/* Shared frame geometry is CSS-only. Guests target its non-scrolling page slot. */
+:root {
+  --desktop-content-radius: var(--radius-lg);
+  --desktop-content-border: 1px;
+}
+
+.grida-content-frame {
+  border-width: var(--desktop-content-border);
+  border-radius: var(--desktop-content-radius);
+}
+
+.grida-browser-guest {
+  position: fixed;
+  top: anchor(top);
+  left: anchor(left);
+  width: anchor-size(width);
+  height: anchor-size(height);
+  z-index: 10;
+  overflow: hidden;
+  border-bottom-left-radius: max(
+    0px,
+    calc(var(--desktop-content-radius) - var(--desktop-content-border))
+  );
+  border-bottom-right-radius: max(
+    0px,
+    calc(var(--desktop-content-radius) - var(--desktop-content-border))
+  );
+}

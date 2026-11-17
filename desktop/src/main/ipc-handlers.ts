@@ -8,6 +8,9 @@ import {
   type WebContents,
 } from "electron";
 import path from "node:path";
+import { DesktopBrowserHost } from "./browser-host";
+import type { BrowserHistory } from "./browser-history";
+import type { BrowserDownloads } from "./browser-downloads";
 import { URL } from "node:url";
 import type { RecentStore } from "@grida/daemon/server";
 import {
@@ -82,6 +85,8 @@ const EDITOR_ORIGIN = (() => {
 })();
 
 type RegisterIpcHandlersOptions = {
+  browser_history?: BrowserHistory;
+  browser_downloads?: BrowserDownloads;
   resolve_ipc_role: (window: BrowserWindow) => DesktopIpcRole | null;
   open_settings: () => void;
   archives?: NativeArchives;
@@ -136,10 +141,20 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   const recentFiles = options.recent_files ?? servicesSidecarClient.recent;
   const admittedWindow = (sender: WebContents) => {
     const window = BrowserWindow.fromWebContents(sender);
-    return window && options.resolve_ipc_role(window) === "main"
+    return window &&
+      window.webContents === sender &&
+      options.resolve_ipc_role(window) === "main"
       ? window
       : null;
   };
+  const browserHost = new DesktopBrowserHost({
+    history: options.browser_history,
+    downloads: options.browser_downloads,
+    editorOrigin: EDITOR_ORIGIN,
+    admitWindow: (window) => options.resolve_ipc_role(window) === "main",
+    workspaceExists: async (id) =>
+      !!(await servicesSidecarClient.findWorkspace(id)),
+  });
   const nativeChat = new NativeChatIpc(
     EDITOR_ORIGIN,
     (sender, workspaceId, profileId) => {
@@ -264,6 +279,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       const selectedDocument = docId !== null;
       const nestedDeck = ipc_sender.nestedDeck(senderUrl) !== null;
       if (
+        // GRIDA-SEC-016 — a guest may visit a Desktop URL; URL and owning
+        // BrowserWindow alone must never turn it into the privileged shell.
+        !window ||
+        window.webContents !== event.sender ||
+        event.senderFrame !== event.sender.mainFrame ||
         !ipc_sender.isAllowed(senderUrl, EDITOR_ORIGIN) ||
         !role ||
         !pathname ||
@@ -295,6 +315,115 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       return invoke();
     });
   }
+
+  // GRIDA-SEC-016 — private guest intents have actual guest/frame admission,
+  // independent of the privileged application IPC guard.
+  ipcMain.on("grida:browser-guest:link", (event, raw: unknown) => {
+    try {
+      browserHost.guestLink(event, raw);
+    } catch {
+      /* Stale or malformed website intent. */
+    } finally {
+      event.returnValue = null;
+    }
+  });
+  guarded(IPC_CHANNELS.BROWSER_FIND, (event, raw: unknown) =>
+    browserHost.find(event, raw)
+  );
+  guarded(IPC_CHANNELS.BROWSER_STOP_FIND, (event, raw: unknown) =>
+    browserHost.stopFind(event, raw)
+  );
+  guarded(IPC_CHANNELS.BROWSER_GET_ZOOM, (event, raw: unknown) =>
+    browserHost.getZoom(event, raw)
+  );
+  guarded(IPC_CHANNELS.BROWSER_SET_ZOOM, (event, raw: unknown) =>
+    browserHost.setZoom(event, raw)
+  );
+  guarded(IPC_CHANNELS.BROWSER_PRINT, (event, raw: unknown) =>
+    browserHost.print(event, raw)
+  );
+  guarded(IPC_CHANNELS.BROWSER_INSPECT, (event, raw: unknown) =>
+    browserHost.inspect(event, raw)
+  );
+  guarded(IPC_CHANNELS.BROWSER_CLEAR_HISTORY, (event) =>
+    browserHost.clearHistory(event)
+  );
+  guarded(IPC_CHANNELS.BROWSER_CLEAR_CACHE, (event) =>
+    browserHost.clearCache(event)
+  );
+  guarded(IPC_CHANNELS.BROWSER_RESET_PERMISSIONS, (event) =>
+    browserHost.resetPermissions(event)
+  );
+  guarded(IPC_CHANNELS.BROWSER_DOWNLOAD_PREFERENCES, (event) =>
+    browserHost.downloadPreferences(event)
+  );
+  guarded(IPC_CHANNELS.BROWSER_SET_DOWNLOAD_PROMPT, (event, raw: unknown) =>
+    browserHost.setDownloadPrompt(event, raw)
+  );
+  guarded(IPC_CHANNELS.BROWSER_CHOOSE_DOWNLOAD_DIRECTORY, (event) =>
+    browserHost.chooseDownloadDirectory(event)
+  );
+  guarded(IPC_CHANNELS.BROWSER_OPEN_PAGE, (event, raw: unknown) =>
+    browserHost.openPage(event, raw)
+  );
+  guarded(IPC_CHANNELS.BROWSER_ATTACH, (event, workspaceId: unknown) =>
+    browserHost.attach(event, workspaceId)
+  );
+  guarded(IPC_CHANNELS.BROWSER_THUMBNAIL, (event, request: unknown) =>
+    browserHost.thumbnail(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_FAVICON, (event, request: unknown) =>
+    browserHost.favicon(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_HISTORY_QUERY, (event, request: unknown) =>
+    browserHost.historyQuery(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_HISTORY_REMOVE, (event, request: unknown) =>
+    browserHost.historyRemove(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_SNAPSHOT, (event, attachmentId: unknown) =>
+    browserHost.snapshot(event, attachmentId)
+  );
+  guarded(IPC_CHANNELS.BROWSER_DETACH, (event, attachmentId: unknown) =>
+    browserHost.detach(event, attachmentId)
+  );
+  guarded(IPC_CHANNELS.BROWSER_CREATE, (event, request: unknown) =>
+    browserHost.create(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_NAVIGATE, (event, request: unknown) =>
+    browserHost.navigate(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_BACK, (event, request: unknown) =>
+    browserHost.back(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_FORWARD, (event, request: unknown) =>
+    browserHost.forward(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_RELOAD, (event, request: unknown) =>
+    browserHost.reload(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_STOP, (event, request: unknown) =>
+    browserHost.stop(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_FOCUS, (event, request: unknown) =>
+    browserHost.focus(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_RESERVE_MOUNT, (event, request: unknown) =>
+    browserHost.reserveMount(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_SET_ACTIVE, (event, request: unknown) =>
+    browserHost.setActive(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_CLOSE, (event, request: unknown) =>
+    browserHost.close(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_OPEN_EXTERNAL, (event, request: unknown) =>
+    browserHost.openExternal(event, request)
+  );
+  guarded(
+    IPC_CHANNELS.BROWSER_CLEAR_BROWSING_DATA,
+    (event, ...args: unknown[]) => browserHost.clearBrowsingData(event, ...args)
+  );
 
   const archives = new NativeArchiveIpc(
     options.archives,
@@ -720,6 +849,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     IPC_CHANNELS.NATIVE_CHAT_READ_ATTACHMENT_PREVIEW,
     (event, id: string, preview: unknown) =>
       nativeChat.readAttachmentPreview(event, id, preview)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_READ_TOOL_IMAGE,
+    (event, id: string, preview: unknown) =>
+      nativeChat.readToolImage(event, id, preview)
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_READ_ARTIFACT,
@@ -1523,6 +1657,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   guarded(IPC_CHANNELS.WORKSPACE_UNSUBSCRIBE_CHANGES, (_event, id: string) => {
     unsubscribeWorkspaceChanges(id);
   });
+  return browserHost;
 }
 
 async function findWorkspaceOrThrow(workspaceId: string) {
@@ -1576,20 +1711,23 @@ export function computeNavigationState(wc: WebContents): NavigationState {
 export function attachNavigationEvents(window: BrowserWindow): void {
   const wc = window.webContents;
   let last: NavigationState | null = null;
+  let lastUrl: string | undefined;
   const publish = () => {
     if (wc.isDestroyed()) return;
     const next = computeNavigationState(wc);
-    // SPA pushState/replaceState from Next.js client routing fires
-    // `did-navigate-in-page` even when back/forward state didn't move
-    // — skip the IPC + downstream React re-renders in that case.
+    const url = wc.getURL();
+    // Route subscribers also revoke document-scoped owners. Publish a URL
+    // change even when the back/forward booleans happen to remain identical.
     if (
       last &&
+      lastUrl === url &&
       last.can_go_back === next.can_go_back &&
       last.can_go_forward === next.can_go_forward
     ) {
       return;
     }
     last = next;
+    lastUrl = url;
     wc.send(IPC_CHANNELS.WINDOW_NAVIGATION_CHANGED, next);
   };
   wc.on("did-navigate", publish);

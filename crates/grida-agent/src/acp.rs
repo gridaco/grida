@@ -459,7 +459,9 @@ async fn serve_connection(
                         if let Some(projection::ReplayRequest::Read { request_id, before }) = mode {
                             load_sessions.lock().unwrap().ensure_attached(&id)?;
                             let window = load_host.transcript_window(id.clone(), before, projection::visible_record_bytes).await.map_err(host_error)?;
-                            let mut projection = Projection::new(request.session_id).with_activity_order(
+                            let mut projection = Projection::new(request.session_id).with_tool_images(
+                                { let state = load_sessions.lock().unwrap(); state.negotiated.contains(extensions::tool_images::CAPABILITY) }
+                            ).with_activity_order(
                                 load_sessions.lock().unwrap().negotiated.contains(projection::ACTIVITY_ORDER)
                                     .then(|| load_host.activity_order.clone()));
                             projection.correlate_replay(request_id.clone());
@@ -483,7 +485,9 @@ async fn serve_connection(
                             .open_history_replay(id.clone(), request.cwd)
                             .await
                             .map_err(host_error)?;
-                        let mut projection = Projection::new(request.session_id).with_activity_order(
+                        let mut projection = Projection::new(request.session_id).with_tool_images(
+                                { let state = load_sessions.lock().unwrap(); state.negotiated.contains(extensions::tool_images::CAPABILITY) }
+                            ).with_activity_order(
                                 load_sessions.lock().unwrap().negotiated.contains(projection::ACTIVITY_ORDER)
                                     .then(|| load_host.activity_order.clone()));
                         while let Some(records) = replay.next().await.map_err(host_error)? {
@@ -587,7 +591,9 @@ async fn serve_connection(
                         let _observation = observation;
                         let cancellation = responder.cancellation();
                         let session = run.session.clone();
-                        let mut projection = Projection::new(request.session_id).with_activity_order(
+                        let mut projection = Projection::new(request.session_id).with_tool_images(
+                            { let state = sessions.lock().unwrap(); state.negotiated.contains(extensions::tool_images::CAPABILITY) }
+                        ).with_activity_order(
                             sessions.lock().unwrap().negotiated.contains(projection::ACTIVITY_ORDER)
                                 .then(|| host.activity_order.clone()));
                         let result = project_run(
@@ -865,15 +871,26 @@ fn catalog_response(mut catalog: SessionCatalog) -> Result<ListSessionsResponse>
     }
     if catalog.entries.len() > page_limit {
         catalog.entries.truncate(page_limit);
-        catalog.next_after = catalog.entries.last().map(|entry| entry.session.clone());
+        catalog.next_after = catalog
+            .entries
+            .last()
+            .map(|record| record.entry.session.clone());
     }
     Ok(ListSessionsResponse::new(
         catalog
             .entries
             .into_iter()
-            .map(|entry| {
+            .map(|record| {
+                let meta = record.latest_turn_activity_ms.map(|timestamp| {
+                    serde_json::Map::from_iter([(
+                        "co.grida/lastActivityAtMs".to_owned(),
+                        timestamp.into(),
+                    )])
+                });
+                let entry = record.entry;
                 SessionInfo::new(entry.session.as_str().to_owned(), catalog.cwd.clone())
                     .title(entry.label)
+                    .meta(meta)
             })
             .collect(),
     )

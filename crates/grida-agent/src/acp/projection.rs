@@ -52,6 +52,7 @@ pub(super) struct Projection {
     streamed_text: BTreeMap<MessageId, String>,
     ordering: Option<Arc<crate::host::activity_order::State>>,
     turn: Option<agent_kit_core::TurnId>,
+    tool_images: bool,
     calls: BTreeMap<agent_kit_core::ToolCallId, (MessageId, ToolCall)>,
     finished: BTreeSet<agent_kit_core::ToolCallId>,
 }
@@ -64,6 +65,7 @@ impl Projection {
             streamed_text: BTreeMap::new(),
             ordering: None,
             turn: None,
+            tool_images: false,
             calls: BTreeMap::new(),
             finished: BTreeSet::new(),
         }
@@ -75,6 +77,17 @@ impl Projection {
     ) -> Self {
         self.ordering = ordering;
         self
+    }
+
+    pub(super) fn with_tool_images(mut self, enabled: bool) -> Self {
+        self.tool_images = enabled;
+        self
+    }
+
+    fn image_owner(&self) -> Option<agent_kit_core::SessionId> {
+        self.tool_images
+            .then(|| agent_kit_core::SessionId::new(self.session.0.to_string()).ok())
+            .flatten()
     }
 
     pub(super) fn set_turn(&mut self, turn: agent_kit_core::TurnId) {
@@ -228,7 +241,14 @@ impl Projection {
                 let mut attribution = meta.clone();
                 attribution.as_object_mut().expect("object").remove("phase");
                 self.stamp(&mut attribution, turn.as_ref(), None, Some(&call.id));
-                let update = activity_update(&message.id, call, outcome, result, attribution);
+                let update = activity_update(
+                    &message.id,
+                    call,
+                    outcome,
+                    result,
+                    attribution,
+                    turn.as_ref().and(self.image_owner().as_ref()),
+                );
                 let notification = SessionNotification::new(self.session.clone(), update.0)
                     .meta(self.metadata(Some((TRANSCRIPT_WINDOW, update.1.clone())), &update.1));
                 delivery.send(connection, notification).await?;
@@ -263,7 +283,7 @@ impl Projection {
                     self.message(connection, delivery, message).await?;
                 }
             }
-            TurnUpdate::Snapshot(view) if self.ordering.is_some() => {
+            TurnUpdate::Snapshot(view) if self.ordering.is_some() || self.tool_images => {
                 let mut updates = Vec::new();
                 for HistoryRecord::Message(message) in view.state.history().records() {
                     if message.role != Role::Tool {
@@ -320,7 +340,9 @@ impl Projection {
         }
         self.attachments(connection, delivery, &message, meta.as_ref())
             .await?;
-        if self.ordering.is_some() && message.role == Role::Assistant {
+        if (self.ordering.is_some() || (self.tool_images && self.turn.is_some()))
+            && message.role == Role::Assistant
+        {
             for part in &message.content {
                 if let Content::ToolCall(call) = part
                     && !self.calls.contains_key(&call.id)
@@ -349,7 +371,14 @@ impl Projection {
         }
         self.stamp(&mut meta, self.turn.as_ref(), None, Some(&call.id));
         let outcome = result.map_or(Outcome::Running, |result| Outcome::Finished(result.status));
-        let (update, meta) = activity_update(message, call, outcome, result, meta);
+        let (update, meta) = activity_update(
+            message,
+            call,
+            outcome,
+            result,
+            meta,
+            self.turn.as_ref().and(self.image_owner().as_ref()),
+        );
         let notification = SessionNotification::new(self.session.clone(), update)
             .meta(self.metadata(Some((super::live::CAPABILITY, meta.clone())), &meta));
         delivery.send(connection, notification).await
@@ -539,6 +568,7 @@ pub(super) fn activity_update(
     outcome: Outcome,
     result: Option<&ToolResult>,
     mut attribution: Value,
+    image_owner: Option<&agent_kit_core::SessionId>,
 ) -> (SessionUpdate, Value) {
     let classified = activity::classify(&call.tool);
     let (status, label) = match outcome {
@@ -570,7 +600,25 @@ pub(super) fn activity_update(
         .kind(kind)
         .status(status)
         .raw_input(tool_input(&call.arguments))
-        .raw_output(result.map(tool_output));
+        .raw_output(result.map(|result| {
+            let mut output = tool_output(result);
+            if let Some(owner) = image_owner {
+                let images = crate::host::tool_images::references(result, owner);
+                if !images.is_empty() {
+                    output["images"] = json!(
+                        images
+                            .iter()
+                            .take(crate::host::tool_images::MAX_IMAGES)
+                            .collect::<Vec<_>>()
+                    );
+                    if images.len() > crate::host::tool_images::MAX_IMAGES {
+                        output["omittedImages"] =
+                            json!(images.len() - crate::host::tool_images::MAX_IMAGES);
+                    }
+                }
+            }
+            output
+        }));
     (SessionUpdate::ToolCall(update), attribution)
 }
 

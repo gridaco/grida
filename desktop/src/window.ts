@@ -190,9 +190,8 @@ function register_window_hooks(
     return { action: "deny" };
   });
 
-  window.webContents.on("will-attach-webview", (event) => {
-    event.preventDefault();
-  });
+  // GRIDA-SEC-016 — the global Main creation observer admits only one-use,
+  // document-bound browser mounts, including before this window starts loading.
 
   window.webContents.on("will-navigate", (event, target) => {
     if (!isAllowedNavigation(baseUrl, target)) {
@@ -302,7 +301,9 @@ export function create_desktop_window({
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
-      webviewTag: false,
+      // GRIDA-SEC-016 — Main's global creation observer denies every guest
+      // without a document-bound browser mount before any shell loads.
+      webviewTag: true,
       webSecurity: true,
       allowRunningInsecureContent: false,
       preload: path.join(__dirname, "preload.js"),

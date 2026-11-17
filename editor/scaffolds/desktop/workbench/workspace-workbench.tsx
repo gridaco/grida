@@ -38,6 +38,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useState,
   useSyncExternalStore,
@@ -58,7 +59,6 @@ import {
   workspaces as workspacesNs,
   type Workspace,
 } from "@/lib/desktop/bridge";
-import { WorkspaceViewState } from "@/lib/desktop/workspace-view-state";
 import {
   confirmAndTrashEntry,
   copyAbsolutePath,
@@ -79,7 +79,7 @@ import { WorkspaceUtilities } from "./workspace-utilities";
 import { WorkspaceUtilitiesPanel } from "./workspace-utilities-panel";
 import type { NativeBackgroundProcessController } from "@/lib/agent-chat/native-background-process-controller";
 import { WorkspaceChangesProvider } from "./workspace-changes";
-import { EditorGroup } from "./editor-group";
+import { WorkspaceBrowserSession } from "./workspace-browser-session";
 import { WorkbenchTab } from "./workbench-tab";
 import { WorkbenchPanels } from "./workbench-panels";
 import { SideChatTabPlacement } from "./side-chat-tab-placement";
@@ -87,6 +87,7 @@ import { SubagentTabPlacement } from "./subagent-tab-placement";
 import { WorkspaceSurfaceHost } from "./workspace-surface-host";
 import { WorkspaceCanvasCreation } from "./workspace-canvas-creation";
 import styles from "./workspace-workbench.module.css";
+import "./browser-guest-mounts.css";
 
 /**
  * Pane sizing for the agent-first split:
@@ -161,9 +162,19 @@ export function WorkspaceWorkbench({
   // always one of `tabs`. (Per the `code-react` doctrine: load-bearing UX logic
   // lives where it's testable, not smeared across effects + refs + nested
   // setState updaters.)
-  const group = useMemo(
-    () => new EditorGroup({ reopenable: WorkbenchTab.reopenable }),
-    []
+  const browserSession = useMemo(
+    () =>
+      WorkspaceBrowserSession.for(
+        typeof document === "undefined" ? null : document,
+        workspace.id
+      ),
+    [workspace.id]
+  );
+  const { group, browsers } = browserSession;
+  const [browserUIOwner] = useState(() => ({}));
+  useLayoutEffect(
+    () => browserSession.bindUI(browserUIOwner),
+    [browserSession, browserUIOwner]
   );
   const panels = useMemo(() => new WorkbenchPanels(group), [group]);
   const sideChatPlacement = useMemo(
@@ -199,38 +210,23 @@ export function WorkspaceWorkbench({
       );
   }, [restoreSettled, surfaceHost]);
 
-  // Workspace continuity is a one-shot host action. The persisted renderer
-  // state supplies order + focus; the surface host still checks every path
-  // against live bridge truth before restoring the editor group.
-  //
-  // `initialActiveRelPath` is the legacy v1 last-workspace handoff. It seeds a
-  // one-tab state only when this workspace has no newer view-state record.
+  // File admission and native page attachment settle before the Start surface.
   useEffect(() => {
     let current = true;
-    const tabs = WorkspaceViewState.initialTabs(
-      window.localStorage,
-      workspace.id,
-      initialActiveRelPath
-    );
-    void surfaceHost.restoreRelative(tabs).finally(() => {
-      if (current) setRestoreSettled(true);
-    });
+    setRestoreSettled(false);
+    void browserSession
+      .start(
+        window.localStorage,
+        (paths) => surfaceHost.resolveRelativePaths(paths),
+        initialActiveRelPath
+      )
+      .finally(() => {
+        if (current) setRestoreSettled(true);
+      });
     return () => {
       current = false;
     };
-  }, [initialActiveRelPath, surfaceHost, workspace.id]);
-
-  // Manual regression: test/desktop-startup-restore-last-workspace.md
-  useEffect(() => {
-    if (!restoreSettled) return;
-    const remember = () => {
-      WorkspaceViewState.remember(window.localStorage, workspace.id, {
-        tabs: surfaceHost.rememberedTabs(),
-      });
-    };
-    remember();
-    return group.subscribe(remember);
-  }, [group, restoreSettled, surfaceHost, workspace.id]);
+  }, [browserSession, initialActiveRelPath, surfaceHost]);
 
   // Do not flash Start while a remembered artifact is still being validated.
   // Once restoration settles, an actually-empty editor group owns the faux tab.
@@ -409,13 +405,15 @@ export function WorkspaceWorkbench({
     [group]
   );
   const createCanvas = useCallback(
-    async (editor: WorkspaceCanvasCreation.Editor) => {
+    async (editor: WorkspaceCanvasCreation.Editor, replaceTab?: string) => {
       const relPath = await WorkspaceCanvasCreation.create(
         workspace.id,
         editor
       );
       bumpTreeRefresh();
-      group.open(WorkbenchTab.file(relPath));
+      const key = WorkbenchTab.file(relPath);
+      if (replaceTab) group.replace(replaceTab, key);
+      group.open(key);
     },
     [workspace.id, group, bumpTreeRefresh]
   );
@@ -423,7 +421,15 @@ export function WorkspaceWorkbench({
     (tab: string) => group.activate(tab),
     [group]
   );
-  const closeTab = useCallback((tab: string) => group.close(tab), [group]);
+  const closeTab = useCallback(
+    async (tab: string): Promise<boolean> => {
+      const target = WorkbenchTab.parse(tab);
+      if (target.kind === "browser") return browsers.close(target.id);
+      group.close(tab);
+      return true;
+    },
+    [group, browsers]
+  );
   const reopenClosedTab = useCallback(() => group.reopenClosed(), [group]);
 
   return (
@@ -497,6 +503,7 @@ export function WorkspaceWorkbench({
                         workspace={workspace}
                         svgText={surfaceHost.svgText}
                         panels={panels}
+                        browsers={browsers}
                         openTabs={openTabs}
                         activeTab={activeTab}
                         onSelectTab={activateTab}

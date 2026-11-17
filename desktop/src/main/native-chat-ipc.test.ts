@@ -1040,6 +1040,77 @@ describe("native chat IPC", () => {
     await expect(pending).rejects.toThrow("attachment_unavailable");
   });
 
+  it("reads a captured tool image only through its owning frame and rechecks navigation", async () => {
+    const { ipc, first, second, chat } = setup();
+    const opened = await ipc.create(first.event);
+    const previewId = randomUUID();
+    const bytes = new ArrayBuffer(67);
+    const read = vi
+      .fn<NonNullable<typeof chat.readToolImage>>()
+      .mockResolvedValue(bytes);
+    chat.readToolImage = read;
+    await expect(
+      ipc.readToolImage(second.event, opened.attachmentId, previewId)
+    ).rejects.toThrow("attachment_unavailable");
+    await expect(
+      ipc.readToolImage(first.event, opened.attachmentId, {
+        path: "/source.png",
+      })
+    ).rejects.toThrow("tool_image_unavailable");
+    expect(read).not.toHaveBeenCalled();
+    await expect(
+      ipc.readToolImage(first.event, opened.attachmentId, previewId)
+    ).resolves.toBe(bytes);
+    expect(read).toHaveBeenCalledExactlyOnceWith(
+      { id: opened.sessionId },
+      previewId
+    );
+    const reply = Promise.withResolvers<ArrayBuffer>();
+    read.mockReturnValueOnce(reply.promise);
+    const pending = ipc.readToolImage(
+      first.event,
+      opened.attachmentId,
+      previewId
+    );
+    first.contents.emit("did-start-navigation", { isMainFrame: true });
+    reply.resolve(bytes);
+    await expect(pending).rejects.toThrow("attachment_unavailable");
+  });
+
+  it("bounds tool-image reads and rejects unavailable, malformed or oversized readbacks", async () => {
+    const { ipc, first, chat } = setup();
+    const opened = await ipc.create(first.event);
+    const previewId = randomUUID();
+    await expect(
+      ipc.readToolImage(first.event, opened.attachmentId, previewId)
+    ).rejects.toThrow("tool_image_unavailable");
+    const reply = Promise.withResolvers<ArrayBuffer>();
+    const read = vi
+      .fn<NonNullable<typeof chat.readToolImage>>()
+      .mockReturnValue(reply.promise);
+    chat.readToolImage = read;
+    const reads = Array.from({ length: 8 }, () =>
+      ipc.readToolImage(first.event, opened.attachmentId, previewId)
+    );
+    await expect(
+      ipc.readToolImage(first.event, opened.attachmentId, previewId)
+    ).rejects.toThrow("tool_image_busy");
+    reply.resolve(new ArrayBuffer(67));
+    await Promise.all(reads);
+    read.mockResolvedValueOnce(new ArrayBuffer(384 * 1024 + 1));
+    await expect(
+      ipc.readToolImage(first.event, opened.attachmentId, previewId)
+    ).rejects.toThrow("tool_image_unavailable");
+    read.mockResolvedValueOnce(new ArrayBuffer(1));
+    await expect(
+      ipc.readToolImage(first.event, opened.attachmentId, previewId)
+    ).rejects.toThrow("tool_image_unavailable");
+    await ipc.detach(first.event, opened.attachmentId);
+    await expect(
+      ipc.readToolImage(first.event, opened.attachmentId, previewId)
+    ).rejects.toThrow("attachment_unavailable");
+  });
+
   it("reads an input preview only through its attached frame and rechecks navigation", async () => {
     const { ipc, first, second, chat } = setup();
     const opened = await ipc.create(first.event);

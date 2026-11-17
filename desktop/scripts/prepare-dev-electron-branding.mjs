@@ -118,6 +118,25 @@ execFileSync("/usr/libexec/PlistBuddy", [
   plist,
 ]);
 
+// GRIDA-SEC-016 — the running dev Electron needs the same macOS consent
+// descriptions as packaged Grida. Copy only these fixed keys, never user input.
+for (const key of [
+  "NSCameraUsageDescription",
+  "NSMicrophoneUsageDescription",
+  "NSLocationUsageDescription",
+  "NSLocationWhenInUseUsageDescription",
+  "NSBluetoothAlwaysUsageDescription",
+]) {
+  const value = execFileSync(
+    "/usr/libexec/PlistBuddy",
+    ["-c", `Print :${key}`, path.join(root, "Info.plist")],
+    { encoding: "utf8" }
+  ).trim();
+  // Separate arguments preserve punctuation in the descriptions; PlistBuddy's
+  // command-language string parser otherwise consumes apostrophes as quoting.
+  execFileSync("/usr/bin/plutil", ["-replace", key, "-string", value, plist]);
+}
+
 // Re-sign ad-hoc so the signature matches the patched Info.plist (id + scheme).
 // The stock bundle is ad-hoc/linker-signed (`Identifier=Electron`); editing
 // Info.plist alone leaves the signature stale, which macOS can prefer over

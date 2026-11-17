@@ -4,7 +4,7 @@ use super::*;
 use crate::acp::observation::Observation;
 use crate::host::is_archived;
 use agent_client_protocol::v1::schema::ListSessionsResponse;
-use agent_kit_store_sqlite::catalog::CatalogEntry;
+use agent_kit_store_sqlite::catalog::CatalogRecord;
 use std::path::PathBuf;
 
 pub(super) const ORGANIZE: &str = "co.grida/session/organize";
@@ -52,16 +52,20 @@ struct Entry {
     revision: u64,
     title: Option<String>,
     archived: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    last_activity_at_ms: Option<u64>,
 }
 
-impl From<CatalogEntry> for Entry {
-    fn from(entry: CatalogEntry) -> Self {
+impl From<CatalogRecord> for Entry {
+    fn from(record: CatalogRecord) -> Self {
+        let entry = record.entry;
         let archived = is_archived(&entry);
         Self {
             session_id: entry.session,
             revision: entry.revision,
             title: entry.label,
             archived,
+            last_activity_at_ms: record.latest_turn_activity_ms,
         }
     }
 }

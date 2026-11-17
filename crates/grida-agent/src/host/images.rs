@@ -639,11 +639,39 @@ fn scope_id(owner: &SessionId) -> Result<BindingId> {
     BindingId::new(format!("retained-input/{owner}"))
 }
 
+pub(super) fn validate_prepared_png(bytes: &[u8]) -> Result<()> {
+    if bytes.is_empty() || bytes.len() > super::image_preparation::MAX_PREPARED_BYTES {
+        return Err(image_too_large());
+    }
+    validate_png_with_limits(
+        bytes,
+        super::image_preparation::MAX_PREPARED_PIXELS,
+        // PNG supports four 16-bit channels. The source preparation contract
+        // permits that precision even for a highly compressed retained still.
+        super::image_preparation::MAX_PREPARED_PIXELS as usize * 8,
+        Some(super::image_preparation::MAX_PREPARED_SIDE),
+    )
+}
+
 fn validate_png(bytes: &[u8]) -> Result<()> {
+    validate_png_with_limits(bytes, MAX_PIXELS, MAX_DECODED_BYTES, None)
+}
+
+fn validate_png_with_limits(
+    bytes: &[u8],
+    max_pixels: u64,
+    max_decoded: usize,
+    max_side: Option<u32>,
+) -> Result<()> {
     let mut source = Cursor::new(bytes);
-    let mut decoder = decoder(&mut source);
+    let mut decoder = png::Decoder::new(&mut source);
+    decoder.set_limits(png::Limits { bytes: max_decoded });
+    decoder.set_ignore_text_chunk(true);
+    decoder.set_ignore_iccp_chunk(true);
     let header = decoder.read_header_info().map_err(|_| invalid_png())?;
-    if u64::from(header.width) * u64::from(header.height) > MAX_PIXELS {
+    if u64::from(header.width) * u64::from(header.height) > max_pixels
+        || max_side.is_some_and(|side| header.width > side || header.height > side)
+    {
         return Err(image_too_large());
     }
     let mut reader = decoder.read_info().map_err(|_| invalid_png())?;
@@ -655,7 +683,7 @@ fn validate_png(bytes: &[u8]) -> Result<()> {
     }
     let size = reader
         .output_buffer_size()
-        .filter(|size| *size <= MAX_DECODED_BYTES)
+        .filter(|size| *size <= max_decoded)
         .ok_or_else(image_too_large)?;
     reader
         .next_frame(&mut vec![0; size])

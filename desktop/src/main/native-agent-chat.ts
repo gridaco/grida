@@ -27,6 +27,7 @@ import type {
   NativeChatGoalRequest,
   NativeChatImageArtifact,
   NativeChatActivity,
+  NativeChatToolImage,
   NativeChatMessage,
   NativeChatMessageAttachment,
   NativeChatTranscriptPage,
@@ -57,6 +58,7 @@ import { NativeAgentPermissionModes } from "./native-agent-permission-mode";
 import { NativeAgentArtifacts } from "./native-agent-artifacts";
 import { NativeFileReference } from "./native-file-reference";
 import { NativeInputImages } from "./native-input-images";
+import { NativeToolImages } from "./native-tool-images";
 import { NativeQueuedMessages } from "./native-queued-messages";
 import { NativeSelectedImages } from "./native-selected-images";
 import { NativeAgentBackgroundProcesses } from "./native-agent-background-processes";
@@ -297,6 +299,7 @@ export class NativeAgentChat {
   private readonly loading = new Map<string, Promise<NativeChatSession>>();
   private readonly transcripts = new Map<string, TranscriptCapture>();
   private readonly inputImages = new NativeInputImages();
+  private readonly toolImages = new NativeToolImages();
   private readonly queuedMessages = new NativeQueuedMessages();
   private readonly unverifiedTranscripts = new Set<string>();
   private readonly questionReviews = new WeakSet<NativeQuestionReview>();
@@ -543,12 +546,20 @@ export class NativeAgentChat {
     )
       throw invalidResponse();
     const titles: NonNullable<NativeChatPage["titles"]>[number][] = [];
+    const lastActivity: NonNullable<NativeChatPage["lastActivity"]>[number][] =
+      [];
     const sessionIds = result.sessions.map((entry: unknown) => {
       const session = object(entry);
       if (session.cwd !== this.cwd) throw invalidResponse();
       const sessionId = identity(session.sessionId);
       const title = catalogTitle(session.title ?? null);
       if (title !== null) titles.push({ sessionId, title });
+      const atMs = catalogActivityTime(
+        session._meta == null
+          ? undefined
+          : object(session._meta)["co.grida/lastActivityAtMs"]
+      );
+      if (atMs !== undefined) lastActivity.push({ sessionId, atMs });
       return sessionId;
     });
     const nextCursor = result.nextCursor ?? null;
@@ -560,7 +571,12 @@ export class NativeAgentChat {
           sessionIds.length === 0))
     )
       throw invalidResponse();
-    return { sessionIds, nextCursor, ...(titles.length && { titles }) };
+    return {
+      sessionIds,
+      nextCursor,
+      ...(titles.length && { titles }),
+      ...(lastActivity.length && { lastActivity }),
+    };
   }
 
   /** Metadata-only Settings calls never attach or restore a chat. */
@@ -2309,6 +2325,32 @@ export class NativeAgentChat {
     return this.inputImages.decode(result, image);
   }
 
+  /** Read the captured image of a successful result, without reopening its source. */
+  async readToolImage(
+    session: NativeChatSession,
+    previewId: string
+  ): Promise<ArrayBuffer> {
+    const sessionId = this.requireAttached(session);
+    if (!this.process.acceptsToolImages)
+      throw new Error("native_chat_tool_image_unavailable");
+    const image = this.toolImages.require(sessionId, previewId);
+    return this.toolImages.readChunks(image, async (offset) => {
+      this.requireAttached(session);
+      const result = await this.process.request(NativeToolImages.readMethod, {
+        sessionId,
+        turnId: image.turnId,
+        toolCallId: image.toolCallId,
+        mediaId: image.mediaId,
+        contentIndex: image.contentIndex,
+        offset,
+      });
+      this.requireAttached(session);
+      if (this.toolImages.require(sessionId, previewId) !== image)
+        throw new Error("native_chat_tool_image_unavailable");
+      return result;
+    });
+  }
+
   close(): Promise<void> {
     this.closed = true;
     this.sideChats.clear();
@@ -2316,6 +2358,7 @@ export class NativeAgentChat {
     this.listeners.clear();
     this.lifecycleSeen.clear();
     this.inputImages.clear();
+    this.toolImages.clear();
     this.queuedMessages.clear();
     return this.process.close();
   }
@@ -2394,7 +2437,10 @@ export class NativeAgentChat {
                 update,
                 attribution,
                 metadata,
-                this.process.acceptsActivityOrder
+                this.process.acceptsActivityOrder,
+                this.process.acceptsToolImages
+                  ? { images: this.toolImages, sessionId }
+                  : undefined
               )
             );
           }
@@ -2412,7 +2458,10 @@ export class NativeAgentChat {
             update,
             attribution,
             metadata,
-            this.process.acceptsActivityOrder
+            this.process.acceptsActivityOrder,
+            this.process.acceptsToolImages
+              ? { images: this.toolImages, sessionId }
+              : undefined
           ),
         });
         for (const listener of listeners) {
@@ -2867,7 +2916,8 @@ function activity(
   update: Record<string, unknown>,
   attribution: Record<string, unknown>,
   metadata: Record<string, unknown> | undefined,
-  orderAvailable: boolean
+  orderAvailable: boolean,
+  toolImages?: { images: NativeToolImages; sessionId: string }
 ): NativeChatActivity {
   const kind = attribution.activity;
   const outcome = attribution.outcome;
@@ -2882,9 +2932,17 @@ function activity(
     attribution.source === undefined ? undefined : identity(attribution.source);
   if (source !== undefined && kind !== "integration") throw invalidResponse();
   const input = toolDetail(update.rawInput);
-  const output = toolOutput(update.rawOutput);
+  const callId = identity(update.toolCallId);
+  const turnId = optionalIdentity(attribution.turnId);
+  const output = toolOutput(
+    update.rawOutput,
+    toolImages && turnId && outcome === "succeeded"
+      ? (value) =>
+          toolImages.images.project(toolImages.sessionId, turnId, callId, value)
+      : undefined
+  );
   return Object.freeze({
-    callId: identity(update.toolCallId),
+    callId,
     title: identity(update.title),
     kind: kind as NativeChatActivity["kind"],
     ...(source !== undefined && { source }),
@@ -2916,16 +2974,29 @@ function toolDetail(value: unknown): unknown {
   return JSON.parse(text);
 }
 
-function toolOutput(value: unknown): NativeChatActivity["output"] {
+function toolOutput(
+  value: unknown,
+  projectImages?: (value: unknown) => readonly NativeChatToolImage[]
+): NativeChatActivity["output"] {
   if (value === undefined || value === null) return undefined;
   const output = object(value);
   if (typeof output.text !== "string" || typeof output.truncated !== "boolean")
     throw invalidResponse();
   const structured = toolDetail(output.structured);
+  const images =
+    output.images === undefined ? undefined : projectImages?.(output.images);
+  const omittedImages =
+    projectImages && output.omittedImages !== undefined
+      ? revision(output.omittedImages)
+      : undefined;
+  if (omittedImages !== undefined && omittedImages > 1024)
+    throw invalidResponse();
   return Object.freeze({
     text: output.text.slice(0, MAX_TOOL_DETAIL_BYTES),
     truncated: output.truncated,
     ...(structured !== undefined && { structured }),
+    ...(images !== undefined && { images }),
+    ...(omittedImages !== undefined && { omittedImages }),
   });
 }
 
@@ -3239,12 +3310,27 @@ function catalogEntry(
 ): NativeChatCatalogEntry {
   const entry = object(value);
   if (entry.sessionId !== sessionId) throw invalidResponse();
+  const lastActivityAtMs = catalogActivityTime(entry.lastActivityAtMs);
   return Object.freeze({
     sessionId,
     revision: revision(entry.revision),
     title: catalogTitle(entry.title),
     archived: flag(entry.archived),
+    ...(lastActivityAtMs !== undefined && { lastActivityAtMs }),
   });
+}
+
+function catalogActivityTime(value: unknown): number | undefined {
+  if (value === undefined) return undefined;
+  // Date's representable range is narrower than JavaScript's safe integers.
+  if (
+    typeof value !== "number" ||
+    !Number.isSafeInteger(value) ||
+    value < 0 ||
+    value > 8_640_000_000_000_000
+  )
+    throw invalidResponse();
+  return value;
 }
 
 function catalogChange(value: unknown): NativeChatCatalogChange {

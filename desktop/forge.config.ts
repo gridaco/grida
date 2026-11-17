@@ -323,6 +323,12 @@ const config: ForgeConfig = {
           target: "preload",
         },
         {
+          // GRIDA-SEC-016 — isolated click intents, never the application bridge.
+          entry: "src/browser-guest-preload.ts",
+          config: "vite.preload.config.ts",
+          target: "preload",
+        },
+        {
           // Services sidecar. Runs in Electron-as-Node and starts the
           // retained media and host services. Forge emits
           // `.vite/build/services-sidecar.js`

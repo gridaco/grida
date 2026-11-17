@@ -62,7 +62,7 @@ Retiring a subscription model requires current subscription-specific evidence;
 API retirement and subscription retirement can differ. The current subscription
 choices follow [OpenAI's model guidance](https://learn.chatgpt.com/docs/models),
 including the separate GPT-5.5 and GPT-5.4 subscription retirements. Existing
-GPT-5.6 selections stay compatible; GPT-6.1 Sol is the default for new untouched
+GPT-5.6 selections stay compatible; GPT-6.2 Sol is the default for new untouched
 selections. Account and plan availability is still checked by the service.
 
 The generator lists the OpenRouter models that take PNG input: listed product

@@ -22,11 +22,11 @@ describe("models.three_d.model_generation", () => {
     expect(catalogue.is_model_id("P2-20260801")).toBe(false);
     expect(catalogue.is_model_id("tripo/remesh")).toBe(false);
   });
-  it("records public launch dates rather than API snapshot suffix dates", () => {
+  it("records public launch dates and the current Tripo P2 release status", () => {
     expect(
       Object.values(catalogue.models).map((card) => card.release.date)
     ).toEqual(["2026-03-06", "2026-03-11", "2026-08-19"]);
-    expect(catalogue.models["tripo/p2"].preview).toBe(true);
+    expect(catalogue.models["tripo/p2"].preview).toBe(false);
   });
   it("prices each input variant and texture tier in provider credits", () => {
     expect(catalogue.models["tripo/h3.1"].pricing.base_credits).toEqual({

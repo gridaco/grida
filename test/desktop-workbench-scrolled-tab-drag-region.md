@@ -20,7 +20,9 @@ them—excludes native window dragging. The gaps remain part of the horizontal
 scroll surface, so wheel input works continuously while crossing the tab rail.
 Tabs that are horizontally clipped or fully scrolled out of view must not leave
 ghost hit regions over neighboring title bars. Visually empty title-bar space
-after the final tab remains draggable at every scroll position.
+after the **+** button remains draggable at every scroll position. The **+**
+button follows the last tab when there is room. As the rail overflows, it
+stays visible beside the right-side panel controls while only the tabs scroll.
 
 ## Steps
 
@@ -42,7 +44,8 @@ after the final tab remains draggable at every scroll position.
    - Expected: the tabs scroll continuously; crossing a gap does not interrupt
      wheel input.
 8. Close enough tabs to leave visibly unused rail space after the final tab,
-   then drag from that empty space.
+   then check that **+** follows the final tab and drag from the empty space
+   after **+**.
    - Expected: the OS window moves. The horizontal strips above and below the
      tabs also remain draggable.
 9. Repeat with the file-tree pane both hidden and visible.

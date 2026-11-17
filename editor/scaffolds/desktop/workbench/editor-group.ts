@@ -75,14 +75,44 @@ export class EditorGroup {
 
   // ── mutations ──────────────────────────────────────────────────────
 
-  /** Open `id` (append if new) and focus it. No-op if it's already the active
-   *  tab — so a redundant open doesn't churn the render layer. */
-  open(id: string): void {
-    const prevTabs = this._tabs;
-    if (!prevTabs.includes(id)) this._tabs = [...prevTabs, id];
-    if (this._active === id && this._tabs === prevTabs) return;
-    this._active = id;
+  /** Open `id` once, appending by default or inserting after an existing key.
+   * Background opens preserve selection; an empty group always selects its tab.
+   * Reopening an existing key never moves it or changes close history. */
+  open(id: string, options: { after?: string; activate?: boolean } = {}): void {
+    const previous = this._tabs;
+    if (!previous.includes(id)) {
+      const after =
+        options.after === undefined ? -1 : previous.indexOf(options.after);
+      const index = after < 0 ? previous.length : after + 1;
+      this._tabs = [...previous.slice(0, index), id, ...previous.slice(index)];
+    }
+    const active =
+      options.activate !== false || this._active === null ? id : this._active;
+    if (active === this._active && this._tabs === previous) return;
+    this._active = active;
     this.commit();
+  }
+
+  /**
+   * Substitute a fresh key at one open tab's index in one publication. An
+   * active source selects its replacement; an inactive source keeps focus.
+   * Refuses a missing source or a key already used by another open tab.
+   * Replacing an existing key with itself succeeds without publishing.
+   *
+   * This changes the collection only: callers own content teardown and any
+   * dirty guards. It adds no close-history record and preserves prior history.
+   */
+  replace(previousId: string, nextId: string): boolean {
+    const index = this._tabs.indexOf(previousId);
+    if (index < 0) return false;
+    if (previousId === nextId) return true;
+    if (this._tabs.includes(nextId)) return false;
+    this._tabs = this._tabs.map((id, position) =>
+      position === index ? nextId : id
+    );
+    if (this._active === previousId) this._active = nextId;
+    this.commit();
+    return true;
   }
 
   /**

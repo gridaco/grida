@@ -52,8 +52,6 @@ import { NativeComposerTray } from "./native-composer-tray";
 import { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
 import { ContextMeter } from "../shared/context-meter";
 import { computeContextUsage } from "@/lib/agent-chat/context-usage";
-import { cn } from "@app/ui/lib/utils";
-import styles from "./agent-pane.module.css";
 import {
   SideChatPlacement,
   type SideChatPresentation,
@@ -380,7 +378,11 @@ export function NativeAgentPane({
       draftRef={draft}
       subagentsInTabs={!!subagentPlacement}
       header={(state) => (
-        <NativeChatHeader controller={controller} state={state} />
+        <NativeChatHeader
+          controller={controller}
+          state={state}
+          onChatSelected={() => draft.current?.focus()}
+        />
       )}
     />
   );
@@ -451,7 +453,7 @@ function NativeChatPane({
   connectionNote,
   draftRef: draft,
   header,
-  autofocus,
+  autofocus = true,
   testId = "workspace-native-chat",
   subagentsInTabs = false,
 }: {
@@ -533,8 +535,13 @@ function NativeChatPane({
       : undefined;
   const question = turn && !turn.cancelled ? state.questions[0] : undefined;
   const librarySelection = state.librarySelection;
-  const retrying =
-    running && !question && snapshot?.retryNotBeforeMs !== undefined;
+  const stillWorking = running && !pausing && !approval && !question;
+  const outputStarted = state.messages.some(
+    (message) =>
+      message.turnId === turn?.turnId &&
+      message.role === "assistant" &&
+      (!!message.text || !!message.activity?.length)
+  );
   const queued = snapshot?.queuedInputs ?? 0;
   const streamingControlsOnly = running && !bridge.enqueue;
   const error = state.error ?? state.approvalError ?? state.questionError;
@@ -601,6 +608,7 @@ function NativeChatPane({
       <ChatMessageView
         key={message.messageId}
         loadAttachmentPreview={controller.readAttachmentPreview}
+        loadToolImage={controller.readToolImage}
         actions={
           message.role === "user"
             ? {
@@ -687,12 +695,11 @@ function NativeChatPane({
             initial="instant"
             resize={running ? "smooth" : "instant"}
           >
+            {/* See test/desktop-agent-chat-scrollbar.md. */}
             <ConversationContent
-              className="gap-4 px-3 py-4"
-              scrollClassName={cn(
-                styles.chatScroll,
-                "desktop-native-drag-scroll-viewport scroll-fade-y scroll-fade-4"
-              )}
+              scrollbar="custom"
+              className="gap-4 px-[max(0.75rem,calc((100%_-_48rem)/2))] py-4"
+              scrollClassName="desktop-native-drag-scroll-viewport scroll-fade-y scroll-fade-4"
             >
               <NativeEarlierMessages
                 canLoad={state.canReadEarlier}
@@ -716,6 +723,7 @@ function NativeChatPane({
                     key={block.turnId}
                     block={block}
                     renderMessage={renderMessage}
+                    loadToolImage={controller.readToolImage}
                     subagentEvents={subagentActivity?.events.filter(
                       (event) => event.parentTurnId === block.turnId
                     )}
@@ -745,11 +753,13 @@ function NativeChatPane({
                     More subagent activity is available in Subagents
                   </Button>
                 )}
-              {running &&
-                !retrying &&
-                state.messages.at(-1)?.role !== "assistant" && (
-                  <PendingTurnIndicator />
-                )}
+              {stillWorking && (
+                <PendingTurnIndicator
+                  key={turn?.turnId}
+                  progress={state.progressRevision}
+                  immediate={!outputStarted}
+                />
+              )}
               {/* See test/desktop-agent-chat-transcript-history.md. */}
               {!turn &&
                 !state.loading &&
@@ -864,7 +874,7 @@ function NativeChatPane({
             </Button>
           </div>
         )}
-        <div className="shrink-0 p-3">
+        <div className="shrink-0 px-[max(0.75rem,calc((100%_-_48rem)/2))] py-3">
           {state.imageInput && (
             <input
               key={`png-${state.scope}`}

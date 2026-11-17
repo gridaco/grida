@@ -1,3 +1,4 @@
+// GRIDA-SEC-016 — browser channels carry no guest authority.
 // GRIDA-SEC-004 / GRIDA-SEC-008 — narrow native IPC channel vocabulary.
 export {
   DESKTOP_BRIDGE_PROTOCOL,
@@ -38,6 +39,40 @@ export const NATIVE_DOCUMENT_CHAT_ARGUMENT = "grida-native-document-chat";
 export const NATIVE_WORKSPACE_CHAT_ARGUMENT = "grida-native-workspace-chat";
 
 export const IPC_CHANNELS = {
+  BROWSER_ATTACH: "grida:browser:attach",
+  BROWSER_THUMBNAIL: "grida:browser:thumbnail",
+  BROWSER_FAVICON: "grida:browser:favicon",
+  BROWSER_HISTORY_QUERY: "grida:browser:history-query",
+  BROWSER_HISTORY_REMOVE: "grida:browser:history-remove",
+  BROWSER_HISTORY_CHANGED: "grida:browser:history-changed",
+  BROWSER_SNAPSHOT: "grida:browser:snapshot",
+  BROWSER_DETACH: "grida:browser:detach",
+  BROWSER_CREATE: "grida:browser:create",
+  BROWSER_NAVIGATE: "grida:browser:navigate",
+  BROWSER_BACK: "grida:browser:back",
+  BROWSER_FORWARD: "grida:browser:forward",
+  BROWSER_RELOAD: "grida:browser:reload",
+  BROWSER_STOP: "grida:browser:stop",
+  BROWSER_FOCUS: "grida:browser:focus",
+  BROWSER_RESERVE_MOUNT: "grida:browser:reserve-mount",
+  BROWSER_SET_ACTIVE: "grida:browser:set-active",
+  BROWSER_CLOSE: "grida:browser:close",
+  BROWSER_OPEN_EXTERNAL: "grida:browser:open-external",
+  BROWSER_CLEAR_BROWSING_DATA: "grida:browser:clear-browsing-data",
+  BROWSER_FIND: "grida:browser:find",
+  BROWSER_STOP_FIND: "grida:browser:stop-find",
+  BROWSER_GET_ZOOM: "grida:browser:get-zoom",
+  BROWSER_SET_ZOOM: "grida:browser:set-zoom",
+  BROWSER_PRINT: "grida:browser:print",
+  BROWSER_INSPECT: "grida:browser:inspect",
+  BROWSER_CLEAR_HISTORY: "grida:browser:clear-history",
+  BROWSER_CLEAR_CACHE: "grida:browser:clear-cache",
+  BROWSER_RESET_PERMISSIONS: "grida:browser:reset-permissions",
+  BROWSER_DOWNLOAD_PREFERENCES: "grida:browser:download-preferences",
+  BROWSER_SET_DOWNLOAD_PROMPT: "grida:browser:set-download-prompt",
+  BROWSER_CHOOSE_DOWNLOAD_DIRECTORY: "grida:browser:choose-download-directory",
+  BROWSER_OPEN_PAGE: "grida:browser:open-page",
+  BROWSER_CHANGED: "grida:browser:changed",
   WINDOW_SET_DOCUMENT_EDITED: "grida:window:set-document-edited",
   WINDOW_SET_REPRESENTED_FILENAME: "grida:window:set-represented-filename",
   WINDOW_CLOSE: "grida:window:close",
@@ -135,6 +170,7 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_READ_ARTIFACT: "grida:native-chat:read-artifact",
   NATIVE_CHAT_READ_ATTACHMENT_PREVIEW:
     "grida:native-chat:read-attachment-preview",
+  NATIVE_CHAT_READ_TOOL_IMAGE: "grida:native-chat:read-tool-image",
   NATIVE_CHAT_SAVE_ARTIFACT: "grida:native-chat:save-artifact",
   NATIVE_CHAT_QUEUE: "grida:native-chat:queue",
   NATIVE_CHAT_ACCEPTS_QUEUED_TEXT_REPLACEMENT:

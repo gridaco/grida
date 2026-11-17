@@ -7,6 +7,7 @@ import {
   byokProvidersFor,
   CHATGPT_PROVIDER_ID,
   CHATGPT_SUBSCRIPTION_MODEL_IDS,
+  CHATGPT_SUBSCRIPTION_MODEL_METADATA,
   CHATGPT_SUBSCRIPTION_RETIRED_MODEL_IDS,
   GG_PROVIDER_ID,
   GG_PROVIDER_METADATA,
@@ -92,16 +93,12 @@ export namespace NativeChatProfiles {
 
   export function subscriptionChoices(scope: string): Saved[] {
     return CHATGPT_SUBSCRIPTION_MODEL_IDS.map((modelId) => {
-      const model =
-        catalog.text.catalog[modelId as keyof typeof catalog.text.catalog];
       return {
         id: subscriptionBinding(scope, modelId),
         providerId: CHATGPT_PROVIDER_ID,
         modelId,
         connection: "ChatGPT Subscription",
-        model: model
-          ? catalog.text.displayLabel(model)
-          : modelId.replace(/^openai\/gpt-/, "GPT-"),
+        model: CHATGPT_SUBSCRIPTION_MODEL_METADATA[modelId].label,
       };
     });
   }
@@ -144,22 +141,31 @@ export namespace NativeChatProfiles {
       }));
   }
 
-  /** The catalogue's context window for a model, when it lists one. */
-  export function contextWindow(modelId: string): number | undefined {
+  /** The context window from the selected provider's model catalogue. */
+  export function contextWindow(
+    modelId: string,
+    providerId?: string
+  ): number | undefined {
     const window =
-      catalog.text.catalog[modelId as keyof typeof catalog.text.catalog]
-        ?.contextWindow;
+      providerId === CHATGPT_PROVIDER_ID &&
+      isChatGptSubscriptionModelId(modelId)
+        ? CHATGPT_SUBSCRIPTION_MODEL_METADATA[modelId].context_window
+        : catalog.text.catalog[modelId as keyof typeof catalog.text.catalog]
+            ?.contextWindow;
     return positive(window) ? window : undefined;
   }
 
   /** Canonical PNG/tool facts intersected with the native route's implemented profile. */
   export function imageInput(providerId: string, modelId: string): boolean {
+    if (providerId === CHATGPT_PROVIDER_ID)
+      return (
+        isChatGptSubscriptionModelId(modelId) &&
+        CHATGPT_SUBSCRIPTION_MODEL_METADATA[modelId].image_input
+      );
     const model =
       catalog.text.catalog[modelId as keyof typeof catalog.text.catalog];
     if (!model?.tool_call || !model.imageInputMimes.includes("image/png"))
       return false;
-    if (providerId === CHATGPT_PROVIDER_ID)
-      return isChatGptSubscriptionModelId(modelId);
     if (providerId === "openrouter")
       return catalog.text.listed_models().some((entry) => entry.id === modelId);
     // GG's native adapter currently implements only this exact retained-PNG route.

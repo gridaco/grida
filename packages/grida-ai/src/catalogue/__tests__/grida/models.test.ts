@@ -541,7 +541,7 @@ describe("models.audio.sound_effects catalogue invariants", () => {
     ).toEqual(["eleven_text_to_sound_v2"]);
   });
 
-  it("stores ElevenLabs' exact SFX id, IO limits, and provider-credit meter", () => {
+  it("stores ElevenLabs' exact SFX id, IO limits, and published per-second rate", () => {
     const card = models.audio.sound_effects.models.eleven_text_to_sound_v2;
     expect(card).toMatchObject({
       id: "eleven_text_to_sound_v2",
@@ -551,7 +551,7 @@ describe("models.audio.sound_effects catalogue invariants", () => {
       input: { type: "text" },
       output: {
         default_format: "mp3",
-        formats: ["mp3"],
+        formats: ["alaw", "mp3", "opus", "pcm", "ulaw", "wav"],
         sample_rate_hz: 44_100,
         duration: {
           mode: "automatic_or_fixed",
@@ -560,9 +560,8 @@ describe("models.audio.sound_effects catalogue invariants", () => {
         },
       },
       pricing: {
-        type: "provider_credits",
-        automatic_duration_credits: 100,
-        specified_duration_credits_per_second: 11,
+        type: "per_second",
+        usd: 0.002,
       },
       avg_cost_usd: null,
     });
@@ -591,11 +590,11 @@ describe("models.audio.text_to_speech catalogue invariants", () => {
       },
       output: {
         default_format: "mp3",
-        formats: ["mp3"],
+        formats: ["alaw", "mp3", "opus", "pcm", "ulaw", "wav"],
         sample_rate_hz: 44_100,
         bit_rate_kbps: 128,
       },
-      pricing: { type: "per_1000_characters", usd: 0.1 },
+      pricing: { type: "per_1000_characters", usd: 0.08 },
     });
   });
 });

@@ -9,8 +9,7 @@
  *   - `Task` — stock ai-elements collapsible. Every tool call renders as
  *     a compact `Task` row; a run of consecutive calls nests those rows
  *     inside one summary `Task` (title from `toolDisplay.summarize`).
- *   - `Shimmer` — pre-content "Thinking" indicator before any part has
- *     streamed for this turn.
+ *   - `Shimmer` — running tool labels and the pending-turn "Thinking" indicator.
  *
  * Owns no state beyond the stock collapsibles; the caller passes a
  * settled-or-streaming `UIMessage` plus `isStreaming` for the live turn.
@@ -23,6 +22,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { isFileUIPart, isTextUIPart, type FileUIPart } from "ai";
@@ -36,6 +36,7 @@ import {
   BookOpenIcon,
   CheckIcon,
   ChevronDownIcon,
+  ChevronRightIcon,
   CopyIcon,
   FileIcon,
   FilePenLineIcon,
@@ -90,6 +91,7 @@ import { workspace_links } from "./workspace-links";
 import { FullscreenImagePreview } from "@/kits/image-preview";
 import { AttachmentImagePreview } from "./attachment-image-preview";
 import { ChatMessageEditor, type ChatMessageEdit } from "./message-editor";
+import { WorkingIndicator } from "./working-indicator";
 import {
   hasOpenTabsResult,
   isSurfaceToolEntry,
@@ -98,12 +100,12 @@ import {
 
 export type { ChatMessage, ToolCallEntry };
 
-/** The size and line height of chat messages, user and agent alike. */
-const CHAT_TEXT = "text-[15px] leading-6";
+/** Shared transcript typography, user and agent alike. */
+const CHAT_TEXT = "text-[14px] leading-[23px]";
 
 const markdown = {
   // Markdown uses the shared chat reading size; see CHAT_TEXT.
-  className: `grida-ai-response-markdown space-y-2 ${CHAT_TEXT}`,
+  className: `grida-ai-response-markdown ${CHAT_TEXT}`,
   controls: {
     code: { copy: true, download: false },
     table: { copy: true, download: false, fullscreen: false },
@@ -149,6 +151,7 @@ export function ChatMessageView({
   actions,
   edit,
   loadAttachmentPreview,
+  loadToolImage,
 }: {
   message: ChatMessage;
   isStreaming?: boolean;
@@ -158,6 +161,8 @@ export function ChatMessageView({
   edit?: ChatMessageEdit;
   /** Read-only retained PNG display, supplied by the owning host. */
   loadAttachmentPreview?: AttachmentImagePreview.Loader;
+  /** Captured tool-result images, with authority kept separate from user attachments. */
+  loadToolImage?: AttachmentImagePreview.Loader;
 }) {
   // A compaction summary (synthetic assistant turn carrying a
   // `data-compaction` part) renders as a divider with an expandable
@@ -278,7 +283,13 @@ export function ChatMessageView({
               </MessageResponse>
             );
           }
-          return <ToolCallGroupView key={group.key} entries={group.entries} />;
+          return (
+            <ToolCallGroupView
+              key={group.key}
+              entries={group.entries}
+              loadToolImage={loadToolImage}
+            />
+          );
         })}
         {isStreaming && !hasVisibleContent && (
           <Shimmer className="text-xs">Thinking</Shimmer>
@@ -513,7 +524,7 @@ function MessageTime({ at }: { at: number }) {
 
 /**
  * Height (px) a user bubble is clamped to before the "Show more" affordance
- * kicks in. Roughly ten lines at the bubble's `leading-6` — tall enough that
+ * kicks in. Roughly ten lines of chat text — tall enough that
  * an ordinary message never collapses, short enough that a pasted wall of text
  * doesn't push the rest of the transcript off-screen.
  */
@@ -648,7 +659,7 @@ function findCompactionSummary(
  * appears, in milliseconds. Below this only the shimmering label shows; at or
  * past it the "· {time}" counter is revealed.
  */
-const ELAPSED_REVEAL_AFTER_MS = 3000;
+const ELAPSED_REVEAL_AFTER_MS = 10000;
 
 /**
  * A shimmering label trailed by a live elapsed-time counter — the body of the
@@ -678,16 +689,32 @@ function ShimmerWithElapsed({ label }: { label: string }) {
 }
 
 /**
- * Pre-first-token indicator — the dead-air window between a send and the first
- * streamed chunk. The AI-SDK reducer doesn't create the assistant message until
- * the first content chunk arrives, so the per-turn "Thinking" shimmer that lives
- * inside the assistant bubble ({@link ChatMessageView}) has nothing to mount on
- * yet. A surface renders this at the transcript tail while a turn is in flight
- * and no assistant turn has begun (`isStreaming && last message is not the
- * assistant`); it's framed as an assistant turn so it sits exactly where the
- * real response will, then is replaced by it the moment the first chunk lands.
+ * Shows "Thinking" immediately before first output, then only after visible
+ * progress goes quiet. Set `immediate` while the active turn has no output yet.
+ * Change `progress` on actual streamed text or tool updates, not polling or
+ * transcript replay. The surface owns paused, waiting and finished eligibility.
+ * Key by turn identity to reset the quiet period for each new turn.
  */
-export function PendingTurnIndicator() {
+export function PendingTurnIndicator({
+  progress,
+  immediate = false,
+}: {
+  progress: unknown;
+  immediate?: boolean;
+}) {
+  const [indicator] = useState(() => new WorkingIndicator());
+  const state = useSyncExternalStore(
+    indicator.subscribe,
+    indicator.read,
+    indicator.read
+  );
+  useLayoutEffect(
+    () => indicator.watch(progress, immediate),
+    [indicator, progress, immediate]
+  );
+  // Hide in the same render as a new chunk, before the layout effect resets
+  // the timer. A still-visible snapshot always belongs to its exact progress.
+  if (!state.visible || !Object.is(state.progress, progress)) return null;
   return (
     <Message from="assistant" className="w-full max-w-none">
       <MessageContent className="w-full max-w-full">
@@ -729,16 +756,24 @@ export function CompactionNotice({
 // A lone tool call renders as a single `Task` row; a run of consecutive
 // calls nests those rows inside one summary `Task`.
 /** Tool calls as cards; consecutive calls collapse into one summary row. */
-export function ToolCallGroupView({ entries }: { entries: ToolCallEntry[] }) {
+export function ToolCallGroupView({
+  entries,
+  loadToolImage,
+}: {
+  entries: ToolCallEntry[];
+  loadToolImage?: AttachmentImagePreview.Loader;
+}) {
   if (entries.length === 1) {
-    return <ToolCallView entry={entries[0]} />;
+    return <ToolCallView entry={entries[0]} loadToolImage={loadToolImage} />;
   }
 
-  const summary = toolDisplay.summarize(entries);
+  const { action, summary } = toolDisplay.group(entries);
   return (
     <Task defaultOpen={false} className="w-full">
       <TaskTrigger title={summary}>
-        {triggerRow(groupIcon(entries), summary)}
+        {triggerRow(iconForAction(action), summary, {
+          shimmer: entries.some(isToolRunning),
+        })}
       </TaskTrigger>
       <TaskContent>
         {entries.map((entry, index) => (
@@ -749,6 +784,7 @@ export function ToolCallGroupView({ entries }: { entries: ToolCallEntry[] }) {
           <ToolCallView
             key={`${entry.toolCallId ?? "tool"}-${index}`}
             entry={entry}
+            loadToolImage={loadToolImage}
           />
         ))}
       </TaskContent>
@@ -772,7 +808,17 @@ function approvalOf(entry: ToolCallEntry) {
   return undefined;
 }
 
-function ToolCallView({ entry }: { entry: ToolCallEntry }) {
+function isToolRunning(entry: ToolCallEntry): boolean {
+  return entry.state === "input-streaming" || entry.state === "input-available";
+}
+
+function ToolCallView({
+  entry,
+  loadToolImage,
+}: {
+  entry: ToolCallEntry;
+  loadToolImage?: AttachmentImagePreview.Loader;
+}) {
   // The `question` tool's INTERACTIVE prompt is session-global (pinned above the
   // composer by the surface as `QuestionPrompt`). In the transcript it's only a
   // passive record of what was asked / answered.
@@ -790,7 +836,9 @@ function ToolCallView({ entry }: { entry: ToolCallEntry }) {
     return (
       <Task defaultOpen className="w-full">
         <TaskTrigger title={title}>
-          {triggerRow(iconForAction(description.action), title)}
+          {triggerRow(iconForAction(description.action), title, {
+            shimmer: isToolRunning(entry),
+          })}
         </TaskTrigger>
         <TaskContent>
           <DesignSearchContent entry={entry} />
@@ -816,11 +864,12 @@ function ToolCallView({ entry }: { entry: ToolCallEntry }) {
       <TaskTrigger title={title}>
         {triggerRow(iconForAction(description.action), title, {
           busy: showTriggerSpinner,
+          shimmer: isToolRunning(entry),
         })}
       </TaskTrigger>
       {mediaTool ? (
         <TaskContent>
-          <MediaToolContent entry={entry} />
+          <MediaToolContent entry={entry} loadToolImage={loadToolImage} />
         </TaskContent>
       ) : surfaceTool ? (
         <TaskContent>
@@ -876,17 +925,25 @@ function QuestionToolView({ entry }: { entry: ToolCallEntry }) {
 function triggerRow(
   Icon: LucideIcon,
   title: string,
-  options?: { busy?: boolean }
+  options?: { busy?: boolean; shimmer?: boolean }
 ) {
   return (
-    <div className="flex w-full cursor-pointer items-center gap-2 text-muted-foreground text-xs transition-colors hover:text-foreground">
+    <div className="group/tool-trigger flex w-full cursor-pointer items-center gap-2 text-muted-foreground text-xs transition-colors hover:text-foreground">
       {options?.busy ? (
         <ToolActivitySpinner className="size-3.5 shrink-0" />
       ) : (
         <Icon className="size-3.5 shrink-0" />
       )}
-      <span className="min-w-0 flex-1 truncate">{title}</span>
-      <ChevronDownIcon className="size-3 shrink-0 opacity-50 transition-transform group-data-[state=open]:rotate-180" />
+      <span className="min-w-0 truncate">
+        {options?.shimmer ? (
+          <Shimmer as="span" className="max-w-full truncate align-bottom">
+            {title}
+          </Shimmer>
+        ) : (
+          title
+        )}
+      </span>
+      <ChevronRightIcon className="size-3 shrink-0 opacity-0 transition-[opacity,transform] duration-150 group-hover/tool-trigger:opacity-50 group-focus-visible/tool-trigger:opacity-50 group-data-[state=open]/tool-trigger:rotate-90 motion-reduce:transition-none" />
     </div>
   );
 }
@@ -946,14 +1003,4 @@ function iconForAction(action: ToolDisplayDescription["action"]): LucideIcon {
     case "tool":
       return WrenchIcon;
   }
-}
-
-// Uniform runs (3 reads) keep the shared action icon; mixed runs fall back
-// to a generic wrench.
-function groupIcon(entries: ToolCallEntry[]): LucideIcon {
-  const first = toolDisplay.describe(entries[0]).action;
-  const uniform = entries.every(
-    (entry) => toolDisplay.describe(entry).action === first
-  );
-  return uniform ? iconForAction(first) : WrenchIcon;
 }

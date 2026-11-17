@@ -14,7 +14,65 @@ describe("toolDisplay", () => {
           description: "Typecheck editor",
         }),
       ])
-    ).toBe("Edited 1 file, read 1 file, ran 1 command");
+    ).toBe("Ran 1 command, read 1 file, edited 1 file");
+  });
+
+  it("uses one frequency ranking for the icon and every summary clause", () => {
+    expect(
+      toolDisplay.group([
+        tool("1", "edit_file", { path: "/a.ts" }),
+        tool("2", "read_file", { path: "/b.ts" }),
+        tool("3", "edit_file", { path: "/a.ts" }),
+        tool("4", "read_file", { path: "/c.ts" }),
+        tool("5", "edit_file", { path: "/a.ts" }),
+        tool("6", "exec_command", { command: "pnpm test" }),
+      ])
+    ).toEqual({
+      action: "edit",
+      summary: "Edited 1 file, read 2 files, ran 1 command",
+    });
+  });
+
+  it("breaks frequency ties by the most recent call without reordering the calls", () => {
+    const entries = [
+      tool("1", "read_file", { path: "/a.ts" }),
+      tool("2", "edit_file", { path: "/b.ts" }),
+      tool("3", "read_file", { path: "/c.ts" }),
+      tool("4", "edit_file", { path: "/d.ts" }),
+    ];
+    expect(toolDisplay.group(entries)).toEqual({
+      action: "edit",
+      summary: "Edited 2 files, read 2 files",
+    });
+    expect(entries.map((entry) => entry.toolCallId)).toEqual([
+      "1",
+      "2",
+      "3",
+      "4",
+    ]);
+    expect(toolDisplay.group(entries.slice(0, 3))).toEqual({
+      action: "read",
+      summary: "Read 2 files, edited 1 file",
+    });
+  });
+
+  it("keeps running and failed work honest in the same ranked action group", () => {
+    expect(
+      toolDisplay.group([
+        tool("1", "edit_file", { path: "/a.ts" }),
+        tool("2", "edit_file", { path: "/b.ts" }, { ok: false }),
+        runningTool("3", "edit_file", { path: "/c.ts" }),
+        tool("4", "read_file", { path: "/d.ts" }),
+      ])
+    ).toEqual({
+      action: "edit",
+      summary:
+        "Edited 1 file, editing 1 file, failed to edit 1 file, read 1 file",
+    });
+    expect(toolDisplay.group([])).toEqual({
+      action: "tool",
+      summary: "No tool calls",
+    });
   });
 
   it("counts a listing's folders apart from its files", () => {
@@ -57,7 +115,7 @@ describe("toolDisplay", () => {
         tool("2", "write_stdin", { description: "checked process 3" }),
         tool("3", "write_stdin", { description: "interrupted process 3" }),
       ])
-    ).toBe("Ran 1 command, used 2 processes");
+    ).toBe("Used 2 processes, ran 1 command");
   });
 
   it("counts distinct files instead of repeated file tool calls", () => {
@@ -119,7 +177,7 @@ describe("toolDisplay", () => {
           input: { path: "/src/c.ts" },
         } as ToolCallEntry,
       ])
-    ).toBe("Edited 1 file, reading 1 file, 1 tool failed");
+    ).toBe("Reading 1 file, failed to write 1 file, edited 1 file");
   });
 
   it("labels tool protocol errors as failures", () => {
