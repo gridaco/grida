@@ -1,13 +1,13 @@
 ---
 id: TC-DESKTOP-BROWSER-005
-title: Browser Settings clears website data for the selected workspace
+title: Browser Settings clears the shared browser data across all windows
 module: desktop
 area: browser
 tags: [browser, settings, sessions, confirmation]
 status: untested
 severity: high
 date: 2026-11-17
-updated: 2026-11-17
+updated: 2026-11-18
 automatable: partial
 covered_by:
   - desktop/src/main/browser-host.test.ts
@@ -18,46 +18,51 @@ covered_by:
 
 ## Behavior
 
-Application Settings has a Browser category for managing existing workspace
-website data. The user explicitly selects a registered workspace before
-requesting cleanup. A native confirmation names that workspace and defaults
-to Cancel. Cancellation preserves its live pages and stored website state.
-Confirmation closes that workspace's browser pages across windows and clears
-its cookies, site storage, cache and HTTP authentication. Other workspace
-profiles and the application sign-in keep their separate state. Downloaded
-files and remembered tab addresses have separate lifetimes.
+Application Settings has one Browser category for the shared built-in browser.
+It has no workspace selector or multiple-profile controls. The same full cleanup
+is available from each browser tab. History-only clearing, cache-only clearing
+and permission reset are separate operations. A native confirmation describes
+the full reset's all-windows scope and defaults to Cancel. Cancellation preserves
+every browser page and its website state. Confirmation force-closes all built-in
+browser tabs and managed website windows, cancels accepted transfers, and clears
+shared history, cookies, site storage, cache, HTTP authentication and remembered
+website choices. Previously accepted certificate trust can remain cached until
+Grida restarts. Desktop sign-in, provider credentials, workspace files and saved
+downloads are separate.
 
-The Settings surface grants no page attachment, navigation or capture
-authority. It cannot supply arbitrary profile names or paths. A stale or
-foreign Settings document cannot authorize cleanup after navigation, role
-loss or a change to the selected workspace's registered identity. The UI
-discards late results after its lifecycle ends and prevents duplicate requests
-while an operation is pending.
-
-The page describes the browser's current download and sensitive-permission
-policies without presenting unsupported configuration switches. Older native
-builds without the management operation show an availability message.
+Settings requires no selected or open workspace. It grants no page attachment,
+navigation or capture authority and accepts no profile names or paths. A stale
+or foreign document cannot authorize cleanup after navigation or role loss.
+The UI discards late results and prevents duplicate requests while pending.
+Older native versions show an update message and never reinterpret an older
+workspace-only operation as a global one.
 
 ## Steps
 
-1. Open two workspaces with a controlled local website that sets a cookie and
-   local storage. Confirm each workspace has independent website state.
-2. Open application Settings and choose **Browser**.
-   - Expected: the workspace selector lists registered workspaces. Clearing
-     stays disabled until a workspace is selected.
-3. Select the first workspace and choose **Clear cookies and site data…**.
-   - Expected: a native confirmation identifies that workspace and defaults
-     to Cancel. Cancel it; its browser pages and website state remain.
+1. Open the same controlled website in browser tabs in two workspaces/windows.
+   Set a cookie/local storage in one; verify the other sees the shared state.
+2. Open **Settings → Browser**.
+   - Expected: one shared Browser category with no workspace/profile selector.
+     Full browsing-data clearing is visibly distinct from the separate history,
+     cache, permission and download controls.
+3. Choose **Clear browsing data…**.
+   - Expected: a native confirmation describes clearing all built-in browser
+     tabs/windows and defaults to Cancel. Cancel; both pages and data remain.
 4. Request cleanup again and confirm.
-   - Expected: the selected workspace's browser tabs close. Reopening the
-     website starts without its previous cookie or local storage. The second
-     workspace's page, website state and Desktop sign-in remain available.
-5. Close all browser tabs in the second workspace, then clear its website data
-   through Settings and reopen the site.
-   - Expected: cleanup also works without a live page or workspace attachment.
-6. Switch Settings categories or close the window while a request is pending.
-   - Expected: no result later appears in another section or triggers cleanup
-     under a replacement Settings document.
-7. Use a native build without the optional Settings management method.
-   - Expected: the Browser category explains that the operation is unavailable
-     without attempting to attach a page or weakening workspace admission.
+   - Expected: browser tabs and managed website windows close in every window,
+     including pages with unsaved-change handlers. Accepted transfers are canceled.
+     Reopening the site anywhere starts without its former cookie/local storage
+     or browser history. Desktop sign-in, provider state, workspace files and
+     downloaded files remain available.
+5. Close every browser tab, then repeat cleanup through Settings.
+   - Expected: cleanup works without a live browser page or workspace selection.
+6. Repeat via a browser tab's **… → Clear browsing data…**.
+   - Expected: the same native confirmation and global effect.
+7. Close/navigate the initiating window while confirmation is pending.
+   - Expected: a replacement document cannot spend the old confirmation.
+8. Use a native browser version older than v4 or missing browser capability.
+   - Expected: an update message, with no older scoped clear invoked.
+9. In a disposable profile containing recognized legacy experimental browser
+   partitions, confirm global clearing.
+   - Expected: legacy browser data is cleared without merging sign-ins into the
+     shared profile or touching account/provider partitions or symlink targets.

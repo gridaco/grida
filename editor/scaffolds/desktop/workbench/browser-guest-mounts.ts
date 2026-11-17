@@ -145,6 +145,8 @@ export class BrowserGuestMounts {
     wrapper.inert = true;
     const guest = this.document.createElement("webview");
     guest.setAttribute("aria-label", "Website");
+    // Presentation intent only; Main owns popup admission and guest preferences.
+    guest.setAttribute("allowpopups", "");
     guest.tabIndex = -1;
     guest.style.cssText = "display:flex;width:100%;height:100%;border:0";
     // No caller partition, preload or webpreferences. Main consumes its issued

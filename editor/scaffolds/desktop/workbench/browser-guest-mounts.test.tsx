@@ -3,9 +3,13 @@ import { createRoot } from "react-dom/client";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { DesktopBrowser, DESKTOP_BRIDGE_PROTOCOL } from "@grida/desktop-bridge";
 import { BrowserGuestMounts } from "./browser-guest-mounts";
+import { BrowserPageControls } from "@/lib/desktop/browser-page-controls";
 import { BrowserPane } from "./browser-pane";
 import { WorkspaceBrowserSession } from "./workspace-browser-session";
-import type { WorkspaceBrowserTabs } from "./workspace-browser-tabs";
+import { WorkspaceBrowserTabs } from "./workspace-browser-tabs";
+import { EditorGroup } from "./editor-group";
+import { WorkbenchPanelTab } from "./workbench-panel-tab";
+import { BrowserFindBar } from "./browser-find-bar";
 
 const dom = await vi.hoisted(async () => {
   // Match existing DOM component tests: canvas is an unused optional peer.
@@ -64,7 +68,7 @@ const entry = (
 ): WorkspaceBrowserTabs.Entry => ({
   id: "tab",
   url: "https://example.com/",
-  storageScope: "workspace",
+
   error: null,
   locationRevision: 0,
   page: {
@@ -77,7 +81,7 @@ const entry = (
     canGoBack: false,
     canGoForward: false,
     focused: false,
-    storageScope: "workspace",
+
     failure: null,
     ...overrides,
   },
@@ -143,6 +147,10 @@ describe("BrowserGuestMounts", () => {
     });
     const guest = document.querySelector("webview")!;
     const wrapper = guest.parentElement!;
+    expect(guest.hasAttribute("allowpopups")).toBe(true);
+    expect(guest.hasAttribute("preload")).toBe(false);
+    expect(guest.hasAttribute("webpreferences")).toBe(false);
+    expect(guest.hasAttribute("partition")).toBe(false);
     const src = guest.getAttribute("src");
     const write = vi.spyOn(guest, "setAttribute");
     act(() => root.unmount());
@@ -283,6 +291,7 @@ describe("BrowserGuestMounts", () => {
     const root = createRoot(container);
     const tabs = {
       mounts: owner,
+      controls: () => new BrowserPageControls.Controller(() => null),
       getSnapshot: () => ({ supported: true, error: null }),
     } as unknown as WorkspaceBrowserTabs;
     act(() =>
@@ -304,6 +313,199 @@ describe("BrowserGuestMounts", () => {
     expect(guest.isConnected).toBe(true);
     expect(guest.parentElement!.style.visibility).toBe("visible");
     act(() => root.unmount());
+  });
+
+  it("keeps the connected node through close-button Stay and waits for middle-click consent", async () => {
+    const page = entry().page!;
+    let outcome!: (event: DesktopBrowser.Event) => void;
+    let finish!: (accepted: boolean) => void;
+    const close = vi.fn<DesktopBrowser.Bridge["close"]>(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+    );
+    const host = {
+      attach: async () => ({
+        version: 4,
+        attachmentId: "owner",
+        revision: 0,
+        pages: [],
+      }),
+      snapshot: async () => ({
+        version: 4,
+        attachmentId: "owner",
+        revision: 0,
+        pages: [],
+      }),
+      subscribe: (listener: (event: DesktopBrowser.Event) => void) => {
+        outcome = listener;
+        return () => {};
+      },
+      detach: async () => {},
+      create: async () => {
+        outcome({
+          type: "changed",
+          attachmentId: "owner",
+          revision: page.revision,
+          page,
+        });
+        return page;
+      },
+      close,
+      reserveMount: async () => ({
+        src: `${DesktopBrowser.MOUNT_URL_PREFIX}ticket`,
+      }),
+      setActive: async () => {},
+    } as unknown as DesktopBrowser.Bridge;
+    const group = new EditorGroup();
+    const tabs = new WorkspaceBrowserTabs(
+      "workspace",
+      group,
+      () => host,
+      () => "tab"
+    );
+    await tabs.start(
+      { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+      async () => []
+    );
+    tabs.open("https://example.com/");
+    await settle();
+    const owner = new BrowserGuestMounts(document, tabs);
+    owners.push(owner);
+    tabs.mounts = owner;
+    tabs.subscribe(() => owner.reconcile(tabs.getSnapshot().entries));
+    const shell = document.createElement("div");
+    shell.tabIndex = -1;
+    const slot = document.createElement("div");
+    shell.append(slot);
+    document.body.append(shell);
+    owner.connect("tab", slot, shell);
+    owner.update(tabs.getSnapshot().entries.get("tab")!, true);
+    await settle();
+    const guest = document.querySelector("webview")!;
+    outcome({
+      type: "changed",
+      attachmentId: "owner",
+      revision: 2,
+      page: { ...page, revision: 2, mounted: true },
+    });
+    const source = guest.getAttribute("src");
+    const write = vi.spyOn(guest, "setAttribute");
+    const strip = document.createElement("div");
+    document.body.append(strip);
+    const root = createRoot(strip);
+    act(() =>
+      root.render(
+        <WorkbenchPanelTab
+          title="Example"
+          active
+          onSelect={() => {}}
+          onClose={() => {
+            void tabs.close("tab");
+          }}
+        />
+      )
+    );
+    act(() => strip.querySelector("button")!.click());
+    await vi.waitFor(() => expect(close).toHaveBeenCalledTimes(1));
+    expect(group.getSnapshot().tabs).toEqual(["browser:tab"]);
+    expect(guest.isConnected).toBe(true);
+    finish(false);
+    await tabs.close("tab");
+    expect(document.querySelector("webview")).toBe(guest);
+    expect(guest.getAttribute("src")).toBe(source);
+    expect(write).not.toHaveBeenCalledWith("src", expect.anything());
+    act(() =>
+      strip
+        .querySelector("[role=tab]")!
+        .dispatchEvent(
+          new dom.window.MouseEvent("mousedown", { bubbles: true, button: 1 })
+        )
+    );
+    await settle();
+    await vi.waitFor(() => expect(close).toHaveBeenCalledTimes(2));
+    expect(guest.isConnected).toBe(true);
+    finish(true);
+    await tabs.close("tab");
+    expect(group.getSnapshot().tabs).toEqual([]);
+    expect(guest.isConnected).toBe(false);
+    act(() => root.unmount());
+    tabs.stop();
+  });
+
+  it("focuses find text, respects IME Enter and dismisses Escape from descendant controls", async () => {
+    const target = { attachmentId: "owner", pageId: "page" };
+    const find = vi.fn<DesktopBrowser.Utilities.Bridge["find"]>(async () => ({
+      matches: 1,
+      activeMatchOrdinal: 1,
+    }));
+    const controls = new BrowserPageControls.Controller(() => ({
+      api: {
+        version: 1,
+        find,
+        stopFind: async () => {},
+      } as unknown as DesktopBrowser.Utilities.Bridge,
+      target,
+      revision: 0,
+    }));
+    const focusPage = vi.fn<() => void>();
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const render = () =>
+      root.render(
+        <BrowserFindBar
+          controls={controls}
+          state={controls.read()}
+          focusPage={focusPage}
+        />
+      );
+    controls.openFind();
+    controls.setText("word");
+    await settle();
+    act(render);
+    const input = host.querySelector<HTMLInputElement>("input")!;
+    expect(document.activeElement).toBe(input);
+    find.mockClear();
+    act(() =>
+      input.dispatchEvent(
+        new dom.window.KeyboardEvent("keydown", {
+          key: "Enter",
+          bubbles: true,
+          isComposing: true,
+        })
+      )
+    );
+    expect(find).not.toHaveBeenCalled();
+    act(() =>
+      input.dispatchEvent(
+        new dom.window.KeyboardEvent("keydown", {
+          key: "Enter",
+          bubbles: true,
+          shiftKey: true,
+        })
+      )
+    );
+    expect(find).toHaveBeenCalledWith({
+      ...target,
+      text: "word",
+      forward: false,
+      findNext: true,
+      matchCase: false,
+    });
+    act(() =>
+      host.querySelector("button")!.dispatchEvent(
+        new dom.window.KeyboardEvent("keydown", {
+          key: "Escape",
+          bubbles: true,
+        })
+      )
+    );
+    expect(controls.read().findOpen).toBe(false);
+    expect(focusPage).toHaveBeenCalledTimes(1);
+    act(() => root.unmount());
+    controls.dispose();
   });
 
   it("does not connect a late mount after its page closes", async () => {
@@ -359,16 +561,16 @@ describe("WorkspaceBrowserSession document ownership", () => {
     let navigation!: () => void;
     let sequence = 0;
     const browser = {
-      version: 2,
+      version: 4,
       presentation: "webview",
       attach: vi.fn<DesktopBrowser.Bridge["attach"]>(async () => ({
-        version: 2,
+        version: 4,
         attachmentId: `owner${++sequence}`,
         revision: 0,
         pages: [],
       })),
       snapshot: async (attachmentId: string) => ({
-        version: 2,
+        version: 4,
         attachmentId,
         revision: 0,
         pages: [],

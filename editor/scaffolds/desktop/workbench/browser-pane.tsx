@@ -4,6 +4,8 @@ import {
   type ReactNode,
   useEffect,
   useLayoutEffect,
+  useMemo,
+  useSyncExternalStore,
   useRef,
   useState,
 } from "react";
@@ -13,7 +15,6 @@ import {
   EllipsisIcon,
   ExternalLinkIcon,
   GlobeIcon,
-  Loader2Icon,
   RotateCwIcon,
   Trash2Icon,
   XIcon,
@@ -28,6 +29,8 @@ import {
   DropdownMenuTrigger,
 } from "@app/ui/components/dropdown-menu";
 import type { WorkspaceBrowserTabs } from "./workspace-browser-tabs";
+import { BrowserAddressBar } from "./browser-address-bar";
+import { BrowserFindBar } from "./browser-find-bar";
 
 /** Browser chrome and guest compose through the ordinary workbench DOM. */
 export function BrowserPane({
@@ -39,10 +42,13 @@ export function BrowserPane({
   entry: WorkspaceBrowserTabs.Entry;
   active: boolean;
 }) {
-  const address = useRef<HTMLInputElement>(null);
   const slot = useRef<HTMLDivElement>(null);
-  const consumedLocation = useRef(0);
-  const [draft, setDraft] = useState(entry.page?.url ?? entry.url ?? "");
+  const controls = useMemo(() => tabs.controls(entry.id), [tabs, entry.id]);
+  const controlState = useSyncExternalStore(
+    controls.subscribe,
+    controls.read,
+    controls.read
+  );
   const [menuOpen, setMenuOpen] = useState(false);
   const state = tabs.getSnapshot();
   const available = state.supported && !state.error;
@@ -54,12 +60,12 @@ export function BrowserPane({
 
   useLayoutEffect(
     () =>
-      slot.current && address.current
+      slot.current
         ? tabs.mounts?.connect(
             entry.id,
             slot.current,
             slot.current.closest<HTMLElement>(".grida-content-frame") ??
-              address.current
+              slot.current
           )
         : undefined,
     [tabs, entry.id]
@@ -69,17 +75,8 @@ export function BrowserPane({
     [tabs, entry, active]
   );
   useEffect(() => {
-    setDraft(currentUrl ?? "");
-  }, [currentUrl]);
-  useEffect(() => {
     if (!active) setMenuOpen(false);
   }, [active]);
-  useEffect(() => {
-    if (!active || entry.locationRevision <= consumedLocation.current) return;
-    consumedLocation.current = entry.locationRevision;
-    address.current?.focus();
-    address.current?.select();
-  }, [active, entry.locationRevision]);
 
   return (
     <section
@@ -91,14 +88,7 @@ export function BrowserPane({
         !active && "invisible pointer-events-none"
       )}
     >
-      <form
-        className="desktop-no-drag flex h-11 shrink-0 items-center gap-1 border-b px-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          tabs.navigate(entry.id, draft);
-          address.current?.blur();
-        }}
-      >
+      <div className="desktop-no-drag flex h-11 shrink-0 items-center gap-1 border-b px-2">
         <BrowserButton
           label="Back"
           disabled={!page?.canGoBack}
@@ -122,38 +112,22 @@ export function BrowserPane({
         >
           {page?.loading ? <XIcon /> : <RotateCwIcon />}
         </BrowserButton>
-        <div className="mx-1 flex h-7 min-w-0 flex-1 items-center gap-2 rounded-md border bg-muted/40 px-2 focus-within:ring-2 focus-within:ring-ring">
-          {page?.loading ? (
-            <Loader2Icon className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
-          ) : (
-            <GlobeIcon className="size-3.5 shrink-0 text-muted-foreground" />
-          )}
-          <input
-            ref={address}
-            disabled={!available}
-            aria-label="Website address"
-            type="text"
-            inputMode="url"
-            autoComplete="off"
-            autoCapitalize="off"
-            spellCheck={false}
-            placeholder="Enter a website address"
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") {
-                setDraft(currentUrl ?? "");
-                address.current?.blur();
-                tabs.action(entry.id, "focus");
-              }
-            }}
-            className="h-full min-w-0 flex-1 bg-transparent text-xs outline-none"
-          />
-          {entry.storageScope === "ephemeral" && (
-            <span className="text-[10px] text-muted-foreground">Private</span>
-          )}
-        </div>
-        <DropdownMenu open={active && menuOpen} onOpenChange={setMenuOpen}>
+        <BrowserAddressBar
+          tabs={tabs}
+          id={entry.id}
+          url={currentUrl ?? null}
+          active={active}
+          focusRevision={entry.locationRevision}
+          disabled={!available}
+          loading={!!page?.loading}
+        />
+        <DropdownMenu
+          open={active && menuOpen}
+          onOpenChange={(open) => {
+            setMenuOpen(open);
+            if (open) void controls.refreshZoom();
+          }}
+        >
           <DropdownMenuTrigger asChild>
             <Button
               type="button"
@@ -169,11 +143,39 @@ export function BrowserPane({
           <DropdownMenuContent
             align="end"
             onCloseAutoFocus={(event) => {
-              if (!active) event.preventDefault();
+              if (!active || controls.read().findOpen) event.preventDefault();
             }}
           >
+            {controlState.supported && (
+              <>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    controls.openFind();
+                  }}
+                >
+                  Find in page…
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void controls.zoom("out")}>
+                  Zoom out
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void controls.zoom("reset")}>
+                  Actual size ({Math.round(controlState.zoom * 100)}%)
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void controls.zoom("in")}>
+                  Zoom in
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => void controls.print()}>
+                  Print…
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void controls.inspect()}>
+                  Inspect page
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
             <DropdownMenuItem
-              disabled={!page?.url}
+              disabled={!page?.url || !/^https?:\/\//i.test(page.url)}
               onSelect={() => tabs.action(entry.id, "openExternal")}
             >
               <ExternalLinkIcon />
@@ -183,14 +185,27 @@ export function BrowserPane({
             <DropdownMenuItem
               variant="destructive"
               disabled={!available}
-              onSelect={() => void tabs.clearSession()}
+              onSelect={() => void tabs.clearBrowsingData()}
             >
               <Trash2Icon />
-              Clear workspace browser data…
+              Clear browsing data…
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-      </form>
+      </div>
+      <BrowserFindBar
+        controls={controls}
+        state={controlState}
+        focusPage={() => tabs.action(entry.id, "focus")}
+      />
+      {controlState.error && (
+        <p
+          role="alert"
+          className="shrink-0 border-b px-3 py-2 text-xs text-destructive"
+        >
+          {controlState.error}
+        </p>
+      )}
       {actionError && (
         <p
           role="alert"

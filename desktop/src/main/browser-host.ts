@@ -1,14 +1,16 @@
 /**
- * GRIDA-SEC-016 — Main admits actual DOM guests and owns their isolated sessions.
+ * GRIDA-SEC-016 — Main admits DOM guests in one isolated browser profile.
  * Guest contents never inherit the application's preload, cookies or authority.
  */
 import {
   BrowserWindow,
   dialog,
+  Menu,
+  type IpcMainEvent,
+  type LoadURLOptions,
   session,
   shell,
   type IpcMainInvokeEvent,
-  type DownloadItem,
   type NativeImage,
   type Session,
   type WebContents,
@@ -20,16 +22,26 @@ import path from "node:path";
 import { DesktopBrowser } from "@grida/desktop-bridge";
 import { IPC_CHANNELS } from "../bridge/contract";
 import { ipc_sender } from "./ipc-sender";
+import { BrowserFavicon } from "./browser-favicon";
+import { BrowserLegacyProfiles } from "./browser-legacy-profiles";
+import type { BrowserHistory } from "./browser-history";
+import { BrowserSitePolicy } from "./browser-site-policy";
+import { BrowserAuthDialog } from "./browser-auth-dialog";
+import type { BrowserDownloads } from "./browser-downloads";
+import { BrowserPageTools } from "./browser-page-tools";
+import { BrowserFindDialog } from "./browser-find-dialog";
+import { BrowserExternalLinks } from "./browser-external-links";
 
 type Page = {
   guest: WebContents | null;
   retiring: Set<WebContents>;
   browserSession: Session;
+  favicon: BrowserFavicon;
   mount: Mount | null;
   active: boolean;
   rendered: boolean;
   state: { -readonly [K in keyof DesktopBrowser.Page]: DesktopBrowser.Page[K] };
-  downloads: Set<DownloadItem>;
+  referrer?: LoadURLOptions["httpReferrer"];
   navigation: number;
 };
 type Owner = {
@@ -44,6 +56,13 @@ type Owner = {
   disposers: (() => void)[];
   thumbnail: { page: Page; token: symbol } | null;
 };
+type Popup = {
+  window: BrowserWindow;
+  contents: WebContents;
+  owner: Owner;
+  openerPage: Page;
+};
+
 type Mount = {
   src: string;
   owner: Owner;
@@ -59,8 +78,24 @@ type Mount = {
 /** Browser execution and document-scoped guest admission, independent of agents. */
 export class DesktopBrowserHost {
   readonly #owners = new Map<number, Owner>();
-  readonly #sessions = new Map<string, Session>();
-  readonly #clearing = new Set<string>();
+  #browserSession: Session | undefined;
+  #sitePolicy: BrowserSitePolicy | undefined;
+  readonly #popups = new Map<WebContents, Popup>();
+  readonly #externalLinks = new BrowserExternalLinks();
+  readonly #permissionReloads = new WeakSet<WebContents>();
+  readonly #resourceNotices = new Set<Owner>();
+  readonly #linkIntents = new WeakMap<
+    WebContents,
+    {
+      url: string;
+      documentUrl: string;
+      disposition: "foreground" | "background";
+      expires: number;
+    }
+  >();
+  #clearing = false;
+  readonly #closing = new Set<Promise<void>>();
+  #pendingHistoryChange: DesktopBrowser.History.Change | null = null;
   readonly #pendingAttach = new Map<number, symbol>();
   readonly #mounts = new Map<string, Mount>();
   readonly #acceptedMounts = new Map<number, Mount>();
@@ -70,17 +105,19 @@ export class DesktopBrowserHost {
       editorOrigin: string;
       admitWindow(window: BrowserWindow): boolean;
       workspaceExists(workspaceId: string): Promise<boolean>;
-      resolveWorkspace?(
-        workspaceId: string
-      ): Promise<Readonly<{ name: string; root?: string }> | null>;
+      history?: BrowserHistory;
+      downloads?: BrowserDownloads;
     }
-  ) {}
+  ) {
+    options.history?.subscribe((change) => this.#publishHistory(change));
+  }
 
   async attach(
     event: IpcMainInvokeEvent,
     workspaceId: unknown
   ): Promise<DesktopBrowser.Snapshot> {
     const window = this.#shell(event);
+    if (this.#clearing) throw new Error("browser_session_busy");
     if (
       typeof workspaceId !== "string" ||
       !/^[a-f0-9]{16}$/.test(workspaceId) ||
@@ -118,7 +155,7 @@ export class DesktopBrowserHost {
         this.#pendingAttach.get(event.sender.id) !== attempt ||
         event.senderFrame !== frame ||
         event.sender.getURL() !== href ||
-        this.#clearing.has(workspaceId)
+        this.#clearing
       )
         throw new Error("browser_attachment_expired");
     };
@@ -166,26 +203,53 @@ export class DesktopBrowserHost {
   create(event: IpcMainInvokeEvent, raw: unknown): DesktopBrowser.Page {
     const request = this.#record(raw);
     const owner = this.#attached(event, request.attachmentId);
-    if (this.#clearing.has(owner.workspaceId))
-      throw new Error("browser_session_busy");
+    if (this.#clearing) throw new Error("browser_session_busy");
     if (owner.pages.size >= DesktopBrowser.MAX_PAGES)
       throw new Error("browser_page_limit");
-    if (!DesktopBrowser.isStorageScope(request.storageScope))
-      throw new Error("browser_storage_invalid");
+    if (
+      Object.keys(request).some(
+        (key) => key !== "attachmentId" && key !== "url"
+      )
+    )
+      throw new Error("browser_request_invalid");
     const url = request.url === undefined ? null : this.#url(request.url);
+    return this.#create(owner, url);
+  }
+  #create(
+    owner: Owner,
+    url: string | null,
+    created?: {
+      openerPageId: string | null;
+      disposition: "foreground" | "background";
+    },
+    referrer?: LoadURLOptions["httpReferrer"]
+  ): DesktopBrowser.Page {
+    if (!this.#live(owner) || this.#clearing)
+      throw new Error("browser_attachment_expired");
+    if (owner.pages.size >= DesktopBrowser.MAX_PAGES)
+      throw new Error("browser_page_limit");
     const id = randomUUID();
-    const scope = request.storageScope;
+    const browserSession = this.#session();
     const page: Page = {
       guest: null,
       retiring: new Set(),
-      browserSession: this.#session(
-        scope === "workspace" ? owner.workspaceId : id,
-        scope === "workspace"
-      ),
+      browserSession,
+      favicon: new BrowserFavicon({
+        session: browserSession,
+        current: () =>
+          this.#live(owner) &&
+          owner.pages.get(id) === page &&
+          !!page.guest &&
+          !page.guest.isDestroyed() &&
+          !!DesktopBrowser.normalizeUrl(page.guest.getURL()) &&
+          !page.state.failure &&
+          !this.#clearing,
+        changed: () => this.#changed(owner, page),
+      }),
       mount: null,
       active: false,
       rendered: false,
-      downloads: new Set(),
+      referrer,
       navigation: 0,
       state: {
         id,
@@ -197,12 +261,20 @@ export class DesktopBrowserHost {
         canGoBack: false,
         canGoForward: false,
         focused: false,
-        storageScope: scope,
         failure: null,
       },
     };
     owner.pages.set(id, page);
-    this.#changed(owner, page);
+    if (created) {
+      page.state.revision = ++owner.revision;
+      owner.shell.send(IPC_CHANNELS.BROWSER_CHANGED, {
+        type: "created",
+        attachmentId: owner.attachmentId!,
+        revision: owner.revision,
+        page: { ...page.state },
+        ...created,
+      } satisfies DesktopBrowser.Event);
+    } else this.#changed(owner, page);
     return { ...page.state };
   }
 
@@ -265,12 +337,13 @@ export class DesktopBrowserHost {
       webviewTag: false,
       webSecurity: true,
       allowRunningInsecureContent: false,
-      disableDialogs: true,
+      preload: path.join(__dirname, "browser-guest-preload.js"),
+      disableDialogs: false,
       safeDialogs: true,
       // Additional stock-runtime hardening; the public window-open handler
       // installed before website load is the authoritative popup policy.
-      disablePopups: true,
-      navigateOnDragDrop: false,
+      disablePopups: false,
+      navigateOnDragDrop: true,
       backgroundThrottling: true,
     });
     // Electron otherwise loadURLs this source before did-attach-webview fires.
@@ -278,6 +351,9 @@ export class DesktopBrowserHost {
     delete params.src;
     delete params.httpreferrer;
     delete params.useragent;
+    // Stock42 reads this before the admission event; keep its approved native
+    // parameters consistent with the enforced popup preference as well.
+    (params as Record<string, unknown>).allowpopups = true;
   }
 
   /** Capture actual native identity during synchronous creation, never a caller ID. */
@@ -315,7 +391,19 @@ export class DesktopBrowserHost {
     page.state.failure = null;
     this.#observe(owner, page, guest);
     this.#changed(owner, page);
-    if (page.state.url) this.#load(owner, page, this.#url(page.state.url));
+    if (page.state.url) {
+      const restorable = DesktopBrowser.normalizeUrl(page.state.url);
+      if (restorable) this.#load(owner, page, restorable);
+      else {
+        page.state.failure = {
+          kind: "navigation",
+          code: "generated-unavailable",
+          message:
+            "This generated page is no longer available. Open it again from its source.",
+        };
+        this.#changed(owner, page);
+      }
+    }
   }
 
   setActive(event: IpcMainInvokeEvent, raw: unknown): void {
@@ -353,6 +441,7 @@ export class DesktopBrowserHost {
   }
   reload(event: IpcMainInvokeEvent, raw: unknown): void {
     const [owner, page] = this.#target(event, raw);
+    page.favicon.clear();
     page.state.failure = null;
     page.navigation++;
     page.rendered = false;
@@ -369,9 +458,96 @@ export class DesktopBrowserHost {
     if (!page.active) throw new Error("browser_page_inactive");
     if (owner.window.isFocused()) this.#guest(page).focus();
   }
-  close(event: IpcMainInvokeEvent, raw: unknown): Promise<void> {
+  close(event: IpcMainInvokeEvent, raw: unknown): Promise<boolean> {
     const [owner, page] = this.#target(event, raw);
-    return this.#close(owner, page);
+    return this.#requestClose(owner, page);
+  }
+  async #requestClose(owner: Owner, page: Page): Promise<boolean> {
+    const guest = page.guest;
+    if (guest && !guest.isDestroyed()) {
+      const closed = await this.#ordinaryClose(guest);
+      if (!closed) return false;
+    }
+    await this.#close(owner, page);
+    return true;
+  }
+
+  /** Cached public raster metadata. Reading starts no network requests. */
+  favicon(
+    event: IpcMainInvokeEvent,
+    raw: unknown
+  ): DesktopBrowser.Favicon | null {
+    const [, page] = this.#target(event, raw);
+    return page.favicon.get();
+  }
+
+  async historyQuery(
+    event: IpcMainInvokeEvent,
+    raw: unknown
+  ): Promise<DesktopBrowser.History.Snapshot> {
+    return this.#withHistoryDocument(event, (history, check) =>
+      history.query(raw, check)
+    );
+  }
+  async historyRemove(event: IpcMainInvokeEvent, raw: unknown): Promise<void> {
+    return this.#withHistoryDocument(event, (history, check) =>
+      history.remove(raw, check)
+    );
+  }
+  async #withHistoryDocument<T>(
+    event: IpcMainInvokeEvent,
+    operation: (history: BrowserHistory, check: () => void) => Promise<T>
+  ): Promise<T> {
+    const window = this.#managementWindow(event, "browser_history_expired");
+    if (this.#clearing) throw new Error("browser_session_busy");
+    const history = this.options.history;
+    if (!history) throw new Error("browser_history_unavailable");
+    const frame = event.senderFrame;
+    if (!frame) throw new Error("browser_history_expired");
+    const href = frame.url;
+    let current = true;
+    const revoke = ipc_sender.watchNavigation(event.sender, () => {
+      current = false;
+    });
+    const check = () => {
+      if (
+        !current ||
+        this.#clearing ||
+        this.#managementWindow(event, "browser_history_expired") !== window ||
+        event.senderFrame !== frame ||
+        frame.url !== href
+      )
+        throw new Error("browser_history_expired");
+    };
+    try {
+      const result = await operation(history, check);
+      check();
+      return result;
+    } finally {
+      revoke();
+    }
+  }
+  #publishHistory(change: DesktopBrowser.History.Change): void {
+    if (this.#clearing) {
+      this.#pendingHistoryChange = change;
+      return;
+    }
+    // Subscribe is renderer-local. Only current Main-owned workspace/Settings
+    // documents receive this revision-only invalidation, never guest pages.
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (window.isDestroyed()) continue;
+      const sender = window.webContents;
+      if (sender.isDestroyed()) continue;
+      try {
+        this.#managementWindow(
+          { sender, senderFrame: sender.mainFrame } as IpcMainInvokeEvent,
+          "browser_history_expired"
+        );
+        sender.send(IPC_CHANNELS.BROWSER_HISTORY_CHANGED, change);
+      } catch {
+        /* Not an admitted current document. */
+      }
+    }
   }
 
   /** Explicit transient pixels; see test/desktop-browser-tab-preview.md. */
@@ -467,28 +643,17 @@ export class DesktopBrowserHost {
     if (page.state.url) await shell.openExternal(this.#url(page.state.url));
   }
 
-  async clearSession(event: IpcMainInvokeEvent, raw: unknown): Promise<void> {
-    const request = this.#record(raw);
-    const owner = this.#attached(event, request.attachmentId);
-    await this.#clearWorkspace(owner.workspaceId);
-  }
-
-  /** Settings clears only the catalog identity named in Main's confirmation. */
-  async clearWorkspaceData(
+  /** One explicit, native-confirmed operation for the shared browser profile. */
+  async clearBrowsingData(
     event: IpcMainInvokeEvent,
-    raw: unknown
+    ...args: unknown[]
   ): Promise<boolean> {
-    const request = this.#record(raw);
-    if (
-      Object.keys(request).length !== 1 ||
-      typeof request.workspaceId !== "string" ||
-      !/^[a-f0-9]{16}$/.test(request.workspaceId)
-    )
-      throw new Error("browser_workspace_invalid");
-    const window = this.#settingsWindow(event);
+    if (args.length) throw new Error("browser_request_invalid");
+    const window = this.#managementWindow(event);
+    if (this.#clearing) throw new Error("browser_session_busy");
     const sender = event.sender;
     const frame = event.senderFrame;
-    if (!frame) throw new Error("browser_settings_expired");
+    if (!frame) throw new Error("browser_clear_expired");
     const href = frame.url;
     let current = true;
     const revoke = ipc_sender.watchNavigation(sender, () => {
@@ -497,72 +662,64 @@ export class DesktopBrowserHost {
     const check = () => {
       if (
         !current ||
-        this.#settingsWindow(event) !== window ||
+        this.#managementWindow(event) !== window ||
         sender.mainFrame !== frame ||
         frame.url !== href
       )
-        throw new Error("browser_settings_expired");
+        throw new Error("browser_clear_expired");
     };
     try {
-      const resolveWorkspace = this.options.resolveWorkspace;
-      if (!resolveWorkspace) throw new Error("browser_workspace_unavailable");
-      const workspaceId = request.workspaceId;
-      const workspace = await resolveWorkspace(workspaceId);
-      check();
-      if (!workspace || typeof workspace.name !== "string")
-        throw new Error("browser_workspace_unavailable");
-      const confirmedName = workspace.name;
-      const confirmedRoot = workspace.root ?? null;
-      const name = this.#text(confirmedName, 256) || "this workspace";
       const result = await dialog.showMessageBox(window, {
         type: "warning",
-        message: "Clear website data?",
-        detail: `This clears cookies, site storage, cache and website authentication for “${name}”. Its browser tabs will close, and you may need to sign in to websites again.${confirmedRoot ? `\n\nWorkspace: ${this.#text(confirmedRoot, 4096)}` : ""}`,
-        buttons: ["Cancel", "Clear website data"],
+        message: "Clear browsing data?",
+        detail:
+          "This clears browsing history, cookies, site storage, cache and website authentication for the built-in browser in all windows. All built-in browser tabs and popup windows will close, and you may need to sign in to websites again. Previously accepted development certificates may require restarting Grida to fully reset.",
+        buttons: ["Cancel", "Clear browsing data"],
         defaultId: 0,
         cancelId: 0,
         noLink: true,
       });
       check();
       if (result.response !== 1) return false;
-      const latest = await resolveWorkspace(workspaceId);
-      check();
-      if (
-        !latest ||
-        latest.name !== confirmedName ||
-        (latest.root ?? null) !== confirmedRoot
-      )
-        throw new Error("browser_workspace_changed");
-      await this.#clearWorkspace(workspaceId);
+      await this.#clearBrowser();
       return true;
     } finally {
       revoke();
     }
   }
 
-  async #clearWorkspace(workspaceId: string): Promise<void> {
-    if (this.#clearing.has(workspaceId))
-      throw new Error("browser_session_busy");
-    this.#clearing.add(workspaceId);
+  async #clearBrowser(): Promise<void> {
+    if (this.#clearing) throw new Error("browser_session_busy");
+    this.#clearing = true;
+    this.#pendingAttach.clear();
     try {
+      this.options.downloads?.cancelAll();
+      this.#externalLinks.reset();
+      for (const popup of this.#popups.values()) this.#forcePopup(popup);
       const closing: Promise<void>[] = [];
-      // Every window sharing this partition loses its pages before storage is cleared.
-      for (const other of this.#owners.values()) {
-        if (other.workspaceId === workspaceId) {
-          for (const page of other.pages.values())
-            closing.push(this.#close(other, page));
-        }
+      for (const owner of this.#owners.values()) {
+        for (const page of owner.pages.values())
+          closing.push(this.#close(owner, page));
       }
       await Promise.all(closing);
-      const browserSession = this.#session(workspaceId, true);
-      {
-        await browserSession.closeAllConnections();
-        await browserSession.clearStorageData();
-        await browserSession.clearCache();
-        await browserSession.clearAuthCache();
-      }
+      // Pages and owners leave their maps before native destruction finishes.
+      // Drain closures that began before this clear, including retired owners.
+      while (this.#closing.size) await Promise.all(this.#closing);
+      await this.options.history?.clear();
+      await this.#sitePolicy?.reset();
+      const browserSession = this.#session();
+      await browserSession.closeAllConnections();
+      await browserSession.clearStorageData();
+      await browserSession.clearCache();
+      await browserSession.clearAuthCache();
+      await BrowserLegacyProfiles.clear(browserSession.storagePath);
     } finally {
-      this.#clearing.delete(workspaceId);
+      this.#clearing = false;
+      if (this.#pendingHistoryChange) {
+        const change = this.#pendingHistoryChange;
+        this.#pendingHistoryChange = null;
+        this.#publishHistory(change);
+      }
     }
   }
 
@@ -585,10 +742,13 @@ export class DesktopBrowserHost {
       throw new Error("browser_owner_invalid");
     return window;
   }
-  #settingsWindow(event: IpcMainInvokeEvent): BrowserWindow {
+  #managementWindow(
+    event: IpcMainInvokeEvent,
+    expired = "browser_clear_expired"
+  ): BrowserWindow {
     const sender = event.sender;
     if (sender.isDestroyed() || sender.isLoadingMainFrame())
-      throw new Error("browser_settings_expired");
+      throw new Error(expired);
     const window = BrowserWindow.fromWebContents(sender);
     if (
       !window ||
@@ -597,16 +757,19 @@ export class DesktopBrowserHost {
       event.senderFrame !== sender.mainFrame ||
       !this.options.admitWindow(window)
     )
-      throw new Error("browser_settings_expired");
+      throw new Error(expired);
     try {
       const url = new URL(event.senderFrame.url);
       if (
         url.origin !== this.options.editorOrigin ||
-        url.pathname !== "/desktop/settings"
+        !(
+          url.pathname === "/desktop/settings" ||
+          this.#workspace(event.senderFrame.url)
+        )
       )
         throw new Error();
     } catch {
-      throw new Error("browser_settings_expired");
+      throw new Error(expired);
     }
     return window;
   }
@@ -646,8 +809,7 @@ export class DesktopBrowserHost {
   #target(event: IpcMainInvokeEvent, raw: unknown): [Owner, Page] {
     const request = this.#record(raw);
     const owner = this.#attached(event, request.attachmentId);
-    if (this.#clearing.has(owner.workspaceId))
-      throw new Error("browser_session_busy");
+    if (this.#clearing) throw new Error("browser_session_busy");
     const page =
       typeof request.pageId === "string" && owner.pages.get(request.pageId);
     if (!page) throw new Error("browser_page_unavailable");
@@ -663,18 +825,13 @@ export class DesktopBrowserHost {
     if (!url) throw new Error("browser_url_invalid");
     return url;
   }
-  #session(id: string, persistent: boolean): Session {
-    const key = persistent
-      ? `persist:grida-browser-workspace-${id}`
-      : `grida-browser-page-${id}`;
-    const existing = this.#sessions.get(key);
-    if (existing) return existing;
-    const browserSession = session.fromPartition(key);
-    browserSession.setPermissionRequestHandler(
-      (_contents, _permission, callback) => callback(false)
-    );
-    browserSession.setPermissionCheckHandler(() => false);
-    browserSession.setDevicePermissionHandler(() => false);
+  #session(): Session {
+    if (this.#browserSession) return this.#browserSession;
+    const browserSession = session.fromPartition("persist:grida-browser");
+    this.#sitePolicy = new BrowserSitePolicy(browserSession, {
+      openExternal: (contents, request) =>
+        this.#openApp(contents, request.url, false, request),
+    });
     // Stock webview's built-in loadURL/src paths bypass will-navigate. Guard
     // actual top-level requests in the dedicated browser Session as well.
     // The trusted embedder still has Electron's built-in own-page scripting.
@@ -683,7 +840,8 @@ export class DesktopBrowserHost {
       (details, callback) => {
         const blocked =
           details.resourceType === "mainFrame" &&
-          !DesktopBrowser.normalizeUrl(details.url);
+          !this.#location(details.url) &&
+          !BrowserExternalLinks.parse(details.url);
         callback({ cancel: blocked });
         if (!blocked) return;
         for (const owner of this.#owners.values()) {
@@ -702,53 +860,45 @@ export class DesktopBrowserHost {
       }
     );
     browserSession.on("will-download", (event, item, contents) => {
-      const owner = this.#owners
-        .values()
-        .find((candidate) =>
-          [...candidate.pages.values()].some((page) => page.guest === contents)
-        );
-      if (!owner || !this.#live(owner)) {
+      const site = this.#site(contents);
+      if (!site || !this.options.downloads) {
         event.preventDefault();
         return;
       }
-      const page = [...owner.pages.values()].find(
-        (candidate) => candidate.guest === contents
-      )!;
-      const attachmentId = owner.attachmentId;
-      const destination = dialog.showSaveDialogSync(owner.window, {
-        title: "Save browser download",
-        defaultPath: path.basename(item.getFilename()),
-      });
-      if (
-        !destination ||
-        !this.#live(owner) ||
-        owner.attachmentId !== attachmentId ||
-        owner.pages.get(page.state.id) !== page ||
-        page.guest !== contents ||
-        contents.isDestroyed()
-      ) {
-        event.preventDefault();
-        return;
-      }
-      item.setSavePath(destination);
-      page.downloads.add(item);
-      item.once("done", () => page.downloads.delete(item));
+      this.options.downloads.accept(
+        event,
+        item,
+        contents,
+        site.window,
+        site.live
+      );
     });
-    this.#sessions.set(key, browserSession);
+    this.#browserSession = browserSession;
     return browserSession;
   }
   #load(owner: Owner, page: Page, url: string): void {
+    page.favicon.clear();
     page.navigation++;
     page.rendered = false;
     page.state.url = url;
     page.state.failure = null;
     page.state.loading = page.guest !== null;
     this.#changed(owner, page);
-    void page.guest?.loadURL(url).catch(() => {
+    const httpReferrer = page.referrer;
+    page.referrer = undefined;
+    const loaded = httpReferrer
+      ? page.guest?.loadURL(url, { httpReferrer })
+      : page.guest?.loadURL(url);
+    void loaded?.catch(() => {
       // did-fail-load supplies a bounded failure; replaced loads are normal.
     });
   }
   #observe(owner: Owner, page: Page, contents: WebContents): void {
+    let documentVisit: {
+      url: string;
+      finished: boolean;
+      token: symbol | null;
+    } | null = null;
     const current = () =>
       owner.pages.get(page.state.id) === page &&
       page.guest === contents &&
@@ -761,6 +911,9 @@ export class DesktopBrowserHost {
         event.preventDefault();
         return;
       }
+      // Chromium validates the actual initiating frame/sandbox before the
+      // Session openExternal request. Do not launch an app from this event.
+      if (BrowserExternalLinks.parse(url)) return;
       if (event.isMainFrame === false) {
         try {
           if (
@@ -775,8 +928,9 @@ export class DesktopBrowserHost {
         event.preventDefault();
         return;
       }
-      if (!DesktopBrowser.normalizeUrl(url)) {
+      if (!this.#location(url)) {
         event.preventDefault();
+        page.favicon.clear();
         page.state.failure = {
           kind: "navigation",
           code: "blocked",
@@ -785,39 +939,45 @@ export class DesktopBrowserHost {
         this.#changed(owner, page);
       }
     };
-    contents.setWindowOpenHandler(() => ({ action: "deny" }));
+    this.#configureSite(
+      owner,
+      page,
+      contents,
+      owner.window,
+      current,
+      () => page.active
+    );
     contents.on("will-attach-webview", (event) => event.preventDefault());
     contents.on("will-navigate", navigation);
     contents.on("will-redirect", navigation);
     contents.on("will-frame-navigate", (details) =>
       navigation(details, details.url)
     );
-    contents.on("login", (event, _details, _auth, callback) => {
-      event.preventDefault();
-      callback();
-    });
-    contents.on("will-prevent-unload", (event) => event.preventDefault());
     contents.on("did-start-navigation", (details) => {
       if (!current() || !details.isMainFrame) return;
-      // Blob loaders bypass Session.webRequest. The observational start event
-      // has no preexecution veto; revoke programmatic unsupported documents
-      // and close in a safe later task. Frame-initiated links use the
-      // cancellable navigation hooks; commit observation is a final fallback.
+      if (BrowserExternalLinks.parse(details.url)) return;
+      if (!details.isSameDocument) documentVisit = null;
+      // Some built-in loaders bypass Session.webRequest. This observational
+      // event has no preexecution veto; contain unsupported private documents
+      // after native unwind. Ordinary generated documents remain allowed.
       if (
         !details.isSameDocument &&
         !details.initiator &&
-        !DesktopBrowser.normalizeUrl(details.url)
+        !this.#location(details.url)
       ) {
         this.#rejectDocument(owner, page, contents);
         return;
       }
       page.navigation++;
-      if (!details.isSameDocument) page.rendered = false;
+      if (!details.isSameDocument) {
+        page.favicon.clear();
+        page.rendered = false;
+      }
     });
     const refresh = () => {
       if (!current()) return;
       const rawUrl = contents.getURL();
-      const url = DesktopBrowser.normalizeUrl(rawUrl);
+      const url = this.#location(rawUrl);
       if (
         rawUrl &&
         !url &&
@@ -837,14 +997,82 @@ export class DesktopBrowserHost {
       this.#changed(owner, page);
     };
     contents.on("did-start-loading", refresh);
-    contents.on("did-stop-loading", refresh);
-    contents.on("did-navigate", refresh);
-    contents.on("did-navigate-in-page", refresh);
+    contents.on("did-stop-loading", () => {
+      refresh();
+      if (current() && !page.state.loading && !page.state.failure)
+        page.favicon.ensure(contents.getURL());
+    });
+    contents.on("did-navigate", (_event, url, status) => {
+      if (!current()) return;
+      documentVisit =
+        status >= 200 &&
+        status < 400 &&
+        DesktopBrowser.normalizeUrl(url) === url
+          ? { url, finished: false, token: null }
+          : null;
+      // Old-document icon events can be queued after navigation start while
+      // getURL() still reports the old page. A full commit revokes them again.
+      page.favicon.clear();
+      refresh();
+    });
+    contents.on("did-finish-load", () => {
+      if (
+        !current() ||
+        !this.#live(owner) ||
+        this.#clearing ||
+        !documentVisit ||
+        documentVisit.finished ||
+        contents.getURL() !== documentVisit.url
+      )
+        return;
+      documentVisit.finished = true;
+      documentVisit.token =
+        this.options.history?.visit(
+          documentVisit.url,
+          this.#text(contents.getTitle(), DesktopBrowser.MAX_TITLE_BYTES) ||
+            "Untitled"
+        ) ?? null;
+    });
+    contents.on("did-navigate-in-page", (_event, url, isMainFrame) => {
+      refresh();
+      if (
+        !current() ||
+        !isMainFrame ||
+        !documentVisit ||
+        DesktopBrowser.normalizeUrl(url) !== url ||
+        contents.getURL() !== url ||
+        documentVisit.url === url
+      )
+        return;
+      documentVisit.url = url;
+      if (documentVisit.finished && this.#live(owner) && !this.#clearing)
+        documentVisit.token =
+          this.options.history?.visit(
+            url,
+            this.#text(contents.getTitle(), DesktopBrowser.MAX_TITLE_BYTES) ||
+              "Untitled"
+          ) ?? null;
+    });
     contents.on("page-title-updated", (_event, title) => {
       if (!current()) return;
       page.state.title =
         this.#text(title, DesktopBrowser.MAX_TITLE_BYTES) || "Untitled";
+      if (
+        documentVisit?.finished &&
+        documentVisit.token &&
+        documentVisit.url === contents.getURL() &&
+        this.#live(owner) &&
+        !this.#clearing
+      )
+        this.options.history?.updateTitle(
+          documentVisit.url,
+          page.state.title,
+          documentVisit.token
+        );
       refresh();
+    });
+    contents.on("page-favicon-updated", (_event, candidates) => {
+      if (current()) page.favicon.update(candidates, contents.getURL());
     });
     contents.on("focus", () => {
       if (!page.active) this.#blur(owner, page);
@@ -854,7 +1082,10 @@ export class DesktopBrowserHost {
     contents.on(
       "did-fail-load",
       (_event, code, _description, _url, isMainFrame) => {
+        if (BrowserExternalLinks.parse(_url)) return;
+        if (current() && isMainFrame) documentVisit = null;
         if (!current() || !isMainFrame || code === -3) return;
+        page.favicon.clear();
         page.state.failure = {
           kind: "navigation",
           code: String(code),
@@ -866,6 +1097,8 @@ export class DesktopBrowserHost {
     );
     contents.on("render-process-gone", (_event, details) => {
       if (!current()) return;
+      documentVisit = null;
+      page.favicon.clear();
       page.rendered = false;
       page.state.loading = false;
       page.state.failure = {
@@ -879,11 +1112,12 @@ export class DesktopBrowserHost {
     contents.once("destroyed", () => {
       if (owner.pages.get(page.state.id) !== page || page.guest !== contents)
         return;
+      page.favicon.clear();
       page.guest = null;
       if (owner.thumbnail?.page === page) owner.thumbnail = null;
       page.rendered = false;
       page.navigation++;
-      this.#cancelDownloads(page);
+      this.#sitePolicy?.unregister(contents);
       Object.assign(page.state, {
         mounted: false,
         focused: false,
@@ -914,10 +1148,11 @@ export class DesktopBrowserHost {
       let command: string | undefined;
       if (modifier && !input.alt && !input.shift) {
         if (key === "l") command = "workspace.browser.focus-location";
-        if (key === "t") command = "workspace.browser.new";
+        if (key === "t") command = "workspace.tabs.new";
         if (key === "w") command = "workspace.tabs.close-active";
         if (key === "r") {
           event.preventDefault();
+          page.favicon.clear();
           page.navigation++;
           page.rendered = false;
           page.state.loading = true;
@@ -949,6 +1184,7 @@ export class DesktopBrowserHost {
   }
   #rejectDocument(owner: Owner, page: Page, contents: WebContents): void {
     if (page.guest !== contents) return;
+    page.favicon.clear();
     page.guest = null;
     if (owner.thumbnail?.page === page) owner.thumbnail = null;
     page.active = false;
@@ -956,7 +1192,7 @@ export class DesktopBrowserHost {
     page.navigation++;
     page.retiring.add(contents);
     contents.once("destroyed", () => page.retiring.delete(contents));
-    this.#cancelDownloads(page);
+    this.#sitePolicy?.unregister(contents);
     Object.assign(page.state, {
       mounted: false,
       focused: false,
@@ -979,6 +1215,743 @@ export class DesktopBrowserHost {
         contents.close({ waitForBeforeUnload: false });
     });
   }
+  #openApp(
+    contents: WebContents,
+    url: string,
+    trustedClick: boolean,
+    source?: { origin: string; isCurrent(): boolean }
+  ): void {
+    const site = this.#site(contents);
+    if (!site) return;
+    const visible = () =>
+      site.live() &&
+      site.window.isVisible() &&
+      (this.#popups.has(contents) || site.page.active);
+    if (!visible()) return;
+    void this.#externalLinks.open(url, {
+      contents,
+      parent: site.window,
+      trustedClick,
+      source,
+      isLive: visible,
+    });
+  }
+  #resourceNotice(owner: Owner): void {
+    if (!this.#live(owner) || this.#resourceNotices.has(owner)) return;
+    this.#resourceNotices.add(owner);
+    void dialog
+      .showMessageBox(owner.window, {
+        type: "info",
+        message: "Close a browser tab or window to open another",
+        detail: "The built-in browser has reached its open page limit.",
+        buttons: ["OK"],
+      })
+      .catch(() => {})
+      .finally(() => this.#resourceNotices.delete(owner));
+  }
+  #openTab(
+    owner: Owner,
+    url: string,
+    openerPageId: string | null,
+    disposition: "foreground" | "background",
+    referrer?: LoadURLOptions["httpReferrer"]
+  ): boolean {
+    if (!this.#live(owner) || this.#clearing) return false;
+    if (owner.pages.size >= DesktopBrowser.MAX_PAGES) {
+      this.#resourceNotice(owner);
+      return false;
+    }
+    this.#create(owner, url, { openerPageId, disposition }, referrer);
+    return true;
+  }
+  #location(raw: unknown): string | null {
+    const parsed = DesktopBrowser.normalizeLocation(raw);
+    if (parsed) return parsed;
+    // Large generated documents are live Chromium contents, never persisted or
+    // accepted by create/navigate/external/history APIs. Bound their display.
+    if (
+      typeof raw === "string" &&
+      raw.startsWith("data:") &&
+      raw.includes(",") &&
+      !/[\p{Cc}\p{Cs}]/u.test(raw)
+    )
+      return "data:";
+    return null;
+  }
+  #site(contents: WebContents): {
+    owner: Owner;
+    page: Page;
+    window: BrowserWindow;
+    live: () => boolean;
+  } | null {
+    const popup = this.#popups.get(contents);
+    if (popup)
+      return {
+        owner: popup.owner,
+        page: popup.openerPage,
+        window: popup.window,
+        live: () =>
+          this.#live(popup.owner) &&
+          this.#popups.get(contents) === popup &&
+          !popup.window.isDestroyed() &&
+          !contents.isDestroyed() &&
+          !this.#clearing,
+      };
+    for (const owner of this.#owners.values())
+      for (const page of owner.pages.values())
+        if (page.guest === contents)
+          return {
+            owner,
+            page,
+            window: owner.window,
+            live: () =>
+              this.#live(owner) &&
+              owner.pages.get(page.state.id) === page &&
+              page.guest === contents &&
+              !contents.isDestroyed() &&
+              !this.#clearing,
+          };
+    return null;
+  }
+  /** Private preload intents are admitted by actual guest/frame, never app IPC. */
+  guestLink(event: IpcMainEvent, raw: unknown): void {
+    const site = this.#site(event.sender);
+    if (!site || !site.live() || event.senderFrame !== event.sender.mainFrame)
+      return;
+    if (!this.#popups.has(event.sender) && !site.page.active) return;
+    const request = this.#record(raw);
+    if (
+      Object.keys(request).some(
+        (key) => !["url", "documentUrl", "disposition"].includes(key)
+      ) ||
+      request.documentUrl !== event.senderFrame.url ||
+      request.documentUrl !== event.sender.getURL() ||
+      !["foreground", "background"].includes(request.disposition as string)
+    )
+      return;
+    const external = BrowserExternalLinks.parse(request.url);
+    if (external) {
+      this.#openApp(event.sender, external.url, true);
+      return;
+    }
+    const url = DesktopBrowser.normalizeUrl(request.url);
+    if (!url) return;
+    this.#linkIntents.set(event.sender, {
+      url,
+      documentUrl: event.sender.getURL(),
+      disposition: request.disposition as "foreground" | "background",
+      expires: Date.now() + 1000,
+    });
+  }
+  #configureSite(
+    owner: Owner,
+    openerPage: Page,
+    contents: WebContents,
+    parent: BrowserWindow,
+    current: () => boolean,
+    active: () => boolean
+  ): void {
+    const live = () =>
+      current() &&
+      this.#live(owner) &&
+      !this.#clearing &&
+      !parent.isDestroyed();
+    this.#sitePolicy?.register(contents, {
+      window: parent,
+      isLive: live,
+      isActive: active,
+    });
+    contents.on("did-start-navigation", (details) => {
+      if (details.isMainFrame) this.#linkIntents.delete(contents);
+    });
+    contents.once("destroyed", () => this.#sitePolicy?.unregister(contents));
+    const registerPopup = (window: BrowserWindow, disposition: string) => {
+      const guest = window.webContents;
+      if (!live() || guest.session !== this.#session() || this.#clearing) {
+        window.destroy();
+        return;
+      }
+      const popup: Popup = { window, contents: guest, owner, openerPage };
+      this.#popups.set(guest, popup);
+      const popupCurrent = () =>
+        this.#popups.get(guest) === popup && !guest.isDestroyed();
+      this.#configureSite(owner, openerPage, guest, window, popupCurrent, () =>
+        window.isFocused()
+      );
+      guest.on("will-attach-webview", (event) => event.preventDefault());
+      const guard = (event: { preventDefault(): void }, url: string) => {
+        if (BrowserExternalLinks.parse(url)) return;
+        if (!popupCurrent() || !this.#location(url)) event.preventDefault();
+      };
+      guest.on("will-navigate", guard);
+      guest.on("will-redirect", guard);
+      guest.on("will-frame-navigate", (event) => guard(event, event.url));
+      const contain = (url: string) => {
+        if (BrowserExternalLinks.parse(url)) return;
+        if (!this.#location(url)) setImmediate(() => this.#forcePopup(popup));
+      };
+      guest.on("did-start-navigation", (event) => {
+        if (event.isMainFrame) contain(event.url);
+      });
+      guest.on("did-navigate", (_event, url) => contain(url));
+      let visited: { url: string; token: symbol | null } | null = null;
+      guest.on("did-navigate", (_event, url, status) => {
+        visited =
+          status >= 200 &&
+          status < 400 &&
+          DesktopBrowser.normalizeUrl(url) === url
+            ? { url, token: null }
+            : null;
+      });
+      guest.on("did-finish-load", () => {
+        if (
+          visited &&
+          popupCurrent() &&
+          live() &&
+          guest.getURL() === visited.url
+        )
+          visited.token =
+            this.options.history?.visit(
+              visited.url,
+              this.#text(guest.getTitle(), DesktopBrowser.MAX_TITLE_BYTES) ||
+                "Untitled"
+            ) ?? null;
+      });
+      guest.on("page-title-updated", (_event, title) => {
+        if (
+          visited?.token &&
+          popupCurrent() &&
+          live() &&
+          guest.getURL() === visited.url
+        )
+          this.options.history?.updateTitle(
+            visited.url,
+            this.#text(title, DesktopBrowser.MAX_TITLE_BYTES) || "Untitled",
+            visited.token
+          );
+      });
+      guest.on("did-start-navigation", (event) => {
+        if (event.isMainFrame && !event.isSameDocument) visited = null;
+      });
+      guest.once("destroyed", () => this.#popups.delete(guest));
+      window.once("closed", () => this.#popups.delete(guest));
+      const retirePopup = () => this.#forcePopup(popup);
+      contents.once("destroyed", retirePopup);
+      contents.once("render-process-gone", retirePopup);
+      guest.once("destroyed", () => {
+        contents.off("destroyed", retirePopup);
+        contents.off("render-process-gone", retirePopup);
+      });
+      if (disposition === "background-tab") window.showInactive();
+      else window.show();
+    };
+    contents.setWindowOpenHandler((details) => {
+      // Scripted external opens retain Chromium's native initiator/sandbox
+      // evidence through the hardened factory and Session permission handler.
+      if (
+        !live() ||
+        (!this.#location(details.url) &&
+          !BrowserExternalLinks.parse(details.url))
+      )
+        return { action: "deny" };
+      const intent = this.#linkIntents.get(contents);
+      this.#linkIntents.delete(contents);
+      if (
+        intent &&
+        intent.expires >= Date.now() &&
+        intent.documentUrl === contents.getURL() &&
+        intent.url === DesktopBrowser.normalizeUrl(details.url) &&
+        !details.postBody
+      ) {
+        this.#openTab(
+          owner,
+          intent.url,
+          openerPage.state.id,
+          intent.disposition,
+          details.referrer
+        );
+        return { action: "deny" };
+      }
+      if (this.#popups.size >= 64) {
+        this.#resourceNotice(owner);
+        return { action: "deny" };
+      }
+      // Let Chromium carry POST bodies, window names, opener and self-close.
+      // No privileged application factory or caller-provided webPreferences.
+      return {
+        action: "allow",
+        createWindow: (options) => {
+          // Public createWindow requires passing its native options unchanged.
+          // Its opaque optional webContents carries Chromium's existing opener,
+          // POST and name state. Never replace or reload that supplied object.
+          const supplied = (options as { webContents?: WebContents })
+            .webContents;
+          const window = new BrowserWindow(options);
+          const guest = window.webContents;
+          registerPopup(window, details.disposition);
+          if (!supplied && this.#popups.has(guest)) {
+            const post = details.postBody;
+            void window
+              .loadURL(details.url, {
+                httpReferrer: details.referrer,
+                ...(post && {
+                  postData: post.data,
+                  extraHeaders: `content-type: ${post.contentType}${post.boundary ? `; boundary=${post.boundary}` : ""}`,
+                }),
+              })
+              .catch(() => {});
+          }
+          return guest;
+        },
+        overrideBrowserWindowOptions: {
+          show: false,
+          webPreferences: {
+            session: this.#session(),
+            preload: path.join(__dirname, "browser-guest-preload.js"),
+            sandbox: true,
+            contextIsolation: true,
+            nodeIntegration: false,
+            nodeIntegrationInSubFrames: false,
+            nodeIntegrationInWorker: false,
+            webviewTag: false,
+            webSecurity: true,
+            allowRunningInsecureContent: false,
+            disableDialogs: false,
+            safeDialogs: true,
+            navigateOnDragDrop: true,
+          },
+        },
+      };
+    });
+    contents.on("login", (event, details, auth, callback) => {
+      event.preventDefault();
+      const origin = DesktopBrowser.normalizeUrl(details.url);
+      if (!live() || !origin) {
+        callback();
+        return;
+      }
+      let valid = true;
+      const frame = contents.mainFrame;
+      const authLive = () =>
+        valid && live() && !frame.detached && contents.mainFrame === frame;
+      const revoke = ipc_sender.watchNavigation(contents, () => {
+        valid = false;
+      });
+      void BrowserAuthDialog.prompt({
+        parent,
+        contents,
+        origin: auth.isProxy
+          ? `${this.#text(auth.host, 512)}:${auth.port}`
+          : new URL(origin).origin,
+        realm: auth.realm,
+        isProxy: auth.isProxy,
+        isLive: authLive,
+      })
+        .then(
+          (credentials) => {
+            if (credentials && authLive())
+              callback(credentials.username, credentials.password);
+            else callback();
+          },
+          () => callback()
+        )
+        .finally(revoke);
+    });
+    contents.on("will-prevent-unload", (event) => {
+      if (this.#permissionReloads.has(contents)) {
+        event.preventDefault();
+        return;
+      }
+      if (!live()) {
+        event.preventDefault();
+        return;
+      }
+      const response = dialog.showMessageBoxSync(parent, {
+        type: "question",
+        message: "Leave this page?",
+        detail: "Changes you made may not be saved.",
+        buttons: ["Stay", "Leave"],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true,
+      });
+      if (response === 1 && live()) event.preventDefault();
+    });
+    const tools = () => new BrowserPageTools(contents, parent, live);
+    contents.on("context-menu", (_event, params) => {
+      if (!live()) return;
+      const url = DesktopBrowser.normalizeUrl(params.linkURL);
+      const template: Electron.MenuItemConstructorOptions[] = [];
+      if (url)
+        template.push(
+          {
+            label: "Open link in new tab",
+            click: () => {
+              if (live())
+                this.#openTab(
+                  owner,
+                  url,
+                  openerPage.state.id,
+                  "foreground",
+                  params.referrerPolicy
+                );
+            },
+          },
+          {
+            label: "Open link in background tab",
+            click: () => {
+              if (live())
+                this.#openTab(
+                  owner,
+                  url,
+                  openerPage.state.id,
+                  "background",
+                  params.referrerPolicy
+                );
+            },
+          },
+          {
+            label: "Open link in default browser",
+            click: () => {
+              if (live()) void shell.openExternal(url);
+            },
+          },
+          { type: "separator" }
+        );
+      if (params.isEditable)
+        template.push(
+          { role: "undo" },
+          { role: "redo" },
+          { type: "separator" },
+          { role: "cut" },
+          { role: "copy" },
+          { role: "paste" },
+          { role: "selectAll" },
+          { type: "separator" }
+        );
+      else if (params.selectionText)
+        template.push({ role: "copy" }, { type: "separator" });
+      template.push(
+        {
+          label: "Find in page…",
+          click: () => {
+            if (!live()) return;
+            if (this.#popups.has(contents))
+              BrowserFindDialog.open(parent, contents, live);
+            else {
+              owner.shell.focus();
+              owner.shell.send(
+                IPC_CHANNELS.WORKSPACE_COMMAND,
+                "workspace.browser.find"
+              );
+            }
+          },
+        },
+        {
+          label: "Reload",
+          click: () => {
+            if (live()) contents.reload();
+          },
+        },
+        {
+          label: "Print…",
+          click: () => {
+            void tools()
+              .print()
+              .catch(() => {});
+          },
+        },
+        {
+          label: "Zoom in",
+          click: () => {
+            if (live())
+              contents.setZoomFactor(
+                Math.min(5, contents.getZoomFactor() * 1.2)
+              );
+          },
+        },
+        {
+          label: "Zoom out",
+          click: () => {
+            if (live())
+              contents.setZoomFactor(
+                Math.max(0.25, contents.getZoomFactor() / 1.2)
+              );
+          },
+        },
+        {
+          label: "Actual size",
+          click: () => {
+            if (live()) contents.setZoomFactor(1);
+          },
+        },
+        {
+          label: "Inspect",
+          click: () => {
+            if (live()) contents.inspectElement(params.x, params.y);
+          },
+        }
+      );
+      Menu.buildFromTemplate(template).popup({ window: parent });
+    });
+    contents.on("before-input-event", (event, input) => {
+      if (
+        !live() ||
+        !active() ||
+        input.type !== "keyDown" ||
+        input.isComposing ||
+        input.isAutoRepeat
+      )
+        return;
+      const modifier =
+        process.platform === "darwin" ? input.meta : input.control;
+      const key = input.key.toLowerCase();
+      if (!modifier) return;
+      if (
+        key === "w" &&
+        !input.alt &&
+        !input.shift &&
+        this.#popups.has(contents)
+      ) {
+        event.preventDefault();
+        parent.close();
+        return;
+      }
+      if (["+", "=", "-", "0"].includes(key) && !input.alt) {
+        event.preventDefault();
+        contents.setZoomFactor(
+          key === "0"
+            ? 1
+            : Math.max(
+                0.25,
+                Math.min(
+                  5,
+                  contents.getZoomFactor() * (key === "-" ? 1 / 1.2 : 1.2)
+                )
+              )
+        );
+      }
+      if (key === "p" && !input.alt && !input.shift) {
+        event.preventDefault();
+        void tools()
+          .print()
+          .catch(() => {});
+      }
+      if (
+        key === "i" &&
+        (process.platform === "darwin" ? input.alt : input.shift)
+      ) {
+        event.preventDefault();
+        tools().inspect();
+      }
+      if (key === "f" && this.#popups.has(contents)) {
+        event.preventDefault();
+        BrowserFindDialog.open(parent, contents, live);
+        return;
+      }
+      if ((key === "f" || key === "g") && !this.#popups.has(contents)) {
+        event.preventDefault();
+        owner.shell.focus();
+        owner.shell.send(
+          IPC_CHANNELS.WORKSPACE_COMMAND,
+          key === "f"
+            ? "workspace.browser.find"
+            : input.shift
+              ? "workspace.browser.find-previous"
+              : "workspace.browser.find-next"
+        );
+      }
+    });
+  }
+  #reloadPermissions(contents: WebContents): void {
+    // Reset must end existing streams even when the old document has a beforeunload
+    // handler. This explicit reset differs from ordinary user navigation.
+    this.#permissionReloads.add(contents);
+    const done = () => {
+      this.#permissionReloads.delete(contents);
+      contents.off("did-navigate", done);
+      contents.off("destroyed", done);
+      contents.off("did-fail-load", failed);
+    };
+    const failed = (
+      _event: unknown,
+      _code: number,
+      _description: string,
+      _url: string,
+      isMainFrame: boolean
+    ) => {
+      if (isMainFrame) done();
+    };
+    contents.once("did-navigate", done);
+    contents.once("destroyed", done);
+    contents.on("did-fail-load", failed);
+    try {
+      contents.reload();
+    } catch (error) {
+      done();
+      throw error;
+    }
+  }
+  #forcePopup(popup: Popup): void {
+    this.#popups.delete(popup.contents);
+    this.#sitePolicy?.unregister(popup.contents);
+    if (!popup.window.isDestroyed()) popup.window.destroy();
+  }
+  #ordinaryClose(contents: WebContents): Promise<boolean> {
+    if (contents.isDestroyed()) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      const finish = (closed: boolean) => {
+        contents.off("destroyed", destroyed);
+        contents.off("will-prevent-unload", prevented);
+        resolve(closed);
+      };
+      const destroyed = () => finish(true);
+      const prevented = (event: { defaultPrevented: boolean }) => {
+        if (!event.defaultPrevented) finish(false);
+      };
+      contents.once("destroyed", destroyed);
+      contents.on("will-prevent-unload", prevented);
+      contents.close({ waitForBeforeUnload: true });
+    });
+  }
+  #tools(event: IpcMainInvokeEvent, raw: unknown): BrowserPageTools {
+    const [owner, page] = this.#target(event, raw);
+    const guest = this.#guest(page);
+    return new BrowserPageTools(
+      guest,
+      owner.window,
+      () =>
+        this.#live(owner) &&
+        owner.pages.get(page.state.id) === page &&
+        page.guest === guest &&
+        !this.#clearing
+    );
+  }
+  find(event: IpcMainInvokeEvent, raw: unknown) {
+    const request = DesktopBrowser.Utilities.parseFind(raw);
+    if (!request) throw new Error("browser_find_invalid");
+    return this.#tools(event, request).find(request);
+  }
+  stopFind(event: IpcMainInvokeEvent, raw: unknown) {
+    return this.#tools(event, raw).stopFind();
+  }
+  getZoom(event: IpcMainInvokeEvent, raw: unknown) {
+    return this.#tools(event, raw).getZoom();
+  }
+  setZoom(event: IpcMainInvokeEvent, raw: unknown) {
+    return this.#tools(event, raw).setZoom(raw);
+  }
+  print(event: IpcMainInvokeEvent, raw: unknown) {
+    return this.#tools(event, raw).print();
+  }
+  inspect(event: IpcMainInvokeEvent, raw: unknown) {
+    return this.#tools(event, raw).inspect();
+  }
+  async #manage<T>(
+    event: IpcMainInvokeEvent,
+    operation: (window: BrowserWindow, check: () => void) => T | Promise<T>
+  ): Promise<T> {
+    const window = this.#managementWindow(event);
+    const frame = event.senderFrame;
+    const href = frame?.url;
+    let current = true;
+    const revoke = ipc_sender.watchNavigation(event.sender, () => {
+      current = false;
+    });
+    const check = () => {
+      if (
+        !current ||
+        this.#clearing ||
+        event.senderFrame !== frame ||
+        frame?.url !== href ||
+        this.#managementWindow(event) !== window
+      )
+        throw new Error("browser_management_expired");
+    };
+    try {
+      check();
+      const result = await operation(window, check);
+      check();
+      return result;
+    } finally {
+      revoke();
+    }
+  }
+  clearHistory(event: IpcMainInvokeEvent) {
+    return this.#manage(event, async (_window, check) => {
+      if (!this.options.history) throw new Error("browser_history_unavailable");
+      check();
+      await this.options.history.clear(check);
+      return true;
+    });
+  }
+  clearCache(event: IpcMainInvokeEvent) {
+    return this.#manage(event, async () => {
+      await this.#session().clearCache();
+      return true;
+    });
+  }
+  resetPermissions(event: IpcMainInvokeEvent) {
+    return this.#manage(event, async (_window, check) => {
+      this.#session();
+      this.#externalLinks.reset();
+      const result = await this.#sitePolicy!.resetPermissions();
+      check();
+      for (const owner of this.#owners.values())
+        for (const page of owner.pages.values())
+          if (page.guest && !page.guest.isDestroyed())
+            this.#reloadPermissions(page.guest);
+      for (const popup of this.#popups.values())
+        if (!popup.contents.isDestroyed())
+          this.#reloadPermissions(popup.contents);
+      if (result.certificateRestartRequired)
+        await dialog.showMessageBox(_window, {
+          type: "info",
+          message: "Restart Grida to finish resetting certificate exceptions",
+          detail:
+            "Website permissions were reset. Chromium may keep previously accepted certificates until Grida restarts.",
+          buttons: ["OK"],
+        });
+      return true;
+    });
+  }
+  downloadPreferences(event: IpcMainInvokeEvent) {
+    return this.#manage(event, () => {
+      if (!this.options.downloads)
+        throw new Error("browser_downloads_unavailable");
+      return this.options.downloads.preferences();
+    });
+  }
+  setDownloadPrompt(event: IpcMainInvokeEvent, raw: unknown) {
+    return this.#manage(event, (_window, check) => {
+      if (!this.options.downloads)
+        throw new Error("browser_downloads_unavailable");
+      return this.options.downloads.setPrompt(raw, check);
+    });
+  }
+  chooseDownloadDirectory(event: IpcMainInvokeEvent) {
+    return this.#manage(event, (window, check) => {
+      if (!this.options.downloads)
+        throw new Error("browser_downloads_unavailable");
+      return this.options.downloads.chooseDirectory(window, check);
+    });
+  }
+  openPage(event: IpcMainInvokeEvent, raw: unknown) {
+    return this.#manage(event, (_window, check) => {
+      const request = DesktopBrowser.Management.parseOpenPage(raw);
+      if (!request) throw new Error("browser_url_invalid");
+      check();
+      const owner = [...this.#owners.values()].find((candidate) =>
+        this.#live(candidate)
+      );
+      if (!owner) return false;
+      if (!this.#openTab(owner, request.url, null, "foreground")) return false;
+      owner.window.show();
+      owner.window.focus();
+      return true;
+    });
+  }
+
   #watchOwner(owner: Owner): void {
     const retire = () => this.#retire(owner);
     const navigating = (details: {
@@ -1044,7 +2017,7 @@ export class DesktopBrowserHost {
       mount.owner.pages.get(mount.page.state.id) === mount.page &&
       mount.page.mount === mount &&
       !mount.page.guest &&
-      !this.#clearing.has(mount.owner.workspaceId)
+      !this.#clearing
     );
   }
   #forgetMount(mount: Mount): void {
@@ -1151,10 +2124,20 @@ export class DesktopBrowserHost {
       pages: [...owner.pages.values()].map((page) => ({ ...page.state })),
     };
   }
-  async #close(owner: Owner, page: Page): Promise<void> {
+  #close(owner: Owner, page: Page): Promise<void> {
+    const closing = this.#closePage(owner, page);
+    this.#closing.add(closing);
+    void closing.then(
+      () => this.#closing.delete(closing),
+      () => this.#closing.delete(closing)
+    );
+    return closing;
+  }
+  async #closePage(owner: Owner, page: Page): Promise<void> {
     if (!owner.pages.delete(page.state.id)) return;
+    page.favicon.clear();
     if (owner.thumbnail?.page === page) owner.thumbnail = null;
-    this.#cancelDownloads(page);
+
     this.#blur(owner, page);
     const guests = new Set<WebContents>();
     for (const contents of page.retiring) guests.add(contents);
@@ -1164,6 +2147,7 @@ export class DesktopBrowserHost {
     page.guest = null;
     const destroyed = [...guests].map((contents) => {
       if (contents.isDestroyed()) return Promise.resolve();
+      this.#sitePolicy?.unregister(contents);
       const result = new Promise<void>((resolve) =>
         contents.once("destroyed", () => resolve())
       );
@@ -1179,21 +2163,10 @@ export class DesktopBrowserHost {
         pageId: page.state.id,
       } satisfies DesktopBrowser.Event);
     await Promise.all(destroyed);
-    if (page.state.storageScope === "ephemeral") {
-      this.#sessions.delete(`grida-browser-page-${page.state.id}`);
-      try {
-        await Promise.all([
-          page.browserSession.closeAllConnections(),
-          page.browserSession.clearStorageData(),
-          page.browserSession.clearCache(),
-          page.browserSession.clearAuthCache(),
-        ]);
-      } catch {
-        throw new Error("browser_session_cleanup_failed");
-      }
-    }
   }
   async #destroy(owner: Owner): Promise<void> {
+    for (const popup of this.#popups.values())
+      if (popup.owner === owner) this.#forcePopup(popup);
     owner.attachmentId = null;
     owner.frame = null;
     if (this.#owners.get(owner.shellId) === owner)
@@ -1219,9 +2192,5 @@ export class DesktopBrowserHost {
       bytes += size;
     }
     return text;
-  }
-  #cancelDownloads(page: Page): void {
-    for (const download of page.downloads) download.cancel();
-    page.downloads.clear();
   }
 }

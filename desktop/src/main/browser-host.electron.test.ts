@@ -41,6 +41,23 @@ it.skipIf(process.env.GRIDA_DESKTOP_TEST_ELECTRON !== "1")(
           },
         },
       });
+      await build({
+        configFile: false,
+        logLevel: "silent",
+        build: {
+          target: "esnext",
+          outDir: directory,
+          emptyOutDir: false,
+          lib: {
+            entry: fileURLToPath(
+              new URL("../browser-guest-preload.ts", import.meta.url)
+            ),
+            formats: ["cjs"],
+            fileName: () => "browser-guest-preload.js",
+          },
+          rollupOptions: { external: ["electron"] },
+        },
+      });
       const resultPath = path.join(directory, "result.json");
       const userData = path.join(directory, "browser");
       await fs.mkdir(userData, { mode: 0o700 });
@@ -74,7 +91,7 @@ it.skipIf(process.env.GRIDA_DESKTOP_TEST_ELECTRON !== "1")(
         liveDomOverlays: true,
         inactiveInput: true,
         requestPolicy: true,
-        profileSeparation: true,
+        sharedProfile: true,
         retryNewGuest: true,
         crashRecovery: true,
         documentReloadEndsGuests: true,

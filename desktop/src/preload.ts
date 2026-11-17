@@ -413,6 +413,14 @@ ipcRenderer.on(IPC_CHANNELS.BROWSER_CHANGED, (_event, raw: unknown) => {
   if (event) for (const handler of browserHandlers) handler(event);
 });
 window.addEventListener("pagehide", () => browserHandlers.clear());
+const historyHandlers = new Set<
+  (change: DesktopBrowser.History.Change) => void
+>();
+ipcRenderer.on(IPC_CHANNELS.BROWSER_HISTORY_CHANGED, (_event, raw: unknown) => {
+  const change = DesktopBrowser.History.parseChange(raw);
+  if (change) for (const handler of historyHandlers) handler(change);
+});
+window.addEventListener("pagehide", () => historyHandlers.clear());
 
 const bridge: DesktopBridge = {
   protocol: DESKTOP_BRIDGE_PROTOCOL,
@@ -442,10 +450,55 @@ const bridge: DesktopBridge = {
   browser: {
     version: DesktopBrowser.VERSION,
     presentation: "webview",
+    utilities: {
+      version: DesktopBrowser.Utilities.VERSION,
+      find: (request) => ipcRenderer.invoke(IPC_CHANNELS.BROWSER_FIND, request),
+      stopFind: (request) =>
+        ipcRenderer.invoke(IPC_CHANNELS.BROWSER_STOP_FIND, request),
+      getZoom: (request) =>
+        ipcRenderer.invoke(IPC_CHANNELS.BROWSER_GET_ZOOM, request),
+      setZoom: (request) =>
+        ipcRenderer.invoke(IPC_CHANNELS.BROWSER_SET_ZOOM, request),
+      print: (request) =>
+        ipcRenderer.invoke(IPC_CHANNELS.BROWSER_PRINT, request),
+      inspect: (request) =>
+        ipcRenderer.invoke(IPC_CHANNELS.BROWSER_INSPECT, request),
+    },
+    management: {
+      version: DesktopBrowser.Management.VERSION,
+      clearHistory: () =>
+        ipcRenderer.invoke(IPC_CHANNELS.BROWSER_CLEAR_HISTORY),
+      clearCache: () => ipcRenderer.invoke(IPC_CHANNELS.BROWSER_CLEAR_CACHE),
+      resetPermissions: () =>
+        ipcRenderer.invoke(IPC_CHANNELS.BROWSER_RESET_PERMISSIONS),
+      downloadPreferences: () =>
+        ipcRenderer.invoke(IPC_CHANNELS.BROWSER_DOWNLOAD_PREFERENCES),
+      setDownloadPrompt: (request) =>
+        ipcRenderer.invoke(IPC_CHANNELS.BROWSER_SET_DOWNLOAD_PROMPT, request),
+      chooseDownloadDirectory: () =>
+        ipcRenderer.invoke(IPC_CHANNELS.BROWSER_CHOOSE_DOWNLOAD_DIRECTORY),
+      openPage: (request) =>
+        ipcRenderer.invoke(IPC_CHANNELS.BROWSER_OPEN_PAGE, request),
+    },
+    history: {
+      version: DesktopBrowser.History.VERSION,
+      query: (request) =>
+        ipcRenderer.invoke(IPC_CHANNELS.BROWSER_HISTORY_QUERY, request),
+      remove: (request) =>
+        ipcRenderer.invoke(IPC_CHANNELS.BROWSER_HISTORY_REMOVE, request),
+      subscribe: (handler) => {
+        historyHandlers.add(handler);
+        return () => {
+          historyHandlers.delete(handler);
+        };
+      },
+    },
     attach: (workspaceId) =>
       ipcRenderer.invoke(IPC_CHANNELS.BROWSER_ATTACH, workspaceId),
     thumbnail: (request) =>
       ipcRenderer.invoke(IPC_CHANNELS.BROWSER_THUMBNAIL, request),
+    favicon: (request) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_FAVICON, request),
     snapshot: (attachmentId) =>
       ipcRenderer.invoke(IPC_CHANNELS.BROWSER_SNAPSHOT, attachmentId),
     detach: (attachmentId) =>
@@ -468,10 +521,8 @@ const bridge: DesktopBridge = {
     close: (request) => ipcRenderer.invoke(IPC_CHANNELS.BROWSER_CLOSE, request),
     openExternal: (request) =>
       ipcRenderer.invoke(IPC_CHANNELS.BROWSER_OPEN_EXTERNAL, request),
-    clearWorkspaceData: (request) =>
-      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_CLEAR_WORKSPACE_DATA, request),
-    clearSession: (request) =>
-      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_CLEAR_SESSION, request),
+    clearBrowsingData: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_CLEAR_BROWSING_DATA),
     subscribe: (handler) => {
       browserHandlers.add(handler);
       return () => {

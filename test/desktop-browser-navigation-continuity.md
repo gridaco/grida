@@ -7,7 +7,7 @@ tags: [browser, tabs, navigation, restore, shortcuts]
 status: untested
 severity: high
 date: 2026-11-17
-updated: 2026-11-17
+updated: 2026-11-18
 automatable: partial
 covered_by:
   - editor/scaffolds/desktop/workbench/workspace-browser-tabs.test.ts
@@ -18,16 +18,19 @@ covered_by:
 ## Behavior
 
 Browser tabs are ordinary content tabs with their own navigation state. Tab
-selection preserves a live page; closure ends it. Reopen and application
-restart use recorded addresses without promising to restore form values or
-history. Page-focused application shortcuts address the workbench, while
-ordinary text editing and composition remain website input.
+selection preserves a live page. Ordinary navigation and closure honor a
+website's unsaved-change request through Stay/Leave; confirmed closure ends it.
+Owner teardown and full browser reset remain forced. Reopen and application
+restart use recorded HTTP(S) addresses without promising form values or history.
+Generated live locations are transient and are not restore/reopen addresses.
+Page-focused application shortcuts address the workbench, while ordinary text
+editing and composition remain website input.
 
 ## Steps
 
 1. Launch Desktop with chat disabled, open a workspace, and open Browser from
-   Quick Start. Verify the native menu can also open a browser after a file
-   tab replaces Quick Start.
+   Quick Start. Verify **New Tab** in the native menu opens Quick Start after a file
+   tab replaces it, then choose **Open Browser**.
 2. Navigate through two local pages and a same-document history change. Use
    Back, Forward, Reload and Stop. Expected: toolbar state reflects the page's
    actual history and loading state.
@@ -40,20 +43,29 @@ ordinary text editing and composition remain website input.
    available. Exercise location focus, tab switching and close-tab shortcuts.
    Expected: input edits remain in the page and application commands reach the
    correct browser or workbench target without duplicate actions.
-5. Close and reopen the browser tab. Expected: a new page opens at the recorded
+5. On a controlled page with an active `beforeunload` handler, try navigation,
+   reload and tab closure. Choose Stay, then repeat and choose Leave. Expected:
+   Stay preserves the live document and tab; Leave permits the requested action.
+   A host document reload or full browser reset still ends pages without a
+   website veto.
+6. Close and reopen the browser tab. Expected: a new page opens at the recorded
    URL. Interleave file and browser tabs, restart Desktop and reopen the
    workspace. Expected: eligible addresses, ordering and selection restore;
-   ephemeral browser tabs do not restore.
-6. Stop the local server, reload and restart the server. Expected: failure and
+   website cookies use the same shared profile in every workspace.
+7. Stop the local server, reload and restart the server. Expected: failure and
    retry remain usable and do not close or reload the workbench.
-7. Enter an invalid address while a healthy page contains unsaved form input.
+8. Enter an invalid address while a healthy page contains unsaved form input.
    Expected: the action reports an error while the existing guest, history and
    form state remain. Correct the address or dismiss the error.
-8. Reload the hosting workbench, then crash/recover it in a disposable profile.
+9. Reload the hosting workbench, then crash/recover it in a disposable profile.
    Expected: old guests and attachments end; eligible recorded addresses reopen
    as new documents. No form/history/scroll restoration is implied. Destroy a
    guest independently and retry; its tab remains usable without an automatic
    remount loop. A new window reconstructs a URL rather than adopting a guest.
-9. Exercise an older native build with browser protocol1 or no browser support.
-   Expected: saved browser addresses survive, an update message explains the
-   unavailable presentation, no v2 calls are made, and file tabs remain usable.
+10. Open a generated blank/blob/data document from a controlled website. Expected:
+    it remains usable live content. Close/reopen or restart; no generated location
+    is restored, added to shared history, handed to the default browser or used
+    for favicon acquisition. Eligible ordinary HTTP(S) addresses still restore.
+11. Exercise an older native build with browser protocol1/2/3 or no support.
+    Expected: saved HTTP(S) addresses survive, an update message explains the
+    unavailable presentation, no v4 calls are made, and file tabs remain usable.

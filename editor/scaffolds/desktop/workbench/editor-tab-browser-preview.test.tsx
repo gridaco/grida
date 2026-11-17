@@ -13,6 +13,7 @@ import {
 import type { DesktopBrowser } from "@grida/desktop-bridge";
 import type { WorkspaceBrowserTabs } from "./workspace-browser-tabs";
 import { BrowserThumbnailFixtures } from "./browser-thumbnail.fixtures";
+import { BrowserTabIcon } from "./browser-tab-icon";
 
 const dom = await vi.hoisted(async () => {
   // Match existing DOM component tests: canvas is an unused optional peer.
@@ -91,7 +92,7 @@ function entry(
   return {
     id: "tab",
     url: "https://example.com/",
-    storageScope: "workspace",
+
     error: null,
     locationRevision: 0,
     page: {
@@ -104,7 +105,7 @@ function entry(
       canGoBack: false,
       canGoForward: false,
       focused: false,
-      storageScope: "workspace",
+
       failure: null,
       ...overrides,
     },
@@ -230,5 +231,37 @@ describe("browser tab hover preview", () => {
     expect(container.querySelector("img")).toBeNull();
     expect(container.textContent).toContain("Second");
     expect(read).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("browser tab favicon display", () => {
+  it("uses a globe when optional icon metadata is absent", async () => {
+    await act(async () => root.render(<BrowserTabIcon />));
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelector("svg")).not.toBeNull();
+  });
+
+  it("renders bounded native raster bytes and removes a broken image", async () => {
+    const favicon = { dataUrl: BrowserThumbnailFixtures.solid.dataUrl };
+    await act(async () => root.render(<BrowserTabIcon favicon={favicon} />));
+    expect(container.querySelector("img")?.getAttribute("src")).toBe(
+      favicon.dataUrl
+    );
+    expect(container.querySelector("img")?.getAttribute("alt")).toBe("");
+    await act(async () => {
+      container.querySelector("img")!.dispatchEvent(new Event("error"));
+    });
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelector("svg")).not.toBeNull();
+    await act(async () => root.render(<BrowserTabIcon favicon={favicon} />));
+    expect(container.querySelector("img")).toBeNull();
+    const next = {
+      dataUrl:
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+    };
+    await act(async () => root.render(<BrowserTabIcon favicon={next} />));
+    expect(container.querySelector("img")?.getAttribute("src")).toBe(
+      next.dataUrl
+    );
   });
 });

@@ -162,7 +162,6 @@ app
     const { attachmentId } = await host.attach(event, "eac20941e6a410aa");
     const page = host.create(event, {
       attachmentId,
-      storageScope: "workspace",
       url: `${guestOrigin}/page`,
     });
     const request = targetFor(attachmentId, page);
@@ -296,18 +295,33 @@ app
 
     const fixture = path.join(process.argv[4], "private-fixture.html");
     fs.writeFileSync(fixture, "<html><title>Private</title></html>");
-    // Frame-originated blob links hit cancellable navigation hooks.
+    // Generated pages remain governed by normal Chromium origin semantics.
     const linkBlob = await guest.executeJavaScript(
       "URL.createObjectURL(new Blob(['private'],{type:'text/html'}))"
     );
     await guest.executeJavaScript(
       `(() => { const a=document.createElement('a'); a.href=${JSON.stringify(linkBlob)}; document.body.append(a); a.click(); })()`
     );
-    await new Promise((resolve) => setTimeout(resolve, 30));
-    assert.equal(guest.getURL(), `${guestOrigin}/page`);
+    await waitFor(() => guest.getURL() === linkBlob);
+    assert.equal(pageFor(window, attachmentId, page.id).url, linkBlob);
     assert.equal(guest.isDestroyed(), false);
-    mark("blob link canceled");
-    for (const scheme of ["file", "data", "private", "blob"]) {
+    mark("blob link allowed");
+    host.navigate(event, { ...request, url: `${guestOrigin}/page` });
+    await waitFor(
+      () => guest.getURL() === `${guestOrigin}/page` && !guest.isLoading()
+    );
+    for (const generated of ["about:blank", "data:text/html,generated"]) {
+      await guest.loadURL(generated);
+      await waitFor(
+        () => pageFor(window, attachmentId, page.id).url === generated
+      );
+      assert.equal(guest.isDestroyed(), false);
+      host.navigate(event, { ...request, url: `${guestOrigin}/page` });
+      await waitFor(
+        () => guest.getURL() === `${guestOrigin}/page` && !guest.isLoading()
+      );
+    }
+    for (const scheme of ["file", "private"]) {
       mark(`loading ${scheme}`);
       const url =
         scheme === "file"
@@ -344,29 +358,53 @@ app
     }
     result.requestPolicy = true;
 
-    const privatePage = host.create(event, {
-      attachmentId,
-      storageScope: "ephemeral",
-      url: `${guestOrigin}/private`,
+    const peerWindow = new BrowserWindow({
+      show: false,
+      width: 800,
+      height: 600,
+      webPreferences: {
+        webviewTag: true,
+        sandbox: true,
+        contextIsolation: true,
+        nodeIntegration: false,
+      },
     });
-    const privateGuest = await mount(
-      window,
-      attachmentId,
-      privatePage,
-      "private-guest"
+    windows.add(peerWindow);
+    await peerWindow.loadURL(`${origin}/desktop/workspace?id=1234567890abcdef`);
+    const peerAttachment = await host.attach(
+      eventFor(peerWindow),
+      "1234567890abcdef"
     );
-    assert.notEqual(privateGuest.session, guest.session);
+    const peerPage = host.create(eventFor(peerWindow), {
+      attachmentId: peerAttachment.attachmentId,
+      url: `${guestOrigin}/peer`,
+    });
+    const peerGuest = await mount(
+      peerWindow,
+      peerAttachment.attachmentId,
+      peerPage,
+      "peer-guest"
+    );
+    assert.equal(peerGuest.session, guest.session);
     await guest.session.cookies.set({
       url: guestOrigin,
       name: "fixture",
-      value: "workspace",
+      value: "shared-browser",
     });
     assert.equal(
-      (await privateGuest.session.cookies.get({ name: "fixture" })).length,
-      0
+      (await peerGuest.session.cookies.get({ name: "fixture" }))[0].value,
+      "shared-browser"
     );
-    result.profileSeparation = true;
-    await host.close(event, targetFor(attachmentId, privatePage));
+    await host.close(
+      eventFor(peerWindow),
+      targetFor(peerAttachment.attachmentId, peerPage)
+    );
+    assert.equal(
+      (await guest.session.cookies.get({ name: "fixture" }))[0].value,
+      "shared-browser"
+    );
+    peerWindow.destroy();
+    result.sharedProfile = true;
 
     mark("guest renderer crash");
     guest.forcefullyCrashRenderer();
@@ -417,7 +455,6 @@ app
     result.documentReloadEndsGuests = true;
     const lastPage = host.create(eventFor(window), {
       attachmentId: fresh.attachmentId,
-      storageScope: "workspace",
       url: `${guestOrigin}/last`,
     });
     const lastGuest = await mount(window, fresh.attachmentId, lastPage, "last");

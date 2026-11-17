@@ -71,9 +71,23 @@ export namespace ipc_admission {
   }): boolean {
     switch (role) {
       case "main":
-        // GRIDA-SEC-016 — this management action grants no page lease.
-        if (channel === IPC_CHANNELS.BROWSER_CLEAR_WORKSPACE_DATA)
-          return pathname === "/desktop/settings";
+        // GRIDA-SEC-016 — confirmed app-wide clearing grants no page lease.
+        if (
+          channel === IPC_CHANNELS.BROWSER_CLEAR_BROWSING_DATA ||
+          channel === IPC_CHANNELS.BROWSER_HISTORY_QUERY ||
+          channel === IPC_CHANNELS.BROWSER_HISTORY_REMOVE ||
+          channel === IPC_CHANNELS.BROWSER_CLEAR_HISTORY ||
+          channel === IPC_CHANNELS.BROWSER_CLEAR_CACHE ||
+          channel === IPC_CHANNELS.BROWSER_RESET_PERMISSIONS ||
+          channel === IPC_CHANNELS.BROWSER_DOWNLOAD_PREFERENCES ||
+          channel === IPC_CHANNELS.BROWSER_SET_DOWNLOAD_PROMPT ||
+          channel === IPC_CHANNELS.BROWSER_CHOOSE_DOWNLOAD_DIRECTORY ||
+          channel === IPC_CHANNELS.BROWSER_OPEN_PAGE
+        )
+          return (
+            pathname === "/desktop/settings" ||
+            pathname === "/desktop/workspace"
+          );
         // GRIDA-SEC-016 — browser controls belong only to the workspace shell.
         if (channel.startsWith("grida:browser:"))
           return pathname === "/desktop/workspace";

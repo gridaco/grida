@@ -17,7 +17,6 @@ import {
   useSyncExternalStore,
 } from "react";
 import {
-  GlobeIcon,
   Loader2Icon,
   PanelBottomIcon,
   PanelRightIcon,
@@ -25,12 +24,19 @@ import {
   XIcon,
 } from "lucide-react";
 import { Toggle } from "@app/ui/components/toggle";
+import {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+} from "@app/ui/components/context-menu";
 import { cn } from "@app/ui/lib/utils";
 import { getDesktopBridge, type Workspace } from "@/lib/desktop/bridge";
 import { DESKTOP_WINDOW_CONTROLS_RIGHT_INSET } from "@/scaffolds/desktop/chrome/title-bar";
 import { EditorPaneTab } from "./editor-pane-tab";
 import { EditorPaneStart } from "./editor-pane-start";
 import { BrowserPane } from "./browser-pane";
+import { BrowserTabIcon } from "./browser-tab-icon";
 import type { WorkspaceBrowserTabs } from "./workspace-browser-tabs";
 import { EditorTabPreview } from "./editor-tab-preview";
 import { TabNativeDragRegion } from "./tab-native-drag-region";
@@ -63,7 +69,7 @@ export type EditorPaneProps = {
   openTabs: readonly string[];
   activeTab: string | null;
   onSelectTab: (tab: string) => void;
-  onCloseTab: (tab: string) => void;
+  onCloseTab: (tab: string) => void | Promise<boolean>;
   onReopenClosedTab: () => void;
   /** Show the workspace-local faux Start tab while the real group is empty. */
   showStart: boolean;
@@ -111,11 +117,6 @@ export function EditorPane({
     browsers?.getSnapshot ?? emptyBrowserSnapshot,
     browsers?.getSnapshot ?? emptyBrowserSnapshot
   );
-  const handleOpenBrowser = useCallback(() => browsers?.open(), [browsers]);
-  const openBrowser =
-    browserState.supported && browserState.ready && !browserState.error
-      ? handleOpenBrowser
-      : undefined;
   const handleOpenStart = useCallback(() => {
     if (showStart) return;
     panels.show(
@@ -149,14 +150,14 @@ export function EditorPane({
   }, []);
 
   const handleClose = useCallback(
-    (tab: string) => {
+    async (tab: string): Promise<boolean> => {
       const relPath = WorkbenchTab.relPath(tab);
       if (relPath !== null && dirtyPaths.has(relPath)) {
         const name = relPath.split("/").pop() ?? relPath;
         const ok = window.confirm(
           `"${name}" has unsaved changes. Close anyway?`
         );
-        if (!ok) return;
+        if (!ok) return false;
       }
       if (relPath !== null)
         setDirtyPaths((prev) => {
@@ -165,9 +166,15 @@ export function EditorPane({
           next.delete(relPath);
           return next;
         });
-      onCloseTab(tab);
+      return (await onCloseTab(tab)) !== false;
     },
     [dirtyPaths, onCloseTab]
+  );
+  const handleCloseOthers = useCallback(
+    async (keep: string) => {
+      for (const tab of openTabs) if (tab !== keep) await handleClose(tab);
+    },
+    [openTabs, handleClose]
   );
   const shownPanels = useSyncExternalStore(
     panels.subscribe,
@@ -213,11 +220,41 @@ export function EditorPane({
       if (
         (event.metaKey || event.ctrlKey) &&
         !event.altKey &&
+        !event.isComposing
+      ) {
+        const action =
+          event.key === "+" || event.key === "="
+            ? "zoom-in"
+            : event.key === "-"
+              ? "zoom-out"
+              : event.key === "0"
+                ? "zoom-reset"
+                : !event.shiftKey && event.key.toLowerCase() === "p"
+                  ? "print"
+                  : null;
+        if (action && browsers?.commandActive(action)) {
+          event.preventDefault();
+          return;
+        }
+      }
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        !event.altKey &&
         !event.shiftKey
       ) {
-        if (event.key.toLowerCase() === "t" && openBrowser) {
+        if (
+          event.key.toLowerCase() === "f" &&
+          !event.isComposing &&
+          activeTab &&
+          WorkbenchTab.parse(activeTab).kind === "browser" &&
+          browsers?.findActive()
+        ) {
           event.preventDefault();
-          openBrowser();
+          return;
+        }
+        if (event.key.toLowerCase() === "t") {
+          event.preventDefault();
+          handleOpenStart();
           return;
         }
         if (
@@ -238,8 +275,16 @@ export function EditorPane({
 
     function onWorkbenchCommand(event: Event) {
       const command = (event as CustomEvent<unknown>).detail;
-      if (command === "workspace.browser.new") {
-        openBrowser?.();
+      if (
+        command === "workspace.tabs.new" ||
+        // Older native menus forward the former browser-specific command.
+        command === "workspace.browser.new"
+      ) {
+        handleOpenStart();
+        return;
+      }
+      if (command === "workspace.browser.find") {
+        browsers?.findActive();
         return;
       }
       if (command === "workspace.browser.focus-location") {
@@ -262,7 +307,7 @@ export function EditorPane({
         onWorkbenchCommand
       );
     };
-  }, [dispatchWorkspaceCommand, openBrowser, browsers, activeTab]);
+  }, [dispatchWorkspaceCommand, handleOpenStart, browsers, activeTab]);
 
   return (
     <div className={cn("flex h-full w-full flex-col", className)}>
@@ -277,6 +322,7 @@ export function EditorPane({
         dirtyPaths={dirtyPaths}
         onSelect={onSelectTab}
         onClose={handleClose}
+        onCloseOthers={handleCloseOthers}
         showStart={showStart}
         treeVisible={treeVisible}
         onToggleTree={onToggleTree}
@@ -370,7 +416,7 @@ function StartTabContent({
         onCreateCanvas={(editor) => onCreateCanvas(editor, replaceTab)}
         onOpenBrowser={
           browserState.supported && browserState.ready && !browserState.error
-            ? () => browsers?.open(undefined, "workspace", replaceTab)
+            ? () => browsers?.open(undefined, replaceTab)
             : undefined
         }
       />
@@ -389,6 +435,7 @@ function EditorTitleBar({
   dirtyPaths,
   onSelect,
   onClose,
+  onCloseOthers,
   showStart,
   treeVisible,
   onToggleTree,
@@ -406,6 +453,7 @@ function EditorTitleBar({
   dirtyPaths: Set<string>;
   onSelect: (tab: string) => void;
   onClose: (tab: string) => void;
+  onCloseOthers: (keep: string) => Promise<void>;
   showStart: boolean;
   treeVisible: boolean;
   onToggleTree: () => void;
@@ -523,6 +571,10 @@ function EditorTitleBar({
             <BrowserTabItem
               key={tab}
               tabKey={tab}
+              onCloseOthers={() => {
+                previewController.dismiss();
+                void onCloseOthers(tab);
+              }}
               entry={browserEntries.get(target.id)}
               previewController={previewController}
               active={tab === activeTab}
@@ -884,6 +936,7 @@ const noBrowserSubscription = () => () => {};
 
 function BrowserTabItem({
   tabKey,
+  onCloseOthers,
   entry,
   active,
   onSelect,
@@ -895,6 +948,7 @@ function BrowserTabItem({
   active: boolean;
   onSelect(): void;
   onClose(): void;
+  onCloseOthers(): void;
   previewController: TabPreviewController;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -909,29 +963,43 @@ function BrowserTabItem({
     } catch {}
   }
   return (
-    <WorkbenchPanelTab
-      ref={ref}
-      data-tab-native-drag-region-target={tabKey}
-      title={title || "Browser"}
-      icon={
-        entry?.page?.loading ? (
-          <Loader2Icon className="size-3.5 animate-spin" />
-        ) : (
-          <GlobeIcon className="size-3.5" />
-        )
-      }
-      active={active}
-      onSelect={onSelect}
-      onClose={onClose}
-      onPointerEnter={(event) =>
-        previewController.pointerEnter(
-          { tabKey, anchor: event.currentTarget },
-          event.pointerType
-        )
-      }
-      onPointerLeave={(event) =>
-        previewController.pointerLeave(tabKey, event.pointerType)
-      }
-    />
+    <ContextMenu
+      onOpenChange={(open) => {
+        if (open) previewController.dismiss();
+      }}
+    >
+      <ContextMenuTrigger asChild>
+        <WorkbenchPanelTab
+          ref={ref}
+          data-tab-native-drag-region-target={tabKey}
+          title={title || "Browser"}
+          icon={
+            entry?.page?.loading ? (
+              <Loader2Icon className="size-3.5 animate-spin" />
+            ) : (
+              <BrowserTabIcon favicon={entry?.favicon} />
+            )
+          }
+          active={active}
+          onSelect={onSelect}
+          onClose={onClose}
+          onPointerEnter={(event) =>
+            previewController.pointerEnter(
+              { tabKey, anchor: event.currentTarget },
+              event.pointerType
+            )
+          }
+          onPointerLeave={(event) =>
+            previewController.pointerLeave(tabKey, event.pointerType)
+          }
+        />
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem onSelect={onClose}>Close tab</ContextMenuItem>
+        <ContextMenuItem onSelect={onCloseOthers}>
+          Close other tabs
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }

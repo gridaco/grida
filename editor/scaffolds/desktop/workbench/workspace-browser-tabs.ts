@@ -1,5 +1,6 @@
 import { DesktopBrowser } from "@grida/desktop-bridge";
 import { Browser } from "@/lib/desktop/browser";
+import { BrowserPageControls } from "@/lib/desktop/browser-page-controls";
 import { WorkspaceViewState } from "@/lib/desktop/workspace-view-state";
 import type { EditorGroup } from "./editor-group";
 import type { BrowserGuestMounts } from "./browser-guest-mounts";
@@ -11,11 +12,12 @@ export namespace WorkspaceBrowserTabs {
     id: string;
     page: DesktopBrowser.Page | null;
     url: string | null;
-    storageScope: DesktopBrowser.StorageScope;
     error: string | null;
     locationRevision: number;
     /** Changes on navigation, including reloads to the same URL. */
     previewRevision?: number;
+    /** Current guest raster metadata; never persisted with URL restore state. */
+    favicon?: DesktopBrowser.Favicon | null;
   }>;
   export type State = Readonly<{
     supported: boolean;
@@ -46,6 +48,15 @@ export class WorkspaceBrowserTabs {
   private pages = new Map<string, DesktopBrowser.Page>();
   private entries = new Map<string, WorkspaceBrowserTabs.Entry>();
   private pending = new Set<string>();
+  private creationTasks = new Map<string, Promise<void>>();
+  private closeTasks = new Map<string, Promise<boolean>>();
+  private closing = new Set<string>();
+  private nativeCreations = new Map<
+    string,
+    { openerPageId: string | null; disposition: "foreground" | "background" }
+  >();
+  private lastChildren = new Map<string, string>();
+  private pageControls = new Map<string, BrowserPageControls.Controller>();
   private pendingLocations = new Map<string, string>();
   private previousTabs = new Set<string>();
   private closedOrder: string[] = [];
@@ -59,9 +70,13 @@ export class WorkspaceBrowserTabs {
   };
   private resyncing = false;
   private clearing = false;
-  private thumbnailEpoch = 0;
-  private thumbnailNavigation = new Map<string, number>();
+  private imageEpoch = 0;
+  private imageRevisions = new Map<string, number>();
   private buffered: DesktopBrowser.Event[] = [];
+  private faviconReads = new Map<
+    string,
+    { pageId: string; revision: number }
+  >();
 
   constructor(
     private readonly workspaceId: string,
@@ -71,12 +86,12 @@ export class WorkspaceBrowserTabs {
       | "subscribe"
       | "restore"
       | "open"
+      | "close"
       | "replace"
       | "closeMatching"
     >,
     private readonly getBridge: () => DesktopBrowser.Bridge | null = Browser.getBridge,
-    private readonly newId: () => string = () => crypto.randomUUID(),
-    private readonly confirmClear: () => Promise<boolean> = Browser.confirmClearSession
+    private readonly newId: () => string = () => crypto.randomUUID()
   ) {}
 
   subscribe = (listener: () => void): (() => void) => {
@@ -97,8 +112,14 @@ export class WorkspaceBrowserTabs {
     this.entries = new Map();
     this.pages = new Map();
     this.pending = new Set();
+    this.creationTasks.clear();
+    this.closeTasks.clear();
+    this.closing.clear();
+    this.nativeCreations.clear();
+    this.lastChildren.clear();
     this.pendingLocations = new Map();
-    this.thumbnailNavigation.clear();
+    this.imageRevisions.clear();
+    this.faviconReads.clear();
     this.closedOrder = [];
     this.state = {
       supported: this.bridge !== null,
@@ -139,6 +160,12 @@ export class WorkspaceBrowserTabs {
           return;
         }
         this.attachment = attached.attachmentId;
+        for (const event of this.buffered)
+          if (
+            event.type === "created" &&
+            event.attachmentId === this.attachment
+          )
+            this.nativeCreations.set(event.page.id, event);
         this.applySnapshot(attached);
         this.resyncing = true;
         const snapshot = DesktopBrowser.parseSnapshot(
@@ -173,7 +200,6 @@ export class WorkspaceBrowserTabs {
           id: descriptor.id,
           page,
           url: descriptor.url,
-          storageScope: "workspace",
           error:
             this.state.error ??
             (this.bridge
@@ -205,6 +231,7 @@ export class WorkspaceBrowserTabs {
     this.previousTabs = new Set(restoredTabs);
     this.state = { ...this.state, ready: true };
     this.unsubscribers.push(this.group.subscribe(this.reconcile));
+    this.adoptPages();
     this.publish();
     this.remember();
     for (const entry of this.entries.values())
@@ -222,22 +249,20 @@ export class WorkspaceBrowserTabs {
     this.revision = 0;
     this.resyncing = false;
     this.buffered = [];
+    this.faviconReads.clear();
+    for (const controls of this.pageControls.values()) controls.dispose();
+    this.pageControls.clear();
     if (bridge && attachmentId)
       void bridge.detach(attachmentId).catch(() => {});
   }
 
-  open = (
-    url?: string,
-    storageScope: DesktopBrowser.StorageScope = "workspace",
-    replaceTab?: string
-  ): void => {
+  open = (url?: string, replaceTab?: string): void => {
     if (!this.bridge || !this.attachment || !this.state.ready) return;
     const id = this.newId();
     this.entries.set(id, {
       id,
       page: null,
       url: url ?? null,
-      storageScope,
       error: null,
       locationRevision: 1,
     });
@@ -247,6 +272,103 @@ export class WorkspaceBrowserTabs {
     this.group.open(key);
     void this.ensurePage(id);
   };
+
+  controls(id: string): BrowserPageControls.Controller {
+    let controls = this.pageControls.get(id);
+    if (!controls) {
+      controls = new BrowserPageControls.Controller(() => {
+        const target = this.target(id);
+        const api = this.bridge?.utilities;
+        const page = this.entries.get(id)?.page;
+        return target &&
+          api?.version === DesktopBrowser.Utilities.VERSION &&
+          page?.mounted &&
+          !page.failure &&
+          this.group.getSnapshot().active === WorkbenchTab.browser(id)
+          ? { api, target, revision: this.imageRevisions.get(id) ?? 0 }
+          : null;
+      });
+      this.pageControls.set(id, controls);
+    }
+    return controls;
+  }
+
+  findActive(): boolean {
+    return this.commandActive("find");
+  }
+
+  commandActive(
+    action: "find" | "zoom-in" | "zoom-out" | "zoom-reset" | "print"
+  ): boolean {
+    const key = this.group.getSnapshot().active;
+    if (!key) return false;
+    const tab = WorkbenchTab.parse(key);
+    if (tab.kind !== "browser") return false;
+    const controls = this.controls(tab.id);
+    controls.sync();
+    if (!controls.read().supported) return false;
+    switch (action) {
+      case "find":
+        return controls.openFind();
+      case "print":
+        void controls.print();
+        break;
+      case "zoom-in":
+        void controls.zoom("in");
+        break;
+      case "zoom-out":
+        void controls.zoom("out");
+        break;
+      case "zoom-reset":
+        void controls.zoom("reset");
+        break;
+    }
+    return true;
+  }
+
+  close = (id: string): Promise<boolean> => {
+    const pending = this.closeTasks.get(id);
+    if (pending) return pending;
+    this.closing.add(id);
+    const task = this.closePage(id).finally(() => {
+      if (this.closeTasks.get(id) === task) {
+        this.closeTasks.delete(id);
+        this.closing.delete(id);
+      }
+    });
+    this.closeTasks.set(id, task);
+    return task;
+  };
+
+  async closeMatching(predicate: (key: string) => boolean): Promise<void> {
+    for (const key of this.group.getSnapshot().tabs) {
+      const tab = WorkbenchTab.parse(key);
+      if (tab.kind === "browser" && predicate(key)) await this.close(tab.id);
+    }
+  }
+
+  private async closePage(id: string): Promise<boolean> {
+    const epoch = this.epoch;
+    await this.ensurePage(id);
+    if (epoch !== this.epoch) return false;
+    const target = this.target(id);
+    const bridge = this.bridge;
+    if (!target) {
+      this.group.close(WorkbenchTab.browser(id));
+      return true;
+    }
+    if (!bridge) return false;
+    try {
+      const accepted = await bridge.close(target);
+      if (epoch !== this.epoch || accepted !== true) return false;
+      this.finishClosed(target.pageId);
+      return true;
+    } catch {
+      if (epoch === this.epoch)
+        this.setError(id, "This page could not be closed. Try again.");
+      return false;
+    }
+  }
 
   focusLocation = (): void => {
     const active = this.group.getSnapshot().active;
@@ -270,7 +392,7 @@ export class WorkspaceBrowserTabs {
       this.setError(id, "Enter an HTTP or HTTPS address.");
       return;
     }
-    this.invalidateThumbnail(id);
+    this.invalidatePageImages(id);
     if (!entry.page) {
       this.entries.set(id, { ...entry, url, error: null });
       this.pendingLocations.set(id, url);
@@ -287,7 +409,7 @@ export class WorkspaceBrowserTabs {
   ): void => {
     const entry = this.entries.get(id);
     if (action === "back" || action === "forward" || action === "reload")
-      this.invalidateThumbnail(id);
+      this.invalidatePageImages(id);
     if (action === "reload" && entry && !entry.page) {
       void this.ensurePage(id);
       return;
@@ -346,6 +468,7 @@ export class WorkspaceBrowserTabs {
       !bridge?.thumbnail ||
       !target ||
       !page?.url ||
+      DesktopBrowser.normalizeUrl(page.url) === null ||
       !page.mounted ||
       page.loading ||
       page.failure ||
@@ -353,20 +476,20 @@ export class WorkspaceBrowserTabs {
     )
       return null;
     const epoch = this.epoch;
-    const thumbnailEpoch = this.thumbnailEpoch;
-    const navigation = this.thumbnailNavigation.get(id) ?? 0;
+    const imageEpoch = this.imageEpoch;
+    const navigation = this.imageRevisions.get(id) ?? 0;
     const url = page.url;
     try {
       const value = await bridge.thumbnail(target);
       const current = this.entries.get(id);
       if (
         epoch !== this.epoch ||
-        thumbnailEpoch !== this.thumbnailEpoch ||
+        imageEpoch !== this.imageEpoch ||
         this.clearing ||
         this.attachment !== target.attachmentId ||
         current?.page?.id !== target.pageId ||
         current.page.url !== url ||
-        navigation !== (this.thumbnailNavigation.get(id) ?? 0) ||
+        navigation !== (this.imageRevisions.get(id) ?? 0) ||
         !this.group.getSnapshot().tabs.includes(WorkbenchTab.browser(id))
       )
         return null;
@@ -376,25 +499,29 @@ export class WorkspaceBrowserTabs {
     }
   }
 
-  private invalidateThumbnail(id: string): void {
-    const revision = (this.thumbnailNavigation.get(id) ?? 0) + 1;
-    this.thumbnailNavigation.set(id, revision);
+  private invalidatePageImages(id: string): void {
+    const revision = (this.imageRevisions.get(id) ?? 0) + 1;
+    this.imageRevisions.set(id, revision);
     const entry = this.entries.get(id);
-    if (entry) this.entries.set(id, { ...entry, previewRevision: revision });
+    if (entry)
+      this.entries.set(id, {
+        ...entry,
+        previewRevision: revision,
+        favicon: null,
+      });
   }
 
-  clearSession = async (): Promise<void> => {
-    if (this.clearing || !this.bridge || !this.attachment) return;
+  clearBrowsingData = async (): Promise<void> => {
+    if (this.clearing || !this.bridge) return;
     this.clearing = true;
     const epoch = this.epoch;
     try {
-      if (!(await this.confirmClear()) || epoch !== this.epoch) return;
-      this.thumbnailEpoch++;
-      await this.bridge.clearSession({ attachmentId: this.attachment });
-      if (epoch !== this.epoch) return;
-      this.group.closeMatching(
-        (key) => WorkbenchTab.parse(key).kind === "browser"
-      );
+      const cleared = await this.bridge.clearBrowsingData();
+      if (typeof cleared !== "boolean")
+        throw new Error("Invalid browser clear result");
+      if (cleared && epoch === this.epoch) this.imageEpoch++;
+      // Native closed outcomes remove each window's exact owned pages. A page
+      // opened after global clearing completes is not part of that operation.
     } catch {
       const active = this.group.getSnapshot().active;
       const tab = active ? WorkbenchTab.parse(active) : null;
@@ -427,7 +554,17 @@ export class WorkspaceBrowserTabs {
     );
   }
 
-  private async ensurePage(id: string): Promise<void> {
+  private ensurePage(id: string): Promise<void> {
+    const existing = this.creationTasks.get(id);
+    if (existing) return existing;
+    const task = this.createPage(id).finally(() => {
+      if (this.creationTasks.get(id) === task) this.creationTasks.delete(id);
+    });
+    this.creationTasks.set(id, task);
+    return task;
+  }
+
+  private async createPage(id: string): Promise<void> {
     const entry = this.entries.get(id);
     if (
       !entry ||
@@ -443,7 +580,6 @@ export class WorkspaceBrowserTabs {
       const page = DesktopBrowser.parsePage(
         await this.bridge.create({
           attachmentId: this.attachment,
-          storageScope: entry.storageScope,
           ...(entry.url ? { url: entry.url } : {}),
         })
       );
@@ -481,7 +617,7 @@ export class WorkspaceBrowserTabs {
         void this.bridge
           ?.close({ attachmentId: this.attachment!, pageId: page.id })
           .catch(() => {});
-        this.entries.set(id, { ...current, page: null });
+        this.entries.set(id, { ...current, page: null, favicon: null });
       }
     } catch {
       if (epoch === this.epoch)
@@ -492,6 +628,7 @@ export class WorkspaceBrowserTabs {
     } finally {
       if (epoch === this.epoch) {
         this.pending.delete(id);
+        this.adoptPages();
         this.publish();
         this.remember();
       }
@@ -509,8 +646,19 @@ export class WorkspaceBrowserTabs {
         this.closedOrder.push(id);
         if (!entry.page) continue;
         const target = this.target(id);
-        this.entries.set(id, { ...entry, page: null, url: entry.page.url });
-        if (target && this.bridge)
+        this.entries.set(id, {
+          ...entry,
+          page: null,
+          url: entry.page.url,
+          favicon: null,
+        });
+        this.faviconReads.delete(id);
+        if (
+          target &&
+          this.bridge &&
+          this.pages.has(target.pageId) &&
+          !this.closing.has(id)
+        )
           void this.bridge.close(target).catch(() => {});
       }
     }
@@ -518,7 +666,10 @@ export class WorkspaceBrowserTabs {
       const oldest = this.closedOrder.shift()!;
       this.entries.delete(oldest);
       this.pendingLocations.delete(oldest);
-      this.thumbnailNavigation.delete(oldest);
+      this.imageRevisions.delete(oldest);
+      this.faviconReads.delete(oldest);
+      this.pageControls.get(oldest)?.dispose();
+      this.pageControls.delete(oldest);
     }
     this.previousTabs = open;
     this.publish();
@@ -532,6 +683,8 @@ export class WorkspaceBrowserTabs {
       this.buffer(event);
       return;
     }
+    if (event.type === "created" && event.attachmentId === this.attachment)
+      this.nativeCreations.set(event.page.id, event);
     if (
       event.attachmentId !== this.attachment ||
       event.revision <= this.revision
@@ -552,7 +705,9 @@ export class WorkspaceBrowserTabs {
 
   private acceptEvent(event: DesktopBrowser.Event): void {
     this.revision = event.revision;
-    if (event.type === "changed") {
+    if (event.type === "changed" || event.type === "created") {
+      if (event.type === "created")
+        this.nativeCreations.set(event.page.id, event);
       const previous = this.pages.get(event.page.id);
       if (
         previous &&
@@ -562,20 +717,84 @@ export class WorkspaceBrowserTabs {
           previous.failure !== event.page.failure)
       ) {
         for (const [id, entry] of this.entries)
-          if (entry.page?.id === event.page.id) this.invalidateThumbnail(id);
+          if (entry.page?.id === event.page.id) this.invalidatePageImages(id);
       }
       this.pages.set(event.page.id, event.page);
     } else {
-      this.pages.delete(event.pageId);
-      const closed = new Set<string>();
-      for (const [id, entry] of this.entries) {
-        if (entry.page?.id !== event.pageId) continue;
-        this.entries.set(id, { ...entry, page: null });
-        closed.add(WorkbenchTab.browser(id));
-      }
-      if (closed.size) this.group.closeMatching((key) => closed.has(key));
+      this.finishClosed(event.pageId);
     }
+    this.adoptPages();
     this.refreshEntries();
+  }
+
+  private finishClosed(pageId: string): void {
+    this.pages.delete(pageId);
+    this.nativeCreations.delete(pageId);
+    for (const [id, entry] of this.entries) {
+      if (entry.page?.id !== pageId) continue;
+      const live = entry.page.url;
+      const transient =
+        live !== null && DesktopBrowser.normalizeUrl(live) === null;
+      this.entries.set(id, {
+        ...entry,
+        page: null,
+        url: transient ? null : live,
+        favicon: null,
+      });
+      this.faviconReads.delete(id);
+      const key = WorkbenchTab.browser(id);
+      if (this.closing.has(id) && !transient) this.group.close(key);
+      else this.group.closeMatching((candidate) => candidate === key);
+      if (transient) this.entries.delete(id);
+    }
+  }
+
+  private adoptPages(): void {
+    if (!this.state.ready || this.pending.size) return;
+    const owned = new Set(
+      [...this.entries.values()].flatMap((entry) =>
+        entry.page ? [entry.page.id] : []
+      )
+    );
+    for (const page of this.pages.values()) {
+      if (owned.has(page.id)) {
+        this.nativeCreations.delete(page.id);
+        continue;
+      }
+      const creation = this.nativeCreations.get(page.id);
+      const opener = creation?.openerPageId
+        ? [...this.entries.values()].find(
+            (entry) => entry.page?.id === creation.openerPageId
+          )
+        : null;
+      const id = this.newId();
+      const key = WorkbenchTab.browser(id);
+      this.entries.set(id, {
+        id,
+        page,
+        url: page.url,
+        error: null,
+        locationRevision: 0,
+      });
+      owned.add(page.id);
+      this.publish();
+      const sibling = creation?.openerPageId
+        ? this.lastChildren.get(creation.openerPageId)
+        : undefined;
+      const after =
+        sibling && this.group.getSnapshot().tabs.includes(sibling)
+          ? sibling
+          : opener
+            ? WorkbenchTab.browser(opener.id)
+            : undefined;
+      this.group.open(key, {
+        after,
+        activate: creation?.disposition === "foreground" || page.focused,
+      });
+      if (creation?.openerPageId)
+        this.lastChildren.set(creation.openerPageId, key);
+      this.nativeCreations.delete(page.id);
+    }
   }
 
   private drainEvents(): boolean {
@@ -604,8 +823,19 @@ export class WorkspaceBrowserTabs {
       snapshot.revision < this.revision
     )
       return;
+    for (const event of this.buffered)
+      if (
+        event.type === "created" &&
+        event.attachmentId === snapshot.attachmentId
+      )
+        this.nativeCreations.set(event.page.id, event);
     this.revision = snapshot.revision;
+    const missing = [...this.pages.keys()].filter(
+      (id) => !snapshot.pages.some((page) => page.id === id)
+    );
     this.pages = new Map(snapshot.pages.map((page) => [page.id, page]));
+    for (const id of missing) this.finishClosed(id);
+    this.adoptPages();
     this.refreshEntries();
   }
 
@@ -634,7 +864,19 @@ export class WorkspaceBrowserTabs {
     for (const [id, entry] of this.entries) {
       if (!entry.page) continue;
       const page = this.pages.get(entry.page.id) ?? null;
-      this.entries.set(id, { ...entry, page, url: page?.url ?? entry.url });
+      this.entries.set(id, {
+        ...entry,
+        page,
+        url: page?.url ?? entry.url,
+        favicon:
+          !page ||
+          page.url !== entry.page.url ||
+          page.loading ||
+          !page.mounted ||
+          page.failure
+            ? null
+            : entry.favicon,
+      });
     }
     this.publish();
     this.remember();
@@ -649,7 +891,58 @@ export class WorkspaceBrowserTabs {
 
   private publish(): void {
     this.state = { ...this.state, entries: new Map(this.entries) };
+    for (const controls of this.pageControls.values()) controls.sync();
     for (const listener of this.listeners) listener();
+    for (const entry of this.entries.values()) void this.readFavicon(entry);
+  }
+
+  private async readFavicon(entry: WorkspaceBrowserTabs.Entry): Promise<void> {
+    const bridge = this.bridge;
+    const page = entry.page;
+    const target = this.target(entry.id);
+    if (
+      !bridge?.favicon ||
+      !target ||
+      !page?.url ||
+      DesktopBrowser.normalizeUrl(page.url) === null ||
+      !page.mounted ||
+      page.loading ||
+      page.failure ||
+      !this.group.getSnapshot().tabs.includes(WorkbenchTab.browser(entry.id))
+    )
+      return;
+    const previous = this.faviconReads.get(entry.id);
+    if (previous?.pageId === page.id && previous.revision === page.revision)
+      return;
+    const read = { pageId: page.id, revision: page.revision };
+    this.faviconReads.set(entry.id, read);
+    const epoch = this.epoch;
+    const navigation = this.imageRevisions.get(entry.id) ?? 0;
+    const clearing = this.imageEpoch;
+    try {
+      const favicon = DesktopBrowser.parseFavicon(await bridge.favicon(target));
+      const current = this.entries.get(entry.id);
+      if (
+        epoch !== this.epoch ||
+        clearing !== this.imageEpoch ||
+        this.attachment !== target.attachmentId ||
+        this.faviconReads.get(entry.id) !== read ||
+        (this.imageRevisions.get(entry.id) ?? 0) !== navigation ||
+        current?.page?.id !== page.id ||
+        current.page.url !== page.url ||
+        current.page.loading ||
+        !current.page.mounted ||
+        current.page.failure ||
+        !this.group.getSnapshot().tabs.includes(WorkbenchTab.browser(entry.id))
+      )
+        return;
+      if ((current.favicon?.dataUrl ?? null) === (favicon?.dataUrl ?? null))
+        return;
+      this.entries.set(entry.id, { ...current, favicon });
+      this.publish();
+    } catch {
+      // Optional website metadata cannot fail the page or initiate a retry loop.
+    }
   }
 
   private remember(): void {
@@ -663,7 +956,10 @@ export class WorkspaceBrowserTabs {
       if (tab.kind === "file") descriptor = tab;
       else if (tab.kind === "browser") {
         const entry = this.entries.get(tab.id);
-        if (!entry || entry.storageScope !== "workspace") continue;
+        if (!entry) continue;
+        const live = entry.page?.url ?? entry.url;
+        if (live !== null && DesktopBrowser.normalizeUrl(live) === null)
+          continue;
         descriptor = {
           kind: "browser",
           id: entry.id,

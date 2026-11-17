@@ -1,39 +1,40 @@
-import type { DesktopBrowser, Workspace } from "@grida/desktop-bridge";
+import { DesktopBrowser } from "@grida/desktop-bridge";
 
-/** Settings may clear one workspace's website data without attaching to pages. */
+/** Settings clears the shared browser profile without attaching to pages. */
 export namespace SettingsBrowser {
-  type Native = Pick<DesktopBrowser.Bridge, "clearWorkspaceData">;
-  export type WorkspaceChoice = Readonly<
-    Pick<Workspace, "id" | "name" | "root">
-  >;
+  type Native = Pick<DesktopBrowser.Bridge, "clearBrowsingData" | "management">;
   export type State = Readonly<{
     supported: boolean;
-    loading: boolean;
-    workspaces: readonly WorkspaceChoice[];
-    selectedId: string | null;
     clearing: boolean;
     result: "cleared" | "cancelled" | null;
     error: string | null;
+    managementSupported: boolean;
+    canOpenHistory: boolean;
+    downloads: DesktopBrowser.Management.DownloadPreferences | null;
+    action: string | null;
+    notice: string | null;
   }>;
 
   export class Controller {
     private state: State = {
       supported: false,
-      loading: true,
-      workspaces: [],
-      selectedId: null,
       clearing: false,
       result: null,
       error: null,
+      managementSupported: false,
+      canOpenHistory: false,
+      downloads: null,
+      action: null,
+      notice: null,
     };
     private listeners = new Set<() => void>();
     private generation = 0;
     private pending = false;
+    private readGeneration = 0;
 
-    constructor(
-      private readonly native: () => Native | null | undefined,
-      private readonly listWorkspaces: () => Promise<readonly Workspace[]>
-    ) {}
+    constructor(private readonly native: () => Native | null | undefined) {
+      this.state = { ...this.state, supported: !!native()?.clearBrowsingData };
+    }
 
     readonly read = (): State => this.state;
     readonly subscribe = (listener: () => void): (() => void) => {
@@ -41,97 +42,55 @@ export namespace SettingsBrowser {
       return () => this.listeners.delete(listener);
     };
 
-    /** Stop observing an in-flight action; native accepted work keeps its owner. */
+    /** Stop observing an in-flight action; accepted native work keeps its owner. */
     cancel(): void {
       this.generation++;
+      this.readGeneration++;
       this.pending = false;
+      this.publish({ action: null, clearing: false });
     }
 
-    readonly select = (id: string): void => {
-      if (
-        this.pending ||
-        !this.state.workspaces.some((workspace) => workspace.id === id)
-      )
+    readonly refresh = (): void => {
+      if (this.pending) return;
+      if (!this.native()?.clearBrowsingData) {
+        this.unsupported();
         return;
-      this.publish({ selectedId: id, result: null, error: null });
+      }
+      this.publish({ supported: true, clearing: false });
+      const management = this.management();
+      this.publish({
+        managementSupported: !!management,
+        canOpenHistory: typeof management?.openPage === "function",
+      });
+      if (management) void this.loadPreferences(management);
     };
 
-    readonly refresh = async (): Promise<void> => {
+    readonly clear = async (): Promise<void> => {
       if (this.pending) return;
-      if (!this.native()?.clearWorkspaceData) {
+      const api = this.native();
+      if (!api?.clearBrowsingData) {
         this.unsupported();
         return;
       }
       this.pending = true;
+      this.readGeneration++;
       const generation = ++this.generation;
       this.publish({
         supported: true,
-        loading: true,
-        clearing: false,
+        clearing: true,
+        result: null,
         error: null,
       });
       try {
-        const workspaces = Array.from(
-          new Map(
-            (await this.listWorkspaces()).map(({ id, name, root }) => [
-              id,
-              { id, name, root },
-            ])
-          ).values()
-        );
-        if (generation !== this.generation) return;
-        const selectedId = workspaces.some(
-          (workspace) => workspace.id === this.state.selectedId
-        )
-          ? this.state.selectedId
-          : null;
-        this.publish({
-          workspaces,
-          selectedId,
-          ...(selectedId === null ? { result: null } : {}),
-        });
-      } catch {
-        if (generation === this.generation)
-          this.publish({
-            error: "Couldn’t load workspaces. Try refreshing the list.",
-          });
-      } finally {
-        if (generation === this.generation) {
-          this.pending = false;
-          this.publish({ loading: false });
-        }
-      }
-    };
-
-    readonly clearSelected = async (): Promise<void> => {
-      if (this.pending) return;
-      const api = this.native();
-      if (!api?.clearWorkspaceData) {
-        this.unsupported();
-        return;
-      }
-      const workspace = this.state.workspaces.find(
-        (entry) => entry.id === this.state.selectedId
-      );
-      if (!workspace) return;
-      this.pending = true;
-      const generation = ++this.generation;
-      this.publish({ clearing: true, result: null, error: null });
-      try {
-        // Main names the registered workspace, confirms, and rechecks admission.
-        const cleared = await api.clearWorkspaceData({
-          workspaceId: workspace.id,
-        });
+        // Main confirms the same app-wide operation from Settings and toolbar.
+        const cleared = await api.clearBrowsingData();
         if (typeof cleared !== "boolean")
           throw new Error("Invalid browser clear result");
         if (generation === this.generation)
           this.publish({ result: cleared ? "cleared" : "cancelled" });
       } catch {
         if (generation === this.generation)
-          this.publish({
-            error:
-              "Couldn’t clear this workspace’s cookies and site data. Refresh the list and try again.",
-          });
+          this.publish({ error: "Couldn’t clear browsing data. Try again." });
       } finally {
         if (generation === this.generation) {
           this.pending = false;
@@ -140,15 +99,135 @@ export namespace SettingsBrowser {
       }
     };
 
+    readonly clearHistory = (): Promise<void> =>
+      this.perform("history", async (api) =>
+        this.completed(await api.clearHistory(), "Browsing history cleared.")
+      );
+    readonly clearCache = (): Promise<void> =>
+      this.perform("cache", async (api) =>
+        this.completed(await api.clearCache(), "Browser cache cleared.")
+      );
+    readonly resetPermissions = (): Promise<void> =>
+      this.perform("permissions", async (api) =>
+        this.completed(
+          await api.resetPermissions(),
+          "Site permissions reset. Open pages reload to stop active access.",
+          "Reset cancelled."
+        )
+      );
+    readonly chooseDownloadDirectory = (): Promise<void> =>
+      this.perform("download-directory", async (api) => {
+        const value = await api.chooseDownloadDirectory();
+        if (value === null) return null;
+        const preferences =
+          DesktopBrowser.Management.parseDownloadPreferences(value);
+        if (!preferences) throw new Error("Invalid browser preferences");
+        return { preferences, notice: "Download location updated." };
+      });
+    readonly setDownloadPrompt = (askBeforeDownload: boolean): Promise<void> =>
+      this.perform("download-prompt", async (api) => {
+        const preferences = DesktopBrowser.Management.parseDownloadPreferences(
+          await api.setDownloadPrompt({ askBeforeDownload })
+        );
+        if (!preferences) throw new Error("Invalid browser preferences");
+        return { preferences, notice: null };
+      });
+    readonly openHistory = (url: string): Promise<void> =>
+      this.perform("open-page", async (api) => {
+        const request = DesktopBrowser.Management.parseOpenPage({ url });
+        if (!request || !api.openPage) return null;
+        const opened = await api.openPage(request);
+        if (typeof opened !== "boolean")
+          throw new Error("Invalid browser open result");
+        return opened
+          ? null
+          : "Open a workspace to view this page in the built-in browser.";
+      });
+
+    private completed(
+      value: unknown,
+      success: string,
+      cancelled = "Clearing cancelled."
+    ): string {
+      if (typeof value !== "boolean")
+        throw new Error("Invalid browser management result");
+      return value ? success : cancelled;
+    }
+
+    private management(): DesktopBrowser.Management.Bridge | null {
+      const api = this.native()?.management;
+      return api?.version === DesktopBrowser.Management.VERSION ? api : null;
+    }
+    private async loadPreferences(
+      api: DesktopBrowser.Management.Bridge
+    ): Promise<void> {
+      const generation = ++this.readGeneration;
+      try {
+        const value = DesktopBrowser.Management.parseDownloadPreferences(
+          await api.downloadPreferences()
+        );
+        if (generation !== this.readGeneration || this.pending) return;
+        if (!value) throw new Error("Invalid browser preferences");
+        this.publish({ downloads: value });
+      } catch {
+        if (generation === this.readGeneration && !this.pending)
+          this.publish({
+            error: "Couldn’t load browser preferences. Try again.",
+          });
+      }
+    }
+    private async perform(
+      action: string,
+      operation: (api: DesktopBrowser.Management.Bridge) => Promise<
+        | string
+        | null
+        | {
+            preferences: DesktopBrowser.Management.DownloadPreferences;
+            notice: string | null;
+          }
+      >
+    ): Promise<void> {
+      if (this.pending) return;
+      const api = this.management();
+      if (!api) return;
+      this.pending = true;
+      this.readGeneration++;
+      const generation = ++this.generation;
+      this.publish({ action, error: null, notice: null, result: null });
+      try {
+        const result = await operation(api);
+        if (generation !== this.generation) return;
+        if (result && typeof result === "object")
+          this.publish({
+            downloads: result.preferences,
+            notice: result.notice,
+          });
+        else this.publish({ notice: result });
+      } catch {
+        if (generation === this.generation)
+          this.publish({
+            error: "The browser action could not be completed. Try again.",
+          });
+      } finally {
+        if (generation === this.generation) {
+          this.pending = false;
+          this.publish({ action: null });
+        }
+      }
+    }
+
     private unsupported(): void {
+      this.readGeneration++;
       this.publish({
         supported: false,
-        loading: false,
         clearing: false,
-        workspaces: [],
-        selectedId: null,
         result: null,
         error: null,
+        managementSupported: false,
+        canOpenHistory: false,
+        downloads: null,
+        action: null,
+        notice: null,
       });
     }
     private publish(patch: Partial<State>): void {

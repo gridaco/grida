@@ -4344,16 +4344,24 @@ caller is the actual privileged top-level workbench document.
 
 1. **Separate guest contexts.** Main forces sandboxing, context isolation,
    disabled Node integration and disabled nested webviews at guest admission.
-   Renderer-supplied preferences and preload paths are discarded; no guest
-   preload is approved. Guests receive neither the application preload nor
-   its additional arguments. Main selects explicit browser sessions, ignoring
-   renderer partition names; it never uses the default account session or provider-network session and installs no
-   private workspace protocol on them.
+   Renderer-supplied preferences and preload paths are discarded. Main approves
+   only its bundled sandboxed link-intent helper; that helper exposes no
+   application bridge or Node API to website scripts. Guests receive neither
+   the application preload nor its additional arguments. Main forces the shared browser session, ignoring
+   renderer partition names; it never uses the default account or provider
+   session and installs no private workspace protocol on the browser session.
 2. **Exact shell admission.** Common native IPC requires the exact window
    `webContents` and its current top-level sender frame, in addition to the
    existing origin, route and native role checks. Browser IPC is limited to
-   workspace shells, with one Settings-only workspace-data clearing operation
-   that grants no attachment or page-control authority. Global
+   workspace shells, with global browsing-data clearing and bounded shared
+   history management also admitted in Settings. Those management operations
+   grant no attachment or existing-page control authority. The optional open-page
+   management intent accepts only a canonical HTTP(S) address; Main selects an
+   existing admitted owner and emits a native-created page outcome. A Settings
+   document cannot select a window, lease or page identity. Private guest link
+   IPC independently validates the actual registered guest and current main
+   frame, records a bounded one-use click intent and uses Chromium's native
+   referrer metadata. It is not part of the Grida website bridge. Global
    account-navigation reconciliation likewise checks
    exact shell identity before acting. Guest navigation to a Desktop URL grants
    no native authority and cannot hide or reconcile the owning shell.
@@ -4377,30 +4385,74 @@ caller is the actual privileged top-level workbench document.
    A committed document replacement also revokes a browser attachment created
    after that navigation had already started, so a late attachment cannot
    leave a guest admitted under a different application document.
-4. **Destination and browser policy.** Main validates HTTP(S) navigation and
-   external handoff, refusing credential-bearing, file, executable and private
-   top-level URLs. A browser-session request filter also rejects forbidden
-   main-frame document requests exposed by Chromium, including file/data loads
-   initiated through stock webview APIs. Programmatic local document loaders
-   such as blob can bypass those request hooks; observed unsupported loads
-   revoke input and are terminated asynchronously after the native callback.
-   This containment does not guarantee their scripts never executed.
-   Subframes retain ordinary web content schemes without gaining native
-   authority. Popups, sensitive permissions, device access,
-   JavaScript dialogs and HTTP auth are denied. Certificates use the engine's
-   verdict. Downloads require a native save destination under a live owning
-   attachment and are never opened automatically.
-5. **Profile lifetime.** Workspace-persistent browser profiles and per-page
-   ephemeral profiles have separate identities. Clearing a workspace locks
-   admission and page operations for that scope, closes its pages across
-   windows and clears storage, connections, cache and auth state before
-   unlocking. Ephemeral closure releases its retained session state. These
-   operations never clear the Desktop or provider sessions.
-   The Settings action resolves its selected workspace from the registered
-   catalog, shows a native confirmation naming that workspace with Cancel as
-   the default, and rechecks the exact Settings document and catalog identity
-   after asynchronous admission and confirmation before clearing begins.
-   It shares the existing workspace lock, page teardown and storage cleanup.
+4. **Website behavior without application authority.** Typed creation/navigation,
+   history, restoration, favicon fetching and default-browser handoff retain
+   strict HTTP(S) destination validation. Separately bounded live locations
+   allow ordinary generated `blob:`, `about:blank`/`srcdoc` and `data:` documents
+   under Chromium's web-origin rules. These transient values grant no native
+   fetch, file or application-protocol access and are not restart URLs. Main
+   continues rejecting file, executable, credential-bearing HTTP(S) and private
+   top-level destinations. Session request guards and observed-document
+   containment supplement cancellable navigation; they are not a preexecution
+   scripting barrier against the trusted embedder.
+   Ordinary links create owned browser tabs. Scripted/form/named windows use
+   real managed native child contents, retaining native opener, POST, referrer
+   and close semantics. Main forces the isolated browser session and security
+   preferences, installs child policy at creation and never gives these windows
+   an application role or application preload. No arbitrary webContents
+   adoption is used. Native dialogs and normal Leave/Stay behavior do not grant
+   additional authority; forced owner/document teardown remains explicit.
+   External-app links use a separate Main policy. Actual top-document clicks on
+   mail, telephone and SMS links can open the OS handler. Other protocols ask
+   for native consent; remembered consent applies only to a real click from the
+   same site and protocol during this Desktop session. Scripted requests with an
+   identified website context always ask; requests without attributable context
+   remain unavailable. Chromium's direct external launch is denied in favor of
+   this mediation. Frame-initiated handoffs retain Chromium's sandbox checks and
+   actual requesting-frame identity. Malformed, file, executable, internal and
+   Grida protocols are refused, and a stale requesting document cannot complete
+   an OS handoff.
+   Browser-site permissions are mediated by Main using actual requester and
+   embedding frame origins where the API supplies them, bounded session grants
+   and explicit native consent/source/device choosers. Null-webContents checks
+   can consume an existing origin grant but cannot invent an active-page prompt.
+   Sparse device APIs retain their actual origin/device evidence rather than
+   inferring an application role. Unknown powers and unattributable restricted
+   filesystem overrides remain unavailable. Permission reset revokes future
+   choices and reloads retained pages to stop their active streams.
+   Development TLS exceptions require a native choice for the exact browser
+   host and certificate's DER SHA-256 fingerprint. Unmatched certificates keep
+   Chromium's verdict; account/provider TLS is untouched. Chromium may cache
+   accepted browser trust until relaunch, which the UI/reference disclose.
+   HTTP authentication uses a script-free, isolated native form naming the
+   actual site or proxy challenge. Its bounded POST is intercepted before
+   network transmission, credentials never enter URLs, and callback ownership
+   is rechecked before use. Grida/provider credentials are never borrowed.
+   Downloads are admitted from an actual owned website into a native-selected
+   folder or save destination. Filenames are bounded/sanitized and automatic
+   destinations are reserved without overwriting existing files. Accepted
+   native jobs have their own lifetime after a tab closes and never execute
+   or automatically open downloaded files. Caller-supplied native paths are
+   not management arguments.
+5. **One persistent browser profile.** Every browser page shares one explicit
+   browser session across workspaces and windows. Ownership leases authorize
+   page operations, never a profile choice. Closing pages or withdrawing an
+   owner does not clear shared website storage. The application account and
+   provider sessions remain separate and are never cleared by this feature.
+   A single global clear operation is available from the exact admitted
+   workspace or Settings document. Main shows its own all-windows confirmation
+   with Cancel as the default and rechecks that exact document after the
+   asynchronous confirmation. No workspace, partition or path selector is
+   accepted. A global lock blocks competing browser admission and page work;
+   cleanup closes all owners' pages, aborts retained work, and clears browser
+   history, storage, connections, cache and authentication before unlocking. Recognized
+   legacy experimental browser partitions are cleaned only by this explicit
+   action, without merging their cookies into the shared profile or touching
+   account/provider partitions. Version3 is explicit: old scoped operations
+   are not forwarded to a global clear under an older client's confirmation.
+   Separate history/cache operations leave pages and sign-ins intact; permission
+   reset reloads pages. Version4 explicitly negotiates generated metadata,
+   native-created outcomes, cancellable close and the larger page bound.
 6. **Bounded observations.** The typed bridge carries bounded page
    metadata and revisioned snapshots, not raw Electron objects, credentials,
    scripts or debugger commands. DOM/CSS owns presentation; no native geometry
@@ -4411,13 +4463,29 @@ caller is the actual privileged top-level workbench document.
    hidden pages hidden, limits concurrency and rechecks attachment, page and
    navigation lifetime before publishing pixels. Hover images are transient
    display data; the presentation neither persists them nor polls for updates.
+   An optional favicon read returns only bounded raster data for the owned
+   guest's current document. Icon URLs come from that guest's native metadata;
+   callers cannot request arbitrary URLs. Fetches use its isolated session
+   without cookies/authentication, validate each HTTP(S) redirect, and bound
+   candidates, time and bytes. Raster bytes are validated without decoding in
+   Main. Navigation/teardown aborts requests and discards late results. The
+   workbench loads only the returned image data, never remote favicon URLs.
+   Optional versioned history reads expose only bounded, validated URL/title/
+   last-visit snapshots to exact admitted workspace or Settings documents.
+   Main records actual successful guest navigations; renderers cannot insert
+   visits or choose a history file. History changes publish revision-only
+   invalidations, and asynchronous reads/removals recheck their initiating
+   document. The bounded device-local history store serializes persistence,
+   removal and clearing; queued writes and stale title updates cannot restore
+   removed entries. Its fixed private file is read with regular-file, size and
+   no-follow checks and atomically replaced with owner-only permissions.
 
 **Limits.** Browser pages retain normal web networking, including reachable
 local services; this is not the native command sandbox. Local services must
 continue enforcing their own authentication and browser perimeter, including
 GRIDA-SEC-004. A selected upload or accepted download is an explicit user file
-operation. Profile separation does not prevent a user from separately signing
-into the same website in multiple profiles. The admitted shell may read its
+operation. Website sign-ins intentionally apply across all browser tabs; browser storage
+separation protects the application and provider sessions. The admitted shell may read its
 own pages' thumbnail pixels; the bridge does not prove a physical hover event.
 The admitted hosted workbench is a trusted embedder. Stock webview elements
 intrinsically expose APIs for their own guests, including script execution and
@@ -4428,13 +4496,41 @@ cancellable navigation and request hooks. The session request guard is not a
 preexecution barrier against the trusted embedder's existing scripting power.
 This boundary therefore does not isolate a guest's website contents from its authorized workbench. It isolates guest websites from native
 application authority and unrelated profiles. No agent tool, MCP server or
-product debugger surface is supplied. Main retains the actual registered guest
-for native commands and any separately authorized future debugger integration.
+agent debugger transport is supplied. The user can open native DevTools for an
+actual owned page; typed utility commands expose no arbitrary scripts, debugger
+messages or remote-debugging endpoint. Main retains the actual registered guest
+for native commands and any separately authorized future automation integration.
 
 **Files bound by this id.**
 
 - `desktop/src/main/browser-host.ts` — fixed guest preferences, profiles,
   admission, mount correlation, leases, navigation, downloads and teardown.
+- `desktop/src/main/browser-favicon.ts` and its tests — bounded, isolated
+  favicon fetching and document-lifetime cache.
+- `desktop/src/main/browser-legacy-profiles.ts` and its tests — narrowly
+  recognized legacy browser cleanup without account/provider partition access.
+- `desktop/src/main/browser-history.ts` and its tests — bounded shared history,
+  private persistence and ordered removal/clear barriers.
+- `desktop/src/browser-guest-preload.ts` and its tests — approved isolated,
+  one-use native link intent without a website-exposed Grida bridge.
+- `desktop/src/main/browser-site-policy.ts` and its tests — actual frame origins,
+  native website consent/choosers, session grants and scoped development TLS.
+- `desktop/src/main/browser-auth-dialog.ts` and its tests — isolated native
+  challenge form and bounded, non-transmitted credential submission.
+- `desktop/src/main/browser-downloads.ts` and its tests — native directory
+  preferences, safe destination reservation and accepted job lifetime.
+- `desktop/src/main/browser-page-tools.ts` and its tests — owned guest utilities
+  without script/debugger-command transport.
+- `desktop/src/main/browser-find-dialog.ts` and its tests — isolated, bounded
+  native find UI for managed website windows.
+- `desktop/src/main/browser-external-links.ts` and its tests — bounded OS-app
+  handoffs, native consent and requesting-document lifetime checks.
+- `desktop/forge.config.ts` — packages the fixed approved guest helper preload.
+- `desktop/src/menu.ts` and its tests — actual application origin and session
+  checks keep managed website windows out of workbench menu routing.
+- `desktop/Info.plist`, `desktop/build/entitlements.mac.plist` and
+  `desktop/scripts/prepare-dev-electron-branding.mjs` — browser-related macOS
+  usage descriptions and native capability declarations.
 - `desktop/src/main/ipc-handlers.ts` and `desktop/src/main/ipc-admission.ts` —
   exact shell/frame and operation-specific workspace or Settings admission.
 - `desktop/src/main/ipc-sender.ts` — navigation and teardown revocation for

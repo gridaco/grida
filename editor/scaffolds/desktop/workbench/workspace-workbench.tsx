@@ -421,7 +421,15 @@ export function WorkspaceWorkbench({
     (tab: string) => group.activate(tab),
     [group]
   );
-  const closeTab = useCallback((tab: string) => group.close(tab), [group]);
+  const closeTab = useCallback(
+    async (tab: string): Promise<boolean> => {
+      const target = WorkbenchTab.parse(tab);
+      if (target.kind === "browser") return browsers.close(target.id);
+      group.close(tab);
+      return true;
+    },
+    [group, browsers]
+  );
   const reopenClosedTab = useCallback(() => group.reopenClosed(), [group]);
 
   return (

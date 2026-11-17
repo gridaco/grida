@@ -39,6 +39,33 @@ describe("EditorGroup — open / activate", () => {
     expect(g.getSnapshot()).toBe(before);
   });
 
+  it("inserts beside an existing opener with one background publication", () => {
+    const g = new EditorGroup();
+    g.restore({ tabs: ["a", "b"], active: "b" });
+    const published: ReturnType<typeof snap>[] = [];
+    g.subscribe(() => published.push(snap(g)));
+    g.open("child", { after: "a", activate: false });
+    expect(published).toEqual([{ tabs: ["a", "child", "b"], active: "b" }]);
+    const before = g.getSnapshot();
+    g.open("child", { after: "b", activate: false });
+    expect(g.getSnapshot()).toBe(before);
+  });
+
+  it("falls back to append, selects the first background tab and preserves close history", () => {
+    const g = new EditorGroup();
+    g.open("historic");
+    g.close("historic");
+    g.open("a", { after: "missing", activate: false });
+    expect(snap(g)).toEqual({ tabs: ["a"], active: "a" });
+    g.open("b", { after: "missing", activate: false });
+    expect(snap(g)).toEqual({ tabs: ["a", "b"], active: "a" });
+    g.reopenClosed();
+    expect(snap(g)).toEqual({
+      tabs: ["a", "b", "historic"],
+      active: "historic",
+    });
+  });
+
   it("activate focuses an open tab; ignores unknown or already-active", () => {
     const g = new EditorGroup();
     g.open("a");

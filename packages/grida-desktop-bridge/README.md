@@ -250,13 +250,15 @@ and, when applicable, its model connection. A missing or stale click returns
 ## Native browser
 
 `browser` is optional under the unchanged outer Desktop bridge protocol 1.
-The browser contract is version 2 with `presentation: "webview"`. Offer browser
+The browser contract is version 4 with `presentation: "webview"`. Offer browser
 pages only when `caps.native.browser === true`, the namespace exists,
 `browser.version === DesktopBrowser.VERSION` and `browser.presentation ===
-"webview"`. Installed version-1 browser hosts are incompatible: withhold the
-version-2 page UI and requests until the native host is updated. Missing browser
-capability remains valid. Browser operation does not start chat or depend on
-file or media services.
+"webview"`. Installed version-1, version-2 and version-3 browser hosts are incompatible:
+withhold version-4 requests until the native host is updated, preserving saved
+tab URLs for restoration instead of erasing them while the feature is
+unavailable. Missing browser capability remains valid. Version-2 scoped clear
+operations must never be aliased to the version-3 global clear. Browser operation
+does not start chat or depend on file or media services.
 
 `attach(workspaceId)` asks Main to admit the exact top-level document to a
 registered workspace and returns its authoritative page snapshot. Main issues
@@ -264,6 +266,8 @@ an attachment ID bound to that document generation. The renderer cannot name
 another window, generation, native path or session. A well-formed identity or
 capability flag grants no authority. Every request rechecks native admission
 and page ownership; stale, foreign or invalid requests reject.
+Workspace identity authorizes ownership and tab placement; it does not select
+a browser storage profile.
 
 Subscribe before attaching or reading. Buffer outcomes during a read, then
 apply only outcomes for its attachment with revisions greater than the returned
@@ -272,9 +276,26 @@ revisions cannot exceed its owner revision. Ignore already-seen outcomes;
 a revision gap requires a new snapshot. A method response must never replace a
 newer retained view. Metadata is untrusted plain text.
 
+Main-created pages use `Event { type: "created", attachmentId, revision, page,
+openerPageId, disposition }`. The page revision equals the outcome revision.
+`openerPageId` is an opaque identity in the same attachment, or null when no
+opener is retained; it cannot name the created page itself. `disposition` is
+`"foreground"` or `"background"`, independently from actual input focus. Apply
+creation using the same attachment/revision rules as other outcomes. A snapshot
+is authoritative even when creation notifications were missed. Neither a valid
+opener string nor a received page descriptor grants authority over another
+attachment or permits arbitrary native guest adoption. Native window opens
+that retain web opener/POST behavior remain native-owned web content.
+
+`close(target)` resolves true after the page closes. It resolves false when the
+user chooses to keep the page, such as Stay in a before-unload dialog. Keep the
+tab and live page on false; admission and operational failures reject. This is
+part of the incompatible version-4 contract, rather than an older void close
+being interpreted as successful closure.
+
 ### Guest mounting and presentation
 
-`create({ attachmentId, storageScope, url? })` creates a page descriptor with
+`create({ attachmentId, url? })` creates a page descriptor with
 `mounted: false`. Omitting `url` requests a blank page. Submitted destinations
 must be absolute HTTP(S) URLs without credentials, controls or backslashes;
 `normalizeUrl` validates them without guessing a scheme.
@@ -300,8 +321,8 @@ their own classifications. No public adoption or raw guest-ID API exists.
 The document's presentation owner keeps guest nodes connected through React
 subscription/remount cycles, tab selection and same-document layout or group
 movement. DOM/CSS owns geometry, rounded clipping, visibility and composition
-with menus and dialogs. There is no native layout, bounds, zoom, radius or
-overlay API. `setActive({ ...target, active })` communicates input/focus
+with menus and dialogs. There is no native layout, bounds, radius or overlay API. The independently
+optional page zoom operation changes website scale, never presentation geometry. `setActive({ ...target, active })` communicates input/focus
 eligibility only. Main must not focus an inactive page; presentation must
 relinquish the guest's DOM focus and disable its input when inactive. Main's
 `focus` command alone does not establish the containing DOM element's focus.
@@ -310,7 +331,7 @@ remaining connected does not promise unthrottled playback.
 
 ### Document and storage lifetime
 
-`detach` ends the attachment's pages and guests, including ephemeral sessions.
+`detach` ends the attachment's pages and guests, preserving browser profile data.
 Replacing, reloading, crashing or destroying the containing document likewise
 ends its live guests. A new document reconstructs eligible URLs with fresh page
 and mount identities; URL restoration does not restore running documents,
@@ -322,48 +343,172 @@ page descriptor with `mounted: false`; explicit retry reserves a fresh guest
 at its retained URL. A crashed guest that still exists remains mounted with
 an observable failure. Neither case grants adoption of another guest.
 
-Storage scope is required. `workspace` uses an isolated native-managed,
-persistent workspace browser session. `ephemeral` uses an in-memory session
-unique to the page lifetime, discarded when that page ends. A same-document
-guest retry may retain that page's session; document loss or window transfer
-promises no private-session transfer. These sessions never share the
-application's or provider's authentication profiles. `clearSession` closes
-matching pages across windows and clears the persistent workspace browser
-session under a shared scope lock. `openExternal` uses the page's current
-native-validated HTTP(S) URL, accepting no caller-provided destination.
+All built-in browser pages and windows use one native-managed persistent browser
+profile, isolated from the Desktop account and provider sessions. There are no
+workspace profiles, private-page scopes or caller-selected storage identifiers.
+Website login and storage survive page, window and document teardown, including
+closing every browser tab and later opening a page in another workspace.
+`openExternal` uses the page's current native-validated HTTP(S) URL, accepting
+no caller-provided destination.
 
-Settings may independently expose optional `clearWorkspaceData({ workspaceId })`.
-Main requires the exact admitted top-level Settings document, resolves the
-registered workspace and displays its own named confirmation with Cancel as
-the default. It rechecks document generation and registered identity after
-asynchronous admission/confirmation before using the same clearing routine and
-lock. `false` means explicit cancellation; `true` means completed clearing.
-Stale admission, unavailable workspace and operational failures reject.
-Settings gains no attachment or page control. The request accepts no paths,
-partitions, names, consent flags or preferences; clearing deletes no download
-files and changes no application or provider profile.
+`clearBrowsingData()` takes no arguments and is the same action from a workspace
+or Settings. Main requires the exact admitted top-level document and displays
+its own confirmation explaining that all built-in browser tabs/windows and
+website data are affected, with Cancel selected by default. It rechecks that
+document's generation and role after confirmation, before clearing begins.
+Settings needs no open workspace or catalog selection and gains no attachment
+or page authority. `false` means explicit cancellation; `true` means clearing
+completed. Stale admission and operational failures reject.
+
+The global clear lock blocks racing page/mount admission and operations. Main
+revokes pending mounts, aborts icon/download/capture work, closes every owned
+page and clears website storage, cache, HTTP auth and connections. It also
+cleans narrowly recognized legacy experimental browser partitions when present;
+no caller supplies paths or partition identities. The shared profile can start
+fresh without automatically merging legacy cookies. No cleanup occurs merely
+because a document closes or a newer host starts. Explicit clearing deletes
+no downloaded files and changes no Desktop account or provider profile.
+
+### Shared browser history
+
+`browser.history` is independently optional on version-4 hosts. Offer its reads
+and removal only when the group exists and `history.version ===
+DesktopBrowser.History.VERSION` (currently 1). Its absence leaves ordinary
+browser pages, navigation and global clearing available. This group does not
+change strict `Page`, `Snapshot` or `Event` projections.
+
+The native host owns one bounded persistent history collection across browser
+tabs, workspaces and windows. It records actual committed HTTP(S) guest
+navigation, not renderer keystrokes or supplied visit records. The collection
+contains only canonical URLs, untrusted page titles and the last visit time.
+It is separate from a guest's live back/forward stack. Retention and persistence
+belong to Main; no database path, profile, partition, page ID or visit insertion
+crosses this protocol.
+
+`history.query({ query, limit })` returns `History.Snapshot { version, revision,
+entries }`. `query` is bounded to 512 UTF-8 bytes without control characters or
+unpaired surrogates. The host trims the query and compares lowercase URL/title
+substrings using the default JavaScript `toLowerCase()` conversion; a blank
+query reads recent entries. `limit` is a required integer from 1 through 100.
+Results contain no duplicate URLs and are sorted by descending `lastVisitedAt`,
+then ascending URL in UTF-16 code-unit order. Each `Entry` contains exactly
+`{ url, title, lastVisitedAt }`: canonical credential-free HTTP(S) URLs up to
+8 KiB, titles up to 1 KiB, and a nonnegative integer Unix millisecond timestamp
+within the JavaScript Date range. No remote typeahead request is implied by a
+query. `History.parseQuery`, `parseEntry` and `parseSnapshot` enforce these
+bounded projections; they establish no native admission.
+
+`history.remove({ url })` removes only that exact canonical URL. It neither
+matches a prefix nor clears website data. An absent URL succeeds without
+changing the collection. `History.parseRemoval` refuses noncanonical aliases
+instead of silently rewriting the removal identity. Global `clearBrowsingData`
+also empties retained history; cancellation leaves it intact. Main serializes
+clear and pending writes so an earlier visit cannot resurrect deleted history.
+
+`history.subscribe(handler)` reports only `History.Change { revision }`
+invalidations, validated by `parseChange`. Revisions increase for observable
+collection changes within the current native process and are independent of
+page revisions and attachment IDs. Subscribe before querying, discard responses
+older than the latest observed collection revision, and discard responses for
+superseded queries. A notification means to reread; it carries no private URL
+or guessable entry identity. Main delivers notifications only to currently
+admitted documents and withdraws them when their admission ends.
+
+Reads, removals and subscriptions require the exact current admitted workspace
+or Settings top-level document, rechecked by Main. Settings needs no open page
+or attachment and gains no page-control authority. Website guests and stale or
+foreign documents receive no history metadata. History reads start no work in
+guests, grant no filesystem or network authority and expose no icons or scripts.
+
+### Optional page utilities and browser management
+
+`browser.utilities` and `browser.management` are independently optional. Check
+each group and its own `version` against `Utilities.VERSION` or
+`Management.VERSION` (both currently 1) before exposing its actions. Missing or
+unknown groups leave ordinary pages available. Utilities require the exact
+current attachment and owned page; global management requires the current
+admitted workspace or Settings document and grants no page-control authority.
+
+`utilities.find({ attachmentId, pageId, text, forward, findNext, matchCase })`
+performs a bounded page-text search, with an explicit nonempty query up to
+1 KiB and required boolean options. It resolves the final native
+`FindResult { matches, activeMatchOrdinal }` for that request. Counts are
+nonnegative safe integers; the one-based active ordinal can be zero when no
+result is active and cannot exceed matches. A replaced search, navigation or
+lost page must not resolve with another search's result. `stopFind(target)` ends
+finding and clears its selection. No native request ID or match geometry is
+exposed. The corresponding parsers return frozen strict projections.
+
+`getZoom(target)` reads the website zoom factor. `setZoom({ ...target, factor })`
+accepts a finite factor from 0.25 through 5 and returns the applied factor.
+`print(target)` opens ordinary Chromium print UI. `inspect(target)` opens that
+owned page's native DevTools. Neither accepts scripts, debugger commands,
+protocol methods or native print options. These are user actions on their owned
+website, not a programmatic inspection transport.
+
+`management.clearHistory()`, `clearCache()` and `resetPermissions()` accept no
+arguments. They respectively clear recorded visits, clear HTTP cache while
+preserving website sign-ins/history, and revoke browser site permission grants.
+They resolve true on completion and false on user cancellation if a native
+confirmation is shown; failures reject. They neither select an origin nor
+touch application account/provider state. Narrow clear actions do not imply
+the full `clearBrowsingData` operation, which retains its native confirmation
+and all-pages cleanup contract. History clearing uses the existing collection
+revision/invalidation and persistence ordering rules.
+
+`downloadPreferences()` reads `DownloadPreferences { askBeforeDownload,
+directoryName }`. `setDownloadPrompt({ askBeforeDownload })` changes only that
+choice and returns the current preferences. A true value asks where to save
+each download; otherwise Main selects its managed default directory.
+`chooseDownloadDirectory()` opens a native directory chooser and returns updated
+preferences, or null on explicit cancellation. The renderer supplies no path.
+`directoryName` is display-only: a nonempty folder basename up to 256 UTF-8 bytes,
+or null for the system default. It contains no slash, backslash or control
+characters and grants no filesystem authority. Native Main owns the actual
+path, naming/collision policy and download destination; no downloaded file is
+opened automatically. Preference parsers reject additional native options.
+
+`management.openPage({ url })` is independently optional even on Management v1.
+Check the method exists before offering it. The destination must already be a
+canonical credential-free HTTP(S) URL; `Management.parseOpenPage` refuses
+aliases, generated locations and additional fields. This user intent asks Main
+to open a new page in an existing admitted workbench and focus its shell. It
+resolves false when no eligible workbench can receive it, true once delivered;
+admission and operational failures reject. Main chooses and rechecks the actual
+current owner/attachment before creating the page and publishing its outcome.
+Settings gains no attachment, window selector, existing-page control or native
+guest authority from requesting the new page.
 
 ### Bounded presentation reads and trust limits
 
 `parsePage`, `parseSnapshot` and `parseEvent` accept bounded protocol
-projections: at most 16 pages, URLs up to 8 KiB, titles 1 KiB and public failure
-messages 2 KiB in UTF-8. Guests receive no application preload or `window.grida`,
-even when visiting Desktop URLs. Main hardens sessions, preferences, native
-preloads, destinations, popups, permissions, downloads and mount ownership.
+projections: at most 64 pages, URLs up to 8 KiB, titles 1 KiB and public failure
+messages 2 KiB in UTF-8. Guests receive no application bridge preload or `window.grida`, even when
+visiting Desktop URLs. Any native-approved website helper remains a fixed,
+sandboxed guest-only boundary with no application capability. Main owns browser sessions, preferences, preload admission, destination policy,
+new-window ownership, permission choices, downloads and mount ownership.
+Chromium web security remains enabled; ordinary website behavior does not
+establish native authority.
 
-Stock Electron webview intentionally gives its trusted containing renderer
-built-in control of its own guest, including scripting and navigation. The
-typed bridge does not remove those methods. In particular, a `javascript:`
-load can execute same-document script even when its load promise rejects.
-HTTP(S) validation describes the typed navigation contract and native network
-request policy; it is not proof that the trusted embedder lacks page-script
-authority. Programmatic blob-document loads can also bypass cancellable
-navigation hooks and session request interception. Main observes an unsupported
-full-document load, immediately revokes that guest's mounted/input eligibility
-and closes it in a later task. The failed descriptor can be retried with a fresh
-guest at its retained HTTP(S) URL. This is containment after observation, not a
-guarantee that unsupported document code never executes. No agent, MCP,
-debugger/CDP or generic automation API is added here.
+Live `Page.url` is bounded transient location metadata. `normalizeLocation` also
+accepts `about:blank`, `about:srcdoc`, HTTP(S)-origin or null-origin `blob:`
+locations and `data:` documents. The reserved mount bootstrap is excluded.
+Generated locations grant no native navigation or resource authority. A host may
+report `data:` as a display fallback when the full generated URL exceeds 8 KiB;
+it must not let an oversized generated location invalidate the whole page.
+
+`normalizeUrl` remains strictly HTTP(S). Typed `create`/`navigate` requests,
+external handoff, persistent history, saved tab restoration and favicon fetches
+must use that narrower validator. Never persist or restore a generated live
+location. A containing renderer that retains a restoration URL keeps the last
+eligible HTTP(S) URL separately from transient generated locations.
+
+Stock Electron webview gives its trusted containing renderer built-in control
+of its own guest, including scripting and navigation. The typed bridge does not
+remove those intrinsic methods. Ordinary generated web documents remain in the
+sandboxed browser context and cannot acquire native, account or provider
+privileges. This is a native authority boundary, not a content filter. No agent,
+MCP, debugger/CDP command transport or generic automation API is added here.
 
 `thumbnail` remains independently optional. Check it before requesting an image;
 metadata hover previews remain available without it. It reads only the existing
@@ -382,6 +527,31 @@ accepts canonical JPEG base64 with matching encoded dimensions, up to 320 by
 180 pixels and 64 KiB of decoded bytes. It checks baseline/progressive JPEG
 framing and dimensions, not the complete codec. Pixels are untrusted display
 data; no persistence or freshly rendered frame is promised.
+
+`favicon(target)` is an independently optional read of the page's transient
+cached icon. Matching version-4 hosts can omit it without disabling browser pages.
+It returns `Favicon { dataUrl }` or `null`; it accepts no URL or fetch options.
+Page and event projections remain unchanged, so older strict parsers still
+accept them. When the cached icon changes, Main emits an ordinary changed page
+with a new revision; reading a stable cache does not emit another outcome.
+
+Main fetches only bounded website icon candidates through the actual guest's
+isolated session, with limits on candidates, redirects, bytes and elapsed time.
+It binds results to the exact guest and navigation lifetime and clears them on
+document replacement or guest/page destruction. Unsupported or unavailable
+icons fall back without failing the page. Consumers discard late results after
+navigation or target changes, retain icons across ordinary selection/focus
+changes and never persist them or load remote icon URLs in the workbench.
+
+`parseFavicon` accepts only canonical base64 raster data URLs, up to 64 KiB and
+256 pixels per edge. `FAVICON_MIME_TYPES` lists PNG, ICO (both accepted MIME
+spellings), JPEG, static WebP and single-image GIF. ICO is limited to 16 PNG or
+uncompressed bitmap entries; animated containers and SVG are unsupported.
+Validation checks container framing and dimensions, not the complete codec.
+The bytes remain untrusted: Chromium decodes them in the sandboxed renderer;
+Main must not decode website images with a native image codec. A renderer
+decode failure uses the generic icon fallback. No favicon service, persistence,
+page-script evaluation or general fetch capability is exposed.
 
 ## Anti-goals
 

@@ -1,182 +1,210 @@
 import { describe, expect, it, vi } from "vitest";
-import type { DesktopBrowser, Workspace } from "@grida/desktop-bridge";
+import type { DesktopBrowser } from "@grida/desktop-bridge";
 import { SettingsBrowser } from "./settings-browser";
 
-type Clear = NonNullable<DesktopBrowser.Bridge["clearWorkspaceData"]>;
-const first: Workspace = {
-  id: "aaaaaaaaaaaaaaaa",
-  name: "Project",
-  root: "/work/first",
-  opened_at: 1,
-  pinned: false,
-};
-const second: Workspace = {
-  id: "bbbbbbbbbbbbbbbb",
-  name: "Project",
-  root: "/work/second",
-  opened_at: 2,
-  pinned: false,
-};
+type Clear = DesktopBrowser.Bridge["clearBrowsingData"];
+
+function managementFixture() {
+  const preferences = { askBeforeDownload: false, directoryName: null };
+  const management: DesktopBrowser.Management.Bridge = {
+    version: 1,
+    clearHistory: vi.fn<DesktopBrowser.Management.Bridge["clearHistory"]>(
+      async () => true
+    ),
+    clearCache: vi.fn<DesktopBrowser.Management.Bridge["clearCache"]>(
+      async () => true
+    ),
+    resetPermissions: vi.fn<
+      DesktopBrowser.Management.Bridge["resetPermissions"]
+    >(async () => true),
+    downloadPreferences: vi.fn<
+      DesktopBrowser.Management.Bridge["downloadPreferences"]
+    >(async () => preferences),
+    setDownloadPrompt: vi.fn<
+      DesktopBrowser.Management.Bridge["setDownloadPrompt"]
+    >(async ({ askBeforeDownload }) => ({
+      ...preferences,
+      askBeforeDownload,
+    })),
+    chooseDownloadDirectory: vi.fn<
+      DesktopBrowser.Management.Bridge["chooseDownloadDirectory"]
+    >(async () => ({
+      ...preferences,
+      directoryName: "Exports",
+    })),
+    openPage: vi.fn<NonNullable<DesktopBrowser.Management.Bridge["openPage"]>>(
+      async () => true
+    ),
+  };
+  const api = {
+    clearBrowsingData: vi.fn<Clear>().mockResolvedValue(true),
+    management,
+  };
+  return {
+    api,
+    management,
+    controller: new SettingsBrowser.Controller(() => api),
+  };
+}
 function fixture() {
-  const api = { clearWorkspaceData: vi.fn<Clear>().mockResolvedValue(true) };
-  const list = vi
-    .fn<() => Promise<readonly Workspace[]>>()
-    .mockResolvedValue([first, second]);
-  const controller = new SettingsBrowser.Controller(() => api, list);
-  return { api, list, controller };
+  const api = { clearBrowsingData: vi.fn<Clear>().mockResolvedValue(true) };
+  const controller = new SettingsBrowser.Controller(() => api);
+  return { api, controller };
 }
 
 describe("SettingsBrowser.Controller", () => {
-  it("requires an explicit registered workspace choice and passes only its identity", async () => {
-    const { api, list, controller } = fixture();
-    await controller.refresh();
-    expect(list).toHaveBeenCalledOnce();
-    expect(controller.read().selectedId).toBeNull();
-    await controller.clearSelected();
-    expect(api.clearWorkspaceData).not.toHaveBeenCalled();
-    controller.select("unknown");
-    expect(controller.read().selectedId).toBeNull();
-    controller.select(first.id);
-    await controller.clearSelected();
-    expect(api.clearWorkspaceData).toHaveBeenCalledExactlyOnceWith({
-      workspaceId: first.id,
+  it("loads native download settings and uses only the native directory chooser", async () => {
+    const f = managementFixture();
+    f.controller.refresh();
+    await Promise.resolve();
+    expect(f.controller.read()).toMatchObject({
+      managementSupported: true,
+      canOpenHistory: true,
+      downloads: { askBeforeDownload: false, directoryName: null },
     });
+    await f.controller.chooseDownloadDirectory();
+    expect(f.management.chooseDownloadDirectory).toHaveBeenCalledWith();
+    expect(f.controller.read().downloads?.directoryName).toBe("Exports");
+    await f.controller.setDownloadPrompt(true);
+    expect(f.management.setDownloadPrompt).toHaveBeenCalledWith({
+      askBeforeDownload: true,
+    });
+    expect(f.controller.read().downloads?.askBeforeDownload).toBe(true);
+  });
+
+  it("keeps history/cache/permission reset distinct from full browser clearing", async () => {
+    const f = managementFixture();
+    await f.controller.clearHistory();
+    expect(f.controller.read().notice).toBe("Browsing history cleared.");
+    await f.controller.clearCache();
+    expect(f.controller.read().notice).toBe("Browser cache cleared.");
+    await f.controller.resetPermissions();
+    expect(f.controller.read().notice).toContain("Site permissions reset");
+    expect(f.api.clearBrowsingData).not.toHaveBeenCalled();
+    expect(f.management.clearHistory).toHaveBeenCalledOnce();
+    expect(f.management.clearCache).toHaveBeenCalledOnce();
+  });
+
+  it("opens history only through a strict native UI intent and explains no-workspace results", async () => {
+    const f = managementFixture();
+    await f.controller.openHistory("https://example.test/");
+    expect(f.management.openPage).toHaveBeenCalledWith({
+      url: "https://example.test/",
+    });
+    await f.controller.openHistory("file:///private/never-open");
+    expect(f.management.openPage).toHaveBeenCalledOnce();
+    vi.mocked(f.management.openPage!).mockResolvedValue(false);
+    await f.controller.openHistory("https://example.test/");
+    expect(f.controller.read().notice).toContain("Open a workspace");
+  });
+
+  it("discards late preference reads and cancels pending management observations", async () => {
+    const f = managementFixture();
+    let complete!: (
+      value: DesktopBrowser.Management.DownloadPreferences
+    ) => void;
+    vi.mocked(f.management.downloadPreferences).mockReturnValueOnce(
+      new Promise((done) => {
+        complete = done;
+      })
+    );
+    f.controller.refresh();
+    await f.controller.setDownloadPrompt(true);
+    complete({ askBeforeDownload: false, directoryName: null });
+    await Promise.resolve();
+    expect(f.controller.read().downloads?.askBeforeDownload).toBe(true);
+    let done!: (value: boolean) => void;
+    vi.mocked(f.management.clearCache).mockReturnValueOnce(
+      new Promise((resolve) => {
+        done = resolve;
+      })
+    );
+    const clearing = f.controller.clearCache();
+    f.controller.cancel();
+    done(true);
+    await clearing;
+    expect(f.controller.read().action).toBeNull();
+    expect(f.controller.read().notice).not.toBe("Browser cache cleared.");
+  });
+
+  it("rejects malformed native results without exposing diagnostics", async () => {
+    const f = managementFixture();
+    vi.mocked(f.management.clearHistory).mockResolvedValue(
+      "yes" as unknown as boolean
+    );
+    await f.controller.clearHistory();
+    expect(f.controller.read().error).toBe(
+      "The browser action could not be completed. Try again."
+    );
+    expect(f.controller.read().notice).toBeNull();
+    vi.mocked(f.management.chooseDownloadDirectory).mockRejectedValue(
+      new Error("/private/secret")
+    );
+    await f.controller.chooseDownloadDirectory();
+    expect(f.controller.read().error).not.toContain("/private");
+  });
+
+  it("clears globally without a workspace catalog, selector or renderer consent argument", async () => {
+    const { api, controller } = fixture();
+    controller.refresh();
+    expect(controller.read().supported).toBe(true);
+    await controller.clear();
+    expect(api.clearBrowsingData.mock.calls).toEqual([[]]);
     expect(controller.read()).toMatchObject({
       clearing: false,
       result: "cleared",
-      selectedId: first.id,
       error: null,
     });
-    expect(controller.read().workspaces).toEqual([
-      { id: first.id, name: first.name, root: first.root },
-      { id: second.id, name: second.name, root: second.root },
-    ]);
   });
 
   it("treats the native false result as cancellation without claiming success", async () => {
     const { api, controller } = fixture();
-    api.clearWorkspaceData.mockResolvedValue(false);
-    await controller.refresh();
-    controller.select(first.id);
-    await controller.clearSelected();
+    api.clearBrowsingData.mockResolvedValue(false);
+    await controller.clear();
     expect(controller.read()).toMatchObject({
       result: "cancelled",
       clearing: false,
       error: null,
-      selectedId: first.id,
     });
   });
 
   it("reports clear failures without exposing private native diagnostics", async () => {
     const { api, controller } = fixture();
-    api.clearWorkspaceData.mockRejectedValue(
+    api.clearBrowsingData.mockRejectedValue(
       new Error("/private/browser-profile/secret")
     );
-    await controller.refresh();
-    controller.select(first.id);
-    await controller.clearSelected();
-    expect(controller.read().result).toBeNull();
-    expect(controller.read().clearing).toBe(false);
-    expect(controller.read().error).toContain("Refresh the list");
-    expect(controller.read().error).not.toContain("/private");
+    await controller.clear();
+    expect(controller.read()).toMatchObject({
+      result: null,
+      clearing: false,
+      error: "Couldn’t clear browsing data. Try again.",
+    });
   });
 
   it("deduplicates clear and focus refresh while native confirmation or clearing is pending", async () => {
-    const { api, list, controller } = fixture();
+    const { api, controller } = fixture();
     let resolve!: (value: boolean) => void;
-    api.clearWorkspaceData.mockReturnValue(
+    api.clearBrowsingData.mockReturnValue(
       new Promise((done) => {
         resolve = done;
       })
     );
-    await controller.refresh();
-    controller.select(first.id);
-    const clearing = controller.clearSelected();
+    const clearing = controller.clear();
     expect(controller.read().clearing).toBe(true);
-    await controller.clearSelected();
-    await controller.refresh();
-    controller.select(second.id);
-    expect(api.clearWorkspaceData).toHaveBeenCalledTimes(1);
-    expect(list).toHaveBeenCalledTimes(1);
-    expect(controller.read().selectedId).toBe(first.id);
+    await controller.clear();
+    controller.refresh();
+    expect(api.clearBrowsingData).toHaveBeenCalledTimes(1);
+    expect(controller.read().clearing).toBe(true);
     resolve(true);
     await clearing;
     expect(controller.read().result).toBe("cleared");
-  });
-
-  it("deduplicates metadata refresh and returned workspace identities", async () => {
-    const { list, controller } = fixture();
-    let resolve!: (value: readonly Workspace[]) => void;
-    list.mockReturnValue(
-      new Promise((done) => {
-        resolve = done;
-      })
-    );
-    const loading = controller.refresh();
-    await controller.refresh();
-    expect(list).toHaveBeenCalledTimes(1);
-    resolve([first, first, second]);
-    await loading;
-    expect(
-      controller.read().workspaces.map((workspace) => workspace.id)
-    ).toEqual([first.id, second.id]);
-    expect(controller.read().selectedId).toBeNull();
-  });
-
-  it("preserves an explicit choice on refresh and clears it when that workspace disappears", async () => {
-    const { list, controller } = fixture();
-    await controller.refresh();
-    controller.select(second.id);
-    await controller.refresh();
-    expect(controller.read().selectedId).toBe(second.id);
-    list.mockResolvedValue([first]);
-    await controller.refresh();
-    expect(controller.read().selectedId).toBeNull();
-    expect(controller.read().workspaces).toEqual([
-      { id: first.id, name: first.name, root: first.root },
-    ]);
-  });
-
-  it("keeps loaded choices on refresh failure and offers a safe retry message", async () => {
-    const { list, controller } = fixture();
-    await controller.refresh();
-    controller.select(first.id);
-    list.mockRejectedValue(new Error("/private/catalog/profile"));
-    await controller.refresh();
-    expect(controller.read().selectedId).toBe(first.id);
-    expect(controller.read().workspaces).toHaveLength(2);
-    expect(controller.read().loading).toBe(false);
-    expect(controller.read().error).toBe(
-      "Couldn’t load workspaces. Try refreshing the list."
-    );
-  });
-
-  it("ignores metadata from a cancelled generation after a newer refresh", async () => {
-    const { list, controller } = fixture();
-    let resolve!: (value: readonly Workspace[]) => void;
-    list.mockReturnValueOnce(
-      new Promise((done) => {
-        resolve = done;
-      })
-    );
-    const stale = controller.refresh();
-    controller.cancel();
-    list.mockResolvedValueOnce([second]);
-    await controller.refresh();
-    controller.select(second.id);
-    resolve([first]);
-    await stale;
-    expect(controller.read().selectedId).toBe(second.id);
-    expect(
-      controller.read().workspaces.map((workspace) => workspace.id)
-    ).toEqual([second.id]);
   });
 
   it("ignores an old clear result without unlocking a newer pending operation", async () => {
     const { api, controller } = fixture();
     let finishOld!: (value: boolean) => void;
     let finishNew!: (value: boolean) => void;
-    api.clearWorkspaceData
+    api.clearBrowsingData
       .mockReturnValueOnce(
         new Promise((done) => {
           finishOld = done;
@@ -187,52 +215,42 @@ describe("SettingsBrowser.Controller", () => {
           finishNew = done;
         })
       );
-    await controller.refresh();
-    controller.select(first.id);
-    const old = controller.clearSelected();
+    const old = controller.clear();
     controller.cancel();
-    await controller.refresh();
-    controller.select(second.id);
-    const current = controller.clearSelected();
+    controller.refresh();
+    const current = controller.clear();
     finishOld(true);
     await old;
-    expect(controller.read()).toMatchObject({
-      clearing: true,
-      result: null,
-      selectedId: second.id,
-    });
+    expect(controller.read()).toMatchObject({ clearing: true, result: null });
     finishNew(false);
     await current;
     expect(controller.read()).toMatchObject({
       clearing: false,
       result: "cancelled",
-      selectedId: second.id,
     });
   });
 
-  it("stays unsupported on older hosts without calling workspace or page operations", async () => {
-    const list = vi.fn<() => Promise<readonly Workspace[]>>();
-    const controller = new SettingsBrowser.Controller(() => ({}), list);
-    await controller.refresh();
-    await controller.clearSelected();
-    expect(list).not.toHaveBeenCalled();
-    expect(controller.read()).toMatchObject({
+  it("stays unsupported on older hosts without issuing page or scoped clear operations", async () => {
+    const controller = new SettingsBrowser.Controller(() => null);
+    controller.refresh();
+    await controller.clear();
+    expect(controller.read()).toEqual({
       supported: false,
-      loading: false,
-      workspaces: [],
-      selectedId: null,
       clearing: false,
+      result: null,
+      error: null,
+      managementSupported: false,
+      canOpenHistory: false,
+      downloads: null,
+      action: null,
+      notice: null,
     });
   });
 
   it("does not interpret malformed native results as cancellation", async () => {
     const { api, controller } = fixture();
-    api.clearWorkspaceData.mockResolvedValue(
-      "unexpected" as unknown as boolean
-    );
-    await controller.refresh();
-    controller.select(first.id);
-    await controller.clearSelected();
+    api.clearBrowsingData.mockResolvedValue("unexpected" as unknown as boolean);
+    await controller.clear();
     expect(controller.read().result).toBeNull();
     expect(controller.read().error).not.toBeNull();
   });

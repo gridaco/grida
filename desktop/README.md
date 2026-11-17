@@ -10,7 +10,7 @@ service sidecar keeps files, workspaces, recents, provider settings and media.
 Workspace content tabs also host an isolated built-in browser. Browser pages
 use DOM `<webview>` presentation under Main-owned admission and browser policy,
 and work independently of chat. See the
-[browser reference](./docs/browser.md) for navigation, profiles, website support
+[browser reference](./docs/browser.md) for navigation, shared history and website data, website support
 and live composition verification.
 
 The conversation master and durable chat execution live in the Rust workspace.

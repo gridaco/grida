@@ -75,13 +75,21 @@ export class EditorGroup {
 
   // ── mutations ──────────────────────────────────────────────────────
 
-  /** Open `id` (append if new) and focus it. No-op if it's already the active
-   *  tab — so a redundant open doesn't churn the render layer. */
-  open(id: string): void {
-    const prevTabs = this._tabs;
-    if (!prevTabs.includes(id)) this._tabs = [...prevTabs, id];
-    if (this._active === id && this._tabs === prevTabs) return;
-    this._active = id;
+  /** Open `id` once, appending by default or inserting after an existing key.
+   * Background opens preserve selection; an empty group always selects its tab.
+   * Reopening an existing key never moves it or changes close history. */
+  open(id: string, options: { after?: string; activate?: boolean } = {}): void {
+    const previous = this._tabs;
+    if (!previous.includes(id)) {
+      const after =
+        options.after === undefined ? -1 : previous.indexOf(options.after);
+      const index = after < 0 ? previous.length : after + 1;
+      this._tabs = [...previous.slice(0, index), id, ...previous.slice(index)];
+    }
+    const active =
+      options.activate !== false || this._active === null ? id : this._active;
+    if (active === this._active && this._tabs === previous) return;
+    this._active = active;
     this.commit();
   }
 

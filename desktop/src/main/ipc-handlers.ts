@@ -9,6 +9,8 @@ import {
 } from "electron";
 import path from "node:path";
 import { DesktopBrowserHost } from "./browser-host";
+import type { BrowserHistory } from "./browser-history";
+import type { BrowserDownloads } from "./browser-downloads";
 import { URL } from "node:url";
 import type { RecentStore } from "@grida/daemon/server";
 import {
@@ -83,6 +85,8 @@ const EDITOR_ORIGIN = (() => {
 })();
 
 type RegisterIpcHandlersOptions = {
+  browser_history?: BrowserHistory;
+  browser_downloads?: BrowserDownloads;
   resolve_ipc_role: (window: BrowserWindow) => DesktopIpcRole | null;
   open_settings: () => void;
   archives?: NativeArchives;
@@ -144,14 +148,12 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       : null;
   };
   const browserHost = new DesktopBrowserHost({
+    history: options.browser_history,
+    downloads: options.browser_downloads,
     editorOrigin: EDITOR_ORIGIN,
     admitWindow: (window) => options.resolve_ipc_role(window) === "main",
     workspaceExists: async (id) =>
       !!(await servicesSidecarClient.findWorkspace(id)),
-    resolveWorkspace: async (id) => {
-      const workspace = await servicesSidecarClient.findWorkspace(id);
-      return workspace ? { name: workspace.name, root: workspace.root } : null;
-    },
   });
   const nativeChat = new NativeChatIpc(
     EDITOR_ORIGIN,
@@ -314,11 +316,70 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     });
   }
 
+  // GRIDA-SEC-016 — private guest intents have actual guest/frame admission,
+  // independent of the privileged application IPC guard.
+  ipcMain.on("grida:browser-guest:link", (event, raw: unknown) => {
+    try {
+      browserHost.guestLink(event, raw);
+    } catch {
+      /* Stale or malformed website intent. */
+    } finally {
+      event.returnValue = null;
+    }
+  });
+  guarded(IPC_CHANNELS.BROWSER_FIND, (event, raw: unknown) =>
+    browserHost.find(event, raw)
+  );
+  guarded(IPC_CHANNELS.BROWSER_STOP_FIND, (event, raw: unknown) =>
+    browserHost.stopFind(event, raw)
+  );
+  guarded(IPC_CHANNELS.BROWSER_GET_ZOOM, (event, raw: unknown) =>
+    browserHost.getZoom(event, raw)
+  );
+  guarded(IPC_CHANNELS.BROWSER_SET_ZOOM, (event, raw: unknown) =>
+    browserHost.setZoom(event, raw)
+  );
+  guarded(IPC_CHANNELS.BROWSER_PRINT, (event, raw: unknown) =>
+    browserHost.print(event, raw)
+  );
+  guarded(IPC_CHANNELS.BROWSER_INSPECT, (event, raw: unknown) =>
+    browserHost.inspect(event, raw)
+  );
+  guarded(IPC_CHANNELS.BROWSER_CLEAR_HISTORY, (event) =>
+    browserHost.clearHistory(event)
+  );
+  guarded(IPC_CHANNELS.BROWSER_CLEAR_CACHE, (event) =>
+    browserHost.clearCache(event)
+  );
+  guarded(IPC_CHANNELS.BROWSER_RESET_PERMISSIONS, (event) =>
+    browserHost.resetPermissions(event)
+  );
+  guarded(IPC_CHANNELS.BROWSER_DOWNLOAD_PREFERENCES, (event) =>
+    browserHost.downloadPreferences(event)
+  );
+  guarded(IPC_CHANNELS.BROWSER_SET_DOWNLOAD_PROMPT, (event, raw: unknown) =>
+    browserHost.setDownloadPrompt(event, raw)
+  );
+  guarded(IPC_CHANNELS.BROWSER_CHOOSE_DOWNLOAD_DIRECTORY, (event) =>
+    browserHost.chooseDownloadDirectory(event)
+  );
+  guarded(IPC_CHANNELS.BROWSER_OPEN_PAGE, (event, raw: unknown) =>
+    browserHost.openPage(event, raw)
+  );
   guarded(IPC_CHANNELS.BROWSER_ATTACH, (event, workspaceId: unknown) =>
     browserHost.attach(event, workspaceId)
   );
   guarded(IPC_CHANNELS.BROWSER_THUMBNAIL, (event, request: unknown) =>
     browserHost.thumbnail(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_FAVICON, (event, request: unknown) =>
+    browserHost.favicon(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_HISTORY_QUERY, (event, request: unknown) =>
+    browserHost.historyQuery(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_HISTORY_REMOVE, (event, request: unknown) =>
+    browserHost.historyRemove(event, request)
   );
   guarded(IPC_CHANNELS.BROWSER_SNAPSHOT, (event, attachmentId: unknown) =>
     browserHost.snapshot(event, attachmentId)
@@ -360,11 +421,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     browserHost.openExternal(event, request)
   );
   guarded(
-    IPC_CHANNELS.BROWSER_CLEAR_WORKSPACE_DATA,
-    (event, request: unknown) => browserHost.clearWorkspaceData(event, request)
-  );
-  guarded(IPC_CHANNELS.BROWSER_CLEAR_SESSION, (event, request: unknown) =>
-    browserHost.clearSession(event, request)
+    IPC_CHANNELS.BROWSER_CLEAR_BROWSING_DATA,
+    (event, ...args: unknown[]) => browserHost.clearBrowsingData(event, ...args)
   );
 
   const archives = new NativeArchiveIpc(

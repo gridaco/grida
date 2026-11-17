@@ -79,7 +79,7 @@ export namespace ipc_sender {
   }
 
   /**
-   * GRIDA-SEC-016 — pending Settings browser management loses authority on
+   * GRIDA-SEC-016 — pending browser data management loses authority on
    * navigation or teardown, including while its native confirmation is open.
    * Revoke a retained main-frame capability on navigation or teardown.
    */
