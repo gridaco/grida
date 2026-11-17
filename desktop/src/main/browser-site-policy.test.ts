@@ -51,7 +51,8 @@ function fixture(
   url = "https://site.test/app",
   openExternal?: NonNullable<
     ConstructorParameters<typeof BrowserSitePolicy>[1]
-  >["openExternal"]
+  >["openExternal"],
+  blockPrompt?: Parameters<BrowserSitePolicy["register"]>[1]["blockPrompt"]
 ) {
   const session = Object.assign(new EventEmitter(), {
     setPermissionRequestHandler: (handler: RequestHandler) => {
@@ -102,7 +103,7 @@ function fixture(
   const policy = new BrowserSitePolicy(session as unknown as Session, {
     openExternal,
   });
-  policy.register(contents, { window, isLive: () => live });
+  policy.register(contents, { window, isLive: () => live, blockPrompt });
   native.frames.set(top, contents);
   return {
     session,
@@ -184,6 +185,18 @@ beforeEach(() => {
   native.sources.mockReset().mockResolvedValue([]);
   native.media.mockReset().mockResolvedValue(true);
   native.frames.clear();
+});
+
+it("reports background permission blockers without showing native prompts", async () => {
+  const block = vi.fn<(kind: "permission" | "certificate") => void>();
+  const browser = fixture(undefined, undefined, block);
+  expect(browser.check("fullscreen")).toBe(false);
+  expect(await browser.request("geolocation")).toBe(false);
+  expect(await browser.display()).toEqual({});
+  expect(block.mock.calls).toEqual([["permission"], ["permission"]]);
+  expect(native.prompt).not.toHaveBeenCalled();
+  expect(native.sources).not.toHaveBeenCalled();
+  expect(native.media).not.toHaveBeenCalled();
 });
 
 it("allows ordinary active-page writes, fullscreen and pointer lock without prompting", async () => {

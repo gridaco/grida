@@ -29,6 +29,7 @@ class BrowserHost implements DesktopBrowser.Bridge {
   revision = 0;
   pages = new Map<string, DesktopBrowser.Page>();
   listeners = new Set<(event: DesktopBrowser.Event) => void>();
+  presentations = new Set<(request: DesktopBrowser.Presentation) => void>();
   closed: string[] = [];
   cleared = 0;
   clearAccepted = true;
@@ -56,6 +57,14 @@ class BrowserHost implements DesktopBrowser.Bridge {
     this.listeners.add(listener);
     return () => {
       this.listeners.delete(listener);
+    };
+  };
+  subscribePresentation = (
+    listener: (request: DesktopBrowser.Presentation) => void
+  ) => {
+    this.presentations.add(listener);
+    return () => {
+      this.presentations.delete(listener);
     };
   };
   async create(request: DesktopBrowser.Create) {
@@ -141,6 +150,27 @@ function setup(host: BrowserHost | null = new BrowserHost()) {
 }
 
 describe("WorkspaceBrowserTabs", () => {
+  it("reveals only the exact live page of the current attachment", async () => {
+    const { group, tabs, storage, host } = setup();
+    await tabs.start(storage, async () => []);
+    tabs.open("https://example.com/");
+    await settle();
+    const first = tabs.activeAutomationPageId()!;
+    tabs.open("https://example.com/");
+    await settle();
+    const second = tabs.activeAutomationPageId()!;
+    expect(first).toBeTruthy();
+    expect(second).not.toBe(first);
+    const [present] = host.presentations;
+    present({ attachmentId: "expired", pageId: first, focus: false });
+    expect(tabs.activeAutomationPageId()).toBe(second);
+    present({ attachmentId: "owner", pageId: first, focus: false });
+    expect(tabs.activeAutomationPageId()).toBe(first);
+    expect(group.getSnapshot().tabs).toHaveLength(2);
+    tabs.stop();
+    expect(host.presentations.size).toBe(0);
+  });
+
   it("restores mixed ordering after validation with fresh URL-only page identity", async () => {
     const { group, tabs, storage, host } = setup();
     const page = host.page("live", "https://example.com/");

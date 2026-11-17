@@ -291,11 +291,17 @@ async fn serve_connection(
                         let svg_text = crate::editor_surfaces::SVG_TEXT_CAPABILITY;
                         let presentation = offered(open);
                         let svg = offered(svg_text);
+                        let browser = crate::browser_tools::CAPABILITY;
+                        let browser_offered = offered(browser);
                         initialized_host.editor_surfaces.attach(
                             connection.clone(),
                             presentation,
                             svg,
+                            browser_offered,
                         );
+                        if browser_offered {
+                            advertised.insert(browser.into(), 1.into());
+                        }
                         advertised.insert(capability.into(), 1.into());
                         if presentation {
                             advertised.insert(open.into(), 1.into());
@@ -322,6 +328,7 @@ async fn serve_connection(
                             crate::editor_surfaces::CAPABILITY,
                             crate::editor_surfaces::OPEN_CAPABILITY,
                             crate::editor_surfaces::SVG_TEXT_CAPABILITY,
+                            crate::browser_tools::CAPABILITY,
                             extensions::gateway_billing::CAPABILITY,
                             extensions::gateway_billing::CHILD_CAPABILITY,
                         ]

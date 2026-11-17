@@ -67,5 +67,29 @@ files open it returns an empty list. Before the workspace window opens, or
 after it navigates away, closes or signs out, the tool reports that the view
 is unavailable. Restart Desktop with the same options to export it again.
 
+## Use the built-in browser from an MCP client
+
+Add `--native-chat-export-mcp-browser` to the Desktop launch above to opt in
+to browser control. The same local bearer now grants access to browser tabs
+in the selected workbench and to background pages created by the export.
+The catalog also lists workbench tabs and handles explicit requests to open
+or show a workbench surface.
+
+Use `browser_open` for a new website or local app. Each call opens its own
+background page. Start with `browser_wait` for the requested navigation, then
+inspect it with `browser_snapshot`. Use the current document and element
+references with `browser_action`. `browser_diagnostics` returns page errors
+and `browser_capture` returns an image. Close the page with `browser_close`
+when finished. New background work keeps workbench focus and selection in
+place.
+
+To work with a page you are already viewing, identify its live tab with
+`surface_list_open` and pass that exact workbench target to the browser tools.
+Use `surface_open` to explicitly show a workbench tab or open a new URL there.
+If the tab becomes hidden, input and capture report that the target needs to
+be visible. Both kinds of pages use the shared Grida browser profile, including
+website sign-ins. Closing the export withdraws control of the workbench tabs
+and closes the background pages it owns. Use `browser_help` for tool details.
+
 To give Grida's own agent tools from another local server, use the separate
 [client-side MCP setup](./skills-and-tools.md#use-tools-from-a-local-mcp-server).

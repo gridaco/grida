@@ -24,7 +24,13 @@ import {
   type WebFrameMain,
 } from "electron";
 
-type Owner = { window: BrowserWindow; isLive(): boolean; isActive?(): boolean };
+type Owner = {
+  window: BrowserWindow;
+  isLive(): boolean;
+  isActive?(): boolean;
+  /** Background automation never presents a device or permission picker. */
+  blockPrompt?(kind: "permission" | "certificate"): void;
+};
 type Registration = Owner & {
   dispose(): void;
   cancel(): void;
@@ -225,6 +231,11 @@ export class BrowserSitePolicy {
       callback: (id: string) => void
     ) => {
       event.preventDefault();
+      if (owner.blockPrompt) {
+        owner.blockPrompt("permission");
+        callback("");
+        return;
+      }
       // Electron does not expose Bluetooth's initiating frame. Label this as
       // the containing page, without claiming it is a known subframe origin.
       bluetoothCallback = callback;
@@ -559,6 +570,7 @@ export class BrowserSitePolicy {
       return false;
     const owner = contents && this.#owners.get(contents);
     if (contents && (!owner || !this.#live(contents, owner))) return false;
+    if (owner && owner.blockPrompt) return false;
     // A null WC is valid for service workers; it can consume saved origin
     // consent but cannot obtain active-page privileges or open a native prompt.
     if (
@@ -628,6 +640,10 @@ export class BrowserSitePolicy {
       permission === "fileSystem"
     );
     if (!context) return false;
+    if (context.owner.blockPrompt) {
+      context.owner.blockPrompt("permission");
+      return false;
+    }
     if (
       ["clipboard-sanitized-write", "fullscreen", "pointerLock"].includes(
         permission
@@ -718,6 +734,10 @@ export class BrowserSitePolicy {
     choices: { id: string; label: string }[],
     note = ""
   ): Promise<string | undefined> {
+    if (this.#current(context) && context.owner.blockPrompt) {
+      context.owner.blockPrompt("permission");
+      return;
+    }
     if (
       !this.#current(context) ||
       !choices.length ||
@@ -894,6 +914,10 @@ export class BrowserSitePolicy {
     const frame = request.frame;
     const contents = frame && webContents.fromFrame(frame);
     const context = contents ? this.#context(contents, frame) : null;
+    if (context?.owner.blockPrompt) {
+      context.owner.blockPrompt("permission");
+      return {};
+    }
     if (
       !context ||
       !request.videoRequested ||
@@ -947,6 +971,10 @@ export class BrowserSitePolicy {
       isMainFrame ? (origin ?? undefined) : undefined
     );
     if (!context || !origin || this.#pending.has(contents)) return false;
+    if (context.owner.blockPrompt) {
+      context.owner.blockPrompt("certificate");
+      return false;
+    }
     const url = new URL(rawUrl);
     if (url.protocol !== "https:") return false;
     const fingerprint = BrowserSitePolicy.#certificateFingerprint(cert);

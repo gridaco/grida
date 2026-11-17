@@ -814,6 +814,7 @@ impl Host {
         captured.allow_image_placement = false;
         captured.editor_endpoint = None;
         captured.editor_presentation = false;
+        captured.editor_browser_tools = false;
         captured.editor_svg_target = None;
         captured.guidance = None;
         captured.skills = None;
@@ -925,6 +926,7 @@ impl Host {
         let prepared = self.prepare_input(
             execution,
             &session,
+            &config.cwd,
             input,
             Some(&profile),
             false,
@@ -1595,6 +1597,7 @@ mod tests {
                     allow_image_placement: false,
                     editor_endpoint: None,
                     editor_presentation: false,
+                    editor_browser_tools: false,
                     editor_svg_target: None,
                     operating_regime: regime,
                     subagent: None,

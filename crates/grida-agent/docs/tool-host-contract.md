@@ -68,6 +68,13 @@ Discovery describes availability and grants no access by itself. Focus and
 selection changes update editor-context data. Context payloads and document
 references follow their owning capability's schema.
 
+The MCP export selects its capability names explicitly at startup and obtains
+one grant per selected name. Discovery and dispatch use that same collection.
+Registering another capability with the host does not expose it through MCP.
+An unknown or duplicate selection fails before the listener binds. The headless
+export and default Desktop editor export select one capability each. The opt-in
+Desktop browser export selects the reviewed browser and workbench catalog.
+
 Optional presentation retains the [workspace surface behavior](https://grida.co/docs/wg/ai/grida/workspace-surfaces).
 A headless `surface_open` succeeds with the structured result
 `{path, requested: false, reason: "not_interactive"}`. An operation requiring a live editor reports an unavailable
@@ -107,6 +114,20 @@ checks the view again before changing tabs. A dispatch receipt confirms Main
 accepted the send to the captured frame. Observed display requires separate
 evidence. An unconfirmed dispatch remains in the turn's account and leaves
 the model free to continue work. Reopening a chat never replays presentation.
+
+A negotiated browser endpoint adds versioned workbench reflection and the
+browser catalog. The existing tool host captures the endpoint in Act and
+preserves it throughout the accepted input. Main owns page admission,
+document and viewport guards, and the actual guest. Background pages remain
+within their creating scope, and workbench calls use the exact authorized
+tab. Browser close and scope cleanup retire owned background pages.
+Observations from a revoked or replaced endpoint are discarded.
+
+The browser opt-in for the external export adds a bounded, correlated private
+request path and normal MCP image content. The read-only export keeps its
+existing operation. Native capture media is scoped to the owning tool result.
+A lost reply after a browser mutation remains uncertain. Repeating a call is
+a new operation.
 
 The SVG text binding captures one plain selected text node at immediate Act
 submission. The renderer owns the loaded editor, tab and selection identity.

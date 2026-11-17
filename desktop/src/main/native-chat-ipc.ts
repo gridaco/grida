@@ -74,6 +74,7 @@ import { NativeAgentDeletion } from "./native-agent-deletion";
 import { RetainedFileExport } from "./retained-file-export";
 import { NativeChatProfiles } from "./native-chat-profiles";
 import type { NativeChatSelections } from "./native-chat-selections";
+import type { DesktopBrowserTools } from "./desktop-browser-tools";
 
 const MAX_ATTACHMENTS = 16;
 const MAX_OBSERVATIONS = 16;
@@ -387,7 +388,8 @@ export class NativeChatIpc {
         action: "install" | "remove"
       ): Promise<boolean>;
     },
-    private readonly selections?: NativeChatSelections
+    private readonly selections?: NativeChatSelections,
+    private readonly browserTools?: DesktopBrowserTools
   ) {}
 
   async documentRequest<T>(
@@ -1892,7 +1894,12 @@ export class NativeChatIpc {
           )
             throw new Error("native_chat_svg_text_unverified");
           return result;
-        }
+        },
+        file
+          ? undefined
+          : this.browserTools?.lease(owner.sender, owner.frame, () =>
+              this.revalidate(owner, attachment)
+            )
       );
     }
   }

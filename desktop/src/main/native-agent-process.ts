@@ -30,6 +30,7 @@ import {
   type NativeEditorSurfaceDelivery,
   type NativeEditorSvgTextDelivery,
 } from "./native-editor-surfaces";
+import type { DesktopBrowserToolLease } from "./desktop-browser-tools";
 import {
   NativeAgentPermissions,
   type NativeWorkspaceSelection,
@@ -192,6 +193,11 @@ export class NativeAgentProcess {
   private editorSurfaces = false;
   private editorSurfaceOpen = false;
   private editorSvgText = false;
+  private editorBrowserTools = false;
+  private readonly editorBrowserRequests = new Map<
+    string | number,
+    AbortController
+  >();
   private chatSelection = false;
   private permissionMode = false;
   private readonly commandCapabilities = new Set<string>();
@@ -662,6 +668,7 @@ export class NativeAgentProcess {
                 ...(providerEgress && {
                   [NativeEditorSurfaceEndpoints.openCapability]: 1,
                   [NativeEditorSurfaceEndpoints.svgTextCapability]: 1,
+                  [NativeEditorSurfaceEndpoints.browserCapability]: 1,
                 }),
                 [NativeAgentArtifacts.capability]: 1,
                 [NativeAgentBackgroundProcesses.capability]: 1,
@@ -808,6 +815,9 @@ export class NativeAgentProcess {
       processOwner.editorSvgText =
         processOwner.editorSurfaces &&
         advertised?.[NativeEditorSurfaceEndpoints.svgTextCapability] === 1;
+      processOwner.editorBrowserTools =
+        processOwner.editorSurfaces &&
+        advertised?.[NativeEditorSurfaceEndpoints.browserCapability] === 1;
       processOwner.ready = true;
       return processOwner;
     } catch (error) {
@@ -893,7 +903,8 @@ export class NativeAgentProcess {
     requireCurrent: () => void,
     deliver: NativeEditorSurfaceDelivery | undefined,
     revision?: number,
-    svgText?: NativeEditorSvgTextDelivery
+    svgText?: NativeEditorSvgTextDelivery,
+    browser?: DesktopBrowserToolLease
   ) {
     if (this.connected && this.editorSurfaces)
       return this.editorEndpoints.register(
@@ -902,7 +913,8 @@ export class NativeAgentProcess {
         requireCurrent,
         this.editorSurfaceOpen ? deliver : undefined,
         revision,
-        this.editorSvgText ? svgText : undefined
+        this.editorSvgText ? svgText : undefined,
+        this.editorBrowserTools ? browser : undefined
       );
   }
 
@@ -958,7 +970,7 @@ export class NativeAgentProcess {
     this.cancelGatewayBillingRequests();
     this.imageGeneration?.close();
     this.imagePlacement?.close();
-    this.editorEndpoints.close();
+    this.closeEditorEndpoints();
     this.child.stdin.end();
     const exit = await bounded(this.exited, SHUTDOWN_TIMEOUT_MS);
     if (exit && !this.ready) return;
@@ -1112,6 +1124,48 @@ export class NativeAgentProcess {
         }
         if (
           this.connected &&
+          this.editorBrowserTools &&
+          message.method === NativeEditorSurfaceEndpoints.browserMethod
+        ) {
+          const id = message.id;
+          if (
+            this.editorBrowserRequests.has(id) ||
+            this.editorBrowserRequests.size >= REQUEST_LIMIT
+          )
+            throw new Error("native_agent_browser_request_limit");
+          const controller = new AbortController();
+          this.editorBrowserRequests.set(id, controller);
+          void this.editorEndpoints
+            .browserTool(message.params, controller.signal)
+            .then(
+              (result) => {
+                if (this.connected)
+                  this.write({
+                    jsonrpc: "2.0",
+                    id,
+                    ...(result
+                      ? { result }
+                      : { error: { code: -32602, message: "Invalid params" } }),
+                  });
+              },
+              () => {
+                if (this.connected)
+                  this.write({
+                    jsonrpc: "2.0",
+                    id,
+                    error: {
+                      code: -32603,
+                      message: "Browser reply unverified",
+                    },
+                  });
+              }
+            )
+            .catch(() => this.disconnect("native_agent_browser_reply_failed"))
+            .finally(() => this.editorBrowserRequests.delete(id));
+          return;
+        }
+        if (
+          this.connected &&
           this.editorSurfaces &&
           (message.method === NativeEditorSurfaceEndpoints.readMethod ||
             (this.editorSurfaceOpen &&
@@ -1139,8 +1193,10 @@ export class NativeAgentProcess {
         this.providerEgress?.cancel(message.params);
       } else if (message.method === "$/cancel_request") {
         const id = object(message.params)?.requestId;
-        if (typeof id === "number" || typeof id === "string")
+        if (typeof id === "number" || typeof id === "string") {
           this.gatewayBillingRequests.get(id)?.abort();
+          this.editorBrowserRequests.get(id)?.abort();
+        }
         this.imageGeneration?.cancel(id);
         this.imagePlacement?.cancel(id);
       } else if (message.method === "session/update") {
@@ -1185,7 +1241,7 @@ export class NativeAgentProcess {
     this.cancelGatewayBillingRequests();
     this.imageGeneration?.close();
     this.imagePlacement?.close();
-    this.editorEndpoints.close();
+    this.closeEditorEndpoints();
     this.providerRequests.clear();
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timer);
@@ -1197,6 +1253,13 @@ export class NativeAgentProcess {
   private disconnect(code: string): void {
     this.fail(new Error(code));
     void this.close().catch(() => {});
+  }
+
+  private closeEditorEndpoints(): void {
+    for (const controller of this.editorBrowserRequests.values())
+      controller.abort();
+    this.editorBrowserRequests.clear();
+    this.editorEndpoints.close();
   }
 
   private cancelGatewayBillingRequests(): void {

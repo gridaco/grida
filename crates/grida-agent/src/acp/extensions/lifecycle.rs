@@ -46,6 +46,8 @@ struct Enqueue {
     editor_endpoint_id: Option<BindingId>,
     #[serde(default)]
     editor_presentation: bool,
+    #[serde(default)]
+    editor_browser_tools: bool,
     editor_svg_target_id: Option<BindingId>,
 }
 
@@ -211,6 +213,7 @@ pub(super) fn handlers(
                         &enqueue.1,
                         request.editor_endpoint_id.as_ref(),
                         request.editor_presentation,
+                        request.editor_browser_tools,
                         request.editor_svg_target_id.as_ref(),
                         false,
                     )?;
@@ -245,6 +248,7 @@ pub(super) fn handlers(
                                 )?,
                                 editor_endpoint: request.editor_endpoint_id,
                                 editor_presentation: request.editor_presentation,
+                                editor_browser_tools: request.editor_browser_tools,
                                 editor_svg_target: request.editor_svg_target_id,
                                 ..SubmissionContext::default()
                             },

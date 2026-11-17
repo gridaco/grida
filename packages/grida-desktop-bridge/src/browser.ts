@@ -24,6 +24,7 @@ export namespace DesktopBrowser {
   ] as const);
 
   export type Target = Readonly<{ attachmentId: string; pageId: string }>;
+  export type Presentation = Target & Readonly<{ focus: boolean }>;
   export type Create = Readonly<{
     attachmentId: string;
     /** Omission creates a blank page. An empty or invalid URL rejects. */
@@ -459,6 +460,25 @@ export namespace DesktopBrowser {
     clearBrowsingData(): Promise<boolean>;
     /** Subscribe before attaching/reading; revision gaps require a snapshot. */
     subscribe(handler: (event: Event) => void): () => void;
+    subscribePresentation?(
+      handler: (request: Presentation) => void
+    ): () => void;
+  }
+
+  export function parsePresentation(value: unknown): Presentation | null {
+    if (
+      !record(value) ||
+      !keys(value, ["attachmentId", "pageId", "focus"]) ||
+      !isIdentity(value.attachmentId) ||
+      !isIdentity(value.pageId) ||
+      typeof value.focus !== "boolean"
+    )
+      return null;
+    return {
+      attachmentId: value.attachmentId,
+      pageId: value.pageId,
+      focus: value.focus,
+    };
   }
 
   const encoder = new TextEncoder();

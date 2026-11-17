@@ -73,6 +73,7 @@ export const IPC_CHANNELS = {
   BROWSER_CHOOSE_DOWNLOAD_DIRECTORY: "grida:browser:choose-download-directory",
   BROWSER_OPEN_PAGE: "grida:browser:open-page",
   BROWSER_CHANGED: "grida:browser:changed",
+  BROWSER_PRESENT_PAGE: "grida:browser:present-page",
   WINDOW_SET_DOCUMENT_EDITED: "grida:window:set-document-edited",
   WINDOW_SET_REPRESENTED_FILENAME: "grida:window:set-represented-filename",
   WINDOW_CLOSE: "grida:window:close",
@@ -212,6 +213,9 @@ export const IPC_CHANNELS = {
   WORKSPACE_COMMAND: "grida:workspace:command",
   WORKSPACE_LIST: "grida:workspace:list",
   WORKSPACE_PUBLISH_EDITOR_SURFACES: "grida:workspace:publish-editor-surfaces",
+  WORKSPACE_PUBLISH_AUTOMATION_SURFACES:
+    "grida:workspace:publish-automation-surfaces",
+  WORKSPACE_OPEN_AUTOMATION_FILE: "grida:workspace:open-automation-file",
   WORKSPACE_CHOOSE: "grida:workspace:choose",
   WORKSPACE_REOPEN: "grida:workspace:reopen",
   WORKSPACE_CREATE: "grida:workspace:create",

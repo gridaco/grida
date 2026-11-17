@@ -184,6 +184,8 @@ struct Submit {
     editor_endpoint_id: Option<BindingId>,
     #[serde(default)]
     editor_presentation: bool,
+    #[serde(default)]
+    editor_browser_tools: bool,
     editor_svg_target_id: Option<BindingId>,
 }
 
@@ -590,6 +592,7 @@ pub(super) fn handlers(
                         &submit_sessions,
                         request.editor_endpoint_id.as_ref(),
                         request.editor_presentation,
+                        request.editor_browser_tools,
                         request.editor_svg_target_id.as_ref(),
                         request.allow_wakeups,
                     )?;
@@ -625,6 +628,7 @@ pub(super) fn handlers(
                                 allow_library_selection: request.allow_library_selection,
                                 editor_endpoint: request.editor_endpoint_id,
                                 editor_presentation: request.editor_presentation,
+                                editor_browser_tools: request.editor_browser_tools,
                                 editor_svg_target: request.editor_svg_target_id,
                             },
                         )
@@ -736,6 +740,7 @@ fn editor_binding(
     sessions: &Mutex<ConnectionSessions>,
     endpoint: Option<&BindingId>,
     presentation: bool,
+    browser: bool,
     svg_target: Option<&BindingId>,
     allow_wakeups: bool,
 ) -> Result<()> {
@@ -747,6 +752,12 @@ fn editor_binding(
     }
     if presentation {
         require(sessions, crate::editor_surfaces::OPEN_CAPABILITY, None)?;
+        if endpoint.is_none() {
+            return Err(Error::invalid_params());
+        }
+    }
+    if browser {
+        require(sessions, crate::browser_tools::CAPABILITY, None)?;
         if endpoint.is_none() {
             return Err(Error::invalid_params());
         }

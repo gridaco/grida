@@ -9,6 +9,7 @@ import {
 } from "electron";
 import path from "node:path";
 import { DesktopBrowserHost } from "./browser-host";
+import { DesktopBrowserTools } from "./desktop-browser-tools";
 import type { BrowserHistory } from "./browser-history";
 import type { BrowserDownloads } from "./browser-downloads";
 import { URL } from "node:url";
@@ -87,6 +88,7 @@ const EDITOR_ORIGIN = (() => {
 type RegisterIpcHandlersOptions = {
   browser_history?: BrowserHistory;
   browser_downloads?: BrowserDownloads;
+  on_browser_tools?: (tools: DesktopBrowserTools) => void;
   resolve_ipc_role: (window: BrowserWindow) => DesktopIpcRole | null;
   open_settings: () => void;
   archives?: NativeArchives;
@@ -155,6 +157,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     workspaceExists: async (id) =>
       !!(await servicesSidecarClient.findWorkspace(id)),
   });
+  const browserTools = new DesktopBrowserTools(browserHost);
+  options.on_browser_tools?.(browserTools);
   const nativeChat = new NativeChatIpc(
     EDITOR_ORIGIN,
     (sender, workspaceId, profileId) => {
@@ -249,7 +253,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         return result.response === 1;
       },
     },
-    options.native_chat_selections
+    options.native_chat_selections,
+    browserTools
   );
   const externalAgent = new NativeExternalRunIpc(
     EDITOR_ORIGIN,
@@ -1017,6 +1022,12 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     IPC_CHANNELS.WORKSPACE_PUBLISH_EDITOR_SURFACES,
     (event, snapshot: unknown) =>
       options.publish_workspace_surfaces?.(event, snapshot) ?? false
+  );
+  guarded(
+    IPC_CHANNELS.WORKSPACE_PUBLISH_AUTOMATION_SURFACES,
+    (event, snapshot: unknown, activePageId: unknown) =>
+      admittedWindow(event.sender) !== null &&
+      browserTools.publish(event, snapshot, activePageId)
   );
   guarded(IPC_CHANNELS.WORKSPACE_CHOOSE, chooseWorkspace);
   guarded(IPC_CHANNELS.WORKSPACE_REOPEN, (_event, root: unknown) => {

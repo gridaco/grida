@@ -128,11 +128,17 @@ impl HostTools {
         lease: BindingId,
         present: bool,
         svg_text: bool,
+        browser: bool,
     ) -> Result<Self> {
-        let mut capabilities = vec![LIST_OPEN];
-        if present {
-            capabilities.push(presentation::OPEN);
-        }
+        let mut capabilities = if browser {
+            crate::browser_tools::NAMES.to_vec()
+        } else {
+            let mut capabilities = vec![LIST_OPEN];
+            if present {
+                capabilities.push(presentation::OPEN);
+            }
+            capabilities
+        };
         if svg_text {
             capabilities.extend([READ_TEXT, REPLACE_TEXT]);
         }

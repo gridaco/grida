@@ -217,7 +217,7 @@ fn exec_definition(
         "type": "object",
         "properties": {
             "cmd": {"type": "string", "description": "Shell command to execute."},
-            "workdir": {"type": "string", "description": "Absolute working directory. Defaults to the root of the selected directory."},
+            "workdir": {"type": "string", "description": "Absolute working directory within the selected directory. Omit for its root. Use this field or cd in cmd to run in a subfolder."},
             "tty": {"type": "boolean", "description": "True allocates a pseudo-terminal for the command; false or omitted uses plain pipes with stdin closed."},
             "yield_time_ms": {"type": "number", "description": "How long to wait for the command before returning. Defaults to 10000 ms; effective range is 250-30000 ms."},
             "max_output_tokens": {"type": "number", "description": "Output token budget. Defaults to 10000 tokens; larger requests may be capped."}
@@ -231,7 +231,7 @@ fn exec_definition(
     }
     if scoped {
         schema["properties"]["access"] = json!({"enum": ["read", "read_write"], "description": if unconfined { "Declare the intended operation. Full access does not confine filesystem or network effects, including when read is selected." } else { "read lets the command read the directory; read_write also lets it write there." }});
-        schema["properties"]["directory"] = json!({"type": "string", "description": "Named directory ID. Omit for the primary directory."});
+        schema["properties"]["directory"] = json!({"type": "string", "description": "ID of a configured directory grant. Omit for the primary directory, including when workdir points to one of its subfolders."});
         schema["required"] = json!(["cmd", "access"]);
         description.push_str(" Select read or read_write access explicitly. The working directory must be inside the selected directory.");
     }

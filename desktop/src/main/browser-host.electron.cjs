@@ -114,7 +114,18 @@ app
       response.end(
         request.url === "/animation.js"
           ? "window.frame=0;function tick(){window.frame++;document.querySelector('canvas').getContext('2d').fillRect(window.frame%200,0,1,20);requestAnimationFrame(tick)}tick();"
-          : '<html><title>Unframeable guest</title><body style="margin:0;background:#ff0000"><input id="input" aria-label="Editable text"><canvas width="200" height="20"></canvas><script src="/animation.js"></script></body></html>'
+          : request.url === "/automation"
+            ? `<html><title>Automation fixture</title><body style="margin:0;background:#ff6227"><form><input id="value" aria-label="Value"><button id="save">Save</button></form><output></output><script>
+                const field = document.querySelector('input');
+                let inputTrusted = false, clickTrusted = false, count = 0;
+                field.oninput = event => { inputTrusted = event.isTrusted; };
+                document.querySelector('button').onclick = event => { clickTrusted = event.isTrusted; };
+                document.querySelector('form').onsubmit = event => {
+                  event.preventDefault();
+                  document.querySelector('output').value = JSON.stringify({value:field.value,inputTrusted,clickTrusted,count:++count});
+                };
+              </script></body></html>`
+            : '<html><title>Unframeable guest</title><body style="margin:0;background:#ff0000"><input id="input" aria-label="Editable text"><canvas width="200" height="20"></canvas><script src="/animation.js"></script></body></html>'
       );
     });
     const origin = await serve((_request, response) => {
@@ -406,6 +417,151 @@ app
     peerWindow.destroy();
     result.sharedProfile = true;
 
+    mark("independent background browser pages");
+    const scope = {
+      id: "first-automation-scope",
+      sender: window.webContents,
+      frame: window.webContents.mainFrame,
+      live: () => !window.isDestroyed(),
+    };
+    if (process.platform === "darwin") {
+      window.focus();
+      await waitFor(() => window.isFocused());
+    }
+    await window.webContents.executeJavaScript(
+      "document.querySelector('#shell-focus').focus();true"
+    );
+    const workbenchFocused = window.isFocused();
+    const background = await Promise.all([
+      host.openAutomationPage(scope, `${guestOrigin}/automation`),
+      host.openAutomationPage(scope, `${guestOrigin}/automation`),
+    ]);
+    const backgroundGuests = background.map((target) => target.contents());
+    const backgroundOwners = backgroundGuests.map((contents) =>
+      BrowserWindow.fromWebContents(contents.hostWebContents)
+    );
+    assert.notEqual(backgroundOwners[0], backgroundOwners[1]);
+    const prepare = async (contents) => {
+      await waitFor(
+        () =>
+          contents.getTitle() === "Automation fixture" && !contents.isLoading()
+      );
+      await contents.executeJavaScript(
+        "new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))"
+      );
+      contents.debugger.attach("1.3");
+    };
+    await Promise.all(backgroundGuests.map(prepare));
+    const action = async (target, contents, value) => {
+      const send = (method, params) =>
+        contents.debugger.sendCommand(method, params);
+      const click = async (selector) => {
+        const { result } = await send("Runtime.evaluate", {
+          returnByValue: true,
+          expression: `(() => { const r=document.querySelector('${selector}').getBoundingClientRect();return { x:r.x+r.width/2,y:r.y+r.height/2 }; })()`,
+        });
+        const point = { ...result.value, button: "left", clickCount: 1 };
+        await send("Input.dispatchMouseEvent", {
+          ...point,
+          type: "mousePressed",
+        });
+        await send("Input.dispatchMouseEvent", {
+          ...point,
+          type: "mouseReleased",
+        });
+      };
+      await click("#value");
+      assert.equal(
+        await contents.executeJavaScript("document.activeElement.id"),
+        "value",
+        `expected focus inside ${value}`
+      );
+      await target.prepareInput();
+      await send("Input.insertText", { text: value });
+      assert.equal(
+        await contents.executeJavaScript(
+          "document.querySelector('input').value"
+        ),
+        value
+      );
+      await click("#save");
+      assert.deepEqual(
+        JSON.parse(
+          await contents.executeJavaScript(
+            "document.querySelector('output').value"
+          )
+        ),
+        { value, inputTrusted: true, clickTrusted: true, count: 1 }
+      );
+    };
+    // Chromium's trusted input can contend for focus across widget hosts. The
+    // operation executor serializes input while exact page reads/captures run
+    // independently on both live guests.
+    for (const [index, contents] of backgroundGuests.entries())
+      await action(background[index], contents, `value-${index}`);
+    const captured = await Promise.all(
+      backgroundGuests.map(async (contents) => {
+        const capture = await contents.debugger.sendCommand(
+          "Page.captureScreenshot",
+          {
+            format: "png",
+            fromSurface: true,
+          }
+        );
+        const pixels = Buffer.from(capture.data, "base64");
+        assert(nativeImage.createFromBuffer(pixels).getSize().height > 0);
+        contents.debugger.detach();
+        return pixels;
+      })
+    );
+    assert(!captured[0].equals(captured[1]));
+    for (const [index, contents] of backgroundGuests.entries()) {
+      const owner = backgroundOwners[index];
+      assert.equal(owner.isVisible(), false);
+      assert.equal(owner.isFocused(), false);
+      assert.equal(contents.session, guest.session);
+      assert.notEqual(owner.webContents.session, contents.session);
+      assert.equal(
+        await owner.webContents.executeJavaScript("typeof window.grida"),
+        "undefined"
+      );
+      assert.throws(
+        () => host.snapshot(eventFor(owner), background[index].target.pageId),
+        /browser_owner_invalid/
+      );
+    }
+    assert.equal(
+      await window.webContents.executeJavaScript("document.activeElement.id"),
+      "shell-focus"
+    );
+    assert.equal(window.isFocused(), workbenchFocused);
+    assert.throws(
+      () =>
+        host.resolveAutomationPage(
+          { ...scope, id: "different-scope" },
+          background[0].target
+        ),
+      /browser_page_unavailable/
+    );
+    assert.deepEqual(
+      host.automationWorkbenchPages(scope).map((target) => target.target),
+      [{ kind: "workbench", tabId: page.id }]
+    );
+    assert.equal(
+      await backgroundGuests[0].executeJavaScript(
+        "window.open(location.href) === null"
+      ),
+      true
+    );
+    assert.equal(background[0].blocker(), "popup");
+    await background[0].close();
+    assert.equal(background[1].current(), true);
+    host.revokeAutomation(scope.id);
+    await waitFor(() => backgroundOwners.every((owner) => owner.isDestroyed()));
+    assert(backgroundGuests.every((contents) => contents.isDestroyed()));
+    assert(background.every((target) => !target.current()));
+    result.backgroundAutomation = true;
+
     mark("guest renderer crash");
     guest.forcefullyCrashRenderer();
     await waitFor(
@@ -458,8 +614,21 @@ app
       url: `${guestOrigin}/last`,
     });
     const lastGuest = await mount(window, fresh.attachmentId, lastPage, "last");
+    const lastBackground = await host.openAutomationPage(
+      { ...scope, frame: window.webContents.mainFrame },
+      `${guestOrigin}/automation`
+    );
+    const lastBackgroundGuest = lastBackground.contents();
+    const lastBackgroundWindow = BrowserWindow.fromWebContents(
+      lastBackgroundGuest.hostWebContents
+    );
     window.destroy();
-    await waitFor(() => lastGuest.isDestroyed());
+    await waitFor(
+      () =>
+        lastGuest.isDestroyed() &&
+        lastBackgroundGuest.isDestroyed() &&
+        lastBackgroundWindow.isDestroyed()
+    );
     result.destroyedWithShell = true;
     fs.writeFileSync(resultPath, JSON.stringify(result));
     for (const server of servers) server.close();

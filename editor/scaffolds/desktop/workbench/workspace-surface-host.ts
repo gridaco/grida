@@ -1,5 +1,6 @@
 import {
   NativeEditorSurfaces,
+  type DesktopBridge,
   type NativeEditorSurfaceSnapshot,
 } from "@grida/desktop-bridge";
 import { WorkspaceArtifact } from "@/lib/desktop/workspace-artifact";
@@ -118,7 +119,8 @@ export class WorkspaceSurfaceHost {
   }
 
   publishEditorSurfaces(
-    publish: (snapshot: NativeEditorSurfaceSnapshot) => Promise<boolean>
+    publish: (snapshot: NativeEditorSurfaceSnapshot) => Promise<boolean>,
+    additionalChanges?: (listener: () => void) => () => void
   ): () => void {
     let current = true;
     let pending = false;
@@ -140,10 +142,36 @@ export class WorkspaceSurfaceHost {
       void flush();
     };
     const unsubscribe = this.subscribeToEditorSurfaces(update);
+    const unsubscribeAdditional = additionalChanges?.(update);
     update();
     return () => {
       current = false;
       unsubscribe();
+      unsubscribeAdditional?.();
+    };
+  }
+
+  bindAutomation(
+    automation: NonNullable<DesktopBridge["workspaces"]["automation"]>,
+    activePage: () => string | null,
+    subscribePages: (listener: () => void) => () => void
+  ): () => void {
+    let current = true;
+    let lastPublication: string | undefined;
+    const unlisten = automation.onOpenFile(({ path, expiresAtMs }) => {
+      void this.open(path, () => current && Date.now() < expiresAtMs);
+    });
+    const unpublish = this.publishEditorSurfaces((snapshot) => {
+      const pageId = activePage();
+      const publication = JSON.stringify([snapshot, pageId]);
+      if (publication === lastPublication) return Promise.resolve(true);
+      lastPublication = publication;
+      return automation.publish(snapshot, pageId);
+    }, subscribePages);
+    return () => {
+      current = false;
+      unpublish();
+      unlisten();
     };
   }
 

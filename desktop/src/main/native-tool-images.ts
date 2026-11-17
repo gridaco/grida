@@ -18,6 +18,8 @@ const MAX_CHUNK_BYTES = 256 * 1024;
 const MAX_BASE64 = Math.ceil(MAX_CHUNK_BYTES / 3) * 4;
 const MAX_PIXELS = 16 * 1024 * 1024;
 const PNG = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+const BROWSER_CAPTURE =
+  /^browser-capture\/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 
 /** Purpose-scoped read identities for the captured pixels of successful tool results. */
 export class NativeToolImages {
@@ -40,8 +42,11 @@ export class NativeToolImages {
       const media = record(value);
       if (
         typeof media.mediaId !== "string" ||
-        !media.mediaId.startsWith("workspace-view/") ||
-        media.mediaId.length <= "workspace-view/".length ||
+        (!(
+          media.mediaId.startsWith("workspace-view/") &&
+          media.mediaId.length > "workspace-view/".length
+        ) &&
+          !BROWSER_CAPTURE.test(media.mediaId)) ||
         Buffer.byteLength(media.mediaId) > 512 ||
         /\p{Cc}/u.test(media.mediaId) ||
         !Number.isSafeInteger(media.contentIndex) ||

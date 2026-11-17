@@ -376,6 +376,7 @@ impl Host {
         let input = self.prepare_input(
             execution,
             &view.session,
+            &super::session_configuration(view)?.cwd,
             head,
             None,
             side,

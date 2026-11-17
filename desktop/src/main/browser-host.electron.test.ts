@@ -92,6 +92,7 @@ it.skipIf(process.env.GRIDA_DESKTOP_TEST_ELECTRON !== "1")(
         inactiveInput: true,
         requestPolicy: true,
         sharedProfile: true,
+        backgroundAutomation: true,
         retryNewGuest: true,
         crashRecovery: true,
         documentReloadEndsGuests: true,

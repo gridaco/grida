@@ -44,6 +44,22 @@ cross-origin frames may also open in those windows.
 Pages your app generates with `blob:` or `about:blank` can open normally. These
 previews belong to the current session and are not restored after restarting.
 
+## Test a page with the agent
+
+In a supported Desktop build, you can ask the agent in **Act** to test a local
+app. Start the app's server, then give the agent its URL and describe what to
+verify. Shell commands in **Default** access have networking disabled. The
+built-in browser can visit an already running local server. The agent opens a
+separate background page and can return its findings and errors while you keep
+working in the workbench. It can also return a screenshot on a model connection
+that accepts tool images.
+
+To work together on the page you are viewing, ask the agent to use your current
+browser tab. You can also ask it to open a URL visibly. Keep the requested tab
+displayed when the agent needs to click, type or capture it. Background pages
+and visible tabs have separate documents and share your Grida browser sign-ins.
+[Connect another agent with MCP](../../agent/grida-mcp.md#use-the-built-in-browser-from-an-mcp-client)
+
 ## Search and find recent pages
 
 Enter a search phrase, such as `web typography examples`, to search Google.

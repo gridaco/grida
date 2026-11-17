@@ -1058,6 +1058,7 @@ impl Host {
                             allow_image_placement,
                             editor_endpoint: None,
                             editor_presentation: false,
+                            editor_browser_tools: false,
                             editor_svg_target: None,
                             operating_regime,
                             subagent: None,

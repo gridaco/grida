@@ -388,6 +388,12 @@ admitted workbench frame for that exact folder can publish. Navigating away,
 closing the frame, or signing out withdraws the view for this launch. The
 listener offers `surface_list_open` independently of any model session.
 
+Add `--native-chat-export-mcp-browser` to make the browser catalog available
+to that authenticated client. New browser pages run in the background, and the
+client can work with exact browser targets in the selected workbench. Follow
+the [browser MCP guide](https://grida.co/docs/agent/grida-mcp#use-the-built-in-browser-from-an-mcp-client)
+for the tool workflow and grant scope.
+
 Ordinary macOS and Linux launches offer connected subscription models in the
 Welcome and workspace model pickers. Sign in under **Settings → LLM Providers
 → ChatGPT Subscription**. A new chat without a saved or explicit model choice

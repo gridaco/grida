@@ -1,5 +1,6 @@
 //! GRIDA-SEC-004 — actual native MCP listener, tool contract and admission.
 
+use base64::{Engine, engine::general_purpose::STANDARD};
 use reqwest::{Client, Response, StatusCode};
 use serde_json::{Value, json};
 use std::process::Stdio;
@@ -24,6 +25,10 @@ impl Server {
     }
 
     async fn start_tool(command: &str) -> Self {
+        Self::start_profile(command, &[]).await
+    }
+
+    async fn start_profile(command: &str, extra: &[&str]) -> Self {
         let state = tempfile::tempdir().unwrap();
         let mut child = Command::new(env!("CARGO_BIN_EXE_grida-agent"))
             .env_clear()
@@ -38,6 +43,7 @@ impl Server {
                 "--server-token-env",
                 TOKEN_ENV,
             ])
+            .args(extra)
             .kill_on_drop(true)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -187,6 +193,146 @@ async fn live_editor_exports_the_same_bounded_read_without_a_chat_store() {
         .unwrap()
         .unwrap();
     assert!(status.success());
+}
+
+#[tokio::test]
+async fn browser_profile_correlates_parallel_calls_and_projects_only_its_capture() {
+    let mut server = Server::start_profile("serve-editor-mcp", &["--browser-tools"]).await;
+    let mut input = server.child.stdin.take().unwrap();
+    let mut output = BufReader::new(server.child.stdout.take().unwrap()).lines();
+
+    let listed = decode(
+        server
+            .request("tools/list", json!({}))
+            .send()
+            .await
+            .unwrap(),
+    )
+    .await;
+    let tools = listed["result"]["tools"].as_array().unwrap();
+    assert_eq!(tools.len(), 12);
+    assert!(tools.iter().any(|tool| {
+        tool["name"] == "surface_open" && tool["inputSchema"]["required"] == json!(["target"])
+    }));
+    assert!(tools.iter().any(|tool| tool["name"] == "browser_capture"));
+
+    let malformed = decode(
+        server
+            .request(
+                "tools/call",
+                json!({"name":"browser_open", "arguments":{"url":"file:///tmp/unrelated"}}),
+            )
+            .send()
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(malformed["result"]["isError"], true);
+    assert!(
+        tokio::time::timeout(Duration::from_millis(75), output.next_line())
+            .await
+            .is_err()
+    );
+
+    let open = |page| {
+        let call = server.request(
+            "tools/call",
+            json!({"name":"browser_open", "arguments":{"url":format!("http://127.0.0.1/{page}")}}),
+        );
+        tokio::spawn(async move { decode(call.send().await.unwrap()).await })
+    };
+    let first_reply = open("first");
+    let second_reply = open("second");
+    let mut requests = Vec::new();
+    for _ in 0..2 {
+        let line = tokio::time::timeout(Duration::from_secs(1), output.next_line())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        let request: Value = serde_json::from_str(&line).unwrap();
+        assert_eq!(request["operation"], "browser_open");
+        assert_eq!(request.as_object().unwrap().len(), 4);
+        assert!(uuid::Uuid::parse_str(request["requestId"].as_str().unwrap()).is_ok());
+        assert!(
+            request["timeoutMs"]
+                .as_u64()
+                .is_some_and(|ms| ms > 0 && ms < 8000)
+        );
+        requests.push(request);
+    }
+    assert_ne!(requests[0]["requestId"], requests[1]["requestId"]);
+    for request in requests.into_iter().rev() {
+        let url = request["arguments"]["url"].as_str().unwrap();
+        let name = url.split('/').next_back().unwrap();
+        let reply = json!({
+            "requestId":request["requestId"],
+            "result":{"disposition":"dispatched_verified","data":{
+                "target":{"kind":"background","pageId": name},
+                "readiness":{"kind":"navigation","navigationId":format!("{name}-navigation")}
+            }}
+        });
+        input
+            .write_all(format!("{reply}\n").as_bytes())
+            .await
+            .unwrap();
+    }
+    for (pending, expected) in [(first_reply, "first"), (second_reply, "second")] {
+        let result = pending.await.unwrap();
+        assert_eq!(result["result"]["isError"], false);
+        assert_eq!(
+            result["result"]["structuredContent"]["target"]["pageId"],
+            expected
+        );
+    }
+
+    let call = server.request(
+        "tools/call",
+        json!({"name":"browser_capture", "arguments":{
+            "target":{"kind":"background","pageId":"first"},"documentId":"first-document"
+        }}),
+    );
+    let pending = tokio::spawn(async move { decode(call.send().await.unwrap()).await });
+    let line = tokio::time::timeout(Duration::from_secs(1), output.next_line())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    let request: Value = serde_json::from_str(&line).unwrap();
+    assert_eq!(request["operation"], "browser_capture");
+    let mut pixels = Vec::new();
+    image::codecs::jpeg::JpegEncoder::new(&mut pixels)
+        .encode(&[220, 74, 108], 1, 1, image::ExtendedColorType::Rgb8)
+        .unwrap();
+    let jpeg = STANDARD.encode(pixels);
+    let reply = json!({
+        "requestId":request["requestId"],
+        "result":{"disposition":"dispatched_verified","data":{"documentId":"first-document"},
+            "image":{"mimeType":"image/jpeg", "base64":jpeg}
+        }
+    });
+    input
+        .write_all(format!("{reply}\n").as_bytes())
+        .await
+        .unwrap();
+    let image = pending.await.unwrap();
+    assert_eq!(
+        image["result"]["structuredContent"]["documentId"],
+        "first-document"
+    );
+    assert_eq!(
+        image["result"]["content"],
+        json!([{"type":"image","data":jpeg,"mimeType":"image/jpeg"}])
+    );
+    assert!(server.state.path().read_dir().unwrap().next().is_none());
+    drop(input);
+    assert!(
+        tokio::time::timeout(Duration::from_secs(2), server.child.wait())
+            .await
+            .unwrap()
+            .unwrap()
+            .success()
+    );
 }
 
 async fn decode(response: Response) -> Value {
