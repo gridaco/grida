@@ -75,6 +75,9 @@ type Mount = {
   timer: ReturnType<typeof setTimeout>;
 };
 
+const PERMISSION_RELOAD_TIMEOUT_MS = 2_000;
+const PERMISSION_CLOSE_TIMEOUT_MS = 2_000;
+
 /** Browser execution and document-scoped guest admission, independent of agents. */
 export class DesktopBrowserHost {
   readonly #owners = new Map<number, Owner>();
@@ -94,6 +97,7 @@ export class DesktopBrowserHost {
     }
   >();
   #clearing = false;
+  #resettingPermissions = false;
   readonly #closing = new Set<Promise<void>>();
   #pendingHistoryChange: DesktopBrowser.History.Change | null = null;
   readonly #pendingAttach = new Map<number, symbol>();
@@ -1775,34 +1779,48 @@ export class DesktopBrowserHost {
       }
     });
   }
-  #reloadPermissions(contents: WebContents): void {
+  #reloadPermissions(contents: WebContents): Promise<void> {
+    if (contents.isDestroyed()) return Promise.resolve();
     // Reset must end existing streams even when the old document has a beforeunload
     // handler. This explicit reset differs from ordinary user navigation.
     this.#permissionReloads.add(contents);
-    const done = () => {
-      this.#permissionReloads.delete(contents);
-      contents.off("did-navigate", done);
-      contents.off("destroyed", done);
-      contents.off("did-fail-load", failed);
-    };
-    const failed = (
-      _event: unknown,
-      _code: number,
-      _description: string,
-      _url: string,
-      isMainFrame: boolean
-    ) => {
-      if (isMainFrame) done();
-    };
-    contents.once("did-navigate", done);
-    contents.once("destroyed", done);
-    contents.on("did-fail-load", failed);
-    try {
-      contents.reload();
-    } catch (error) {
-      done();
-      throw error;
-    }
+    return new Promise((resolve, reject) => {
+      let timer: ReturnType<typeof setTimeout>;
+      const cleanup = () => {
+        clearTimeout(timer);
+        this.#permissionReloads.delete(contents);
+        contents.off("did-navigate", retired);
+        contents.off("destroyed", retired);
+      };
+      const retired = () => {
+        cleanup();
+        resolve();
+      };
+      const forceClose = () => {
+        // A provisional failure, cancellation or stalled response can leave the
+        // old document alive. Once closing, only destruction confirms retirement.
+        clearTimeout(timer);
+        contents.off("did-navigate", retired);
+        timer = setTimeout(() => {
+          cleanup();
+          reject(new Error("browser_permission_close_timeout"));
+        }, PERMISSION_CLOSE_TIMEOUT_MS);
+        try {
+          contents.close({ waitForBeforeUnload: false });
+        } catch (error) {
+          cleanup();
+          reject(error);
+        }
+      };
+      contents.once("did-navigate", retired);
+      contents.once("destroyed", retired);
+      timer = setTimeout(forceClose, PERMISSION_RELOAD_TIMEOUT_MS);
+      try {
+        contents.reload();
+      } catch {
+        forceClose();
+      }
+    });
   }
   #forcePopup(popup: Popup): void {
     this.#popups.delete(popup.contents);
@@ -1904,51 +1922,49 @@ export class DesktopBrowserHost {
     });
   }
   resetPermissions(event: IpcMainInvokeEvent) {
-    return this.#manage(event, async (_window, check) => {
+    return this.#manage(event, async (window, check) => {
       check();
+      if (this.#resettingPermissions) throw new Error("browser_session_busy");
       this.#session();
-      this.#externalLinks.reset();
-      let result: Awaited<ReturnType<BrowserSitePolicy["resetPermissions"]>>;
-      let failure: unknown;
+      this.#resettingPermissions = true;
       try {
-        result = await this.#sitePolicy!.resetPermissions();
-      } finally {
-        // Reset has already changed consent. End active streams even if the
-        // initiating Settings document disappears or connection cleanup fails.
+        this.#externalLinks.reset();
+        // Policy clears consent before awaiting connection cleanup. Start guest
+        // retirement immediately and finish it even if that cleanup fails.
+        const reset = this.#sitePolicy!.resetPermissions();
         const guests = new Set<WebContents>();
         for (const owner of this.#owners.values())
           for (const page of owner.pages.values())
             if (page.guest && !page.guest.isDestroyed()) guests.add(page.guest);
         for (const popup of this.#popups.values())
           if (!popup.contents.isDestroyed()) guests.add(popup.contents);
-        for (const guest of guests) {
-          if (guest.isDestroyed()) continue;
-          try {
-            this.#reloadPermissions(guest);
-          } catch (error) {
-            try {
-              guest.close({ waitForBeforeUnload: false });
-            } catch {
-              // An individual native failure cannot leave later pages running.
-              failure ??= error;
-            }
-          }
+        const [result, ...retirements] = await Promise.allSettled([
+          reset,
+          ...[...guests].map((guest) => this.#reloadPermissions(guest)),
+        ]);
+        if (result.status === "rejected") throw result.reason;
+        for (const retirement of retirements) {
+          if (retirement.status === "rejected") throw retirement.reason;
         }
+        if (
+          result.value.certificateRestartRequired ||
+          result.value.deviceRestartRequired
+        ) {
+          const options: Electron.MessageBoxOptions = {
+            type: "info",
+            message: "Restart Grida to finish resetting website permissions",
+            detail:
+              "Website consent choices were cleared. Open pages were reloaded or closed. Chromium may retain previously selected USB, HID or serial devices and accepted certificates until Grida restarts.",
+            buttons: ["OK"],
+          };
+          await (window.isDestroyed() || window.webContents.isDestroyed()
+            ? dialog.showMessageBox(options)
+            : dialog.showMessageBox(window, options));
+        }
+        return true;
+      } finally {
+        this.#resettingPermissions = false;
       }
-      if (failure) throw failure;
-      if (result.certificateRestartRequired || result.deviceRestartRequired) {
-        const options: Electron.MessageBoxOptions = {
-          type: "info",
-          message: "Restart Grida to finish resetting website permissions",
-          detail:
-            "Website consent choices were cleared. Open pages were reloaded or closed. Chromium may retain previously selected USB, HID or serial devices and accepted certificates until Grida restarts.",
-          buttons: ["OK"],
-        };
-        await (_window.isDestroyed() || _window.webContents.isDestroyed()
-          ? dialog.showMessageBox(options)
-          : dialog.showMessageBox(_window, options));
-      }
-      return true;
     });
   }
   downloadPreferences(event: IpcMainInvokeEvent) {

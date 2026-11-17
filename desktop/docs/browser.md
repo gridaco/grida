@@ -177,10 +177,11 @@ checks; incomplete identities are not remembered. A site's USB forget operation
 also removes its matching remembered grant. Electron can retain native ephemeral
 device grants outside this policy: after accepting a USB, HID or serial choice,
 permission reset continues to require a Desktop restart for complete revocation.
-Reset still reloads live pages to end active access, even if the initiating
-Settings document disappears or connection cleanup fails after reset begins.
-If a guest cannot reload, Main closes it to end access and continues processing
-the other guests.
+Reset starts reloading live pages as soon as it clears consent, even if Settings
+closes or connection cleanup fails. A main-frame document commit confirms that
+the page was replaced. Main forces a close if reload throws or no new document
+commits within two seconds. Reset reports failure if destruction is still
+unconfirmed two seconds after that close request.
 
 File System Access uses Chromium's selected file/folder handles and confirms
 that exact path and read/write scope. Workspace attachment and private native
@@ -232,12 +233,12 @@ can.
 
 The optional version1 `management` group separates browser maintenance:
 
-| Action                    | Effect on open pages and shared data                                                                                                                                                                                                                           |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Clear history             | Removes recorded visits; leaves pages, website sign-ins and cache intact.                                                                                                                                                                                      |
-| Clear cache               | Clears HTTP cache; leaves pages, history and website sign-ins intact.                                                                                                                                                                                          |
-| Reset website permissions | Clears remembered site/device choices, external-app click consent and TLS exceptions, cancels prompts, and reloads open tabs/windows to end active captures. OS grants remain separate; native device grants and cached certificate trust can require restart. |
-| Clear browsing data       | Native-confirmed all-windows reset: closes every browser tab/window, cancels accepted downloads, and clears history, website storage, cache, connections, authentication and remembered website choices.                                                       |
+| Action                    | Effect on open pages and shared data                                                                                                                                                                     |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Clear history             | Removes recorded visits; leaves pages, website sign-ins and cache intact.                                                                                                                                |
+| Clear cache               | Clears HTTP cache; leaves pages, history and website sign-ins intact.                                                                                                                                    |
+| Reset website permissions | Clears remembered choices and ends active captures by reloading or closing pages. OS grants remain separate. Native device grants and cached certificate trust can require restart.                      |
+| Clear browsing data       | Native-confirmed all-windows reset: closes every browser tab/window, cancels accepted downloads, and clears history, website storage, cache, connections, authentication and remembered website choices. |
 
 Permission-reset reloads override `beforeunload`; they can discard unsaved form
 input. Full clearing blocks competing browser admission/work, drains teardown

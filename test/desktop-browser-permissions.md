@@ -64,6 +64,9 @@ embedded request has a separately identified origin.
    Unsaved form input can be discarded. OS grants are not reset.
    Repeat while closing/navigating Settings during reset. Expected: once the
    reset starts, page reload/termination still completes and active capture ends.
+   Repeat with a controlled page whose server leaves the reload request pending.
+   Expected: Main closes the stalled page, including a managed window, before
+   reset reports success. Pages that commit their reload stay open.
    After a USB, HID or serial selection, expect a restart-required notice.
    Restart before asserting that the native device grant has ended; reopening
    a site before restart must not be described as proof of full revocation.

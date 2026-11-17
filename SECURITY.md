@@ -4442,8 +4442,10 @@ caller is the actual privileged top-level workbench document.
    Sparse device APIs retain their actual origin/device evidence rather than
    inferring an application role. Unknown powers and unattributable restricted
    filesystem overrides remain unavailable. Permission reset revokes future
-   choices and reloads retained pages to stop their active streams. Once reset
-   starts, initiating-document loss cannot abandon that cleanup. USB forget
+   choices and waits for document replacement or guest destruction to end
+   active streams. Main forces a close when a reload stalls and requires
+   confirmation before reporting success. Once reset starts, initiating-document
+   loss cannot abandon that cleanup. USB forget
    removes the matching remembered origin/device grant; persistent-capable
    device checks use metadata shared with their chooser representation.
    Native ephemeral USB/HID/serial grants can remain inside Chromium until

@@ -112,7 +112,7 @@ export namespace SettingsBrowser {
       this.perform("permissions", async (api) =>
         this.completed(
           await api.resetPermissions(),
-          "Site permission reset requested. Open pages reload; restart Desktop if prompted.",
+          "Website permission choices cleared. Restart Desktop if prompted.",
           "Reset cancelled."
         )
       );

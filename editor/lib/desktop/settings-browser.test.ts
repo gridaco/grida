@@ -104,7 +104,7 @@ describe("SettingsBrowser.Controller", () => {
     expect(f.controller.read().notice).toBe("Browser cache cleared.");
     await f.controller.resetPermissions();
     expect(f.controller.read().notice).toContain(
-      "Site permission reset requested"
+      "Website permission choices cleared"
     );
     expect(f.api.clearBrowsingData).not.toHaveBeenCalled();
     expect(f.management.clearHistory).toHaveBeenCalledOnce();

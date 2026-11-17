@@ -137,7 +137,8 @@ workspace membership and native private paths do not become website grants.
 Platform-specific chooser, pairing and capture limitations belong in the
 implementation reference and must remain visible to callers.
 Resetting permission choices must end active capture independently of the
-initiating Settings document once reset begins. If the runtime retains native
+initiating Settings document once reset begins. Success requires confirmed
+document replacement or closure, even when a website fails to respond. If the runtime retains native
 device grants beyond reset, disclose the restart requirement; clearing an
 application's choice map alone is not complete revocation.
 
@@ -182,12 +183,12 @@ already saved files.
 
 Browser maintenance separates effects:
 
-| Operation                     | Contract                                                                                                                                                                                                                               |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Remove visits / clear history | Forget recorded browsing metadata without closing pages or clearing website storage/cache.                                                                                                                                             |
-| Clear cache                   | Clear shared HTTP cache without closing pages or clearing history/sign-ins.                                                                                                                                                            |
-| Reset website permissions     | Forget remembered website/device and external-app choices, cancel pending prompts and reload open pages/windows to end active capture. OS permission remains separate; native device grants and certificate cache can require restart. |
-| Full browser reset            | Confirm all-windows scope, block competing admission, close all browser pages/windows, cancel accepted transfers and clear history, website storage, cache, connections, authentication and remembered choices.                        |
+| Operation                     | Contract                                                                                                                                                                                                             |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Remove visits / clear history | Forget recorded browsing metadata without closing pages or clearing website storage/cache.                                                                                                                           |
+| Clear cache                   | Clear shared HTTP cache without closing pages or clearing history/sign-ins.                                                                                                                                          |
+| Reset website permissions     | Forget remembered choices, cancel pending prompts and end active capture by replacing or closing affected documents. OS permission remains separate. Native device grants and certificate cache can require restart. |
+| Full browser reset            | Confirm all-windows scope, block competing admission, close all browser pages/windows, cancel accepted transfers and clear history, website storage, cache, connections, authentication and remembered choices.      |
 
 Permission-reset reloads may discard unsaved input and cannot be vetoed by the
 old document. Full reset defaults to Cancel and revalidates the exact initiating

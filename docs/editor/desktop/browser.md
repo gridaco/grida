@@ -168,8 +168,9 @@ clipboard reading and other supported permissions through a browser prompt.
 Screen sharing and device access use a chooser. Permission choices are shared
 for this Desktop session, with the requesting site shown in the prompt.
 
-Use **Settings → Browser → Reset permissions** to clear those choices. Open
-pages reload to stop active access, so finish any unsaved work first.
+Use **Settings → Browser → Reset permissions** to clear those choices and stop
+active access. Open pages reload, and pages that stall during reload close.
+Finish any unsaved work first.
 If you selected a USB, HID or serial device, restart Desktop when prompted to
 fully revoke its browser grant. Electron can retain that grant until restart.
 

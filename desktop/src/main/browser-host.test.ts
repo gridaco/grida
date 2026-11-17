@@ -2188,21 +2188,75 @@ it("permission reset reloads retained tabs and bypasses their beforeunload only 
   const f = await fixture();
   f.create();
   const guest = mock.guests.at(-1)!;
-  await expect(f.host.resetPermissions(settingsFixture().event)).resolves.toBe(
-    true
-  );
+  const resetting = f.host.resetPermissions(settingsFixture().event);
   expect(guest.reload).toHaveBeenCalledOnce();
   const force = { preventDefault: vi.fn<(...args: unknown[]) => void>() };
   guest.emit("will-prevent-unload", force);
   expect(force.preventDefault).toHaveBeenCalledOnce();
   expect(dialog.showMessageBoxSync).not.toHaveBeenCalled();
   guest.emit("did-navigate", {}, guest.url, 200);
+  await expect(resetting).resolves.toBe(true);
   guest.emit("will-prevent-unload", {
     preventDefault: vi.fn<(...args: unknown[]) => void>(),
   });
   expect(dialog.showMessageBoxSync).toHaveBeenCalledOnce();
   f.host.closeAll();
 });
+
+it.each(["destroyed", "unconfirmed"] as const)(
+  "waits for a stalled managed window to be %s before settling permission reset",
+  async (outcome) => {
+    const f = await fixture();
+    const page = f.create();
+    const guest = mock.guests.at(-1)!;
+    const popup = mock.newContents!();
+    popup.session = guest.session;
+    const response = openWindow(guest, "https://oauth.example/");
+    response.createWindow!({
+      ...response.overrideBrowserWindowOptions,
+      webContents: native(popup),
+    } as import("electron").BrowserWindowConstructorOptions);
+    popup.close.mockImplementationOnce(() => {});
+
+    vi.useFakeTimers();
+    const settled = vi.fn<(value: boolean | string) => void>();
+    const resetting = f.host.resetPermissions(settingsFixture().event).then(
+      (value) => settled(value),
+      (error: Error) => settled(error.message)
+    );
+    expect(guest.reload).toHaveBeenCalledOnce();
+    expect(popup.reload).toHaveBeenCalledOnce();
+    guest.emit("did-navigate", {}, guest.url, 200);
+    // Neither an in-page navigation nor a failed provisional load proves
+    // that the capture-owning document was replaced.
+    popup.emit("did-navigate-in-page", {}, popup.url, true);
+    popup.emit("did-fail-load", {}, -3, "ERR_ABORTED", popup.url, true);
+    await vi.advanceTimersByTimeAsync(1_999);
+    expect(popup.close).not.toHaveBeenCalled();
+    expect(settled).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(popup.close).toHaveBeenCalledExactlyOnceWith({
+      waitForBeforeUnload: false,
+    });
+    expect(guest.close).not.toHaveBeenCalled();
+    expect(f.host.snapshot(f.event, f.attached.attachmentId).pages[0].id).toBe(
+      page.id
+    );
+    popup.emit("did-navigate", {}, popup.url, 200);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(settled).not.toHaveBeenCalled();
+    if (outcome === "destroyed") {
+      popup.destroyed = true;
+      popup.emit("destroyed");
+    }
+    await vi.advanceTimersByTimeAsync(2_000);
+    await resetting;
+    expect(settled).toHaveBeenCalledExactlyOnceWith(
+      outcome === "destroyed" ? true : "browser_permission_close_timeout"
+    );
+    f.host.closeAll();
+  }
+);
 
 it.each([
   "settings-navigation",
@@ -2241,6 +2295,7 @@ it.each([
       settings.window.webContents.emit("did-start-navigation", {
         isMainFrame: true,
       });
+    for (const guest of guests) guest.emit("did-navigate", {}, guest.url, 200);
     finish();
     await expect(resetting).rejects.toThrow(
       change === "settings-navigation"
@@ -2269,13 +2324,14 @@ it.each([false, true])(
         throw new Error("close failed");
       });
     const resetting = f.host.resetPermissions(settingsFixture().event);
+    second.emit("did-navigate", {}, second.url, 200);
     const result = await resetting.then(
       (value) => ({ value, error: null }),
       (error: Error) => ({ value: null, error: error.message })
     );
     expect(result).toEqual(
       closeFailure
-        ? { value: null, error: "reload failed" }
+        ? { value: null, error: "close failed" }
         : { value: true, error: null }
     );
     expect(first.close).toHaveBeenCalledWith({ waitForBeforeUnload: false });
@@ -2291,6 +2347,7 @@ it.each([false, true])(
     const f = await fixture();
     f.create();
     const settings = settingsFixture();
+    const guest = mock.guests.at(-1)!;
     vi.spyOn(
       BrowserSitePolicy.prototype,
       "resetPermissions"
@@ -2303,6 +2360,8 @@ it.each([false, true])(
       };
     });
     const resetting = f.host.resetPermissions(settings.event);
+    expect(mock.confirm).not.toHaveBeenCalled();
+    guest.emit("did-navigate", {}, guest.url, 200);
     const result = await resetting.then(
       (value) => ({ value, error: null }),
       (error: Error) => ({ value: null, error: error.message })
