@@ -43,6 +43,8 @@ subframe Node integration is not enabled to turn them into content tabs.
 4. Click the cross-origin iframe's `_blank` anchor. Expected: a managed website
    window opens. It is not promised to become a workbench content tab, and no
    subframe obtains Node or the application bridge.
+   Drag/drop an ordinary HTTP(S) URL into a website guest/window; normal web
+   navigation remains available.
 5. In a managed window, navigate to a Desktop URL and try a further website
    window. Expected: browser ownership/profile policy continues to apply;
    visiting the URL grants no application role.
@@ -55,22 +57,6 @@ subframe Node integration is not enabled to turn them into content tabs.
 7. Using a controlled fixture, reach the 64-content-tab limit for one owner or
    the separate 64-managed-window limit. Expected: a native capacity notice;
    existing pages remain and no unmanaged context escapes the limit.
-8. On the top document, click controlled `mailto:`, `tel:` and `sms:` anchors
-   with registered OS handlers. Expected: the chosen OS app handles the link
-   without an extra Grida prompt. Drag/drop an ordinary HTTP(S) URL into a
-   website guest/window; normal web navigation remains available.
-9. Click a controlled custom-scheme link, cancel once, then accept. Repeat from
-   the same origin/scheme and a different origin. Expected: the first accepted
-   trusted click can be remembered only for its actual origin/scheme in this
-   session; another origin asks again. Scripted attempts and the Chromium
-   external-app permission route ask for an identified website context, even
-   after click consent. Requests without attributable context cannot launch an app.
-10. Keep an external-app confirmation pending while navigating/closing its
-    source or replacing the workbench document. Expected: late acceptance cannot
-    launch an app. Reset website permissions and repeat the trusted custom link;
-    its remembered consent is gone. An unavailable handler leaves the page
-    intact. Malformed, file, known executable and private Grida/internal schemes
-    never launch through this browser handoff.
 
 ## Notes
 

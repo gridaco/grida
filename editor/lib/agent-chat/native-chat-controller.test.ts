@@ -1025,6 +1025,78 @@ it("advances visible progress only for new live output, independently of history
   }
 });
 
+it.each(["valueOf", "toString", "constructor"])(
+  "merges changed JSON tool payloads with an own %s data property",
+  async (key) => {
+    const { controller, running, updates } = fixture();
+    running.add("chat-a");
+    try {
+      await controller.select("chat-a");
+      const live = updates.get("chat-a")!;
+      const activity = {
+        callId: "call",
+        title: "search",
+        kind: "read",
+        outcome: "running",
+        input: { [key]: 0, query: "a" },
+        output: {
+          text: "Result",
+          truncated: false,
+          structured: { nested: { [key]: 0, text: "a" } },
+        },
+      } as const;
+      const update = {
+        kind: "activity",
+        messageId: "work",
+        turnId: "turn-chat-a",
+        activity,
+      } as const;
+      live(update);
+      expect(controller.read().progressRevision).toBe(1);
+      live({
+        ...update,
+        activity: {
+          ...activity,
+          input: { query: "a", [key]: 0 },
+          output: {
+            text: "Result",
+            truncated: false,
+            structured: { nested: { text: "a", [key]: 0 } },
+          },
+        },
+      });
+      expect(controller.read().progressRevision).toBe(1);
+      live({
+        ...update,
+        activity: { ...activity, input: { [key]: 0, query: "b" } },
+      });
+      expect(controller.read().progressRevision).toBe(2);
+      const output = {
+        text: "Result",
+        truncated: false,
+        structured: { nested: { [key]: 0, text: "b" } },
+      };
+      live({
+        ...update,
+        activity: {
+          ...activity,
+          input: { [key]: 0, query: "b" },
+          output,
+        },
+      });
+      expect(controller.read().progressRevision).toBe(3);
+      expect(
+        controller
+          .read()
+          .messages.find((message) => message.messageId === "work")
+          ?.activity?.[0].output
+      ).toEqual(output);
+    } finally {
+      controller.disconnect();
+    }
+  }
+);
+
 it("retains native first-publication positions through live text, replacement, call outcomes and replay", async () => {
   const { bridge, controller, running, updates } = fixture();
   running.add("chat-a");

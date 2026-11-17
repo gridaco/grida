@@ -4442,7 +4442,12 @@ caller is the actual privileged top-level workbench document.
    Sparse device APIs retain their actual origin/device evidence rather than
    inferring an application role. Unknown powers and unattributable restricted
    filesystem overrides remain unavailable. Permission reset revokes future
-   choices and reloads retained pages to stop their active streams.
+   choices and reloads retained pages to stop their active streams. Once reset
+   starts, initiating-document loss cannot abandon that cleanup. USB forget
+   removes the matching remembered origin/device grant; persistent-capable
+   device checks use metadata shared with their chooser representation.
+   Native ephemeral USB/HID/serial grants can remain inside Chromium until
+   relaunch, which reset discloses after a device choice has been accepted.
    Development TLS exceptions require a native choice for the exact browser
    host and certificate's DER SHA-256 fingerprint. Unmatched certificates keep
    Chromium's verdict; account/provider TLS is untouched. Chromium may cache
@@ -4451,6 +4456,12 @@ caller is the actual privileged top-level workbench document.
    actual site or proxy challenge. Its bounded POST is intercepted before
    network transmission, credentials never enter URLs, and callback ownership
    is rechecked before use. Grida/provider credentials are never borrowed.
+   Native forms use a bounded pool of isolated sessions with deny-all defaults;
+   closing a form replaces its request closures and clears storage before reuse.
+   A slot with failed cleanup is not reused. Managed-window find submits to a
+   session-local HTTP 204 handler, retaining its script-free form without network
+   transmission or another browsing context. Tokens and actual dialog contents
+   still fence each submission.
    Downloads are admitted from an actual owned website into a native-selected
    folder or save destination. Filenames are bounded/sanitized and automatic
    destinations are reserved without overwriting existing files. Accepted
@@ -4540,6 +4551,8 @@ for native commands and any separately authorized future automation integration.
   native website consent/choosers, session grants and scoped development TLS.
 - `desktop/src/main/browser-auth-dialog.ts` and its tests — isolated native
   challenge form and bounded, non-transmitted credential submission.
+- `desktop/src/main/browser-dialog-sessions.ts` and its tests — bounded isolated
+  dialog-session slots, deny-all defaults and cleanup before safe reuse.
 - `desktop/src/main/browser-downloads.ts` and its tests — native directory
   preferences, safe destination reservation and accepted job lifetime.
 - `desktop/src/main/browser-page-tools.ts` and its tests — owned guest utilities

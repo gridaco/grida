@@ -122,6 +122,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   act(() => root.unmount());
+  vi.restoreAllMocks();
   container.remove();
   delete (window as unknown as { grida?: unknown }).grida;
 });
@@ -169,6 +170,118 @@ const removeButton = () =>
   )!;
 
 describe("BrowserAddressBar DOM", () => {
+  it("reveals recent options before keyboard selection on an empty address", async () => {
+    const input = await render(null);
+    await act(async () => {
+      input.focus();
+      await settle();
+    });
+    expect(input.getAttribute("aria-expanded")).toBe("false");
+    await act(async () => {
+      key(input, "ArrowDown");
+      await settle();
+    });
+    expect(input.getAttribute("aria-expanded")).toBe("true");
+    const selected = container.querySelector(
+      "[role=option][aria-selected=true]"
+    );
+    expect(selected?.textContent).toContain("Alpha docs");
+    act(() => {
+      key(input, "Enter");
+    });
+    expect(navigate).toHaveBeenCalledExactlyOnceWith("tab", entries[0].url);
+  });
+
+  it("keeps the edited draft across window refocus and subsequent page updates", async () => {
+    const input = await render();
+    await act(async () => {
+      input.focus();
+      type(input, "unfinished search");
+      await settle();
+    });
+    act(() => {
+      window.dispatchEvent(new window.Event("blur"));
+      window.dispatchEvent(new window.Event("focus"));
+    });
+    await render("https://current.test/new-location");
+    expect(input.value).toBe("unfinished search");
+  });
+
+  it.each(["before", "after"] as const)(
+    "preserves the edit when input focusout occurs %s window blur",
+    async (order) => {
+      const input = await render();
+      await act(async () => {
+        input.focus();
+        type(input, "unfinished search");
+        await settle();
+      });
+      const focused = vi.spyOn(document, "hasFocus").mockReturnValue(false);
+      act(() => {
+        const focusout = () =>
+          input.dispatchEvent(
+            new window.FocusEvent("focusout", {
+              bubbles: true,
+              relatedTarget: null,
+            })
+          );
+        if (order === "before") focusout();
+        window.dispatchEvent(new window.Event("blur"));
+        if (order === "after") focusout();
+      });
+      await render("https://current.test/changed-while-away");
+      expect(input.value).toBe("unfinished search");
+      focused.mockReturnValue(true);
+      act(() => {
+        window.dispatchEvent(new window.Event("focus"));
+      });
+      await render("https://current.test/changed-after-return");
+      expect(input.value).toBe("unfinished search");
+      act(() => {
+        key(input, "Escape");
+      });
+      expect(input.value).toBe("current.test/changed-after-return");
+      expect(action).toHaveBeenCalledExactlyOnceWith("tab", "focus");
+    }
+  );
+
+  it("ends editing after a deliberate null-destination blur in a focused document", async () => {
+    const input = await render();
+    await act(async () => {
+      input.focus();
+      type(input, "unfinished search");
+      await settle();
+    });
+    vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    act(() => {
+      input.blur();
+    });
+    await render("https://current.test/new-location");
+    expect(input.value).toBe("current.test/new-location");
+    expect(input.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("ends suspension when focus deliberately transfers to another host control", async () => {
+    const input = await render();
+    await act(async () => {
+      input.focus();
+      type(input, "unfinished search");
+      await settle();
+    });
+    act(() => {
+      window.dispatchEvent(new window.Event("blur"));
+    });
+    const control = document.createElement("button");
+    document.body.append(control);
+    act(() => {
+      control.focus();
+    });
+    await render("https://current.test/new-location");
+    expect(input.value).toBe("current.test/new-location");
+    expect(input.getAttribute("aria-expanded")).toBe("false");
+    control.remove();
+  });
+
   it("hides suggestions without input even when history is available", async () => {
     const input = await render(null);
     await act(async () => {

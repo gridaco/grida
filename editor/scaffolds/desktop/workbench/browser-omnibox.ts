@@ -33,6 +33,7 @@ export namespace BrowserOmnibox {
     private state: State;
     private currentUrl: string;
     private typed = false;
+    private suspended = false;
     private historyEnabled = true;
     private consumedLocation = 0;
     private listeners = new Set<() => void>();
@@ -67,7 +68,9 @@ export namespace BrowserOmnibox {
       const next = url ?? "";
       if (next !== this.currentUrl) {
         const editing =
-          active && this.state.focused && (this.typed || this.state.composing);
+          active &&
+          (this.state.focused || this.suspended) &&
+          (this.typed || this.state.composing);
         this.currentUrl = next;
         // Guest navigation updates the page location, not an active edit.
         if (!editing) {
@@ -86,18 +89,33 @@ export namespace BrowserOmnibox {
       }
     }
     focus(): void {
+      this.suspended = false;
       this.typed = false;
       this.patch({
         focused: true,
-        expanded: true,
+        expanded: !!this.state.draft.trim(),
         selectionRevision: this.state.selectionRevision + 1,
+        selected: -1,
+      });
+      this.query();
+    }
+    suspendFocus(): void {
+      const focused = this.state.focused || this.suspended;
+      this.cancel();
+      this.suspended = focused;
+    }
+    resumeFocus(): void {
+      this.suspended = false;
+      this.patch({
+        focused: true,
+        expanded: !!this.state.draft.trim(),
         selected: -1,
       });
       this.query();
     }
     change(value: string): void {
       this.typed = true;
-      this.patch({ draft: value, expanded: true, selected: -1 });
+      this.patch({ draft: value, expanded: !!value.trim(), selected: -1 });
       this.query();
     }
     composition(active: boolean): void {
@@ -107,6 +125,7 @@ export namespace BrowserOmnibox {
       this.cancel();
     }
     cancel(): void {
+      this.suspended = false;
       this.history.cancel();
       if (this.state.focused || this.state.expanded || this.state.composing)
         this.patch({
@@ -153,7 +172,7 @@ export namespace BrowserOmnibox {
       if (key === "ArrowDown" || key === "ArrowUp") {
         if (!this.state.expanded) {
           this.patch({ expanded: true });
-          this.query();
+          if (!this.state.options.length) this.query();
         }
         const count = this.state.options.length;
         if (count)
@@ -288,14 +307,30 @@ export namespace BrowserOmnibox {
     connect(input: HTMLInputElement, container: HTMLElement): () => void {
       this.input = input;
       this.container = container;
+      let windowSuspended = false;
       const focus = () => {
-        if (!this.suppressFocus) this.controller.focus();
+        if (!this.suppressFocus && !this.controller.read().focused) {
+          if (windowSuspended) this.controller.resumeFocus();
+          else this.controller.focus();
+        }
       };
       const blur = (event: FocusEvent) => {
         if (
           !(event.relatedTarget instanceof Node) ||
           !container.contains(event.relatedTarget)
-        )
+        ) {
+          // App deactivation can deliver input focusout before window blur.
+          // A real destination, or a blur in the focused document, ends editing.
+          if (
+            event.relatedTarget === null &&
+            (windowSuspended || !input.ownerDocument.hasFocus())
+          )
+            this.controller.suspendFocus();
+          else this.controller.blur();
+        }
+      };
+      const focusTransfer = (event: FocusEvent) => {
+        if (event.target instanceof Node && !container.contains(event.target))
           this.controller.blur();
       };
       const mouse = (event: MouseEvent) => {
@@ -328,10 +363,15 @@ export namespace BrowserOmnibox {
         }
       };
       const hostWindow = input.ownerDocument.defaultView;
-      const windowBlur = () => this.controller.blur();
+      const windowBlur = () => {
+        windowSuspended = true;
+        this.controller.suspendFocus();
+      };
       const windowFocus = () => {
         if (input.ownerDocument.activeElement === input && !input.disabled)
-          this.controller.focus();
+          this.controller.resumeFocus();
+        else this.controller.blur();
+        windowSuspended = false;
       };
       hostWindow?.addEventListener("blur", windowBlur);
       hostWindow?.addEventListener("focus", windowFocus);
@@ -362,6 +402,7 @@ export namespace BrowserOmnibox {
       };
       input.addEventListener("focus", focus);
       container.addEventListener("focusout", blur);
+      input.ownerDocument.addEventListener("focusin", focusTransfer);
       input.addEventListener("mousedown", mouse);
       container.addEventListener("keydown", key);
       input.addEventListener("compositionstart", start);
@@ -377,6 +418,7 @@ export namespace BrowserOmnibox {
       this.cleanup = () => {
         input.removeEventListener("focus", focus);
         container.removeEventListener("focusout", blur);
+        input.ownerDocument.removeEventListener("focusin", focusTransfer);
         input.removeEventListener("mousedown", mouse);
         container.removeEventListener("keydown", key);
         hostWindow?.removeEventListener("blur", windowBlur);

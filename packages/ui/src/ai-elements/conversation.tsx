@@ -58,9 +58,11 @@ function ConversationScrollAreaContent({
       className="relative h-full min-h-0 min-w-0"
     >
       {/* Share one native viewport. Radix's table wrapper measures horizontal
-          overflow; a vertical-only transcript needs block layout to wrap. */}
+          overflow; a vertical-only transcript needs block layout to wrap.
+          The wheel escape reads computed overflow, so keep both axes equal. */}
       <ScrollAreaPrimitive.Viewport
         ref={context.scrollRef}
+        style={{ overflowX: "scroll", overflowY: "scroll" }}
         className={cn("size-full [&>div]:!block", scrollClassName)}
         data-slot="scroll-area-viewport"
       >

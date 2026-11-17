@@ -167,6 +167,20 @@ the dialog identifies the containing page without claiming universal subframe
 scoping. USB/HID selection has a requesting frame. Windows/Linux Bluetooth
 pairing requiring a PIN or additional validation has no custom pairing handler.
 Availability still depends on hardware, Chromium and the operating system.
+Bluetooth-backed serial ports can remain unavailable: the pinned chooser omits
+the native Bluetooth path needed to match its permission check. Display names
+are not used as substitute device identities.
+
+Chooser identifiers are used only to select the actual device. Remembered
+USB/HID/serial grants use type-specific metadata available again during permission
+checks; incomplete identities are not remembered. A site's USB forget operation
+also removes its matching remembered grant. Electron can retain native ephemeral
+device grants outside this policy: after accepting a USB, HID or serial choice,
+permission reset continues to require a Desktop restart for complete revocation.
+Reset still reloads live pages to end active access, even if the initiating
+Settings document disappears or connection cleanup fails after reset begins.
+If a guest cannot reload, Main closes it to end access and continues processing
+the other guests.
 
 File System Access uses Chromium's selected file/folder handles and confirms
 that exact path and read/write scope. Workspace attachment and private native
@@ -178,6 +192,9 @@ HTTP authentication uses a native credential form for the actual site origin;
 a proxy challenge identifies its actual host and port. Navigation or owner loss
 cancels pending authentication. Credentials go to Chromium's challenge callback,
 not the hosted renderer or application account store.
+Authentication and managed-window Find forms reuse bounded isolated session
+slots after storage cleanup. Find submissions receive a local HTTP 204 response,
+so Next, Previous and a new query retain the same script-free form document.
 
 A certificate error can show an explicit native trust choice for the exact
 hostname and certificate. The displayed SHA-256 fingerprint is the X.509 DER
@@ -215,12 +232,12 @@ can.
 
 The optional version1 `management` group separates browser maintenance:
 
-| Action                    | Effect on open pages and shared data                                                                                                                                                                                                  |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Clear history             | Removes recorded visits; leaves pages, website sign-ins and cache intact.                                                                                                                                                             |
-| Clear cache               | Clears HTTP cache; leaves pages, history and website sign-ins intact.                                                                                                                                                                 |
-| Reset website permissions | Clears remembered site/device choices, external-app click consent and TLS exceptions, cancels prompts, and reloads open tabs/windows to end active captures. OS grants remain separate; cached certificate trust can require restart. |
-| Clear browsing data       | Native-confirmed all-windows reset: closes every browser tab/window, cancels accepted downloads, and clears history, website storage, cache, connections, authentication and remembered website choices.                              |
+| Action                    | Effect on open pages and shared data                                                                                                                                                                                                                           |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Clear history             | Removes recorded visits; leaves pages, website sign-ins and cache intact.                                                                                                                                                                                      |
+| Clear cache               | Clears HTTP cache; leaves pages, history and website sign-ins intact.                                                                                                                                                                                          |
+| Reset website permissions | Clears remembered site/device choices, external-app click consent and TLS exceptions, cancels prompts, and reloads open tabs/windows to end active captures. OS grants remain separate; native device grants and cached certificate trust can require restart. |
+| Clear browsing data       | Native-confirmed all-windows reset: closes every browser tab/window, cancels accepted downloads, and clears history, website storage, cache, connections, authentication and remembered website choices.                                                       |
 
 Permission-reset reloads override `beforeunload`; they can discard unsaved form
 input. Full clearing blocks competing browser admission/work, drains teardown

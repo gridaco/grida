@@ -209,9 +209,7 @@ export class BrowserHistory {
     }).catch(() => console.warn("[grida] browser history could not be saved"));
   }
 
-  #takePending(): Map<string, Entry> {
-    const updates = this.#pending;
-    this.#pending = new Map();
+  #updatedEntries(updates: ReadonlyMap<string, Update>): Map<string, Entry> {
     const next = new Map(this.#entries);
     for (const [url, update] of updates) {
       if (
@@ -229,7 +227,40 @@ export class BrowserHistory {
   }
 
   async #applyPending(): Promise<void> {
-    if (this.#pending.size) await this.#commit(this.#takePending());
+    if (!this.#pending.size) return;
+    const updates = this.#pending;
+    this.#pending = new Map();
+    try {
+      await this.#commit(this.#updatedEntries(updates));
+    } catch (error) {
+      // Keep accepted visits after a transient write failure, without reviving
+      // removed/cleared visits or replacing newer visits and title refinements.
+      const restored = new Map<string, Update>();
+      for (const [url, update] of updates) {
+        if (
+          update.epoch !== this.#epoch ||
+          this.#tokens.get(url) !== update.token
+        )
+          continue;
+        const newer = this.#pending.get(url);
+        if (newer) {
+          if (
+            update.kind === "visit" &&
+            newer.kind === "title" &&
+            newer.token === update.token
+          )
+            this.#pending.set(url, {
+              ...update,
+              entry: { ...update.entry, title: newer.title },
+            });
+        } else restored.set(url, update);
+      }
+      for (const [url, update] of this.#pending) restored.set(url, update);
+      while (restored.size > BrowserHistory.MAX_ENTRIES)
+        restored.delete(restored.keys().next().value!);
+      this.#pending = restored;
+      throw error;
+    }
   }
 
   async #commit(

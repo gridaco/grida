@@ -1,6 +1,7 @@
 /** GRIDA-SEC-016 — browser credentials stay in a dedicated native challenge. */
-import { BrowserWindow, session, type WebContents } from "electron";
+import { BrowserWindow, type WebContents } from "electron";
 import { randomUUID } from "node:crypto";
+import { BrowserDialogSessions } from "./browser-dialog-sessions";
 
 type Challenge = {
   parent: BrowserWindow;
@@ -51,15 +52,17 @@ export class BrowserAuthDialog {
   }
 
   static async #show(options: Challenge): Promise<Credentials | null> {
-    if (!options.isLive() || options.contents.isDestroyed())
+    if (
+      !options.isLive() ||
+      options.contents.isDestroyed() ||
+      options.parent.isDestroyed()
+    )
       return Promise.resolve(null);
     const token = randomUUID();
     const action = `https://browser-auth.invalid/${token}`;
-    const isolated = session.fromPartition(`grida-browser-auth-${token}`);
-    isolated.setPermissionRequestHandler((_contents, _permission, done) =>
-      done(false)
-    );
-    isolated.setPermissionCheckHandler(() => false);
+    const lease = BrowserDialogSessions.acquire("auth");
+    if (!lease) return null;
+    const isolated = lease.session;
     const source = `data:text/html;charset=utf-8,${encodeURIComponent(
       BrowserAuthDialog.document(action, options).toWellFormed()
     )}`;
@@ -101,11 +104,8 @@ export class BrowserAuthDialog {
         options.contents.removeListener("destroyed", cancel);
         options.contents.removeListener("did-start-navigation", navigation);
         options.parent.removeListener("closed", cancel);
-        isolated.webRequest.onBeforeRequest(
-          { urls: ["<all_urls>"] },
-          (_details, done) => done({ cancel: true })
-        );
         if (!window.isDestroyed()) window.destroy();
+        lease.release();
         resolve(value);
       };
       const cancel = () => finish(null);

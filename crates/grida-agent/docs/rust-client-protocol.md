@@ -136,6 +136,12 @@ and external metadata remain untrusted data. They cannot install executable
 renderers or authorize an action. Required client actions use negotiated,
 validated capabilities with correlated results and executor-declared recovery.
 
+Tool inputs and structured results remain JSON data, including member names
+such as `valueOf`, `toString` and `constructor`. Client change detection must
+not invoke those members or depend on object-key insertion order. The
+[Desktop controller regressions](../../../editor/lib/agent-chat/native-chat-controller.test.ts)
+cover equivalent reordered payloads and changed input/nested result data.
+
 ## Small extension surface
 
 The host uses ACP's reserved extension mechanism. Capability keys use

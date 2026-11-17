@@ -673,7 +673,7 @@ export class DesktopBrowserHost {
         type: "warning",
         message: "Clear browsing data?",
         detail:
-          "This clears browsing history, cookies, site storage, cache and website authentication for the built-in browser in all windows. All built-in browser tabs and popup windows will close, and you may need to sign in to websites again. Previously accepted development certificates may require restarting Grida to fully reset.",
+          "This clears browsing history, cookies, site storage, cache and website authentication for the built-in browser in all windows. All built-in browser tabs and popup windows will close, and you may need to sign in to websites again. Previously selected USB, HID or serial devices and accepted development certificates may require restarting Grida to fully reset.",
         buttons: ["Cancel", "Clear browsing data"],
         defaultId: 0,
         cancelId: 0,
@@ -1905,25 +1905,49 @@ export class DesktopBrowserHost {
   }
   resetPermissions(event: IpcMainInvokeEvent) {
     return this.#manage(event, async (_window, check) => {
+      check();
       this.#session();
       this.#externalLinks.reset();
-      const result = await this.#sitePolicy!.resetPermissions();
-      check();
-      for (const owner of this.#owners.values())
-        for (const page of owner.pages.values())
-          if (page.guest && !page.guest.isDestroyed())
-            this.#reloadPermissions(page.guest);
-      for (const popup of this.#popups.values())
-        if (!popup.contents.isDestroyed())
-          this.#reloadPermissions(popup.contents);
-      if (result.certificateRestartRequired)
-        await dialog.showMessageBox(_window, {
+      let result: Awaited<ReturnType<BrowserSitePolicy["resetPermissions"]>>;
+      let failure: unknown;
+      try {
+        result = await this.#sitePolicy!.resetPermissions();
+      } finally {
+        // Reset has already changed consent. End active streams even if the
+        // initiating Settings document disappears or connection cleanup fails.
+        const guests = new Set<WebContents>();
+        for (const owner of this.#owners.values())
+          for (const page of owner.pages.values())
+            if (page.guest && !page.guest.isDestroyed()) guests.add(page.guest);
+        for (const popup of this.#popups.values())
+          if (!popup.contents.isDestroyed()) guests.add(popup.contents);
+        for (const guest of guests) {
+          if (guest.isDestroyed()) continue;
+          try {
+            this.#reloadPermissions(guest);
+          } catch (error) {
+            try {
+              guest.close({ waitForBeforeUnload: false });
+            } catch {
+              // An individual native failure cannot leave later pages running.
+              failure ??= error;
+            }
+          }
+        }
+      }
+      if (failure) throw failure;
+      if (result.certificateRestartRequired || result.deviceRestartRequired) {
+        const options: Electron.MessageBoxOptions = {
           type: "info",
-          message: "Restart Grida to finish resetting certificate exceptions",
+          message: "Restart Grida to finish resetting website permissions",
           detail:
-            "Website permissions were reset. Chromium may keep previously accepted certificates until Grida restarts.",
+            "Website consent choices were cleared. Open pages were reloaded or closed. Chromium may retain previously selected USB, HID or serial devices and accepted certificates until Grida restarts.",
           buttons: ["OK"],
-        });
+        };
+        await (_window.isDestroyed() || _window.webContents.isDestroyed()
+          ? dialog.showMessageBox(options)
+          : dialog.showMessageBox(_window, options));
+      }
       return true;
     });
   }

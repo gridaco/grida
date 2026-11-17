@@ -31,6 +31,7 @@ vi.mock("electron", () => ({
   dialog: { showMessageBox: fixture.confirm },
   shell: { openPath: fixture.openPath },
   ipcMain: {
+    on: vi.fn<() => void>(),
     handle: (
       channel: string,
       handler: (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown

@@ -13,6 +13,7 @@ const mock = await vi.hoisted(async () => {
   }
   const windows: Window[] = [];
   const states: {
+    protocolHandler?: (request: Request) => Response;
     handler?: (
       details: Record<string, unknown>,
       callback: (result: unknown) => void
@@ -43,9 +44,18 @@ const mock = await vi.hoisted(async () => {
     states.push(state);
     return {
       partition,
+      state,
       setPermissionRequestHandler: vi.fn<(handler: unknown) => void>(),
       setPermissionCheckHandler: vi.fn<(handler: unknown) => void>(),
       clearStorageData: async () => {},
+      protocol: {
+        handle: (_scheme: string, handler: typeof state.protocolHandler) => {
+          state.protocolHandler = handler;
+        },
+        unhandle: (_scheme: string) => {
+          state.protocolHandler = undefined;
+        },
+      },
       webRequest: {
         onBeforeRequest: (_filter: unknown, handler: typeof state.handler) => {
           state.handler = handler;
@@ -81,7 +91,6 @@ vi.mock("./browser-page-tools", () => ({
 afterEach(() => {
   for (const window of mock.windows.splice(0))
     if (!window.destroyed) window.destroy();
-  mock.states.splice(0);
   vi.clearAllMocks();
 });
 import { BrowserFindDialog } from "./browser-find-dialog";
@@ -130,13 +139,22 @@ function fixture() {
   )![1];
   return {
     window,
+    state: (
+      window.options as {
+        webPreferences: { session: { state: (typeof mock.states)[number] } };
+      }
+    ).webPreferences.session.state,
     contents,
     revoke: () => {
       live = false;
     },
     request(body: string, overrides: Record<string, unknown> = {}) {
       const callback = vi.fn<(result: unknown) => void>();
-      mock.states.at(-1)!.handler!(
+      (
+        window.options as {
+          webPreferences: { session: { state: (typeof mock.states)[number] } };
+        }
+      ).webPreferences.session.state.handler!(
         {
           url: action,
           method: "POST",
@@ -151,7 +169,7 @@ function fixture() {
     },
   };
 }
-it("finds only from the exact native form and blocks every submission before transmission", async () => {
+it("finds only from the exact native form and handles valid submissions locally", async () => {
   const f = fixture();
   expect(f.window.options).toMatchObject({
     webPreferences: {
@@ -169,13 +187,45 @@ it("finds only from the exact native form and blocks every submission before tra
   ).toHaveBeenCalledWith({ cancel: true });
   expect(mock.find).not.toHaveBeenCalled();
   expect(f.request("text=hello&action=next")).toHaveBeenCalledWith({
-    cancel: true,
+    cancel: false,
   });
   expect(mock.find).toHaveBeenCalledWith(
     expect.objectContaining({ text: "hello", forward: true })
   );
   await Promise.resolve();
   expect(f.window.setTitle).toHaveBeenCalledWith("Find in page — 1 of 2");
+});
+
+it("responds without replacing the form through Next, Previous and a new search", async () => {
+  const f = fixture();
+  const source = f.window.webContents.url;
+  for (const [text, action] of [
+    ["hello", "next"],
+    ["hello", "previous"],
+    ["new", "next"],
+  ]) {
+    expect(f.request(`text=${text}&action=${action}`)).toHaveBeenCalledWith({
+      cancel: false,
+    });
+    const target = /<form action="([^"]+)"/.exec(
+      decodeURIComponent(source.split(",").slice(1).join(","))
+    )![1];
+    const response = f.state.protocolHandler!(
+      new Request(target, { method: "POST" })
+    );
+    expect(response.status).toBe(204);
+    expect(response.body).toBeNull();
+    expect(f.window.webContents.url).toBe(source);
+    await Promise.resolve();
+  }
+  expect(mock.find.mock.calls.map(([request]) => request)).toEqual([
+    { text: "hello", forward: true, findNext: false, matchCase: false },
+    { text: "hello", forward: false, findNext: true, matchCase: false },
+    { text: "new", forward: true, findNext: false, matchCase: false },
+  ]);
+  expect(
+    f.state.protocolHandler!(new Request("https://foreign.test"))
+  ).toMatchObject({ status: 403 });
 });
 it("refuses a replaced form or withdrawn guest and closes on website document replacement", () => {
   const f = fixture();

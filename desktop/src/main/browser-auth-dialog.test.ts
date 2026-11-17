@@ -42,6 +42,15 @@ const mock = await vi.hoisted(async () => {
     const state: (typeof sessions)[number] = {};
     sessions.push(state);
     return {
+      state,
+      partition: _partition,
+      protocol: {
+        handle:
+          vi.fn<
+            (scheme: string, handler: (request: Request) => Response) => void
+          >(),
+      },
+      clearStorageData: vi.fn<() => Promise<void>>(async () => {}),
       setPermissionRequestHandler: vi.fn<(handler: unknown) => void>(),
       setPermissionCheckHandler: vi.fn<(handler: unknown) => void>(),
       webRequest: {
@@ -63,7 +72,6 @@ vi.mock("electron", () => ({
 afterEach(() => {
   for (const window of mock.windows.splice(0))
     if (!window.destroyed) window.destroy();
-  mock.sessions.splice(0);
   vi.clearAllMocks();
 });
 function fixture() {
@@ -86,7 +94,11 @@ function fixture() {
   const action = /<form action="([^"]+)"/.exec(html)![1];
   const request = (body: unknown, overrides: Record<string, unknown> = {}) => {
     const done = vi.fn<(value: unknown) => void>();
-    mock.sessions.at(-1)!.handler!(
+    (
+      window.options as {
+        webPreferences: { session: { state: (typeof mock.sessions)[number] } };
+      }
+    ).webPreferences.session.state.handler!(
       {
         url: action,
         method: "POST",
@@ -140,9 +152,19 @@ it("returns credentials only from the exact native form while cancelling transmi
   expect(
     (f.window.options as { webPreferences: object }).webPreferences
   ).not.toHaveProperty("preload");
-  expect(mock.fromPartition.mock.calls[0][0]).not.toMatch(/^persist:/);
+  expect(
+    (f.window.options as { webPreferences: { session: { partition: string } } })
+      .webPreferences.session.partition
+  ).not.toMatch(/^persist:/);
   const stillBlocked = vi.fn<(value: unknown) => void>();
-  mock.sessions.at(-1)!.handler!({ url: "https://example.test" }, stillBlocked);
+  (
+    f.window.options as {
+      webPreferences: { session: { state: (typeof mock.sessions)[number] } };
+    }
+  ).webPreferences.session.state.handler!(
+    { url: "https://example.test" },
+    stillBlocked
+  );
   expect(stillBlocked).toHaveBeenCalledWith({ cancel: true });
 });
 
@@ -199,5 +221,27 @@ it("rejects unbounded bodies and native-file upload parts without reading them",
   expect(await f.result).toBeNull();
   const g = fixture();
   g.request("ignored", { uploadData: [{ file: "/private/never-read" }] });
+  expect(await g.result).toBeNull();
+});
+
+it("reuses a bounded session slot without accepting an earlier challenge token", async () => {
+  const f = fixture();
+  const oldSource = f.window.webContents.url;
+  f.request("action=cancel");
+  expect(await f.result).toBeNull();
+  const firstPartition = (
+    f.window.options as { webPreferences: { session: { partition: string } } }
+  ).webPreferences.session.partition;
+  const g = fixture();
+  expect(
+    (g.window.options as { webPreferences: { session: { partition: string } } })
+      .webPreferences.session.partition
+  ).toBe(firstPartition);
+  const oldAction = /<form action="([^"]+)"/.exec(
+    decodeURIComponent(oldSource.split(",").slice(1).join(","))
+  )![1];
+  g.request("username=old&password=old&action=signin", { url: oldAction });
+  expect(g.window.destroyed).toBe(false);
+  g.request("action=cancel");
   expect(await g.result).toBeNull();
 });

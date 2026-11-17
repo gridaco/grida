@@ -526,6 +526,62 @@ describe("BrowserGuestMounts", () => {
 });
 
 describe("WorkspaceBrowserSession document ownership", () => {
+  it("releases failed initialization subscriptions before retrying", async () => {
+    const session = WorkspaceBrowserSession.for(document, "workspace");
+    const unwatch = vi.fn<() => void>();
+    const unsubscribeNavigation = vi.fn<() => void>();
+    vi.spyOn(session.browsers, "subscribe").mockReturnValue(unwatch);
+    vi.spyOn(session.browsers, "start")
+      .mockRejectedValueOnce(new Error("file resolution failed"))
+      .mockResolvedValue();
+    vi.stubGlobal("window", {
+      grida: {
+        protocol: DESKTOP_BRIDGE_PROTOCOL,
+        window: { navigation: { subscribe: () => unsubscribeNavigation } },
+      },
+    });
+    const storage = {
+      getItem: () => null,
+      setItem: () => {},
+      removeItem: () => {},
+    };
+    await expect(session.start(storage, async () => [])).rejects.toThrow(
+      "file resolution failed"
+    );
+    expect(unwatch).toHaveBeenCalledTimes(1);
+    expect(unsubscribeNavigation).toHaveBeenCalledTimes(1);
+    await session.start(storage, async () => []);
+    session.dispose();
+    expect(unwatch).toHaveBeenCalledTimes(2);
+    expect(unsubscribeNavigation).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not activate an older file request that resolves after a newer one", async () => {
+    const session = WorkspaceBrowserSession.for(document, "workspace");
+    vi.spyOn(session.browsers, "start").mockResolvedValue();
+    const storage = {
+      getItem: () => null,
+      setItem: () => {},
+      removeItem: () => {},
+    };
+    await session.start(storage, async () => []);
+    const pending = new Map<string, (paths: readonly string[]) => void>();
+    const resolveFiles = (paths: readonly string[]) =>
+      new Promise<readonly string[]>((resolve) => {
+        pending.set(paths[0], resolve);
+      });
+    const first = session.start(storage, resolveFiles, "a.svg");
+    const second = session.start(storage, resolveFiles, "b.svg");
+    await settle();
+    pending.get("b.svg")!(["b.svg"]);
+    await second;
+    pending.get("a.svg")!(["a.svg"]);
+    await first;
+    expect(session.group.getSnapshot().active).toBe("file:b.svg");
+    expect(session.group.getSnapshot().tabs).toEqual(["file:b.svg"]);
+    session.dispose();
+  });
+
   it("reuses group/controller across UI remounts, drops stale panels, and detaches only on disposal", async () => {
     const session = WorkspaceBrowserSession.for(document, "workspace");
     const start = vi.spyOn(session.browsers, "start").mockResolvedValue();

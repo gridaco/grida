@@ -60,7 +60,6 @@ import { video_attachment } from "./video-attachment";
 import { image_attachment_preview } from "./image-attachment-preview";
 import { NativeSubagentController } from "./native-subagent-controller";
 import { NativeBackgroundProcessController } from "./native-background-process-controller";
-import equal from "fast-deep-equal";
 
 /** Composer choices made before opening a workspace; all execution uses existing APIs. */
 export type NativeChatInitialComposer = Readonly<{
@@ -6401,8 +6400,8 @@ export class NativeChatController {
       prior.kind !== update.activity.kind ||
       prior.source !== update.activity.source ||
       prior.outcome !== update.activity.outcome ||
-      !equal(prior.input, update.activity.input) ||
-      !equal(prior.output, update.activity.output)
+      !activityPayloadEqual(prior.input, update.activity.input) ||
+      !activityPayloadEqual(prior.output, update.activity.output)
     )
       scope.progressRevision++;
     const activity =
@@ -6729,6 +6728,34 @@ function historyPosition(
     observation?.snapshot.current?.historyPosition ??
     observation?.snapshot.latest?.historyPosition
   );
+}
+
+/** Wire JSON keys such as valueOf and toString are data, never methods. */
+function activityPayloadEqual(left: unknown, right: unknown): boolean {
+  const pending: [unknown, unknown][] = [[left, right]];
+  while (pending.length) {
+    const [a, b] = pending.pop()!;
+    if (a === b) continue;
+    if (
+      a === null ||
+      b === null ||
+      typeof a !== "object" ||
+      typeof b !== "object" ||
+      Array.isArray(a) !== Array.isArray(b)
+    )
+      return false;
+    if (Array.isArray(a) && a.length !== (b as unknown[]).length) return false;
+    const keys = Object.keys(a);
+    if (keys.length !== Object.keys(b).length) return false;
+    for (const key of keys) {
+      if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
+      pending.push([
+        (a as Record<string, unknown>)[key],
+        (b as Record<string, unknown>)[key],
+      ]);
+    }
+  }
+  return true;
 }
 
 function applyText(

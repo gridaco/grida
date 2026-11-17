@@ -34,6 +34,8 @@ export namespace BrowserPageControls {
     private generation = 0;
     private disposed = false;
     private findSequence = 0;
+    private zoomSequence = 0;
+    private zoomPending = 0;
     private listeners = new Set<() => void>();
     private zoomQueue: Promise<void> = Promise.resolve();
     constructor(private readonly native: () => Binding | null) {
@@ -107,12 +109,18 @@ export namespace BrowserPageControls {
       this.sync();
       const binding = this.binding;
       const generation = this.generation;
-      if (!binding) return;
+      const sequence = this.zoomSequence;
+      if (!binding || this.zoomPending) return;
       try {
         const zoom = DesktopBrowser.Utilities.parseZoomFactor(
           await binding.api.getZoom(binding.target)
         );
-        if (generation === this.generation && zoom !== null)
+        if (
+          generation === this.generation &&
+          sequence === this.zoomSequence &&
+          !this.zoomPending &&
+          zoom !== null
+        )
           this.publish({ zoom });
       } catch {
         /* Optional menu observation keeps the last usable value. */
@@ -123,6 +131,8 @@ export namespace BrowserPageControls {
       const binding = this.binding;
       const generation = this.generation;
       if (!binding) return Promise.resolve();
+      this.zoomSequence++;
+      this.zoomPending++;
       const operation = this.zoomQueue.then(async () => {
         if (generation !== this.generation) return;
         try {
@@ -152,8 +162,11 @@ export namespace BrowserPageControls {
             this.publish({ error: "Couldn’t change page zoom. Try again." });
         }
       });
-      this.zoomQueue = operation;
-      return operation;
+      const completed = operation.finally(() => {
+        this.zoomPending--;
+      });
+      this.zoomQueue = completed;
+      return completed;
     };
     readonly print = (): Promise<void> => this.action("print");
     readonly inspect = (): Promise<void> => this.action("inspect");

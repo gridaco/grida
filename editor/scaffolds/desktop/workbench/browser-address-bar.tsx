@@ -68,7 +68,6 @@ export function BrowserAddressBar({
   const open =
     state.expanded &&
     state.focused &&
-    state.draft.trim().length > 0 &&
     active &&
     !disabled &&
     (state.options.length > 0 || state.loading || !!state.error);

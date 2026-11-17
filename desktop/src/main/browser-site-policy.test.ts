@@ -138,15 +138,19 @@ function fixture(
       }),
     device: (
       origin: string,
-      id: string,
+      id: string | Record<string, unknown>,
       type: "usb" | "hid" | "serial" = "usb"
     ) =>
       device({
         origin,
         deviceType: type,
         device:
-          type === "serial" ? { portId: id, portName: id } : { deviceId: id },
-      } as Parameters<DeviceHandler>[0]),
+          typeof id === "object"
+            ? id
+            : type === "serial"
+              ? { portId: id, portName: id }
+              : { deviceId: id },
+      } as unknown as Parameters<DeviceHandler>[0]),
     display: (extra: Partial<Parameters<DisplayHandler>[0]> = {}) =>
       new Promise<Electron.Streams>((resolve) =>
         display(
@@ -510,24 +514,66 @@ it("selects actual HID, serial and Bluetooth IDs through native dialogs", async 
       browser.event(),
       {
         frame: browser.top,
-        deviceList: [{ deviceId: "hid-one", name: "Controller" }],
+        deviceList: [
+          {
+            deviceId: "hid-one",
+            name: "Controller",
+            vendorId: 1000,
+            productId: 2000,
+            serialNumber: "hid-serial",
+          },
+        ],
       },
       resolve
     )
   );
   expect(hid).toBe("hid-one");
-  expect(browser.device("https://site.test", "hid-one", "hid")).toBe(true);
+  expect(
+    browser.device(
+      "https://site.test",
+      {
+        name: "Controller",
+        vendorId: 1000,
+        productId: 2000,
+        serialNumber: "hid-serial",
+      },
+      "hid"
+    )
+  ).toBe(true);
   const serial = await new Promise((resolve) =>
     browser.session.emit(
       "select-serial-port",
       browser.event(),
-      [{ portId: "port-one", portName: "/dev/tty.test" }],
+      [
+        {
+          portId: "port-one",
+          portName: "/dev/tty.test",
+          deviceInstanceId: "instance-one",
+          vendorId: "1000",
+          productId: "2000",
+          serialNumber: "serial-one",
+          usbDriverName: "driver-one",
+        },
+      ],
       browser.contents,
       resolve
     )
   );
   expect(serial).toBe("port-one");
-  expect(browser.device("https://site.test", "port-one", "serial")).toBe(true);
+  expect(
+    browser.device(
+      "https://site.test",
+      process.platform === "win32"
+        ? { device_instance_id: "instance-one" }
+        : {
+            vendor_id: 1000,
+            product_id: 2000,
+            serial_number: "serial-one",
+            usb_driver: "driver-one",
+          },
+      "serial"
+    )
+  ).toBe(true);
   const bluetooth = await new Promise((resolve) =>
     browser.contents.emit(
       "select-bluetooth-device",
@@ -537,6 +583,179 @@ it("selects actual HID, serial and Bluetooth IDs through native dialogs", async 
     )
   );
   expect(bluetooth).toBe("blue-one");
+});
+
+it.each(["usb", "hid", "serial"] as const)(
+  "forgets only the matching %s origin/device grant on native revocation",
+  async (type) => {
+    const browser = fixture();
+    const devices = ["one", "two"].map((id) =>
+      type === "serial"
+        ? {
+            portId: id,
+            portName: id,
+            deviceInstanceId: `instance-${id}`,
+            vendorId: "1000",
+            productId: "2000",
+            serialNumber: id,
+            usbDriverName: "driver",
+          }
+        : {
+            deviceId: id,
+            name: "Controller",
+            vendorId: 1000,
+            productId: 2000,
+            serialNumber: id,
+          }
+    );
+    const choose = () =>
+      new Promise((resolve) => {
+        if (type === "serial")
+          browser.session.emit(
+            "select-serial-port",
+            browser.event(),
+            devices,
+            browser.contents,
+            resolve
+          );
+        else
+          browser.session.emit(
+            `select-${type}-device`,
+            browser.event(),
+            { frame: browser.top, deviceList: devices },
+            resolve
+          );
+      });
+    await choose();
+    native.prompt.mockResolvedValueOnce({ response: 2 });
+    await choose();
+    const permission = (id: string) =>
+      type === "serial"
+        ? process.platform === "win32"
+          ? { device_instance_id: `instance-${id}` }
+          : {
+              vendor_id: 1000,
+              product_id: 2000,
+              serial_number: id,
+              usb_driver: "driver",
+            }
+        : type === "hid"
+          ? {
+              name: "Controller",
+              vendorId: 1000,
+              productId: 2000,
+              serialNumber: id,
+            }
+          : { deviceId: id };
+    expect(browser.device("https://site.test", permission("one"), type)).toBe(
+      true
+    );
+    expect(browser.device("https://site.test", permission("two"), type)).toBe(
+      true
+    );
+    const details =
+      type === "serial" ? { port: devices[0] } : { device: devices[0] };
+    browser.session.emit(
+      type === "serial" ? "serial-port-revoked" : `${type}-device-revoked`,
+      browser.event(),
+      { ...details, origin: "https://other.test" }
+    );
+    expect(browser.device("https://site.test", permission("one"), type)).toBe(
+      true
+    );
+    browser.session.emit(
+      type === "serial" ? "serial-port-revoked" : `${type}-device-revoked`,
+      browser.event(),
+      { ...details, origin: "https://site.test" }
+    );
+    expect(browser.device("https://site.test", permission("one"), type)).toBe(
+      false
+    );
+    expect(browser.device("https://site.test", permission("two"), type)).toBe(
+      true
+    );
+  }
+);
+
+it("rejects incomplete HID/serial check identities instead of matching absent chooser IDs", () => {
+  const browser = fixture();
+  for (const type of ["hid", "serial"] as const) {
+    expect(browser.device("https://site.test", {}, type)).toBe(false);
+    expect(
+      browser.device(
+        "https://site.test",
+        { deviceId: "chooser", portId: "chooser" },
+        type
+      )
+    ).toBe(false);
+  }
+});
+
+it("keeps restart required after a native device choice even after consent maps are cleared", async () => {
+  const browser = fixture();
+  await new Promise((resolve) =>
+    browser.session.emit(
+      "select-usb-device",
+      browser.event(),
+      {
+        frame: browser.top,
+        deviceList: [{ deviceId: "ephemeral", productName: "Board" }],
+      },
+      resolve
+    )
+  );
+  expect(browser.policy.read().selectedDevices).toBe(1);
+  expect(await browser.policy.resetPermissions()).toEqual({
+    reloadRequired: true,
+    certificateRestartRequired: false,
+    deviceRestartRequired: true,
+  });
+  expect(browser.policy.read().selectedDevices).toBe(0);
+  expect(browser.device("https://site.test", "ephemeral")).toBe(false);
+  expect((await browser.policy.resetPermissions()).deviceRestartRequired).toBe(
+    true
+  );
+});
+
+it("leaves ephemeral HID interface permissions with Chromium instead of creating a second grant", async () => {
+  const browser = fixture();
+  expect(
+    await new Promise((resolve) =>
+      browser.session.emit(
+        "select-hid-device",
+        browser.event(),
+        {
+          frame: browser.top,
+          deviceList: [
+            {
+              deviceId: "physical-device",
+              guid: "interface-one",
+              name: "Controller",
+              vendorId: 1000,
+              productId: 2000,
+            },
+          ],
+        },
+        resolve
+      )
+    )
+  ).toBe("physical-device");
+  expect(
+    browser.device(
+      "https://site.test",
+      {
+        guid: "interface-one",
+        name: "Controller",
+        vendorId: 1000,
+        productId: 2000,
+      },
+      "hid"
+    )
+  ).toBe(false);
+  expect(browser.policy.read().selectedDevices).toBe(0);
+  expect((await browser.policy.resetPermissions()).deviceRestartRequired).toBe(
+    true
+  );
 });
 
 it("waits for a real Bluetooth scan result and cancels waiting discovery on reset", async () => {
@@ -643,6 +862,7 @@ it("trusts only an explicitly accepted host and certificate, including initial b
   expect(await browser.policy.resetPermissions()).toEqual({
     reloadRequired: true,
     certificateRestartRequired: true,
+    deviceRestartRequired: false,
   });
   expect(await browser.certificate("localhost", cert)).toBe(-3);
   expect(browser.session.closeAllConnections).toHaveBeenCalledOnce();

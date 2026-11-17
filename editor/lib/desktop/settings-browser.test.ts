@@ -53,6 +53,30 @@ function fixture() {
 }
 
 describe("SettingsBrowser.Controller", () => {
+  it.each(["clearCache", "clear"] as const)(
+    "restarts an initial preference read invalidated by %s",
+    async (action) => {
+      const f = managementFixture();
+      let finish!: (
+        value: DesktopBrowser.Management.DownloadPreferences
+      ) => void;
+      vi.mocked(f.management.downloadPreferences).mockReturnValueOnce(
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+      );
+      f.controller.refresh();
+      await f.controller[action]();
+      finish({ askBeforeDownload: true, directoryName: "Stale" });
+      await Promise.resolve();
+      expect(f.management.downloadPreferences).toHaveBeenCalledTimes(2);
+      expect(f.controller.read().downloads).toEqual({
+        askBeforeDownload: false,
+        directoryName: null,
+      });
+    }
+  );
+
   it("loads native download settings and uses only the native directory chooser", async () => {
     const f = managementFixture();
     f.controller.refresh();
@@ -79,7 +103,9 @@ describe("SettingsBrowser.Controller", () => {
     await f.controller.clearCache();
     expect(f.controller.read().notice).toBe("Browser cache cleared.");
     await f.controller.resetPermissions();
-    expect(f.controller.read().notice).toContain("Site permissions reset");
+    expect(f.controller.read().notice).toContain(
+      "Site permission reset requested"
+    );
     expect(f.api.clearBrowsingData).not.toHaveBeenCalled();
     expect(f.management.clearHistory).toHaveBeenCalledOnce();
     expect(f.management.clearCache).toHaveBeenCalledOnce();

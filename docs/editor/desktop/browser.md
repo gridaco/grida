@@ -170,6 +170,8 @@ for this Desktop session, with the requesting site shown in the prompt.
 
 Use **Settings → Browser → Reset permissions** to clear those choices. Open
 pages reload to stop active access, so finish any unsaved work first.
+If you selected a USB, HID or serial device, restart Desktop when prompted to
+fully revoke its browser grant. Electron can retain that grant until restart.
 
 For a development server with a self-signed certificate, the browser offers a
 session-only exception for that host and certificate. Other sites continue to
@@ -184,6 +186,7 @@ Website alerts, confirmations and ordinary tab Leave/Stay warnings are enabled.
 Some runtime features remain unavailable: Electron 42 does not support
 `prompt()` dialogs, screen sharing currently supplies video without system
 audio, and some device pairing or protected-directory requests are unsupported.
+Some Bluetooth serial devices are also unsupported.
 
 Mail, telephone and SMS links can open their apps on your computer. Other app
 links ask before opening. An accepted choice for a site's app links lasts for

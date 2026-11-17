@@ -765,6 +765,42 @@ describe("WorkspaceBrowserTabs", () => {
 const hoverThumbnail = BrowserThumbnailFixtures.solid;
 
 describe("WorkspaceBrowserTabs hover thumbnails", () => {
+  it.each([true, false])(
+    "resync invalidates navigation images but preserves focus-only images (loading=%s)",
+    async (loading) => {
+      const { tabs, storage, host } = setup();
+      let finish!: (value: DesktopBrowser.Thumbnail) => void;
+      host.thumbnail = () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        });
+      await tabs.start(storage, async () => []);
+      tabs.open("https://example.com/");
+      await settle();
+      const entry = [...tabs.getSnapshot().entries.values()][0];
+      const capture = tabs.thumbnail(entry.id);
+      const page = {
+        ...entry.page!,
+        loading,
+        focused: true,
+        revision: host.revision + 2,
+      };
+      host.revision = page.revision;
+      host.pages.set(page.id, page);
+      // A revision gap forces a snapshot after the navigation-start event was missed.
+      host.emit({
+        type: "changed",
+        attachmentId: "owner",
+        revision: page.revision,
+        page,
+      });
+      await settle();
+      finish(hoverThumbnail);
+      expect(await capture).toEqual(loading ? null : hoverThumbnail);
+      tabs.stop();
+    }
+  );
+
   it("reads only on explicit hover request without selecting or focusing the page", async () => {
     const { group, tabs, storage, host } = setup();
     host.thumbnail = vi.fn<NonNullable<DesktopBrowser.Bridge["thumbnail"]>>(

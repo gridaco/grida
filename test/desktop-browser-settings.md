@@ -54,7 +54,8 @@ workspace-only operation as a global one.
      Reopening the site anywhere starts without its former cookie/local storage
      or browser history. Desktop sign-in, provider state, workspace files and
      downloaded files remain available.
-5. Close every browser tab, then repeat cleanup through Settings.
+5. Close every browser tab and all workspace windows. Keep Settings open without
+   an open workspace, then repeat cleanup there.
    - Expected: cleanup works without a live browser page or workspace selection.
 6. Repeat via a browser tab's **… → Clear browsing data…**.
    - Expected: the same native confirmation and global effect.

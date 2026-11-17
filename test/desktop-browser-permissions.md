@@ -21,6 +21,7 @@ A permission decision does not grant Desktop, workspace or provider authority.
 Site choices last for the app session, while OS permissions remain separate.
 Resetting website permissions forgets choices and reloads open browser pages
 and managed windows so an existing capture cannot keep using the old document.
+Native device grants may require a Desktop restart, which reset must disclose.
 Runtime identity and hardware limits are reported without claiming every
 embedded request has a separately identified origin.
 
@@ -50,6 +51,8 @@ embedded request has a separately identified origin.
    platform/device paths; PIN/additional-validation Bluetooth pairing on
    Windows/Linux has no custom handler. Serial/Bluetooth labels identify the
    containing page because the pinned runtime omits requesting-frame identity.
+   For USB, call the selected device's `forget()` method. Expected: the matching
+   origin/device grant is removed, without affecting unrelated device grants.
 6. Select a file/folder through Chromium's picker and exercise its requested
    read/write scope. Expected: consent applies to that selected resource;
    workspace membership grants no other path. Restricted-directory override is
@@ -59,6 +62,11 @@ embedded request has a separately identified origin.
    unsaved-change handler. Expected: open pages/windows reload despite that
    handler, active capture ends, and future requests need fresh consent.
    Unsaved form input can be discarded. OS grants are not reset.
+   Repeat while closing/navigating Settings during reset. Expected: once the
+   reset starts, page reload/termination still completes and active capture ends.
+   After a USB, HID or serial selection, expect a restart-required notice.
+   Restart before asserting that the native device grant has ended; reopening
+   a site before restart must not be described as proof of full revocation.
 8. Relaunch Grida and repeat a site request. Expected: the app's in-memory site
    decision is gone; persistent website sign-in remains separate.
 

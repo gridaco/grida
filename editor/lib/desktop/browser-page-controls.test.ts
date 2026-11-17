@@ -44,6 +44,34 @@ const settle = async () => {
 };
 
 describe("BrowserPageControls.Controller", () => {
+  it("does not let a stale or overlapping zoom observation replace a command", async () => {
+    const { api, controller } = fixture();
+    let finishRead!: (value: number) => void;
+    const read = vi.mocked(api.getZoom).mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishRead = resolve;
+      })
+    );
+    const refreshing = controller.refreshZoom();
+    let finishWrite!: (value: number) => void;
+    vi.mocked(api.setZoom).mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishWrite = resolve;
+      })
+    );
+    const changing = controller.zoom("in");
+    await settle();
+    await controller.refreshZoom();
+    expect(read).toHaveBeenCalledTimes(2);
+    finishWrite(1.2);
+    await changing;
+    finishRead(1);
+    await refreshing;
+    expect(controller.read().zoom).toBe(1.2);
+    await controller.refreshZoom();
+    expect(read).toHaveBeenCalledTimes(3);
+  });
+
   it("finds with an owned target, supports previous/match-case and stops on close", async () => {
     const { api, controller, target } = fixture();
     expect(api.find).not.toHaveBeenCalled();

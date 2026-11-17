@@ -23,6 +23,7 @@ export class WorkspaceBrowserSession {
   private unwatch?: () => void;
   private unsubscribeNavigation?: () => void;
   private initialPath?: string;
+  private pathSequence = 0;
 
   static for(
     document: Document | null,
@@ -86,14 +87,20 @@ export class WorkspaceBrowserSession {
       this.started = this.browsers
         .start(storage, resolveFiles, initialPath)
         .catch((error: unknown) => {
+          this.releaseSubscriptions();
           this.started = null;
           throw error;
         });
     } else if (initialPath && initialPath !== this.initialPath) {
       this.initialPath = initialPath;
+      const sequence = ++this.pathSequence;
       return this.started.then(async () => {
         const accepted = await resolveFiles([initialPath]);
-        if (!this.disposed && accepted.includes(initialPath))
+        if (
+          !this.disposed &&
+          sequence === this.pathSequence &&
+          accepted.includes(initialPath)
+        )
           this.group.open(WorkbenchTab.file(initialPath));
       });
     }
@@ -112,12 +119,19 @@ export class WorkspaceBrowserSession {
     };
   }
 
+  private releaseSubscriptions(): void {
+    this.unwatch?.();
+    this.unwatch = undefined;
+    this.unsubscribeNavigation?.();
+    this.unsubscribeNavigation = undefined;
+    this.document?.defaultView?.removeEventListener("pagehide", this.dispose);
+  }
+
   dispose = (): void => {
     if (this.disposed) return;
     this.disposed = true;
-    this.unwatch?.();
-    this.unsubscribeNavigation?.();
-    this.document?.defaultView?.removeEventListener("pagehide", this.dispose);
+    this.pathSequence++;
+    this.releaseSubscriptions();
     this.mounts?.dispose();
     this.browsers.stop();
     if (this.document) {

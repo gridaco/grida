@@ -2204,6 +2204,125 @@ it("permission reset reloads retained tabs and bypasses their beforeunload only 
   f.host.closeAll();
 });
 
+it.each([
+  "settings-navigation",
+  "connection-failure",
+  "connection-and-close-failure",
+] as const)(
+  "finishes permission-reset stream termination after %s",
+  async (change) => {
+    const f = await fixture();
+    f.create();
+    const peer = await fixture("1234567890abcdef", f.host);
+    peer.create();
+    const guests = [...mock.guests];
+    if (change === "connection-and-close-failure") {
+      guests[0].reload.mockImplementationOnce(() => {
+        throw new Error("reload failed");
+      });
+      guests[0].close.mockImplementationOnce(() => {
+        throw new Error("close failed");
+      });
+    }
+    const settings = settingsFixture();
+    const profile = mock.sessions.get("persist:grida-browser")!;
+    let finish!: () => void;
+    profile.closeAllConnections.mockImplementationOnce(
+      () =>
+        new Promise((resolve, reject) => {
+          finish = () =>
+            change === "settings-navigation"
+              ? resolve()
+              : reject(new Error("connection cleanup failed"));
+        })
+    );
+    const resetting = f.host.resetPermissions(settings.event);
+    if (change === "settings-navigation")
+      settings.window.webContents.emit("did-start-navigation", {
+        isMainFrame: true,
+      });
+    finish();
+    await expect(resetting).rejects.toThrow(
+      change === "settings-navigation"
+        ? "browser_management_expired"
+        : "connection cleanup failed"
+    );
+    for (const guest of guests) expect(guest.reload).toHaveBeenCalledOnce();
+    f.host.closeAll();
+  }
+);
+
+it.each([false, true])(
+  "continues permission-reset cleanup after an individual reload fails (close failure: %s)",
+  async (closeFailure) => {
+    const f = await fixture();
+    f.create();
+    const first = mock.guests.at(-1)!;
+    const peer = await fixture("1234567890abcdef", f.host);
+    peer.create();
+    const second = mock.guests.at(-1)!;
+    first.reload.mockImplementationOnce(() => {
+      throw new Error("reload failed");
+    });
+    if (closeFailure)
+      first.close.mockImplementationOnce(() => {
+        throw new Error("close failed");
+      });
+    const resetting = f.host.resetPermissions(settingsFixture().event);
+    const result = await resetting.then(
+      (value) => ({ value, error: null }),
+      (error: Error) => ({ value: null, error: error.message })
+    );
+    expect(result).toEqual(
+      closeFailure
+        ? { value: null, error: "reload failed" }
+        : { value: true, error: null }
+    );
+    expect(first.close).toHaveBeenCalledWith({ waitForBeforeUnload: false });
+    expect(second.reload).toHaveBeenCalledOnce();
+    f.host.closeAll();
+  }
+);
+
+it.each([false, true])(
+  "discloses native device restart requirements after permission reset (Settings gone: %s)",
+  async (settingsGone) => {
+    const { BrowserSitePolicy } = await import("./browser-site-policy");
+    const f = await fixture();
+    f.create();
+    const settings = settingsFixture();
+    vi.spyOn(
+      BrowserSitePolicy.prototype,
+      "resetPermissions"
+    ).mockImplementationOnce(async () => {
+      if (settingsGone) settings.window.webContents.destroyed = true;
+      return {
+        reloadRequired: true,
+        certificateRestartRequired: false,
+        deviceRestartRequired: true,
+      };
+    });
+    const resetting = f.host.resetPermissions(settings.event);
+    const result = await resetting.then(
+      (value) => ({ value, error: null }),
+      (error: Error) => ({ value: null, error: error.message })
+    );
+    expect(result).toEqual(
+      settingsGone
+        ? { value: null, error: "browser_clear_expired" }
+        : { value: true, error: null }
+    );
+    const options = expect.objectContaining({
+      message: "Restart Grida to finish resetting website permissions",
+      detail: expect.stringContaining("USB, HID or serial"),
+    });
+    expect(mock.confirm.mock.calls.at(-1)).toEqual(
+      settingsGone ? [options] : [settings.window, options]
+    );
+    f.host.closeAll();
+  }
+);
+
 it("binds HTTP credentials to the actual frame/navigation and displays a proxy's actual recipient", async () => {
   const { BrowserAuthDialog } = await import("./browser-auth-dialog");
   let finish!: (credentials: { username: string; password: string }) => void;

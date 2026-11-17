@@ -210,3 +210,96 @@ it("rechecks queued removal authority before committing a file mutation", async 
     (await (await BrowserHistory.open(f.directory)).query(recent)).entries
   ).toHaveLength(1);
 });
+
+it("retains a failed visit batch for a later successful flush", async () => {
+  const f = await fixture();
+  vi.spyOn(console, "warn").mockImplementation(() => {});
+  let fail!: () => void;
+  vi.spyOn(fs, "rename").mockImplementationOnce(
+    () =>
+      new Promise((_resolve, reject) => {
+        fail = () => reject(new Error("disk unavailable"));
+      })
+  );
+  f.history.visit("https://example.com/", "retained", 1);
+  await vi.waitFor(() => expect(fail).toBeTypeOf("function"));
+  fail();
+  await f.history.flush();
+  expect(
+    (await (await BrowserHistory.open(f.directory)).query(recent)).entries
+  ).toEqual([
+    { url: "https://example.com/", title: "retained", lastVisitedAt: 1 },
+  ]);
+});
+
+it.each(["title", "visit", "remove", "clear"] as const)(
+  "preserves newer %s changes when restoring a failed visit batch",
+  async (change) => {
+    const f = await fixture();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    let fail!: () => void;
+    vi.spyOn(fs, "rename").mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          fail = () => reject(new Error("disk unavailable"));
+        })
+    );
+    const url = "https://example.com/";
+    const token = f.history.visit(url, "old", 1)!;
+    await vi.waitFor(() => expect(fail).toBeTypeOf("function"));
+    let mutation: Promise<void> | undefined;
+    if (change === "title") f.history.updateTitle(url, "new title", token);
+    if (change === "visit") f.history.visit(url, "new visit", 2);
+    if (change === "remove") mutation = f.history.remove({ url });
+    if (change === "clear") mutation = f.history.clear();
+    fail();
+    await mutation;
+    await f.history.flush();
+    const entries = (
+      await (await BrowserHistory.open(f.directory)).query(recent)
+    ).entries;
+    expect(entries).toEqual(
+      change === "remove" || change === "clear"
+        ? []
+        : [
+            {
+              url,
+              title: change === "title" ? "new title" : "new visit",
+              lastVisitedAt: change === "title" ? 1 : 2,
+            },
+          ]
+    );
+  }
+);
+
+it("keeps newer pending updates ahead of restored visits when the pending bound is full", async () => {
+  const f = await fixture();
+  vi.spyOn(console, "warn").mockImplementation(() => {});
+  let fail!: () => void;
+  vi.spyOn(fs, "rename").mockImplementationOnce(
+    () =>
+      new Promise((_resolve, reject) => {
+        fail = () => reject(new Error("disk unavailable"));
+      })
+  );
+  const token = f.history.visit("https://example.com/old-0", "old", 1000)!;
+  for (let index = 1; index < BrowserHistory.MAX_ENTRIES; index++)
+    f.history.visit(`https://example.com/old-${index}`, "old", index);
+  await vi.waitFor(() => expect(fail).toBeTypeOf("function"));
+  f.history.updateTitle("https://example.com/old-0", "new title", token);
+  for (let index = 1; index < BrowserHistory.MAX_ENTRIES; index++)
+    f.history.visit(`https://example.com/new-${index}`, "new", 1000 + index);
+  fail();
+  await f.history.flush();
+  const history = await BrowserHistory.open(f.directory);
+  expect((await history.query({ query: "old-0", limit: 1 })).entries).toEqual([
+    {
+      url: "https://example.com/old-0",
+      title: "new title",
+      lastVisitedAt: 1000,
+    },
+  ]);
+  expect((await history.query({ query: "/old-1", limit: 1 })).entries).toEqual(
+    []
+  );
+});

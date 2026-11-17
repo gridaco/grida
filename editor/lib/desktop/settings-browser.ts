@@ -95,6 +95,7 @@ export namespace SettingsBrowser {
         if (generation === this.generation) {
           this.pending = false;
           this.publish({ clearing: false });
+          this.loadInitialPreferences();
         }
       }
     };
@@ -111,7 +112,7 @@ export namespace SettingsBrowser {
       this.perform("permissions", async (api) =>
         this.completed(
           await api.resetPermissions(),
-          "Site permissions reset. Open pages reload to stop active access.",
+          "Site permission reset requested. Open pages reload; restart Desktop if prompted.",
           "Reset cancelled."
         )
       );
@@ -143,6 +144,11 @@ export namespace SettingsBrowser {
           ? null
           : "Open a workspace to view this page in the built-in browser.";
       });
+
+    private loadInitialPreferences(): void {
+      const api = this.management();
+      if (!this.state.downloads && api) void this.loadPreferences(api);
+    }
 
     private completed(
       value: unknown,
@@ -212,6 +218,7 @@ export namespace SettingsBrowser {
         if (generation === this.generation) {
           this.pending = false;
           this.publish({ action: null });
+          this.loadInitialPreferences();
         }
       }
     }

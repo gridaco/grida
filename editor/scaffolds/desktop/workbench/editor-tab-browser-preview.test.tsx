@@ -116,6 +116,25 @@ const source = (
 ) => ({ thumbnail }) as WorkspaceBrowserTabs;
 
 describe("browser tab hover preview", () => {
+  it("captures a page that finishes loading while the same hover stays mounted", async () => {
+    const read = vi.fn<WorkspaceBrowserTabs["thumbnail"]>(
+      async () => BrowserThumbnailFixtures.solid
+    );
+    const tabs = source(read);
+    await act(async () =>
+      root.render(
+        <BrowserTabPreview tabs={tabs} entry={entry({ loading: true })} />
+      )
+    );
+    expect(read).not.toHaveBeenCalled();
+    expect(container.querySelector("img")).toBeNull();
+    await act(async () =>
+      root.render(<BrowserTabPreview tabs={tabs} entry={entry()} />)
+    );
+    expect(read).toHaveBeenCalledExactlyOnceWith("tab");
+    expect(container.querySelector("img")).not.toBeNull();
+  });
+
   it("shares one lazy read across StrictMode effect replay and renders its result", async () => {
     let resolve!: (image: DesktopBrowser.Thumbnail) => void;
     const read = vi.fn<WorkspaceBrowserTabs["thumbnail"]>(
@@ -173,7 +192,7 @@ describe("browser tab hover preview", () => {
     expect(container.querySelector(".aspect-video")).toBeNull();
   });
 
-  it("discards settled pixels across a same-URL reload without another capture", async () => {
+  it("replaces the cached capture when a same-URL reload finishes", async () => {
     const read = vi.fn<WorkspaceBrowserTabs["thumbnail"]>(
       async () => BrowserThumbnailFixtures.solid
     );
@@ -199,8 +218,8 @@ describe("browser tab hover preview", () => {
         />
       )
     );
-    expect(container.querySelector("img")).toBeNull();
-    expect(read).toHaveBeenCalledTimes(1);
+    expect(container.querySelector("img")).not.toBeNull();
+    expect(read).toHaveBeenCalledTimes(2);
   });
 
   it("ignores a late capture when the pointer moves to another tab", async () => {

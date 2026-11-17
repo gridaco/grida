@@ -44,6 +44,23 @@ function fixture(
 }
 
 describe("BrowserOmnibox.Controller", () => {
+  it("protects the draft during application suspension and refocus without selecting it again", () => {
+    const { controller, history } = fixture();
+    controller.focus();
+    controller.change("unfinished search");
+    const selection = controller.read().selectionRevision;
+    controller.suspendFocus();
+    controller.sync("https://current.test/while-away", true, 0);
+    controller.resumeFocus();
+    controller.sync("https://current.test/after-return", true, 0);
+    expect(controller.read().draft).toBe("unfinished search");
+    expect(controller.read().selectionRevision).toBe(selection);
+    expect(history.read().query).toBe("unfinished search");
+    controller.key("Escape");
+    expect(controller.read().draft).toBe("https://current.test/after-return");
+    controller.dispose();
+  });
+
   it("offers recent pages on focus, then local matches only after typing", async () => {
     const { controller, api, listeners } = fixture();
     expect(listeners.size).toBe(0);

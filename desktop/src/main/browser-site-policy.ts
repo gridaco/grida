@@ -76,6 +76,7 @@ export class BrowserSitePolicy {
   >();
   #epoch = 0;
   #certificateAccepted = false;
+  #deviceAccepted = false;
 
   constructor(
     readonly browserSession: Session,
@@ -120,12 +121,18 @@ export class BrowserSitePolicy {
     );
     browserSession.setDevicePermissionHandler((details) => {
       const origin = BrowserSitePolicy.#origin(details.origin);
-      return (
-        !!origin &&
-        this.#devices.has(
-          this.#deviceKey(origin, details.deviceType, details.device)
-        )
-      );
+      const key =
+        origin && this.#deviceKey(origin, details.deviceType, details.device);
+      return !!key && this.#devices.has(key);
+    });
+    browserSession.on("usb-device-revoked", (_event, details) => {
+      this.#revokeDevice("usb", details.origin, details.device);
+    });
+    browserSession.on("hid-device-revoked", (_event, details) => {
+      this.#revokeDevice("hid", details.origin, details.device);
+    });
+    browserSession.on("serial-port-revoked", (_event, details) => {
+      this.#revokeDevice("serial", details.origin, details.port);
     });
     browserSession.setDisplayMediaRequestHandler((request, callback) => {
       void this.#display(request).then(callback, () => callback({}));
@@ -330,6 +337,7 @@ export class BrowserSitePolicy {
   async resetPermissions(): Promise<{
     reloadRequired: true;
     certificateRestartRequired: boolean;
+    deviceRestartRequired: boolean;
   }> {
     // Once Chromium may have cached an exception, subsequent resets cannot
     // establish that it has forgotten it either. Only process exit does that.
@@ -340,7 +348,14 @@ export class BrowserSitePolicy {
     this.#devices.clear();
     this.#certificates.clear();
     await this.browserSession.closeAllConnections();
-    return { reloadRequired: true, certificateRestartRequired };
+    // Electron's chooser contexts retain ephemeral USB/HID/serial grants ahead
+    // of the custom permission handler. Public Session APIs cannot revoke those
+    // native maps, so only relaunch guarantees that accepted devices are gone.
+    return {
+      reloadRequired: true,
+      certificateRestartRequired,
+      deviceRestartRequired: this.#deviceAccepted,
+    };
   }
 
   static #origin(raw: string | undefined): string | null {
@@ -775,11 +790,68 @@ export class BrowserSitePolicy {
     origin: string,
     type: DevicePermissionHandlerHandlerDetails["deviceType"],
     device: Device
-  ): string {
-    // Electron's deviceId/portId are the actual Chromium IDs supplied by the
-    // native chooser and permission check; a name alone never identifies a grant.
-    const id = "portId" in device ? device.portId : device.deviceId;
-    return JSON.stringify([origin, type, id]);
+  ): string | null {
+    // Chooser IDs are callback tokens, not a common permission identity.
+    // Electron 42's HID checks omit deviceId and serial checks use a separate
+    // snake_case native dictionary with numeric USB identifiers.
+    const value = device as unknown as Record<string, unknown>;
+    const text = (...keys: string[]): string | null => {
+      for (const key of keys)
+        if (typeof value[key] === "string" && value[key])
+          return value[key] as string;
+      return null;
+    };
+    const number = (...keys: string[]): number | null => {
+      for (const key of keys) {
+        const raw = value[key];
+        const parsed =
+          typeof raw === "number"
+            ? raw
+            : typeof raw === "string" && /^\d+$/.test(raw)
+              ? Number(raw)
+              : NaN;
+        if (Number.isInteger(parsed) && parsed >= 0 && parsed <= 0xffff)
+          return parsed;
+      }
+      return null;
+    };
+    if (type === "usb") {
+      const id = text("deviceId");
+      return id ? JSON.stringify([origin, type, id]) : null;
+    }
+    if (type === "hid") {
+      const serial = text("serialNumber");
+      const name = text("name");
+      const vendor = number("vendorId");
+      const product = number("productId");
+      if (serial && name && vendor !== null && product !== null)
+        return JSON.stringify([origin, type, vendor, product, serial, name]);
+      // Native ephemeral HID grants already cover the selected interfaces.
+      // Keep no second grant that could outlive Chromium's physical-device forget.
+      return null;
+    }
+    if (process.platform === "win32") {
+      const id = text("deviceInstanceId", "device_instance_id");
+      return id ? JSON.stringify([origin, type, "instance", id]) : null;
+    }
+    const vendor = number("vendorId", "vendor_id");
+    const product = number("productId", "product_id");
+    const serial = text("serialNumber", "serial_number");
+    const driver =
+      process.platform === "darwin" ? text("usbDriverName", "usb_driver") : "";
+    return vendor !== null && product !== null && serial && driver !== null
+      ? JSON.stringify([origin, type, vendor, product, serial, driver])
+      : null;
+  }
+
+  #revokeDevice(
+    type: DevicePermissionHandlerHandlerDetails["deviceType"],
+    rawOrigin: string | undefined,
+    device: Device
+  ): void {
+    const origin = BrowserSitePolicy.#origin(rawOrigin);
+    const key = origin && this.#deviceKey(origin, type, device);
+    if (key) this.#devices.delete(key);
   }
 
   async #selectDevice(
@@ -808,7 +880,9 @@ export class BrowserSitePolicy {
       (entry) => ("portId" in entry ? entry.portId : entry.deviceId) === id
     );
     if (!device) return;
-    this.#devices.add(this.#deviceKey(context.origin, type, device));
+    const key = this.#deviceKey(context.origin, type, device);
+    if (key) this.#devices.add(key);
+    this.#deviceAccepted = true;
     while (this.#devices.size > 500)
       this.#devices.delete(this.#devices.values().next().value!);
     return id;

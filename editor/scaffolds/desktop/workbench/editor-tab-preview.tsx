@@ -197,6 +197,8 @@ export function BrowserTabPreview({
   // StrictMode replays effect setup: both subscriptions share the one lazy
   // hover read, while each cleanup still ignores its own late completion.
   const request = useRef<{
+    tabs: WorkspaceBrowserTabs;
+    id: string;
     identity: string;
     promise: Promise<DesktopBrowser.Thumbnail | null>;
   } | null>(null);
@@ -205,10 +207,20 @@ export function BrowserTabPreview({
     image: DesktopBrowser.Thumbnail | null;
   } | null>(null);
   useEffect(() => {
-    const read = (request.current ??= {
-      identity,
-      promise: tabs.thumbnail(entry.id),
-    });
+    if (
+      request.current?.identity !== identity ||
+      request.current.tabs !== tabs ||
+      request.current.id !== entry.id
+    )
+      request.current = {
+        tabs,
+        id: entry.id,
+        identity,
+        promise: entry.page?.loading
+          ? Promise.resolve(null)
+          : tabs.thumbnail(entry.id),
+      };
+    const read = request.current;
     let current = true;
     void read.promise.then((image) => {
       if (current) setCapture({ identity: read.identity, image });

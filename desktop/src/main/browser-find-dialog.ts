@@ -1,8 +1,9 @@
 /** GRIDA-SEC-016 — script-free native find for managed website windows. */
-import { BrowserWindow, session, type WebContents } from "electron";
+import { BrowserWindow, type WebContents } from "electron";
 import { randomUUID } from "node:crypto";
 import { DesktopBrowser } from "@grida/desktop-bridge";
 import { BrowserPageTools } from "./browser-page-tools";
+import { BrowserDialogSessions } from "./browser-dialog-sessions";
 
 export class BrowserFindDialog {
   static readonly #windows = new WeakMap<WebContents, BrowserWindow>();
@@ -20,11 +21,9 @@ export class BrowserFindDialog {
     }
     const token = randomUUID();
     const action = `https://browser-find.invalid/${token}`;
-    const isolated = session.fromPartition(`grida-browser-find-${token}`);
-    isolated.setPermissionRequestHandler((_contents, _permission, callback) =>
-      callback(false)
-    );
-    isolated.setPermissionCheckHandler(() => false);
+    const lease = BrowserDialogSessions.acquire("find");
+    if (!lease) return;
+    const isolated = lease.session;
     const source = `data:text/html;charset=utf-8,${encodeURIComponent(this.document(action))}`;
     const window = new BrowserWindow({
       parent,
@@ -93,12 +92,11 @@ export class BrowserFindDialog {
           /* Retired guest. */
         }
       }
-      isolated.webRequest.onBeforeRequest(
-        { urls: ["<all_urls>"] },
-        (_details, callback) => callback({ cancel: true })
-      );
-      void isolated.clearStorageData().catch(() => {});
+      lease.release();
     });
+    // A canceled top-level POST can replace the form with Chromium's error page.
+    // A local 204 response retains the live document and never reaches the network.
+    lease.answerPost(action, valid);
     isolated.webRequest.onBeforeRequest(
       { urls: ["<all_urls>"] },
       (details, callback) => {
@@ -110,7 +108,7 @@ export class BrowserFindDialog {
           details.resourceType === "mainFrame" &&
           details.webContentsId === window.webContents.id &&
           window.webContents.getURL() === source;
-        callback({ cancel: !initial });
+        callback({ cancel: !(initial || submitted) });
         if (!submitted || !valid()) return;
         const request = this.parse(details.uploadData);
         if (!request) {

@@ -708,23 +708,27 @@ export class WorkspaceBrowserTabs {
     if (event.type === "changed" || event.type === "created") {
       if (event.type === "created")
         this.nativeCreations.set(event.page.id, event);
-      const previous = this.pages.get(event.page.id);
-      if (
-        previous &&
-        (previous.url !== event.page.url ||
-          (!previous.loading && event.page.loading) ||
-          previous.mounted !== event.page.mounted ||
-          previous.failure !== event.page.failure)
-      ) {
-        for (const [id, entry] of this.entries)
-          if (entry.page?.id === event.page.id) this.invalidatePageImages(id);
-      }
+      this.invalidateChangedPage(event.page);
       this.pages.set(event.page.id, event.page);
     } else {
       this.finishClosed(event.pageId);
     }
     this.adoptPages();
     this.refreshEntries();
+  }
+
+  private invalidateChangedPage(page: DesktopBrowser.Page): void {
+    const previous = this.pages.get(page.id);
+    if (
+      previous &&
+      (previous.url !== page.url ||
+        (!previous.loading && page.loading) ||
+        previous.mounted !== page.mounted ||
+        previous.failure !== page.failure)
+    ) {
+      for (const [id, entry] of this.entries)
+        if (entry.page?.id === page.id) this.invalidatePageImages(id);
+    }
   }
 
   private finishClosed(pageId: string): void {
@@ -833,6 +837,7 @@ export class WorkspaceBrowserTabs {
     const missing = [...this.pages.keys()].filter(
       (id) => !snapshot.pages.some((page) => page.id === id)
     );
+    for (const page of snapshot.pages) this.invalidateChangedPage(page);
     this.pages = new Map(snapshot.pages.map((page) => [page.id, page]));
     for (const id of missing) this.finishClosed(id);
     this.adoptPages();

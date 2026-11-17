@@ -50,6 +50,7 @@ it("shares the native viewport with autoscroll and fades only the overlay scroll
     ) < 2;
   expect(contextRef.current?.scrollRef.current).toBe(viewport);
   expect(getComputedStyle(viewport).scrollbarWidth).toBe("none");
+  expect(getComputedStyle(viewport).overflow).toBe("scroll");
   await expect.poll(atBottom).toBe(true);
 
   // Growing streamed content follows the bottom on that same viewport.
@@ -64,15 +65,20 @@ it("shares the native viewport with autoscroll and fades only the overlay scroll
   expect(getComputedStyle(scrollbar()!).animationName).not.toBe("none");
   await expect.poll(() => scrollbar(), { timeout: 3000 }).toBeNull();
 
-  // User scrolling up breaks the bottom lock; later streaming must respect it.
+  // Upward wheel intent escapes even before a scroll event, while streamed
+  // growth can cause the library to ignore scroll events during resize.
+  render(1800);
   flushSync(() => {
-    viewport.dispatchEvent(new WheelEvent("wheel", { deltaY: -400 }));
-    viewport.scrollTop -= 400;
+    viewport.firstElementChild!.dispatchEvent(
+      new WheelEvent("wheel", { deltaY: -400, bubbles: true })
+    );
   });
   await expect.poll(() => contextRef.current?.isAtBottom).toBe(false);
+  // Synthetic wheel events have no browser default scrolling action.
+  viewport.scrollTop -= 400;
   const previousTop = viewport.scrollTop;
-  render(1800);
-  await expect.poll(() => viewport.scrollHeight).toBeGreaterThan(1800);
+  render(2100);
+  await expect.poll(() => viewport.scrollHeight).toBeGreaterThan(2100);
   expect(viewport.scrollTop).toBe(previousTop);
   await expect.poll(() => scrollbar()?.dataset.state).toBe("visible");
 });
