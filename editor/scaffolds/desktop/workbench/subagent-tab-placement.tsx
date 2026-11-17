@@ -34,7 +34,7 @@ export class SubagentTabPlacement implements SubagentPlacement {
           <section
             data-testid="subagent-tab-content"
             aria-label="Subagent activity"
-            className="h-full min-h-0 overflow-hidden p-4"
+            className="h-full min-h-0 overflow-hidden py-4"
           >
             <NativeSubagentActivity
               controller={presentation.controller}

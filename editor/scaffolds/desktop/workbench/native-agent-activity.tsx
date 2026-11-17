@@ -107,7 +107,7 @@ export function NativeSubagentActivityPanel({
               <XIcon className="size-3.5" />
             </Button>
           </header>
-          <div className="min-h-0 flex-1 overflow-hidden p-3">
+          <div className="min-h-0 flex-1 overflow-hidden py-3">
             <NativeSubagentActivity
               controller={subagents}
               onBack={() => {
@@ -145,7 +145,7 @@ export function NativeSubagentActivity({
     >
       {view.detail && view.selected ? (
         <>
-          <header className="flex min-w-0 shrink-0 items-center gap-2">
+          <header className="flex min-w-0 shrink-0 items-center gap-2 px-4">
             <Button
               type="button"
               variant="ghost"
@@ -184,7 +184,7 @@ export function NativeSubagentActivity({
           >
             <ConversationContent
               scrollbar="custom"
-              className="mx-auto w-full max-w-2xl gap-4 p-0 pb-4"
+              className="gap-4 p-0 px-[max(1rem,calc((100%_-_48rem)/2))] pb-4"
             >
               {view.activityAvailable && (
                 <NativeSubagentConversationView controller={controller} />
@@ -258,7 +258,7 @@ export function NativeSubagentActivity({
           </Conversation>
         </>
       ) : (
-        <>
+        <div className="mx-auto w-full max-w-3xl space-y-4 px-4">
           <div className="flex items-center justify-end gap-2">
             {heading && (
               <h2 className="mr-auto text-sm font-medium">Subagents</h2>
@@ -317,15 +317,15 @@ export function NativeSubagentActivity({
               Show more
             </Button>
           )}
-        </>
+        </div>
       )}
       {view.error && (
-        <p role="alert" className="text-xs text-destructive">
+        <p role="alert" className="px-4 text-xs text-destructive">
           {view.error}
         </p>
       )}
       {view.activityError && (
-        <p role="alert" className="text-xs text-destructive">
+        <p role="alert" className="px-4 text-xs text-destructive">
           {view.activityError}
         </p>
       )}
