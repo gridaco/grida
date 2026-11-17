@@ -698,7 +698,7 @@ function NativeChatPane({
             {/* See test/desktop-agent-chat-scrollbar.md. */}
             <ConversationContent
               scrollbar="custom"
-              className="gap-4 px-3 py-4"
+              className="gap-4 px-[max(0.75rem,calc((100%_-_48rem)/2))] py-4"
               scrollClassName="desktop-native-drag-scroll-viewport scroll-fade-y scroll-fade-4"
             >
               <NativeEarlierMessages
@@ -874,7 +874,7 @@ function NativeChatPane({
             </Button>
           </div>
         )}
-        <div className="shrink-0 p-3">
+        <div className="shrink-0 px-[max(0.75rem,calc((100%_-_48rem)/2))] py-3">
           {state.imageInput && (
             <input
               key={`png-${state.scope}`}

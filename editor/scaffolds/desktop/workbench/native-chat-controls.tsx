@@ -77,7 +77,7 @@ export function NativeChatHeader({
   return (
     <header
       data-testid="native-chat-header"
-      className="flex h-10 shrink-0 items-center gap-2 px-3 text-xs font-medium"
+      className="flex h-10 shrink-0 items-center gap-2 px-[max(0.75rem,calc((100%_-_48rem)/2))] text-xs font-medium"
     >
       <Popover
         open={open}
