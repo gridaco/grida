@@ -96,6 +96,7 @@ function entry(
     locationRevision: 0,
     page: {
       id: "page",
+      mounted: true,
       revision: 1,
       url: "https://example.com/",
       title: "Example",

@@ -1,9 +1,9 @@
 ---
 id: TC-DESKTOP-BROWSER-001
-title: Native browser pages follow the content viewport and yield to workbench overlays
+title: Live browser pages compose beneath workbench controls
 module: desktop
 area: browser
-tags: [browser, native, layout, overlays, zoom]
+tags: [browser, layout, overlays, zoom, focus]
 status: untested
 severity: high
 date: 2026-11-17
@@ -11,43 +11,48 @@ updated: 2026-11-17
 automatable: partial
 covered_by:
   - desktop/src/main/browser-host.electron.test.ts
-  - editor/scaffolds/desktop/workbench/browser-viewport.test.ts
+  - editor/scaffolds/desktop/workbench/browser-guest-mounts.test.tsx
 ---
 
 ## Behavior
 
-A native browser page occupies only its content viewport, below its toolbar.
-It follows workbench layout and window zoom. Workbench menus, dialogs and
-previews remain usable: overlapping UI hides the native page and displays a
-neutral placeholder until the overlay ends. Website contents are not copied
-into the workbench to produce that placeholder.
+The browser page uses DOM composition below its toolbar. It follows workbench
+layout and shell zoom, and shares its frame's rounded clipping. Workbench menus,
+tooltips, popovers, previews and global modal backdrops appear above the live
+page while video and animation visibly continue. Opening a control neither
+hides the page nor substitutes a frozen screenshot. Ordinary modal focus
+trapping, backdrop dismissal and return of page interaction remain effective.
 
-The frame's CSS radius also controls the page viewport's uniform corner clip.
-Native pixels must not escape the rounded frame's bottom corners. Changing
-only the CSS radius updates both DOM and native clipping without resizing.
+Inactive or temporarily unpresented guests stay connected to the document but
+are hidden and inert. Focus returns to an actual workbench element before
+hiding a page. Removing or moving its presentation slot cannot expose fallback
+geometry or leak page input into another tab.
 
 ## Steps
 
-1. Open a workspace browser tab on a local server with a visibly colored page.
-2. Resize the window and the chat/content divider. Open and resize File
-   Explorer and the bottom terminal utility. Expected: the page follows its
-   viewport without painting over the toolbar, chat, tree or terminal.
-3. Open a workbench menu or dialog that overlaps the page. Hover a neighboring
-   file tab long enough to show its preview. Expected: the shell overlay stays
-   usable, the browser shows a neutral placeholder, and dismissing the overlay
-   restores the same page without navigation.
-   Open the browser's **…** menu and dismiss it with Escape. Expected: both
-   actions are available, the page yields to the menu, and focus returns to
-   the menu trigger. A blank page disables **Open in default browser**.
-4. Switch to another tab. Expected: the native page no longer paints or
-   receives input in the content area. Switch tabs with the browser menu open;
-   its menu closes and does not reopen when returning to the page.
-5. Change shell zoom and enter/exit fullscreen. Move the window between displays
-   with different scaling where available. Expected: page bounds stay aligned
-   with the reserved viewport.
-6. Repeat after a cold Desktop launch, recording the operating system and
-   display configuration used.
-7. With a colored page visible, change the content frame's border radius in
-   renderer DevTools without changing its dimensions. Expected: the DOM page
-   viewport and native page update together, with no leaked bottom corners.
-   Repeat at non-default shell zoom and with a zero radius.
+1. Open a workspace browser on a controlled local page containing a bright
+   animated canvas, continuously advancing video, a frame counter and form
+   input. Confirm frame-refusing headers do not prevent it from loading.
+2. Resize the window, chat divider, File Explorer and terminal. Scroll inside
+   the website. Expected: browser pixels remain inside the content frame and
+   below the toolbar. No rectangle synchronization or overlay placeholder is
+   involved.
+3. Open the browser **…** menu and a workbench popover/preview overlapping the
+   page. Expected: controls appear above continuously changing video/animation.
+   Dismiss with Escape; normal page input immediately works again.
+4. Open a real global workbench modal across the page. Expected: its backdrop
+   dims the page while visible video/animation advances; clicks on the page
+   cannot activate it. Tab/Shift-Tab cycle only within the modal. Exercise
+   Escape, outside dismissal and explicit close separately, then verify page
+   pointer and keyboard interaction resume.
+5. Switch tabs with a page input focused and while the menu is open. Expected:
+   the hidden guest receives no keystrokes/clicks, its menu closes, and its
+   form value remains on return. Remount workbench chrome and move its
+   presentation slot; the same guest and running document remain connected.
+6. Change shell zoom, resize and enter/exit fullscreen. Move between displays
+   with different scales where available. Expected: alignment and corner
+   clipping remain correct. Change the shared frame radius without resizing,
+   including zero radius; bottom corners update together with no pixel leak.
+7. Repeat after a cold Desktop launch. Record OS, Electron version, display
+   configuration and which input/IME paths were actually exercised. Unit tests
+   and a synthetic Electron fixture do not replace actual workbench evidence.

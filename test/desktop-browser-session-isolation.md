@@ -43,3 +43,17 @@ or private workspace protocol access to the page.
    attempt. Cancellation preserves the pages; confirmation closes them, their
    website state is cleared, and other workspace profiles and Desktop sign-in
    remain unchanged.
+7. In a disposable harness, attempt forged, duplicate, replayed, expired and
+   previous-document mounts, hostile partition/preload/preferences and nested
+   guests. Expected: Main admits only the actual guest for the exact live
+   owner/page; no website loads before registration and policy installation.
+8. Test page-origin forbidden links/redirects separately from trusted webview
+   built-in programmatic loads. Expected: ordinary forbidden navigation is
+   canceled; file/data document requests are blocked. A programmatic local
+   loader that bypasses those hooks is terminated and yields a recoverable
+   failure, without crashing Main. This does not prove no script executed:
+   the trusted workbench already has intrinsic own-guest scripting authority.
+9. Exercise actual registered guest CDP evaluation, screenshot and input in a
+   disposable native fixture. Verify isolation and page identity separately
+   from raw target discovery. If Playwright is used, record whether it exposes
+   an ordinary guest Page rather than assuming target discovery implies it.

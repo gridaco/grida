@@ -33,7 +33,7 @@ For the user-facing app and the security boundary:
 ## Pages
 
 The [built-in browser](./browser.md) defines standalone page ownership,
-profile isolation, lifetime and native presentation.
+profile isolation, document lifetime and live workbench composition.
 
 | Page                                               | Covers                                                                                                                                                           |
 | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |

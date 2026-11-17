@@ -543,7 +543,9 @@ own reviewed profile and process confinement described below.
 load `https://grida.co` while dev loads `http://localhost:3000`;
 `will-navigate` blocks navigation off `EDITOR_BASE_URL`;
 `setWindowOpenHandler` denies and routes external links through
-`shell.openExternal` after validation; `will-attach-webview` rejects;
+`shell.openExternal` after validation; `will-attach-webview` rejects every
+guest except a one-use, exact-document browser mount admitted under
+GRIDA-SEC-016; guest preferences and session selection are forced by Main;
 every main-process IPC handler validates `event.senderFrame.url`.
 
 **Explicit Full access.** The ordinary restricted profile retains all command
@@ -4322,8 +4324,9 @@ incident investigations out of the architectural guarantee.
 **What it protects.** Untrusted browser pages remain ordinary sandboxed web
 content. They cannot obtain the privileged Desktop bridge, application account
 cookies, provider networking, private workspace protocol or authority over
-another window's pages. Native page ownership remains with Main across
-workbench navigation, reload and account-role changes.
+another window's pages. Main owns admission, page identities, browser policy
+and cleanup. A mounted guest belongs to its live hosting document; replacing
+that document revokes its authority and ends its guests.
 
 **Vulnerable scenario (prevented).** A website navigates a guest to a
 `/desktop/*` URL and is mistaken for the application renderer because it shares
@@ -4333,17 +4336,18 @@ could also act on pages owned by its replacement, or race storage clearing to
 keep authenticated website state alive.
 
 **Why it's specifically risky here.** The privileged workbench is hosted web
-content and browser guests are native child views in the same window. Origin,
+content and browser guests are DOM webviews in the same window. Origin,
 pathname and `BrowserWindow.fromWebContents` are insufficient evidence that a
 caller is the actual privileged top-level workbench document.
 
 **How the code prevents it.**
 
-1. **Separate guest contexts.** Main creates page views with fixed sandbox,
-   context isolation, disabled Node integration and disabled webview support.
-   Guests receive neither the application preload nor its additional
-   arguments. Main creates explicit browser session partitions; it never uses
-   the default account session or provider-network session and installs no
+1. **Separate guest contexts.** Main forces sandboxing, context isolation,
+   disabled Node integration and disabled nested webviews at guest admission.
+   Renderer-supplied preferences and preload paths are discarded; no guest
+   preload is approved. Guests receive neither the application preload nor
+   its additional arguments. Main selects explicit browser sessions, ignoring
+   renderer partition names; it never uses the default account session or provider-network session and installs no
    private workspace protocol on them.
 2. **Exact shell admission.** Common native IPC requires the exact window
    `webContents` and its current top-level sender frame, in addition to the
@@ -4353,22 +4357,36 @@ caller is the actual privileged top-level workbench document.
    account-navigation reconciliation likewise checks
    exact shell identity before acting. Guest navigation to a Desktop URL grants
    no native authority and cannot hide or reconcile the owning shell.
-3. **Attachment and page ownership.** Main verifies the workspace against the
-   registered workspace catalog and rechecks frame, URL and role after that
+3. **Attachment, mount and page ownership.** Main verifies the workspace
+   against the registered workspace catalog and rechecks frame, URL and role after that
    asynchronous admission. Each attach rotates an opaque lease bound to the
-   current document. Commands validate that lease and page ownership. Reload
-   hides pages and invalidates the lease; stale or canceled attachments cannot
-   replace a newer one. Window destruction and role withdrawal revoke the
+   current document. Commands validate that lease and page ownership. A
+   native-issued one-use bootstrap identifies an authorized mount; it is not
+   a website URL, partition or raw webContents ID. A global deny-by-default
+   attachment guard checks the exact shell, current document, lease and page,
+   consumes the claim and suppresses automatic loading of caller attributes.
+   The actual created guest is correlated by object identity with its exact
+   host and must be the guest supplied by `did-attach-webview`. Main installs
+   policy before navigating that registered guest. Unknown, duplicate, replayed,
+   nested and stale mounts are rejected.
+   Document loss ends pages and invalidates the lease; stale or canceled
+   attachments cannot replace a newer one. Window destruction and role withdrawal revoke the
    lease and remove the owner before closing its pages. Notifications and
    focus use the retained live shell identity, since a window wrapper can
    outlive its destroyed contents.
    A committed document replacement also revokes a browser attachment created
    after that navigation had already started, so a late attachment cannot
-   leave a native child visible over a different application route.
+   leave a guest admitted under a different application document.
 4. **Destination and browser policy.** Main validates HTTP(S) navigation and
    external handoff, refusing credential-bearing, file, executable and private
-   top-level URLs. Subframes retain ordinary web content schemes without
-   gaining native authority. Popups, sensitive permissions, device access,
+   top-level URLs. A browser-session request filter also rejects forbidden
+   main-frame document requests exposed by Chromium, including file/data loads
+   initiated through stock webview APIs. Programmatic local document loaders
+   such as blob can bypass those request hooks; observed unsupported loads
+   revoke input and are terminated asynchronously after the native callback.
+   This containment does not guarantee their scripts never executed.
+   Subframes retain ordinary web content schemes without gaining native
+   authority. Popups, sensitive permissions, device access,
    JavaScript dialogs and HTTP auth are denied. Certificates use the engine's
    verdict. Downloads require a native save destination under a live owning
    attachment and are never opened automatically.
@@ -4383,12 +4401,11 @@ caller is the actual privileged top-level workbench document.
    the default, and rechecks the exact Settings document and catalog identity
    after asynchronous admission and confirmation before clearing begins.
    It shares the existing workspace lock, page teardown and storage cleanup.
-6. **Bounded observations and geometry.** The bridge carries bounded page
+6. **Bounded observations.** The typed bridge carries bounded page
    metadata and revisioned snapshots, not raw Electron objects, credentials,
-   scripts or debugger commands. Main obtains zoom itself, bounds geometry to
-   the owning window, clamps the bounded CSS corner radius and rejects stale
-   layout sequences. Website metadata remains untrusted display data. The
-   optional thumbnail operation returns only a bounded JPEG of an owned
+   scripts or debugger commands. DOM/CSS owns presentation; no native geometry
+   or overlay classification crosses this bridge. Website metadata remains
+   untrusted display data. The optional thumbnail operation returns only a bounded JPEG of an owned
    page's rendered viewport to the admitted hosted shell. Callers cannot
    choose capture regions, formats, scripts or native options. Capture keeps
    hidden pages hidden, limits concurrency and rechecks attachment, page and
@@ -4402,22 +4419,32 @@ GRIDA-SEC-004. A selected upload or accepted download is an explicit user file
 operation. Profile separation does not prevent a user from separately signing
 into the same website in multiple profiles. The admitted shell may read its
 own pages' thumbnail pixels; the bridge does not prove a physical hover event.
-Agent observation, page scripts,
-debugger access and automated interaction are not supplied by this boundary.
+The admitted hosted workbench is a trusted embedder. Stock webview elements
+intrinsically expose APIs for their own guests, including script execution and
+navigation; the purpose-specific bridge does not remove those APIs.
+`javascript:` execution is in-document scripting and can occur without a
+document request. Some programmatic local document loaders also bypass
+cancellable navigation and request hooks. The session request guard is not a
+preexecution barrier against the trusted embedder's existing scripting power.
+This boundary therefore does not isolate a guest's website contents from its authorized workbench. It isolates guest websites from native
+application authority and unrelated profiles. No agent tool, MCP server or
+product debugger surface is supplied. Main retains the actual registered guest
+for native commands and any separately authorized future debugger integration.
 
 **Files bound by this id.**
 
 - `desktop/src/main/browser-host.ts` — fixed guest preferences, profiles,
-  admission, leases, navigation, downloads, geometry and teardown.
+  admission, mount correlation, leases, navigation, downloads and teardown.
 - `desktop/src/main/ipc-handlers.ts` and `desktop/src/main/ipc-admission.ts` —
   exact shell/frame and operation-specific workspace or Settings admission.
 - `desktop/src/main/ipc-sender.ts` — navigation and teardown revocation for
   pending Settings confirmations.
-- `desktop/src/main.ts` — exact account-navigation observer and role teardown.
+- `desktop/src/main.ts` and `desktop/src/window.ts` — global attachment guard,
+  fixed shell preferences, exact account-navigation observer and role teardown.
 - `desktop/src/preload.ts` and `desktop/src/bridge/contract.ts` — purpose-scoped
   browser IPC and event projection for the shell only.
 - `packages/grida-desktop-bridge/src/browser.ts` and `browser.test.ts` — bounded
-  browser values and URL, geometry and observation validation.
+  browser values and URL, mount and observation validation.
 - `desktop/src/main/browser-host.test.ts` and
   `desktop/src/main/browser-host.electron.test.ts` with its
   `browser-host.electron.cjs` fixture — ownership, storage and destroyed-shell

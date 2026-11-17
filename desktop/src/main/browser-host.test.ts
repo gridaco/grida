@@ -1,7 +1,7 @@
-// GRIDA-SEC-016 — guest isolation, ownership and browser recovery contracts.
-import { beforeEach, expect, it, vi, type Mock } from "vitest";
+// GRIDA-SEC-016 — actual guest admission, document lifetime and profile isolation.
+import { afterEach, beforeEach, expect, it, vi, type Mock } from "vitest";
 import type { EventEmitter } from "node:events";
-import type { IpcMainInvokeEvent } from "electron";
+import type { IpcMainInvokeEvent, WebContents, WebPreferences } from "electron";
 import { DesktopBrowser } from "@grida/desktop-bridge";
 
 type FakeImage = {
@@ -12,19 +12,23 @@ type FakeImage = {
   >;
   toJPEG: Mock<(quality: number) => Buffer>;
 };
-
 type FakeContents = EventEmitter & {
   id: number;
   url: string;
   mainFrame: { url: string };
   destroyed: boolean;
   focused: boolean;
+  type: string;
+  hostWebContents: FakeContents | null;
+  session: FakeSession | null;
+  getLastWebPreferences(): WebPreferences;
+  preferences: WebPreferences;
   getURL(): string;
+  getType(): string;
   isDestroyed(): boolean;
   isFocused(): boolean;
   isLoading(): boolean;
   isLoadingMainFrame(): boolean;
-  getZoomFactor(): number;
   capturePage: Mock<
     (
       rect?: unknown,
@@ -45,28 +49,23 @@ type FakeContents = EventEmitter & {
   focus: Mock<() => void>;
   close: Mock<(options?: { waitForBeforeUnload: boolean }) => void>;
 };
-type FakeView = {
-  webContents: FakeContents;
-  visible: boolean;
-  options: { webPreferences: Record<string, unknown> };
-  setBounds: Mock<(rect: DesktopBrowser.Rect) => void>;
-  setBorderRadius: Mock<(radius: number) => void>;
-  setVisible: Mock<(visible: boolean) => void>;
-};
 type FakeWindow = EventEmitter & {
   webContents: FakeContents;
   destroyed: boolean;
   focused: boolean;
-  children: Set<unknown>;
-  contentView: {
-    addChildView(view: FakeView): void;
-    removeChildView(view: unknown): boolean;
-  };
   isDestroyed(): boolean;
   isFocused(): boolean;
-  getContentSize(): number[];
 };
+type BeforeRequest = (
+  details: { url: string; resourceType: string; webContentsId: number },
+  callback: (response: { cancel: boolean }) => void
+) => void;
 type FakeSession = EventEmitter & {
+  webRequest: {
+    onBeforeRequest: Mock<
+      (filter: { urls: string[] }, handler: BeforeRequest) => void
+    >;
+  };
   setPermissionRequestHandler: Mock<(...args: unknown[]) => void>;
   setPermissionCheckHandler: Mock<(...args: unknown[]) => void>;
   setDevicePermissionHandler: Mock<(...args: unknown[]) => void>;
@@ -75,12 +74,12 @@ type FakeSession = EventEmitter & {
   clearCache: Mock<() => Promise<void>>;
   clearAuthCache: Mock<() => Promise<void>>;
 };
-
 const mock = vi.hoisted(() => ({
   owners: new Map<unknown, FakeWindow>(),
-  views: [] as FakeView[],
+  guests: [] as FakeContents[],
   sessions: new Map<string, FakeSession>(),
   next: 1,
+  newContents: null as (() => FakeContents) | null,
   savePath: undefined as string | undefined,
   confirm: vi.fn<
     (
@@ -96,10 +95,13 @@ const mock = vi.hoisted(() => ({
 }));
 beforeEach(() => {
   mock.owners.clear();
-  mock.views.length = 0;
+  mock.guests.length = 0;
   mock.sessions.clear();
   mock.savePath = undefined;
   mock.confirm.mockReset().mockResolvedValue({ response: 0 });
+});
+afterEach(() => {
+  vi.useRealTimers();
 });
 vi.mock("electron", async () => {
   const { EventEmitter } = await import("node:events");
@@ -109,12 +111,17 @@ vi.mock("electron", async () => {
     mainFrame = { url: this.url };
     destroyed = false;
     focused = false;
+    type = "window";
+    hostWebContents: FakeContents | null = null;
+    session: FakeSession | null = null;
+    preferences: WebPreferences = {};
+    getLastWebPreferences = () => this.preferences;
     getURL = () => this.url;
+    getType = () => this.type;
     isDestroyed = () => this.destroyed;
     isFocused = () => this.focused;
     isLoading = () => false;
     isLoadingMainFrame = () => false;
-    getZoomFactor = () => 1.25;
     capturePage = vi.fn<
       (
         rect?: unknown,
@@ -131,7 +138,7 @@ vi.mock("electron", async () => {
       goBack: vi.fn<() => void>(),
       goForward: vi.fn<() => void>(),
     };
-    loadURL = vi.fn<(url: string) => Promise<void>>(async (url: string) => {
+    loadURL = vi.fn<(url: string) => Promise<void>>(async (url) => {
       this.url = url;
     });
     reload = vi.fn<() => void>();
@@ -145,21 +152,13 @@ vi.mock("electron", async () => {
       this.emit("destroyed");
     });
   }
+  mock.newContents = () => new Contents();
   class Window extends EventEmitter {
     webContents = new Contents();
     destroyed = false;
     focused = true;
-    children = new Set<unknown>();
-    contentView = {
-      addChildView: (view: FakeView) => {
-        this.children.add(view);
-        mock.owners.set(view.webContents, this);
-      },
-      removeChildView: (view: unknown) => this.children.delete(view),
-    };
     isDestroyed = () => this.destroyed;
     isFocused = () => this.focused;
-    getContentSize = () => [1000, 800];
     constructor() {
       super();
       mock.owners.set(this.webContents, this);
@@ -168,36 +167,31 @@ vi.mock("electron", async () => {
       return mock.owners.get(contents) ?? null;
     }
   }
-  class View {
-    webContents = new Contents();
-    visible = false;
-    setBounds = vi.fn<(rect: DesktopBrowser.Rect) => void>();
-    setBorderRadius = vi.fn<(radius: number) => void>();
-    setVisible = vi.fn<(visible: boolean) => void>((visible: boolean) => {
-      this.visible = visible;
-    });
-    constructor(readonly options: { webPreferences: Record<string, unknown> }) {
-      mock.views.push(this);
-    }
-  }
-  const fromPartition = vi.fn<(key: string) => FakeSession>((key: string) => {
-    if (!mock.sessions.has(key)) {
-      const value = Object.assign(new EventEmitter(), {
-        setPermissionRequestHandler: vi.fn<(...args: unknown[]) => void>(),
-        setPermissionCheckHandler: vi.fn<(...args: unknown[]) => void>(),
-        setDevicePermissionHandler: vi.fn<(...args: unknown[]) => void>(),
-        closeAllConnections: vi.fn<() => Promise<void>>(async () => {}),
-        clearStorageData: vi.fn<() => Promise<void>>(async () => {}),
-        clearCache: vi.fn<() => Promise<void>>(async () => {}),
-        clearAuthCache: vi.fn<() => Promise<void>>(async () => {}),
-      });
-      mock.sessions.set(key, value);
-    }
+  const fromPartition = vi.fn<(key: string) => FakeSession>((key) => {
+    if (!mock.sessions.has(key))
+      mock.sessions.set(
+        key,
+        Object.assign(new EventEmitter(), {
+          webRequest: {
+            onBeforeRequest:
+              vi.fn<
+                (filter: { urls: string[] }, handler: BeforeRequest) => void
+              >(),
+          },
+          setPermissionRequestHandler: vi.fn<(...args: unknown[]) => void>(),
+          setPermissionCheckHandler: vi.fn<(...args: unknown[]) => void>(),
+          setDevicePermissionHandler: vi.fn<(...args: unknown[]) => void>(),
+          closeAllConnections: vi.fn<() => Promise<void>>(async () => {}),
+          clearStorageData: vi.fn<() => Promise<void>>(async () => {}),
+          clearCache: vi.fn<() => Promise<void>>(async () => {}),
+          clearAuthCache: vi.fn<() => Promise<void>>(async () => {}),
+        })
+      );
     return mock.sessions.get(key)!;
   });
   return {
     BrowserWindow: Window,
-    WebContentsView: View,
+    webContents: { create: () => new Contents() },
     session: { fromPartition },
     shell: { openExternal: vi.fn<() => Promise<void>>(async () => {}) },
     dialog: {
@@ -206,14 +200,22 @@ vi.mock("electron", async () => {
     },
   };
 });
-import { BrowserWindow, session } from "electron";
+import { BrowserWindow } from "electron";
 import { DesktopBrowserHost } from "./browser-host";
-
+const native = (contents: FakeContents) => contents as unknown as WebContents;
+function shellFixture() {
+  const window = new BrowserWindow() as unknown as FakeWindow;
+  const event = {
+    sender: window.webContents,
+    senderFrame: window.webContents.mainFrame,
+  } as unknown as IpcMainInvokeEvent;
+  return { window, event };
+}
 async function fixture(
   workspace = "eac20941e6a410aa",
   sharedHost?: DesktopBrowserHost
 ) {
-  const window = new BrowserWindow() as unknown as FakeWindow;
+  const { window, event } = shellFixture();
   window.webContents.url = `https://grida.co/desktop/workspace?id=${workspace}`;
   window.webContents.mainFrame.url = window.webContents.url;
   let admitted = true;
@@ -225,22 +227,71 @@ async function fixture(
       workspaceExists: async () => true,
       resolveWorkspace: async (id) => ({ name: `Project ${id}` }),
     });
-  const event = {
-    sender: window.webContents,
-    senderFrame: window.webContents.mainFrame,
-  } as unknown as IpcMainInvokeEvent;
   const attached = await host.attach(event, workspace);
-  const create = (storageScope: DesktopBrowser.StorageScope = "workspace") =>
+  const target = (page: DesktopBrowser.Page) => ({
+    attachmentId: attached.attachmentId,
+    pageId: page.id,
+  });
+  const descriptor = (
+    storageScope: DesktopBrowser.StorageScope = "workspace"
+  ) =>
     host.create(event, {
       attachmentId: attached.attachmentId,
       storageScope,
       url: "https://example.com/",
     });
+  const beginMount = (page: DesktopBrowser.Page) => {
+    const reservation = host.reserveMount(event, target(page));
+    const preferences: WebPreferences = {
+      partition: "persist:forged",
+      preload: "/untrusted.cjs",
+      nodeIntegration: true,
+      sandbox: false,
+      additionalArguments: ["--untrusted"],
+    };
+    const params = {
+      src: reservation.src,
+      httpreferrer: "https://forged.invalid",
+      useragent: "forged",
+    };
+    const preventDefault = vi.fn<() => void>();
+    host.willAttach(
+      native(window.webContents),
+      { preventDefault },
+      preferences,
+      params
+    );
+    expect(preventDefault).not.toHaveBeenCalled();
+    const guest = mock.newContents!();
+    guest.preferences = { ...preferences };
+    guest.type = "webview";
+    guest.url = "";
+    guest.hostWebContents = window.webContents;
+    guest.session = preferences.session as unknown as FakeSession;
+    mock.owners.set(guest, window);
+    mock.guests.push(guest);
+    host.createdContents(native(guest));
+    return { guest, preferences, params, reservation };
+  };
+  const mount = (page: DesktopBrowser.Page) => {
+    const result = beginMount(page);
+    host.didAttach(native(window.webContents), native(result.guest));
+    return result;
+  };
+  const create = (scope: DesktopBrowser.StorageScope = "workspace") => {
+    const page = descriptor(scope);
+    mount(page);
+    return page;
+  };
   return {
     window,
-    host,
     event,
+    host,
     attached,
+    target,
+    descriptor,
+    beginMount,
+    mount,
     create,
     revoke: () => {
       admitted = false;
@@ -249,38 +300,153 @@ async function fixture(
   };
 }
 
-it("creates hardened guest contents in a dedicated profile without the shell preload", async () => {
+it("creates a descriptor then registers only its actual guest with Main-owned session/preferences before website load", async () => {
   const f = await fixture();
-  const page = f.create();
-  const view = mock.views.at(-1)!;
-  const prefs = view.options.webPreferences;
-  expect(prefs).toMatchObject({
+  const page = f.descriptor();
+  expect(page.mounted).toBe(false);
+  expect(mock.guests).toHaveLength(0);
+  const { guest, preferences, params, reservation } = f.beginMount(page);
+  expect(preferences).toMatchObject({
     sandbox: true,
     contextIsolation: true,
     nodeIntegration: false,
     webviewTag: false,
-    webSecurity: true,
     disableDialogs: true,
+    disablePopups: true,
+    backgroundThrottling: true,
   });
-  expect(prefs).not.toHaveProperty("preload");
-  expect(prefs).not.toHaveProperty("additionalArguments");
-  expect(session.fromPartition).toHaveBeenCalledWith(
-    "persist:grida-browser-workspace-eac20941e6a410aa"
+  expect(preferences.preload).toBeUndefined();
+  expect(preferences.additionalArguments).toBeUndefined();
+  expect(preferences.partition).toBeUndefined();
+  expect(params).toEqual({});
+  expect(guest.loadURL).not.toHaveBeenCalled();
+  expect(guest.session).toBe(
+    mock.sessions.get("persist:grida-browser-workspace-eac20941e6a410aa")
   );
-  expect(view.visible).toBe(false);
-  expect(DesktopBrowser.parsePage(page)).not.toBeNull();
-  expect(view.webContents.setWindowOpenHandler.mock.calls[0][0]()).toEqual({
-    action: "deny",
-  });
+  f.host.didAttach(native(f.window.webContents), native(guest));
+  expect(guest.loadURL).toHaveBeenCalledExactlyOnceWith("https://example.com/");
+  expect(
+    f.host.snapshot(f.event, f.attached.attachmentId).pages[0].mounted
+  ).toBe(true);
+  expect(() => f.host.reserveMount(f.event, f.target(page))).toThrow(
+    "browser_mount_unavailable"
+  );
+  const denied = vi.fn<() => void>();
+  f.host.willAttach(
+    native(f.window.webContents),
+    { preventDefault: denied },
+    {},
+    { src: reservation.src }
+  );
+  expect(denied).toHaveBeenCalled();
   f.host.closeAll();
 });
 
-it("denies a guest even when its owning window and URL look privileged", async () => {
+it("denies forged, foreign and overlapping candidates without trusting partitions or guest IDs", async () => {
   const f = await fixture();
-  f.create();
-  const guest = mock.views.at(-1)!.webContents;
-  guest.url = f.window.webContents.url;
-  guest.mainFrame.url = guest.url;
+  const page = f.descriptor();
+  const src = f.host.reserveMount(f.event, f.target(page)).src;
+  const other = await fixture("eac20941e6a410aa", f.host);
+  const foreign = vi.fn<() => void>();
+  f.host.willAttach(
+    native(other.window.webContents),
+    { preventDefault: foreign },
+    {},
+    { src }
+  );
+  expect(foreign).toHaveBeenCalled();
+  const forged = vi.fn<() => void>();
+  f.host.willAttach(
+    native(f.window.webContents),
+    { preventDefault: forged },
+    {},
+    {
+      src: DesktopBrowser.MOUNT_URL_PREFIX + "forged",
+      partition: "persist:grida-browser-workspace-eac20941e6a410aa",
+    }
+  );
+  expect(forged).toHaveBeenCalled();
+  const first = f.beginMount(page);
+  const secondPage = f.descriptor();
+  const second = f.host.reserveMount(f.event, f.target(secondPage));
+  const overlap = vi.fn<() => void>();
+  f.host.willAttach(
+    native(f.window.webContents),
+    { preventDefault: overlap },
+    {},
+    { src: second.src }
+  );
+  expect(overlap).toHaveBeenCalled();
+  const impostor = mock.newContents!();
+  f.host.didAttach(native(f.window.webContents), native(impostor));
+  expect(impostor.close).toHaveBeenCalled();
+  expect(first.guest.loadURL).not.toHaveBeenCalled();
+  f.host.didAttach(native(f.window.webContents), native(first.guest));
+  expect(
+    f.host.snapshot(f.event, f.attached.attachmentId).pages[0].mounted
+  ).toBe(true);
+  const nested = vi.fn<() => void>();
+  f.host.willAttach(
+    native(first.guest),
+    { preventDefault: nested },
+    {},
+    { src: second.src }
+  );
+  expect(nested).toHaveBeenCalled();
+  f.host.closeAll();
+});
+
+it("expires one-use mount claims with a bounded mount failure and permits an explicit retry", async () => {
+  vi.useFakeTimers();
+  const f = await fixture();
+  const page = f.descriptor();
+  const old = f.host.reserveMount(f.event, f.target(page));
+  expect(f.host.reserveMount(f.event, f.target(page))).toEqual(old);
+  await vi.advanceTimersByTimeAsync(15_000);
+  expect(
+    f.host.snapshot(f.event, f.attached.attachmentId).pages[0].failure
+  ).toMatchObject({ kind: "mount", code: "timeout" });
+  expect(() => f.host.reserveMount(f.event, f.target(page))).toThrow(
+    "browser_mount_unavailable"
+  );
+  f.host.reload(f.event, f.target(page));
+  expect(f.host.reserveMount(f.event, f.target(page)).src).not.toBe(old.src);
+  const denied = vi.fn<() => void>();
+  f.host.willAttach(
+    native(f.window.webContents),
+    { preventDefault: denied },
+    {},
+    { src: old.src }
+  );
+  expect(denied).toHaveBeenCalled();
+  f.host.closeAll();
+});
+
+it("ends claimed guests before registration when their document attachment is revoked", async () => {
+  const f = await fixture();
+  const page = f.descriptor();
+  const { guest, reservation } = f.beginMount(page);
+  await f.host.detach(f.event, f.attached.attachmentId);
+  expect(guest.close).toHaveBeenCalledWith({ waitForBeforeUnload: false });
+  f.host.didAttach(native(f.window.webContents), native(guest));
+  expect(guest.loadURL).not.toHaveBeenCalled();
+  const next = await f.host.attach(f.event, "eac20941e6a410aa");
+  expect(next.pages).toEqual([]);
+  const denied = vi.fn<() => void>();
+  f.host.willAttach(
+    native(f.window.webContents),
+    { preventDefault: denied },
+    {},
+    { src: reservation.src }
+  );
+  expect(denied).toHaveBeenCalled();
+  f.host.closeAll();
+});
+
+it("denies guest/subframe IPC and stale leases or pages from another owner", async () => {
+  const f = await fixture();
+  const page = f.create();
+  const guest = mock.guests.at(-1)!;
   await expect(
     f.host.attach(
       {
@@ -290,416 +456,211 @@ it("denies a guest even when its owning window and URL look privileged", async (
       "eac20941e6a410aa"
     )
   ).rejects.toThrow("browser_owner_invalid");
-  await expect(
-    f.host.attach(
+  expect(() =>
+    f.host.snapshot(
       {
         ...f.event,
         senderFrame: { url: f.window.webContents.url },
       } as unknown as IpcMainInvokeEvent,
-      "eac20941e6a410aa"
+      f.attached.attachmentId
     )
-  ).rejects.toThrow("browser_owner_invalid");
-  f.host.closeAll();
-});
-
-it("rejects cross-window page IDs and old attachments after reattachment", async () => {
-  const a = await fixture();
-  const b = await fixture("eac20941e6a410aa", a.host);
-  const page = a.create();
+  ).toThrow("browser_owner_invalid");
+  const peer = await fixture("eac20941e6a410aa", f.host);
   expect(() =>
-    b.host.navigate(b.event, {
-      attachmentId: b.attached.attachmentId,
+    f.host.close(peer.event, {
+      attachmentId: peer.attached.attachmentId,
       pageId: page.id,
-      url: "https://example.org/",
     })
   ).toThrow("browser_page_unavailable");
-  const next = await a.host.attach(a.event, "eac20941e6a410aa");
-  expect(next.attachmentId).not.toBe(a.attached.attachmentId);
-  expect(next.pages.map((page) => page.id)).toEqual([page.id]);
-  expect(() => a.host.detach(a.event, a.attached.attachmentId)).toThrow(
-    "browser_attachment_expired"
-  );
-  expect(a.host.snapshot(a.event, next.attachmentId).pages).toHaveLength(1);
-  a.host.closeAll();
-  b.host.closeAll();
-});
-
-it("applies CSS geometry using native shell zoom, clips it and ignores stale updates", async () => {
-  const f = await fixture();
-  const page = f.create();
-  const target = { attachmentId: f.attached.attachmentId, pageId: page.id };
-  const view = mock.views.at(-1)!;
-  f.host.layout(f.event, {
-    ...target,
-    sequence: 2,
-    rect: { x: 100, y: 40, width: 1000, height: 1000 },
-    visible: true,
-  });
-  expect(view.setBounds).toHaveBeenLastCalledWith({
-    x: 125,
-    y: 50,
-    width: 875,
-    height: 750,
-  });
-  expect(view.visible).toBe(true);
-  f.host.layout(f.event, {
-    ...target,
-    sequence: 1,
-    rect: { x: 0, y: 0, width: 1, height: 1 },
-    visible: false,
-  });
-  expect(view.visible).toBe(true);
-  expect(() =>
-    f.host.layout(f.event, {
-      ...target,
-      sequence: 3,
-      rect: { x: NaN, y: 0, width: 1, height: 1 },
-      visible: true,
-    })
-  ).toThrow("browser_layout_invalid");
-  f.host.detach(f.event, target.attachmentId);
-  expect(view.visible).toBe(false);
-  expect(view.webContents.close).not.toHaveBeenCalled();
-  f.host.closeAll();
-});
-
-it("rejects unsafe destinations on direct navigation and redirects", async () => {
-  const f = await fixture();
-  const page = f.create();
-  for (const url of [
-    "file:///etc/passwd",
-    "javascript:alert(1)",
-    "grida-workspace://private",
-    "https://user:secret@example.com/",
-    "https://example.com/\n",
-  ]) {
-    expect(() =>
-      f.host.navigate(f.event, {
-        attachmentId: f.attached.attachmentId,
-        pageId: page.id,
-        url,
-      })
-    ).toThrow("browser_url_invalid");
-    const preventDefault = vi.fn<() => void>();
-    mock.views
-      .at(-1)!
-      .webContents.emit("will-redirect", { preventDefault }, url);
-    expect(preventDefault).toHaveBeenCalled();
-  }
-  f.host.closeAll();
-});
-
-it("clears shared workspace sessions only after closing every same-scope page", async () => {
-  const f = await fixture();
-  const first = f.create();
-  const transient = f.create("ephemeral");
-  const other = await fixture("eac20941e6a410aa", f.host);
-  other.create();
-  const different = await fixture("1234567890abcdef", f.host);
-  const untouched = different.create();
-  const views = mock.views.slice(-4, -1);
-  await f.host.clearSession(f.event, { attachmentId: f.attached.attachmentId });
-  expect(f.host.snapshot(f.event, f.attached.attachmentId).pages).toEqual([]);
-  for (const view of views)
-    expect(view.webContents.close).toHaveBeenCalledWith({
-      waitForBeforeUnload: false,
-    });
-  expect(
-    mock.sessions.get(`grida-browser-page-${transient.id}`)!.clearStorageData
-  ).toHaveBeenCalled();
-  expect(
-    mock.sessions.get("persist:grida-browser-workspace-eac20941e6a410aa")!
-      .clearStorageData
-  ).toHaveBeenCalled();
-  expect(first.id).not.toBe(transient.id);
-  expect(
-    f.host.snapshot(other.event, other.attached.attachmentId).pages
-  ).toEqual([]);
-  expect(
-    f.host.snapshot(different.event, different.attached.attachmentId).pages[0]
-      .id
-  ).toBe(untouched.id);
-  f.host.closeAll();
-});
-
-it("revokes pending attachments on navigation and native role loss", async () => {
-  const window = new BrowserWindow() as unknown as FakeWindow;
-  let resolve!: (value: boolean) => void;
-  const host = new DesktopBrowserHost({
-    editorOrigin: "https://grida.co",
-    admitWindow: () => true,
-    workspaceExists: () =>
-      new Promise((r) => {
-        resolve = r;
-      }),
-  });
-  const event = {
-    sender: window.webContents,
-    senderFrame: window.webContents.mainFrame,
-  } as unknown as IpcMainInvokeEvent;
-  const pending = host.attach(event, "eac20941e6a410aa");
-  host.closeAll();
-  resolve(true);
-  await expect(pending).rejects.toThrow("browser_attachment_expired");
-});
-
-it("retains hidden pages across shell reload but destroys them on account revocation", async () => {
-  const f = await fixture();
-  f.create();
-  const view = mock.views.at(-1)!;
-  f.window.webContents.emit("did-start-navigation", {
-    isMainFrame: true,
-    isSameDocument: false,
-    url: f.window.webContents.url,
-  });
-  expect(view.webContents.close).not.toHaveBeenCalled();
+  const next = await f.host.attach(f.event, "eac20941e6a410aa");
+  expect(next.pages).toEqual([]);
+  expect(guest.close).toHaveBeenCalled();
   expect(() => f.host.snapshot(f.event, f.attached.attachmentId)).toThrow(
     "browser_attachment_expired"
   );
-  const next = await f.host.attach(f.event, "eac20941e6a410aa");
-  expect(next.pages).toHaveLength(1);
-  f.revoke();
-  expect(view.webContents.close).toHaveBeenCalled();
-  expect(f.window.children.size).toBe(0);
-  expect(f.window.webContents.listenerCount("did-start-navigation")).toBe(0);
+  f.host.closeAll();
 });
 
 it.each([
-  "https://grida.co/desktop/settings",
-  "https://grida.co/desktop/tools",
-  "https://grida.co/desktop/workspace?id=aac20941e6a410aa",
+  "file:///tmp/local.html",
+  "data:text/html,private",
+  "blob:https://example.com/local",
+  "grida-workspace://local/file",
+  "http://user:pass@example.com/",
 ])(
-  "closes a late attachment when an already-started navigation commits to %s",
+  "rejects forbidden Main requests through the browser session: %s",
   async (url) => {
-    const window = new BrowserWindow() as unknown as FakeWindow;
-    const host = new DesktopBrowserHost({
-      editorOrigin: "https://grida.co",
-      admitWindow: () => true,
-      workspaceExists: async () => true,
-    });
-    const event = {
-      sender: window.webContents,
-      senderFrame: window.webContents.mainFrame,
-    } as unknown as IpcMainInvokeEvent;
-    window.webContents.emit("did-start-navigation", {
-      isMainFrame: true,
-      isSameDocument: false,
-      url,
-    });
-    vi.spyOn(window.webContents, "isLoadingMainFrame").mockReturnValue(true);
-    // Hydration may attach while loading; the subsequent commit must revoke it.
-    const attached = await host.attach(event, "eac20941e6a410aa");
-    const page = host.create(event, {
-      attachmentId: attached.attachmentId,
-      storageScope: "workspace",
-    });
-    const view = mock.views.at(-1)!;
-    host.layout(event, {
-      attachmentId: attached.attachmentId,
-      pageId: page.id,
-      sequence: 1,
-      rect: { x: 0, y: 0, width: 100, height: 100 },
-      visible: true,
-    });
-    expect(view.visible).toBe(true);
-    window.webContents.url = url;
-    window.webContents.mainFrame.url = url;
-    window.webContents.emit("did-navigate", {}, url);
-    expect(view.visible).toBe(false);
-    expect(view.webContents.close).toHaveBeenCalledWith({
-      waitForBeforeUnload: false,
-    });
-    expect(window.children.size).toBe(0);
-    expect(() => host.snapshot(event, attached.attachmentId)).toThrow(
-      url.includes("/workspace?")
-        ? "browser_attachment_expired"
-        : "browser_owner_invalid"
-    );
-    expect(window.webContents.listenerCount("did-navigate")).toBe(0);
-    expect(window.webContents.listenerCount("did-start-navigation")).toBe(0);
-    host.closeAll();
-  }
-);
-
-it("hides a late attachment on same-workspace full commit and recovers its pages with a new lease", async () => {
-  const window = new BrowserWindow() as unknown as FakeWindow;
-  const host = new DesktopBrowserHost({
-    editorOrigin: "https://grida.co",
-    admitWindow: () => true,
-    workspaceExists: async () => true,
-  });
-  const event = {
-    sender: window.webContents,
-    senderFrame: window.webContents.mainFrame,
-  } as unknown as IpcMainInvokeEvent;
-  window.webContents.emit("did-start-navigation", {
-    isMainFrame: true,
-    isSameDocument: false,
-    url: window.webContents.url,
-  });
-  const attached = await host.attach(event, "eac20941e6a410aa");
-  const page = host.create(event, {
-    attachmentId: attached.attachmentId,
-    storageScope: "workspace",
-  });
-  const view = mock.views.at(-1)!;
-  const layout = {
-    pageId: page.id,
-    sequence: 1,
-    rect: { x: 0, y: 0, width: 100, height: 100 },
-    visible: true,
-  };
-  host.layout(event, { ...layout, attachmentId: attached.attachmentId });
-  expect(view.visible).toBe(true);
-  window.webContents.emit("did-navigate", {}, window.webContents.url);
-  expect(view.visible).toBe(false);
-  expect(view.webContents.close).not.toHaveBeenCalled();
-  expect(() => host.snapshot(event, attached.attachmentId)).toThrow(
-    "browser_attachment_expired"
-  );
-  const recovered = await host.attach(event, "eac20941e6a410aa");
-  expect(recovered.attachmentId).not.toBe(attached.attachmentId);
-  expect(recovered.pages.map((entry) => entry.id)).toEqual([page.id]);
-  host.layout(event, { ...layout, attachmentId: recovered.attachmentId });
-  expect(view.visible).toBe(true);
-  host.closeAll();
-});
-
-it("refuses pending admission when an already-started same-URL navigation commits during catalog lookup", async () => {
-  const window = new BrowserWindow() as unknown as FakeWindow;
-  let release!: (registered: boolean) => void;
-  const host = new DesktopBrowserHost({
-    editorOrigin: "https://grida.co",
-    admitWindow: () => true,
-    workspaceExists: () =>
-      new Promise((resolve) => {
-        release = resolve;
-      }),
-  });
-  const event = {
-    sender: window.webContents,
-    senderFrame: window.webContents.mainFrame,
-  } as unknown as IpcMainInvokeEvent;
-  window.webContents.emit("did-start-navigation", {
-    isMainFrame: true,
-    isSameDocument: false,
-    url: window.webContents.url,
-  });
-  const pending = host.attach(event, "eac20941e6a410aa");
-  // A same-URL document replacement can retain the same mocked frame wrapper.
-  window.webContents.emit("did-navigate", {}, window.webContents.url);
-  release(true);
-  await expect(pending).rejects.toThrow("browser_attachment_expired");
-  expect(mock.views).toHaveLength(0);
-  expect(window.webContents.listenerCount("did-navigate")).toBe(0);
-  expect(window.webContents.listenerCount("did-start-navigation")).toBe(0);
-  host.closeAll();
-});
-
-it.each([
-  [
-    "did-fail-provisional-load",
-    "https://grida.co/desktop/workspace?id=eac20941e6a410aa",
-  ],
-  ["did-fail-load", "https://grida.co/desktop/workspace?id=eac20941e6a410aa"],
-  ["did-fail-provisional-load", "https://grida.co/desktop/settings"],
-  ["did-fail-load", "https://grida.co/desktop/settings"],
-])(
-  "revokes a late attachment on main-frame %s for %s",
-  async (failureEvent, url) => {
-    const window = new BrowserWindow() as unknown as FakeWindow;
-    const host = new DesktopBrowserHost({
-      editorOrigin: "https://grida.co",
-      admitWindow: () => true,
-      workspaceExists: async () => true,
-    });
-    const event = {
-      sender: window.webContents,
-      senderFrame: window.webContents.mainFrame,
-    } as unknown as IpcMainInvokeEvent;
-    window.webContents.emit("did-start-navigation", {
-      isMainFrame: true,
-      isSameDocument: false,
-      url,
-    });
-    const attached = await host.attach(event, "eac20941e6a410aa");
-    const page = host.create(event, {
-      attachmentId: attached.attachmentId,
-      storageScope: "workspace",
-    });
-    const view = mock.views.at(-1)!;
-    host.layout(event, {
-      attachmentId: attached.attachmentId,
-      pageId: page.id,
-      sequence: 1,
-      rect: { x: 0, y: 0, width: 100, height: 100 },
-      visible: true,
-    });
-    window.webContents.emit(
-      failureEvent,
-      {},
-      -105,
-      "ERR_NAME_NOT_RESOLVED",
-      url,
-      true
-    );
-    expect(view.visible).toBe(false);
-    expect(() => host.snapshot(event, attached.attachmentId)).toThrow(
-      "browser_attachment_expired"
-    );
-    const sameWorkspace = url.includes("/workspace?");
-    expect(view.webContents.close.mock.calls).toEqual(
-      sameWorkspace ? [] : [[{ waitForBeforeUnload: false }]]
-    );
-    expect(window.children.size).toBe(sameWorkspace ? 1 : 0);
-    const recovered = await host.attach(event, "eac20941e6a410aa");
-    expect(recovered.pages.map((entry) => entry.id)).toEqual(
-      sameWorkspace ? [page.id] : []
-    );
-    host.closeAll();
-    expect(window.webContents.listenerCount(failureEvent)).toBe(0);
-  }
-);
-
-it.each(["did-fail-provisional-load", "did-fail-load"])(
-  "keeps an attachment visible on subframe %s",
-  async (failureEvent) => {
     const f = await fixture();
-    const page = f.create();
-    const view = mock.views.at(-1)!;
-    f.host.layout(f.event, {
-      attachmentId: f.attached.attachmentId,
-      pageId: page.id,
-      sequence: 1,
-      rect: { x: 0, y: 0, width: 100, height: 100 },
-      visible: true,
-    });
-    f.window.webContents.emit(
-      failureEvent,
-      {},
-      -105,
-      "ERR_NAME_NOT_RESOLVED",
-      "https://example.com/iframe",
-      false
+    f.create();
+    const guest = mock.guests.at(-1)!;
+    const filter = guest.session!.webRequest.onBeforeRequest.mock.calls[0]![1];
+    const callback = vi.fn<(result: { cancel: boolean }) => void>();
+    filter(
+      { url, resourceType: "mainFrame", webContentsId: guest.id },
+      callback
     );
-    expect(view.visible).toBe(true);
-    expect(view.webContents.close).not.toHaveBeenCalled();
-    expect(f.host.snapshot(f.event, f.attached.attachmentId).pages[0].id).toBe(
-      page.id
+    expect(callback).toHaveBeenCalledExactlyOnceWith({ cancel: true });
+    filter(
+      {
+        url: "https://example.com/",
+        resourceType: "mainFrame",
+        webContentsId: guest.id,
+      },
+      callback
     );
+    expect(callback).toHaveBeenLastCalledWith({ cancel: false });
+    const page = f.host.snapshot(f.event, f.attached.attachmentId).pages[0];
+    expect(page.failure).toMatchObject({ kind: "navigation", code: "blocked" });
     f.host.closeAll();
   }
 );
 
-it.each([
-  ["did-fail-provisional-load", true],
-  ["did-fail-load", true],
-  ["did-fail-provisional-load", false],
-  ["did-fail-load", false],
-])(
-  "scopes pending-admission revocation on %s to main frames (%s)",
-  async (failureEvent, isMainFrame) => {
-    const window = new BrowserWindow() as unknown as FakeWindow;
+it("denies direct unsafe URLs and popups while retaining ordinary subframes and denied permission policy", async () => {
+  const f = await fixture();
+  const page = f.create();
+  const guest = mock.guests.at(-1)!;
+  expect(() =>
+    f.host.navigate(f.event, { ...f.target(page), url: "file:///tmp/local" })
+  ).toThrow("browser_url_invalid");
+  const denied = vi.fn<() => void>();
+  guest.emit("will-navigate", { preventDefault: denied }, "file:///tmp/local");
+  expect(denied).toHaveBeenCalled();
+  expect(guest.setWindowOpenHandler.mock.calls[0]![0]()).toEqual({
+    action: "deny",
+  });
+  f.host.reload(f.event, f.target(page));
+  const blank = vi.fn<() => void>();
+  guest.emit("will-frame-navigate", {
+    preventDefault: blank,
+    url: "about:blank",
+    isMainFrame: false,
+  });
+  expect(blank).not.toHaveBeenCalled();
+  expect(
+    f.host.snapshot(f.event, f.attached.attachmentId).pages[0].failure
+  ).toBeNull();
+  const permissions = guest.session!.setPermissionCheckHandler.mock
+    .calls[0]![0] as () => boolean;
+  expect(permissions()).toBe(false);
+  f.host.closeAll();
+});
+
+it("gates inactive native input and focus while preserving multiple eligible live guests and text composition", async () => {
+  const f = await fixture();
+  const one = f.create();
+  const first = mock.guests.at(-1)!;
+  const two = f.create();
+  const second = mock.guests.at(-1)!;
+  expect(() => f.host.focus(f.event, f.target(one))).toThrow(
+    "browser_page_inactive"
+  );
+  const inactive = vi.fn<() => void>();
+  first.emit(
+    "before-input-event",
+    { preventDefault: inactive },
+    { type: "keyDown", key: "a", isComposing: true }
+  );
+  expect(inactive).toHaveBeenCalled();
+  f.host.setActive(f.event, { ...f.target(one), active: true });
+  f.host.setActive(f.event, { ...f.target(two), active: true });
+  f.host.focus(f.event, f.target(one));
+  f.host.focus(f.event, f.target(two));
+  expect(first.focus).toHaveBeenCalled();
+  expect(second.focus).toHaveBeenCalled();
+  expect(
+    f.host
+      .snapshot(f.event, f.attached.attachmentId)
+      .pages.filter((page) => page.focused)
+  ).toHaveLength(1);
+  const composing = vi.fn<() => void>();
+  second.emit(
+    "before-input-event",
+    { preventDefault: composing },
+    { type: "keyDown", key: "l", meta: true, control: true, isComposing: true }
+  );
+  expect(composing).not.toHaveBeenCalled();
+  const shortcut = vi.fn<() => void>();
+  second.emit(
+    "before-input-event",
+    { preventDefault: shortcut },
+    { type: "keyDown", key: "l", meta: true, control: true }
+  );
+  expect(shortcut).toHaveBeenCalled();
+  expect(f.window.webContents.send).toHaveBeenCalledWith(
+    "grida:workspace:command",
+    "workspace.browser.focus-location"
+  );
+  f.host.setActive(f.event, { ...f.target(two), active: false });
+  expect(f.window.webContents.focus).toHaveBeenCalled();
+  expect(second.close).not.toHaveBeenCalled();
+  f.host.closeAll();
+});
+
+it("keeps native history and guest identity through active changes, then recreates a destroyed guest only after explicit retry", async () => {
+  const f = await fixture();
+  const page = f.create("ephemeral");
+  const guest = mock.guests.at(-1)!;
+  const browserSession = guest.session!;
+  vi.spyOn(guest.navigationHistory, "canGoBack").mockReturnValue(true);
+  f.host.back(f.event, f.target(page));
+  expect(guest.navigationHistory.goBack).toHaveBeenCalled();
+  f.host.setActive(f.event, { ...f.target(page), active: true });
+  f.host.setActive(f.event, { ...f.target(page), active: false });
+  expect(guest.close).not.toHaveBeenCalled();
+  guest.close();
+  expect(
+    f.host.snapshot(f.event, f.attached.attachmentId).pages[0]
+  ).toMatchObject({ mounted: false, failure: { kind: "renderer-gone" } });
+  expect(browserSession.clearStorageData).not.toHaveBeenCalled();
+  expect(() => f.host.reserveMount(f.event, f.target(page))).toThrow(
+    "browser_mount_unavailable"
+  );
+  f.host.reload(f.event, f.target(page));
+  const replacement = f.mount(page).guest;
+  expect(replacement).not.toBe(guest);
+  expect(replacement.session).toBe(browserSession);
+  await f.host.close(f.event, f.target(page));
+  expect(browserSession.clearStorageData).toHaveBeenCalled();
+  f.host.closeAll();
+});
+
+it.each(["did-navigate", "did-fail-provisional-load", "did-fail-load"])(
+  "ends late-attached pages when an already-started document navigation finishes via %s",
+  async (eventName) => {
+    const { window, event } = shellFixture();
+    window.webContents.emit("did-start-navigation", {
+      isMainFrame: true,
+      isSameDocument: false,
+    });
+    const host = new DesktopBrowserHost({
+      editorOrigin: "https://grida.co",
+      admitWindow: () => true,
+      workspaceExists: async () => true,
+    });
+    const attached = await host.attach(event, "eac20941e6a410aa");
+    host.create(event, {
+      attachmentId: attached.attachmentId,
+      storageScope: "workspace",
+    });
+    window.webContents.emit(
+      eventName,
+      {},
+      ...(eventName === "did-navigate"
+        ? [window.webContents.url]
+        : [-105, "failure", window.webContents.url, true])
+    );
+    expect(() => host.snapshot(event, attached.attachmentId)).toThrow(
+      "browser_attachment_expired"
+    );
+    expect((await host.attach(event, "eac20941e6a410aa")).pages).toEqual([]);
+    host.closeAll();
+  }
+);
+
+it.each(["did-navigate", "did-fail-provisional-load", "did-fail-load", "role"])(
+  "rejects pending registry admission after %s",
+  async (eventName) => {
+    const { window, event } = shellFixture();
     let release!: (registered: boolean) => void;
     const host = new DesktopBrowserHost({
       editorOrigin: "https://grida.co",
@@ -709,303 +670,114 @@ it.each([
           release = resolve;
         }),
     });
-    const event = {
-      sender: window.webContents,
-      senderFrame: window.webContents.mainFrame,
-    } as unknown as IpcMainInvokeEvent;
     window.webContents.emit("did-start-navigation", {
       isMainFrame: true,
       isSameDocument: false,
-      url: window.webContents.url,
     });
     const pending = host.attach(event, "eac20941e6a410aa");
-    window.webContents.emit(
-      failureEvent,
-      {},
-      -105,
-      "ERR_NAME_NOT_RESOLVED",
-      window.webContents.url,
-      isMainFrame
-    );
+    if (eventName === "role") host.closeAll();
+    else
+      window.webContents.emit(
+        eventName,
+        {},
+        ...(eventName === "did-navigate"
+          ? [window.webContents.url]
+          : [-105, "failure", window.webContents.url, true])
+      );
     release(true);
-    const outcome = await pending.then(
-      () => "attached",
-      (error: Error) => error.message
-    );
-    expect(outcome).toBe(
-      isMainFrame ? "browser_attachment_expired" : "attached"
-    );
+    await expect(pending).rejects.toThrow("browser_attachment_expired");
+    expect(window.webContents.listenerCount("did-navigate")).toBe(0);
     host.closeAll();
-    expect(window.webContents.listenerCount(failureEvent)).toBe(0);
-    expect(window.webContents.listenerCount("did-start-navigation")).toBe(0);
   }
 );
 
-it("emits bounded revision-consistent outcomes and no changes after close", async () => {
-  const f = await fixture();
-  const page = f.create();
-  f.create();
-  const view = mock.views.at(-2)!;
-  view.webContents.emit("page-title-updated", {}, "控制".repeat(1000) + "\n");
-  const changes = f.window.webContents.send.mock.calls.filter(
-    ([channel]) => channel === "grida:browser:changed"
-  );
-  expect(changes.length).toBeGreaterThan(0);
-  for (const [, event] of changes)
-    expect(DesktopBrowser.parseEvent(event)).not.toBeNull();
-  f.host.close(f.event, {
-    attachmentId: f.attached.attachmentId,
-    pageId: page.id,
-  });
-  const count = f.window.webContents.send.mock.calls.length;
-  view.webContents.emit("render-process-gone", {}, { reason: "crashed" });
-  view.webContents.emit(
-    "did-fail-load",
-    {},
-    -2,
-    "fail",
-    "https://example.com",
-    true
-  );
-  expect(f.window.webContents.send.mock.calls.length).toBe(count);
-  f.host.closeAll();
-});
-
-it("refuses a new page while the shared workspace profile is being cleared", async () => {
+it("closes guests on shell destruction without consulting a destroyed BrowserWindow accessor", async () => {
   const f = await fixture();
   f.create();
-  const browserSession = mock.sessions.get(
-    "persist:grida-browser-workspace-eac20941e6a410aa"
-  )!;
-  let release!: () => void;
-  browserSession.closeAllConnections.mockImplementationOnce(
-    () =>
-      new Promise<void>((resolve) => {
-        release = resolve;
-      })
-  );
-  const clearing = f.host.clearSession(f.event, {
-    attachmentId: f.attached.attachmentId,
-  });
-  expect(() => f.create()).toThrow("browser_session_busy");
-  await vi.waitFor(() => expect(release).toBeTypeOf("function"));
-  release();
-  await clearing;
-  expect(() => f.create()).not.toThrow();
-  f.host.closeAll();
-});
-
-it("clears retained workspace storage even before any page is created in this launch", async () => {
-  const f = await fixture("abcdef0123456789");
-  await f.host.clearSession(f.event, { attachmentId: f.attached.attachmentId });
-  expect(
-    mock.sessions.get("persist:grida-browser-workspace-abcdef0123456789")!
-      .clearStorageData
-  ).toHaveBeenCalled();
-  f.host.closeAll();
-});
-
-it("bounds the page count and keeps blocked subframe navigation out of page failure", async () => {
-  const f = await fixture();
-  for (let i = 0; i < DesktopBrowser.MAX_PAGES; i++) f.create();
-  expect(() => f.create()).toThrow("browser_page_limit");
-  const view = mock.views.at(-1)!;
-  const blocked = vi.fn<() => void>();
-  view.webContents.emit("will-frame-navigate", {
-    preventDefault: blocked,
-    url: "file:///private/data",
-    isMainFrame: false,
-  });
-  expect(blocked).toHaveBeenCalled();
-  const blank = vi.fn<() => void>();
-  view.webContents.emit("will-frame-navigate", {
-    preventDefault: blank,
-    url: "about:blank",
-    isMainFrame: false,
-  });
-  expect(blank).not.toHaveBeenCalled();
-  expect(
-    f.host
-      .snapshot(f.event, f.attached.attachmentId)
-      .pages.every((page) => page.failure === null)
-  ).toBe(true);
-  f.host.closeAll();
-});
-
-it("requires a registered workspace and refuses lookup results after shell navigation", async () => {
-  const window = new BrowserWindow() as unknown as FakeWindow;
-  const event = {
-    sender: window.webContents,
-    senderFrame: window.webContents.mainFrame,
-  } as unknown as IpcMainInvokeEvent;
-  const missing = new DesktopBrowserHost({
-    editorOrigin: "https://grida.co",
-    admitWindow: () => true,
-    workspaceExists: async () => false,
-  });
-  await expect(missing.attach(event, "eac20941e6a410aa")).rejects.toThrow(
-    "browser_workspace_unavailable"
-  );
-  let release!: (value: boolean) => void;
-  const host = new DesktopBrowserHost({
-    editorOrigin: "https://grida.co",
-    admitWindow: () => true,
-    workspaceExists: () =>
-      new Promise((resolve) => {
-        release = resolve;
-      }),
-  });
-  const pending = host.attach(event, "eac20941e6a410aa");
-  window.webContents.emit("did-start-navigation", {
-    isMainFrame: true,
-    isSameDocument: false,
-    url: window.webContents.url,
-  });
-  release(true);
-  await expect(pending).rejects.toThrow("browser_attachment_expired");
-});
-
-it("requires a save destination and cancels accepted downloads when their attachment ends", async () => {
-  const { EventEmitter } = await import("node:events");
-  const f = await fixture();
-  f.create();
-  const view = mock.views.at(-1)!;
-  const browserSession = mock.sessions.get(
-    "persist:grida-browser-workspace-eac20941e6a410aa"
-  )!;
-  const item = Object.assign(new EventEmitter(), {
-    getFilename: () => "download.txt",
-    setSavePath: vi.fn<(destination: string) => void>(),
-    cancel: vi.fn<() => void>(),
-  });
-  const preventDefault = vi.fn<() => void>();
-  mock.savePath = undefined;
-  browserSession.emit(
-    "will-download",
-    { preventDefault },
-    item,
-    view.webContents
-  );
-  expect(preventDefault).toHaveBeenCalled();
-  expect(item.setSavePath).not.toHaveBeenCalled();
-  mock.savePath = "/fixture/download.txt";
-  browserSession.emit(
-    "will-download",
-    { preventDefault },
-    item,
-    view.webContents
-  );
-  expect(item.setSavePath).toHaveBeenCalledWith(mock.savePath);
-  f.host.detach(f.event, f.attached.attachmentId);
-  expect(item.cancel).toHaveBeenCalledOnce();
-  mock.savePath = undefined;
-  f.host.closeAll();
-});
-
-it("revokes publication before closing guests when the shell dies before its BrowserWindow", async () => {
-  const f = await fixture();
-  const page = f.create();
-  f.host.layout(f.event, {
-    attachmentId: f.attached.attachmentId,
-    pageId: page.id,
-    sequence: 1,
-    rect: { x: 0, y: 0, width: 100, height: 100 },
-    visible: true,
-  });
-  const view = mock.views.at(-1)!;
-  const contents = f.window.webContents;
-  const admission = vi.spyOn(f.host.options, "admitWindow");
-  admission.mockClear();
-  contents.send.mockClear();
-  contents.destroyed = true;
-  // Electron's window wrapper can outlive its webContents and native view.
+  const guest = mock.guests.at(-1)!;
+  const sender = f.window.webContents;
+  sender.destroyed = true;
   Object.defineProperty(f.window, "webContents", {
     get: () => {
       throw new Error("Object has been destroyed");
     },
   });
-  Object.defineProperty(f.window, "contentView", {
-    get: () => {
-      throw new Error("Object has been destroyed");
-    },
-  });
-  expect(() => contents.emit("destroyed")).not.toThrow();
-  expect(view.webContents.close).toHaveBeenCalledWith({
-    waitForBeforeUnload: false,
-  });
-  const preventDefault = vi.fn<() => void>();
-  expect(() =>
-    view.webContents.emit(
-      "before-input-event",
-      { preventDefault },
-      { type: "keyDown", key: "l", meta: true, control: true }
-    )
-  ).not.toThrow();
-  expect(preventDefault).not.toHaveBeenCalled();
-  expect(admission).not.toHaveBeenCalled();
-  expect(contents.send).not.toHaveBeenCalled();
-  expect(() => f.window.emit("closed")).not.toThrow();
-  expect(() => f.host.closeAll()).not.toThrow();
+  expect(() => sender.emit("destroyed")).not.toThrow(
+    "Object has been destroyed"
+  );
+  expect(guest.close).toHaveBeenCalled();
+  expect(() => f.window.emit("closed")).not.toThrow(
+    "Object has been destroyed"
+  );
 });
 
-it("scales the presentation radius with native zoom, clamps it to the viewport and resets omitted radii", async () => {
+it("closes same-workspace pages across windows and locks new work until persistent clearing finishes", async () => {
   const f = await fixture();
-  const page = f.create();
-  const view = mock.views.at(-1)!;
-  const target = { attachmentId: f.attached.attachmentId, pageId: page.id };
-  const rect = { x: 100, y: 40, width: 200, height: 100 };
-  f.host.layout(f.event, {
-    ...target,
-    sequence: 1,
-    rect,
-    visible: true,
-    borderRadius: 7.2,
+  f.create();
+  const peer = await fixture("eac20941e6a410aa", f.host);
+  peer.create("ephemeral");
+  const other = await fixture("1234567890abcdef", f.host);
+  const otherPage = other.create();
+  const profile = mock.sessions.get(
+    "persist:grida-browser-workspace-eac20941e6a410aa"
+  )!;
+  let release!: () => void;
+  profile.closeAllConnections.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        release = resolve;
+      })
+  );
+  const pending = f.host.clearSession(f.event, {
+    attachmentId: f.attached.attachmentId,
   });
-  expect(view.setBounds).toHaveBeenLastCalledWith({
-    x: 125,
-    y: 50,
-    width: 250,
-    height: 125,
-  });
-  expect(view.setBorderRadius).toHaveBeenLastCalledWith(9);
-  f.host.layout(f.event, {
-    ...target,
-    sequence: 2,
-    rect,
-    visible: true,
-    borderRadius: 24,
-  });
-  expect(view.setBorderRadius).toHaveBeenLastCalledWith(30);
-  f.host.layout(f.event, {
-    ...target,
-    sequence: 1,
-    rect,
-    visible: true,
-    borderRadius: 0,
-  });
-  expect(view.setBorderRadius).toHaveBeenLastCalledWith(30);
-  f.host.layout(f.event, {
-    ...target,
-    sequence: 3,
-    rect: { ...rect, width: 9.6, height: 4.8 },
-    visible: true,
-    borderRadius: 100,
-  });
-  expect(view.setBorderRadius).toHaveBeenLastCalledWith(3);
-  f.host.layout(f.event, { ...target, sequence: 4, rect, visible: true });
-  expect(view.setBorderRadius).toHaveBeenLastCalledWith(0);
-  expect(() =>
-    f.host.layout(f.event, {
-      ...target,
-      sequence: 5,
-      rect,
-      visible: true,
-      borderRadius: Infinity,
-    })
-  ).toThrow("browser_layout_invalid");
+  expect(() => f.descriptor()).toThrow("browser_session_busy");
+  await vi.waitFor(() => expect(release).toBeTypeOf("function"));
+  release();
+  await pending;
+  expect(f.host.snapshot(f.event, f.attached.attachmentId).pages).toEqual([]);
+  expect(f.host.snapshot(peer.event, peer.attached.attachmentId).pages).toEqual(
+    []
+  );
+  expect(
+    f.host.snapshot(other.event, other.attached.attachmentId).pages[0].id
+  ).toBe(otherPage.id);
+  expect(profile.clearStorageData).toHaveBeenCalled();
   f.host.closeAll();
 });
 
+it("clears a persistent profile before any page exists and enforces the page limit", async () => {
+  const f = await fixture();
+  await f.host.clearSession(f.event, { attachmentId: f.attached.attachmentId });
+  expect(
+    mock.sessions.get("persist:grida-browser-workspace-eac20941e6a410aa")!
+      .clearStorageData
+  ).toHaveBeenCalled();
+  for (let index = 0; index < DesktopBrowser.MAX_PAGES; index++) f.descriptor();
+  expect(() => f.descriptor()).toThrow("browser_page_limit");
+  f.host.closeAll();
+});
+
+it("requires native save selection and cancels accepted downloads at document detach", async () => {
+  const { EventEmitter } = await import("node:events");
+  const f = await fixture();
+  f.create();
+  const guest = mock.guests.at(-1)!;
+  const item = Object.assign(new EventEmitter(), {
+    getFilename: () => "download.txt",
+    setSavePath: vi.fn<(value: string) => void>(),
+    cancel: vi.fn<() => void>(),
+  });
+  const preventDefault = vi.fn<() => void>();
+  guest.session!.emit("will-download", { preventDefault }, item, guest);
+  expect(preventDefault).toHaveBeenCalled();
+  expect(item.setSavePath).not.toHaveBeenCalled();
+  mock.savePath = "/fixture/download.txt";
+  guest.session!.emit("will-download", { preventDefault }, item, guest);
+  expect(item.setSavePath).toHaveBeenCalledWith(mock.savePath);
+  await f.host.detach(f.event, f.attached.attachmentId);
+  expect(item.cancel).toHaveBeenCalled();
+});
 function compositorImage() {
   // Synthetic frame/scan headers lock metadata handling; the opt-in Electron
   // fixture exercises Chromium's actual JPEG encoder.
@@ -1037,148 +809,116 @@ function compositorImage() {
 async function renderedFixture() {
   const f = await fixture();
   const page = f.create();
-  const view = mock.views.at(-1)!;
-  view.webContents.emit("did-stop-loading");
-  const target = { attachmentId: f.attached.attachmentId, pageId: page.id };
-  f.host.layout(f.event, {
-    ...target,
-    sequence: 1,
-    rect: { x: 100, y: 50, width: 400, height: 300 },
-    visible: true,
-  });
-  const boundsCalls = view.setBounds.mock.calls.length;
-  f.host.layout(f.event, {
-    ...target,
-    sequence: 2,
-    rect: { x: 0, y: 0, width: 0, height: 0 },
-    visible: false,
-  });
-  expect(view.setBounds).toHaveBeenCalledTimes(boundsCalls);
-  expect(view.visible).toBe(false);
-  return { ...f, page, view, target };
+  const guest = mock.guests.at(-1)!;
+  guest.emit("did-stop-loading");
+  return { ...f, page, guest, request: f.target(page) };
 }
-
-it("captures a bounded transient JPEG while retaining the hidden page's last viewport and focus", async () => {
+it("captures a bounded thumbnail without activating or focusing an inactive guest", async () => {
   const f = await renderedFixture();
   const { image, resized } = compositorImage();
-  f.view.webContents.capturePage.mockResolvedValue(image);
-  const visibilityCalls = f.view.setVisible.mock.calls.length;
-  const boundsCalls = f.view.setBounds.mock.calls.length;
-  const result = await f.host.thumbnail(f.event, f.target);
-  expect(result).toMatchObject({ width: 240, height: 180 });
+  f.guest.capturePage.mockResolvedValue(image);
+  const result = await f.host.thumbnail(f.event, f.request);
   expect(DesktopBrowser.parseThumbnail(result)).not.toBeNull();
-  expect(f.view.webContents.capturePage).toHaveBeenCalledExactlyOnceWith(
-    undefined,
-    { stayHidden: true, stayAwake: false }
-  );
-  expect(image.resize).toHaveBeenCalledWith({
-    width: 240,
-    height: 180,
-    quality: "good",
+  expect(f.guest.capturePage).toHaveBeenCalledExactlyOnceWith(undefined, {
+    stayHidden: true,
+    stayAwake: false,
   });
+  expect(f.guest.focus).not.toHaveBeenCalled();
   expect(resized.toJPEG).toHaveBeenCalledWith(60);
-  expect(f.view.setVisible).toHaveBeenCalledTimes(visibilityCalls);
-  expect(f.view.setBounds).toHaveBeenCalledTimes(boundsCalls);
-  expect(f.view.webContents.focus).not.toHaveBeenCalled();
   f.host.closeAll();
 });
-
-it("limits capture to one in-flight request per owner without invalidating it on focus changes", async () => {
+it("limits concurrent thumbnails and preserves capture across focus-only changes", async () => {
   const f = await renderedFixture();
   const { image } = compositorImage();
-  let release!: (value: FakeImage) => void;
-  f.view.webContents.capturePage.mockImplementationOnce(
+  let release!: (image: FakeImage) => void;
+  f.guest.capturePage.mockImplementationOnce(
     () =>
       new Promise((resolve) => {
         release = resolve;
       })
   );
-  const pending = f.host.thumbnail(f.event, f.target);
-  await expect(f.host.thumbnail(f.event, f.target)).resolves.toBeNull();
-  expect(f.view.webContents.capturePage).toHaveBeenCalledTimes(1);
+  const pending = f.host.thumbnail(f.event, f.request);
+  await expect(f.host.thumbnail(f.event, f.request)).resolves.toBeNull();
   f.window.focused = false;
   f.window.emit("blur");
   release(image);
   await expect(pending).resolves.toMatchObject({ width: 240, height: 180 });
   f.host.closeAll();
 });
-
-it("rejects closed or detached capture recipients and discards pixels after navigation", async () => {
-  for (const action of ["close", "detach", "navigate"] as const) {
+it.each(["close", "detach", "navigate", "destroy"] as const)(
+  "revokes or discards in-flight thumbnail pixels after %s",
+  async (action) => {
     const f = await renderedFixture();
     const { image } = compositorImage();
-    let release!: (value: FakeImage) => void;
-    f.view.webContents.capturePage.mockImplementationOnce(
+    let release!: (image: FakeImage) => void;
+    f.guest.capturePage.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
           release = resolve;
         })
     );
-    const pending = f.host.thumbnail(f.event, f.target);
-    if (action === "close") await f.host.close(f.event, f.target);
-    if (action === "detach") f.host.detach(f.event, f.target.attachmentId);
+    const pending = f.host.thumbnail(f.event, f.request);
+    if (action === "close") await f.host.close(f.event, f.request);
+    if (action === "detach")
+      await f.host.detach(f.event, f.attached.attachmentId);
     if (action === "navigate")
-      f.host.navigate(f.event, { ...f.target, url: "https://example.org/new" });
+      f.host.navigate(f.event, {
+        ...f.request,
+        url: "https://example.com/new",
+      });
+    if (action === "destroy") f.guest.close();
     release(image);
     const outcome = await pending.then(
       (value) => ({ value, error: null }),
-      (error: unknown) => ({
-        value: null,
-        error: error instanceof Error ? error.message : String(error),
-      })
+      (error: Error) => ({ value: null, error: error.message })
     );
-    const errors = {
-      close: "browser_page_unavailable",
-      detach: "browser_attachment_expired",
-      navigate: null,
-    };
-    expect(outcome).toEqual({ value: null, error: errors[action] });
+    expect(outcome).toEqual({
+      value: null,
+      error:
+        action === "close"
+          ? "browser_page_unavailable"
+          : action === "detach"
+            ? "browser_attachment_expired"
+            : null,
+    });
     f.host.closeAll();
   }
-});
-
-it("withholds unrendered, empty, failed and oversized captures and rejects foreign owners", async () => {
-  const f = await fixture();
-  const unrendered = f.create();
-  const first = mock.views.at(-1)!;
-  first.webContents.emit("did-stop-loading");
+);
+it("withholds unavailable or oversized thumbnails and refuses a foreign recipient", async () => {
+  const f = await renderedFixture();
+  const peer = await fixture("eac20941e6a410aa", f.host);
   await expect(
-    f.host.thumbnail(f.event, {
-      attachmentId: f.attached.attachmentId,
-      pageId: unrendered.id,
-    })
-  ).resolves.toBeNull();
-  expect(first.webContents.capturePage).not.toHaveBeenCalled();
-  f.host.closeAll();
-  const rendered = await renderedFixture();
-  const other = await fixture("eac20941e6a410aa", rendered.host);
-  await expect(
-    rendered.host.thumbnail(other.event, {
-      attachmentId: other.attached.attachmentId,
-      pageId: rendered.page.id,
+    f.host.thumbnail(peer.event, {
+      attachmentId: peer.attached.attachmentId,
+      pageId: f.page.id,
     })
   ).rejects.toThrow("browser_page_unavailable");
+  await expect(f.host.thumbnail(f.event, f.request)).resolves.toBeNull();
   const { image, resized } = compositorImage();
-  rendered.view.webContents.capturePage.mockRejectedValueOnce(
-    new Error("Compositor unavailable")
-  );
-  await expect(
-    rendered.host.thumbnail(rendered.event, rendered.target)
-  ).resolves.toBeNull();
-  rendered.view.webContents.capturePage.mockResolvedValue(image);
-  vi.spyOn(image, "isEmpty").mockReturnValueOnce(true);
-  await expect(
-    rendered.host.thumbnail(rendered.event, rendered.target)
-  ).resolves.toBeNull();
+  f.guest.capturePage.mockResolvedValue(image);
   resized.toJPEG.mockReturnValue(
     Buffer.alloc(DesktopBrowser.MAX_THUMBNAIL_BYTES + 1)
   );
-  await expect(
-    rendered.host.thumbnail(rendered.event, rendered.target)
-  ).resolves.toBeNull();
-  rendered.host.closeAll();
+  await expect(f.host.thumbnail(f.event, f.request)).resolves.toBeNull();
+  f.host.closeAll();
 });
-
+it("bounds untrusted metadata and never emits zombie outcomes after page closure", async () => {
+  const f = await fixture();
+  const page = f.create();
+  const guest = mock.guests.at(-1)!;
+  guest.emit("page-title-updated", {}, "控制".repeat(1000) + "\n");
+  const changes = f.window.webContents.send.mock.calls.filter(
+    ([channel]) => channel === "grida:browser:changed"
+  );
+  for (const [, event] of changes)
+    expect(DesktopBrowser.parseEvent(event)).not.toBeNull();
+  await f.host.close(f.event, f.target(page));
+  const calls = f.window.webContents.send.mock.calls.length;
+  guest.emit("render-process-gone", {}, { reason: "crashed" });
+  guest.emit("page-title-updated", {}, "stale");
+  expect(f.window.webContents.send).toHaveBeenCalledTimes(calls);
+  f.host.closeAll();
+});
 function settingsFixture() {
   const window = new BrowserWindow() as unknown as FakeWindow;
   window.webContents.url = "https://grida.co/desktop/settings#browser";
@@ -1278,7 +1018,7 @@ it("denies management to workspace callers, subframes, guests and caller-supplie
   await expect(f.host.clearWorkspaceData(subframe, request)).rejects.toThrow(
     "browser_settings_expired"
   );
-  const guest = mock.views.at(-1)!.webContents;
+  const guest = mock.guests.at(-1)!;
   guest.url = settings.window.webContents.url;
   guest.mainFrame.url = guest.url;
   await expect(
@@ -1412,4 +1152,162 @@ it("rechecks the Settings role after confirmation and shares the existing worksp
   await clearing;
   expect(profile.clearStorageData).toHaveBeenCalledOnce();
   active.host.closeAll();
+});
+
+it("keeps a timed-out consumed claim as a tombstone so its late guest cannot claim a replacement mount", async () => {
+  vi.useFakeTimers();
+  const f = await fixture();
+  const page = f.descriptor();
+  const first = f.host.reserveMount(f.event, f.target(page));
+  const preferences: WebPreferences = {};
+  const accepted = vi.fn<() => void>();
+  f.host.willAttach(
+    native(f.window.webContents),
+    { preventDefault: accepted },
+    preferences,
+    { src: first.src }
+  );
+  expect(accepted).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(15_000);
+  f.host.reload(f.event, f.target(page));
+  const next = f.host.reserveMount(f.event, f.target(page));
+  const blocked = vi.fn<() => void>();
+  f.host.willAttach(
+    native(f.window.webContents),
+    { preventDefault: blocked },
+    {},
+    { src: next.src }
+  );
+  expect(blocked).toHaveBeenCalled();
+  const late = mock.newContents!();
+  late.type = "webview";
+  late.hostWebContents = f.window.webContents;
+  late.session = preferences.session as unknown as FakeSession;
+  f.host.createdContents(native(late));
+  expect(late.close).toHaveBeenCalled();
+  expect(late.loadURL).not.toHaveBeenCalled();
+  const replacement = f.mount(page).guest;
+  expect(replacement).not.toBe(late);
+  expect(replacement.loadURL).toHaveBeenCalledExactlyOnceWith(
+    "https://example.com/"
+  );
+  f.host.didAttach(native(f.window.webContents), native(late));
+  expect(
+    f.host.snapshot(f.event, f.attached.attachmentId).pages[0].mounted
+  ).toBe(true);
+  f.host.closeAll();
+});
+
+it("revokes unsupported full document loaders and closes them after the native navigation callback", async () => {
+  const f = await fixture();
+  const page = f.create();
+  const guest = mock.guests.at(-1)!;
+  guest.emit("did-start-navigation", {
+    url: "blob:https://example.com/frame",
+    isMainFrame: false,
+    isSameDocument: false,
+  });
+  expect(guest.close).not.toHaveBeenCalled();
+  guest.emit("did-start-navigation", {
+    url: "blob:https://example.com/page",
+    isMainFrame: true,
+    isSameDocument: false,
+  });
+  expect(guest.stop).not.toHaveBeenCalled();
+  expect(guest.close).not.toHaveBeenCalled();
+  expect(
+    f.host.snapshot(f.event, f.attached.attachmentId).pages[0]
+  ).toMatchObject({
+    mounted: false,
+    url: "https://example.com/",
+    failure: { kind: "navigation", code: "blocked" },
+  });
+  await vi.waitFor(() => expect(guest.close).toHaveBeenCalled());
+  f.host.reload(f.event, f.target(page));
+  expect(f.mount(page).guest).not.toBe(guest);
+  f.host.closeAll();
+});
+
+it.each(["session", "host", "type"] as const)(
+  "rejects actual registration when the claimed guest's %s differs",
+  async (field) => {
+    const f = await fixture();
+    const page = f.descriptor();
+    const { guest } = f.beginMount(page);
+    if (field === "session") guest.session = null;
+    if (field === "host") guest.hostWebContents = null;
+    if (field === "type") guest.type = "window";
+    f.host.didAttach(native(f.window.webContents), native(guest));
+    expect(guest.close).toHaveBeenCalled();
+    expect(guest.loadURL).not.toHaveBeenCalled();
+    expect(
+      f.host.snapshot(f.event, f.attached.attachmentId).pages[0]
+    ).toMatchObject({
+      mounted: false,
+      failure: { kind: "mount", code: "rejected" },
+    });
+    f.host.closeAll();
+  }
+);
+
+it("bounds unavailable capture latency while retaining single-flight protection until the native capture settles", async () => {
+  vi.useFakeTimers();
+  const f = await renderedFixture();
+  const { image } = compositorImage();
+  let release!: (image: FakeImage) => void;
+  f.guest.capturePage.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        release = resolve;
+      })
+  );
+  const pending = f.host.thumbnail(f.event, f.request);
+  await vi.advanceTimersByTimeAsync(1500);
+  await expect(pending).resolves.toBeNull();
+  await expect(f.host.thumbnail(f.event, f.request)).resolves.toBeNull();
+  expect(f.guest.capturePage).toHaveBeenCalledOnce();
+  release(image);
+  await Promise.resolve();
+  f.guest.capturePage.mockResolvedValue(image);
+  await expect(f.host.thumbnail(f.event, f.request)).resolves.toMatchObject({
+    width: 240,
+    height: 180,
+  });
+  f.host.closeAll();
+});
+
+it("does not let an old capture completion clear a replacement page's in-flight capture", async () => {
+  const f = await renderedFixture();
+  const { image } = compositorImage();
+  let firstRelease!: (image: FakeImage) => void;
+  f.guest.capturePage.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        firstRelease = resolve;
+      })
+  );
+  const old = f.host
+    .thumbnail(f.event, f.request)
+    .catch((error: Error) => error.message);
+  await f.host.close(f.event, f.request);
+  const nextPage = f.create();
+  const nextGuest = mock.guests.at(-1)!;
+  nextGuest.emit("did-stop-loading");
+  let secondRelease!: (image: FakeImage) => void;
+  nextGuest.capturePage.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        secondRelease = resolve;
+      })
+  );
+  const current = f.host.thumbnail(f.event, f.target(nextPage));
+  firstRelease(image);
+  await expect(old).resolves.toBe("browser_page_unavailable");
+  await expect(
+    f.host.thumbnail(f.event, f.target(nextPage))
+  ).resolves.toBeNull();
+  expect(nextGuest.capturePage).toHaveBeenCalledOnce();
+  secondRelease(image);
+  await expect(current).resolves.toMatchObject({ width: 240, height: 180 });
+  f.host.closeAll();
 });

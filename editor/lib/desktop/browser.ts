@@ -6,7 +6,8 @@ export namespace Browser {
   export function getBridge(): DesktopBrowser.Bridge | null {
     const bridge = getDesktopBridge();
     return bridge?.caps.native.browser &&
-      bridge.browser?.version === DesktopBrowser.VERSION
+      bridge.browser?.version === DesktopBrowser.VERSION &&
+      bridge.browser.presentation === "webview"
       ? bridge.browser
       : null;
   }

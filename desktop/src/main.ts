@@ -182,6 +182,18 @@ function destroyAfterIpcReply(window: BrowserWindow): void {
 }
 
 app.on("web-contents-created", (_event, contents) => {
+  // GRIDA-SEC-016 — installed before any renderer can create a webview. The
+  // browser host may not exist yet; absence is denial, never guest authority.
+  contents.on("will-attach-webview", (event, preferences, params) => {
+    if (browserHost) browserHost.willAttach(contents, event, preferences, params);
+    else event.preventDefault();
+  });
+  contents.on("did-attach-webview", (_event, guest) => {
+    if (browserHost) browserHost.didAttach(contents, guest);
+    else if (!guest.isDestroyed()) guest.close({ waitForBeforeUnload: false });
+  });
+  browserHost?.createdContents(contents);
+
   const reconcileContainedAuthControl = (rawUrl: string) => {
     const path = DesktopEntryWindow.authControlPathForUrl(
       rawUrl,

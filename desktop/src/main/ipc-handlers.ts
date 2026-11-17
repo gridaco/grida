@@ -347,8 +347,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   guarded(IPC_CHANNELS.BROWSER_FOCUS, (event, request: unknown) =>
     browserHost.focus(event, request)
   );
-  guarded(IPC_CHANNELS.BROWSER_LAYOUT, (event, request: unknown) =>
-    browserHost.layout(event, request)
+  guarded(IPC_CHANNELS.BROWSER_RESERVE_MOUNT, (event, request: unknown) =>
+    browserHost.reserveMount(event, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_SET_ACTIVE, (event, request: unknown) =>
+    browserHost.setActive(event, request)
   );
   guarded(IPC_CHANNELS.BROWSER_CLOSE, (event, request: unknown) =>
     browserHost.close(event, request)
@@ -1645,20 +1648,23 @@ export function computeNavigationState(wc: WebContents): NavigationState {
 export function attachNavigationEvents(window: BrowserWindow): void {
   const wc = window.webContents;
   let last: NavigationState | null = null;
+  let lastUrl: string | undefined;
   const publish = () => {
     if (wc.isDestroyed()) return;
     const next = computeNavigationState(wc);
-    // SPA pushState/replaceState from Next.js client routing fires
-    // `did-navigate-in-page` even when back/forward state didn't move
-    // — skip the IPC + downstream React re-renders in that case.
+    const url = wc.getURL();
+    // Route subscribers also revoke document-scoped owners. Publish a URL
+    // change even when the back/forward booleans happen to remain identical.
     if (
       last &&
+      lastUrl === url &&
       last.can_go_back === next.can_go_back &&
       last.can_go_forward === next.can_go_forward
     ) {
       return;
     }
     last = next;
+    lastUrl = url;
     wc.send(IPC_CHANNELS.WINDOW_NAVIGATION_CHANGED, next);
   };
   wc.on("did-navigate", publish);

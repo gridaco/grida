@@ -4,7 +4,6 @@ import {
   type ReactNode,
   useEffect,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
@@ -28,10 +27,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@app/ui/components/dropdown-menu";
-import { BrowserViewport } from "./browser-viewport";
 import type { WorkspaceBrowserTabs } from "./workspace-browser-tabs";
 
-/** Browser chrome remains in the shell; only the page slot is native content. */
+/** Browser chrome and guest compose through the ordinary workbench DOM. */
 export function BrowserPane({
   tabs,
   entry,
@@ -45,27 +43,30 @@ export function BrowserPane({
   const slot = useRef<HTMLDivElement>(null);
   const consumedLocation = useRef(0);
   const [draft, setDraft] = useState(entry.page?.url ?? entry.url ?? "");
-  const [occluded, setOccluded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const viewport = useMemo(
-    () =>
-      new BrowserViewport(
-        (layout) => tabs.layout(entry.id, entry.page?.id ?? null, layout),
-        setOccluded
-      ),
-    [tabs, entry.id, entry.page?.id]
-  );
+  const state = tabs.getSnapshot();
+  const available = state.supported && !state.error;
   const page = entry.page;
-  const failure = entry.error ?? page?.failure?.message;
+  const healthy = !!(page?.mounted && page.url && !page.failure);
+  const failure = page?.failure?.message ?? (!healthy ? entry.error : null);
+  const actionError = healthy ? entry.error : null;
   const currentUrl = page?.url ?? entry.url;
 
   useLayoutEffect(
-    () => (slot.current ? viewport.connect(slot.current) : undefined),
-    [viewport]
+    () =>
+      slot.current && address.current
+        ? tabs.mounts?.connect(
+            entry.id,
+            slot.current,
+            slot.current.closest<HTMLElement>(".grida-content-frame") ??
+              address.current
+          )
+        : undefined,
+    [tabs, entry.id]
   );
   useLayoutEffect(
-    () => viewport.setActive(active && !!page?.url && !failure),
-    [viewport, active, page?.url, failure]
+    () => tabs.mounts?.update(entry, active),
+    [tabs, entry, active]
   );
   useEffect(() => {
     setDraft(currentUrl ?? "");
@@ -114,7 +115,7 @@ export function BrowserPane({
         </BrowserButton>
         <BrowserButton
           label={page?.loading ? "Stop loading" : "Reload page"}
-          disabled={!page && !entry.error}
+          disabled={!available || (!page && !entry.error)}
           onClick={() =>
             tabs.action(entry.id, page?.loading ? "stop" : "reload")
           }
@@ -129,6 +130,7 @@ export function BrowserPane({
           )}
           <input
             ref={address}
+            disabled={!available}
             aria-label="Website address"
             type="text"
             inputMode="url"
@@ -180,6 +182,7 @@ export function BrowserPane({
             <DropdownMenuSeparator />
             <DropdownMenuItem
               variant="destructive"
+              disabled={!available}
               onSelect={() => void tabs.clearSession()}
             >
               <Trash2Icon />
@@ -188,12 +191,19 @@ export function BrowserPane({
           </DropdownMenuContent>
         </DropdownMenu>
       </form>
+      {actionError && (
+        <p
+          role="alert"
+          className="shrink-0 border-b px-3 py-2 text-xs text-destructive"
+        >
+          {actionError}
+        </p>
+      )}
       <div
         ref={slot}
-        style={{ borderRadius: "var(--browser-page-radius, 0px)" }}
         className="relative min-h-0 flex-1 overflow-hidden bg-background"
       >
-        {(failure || !currentUrl || occluded) && (
+        {(failure || !currentUrl) && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-8 text-center">
             <GlobeIcon className="size-7 text-muted-foreground/60" />
             {failure ? (
@@ -204,19 +214,19 @@ export function BrowserPane({
                 >
                   {failure}
                 </p>
-                <button
-                  type="button"
-                  className="text-xs underline underline-offset-4"
-                  onClick={() => tabs.action(entry.id, "reload")}
-                >
-                  Try again
-                </button>
+                {available && (
+                  <button
+                    type="button"
+                    className="text-xs underline underline-offset-4"
+                    onClick={() => tabs.action(entry.id, "reload")}
+                  >
+                    Try again
+                  </button>
+                )}
               </>
             ) : (
               <p className="max-w-sm text-sm text-muted-foreground">
-                {occluded
-                  ? "Page hidden while workbench controls are open."
-                  : "Browse a website or open a local development server."}
+                Browse a website or open a local development server.
               </p>
             )}
           </div>

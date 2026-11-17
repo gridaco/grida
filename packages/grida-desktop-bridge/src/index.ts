@@ -85,7 +85,7 @@ export type DesktopNativeCapabilities = {
    * desktop binary" and fall back to manual/pull refresh.
    */
   workspace_watch: boolean;
-  /** Optional protocol-1 native-owned browser; also requires `browser.version`. */
+  /** Optional browser; negotiate its version and presentation before use. */
   browser?: boolean;
 };
 

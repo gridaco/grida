@@ -1,15 +1,14 @@
 /**
  * GRIDA-SEC-016 — bounded native browser values and destination validation.
- * Values are presentation data, never authority.
+ * DTO validation establishes no caller or guest authority.
  */
 export namespace DesktopBrowser {
-  export const VERSION = 1 as const;
+  export const VERSION = 2 as const;
   export const MAX_PAGES = 16;
   export const MAX_URL_BYTES = 8192;
   export const MAX_TITLE_BYTES = 1024;
   export const MAX_FAILURE_MESSAGE_BYTES = 2048;
-  export const MAX_LAYOUT_EDGE = 16384;
-  export const MAX_LAYOUT_POSITION = 1_000_000;
+  export const MOUNT_URL_PREFIX = "about:blank#grida-browser-mount=" as const;
   export const MAX_THUMBNAIL_WIDTH = 320;
   export const MAX_THUMBNAIL_HEIGHT = 180;
   export const MAX_THUMBNAIL_BYTES = 64 * 1024;
@@ -24,25 +23,8 @@ export namespace DesktopBrowser {
     url?: string;
   }>;
   export type Navigate = Target & Readonly<{ url: string }>;
-  export type Rect = Readonly<{
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  }>;
-  export type Layout = Readonly<{
-    /** Positive, monotonically increasing within this attachment and page. */
-    sequence: number;
-    /** CSS pixels relative to the owning window's content area. */
-    rect: Rect;
-    visible: boolean;
-    /**
-     * Uniform radius of the page viewport's four corners in CSS pixels, at
-     * most 8192. Omission means zero. Native clamps to half its smaller edge.
-     */
-    borderRadius?: number;
-  }>;
-  export type LayoutRequest = Target & Layout;
+  /** Transient native-issued admission claim, passed unchanged to the guest. */
+  export type GuestMount = Readonly<{ src: string }>;
   /** Bounded, untrusted pixels of a page's best-effort last rendered viewport. */
   export type Thumbnail = Readonly<{
     /** JPEG only; no URLs, paths, scripts or image-loading options. */
@@ -51,13 +33,15 @@ export namespace DesktopBrowser {
     height: number;
   }>;
   export type Failure = Readonly<{
-    kind: "navigation" | "renderer-gone";
+    kind: "mount" | "navigation" | "renderer-gone";
     /** Bounded public classification, never an exception or upstream body. */
     code: string;
     message: string;
   }>;
   export type Page = Readonly<{
     id: string;
+    /** An actual registered guest exists; a descriptor alone is not mounted. */
+    mounted: boolean;
     /** Owner revision at which this page last changed. */
     revision: number;
     /** Null identifies an intentionally blank page. */
@@ -94,20 +78,26 @@ export namespace DesktopBrowser {
 
   export interface Bridge {
     readonly version: typeof VERSION;
+    readonly presentation: "webview";
     /** Native admission resolves the workspace identity; no paths are accepted. */
     attach(workspaceId: string): Promise<Snapshot>;
     snapshot(attachmentId: string): Promise<Snapshot>;
-    /** Revokes this attachment and hides pages; live pages remain with Main. */
+    /** Ends this document's pages and guests, including ephemeral sessions. */
     detach(attachmentId: string): Promise<void>;
     create(request: Create): Promise<Page>;
+    /**
+     * Reserves a one-use mount for an unmounted page in this document.
+     * Page.mounted becomes true only after Main registers the actual guest.
+     */
+    reserveMount(request: Target): Promise<GuestMount>;
+    /** Input/focus eligibility only. DOM presentation owns geometry/visibility. */
+    setActive(request: Target & Readonly<{ active: boolean }>): Promise<void>;
     navigate(request: Navigate): Promise<void>;
     back(request: Target): Promise<void>;
     forward(request: Target): Promise<void>;
     reload(request: Target): Promise<void>;
     stop(request: Target): Promise<void>;
     focus(request: Target): Promise<void>;
-    /** Native Main determines zoom, clipping and final native bounds. */
-    layout(request: LayoutRequest): Promise<void>;
     close(request: Target): Promise<void>;
     /** Opens only this page's current, native-validated HTTP(S) URL. */
     openExternal(request: Target): Promise<void>;
@@ -196,59 +186,18 @@ export namespace DesktopBrowser {
     }
   }
 
-  /** Rejects unbounded geometry and caller-supplied zoom or native options. */
-  export function parseLayout(value: unknown): Layout | null {
+  /** Validates only the bounded bootstrap shape; Main still owns admission. */
+  export function parseGuestMount(value: unknown): GuestMount | null {
     if (
       !record(value) ||
-      !keys(
-        value,
-        Object.hasOwn(value, "borderRadius")
-          ? ["sequence", "rect", "visible", "borderRadius"]
-          : ["sequence", "rect", "visible"]
-      ) ||
-      !isRevision(value.sequence) ||
-      value.sequence === 0 ||
-      typeof value.visible !== "boolean"
+      !keys(value, ["src"]) ||
+      typeof value.src !== "string" ||
+      value.src.length > MOUNT_URL_PREFIX.length + 128 ||
+      !value.src.startsWith(MOUNT_URL_PREFIX) ||
+      !isIdentity(value.src.slice(MOUNT_URL_PREFIX.length))
     )
       return null;
-    const rect = parseRect(value.rect);
-    if (!rect) return null;
-    const borderRadius = value.borderRadius;
-    if (
-      borderRadius !== undefined &&
-      (typeof borderRadius !== "number" ||
-        !Number.isFinite(borderRadius) ||
-        borderRadius < 0 ||
-        borderRadius > MAX_LAYOUT_EDGE / 2)
-    )
-      return null;
-    return Object.freeze({
-      sequence: value.sequence,
-      visible: value.visible,
-      rect,
-      ...(borderRadius !== undefined ? { borderRadius } : {}),
-    });
-  }
-
-  function parseRect(value: unknown): Rect | null {
-    if (!record(value) || !keys(value, ["x", "y", "width", "height"]))
-      return null;
-    const { x, y, width, height } = value;
-    if (
-      typeof x !== "number" ||
-      typeof y !== "number" ||
-      typeof width !== "number" ||
-      typeof height !== "number" ||
-      ![x, y, width, height].every(Number.isFinite) ||
-      Math.abs(x) > MAX_LAYOUT_POSITION ||
-      Math.abs(y) > MAX_LAYOUT_POSITION ||
-      width < 0 ||
-      height < 0 ||
-      width > MAX_LAYOUT_EDGE ||
-      height > MAX_LAYOUT_EDGE
-    )
-      return null;
-    return Object.freeze({ x, y, width, height });
+    return Object.freeze({ src: value.src });
   }
 
   /** Accepts a bounded JPEG projection and verifies its encoded dimensions. */
@@ -360,7 +309,9 @@ export namespace DesktopBrowser {
     if (
       !record(value) ||
       !keys(value, ["kind", "code", "message"]) ||
-      (value.kind !== "navigation" && value.kind !== "renderer-gone") ||
+      (value.kind !== "mount" &&
+        value.kind !== "navigation" &&
+        value.kind !== "renderer-gone") ||
       !text(value.code, 64) ||
       value.code.length === 0 ||
       !text(value.message, MAX_FAILURE_MESSAGE_BYTES)
@@ -379,6 +330,7 @@ export namespace DesktopBrowser {
       !record(value) ||
       !keys(value, [
         "id",
+        "mounted",
         "revision",
         "url",
         "title",
@@ -390,6 +342,7 @@ export namespace DesktopBrowser {
         "failure",
       ]) ||
       !isIdentity(value.id) ||
+      typeof value.mounted !== "boolean" ||
       !isRevision(value.revision) ||
       value.revision === 0 ||
       (value.url !== null && normalizeUrl(value.url) === null) ||
@@ -405,6 +358,7 @@ export namespace DesktopBrowser {
     if (value.failure !== null && failure === null) return null;
     return Object.freeze({
       id: value.id,
+      mounted: value.mounted,
       revision: value.revision,
       url: value.url as string | null,
       title: value.title,

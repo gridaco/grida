@@ -21,19 +21,20 @@ class MemoryStorage {
 }
 
 class BrowserHost implements DesktopBrowser.Bridge {
-  version = 1 as const;
+  version = 2 as const;
+  presentation = "webview" as const;
   thumbnail?: NonNullable<DesktopBrowser.Bridge["thumbnail"]>;
   revision = 0;
   pages = new Map<string, DesktopBrowser.Page>();
   listeners = new Set<(event: DesktopBrowser.Event) => void>();
   closed: string[] = [];
   cleared = 0;
-  layouts: DesktopBrowser.LayoutRequest[] = [];
+  active: (DesktopBrowser.Target & { active: boolean })[] = [];
   navigated: string[] = [];
   nextSnapshot: Promise<DesktopBrowser.Snapshot> | null = null;
   snapshotValue(): DesktopBrowser.Snapshot {
     return {
-      version: 1,
+      version: 2,
       attachmentId: "owner",
       revision: this.revision,
       pages: [...this.pages.values()],
@@ -68,6 +69,7 @@ class BrowserHost implements DesktopBrowser.Bridge {
   page(id: string, url: string | null, title = "Page"): DesktopBrowser.Page {
     return {
       id,
+      mounted: true,
       revision: ++this.revision,
       url,
       title,
@@ -90,8 +92,11 @@ class BrowserHost implements DesktopBrowser.Bridge {
   async reload() {}
   async stop() {}
   async focus(_request: DesktopBrowser.Target) {}
-  async layout(request: DesktopBrowser.LayoutRequest) {
-    this.layouts.push(request);
+  async reserveMount(_request: DesktopBrowser.Target) {
+    return { src: `${DesktopBrowser.MOUNT_URL_PREFIX}ticket` };
+  }
+  async setActive(request: DesktopBrowser.Target & { active: boolean }) {
+    this.active.push(request);
   }
   async openExternal() {}
   async clearSession() {
@@ -134,15 +139,14 @@ function setup(
 }
 
 describe("WorkspaceBrowserTabs", () => {
-  it("restores mixed ordering after file validation, reconnecting a live page", async () => {
+  it("restores mixed ordering after validation with fresh URL-only page identity", async () => {
     const { group, tabs, storage, host } = setup();
     const page = host.page("live", "https://example.com/");
-    host.pages.set(page.id, page);
     WorkspaceViewState.remember(storage, "workspace", {
       tabs: { open: ["a.svg", "gone.svg"], active: "a.svg" },
       content: {
         open: [
-          { kind: "browser", id: "browser", pageId: "live", url: page.url },
+          { kind: "browser", id: "browser", url: page.url },
           { kind: "file", relPath: "a.svg" },
           { kind: "file", relPath: "gone.svg" },
         ],
@@ -154,7 +158,11 @@ describe("WorkspaceBrowserTabs", () => {
       tabs: ["browser:browser", "file:a.svg"],
       active: "browser:browser",
     });
-    expect(tabs.getSnapshot().entries.get("browser")?.page?.id).toBe("live");
+    await settle();
+    expect(tabs.getSnapshot().entries.get("browser")?.page?.id).not.toBe(
+      "live"
+    );
+    expect(tabs.getSnapshot().entries.get("browser")?.page?.url).toBe(page.url);
     expect(host.pages.size).toBe(1);
     tabs.stop();
   });
@@ -231,6 +239,51 @@ describe("WorkspaceBrowserTabs", () => {
     expect(tabs.getSnapshot().supported).toBe(false);
     tabs.open("https://example.com/");
     expect(group.getSnapshot().tabs).toEqual(["file:a.svg"]);
+    tabs.stop();
+  });
+
+  it("preserves saved browser URLs on an unsupported host while files remain usable", async () => {
+    const { group, tabs, storage } = setup(null);
+    WorkspaceViewState.remember(storage, "workspace", {
+      tabs: { open: ["a.svg"], active: "a.svg" },
+      content: {
+        open: [
+          { kind: "browser", id: "saved", url: "https://example.com/" },
+          { kind: "file", relPath: "a.svg" },
+        ],
+        active: 0,
+      },
+    });
+    await tabs.start(storage, async (paths) => paths);
+    expect(group.getSnapshot().tabs).toEqual(["browser:saved", "file:a.svg"]);
+    expect(tabs.getSnapshot().entries.get("saved")?.error).toContain(
+      "Update Grida Desktop"
+    );
+    group.open("file:b.svg");
+    expect(
+      WorkspaceViewState.read(storage, "workspace")?.content?.open[0]
+    ).toEqual({ kind: "browser", id: "saved", url: "https://example.com/" });
+    expect(await tabs.reserveMount("saved")).toBeNull();
+    tabs.stop();
+  });
+
+  it("keeps URL restore and an honest error when native attachment fails", async () => {
+    const { tabs, storage, host } = setup();
+    host.attach = async () => {
+      throw new Error("No native admission");
+    };
+    WorkspaceViewState.remember(storage, "workspace", {
+      tabs: { open: [], active: null },
+      content: {
+        open: [{ kind: "browser", id: "saved", url: "https://example.com/" }],
+        active: 0,
+      },
+    });
+    await tabs.start(storage, async () => []);
+    const state = tabs.getSnapshot();
+    expect(state.error).toContain("browser is unavailable");
+    expect(state.entries.get("saved")?.error).toBe(state.error);
+    expect(state.entries.get("saved")?.url).toBe("https://example.com/");
     tabs.stop();
   });
 
@@ -314,29 +367,22 @@ describe("WorkspaceBrowserTabs", () => {
     tabs.stop();
   });
 
-  it("keeps layout sequence monotonic across viewport remounts and rejects stale page slots", async () => {
+  it("exposes only Main-issued transient mounts and input eligibility", async () => {
     const { group, tabs, storage, host } = setup();
     await tabs.start(storage, async () => []);
     tabs.open("https://example.com/");
     await settle();
     const entry = [...tabs.getSnapshot().entries.values()][0];
-    const layout = {
-      sequence: 50,
-      rect: { x: 0, y: 0, width: 500, height: 400 },
-      visible: true,
-    };
-    tabs.layout(entry.id, entry.page!.id, layout);
-    tabs.layout(entry.id, entry.page!.id, { ...layout, sequence: 1 });
-    expect(host.layouts.map((request) => request.sequence)).toEqual([1, 2]);
+    expect(await tabs.reserveMount(entry.id)).toEqual({
+      src: `${DesktopBrowser.MOUNT_URL_PREFIX}ticket`,
+    });
+    tabs.setActive(entry.id, true);
+    expect(host.active).toEqual([
+      { attachmentId: "owner", pageId: entry.page!.id, active: true },
+    ]);
     group.close(WorkbenchTab.browser(entry.id));
     await settle();
-    group.reopenClosed();
-    await settle();
-    const reopened = tabs.getSnapshot().entries.get(entry.id)!;
-    tabs.layout(entry.id, entry.page!.id, { ...layout, visible: false });
-    expect(host.layouts).toHaveLength(2);
-    tabs.layout(entry.id, reopened.page!.id, layout);
-    expect(host.layouts.at(-1)?.sequence).toBe(1);
+    expect(await tabs.reserveMount(entry.id)).toBeNull();
     tabs.stop();
   });
   it("does not resurrect a page closed before its create response arrives", async () => {

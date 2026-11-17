@@ -38,6 +38,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useState,
   useSyncExternalStore,
@@ -58,7 +59,6 @@ import {
   workspaces as workspacesNs,
   type Workspace,
 } from "@/lib/desktop/bridge";
-import { WorkspaceBrowserTabs } from "./workspace-browser-tabs";
 import {
   confirmAndTrashEntry,
   copyAbsolutePath,
@@ -79,7 +79,7 @@ import { WorkspaceUtilities } from "./workspace-utilities";
 import { WorkspaceUtilitiesPanel } from "./workspace-utilities-panel";
 import type { NativeBackgroundProcessController } from "@/lib/agent-chat/native-background-process-controller";
 import { WorkspaceChangesProvider } from "./workspace-changes";
-import { EditorGroup } from "./editor-group";
+import { WorkspaceBrowserSession } from "./workspace-browser-session";
 import { WorkbenchTab } from "./workbench-tab";
 import { WorkbenchPanels } from "./workbench-panels";
 import { SideChatTabPlacement } from "./side-chat-tab-placement";
@@ -87,6 +87,7 @@ import { SubagentTabPlacement } from "./subagent-tab-placement";
 import { WorkspaceSurfaceHost } from "./workspace-surface-host";
 import { WorkspaceCanvasCreation } from "./workspace-canvas-creation";
 import styles from "./workspace-workbench.module.css";
+import "./browser-guest-mounts.css";
 
 /**
  * Pane sizing for the agent-first split:
@@ -161,15 +162,21 @@ export function WorkspaceWorkbench({
   // always one of `tabs`. (Per the `code-react` doctrine: load-bearing UX logic
   // lives where it's testable, not smeared across effects + refs + nested
   // setState updaters.)
-  const group = useMemo(
-    () => new EditorGroup({ reopenable: WorkbenchTab.reopenable }),
-    []
+  const browserSession = useMemo(
+    () =>
+      WorkspaceBrowserSession.for(
+        typeof document === "undefined" ? null : document,
+        workspace.id
+      ),
+    [workspace.id]
+  );
+  const { group, browsers } = browserSession;
+  const [browserUIOwner] = useState(() => ({}));
+  useLayoutEffect(
+    () => browserSession.bindUI(browserUIOwner),
+    [browserSession, browserUIOwner]
   );
   const panels = useMemo(() => new WorkbenchPanels(group), [group]);
-  const browsers = useMemo(
-    () => new WorkspaceBrowserTabs(workspace.id, group),
-    [workspace.id, group]
-  );
   const sideChatPlacement = useMemo(
     () => new SideChatTabPlacement(panels),
     [panels]
@@ -207,7 +214,7 @@ export function WorkspaceWorkbench({
   useEffect(() => {
     let current = true;
     setRestoreSettled(false);
-    void browsers
+    void browserSession
       .start(
         window.localStorage,
         (paths) => surfaceHost.resolveRelativePaths(paths),
@@ -218,9 +225,8 @@ export function WorkspaceWorkbench({
       });
     return () => {
       current = false;
-      browsers.stop();
     };
-  }, [browsers, initialActiveRelPath, surfaceHost]);
+  }, [browserSession, initialActiveRelPath, surfaceHost]);
 
   // Do not flash Start while a remembered artifact is still being validated.
   // Once restoration settles, an actually-empty editor group owns the faux tab.

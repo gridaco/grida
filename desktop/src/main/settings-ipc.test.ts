@@ -1,5 +1,5 @@
 // GRIDA-SEC-004 / GRIDA-SEC-005 — fixed Settings action admission.
-import type { IpcMainInvokeEvent } from "electron";
+import type { BrowserWindow, IpcMainInvokeEvent, WebContents } from "electron";
 import { EventEmitter } from "node:events";
 import type { NativeAgentHooks } from "./native-agent-hooks";
 import { beforeEach, expect, it, vi } from "vitest";
@@ -61,7 +61,7 @@ vi.mock("./native-external-run-ipc", () => ({
 }));
 vi.mock("./agent-notifications", () => ({}));
 
-import { registerIpcHandlers } from "./ipc-handlers";
+import { attachNavigationEvents, registerIpcHandlers } from "./ipc-handlers";
 
 beforeEach(() => {
   fixture.handlers.clear();
@@ -364,4 +364,37 @@ it("revalidates Settings admission after the native trust dialog", async () => {
     f.hook(IPC_CHANNELS.GLOBAL_HOOKS_REVIEW, "check", f.definition.revision)
   ).rejects.toThrow("denied");
   expect(f.owner.trust).not.toHaveBeenCalled();
+});
+
+it("publishes completed route changes even when navigation-history flags remain identical", () => {
+  let url = "https://fixture.invalid/desktop/workspace?id=eac20941e6a410aa";
+  const contents = Object.assign(new EventEmitter(), {
+    getURL: () => url,
+    isDestroyed: () => false,
+    navigationHistory: { canGoBack: () => true, canGoForward: () => false },
+    send: vi.fn<(channel: string, state: unknown) => void>(),
+  });
+  attachNavigationEvents({
+    webContents: contents as unknown as WebContents,
+  } as BrowserWindow);
+  contents.emit("did-navigate", {}, url);
+  url = "https://fixture.invalid/desktop/settings";
+  contents.emit("did-navigate-in-page", {}, url, true);
+  contents.emit("did-navigate-in-page", {}, url, true);
+  url = "https://fixture.invalid/desktop/workspace?id=eac20941e6a410aa";
+  contents.emit("did-navigate-in-page", {}, url, true);
+  expect(contents.send.mock.calls).toEqual([
+    [
+      IPC_CHANNELS.WINDOW_NAVIGATION_CHANGED,
+      { can_go_back: true, can_go_forward: false },
+    ],
+    [
+      IPC_CHANNELS.WINDOW_NAVIGATION_CHANGED,
+      { can_go_back: true, can_go_forward: false },
+    ],
+    [
+      IPC_CHANNELS.WINDOW_NAVIGATION_CHANGED,
+      { can_go_back: true, can_go_forward: false },
+    ],
+  ]);
 });

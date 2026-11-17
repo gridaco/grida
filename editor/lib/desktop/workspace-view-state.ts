@@ -4,7 +4,7 @@ import { WorkspaceArtifact } from "./workspace-artifact";
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 const STORAGE_KEY_PREFIX = "grida.workspaceViewState:";
-const VERSION = 2;
+const VERSION = 3;
 
 /**
  * Optional, workspace-scoped renderer state.
@@ -29,7 +29,6 @@ export namespace WorkspaceViewState {
     | Readonly<{
         kind: "browser";
         id: string;
-        pageId: string;
         url: string | null;
       }>;
 
@@ -40,7 +39,7 @@ export namespace WorkspaceViewState {
 
   export type State = Readonly<{
     tabs: Tabs;
-    /** Mixed presentation order. Page IDs only reconnect live native pages. */
+    /** Mixed presentation order. Browser entries reconstruct URLs, never documents. */
     content?: Content;
   }>;
 
@@ -76,7 +75,7 @@ export namespace WorkspaceViewState {
     try {
       const value = JSON.parse(raw) as Record<string, unknown>;
       if (
-        (value.version !== VERSION && value.version !== 1) ||
+        ![1, 2, VERSION].includes(value.version as number) ||
         !isRecord(value.tabs)
       ) {
         forget(storage, workspaceId);
@@ -88,7 +87,7 @@ export namespace WorkspaceViewState {
         return null;
       }
       const state = normalize({
-        ...(value.version === VERSION && isRecord(value.content)
+        ...(value.version !== 1 && isRecord(value.content)
           ? { content: value.content as unknown as Content }
           : {}),
         tabs: {
@@ -170,12 +169,11 @@ export namespace WorkspaceViewState {
         identity = `file:${relPath}`;
       } else if (
         entry.kind === "browser" &&
-        DesktopBrowser.isIdentity(entry.id) &&
-        DesktopBrowser.isIdentity(entry.pageId)
+        DesktopBrowser.isIdentity(entry.id)
       ) {
         const url = browserUrl(entry.url);
         if (url === undefined) return;
-        tab = { kind: "browser", id: entry.id, pageId: entry.pageId, url };
+        tab = { kind: "browser", id: entry.id, url };
         identity = `browser:${entry.id}`;
       } else return;
       if (identities.has(identity)) return;

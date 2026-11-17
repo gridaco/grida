@@ -8,9 +8,10 @@ and supervises the native Rust chat host over private ACP pipes. A retained
 service sidecar keeps files, workspaces, recents, provider settings and media.
 
 Workspace content tabs also host an isolated built-in browser. Browser pages
-are owned by Main and work independently of chat. See the
+use DOM `<webview>` presentation under Main-owned admission and browser policy,
+and work independently of chat. See the
 [browser reference](./docs/browser.md) for navigation, profiles, website support
-and native composition verification.
+and live composition verification.
 
 The conversation master and durable chat execution live in the Rust workspace.
 Shared retained media operations live in `@grida/ai`; their HTTP adapters remain

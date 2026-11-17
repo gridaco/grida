@@ -1,4 +1,4 @@
-// GRIDA-SEC-016 — opt-in proof against real Chromium views and owner teardown.
+// GRIDA-SEC-016 — opt-in proof against real Chromium DOM guests and owner teardown.
 import { execFile } from "node:child_process";
 import { builtinModules, createRequire } from "node:module";
 import fs from "node:fs/promises";
@@ -12,7 +12,7 @@ const execute = promisify(execFile);
 const require = createRequire(import.meta.url);
 
 it.skipIf(process.env.GRIDA_DESKTOP_TEST_ELECTRON !== "1")(
-  "composes an isolated unframeable browser page and destroys live guests after their owning shell dies",
+  "admits isolated DOM guests under Desktop CSP, composes live overlays, and verifies CDP and document teardown",
   async () => {
     const directory = await fs.mkdtemp(
       path.join(os.tmpdir(), "grida-browser-proof-")
@@ -56,18 +56,29 @@ it.skipIf(process.env.GRIDA_DESKTOP_TEST_ELECTRON !== "1")(
           resultPath,
           userData,
         ],
-        { env: environment, timeout: 20_000, maxBuffer: 1024 * 1024 }
+        {
+          env: environment,
+          timeout: 20_000,
+          killSignal: "SIGKILL",
+          maxBuffer: 1024 * 1024,
+        }
       );
       const result = JSON.parse(await fs.readFile(resultPath, "utf8"));
       expect(result).toEqual({
         electron: expect.any(String),
         pageLoaded: true,
         isolated: true,
-        layout: true,
-        radius: true,
+        hostCsp: true,
+        earlyDenied: true,
+        guestCdp: true,
+        liveDomOverlays: true,
+        inactiveInput: true,
+        requestPolicy: true,
+        profileSeparation: true,
+        retryNewGuest: true,
+        crashRecovery: true,
+        documentReloadEndsGuests: true,
         hiddenThumbnail: true,
-        shortcut: true,
-        reattached: true,
         destroyedWithShell: true,
       });
     } finally {

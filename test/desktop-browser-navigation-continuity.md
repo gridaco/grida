@@ -32,7 +32,9 @@ ordinary text editing and composition remain website input.
    Back, Forward, Reload and Stop. Expected: toolbar state reflects the page's
    actual history and loading state.
 3. Type in a page form, switch to a workspace document, then return. Expected:
-   the form value and live page remain. Saving, copying a file path or trashing
+   the form value and live guest identity remain. Repeat after a React UI
+   remount and same-document presentation/group movement; neither may rewrite
+   the source or recreate the guest. Saving, copying a file path or trashing
    a workspace file must not target the browser URL.
 4. With page input focused, exercise copy/paste, text selection and IME where
    available. Exercise location focus, tab switching and close-tab shortcuts.
@@ -44,3 +46,14 @@ ordinary text editing and composition remain website input.
    ephemeral browser tabs do not restore.
 6. Stop the local server, reload and restart the server. Expected: failure and
    retry remain usable and do not close or reload the workbench.
+7. Enter an invalid address while a healthy page contains unsaved form input.
+   Expected: the action reports an error while the existing guest, history and
+   form state remain. Correct the address or dismiss the error.
+8. Reload the hosting workbench, then crash/recover it in a disposable profile.
+   Expected: old guests and attachments end; eligible recorded addresses reopen
+   as new documents. No form/history/scroll restoration is implied. Destroy a
+   guest independently and retry; its tab remains usable without an automatic
+   remount loop. A new window reconstructs a URL rather than adopting a guest.
+9. Exercise an older native build with browser protocol1 or no browser support.
+   Expected: saved browser addresses survive, an update message explains the
+   unavailable presentation, no v2 calls are made, and file tabs remain usable.

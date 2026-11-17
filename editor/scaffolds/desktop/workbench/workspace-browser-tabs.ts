@@ -2,6 +2,7 @@ import { DesktopBrowser } from "@grida/desktop-bridge";
 import { Browser } from "@/lib/desktop/browser";
 import { WorkspaceViewState } from "@/lib/desktop/workspace-view-state";
 import type { EditorGroup } from "./editor-group";
+import type { BrowserGuestMounts } from "./browser-guest-mounts";
 import { WorkbenchTab } from "./workbench-tab";
 
 /** Browser presentation state; native page identity never doubles as file authority. */
@@ -30,15 +31,16 @@ export namespace WorkspaceBrowserTabs {
 }
 
 /**
- * Joins native-owned pages to the workbench's opaque tab ordering. Reloads
- * reconnect live pages; reopening a closed tab creates a fresh page at its URL.
+ * Joins document-owned guests to the workbench's opaque tab ordering. A new
+ * document or reopened tab reconstructs its URL with a fresh native identity.
  * All coordination lives here so React only subscribes and wires lifecycle.
  */
 export class WorkspaceBrowserTabs {
+  /** The document owner supplies presentation; subscriptions never own guests. */
+  mounts: BrowserGuestMounts | null = null;
   private bridge: DesktopBrowser.Bridge | null = null;
   private attachment: string | null = null;
   private revision = 0;
-  private layoutSequences = new Map<string, number>();
   private epoch = 0;
   private storage: WorkspaceBrowserTabs.Storage | null = null;
   private pages = new Map<string, DesktopBrowser.Page>();
@@ -160,43 +162,29 @@ export class WorkspaceBrowserTabs {
     if (epoch !== this.epoch) return;
     const tabs: string[] = [];
     let active: string | null = null;
-    const adopted = new Set<string>();
     for (const [index, descriptor] of content.open.entries()) {
       let key: string;
       if (descriptor.kind === "file") {
         if (!acceptedFiles.has(descriptor.relPath)) continue;
         key = WorkbenchTab.file(descriptor.relPath);
       } else {
-        if (!this.attachment) continue;
-        const page = adopted.has(descriptor.pageId)
-          ? null
-          : (this.pages.get(descriptor.pageId) ?? null);
-        if (page) adopted.add(page.id);
+        const page = null;
         this.entries.set(descriptor.id, {
           id: descriptor.id,
           page,
           url: descriptor.url,
-          storageScope: page?.storageScope ?? "workspace",
-          error: null,
+          storageScope: "workspace",
+          error:
+            this.state.error ??
+            (this.bridge
+              ? null
+              : "Update Grida Desktop to use the built-in browser."),
           locationRevision: 0,
         });
         key = WorkbenchTab.browser(descriptor.id);
       }
       tabs.push(key);
       if (index === content.active) active = key;
-    }
-    for (const page of this.pages.values()) {
-      if (adopted.has(page.id)) continue;
-      const id = this.newId();
-      this.entries.set(id, {
-        id,
-        page,
-        url: page.url,
-        storageScope: page.storageScope,
-        error: null,
-        locationRevision: 0,
-      });
-      tabs.push(WorkbenchTab.browser(id));
     }
     const currentGroup = this.group.getSnapshot();
     const restoredTabs =
@@ -232,7 +220,6 @@ export class WorkspaceBrowserTabs {
     this.bridge = null;
     this.storage = null;
     this.revision = 0;
-    this.layoutSequences.clear();
     this.resyncing = false;
     this.buffered = [];
     if (bridge && attachmentId)
@@ -305,19 +292,49 @@ export class WorkspaceBrowserTabs {
       void this.ensurePage(id);
       return;
     }
-    this.perform(id, (bridge, target) => bridge[action](target));
+    this.perform(id, async (bridge, target) => {
+      await bridge[action](target);
+      if (action === "focus") this.mounts?.focus(id);
+    });
   };
 
-  layout(
-    id: string,
-    pageId: string | null,
-    layout: DesktopBrowser.Layout
-  ): void {
+  /** Transient admission is never stored or derived from the website URL. */
+  async reserveMount(id: string): Promise<DesktopBrowser.GuestMount | null> {
     const target = this.target(id);
-    if (!target || target.pageId !== pageId || !this.bridge) return;
-    const sequence = (this.layoutSequences.get(pageId) ?? 0) + 1;
-    this.layoutSequences.set(pageId, sequence);
-    void this.bridge.layout({ ...target, ...layout, sequence }).catch(() => {});
+    const bridge = this.bridge;
+    if (!target || !bridge) return null;
+    const epoch = this.epoch;
+    try {
+      const value = await bridge.reserveMount(target);
+      const current = this.target(id);
+      if (
+        epoch !== this.epoch ||
+        current?.attachmentId !== target.attachmentId ||
+        current?.pageId !== target.pageId ||
+        !this.group.getSnapshot().tabs.includes(WorkbenchTab.browser(id))
+      )
+        return null;
+      const mount = DesktopBrowser.parseGuestMount(value);
+      if (!mount)
+        this.setError(
+          id,
+          "This page could not be mounted. Reload to try again."
+        );
+      return mount;
+    } catch {
+      if (epoch === this.epoch && this.target(id)?.pageId === target.pageId)
+        this.setError(
+          id,
+          "This page could not be mounted. Reload to try again."
+        );
+      return null;
+    }
+  }
+
+  setActive(id: string, active: boolean): void {
+    const target = this.target(id);
+    if (target && this.bridge)
+      void this.bridge.setActive({ ...target, active }).catch(() => {});
   }
 
   /** A hover-owned display read. No image survives in the controller. */
@@ -329,6 +346,7 @@ export class WorkspaceBrowserTabs {
       !bridge?.thumbnail ||
       !target ||
       !page?.url ||
+      !page.mounted ||
       page.loading ||
       page.failure ||
       this.clearing
@@ -539,7 +557,9 @@ export class WorkspaceBrowserTabs {
       if (
         previous &&
         (previous.url !== event.page.url ||
-          (!previous.loading && event.page.loading))
+          (!previous.loading && event.page.loading) ||
+          previous.mounted !== event.page.mounted ||
+          previous.failure !== event.page.failure)
       ) {
         for (const [id, entry] of this.entries)
           if (entry.page?.id === event.page.id) this.invalidateThumbnail(id);
@@ -547,7 +567,6 @@ export class WorkspaceBrowserTabs {
       this.pages.set(event.page.id, event.page);
     } else {
       this.pages.delete(event.pageId);
-      this.layoutSequences.delete(event.pageId);
       const closed = new Set<string>();
       for (const [id, entry] of this.entries) {
         if (entry.page?.id !== event.pageId) continue;
@@ -648,7 +667,6 @@ export class WorkspaceBrowserTabs {
         descriptor = {
           kind: "browser",
           id: entry.id,
-          pageId: entry.page?.id ?? entry.id,
           url: entry.page?.url ?? entry.url,
         };
       } else continue;

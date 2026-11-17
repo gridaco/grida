@@ -23,8 +23,8 @@ A deliberate hover on a browser tab uses the workbench's shared preview card.
 It identifies the page by title and address and, when available, shows one
 small still image of its last rendered viewport. Hovering leaves tab selection
 unchanged. Capture itself never changes focus, shows a hidden page, changes its
-viewport or starts continuous capture. Normal native overlay occlusion still
-applies. The still image may be stale. A blank,
+viewport or starts continuous capture. The card composes above a visible live
+page without hiding it. The still image may be stale. A blank,
 unrendered or unavailable page shows metadata without broken-image chrome.
 
 The preview retains image bytes only while mounted. Leaving the rail, closing
@@ -50,8 +50,8 @@ continues to show a metadata card.
      broken-image icon.
 6. Select a browser tab and hover its own tab while typing into a page input.
    - Expected: the preview does not select another tab or focus an input. If
-     the card overlaps the native viewport, normal overlay occlusion applies;
-     leaving the rail restores the page with its input state intact.
+     the card overlaps the viewport, the live page keeps advancing beneath it;
+     leaving the rail preserves the page and its input state.
 7. Keep one preview open for several seconds while the website changes.
    - Expected: it remains a still image. Leaving and hovering again may obtain
      a newer rendered image; no continuous or background capture runs.

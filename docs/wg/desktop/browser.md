@@ -8,130 +8,129 @@ tags: [internal, wg, desktop]
 
 # Built-in browser
 
-Desktop can present web pages beside documents in a workspace. A page is an
-ordinary browser document with its own navigation and website state. Its
-existence does not depend on a conversation, model, workflow or page-specific
-protocol.
+Desktop presents web pages beside workspace documents. A page is an ordinary
+browser document with its own navigation and website state, independent of a
+conversation, model, workflow or agent protocol.
 
-This contract separates the browser host from its presentation. The host owns
-the page and its authority; the workbench requests placement and presents
+The browser host owns admission and policy. The workbench owns presentation and
 navigation controls. A page cannot acquire application authority by navigating
 to an application URL.
 
 ## Vocabulary
 
-| Term       | Meaning                                                                                  |
-| ---------- | ---------------------------------------------------------------------------------------- |
-| Page       | One host-owned browser document and its live navigation state.                           |
-| Owner      | The admitted workbench window and workspace that contain a page.                         |
-| Attachment | An opaque authorization identity for one owner's current top-level document generation.  |
-| Profile    | A browser storage scope, independent of the application's account and provider sessions. |
-| Viewport   | The rectangle in the workbench reserved for a visible page.                              |
+| Term       | Meaning                                                               |
+| ---------- | --------------------------------------------------------------------- |
+| Page       | One admitted browser tab and, while mounted, its live guest document. |
+| Owner      | The admitted workbench document and workspace containing the page.    |
+| Attachment | Opaque authorization for one owner's current document generation.     |
+| Mount      | One-use authorization to connect a guest to its exact owner and page. |
+| Profile    | Website storage scope, independent of account and provider sessions.  |
+| Viewport   | Workbench presentation slot for a selected page.                      |
 
 ## Ownership and lifetime
 
-The host allocates page and attachment identities. The caller cannot choose
-another owner, a session partition or browser security preferences. Every page
-operation validates the current attachment and page ownership before effect.
-Frame identity is authoritative; a matching URL alone does not grant authority.
+The host allocates attachment, page and mount identities. A caller cannot
+choose another owner, session partition, preload or security preferences.
+Every operation validates the current owner and page before effect. Exact
+document identity is authoritative; matching a URL alone grants no authority.
+Only a guest registered through the authorized mount can become the page.
 
-Selecting another tab hides the page without ending its document. Closing the
-tab ends the page. Closing the owning window or withdrawing its application
-role ends all of its pages and revokes its attachments. Renderer replacement
-invalidates the old attachment and hides live pages. An admitted replacement
-may attach again, recover the host snapshot and lay them out before showing
-them. Delayed messages from the previous attachment have no effect.
-A navigation already in progress when the host attaches does not exempt its
-eventual document replacement from these lifetime rules.
+Selecting another tab hides its presentation without ending the connected
+live document. Layout changes, presentation movement and remounting workbench
+controls must preserve it. Closing a page ends its guest. Hidden guests cannot
+intercept workbench focus or input.
 
-An application restart restores only eligible tab descriptors and last recorded
-URLs. It does not restore navigation history, scroll position, form state or
-in-memory documents. Persistent website storage has a separate lifetime from
-the tab descriptor.
+A guest's lifetime depends on its hosting document. Document replacement,
+reload, crash, role withdrawal and window closure revoke the attachment and
+end its pages. Detachment does not promise independent live retention by the
+host. Delayed operations from the previous generation have no effect, even
+when its navigation was already in progress before attachment.
+
+Recovery and application restart reconstruct eligible recorded URLs with new
+identities. They do not restore the running document, navigation history, form
+state or scroll position. Window transfer likewise reconstructs a URL; it does
+not transfer the running guest. Persistent website storage has an independent
+lifetime. Ephemeral pages are not restart-restored.
 
 ## Navigation and isolation
 
-User navigation admits absolute HTTP and HTTPS URLs, including local development
-servers. URL credentials and executable, file and private application schemes
-are refused. Direct navigation, links and redirects follow the host's policy.
-An external-browser action uses the page's authoritative current URL.
+User navigation admits absolute HTTP and HTTPS URLs, including local
+servers. Credential-bearing, executable, file and private application document
+destinations are refused. Links, redirects and document requests obey host
+policy. External handoff uses the page's authoritative current URL.
 
-Pages run in sandboxed, context-isolated browser contexts with no Node access,
-application preload, application bridge, account cookie jar or provider
-transport. Browser policy is installed before the first document load. The
-application's own navigation restrictions remain independent of page policy.
+Guests are sandboxed and context-isolated, with no Node access, application
+preload or bridge, account cookie jar, provider transport or private workspace
+protocol. The host installs policy before loading the first website document.
+Application navigation restrictions remain separate from guest policy.
 
-The initial browser denies unmanaged popup windows, sensitive site permissions,
-HTTP authentication and JavaScript dialogs. It honors the browser engine's
-certificate verdict without trust overrides. A site may receive files only
-through an explicit user file selection. Each download requires a user-selected
-save destination; completion does not execute or open the file.
+Unmanaged popups, sensitive permissions, device access, HTTP authentication
+and JavaScript dialogs are denied. Certificate verdicts are not overridden.
+File uploads require explicit user selection. Downloads require a native save
+destination under a live owner and never automatically execute or open files.
 
 ## Profiles
 
-The persistent profile belongs to a workspace. Ephemeral pages receive their
-own non-persistent profile. Neither scope shares the Desktop account profile or
-the provider networking profile. Clearing a scope ends affected live pages
-before removing website storage and permission state. Clearing one workspace
-does not affect another workspace or the application account.
+Persistent website storage belongs to a workspace. Each ephemeral page has a
+separate non-persistent profile. Neither scope shares application account or
+provider sessions. Clearing a scope blocks competing admission, closes affected
+pages and removes storage, connections, cache and authentication state before
+admission resumes. Other workspaces and application sessions are unaffected.
 
-The application Settings surface may clear one selected registered
-workspace's website data after native confirmation. This management operation
-does not grant page attachment or control authority to Settings. The host
-revalidates the exact Settings document and selected workspace before
-beginning the shared clearing operation.
+Settings can clear one selected registered workspace after a native
+confirmation naming it and defaulting to Cancel. This management operation
+grants no page attachment or control authority. The exact Settings document
+and workspace identity are revalidated before clearing begins.
 
-## Native presentation
+## Live composition and focus
 
-The workbench reserves a rectangular viewport below browser chrome. Geometry is
-expressed in workbench CSS pixels; the host applies its authoritative zoom,
-rounding and window clipping. Invalid, stale or out-of-window layouts cannot
-expose a page outside the owning window's content area. Pages start hidden at
-valid on-screen bounds and become visible only after an accepted layout.
+Pages compose with ordinary workbench content. Menus, tooltips, previews,
+popovers and modal backdrops can appear above the live page without hiding it
+or substituting a frozen image. Visible video and animation continue beneath
+controls. Presentation must share frame clipping, follow layout and zoom, and
+stay below browser chrome and unrelated workbench regions. Overlay-specific
+recognition rules are not part of the browser contract.
 
-The owning frame's resolved inner corner radius is shared by the DOM page
-viewport and the native page. Border thickness is accounted for before the
-host scales the radius with its authoritative zoom. Radius changes are layout
-changes even when the viewport rectangle stays unchanged. The page viewport
-has a uniform radius at all four corners; native clipping does not crop or
-offset the website's content.
+A global modal's backdrop, focus trap and dismissal behavior apply across the
+page. Dismissing it restores normal page interaction. Before hiding a focused
+page, presentation returns focus to an actual workbench element. Selected
+application shortcuts remain available while website editing and composition
+stay with the page. Page reload and workbench reload are distinct operations.
 
-The native page layer appears above workbench HTML. A workbench overlay that
-intersects a viewport therefore hides the page and displays a neutral
-placeholder. Closing the overlay restores the page at the latest accepted
-bounds. Dragged or transformed containers likewise hide their pages. This
-behavior requires no periodic capture.
+Background throttling is permitted. The application does not pause media or
+emulate website visibility on selection changes, and makes no guarantee about
+hidden animation cadence. This does not permit freezing a visible page beneath
+a workbench overlay.
 
-A deliberate tab hover may request a bounded image of that page's last
-rendered viewport. This is a still preview: hidden pages are neither shown nor
-focused to obtain it, and it may lag behind the current document. If no image
-is available, the card shows page metadata. Image bytes remain transient
-presentation data and are discarded when the preview closes. Hovering does
-not start a capture stream or select the page.
-
-Focus combines page focus and owning-window focus. Hiding a focused page first
-returns focus to the workbench. Selected application commands remain available
-while a page has focus; ordinary editing and text composition stay with the
-page. Reloading a page and reloading the workbench are distinct operations.
+A deliberate tab hover can request a bounded still preview of the last rendered
+viewport. Hidden pages are not shown or focused for capture. Unavailable images
+fall back to metadata. Image bytes remain transient; previews neither poll nor
+start a capture stream.
 
 ## Observation and recovery
 
-The host exposes bounded navigation outcomes: page identity, URL, title,
-loading, back/forward availability, focus and failure. Metadata from websites
-is untrusted display data. A monotonic revision orders snapshots and changes;
-an observation gap requires a fresh snapshot rather than guessed state.
+Bounded observations include identity, mounted state, URL, title, loading,
+back/forward availability, focus and failure. Website metadata is untrusted
+display data. A monotonic revision orders snapshots and changes; observation
+gaps require a new snapshot.
 
-Page failure does not take down the workbench. The user can retry navigation or
-close the tab. Page teardown removes native views, closes their browser
-contents and releases listeners. A closed page cannot later reappear from a
-delayed event.
+Guest failure does not take down the workbench. Retry can reload a living guest
+or mount a new one after destruction. Cleanup revokes pending mounts and
+commands, closes guests and releases listeners and ephemeral state. A closed
+page cannot reappear from a delayed event.
 
-## Boundary
+## Trust and extension boundary
 
-This contract provides page hosting and presentation. It grants no page-script
-execution, debugger access, content inspection or automated interaction.
-Additional callers and protocols must define their own admission and authority
-without changing the meaning of page ownership or profile isolation.
+The admitted workbench is a trusted embedder. Its presentation technology may
+intrinsically permit scripting and navigation of its own guest contents; a
+purpose-specific control API does not remove that authority. Some programmatic local document loaders can likewise bypass cancellable
+navigation or request hooks. Unsupported observed documents are terminated
+asynchronously; this is containment, not a preexecution scripting barrier.
+Such scripting must not confer application bridge, account or provider
+authority on the guest.
+The product supplies no agent tool, debugger interface or automation protocol
+through this browser feature. Additional callers require separately defined
+admission and authority without weakening ownership or profile isolation.
 
-The concrete binding and verification instructions live in the
-[Desktop browser reference](https://github.com/gridaco/grida/blob/main/desktop/docs/browser.md).
+The concrete binding, supported Electron behavior and upgrade checks live in
+the [Desktop browser reference](https://github.com/gridaco/grida/blob/main/desktop/docs/browser.md).

@@ -112,20 +112,17 @@ describe("WorkspaceViewState", () => {
           {
             kind: "browser",
             id: "page",
-            pageId: "native",
             url: "https://example.com/",
           },
           { kind: "file", relPath: "a.svg" },
           {
             kind: "browser",
             id: "unsafe",
-            pageId: "native2",
             url: "file:///private/data",
           },
           {
             kind: "browser",
             id: "credentials",
-            pageId: "native3",
             url: "https://user:pass@example.com/",
           },
         ],
@@ -137,12 +134,41 @@ describe("WorkspaceViewState", () => {
         {
           kind: "browser",
           id: "page",
-          pageId: "native",
           url: "https://example.com/",
         },
         { kind: "file", relPath: "a.svg" },
       ],
       active: 0,
     });
+  });
+  it("migrates native page IDs away and writes only URLs in version three", () => {
+    const storage = new MemoryStorage();
+    const key = "grida.workspaceViewState:workspace-a";
+    storage.setItem(
+      key,
+      JSON.stringify({
+        version: 2,
+        tabs: { open: [], active: null },
+        content: {
+          open: [
+            {
+              kind: "browser",
+              id: "tab",
+              pageId: "old-native",
+              url: "https://example.com/",
+            },
+          ],
+          active: 0,
+        },
+      })
+    );
+    const state = WorkspaceViewState.read(storage, "workspace-a")!;
+    expect(state.content?.open).toEqual([
+      { kind: "browser", id: "tab", url: "https://example.com/" },
+    ]);
+    WorkspaceViewState.remember(storage, "workspace-a", state);
+    const saved = JSON.parse(storage.getItem(key)!);
+    expect(saved.version).toBe(3);
+    expect(saved.content.open[0]).not.toHaveProperty("pageId");
   });
 });

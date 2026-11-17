@@ -249,109 +249,139 @@ and, when applicable, its model connection. A missing or stale click returns
 
 ## Native browser
 
-`browser` is an optional, separately versioned protocol-1 capability. Offer it
-only when `caps.native.browser === true`, `browser` exists, and
-`browser.version === DesktopBrowser.VERSION`. Older native hosts omit both
-the namespace and capability. It does not depend on chat, files or media.
+`browser` is optional under the unchanged outer Desktop bridge protocol 1.
+The browser contract is version 2 with `presentation: "webview"`. Offer browser
+pages only when `caps.native.browser === true`, the namespace exists,
+`browser.version === DesktopBrowser.VERSION` and `browser.presentation ===
+"webview"`. Installed version-1 browser hosts are incompatible: withhold the
+version-2 page UI and requests until the native host is updated. Missing browser
+capability remains valid. Browser operation does not start chat or depend on
+file or media services.
 
-`attach(workspaceId)` asks Main to admit the current top-level document to the
-registered workspace and returns its authoritative live-page snapshot. The
-renderer cannot name an owner window, generation, partition or native path.
-Main issues the opaque attachment ID and binds it to the exact calling
-top-level document generation; a well-formed ID alone grants no access.
-Every page request rechecks that attachment and native page ownership.
-Invalid, stale, foreign and unsupported requests reject without granting any
-additional authority.
+`attach(workspaceId)` asks Main to admit the exact top-level document to a
+registered workspace and returns its authoritative page snapshot. Main issues
+an attachment ID bound to that document generation. The renderer cannot name
+another window, generation, native path or session. A well-formed identity or
+capability flag grants no authority. Every request rechecks native admission
+and page ownership; stale, foreign or invalid requests reject.
 
-Subscribe before attaching or reading a snapshot. Buffer outcomes during the
-read, then apply only outcomes for its attachment ID with revisions greater
-than the returned snapshot. Revisions increase once per owner outcome, and a
-changed page's revision equals that outcome's revision. A snapshot's page
-revisions cannot exceed its owner revision. Ignore already-seen revisions;
-an outcome gap requires a fresh `snapshot(attachmentId)` rather than inferring
-missing state. A method response may race a newer outcome: never let an old
-response replace a newer retained view. Metadata is untrusted plain text.
+Subscribe before attaching or reading. Buffer outcomes during a read, then
+apply only outcomes for its attachment with revisions greater than the returned
+snapshot. Changed pages carry the outcome's owner revision. Snapshot page
+revisions cannot exceed its owner revision. Ignore already-seen outcomes;
+a revision gap requires a new snapshot. A method response must never replace a
+newer retained view. Metadata is untrusted plain text.
 
-`create({ attachmentId, storageScope })` creates an intentionally blank page;
-omitting `url` is the only blank-creation form. Submitted destinations must be
-absolute HTTP(S) URLs without credentials, control characters or backslashes.
-`normalizeUrl` validates and canonicalizes them without guessing a scheme.
-Navigation failures are bounded structured page outcomes, separate from
-request rejection. `openExternal` uses the page's native-authoritative current
-URL and accepts no renderer-provided destination.
+### Guest mounting and presentation
+
+`create({ attachmentId, storageScope, url? })` creates a page descriptor with
+`mounted: false`. Omitting `url` requests a blank page. Submitted destinations
+must be absolute HTTP(S) URLs without credentials, controls or backslashes;
+`normalizeUrl` validates them without guessing a scheme.
+
+`reserveMount(target)` returns only `GuestMount { src }`. Pass this Main-issued
+bootstrap URL unchanged to a connected DOM guest. Its exact form is
+`about:blank#grida-browser-mount=<opaque identity>`. This is a transient one-use
+admission claim, not the website URL, a native guest ID or a choice of session
+or preferences. Main issues unpredictable claims and binds them to the exact
+attachment, document and page. `parseGuestMount` validates only the bounded
+shape; syntactically valid or copied claims do not establish native authority.
+An unused reservation may be returned again; a consumed claim cannot create
+another guest, and an already-mounted page refuses a second reservation.
+
+Main strips untrusted guest attributes, fixes preferences and the prepared
+session, and consumes the bootstrap before automatic navigation. It registers
+the actual guest supplied by native attachment events, installs guards, then
+loads the vetted destination. A changed page with `mounted: true` acknowledges
+that actual registration. Pending or failed mounting does not. Failed mounting
+uses a bounded `failure.kind: "mount"`; navigation and renderer failures retain
+their own classifications. No public adoption or raw guest-ID API exists.
+
+The document's presentation owner keeps guest nodes connected through React
+subscription/remount cycles, tab selection and same-document layout or group
+movement. DOM/CSS owns geometry, rounded clipping, visibility and composition
+with menus and dialogs. There is no native layout, bounds, zoom, radius or
+overlay API. `setActive({ ...target, active })` communicates input/focus
+eligibility only. Main must not focus an inactive page; presentation must
+relinquish the guest's DOM focus and disable its input when inactive. Main's
+`focus` command alone does not establish the containing DOM element's focus.
+Background timer/media behavior follows the host's declared Chromium policy;
+remaining connected does not promise unthrottled playback.
+
+### Document and storage lifetime
+
+`detach` ends the attachment's pages and guests, including ephemeral sessions.
+Replacing, reloading, crashing or destroying the containing document likewise
+ends its live guests. A new document reconstructs eligible URLs with fresh page
+and mount identities; URL restoration does not restore running documents,
+forms, scroll positions or live navigation history. Moving to another window
+also reconstructs URLs rather than transferring a running guest.
+
+Within the same owning document, a destroyed guest can remain as a failed
+page descriptor with `mounted: false`; explicit retry reserves a fresh guest
+at its retained URL. A crashed guest that still exists remains mounted with
+an observable failure. Neither case grants adoption of another guest.
 
 Storage scope is required. `workspace` uses an isolated native-managed,
-persistent workspace browser session. `ephemeral` uses a fresh in-memory
-session unique to that page, discarded when the page closes. Neither session
-shares the application's authentication or bridge. `clearSession` closes the
-workspace's pages before clearing its persistent browser session; native
-coordination must prevent another owner from using that session during the
-clear. Clearing browser storage does not alter application credentials.
+persistent workspace browser session. `ephemeral` uses an in-memory session
+unique to the page lifetime, discarded when that page ends. A same-document
+guest retry may retain that page's session; document loss or window transfer
+promises no private-session transfer. These sessions never share the
+application's or provider's authentication profiles. `clearSession` closes
+matching pages across windows and clears the persistent workspace browser
+session under a shared scope lock. `openExternal` uses the page's current
+native-validated HTTP(S) URL, accepting no caller-provided destination.
 
-Settings may independently offer the optional
-`clearWorkspaceData({ workspaceId })` method. It accepts only one registered
-workspace identity, selected through the existing workspace list. Main requires
-the exact admitted top-level Settings document, resolves the workspace and
-shows its own confirmation naming that workspace, with Cancel selected by
-default. It rechecks that document's generation and the registered workspace
-after asynchronous admission and confirmation, before clearing begins.
-The operation uses the same per-workspace lock and clearing routine as
-`clearSession`, closing matching live pages across windows before clearing
-cookies, site storage, cache, connections and HTTP auth. `false` means explicit
-user cancellation; `true` means clearing completed. Stale or foreign admission,
-an unavailable workspace and operational failures reject.
-Older hosts omit the method; keep the existing workspace action available.
-Settings acquires no browser attachment or page authority. Existing browser
-methods remain workspace-route and attachment bound. This operation accepts
-no paths, partitions, display names, consent flags or preferences, and deletes
-neither download files nor the application's or provider's profile.
+Settings may independently expose optional `clearWorkspaceData({ workspaceId })`.
+Main requires the exact admitted top-level Settings document, resolves the
+registered workspace and displays its own named confirmation with Cancel as
+the default. It rechecks document generation and registered identity after
+asynchronous admission/confirmation before using the same clearing routine and
+lock. `false` means explicit cancellation; `true` means completed clearing.
+Stale admission, unavailable workspace and operational failures reject.
+Settings gains no attachment or page control. The request accepts no paths,
+partitions, names, consent flags or preferences; clearing deletes no download
+files and changes no application or provider profile.
 
-`layout` carries a finite bounded CSS rectangle, visibility and a positive
-sequence increasing within the attachment and page. Main ignores older
-sequences, determines actual window zoom, clips to the content area and owns
-native bounds. A caller cannot supply a zoom factor or native preferences.
-An optional `borderRadius` describes the uniform radius of all four page
-viewport corners in CSS pixels. The renderer resolves its current presentation
-radius and uses the same value for DOM and native layout; Main scales it at
-native zoom, rounds to native units and clamps it to half the smaller viewport
-edge. Zero and fractional radii are valid; radius must not exceed 8,192 CSS
-pixels. Omission means zero, preserving existing rectangular layouts. This
-describes the page viewport itself; it does not promise clipping by an ancestor
-frame or change the page's rectangular input bounds. Radius carries
-presentation geometry only and grants no additional native authority.
-`detach` revokes its attachment and hides the pages. Top-level navigation
-also revokes and hides them; a document reload can attach again and recover
-the live pages from Main. Destroying the owner or losing its authenticated
-role closes them. Main retains the only page/session lifecycle authority.
+### Bounded presentation reads and trust limits
 
-`DesktopBrowser.parseLayout`, `parsePage`, `parseSnapshot` and `parseEvent`
-accept only the bounded protocol projections. There are at most 16 pages,
-URLs are at most 8 KiB, titles 1 KiB and public failure messages 2 KiB in UTF-8.
-Parsers do not establish native ownership or replace Main's admission checks.
-Browser pages never receive the application preload or `window.grida`, even
-when they navigate to an application Desktop URL.
+`parsePage`, `parseSnapshot` and `parseEvent` accept bounded protocol
+projections: at most 16 pages, URLs up to 8 KiB, titles 1 KiB and public failure
+messages 2 KiB in UTF-8. Guests receive no application preload or `window.grida`,
+even when visiting Desktop URLs. Main hardens sessions, preferences, native
+preloads, destinations, popups, permissions, downloads and mount ownership.
 
-`thumbnail` is independently optional on version-1 browser hosts. Check the
-method before requesting an image; metadata hover previews remain available
-without it. It accepts only the existing
-attachment/page target and returns a bounded JPEG of the page's best-effort
-last rendered viewport, or `null` when a usable capture is unavailable. A page
-that has never rendered may have no image. Reads must not show, focus or
-navigate a hidden page; no fresh rendering or persistence is promised.
-Capture failure and concurrency limits return `null`; invalid or stale native
-admission still rejects. Main bounds capture concurrency and rechecks the
-attachment, page instance and navigation lifetime after asynchronous capture.
-The caller must discard a late preview after its target or observed page
-changes and retain a metadata fallback.
+Stock Electron webview intentionally gives its trusted containing renderer
+built-in control of its own guest, including scripting and navigation. The
+typed bridge does not remove those methods. In particular, a `javascript:`
+load can execute same-document script even when its load promise rejects.
+HTTP(S) validation describes the typed navigation contract and native network
+request policy; it is not proof that the trusted embedder lacks page-script
+authority. Programmatic blob-document loads can also bypass cancellable
+navigation hooks and session request interception. Main observes an unsupported
+full-document load, immediately revokes that guest's mounted/input eligibility
+and closes it in a later task. The failed descriptor can be retried with a fresh
+guest at its retained HTTP(S) URL. This is containment after observation, not a
+guarantee that unsupported document code never executes. No agent, MCP,
+debugger/CDP or generic automation API is added here.
 
-`DesktopBrowser.Thumbnail` contains only `dataUrl`, `width` and `height`.
-`parseThumbnail` accepts canonical JPEG base64 data URLs with encoded dimensions
-matching positive integer metadata, at most 320 by 180 pixels and 64 KiB of
-decoded JPEG bytes. It checks JPEG framing and baseline/progressive frame
-dimensions, not the complete image codec. Website pixels remain untrusted
-display data. This explicit read grants the admitted shell bounded image
-access for presentation; it exposes no capture options, page scripts,
-debugger, filesystem output or automation-tool integration.
+`thumbnail` remains independently optional. Check it before requesting an image;
+metadata hover previews remain available without it. It reads only the existing
+attachment/page target's best-effort last rendered viewport. An unavailable,
+never-rendered or failed capture returns `null`; stale or invalid admission
+rejects. Reads must not show, focus or navigate a hidden guest. Main bounds
+concurrency and rechecks attachment, page instance and navigation after capture.
+The compositor-frame wait has a 1,500 ms deadline; a stalled capture returns
+`null`. Expiring that wait does not start another capture: the owner retains
+one actual in-flight capture until it settles or its page/attachment lifetime
+ends.
+Discard late previews after their target or observed page changes.
+
+`Thumbnail` contains only `dataUrl`, `width` and `height`. `parseThumbnail`
+accepts canonical JPEG base64 with matching encoded dimensions, up to 320 by
+180 pixels and 64 KiB of decoded bytes. It checks baseline/progressive JPEG
+framing and dimensions, not the complete codec. Pixels are untrusted display
+data; no persistence or freshly rendered frame is promised.
 
 ## Anti-goals
 
@@ -360,8 +390,10 @@ debugger, filesystem output or automation-tool integration.
 - Not a native Desktop runtime.
 - Not a public plugin or extension API.
 - Not a place for secrets, route strings, fetch logic, or filesystem access.
-- Not browser automation: no scripts, debugger/CDP, agent tools, raw native
-  events, credentials, generic IPC or renderer-selected Electron options.
+- Not a generic browser automation API: no typed script execution, debugger/CDP,
+  agent tools, raw native events, credentials, generic IPC or caller-selected
+  Electron options. Stock webview's intrinsic trusted-embedder methods remain
+  outside this typed protocol.
 
 Grida-funded Tripo additionally requires `caps.media.tripo_gg` for generation
 or `caps.media.rigging_gg` for eligibility/rigging. These optional flags gate

@@ -440,7 +440,8 @@ const bridge: DesktopBridge = {
   handshake,
 
   browser: {
-    version: 1,
+    version: DesktopBrowser.VERSION,
+    presentation: "webview",
     attach: (workspaceId) =>
       ipcRenderer.invoke(IPC_CHANNELS.BROWSER_ATTACH, workspaceId),
     thumbnail: (request) =>
@@ -460,8 +461,10 @@ const bridge: DesktopBridge = {
       ipcRenderer.invoke(IPC_CHANNELS.BROWSER_RELOAD, request),
     stop: (request) => ipcRenderer.invoke(IPC_CHANNELS.BROWSER_STOP, request),
     focus: (request) => ipcRenderer.invoke(IPC_CHANNELS.BROWSER_FOCUS, request),
-    layout: (request) =>
-      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_LAYOUT, request),
+    reserveMount: (request) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_RESERVE_MOUNT, request),
+    setActive: (request) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_SET_ACTIVE, request),
     close: (request) => ipcRenderer.invoke(IPC_CHANNELS.BROWSER_CLOSE, request),
     openExternal: (request) =>
       ipcRenderer.invoke(IPC_CHANNELS.BROWSER_OPEN_EXTERNAL, request),

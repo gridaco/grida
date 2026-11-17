@@ -7,6 +7,7 @@ const page = (
   overrides: Partial<DesktopBrowser.Page> = {}
 ): DesktopBrowser.Page => ({
   id: "page-1",
+  mounted: true,
   revision: 1,
   url: "https://example.com/",
   title: "Example",
@@ -22,7 +23,7 @@ const page = (
 const snapshot = (
   pages: readonly DesktopBrowser.Page[] = [page()]
 ): DesktopBrowser.Snapshot => ({
-  version: 1,
+  version: 2,
   attachmentId: "attachment-1",
   revision: 1,
   pages,
@@ -35,7 +36,7 @@ describe("DesktopBrowser optional capability", () => {
     expect(older.browser).toBeUndefined();
     expect(capabilities.browser).toBeUndefined();
     expect(DESKTOP_BRIDGE_PROTOCOL).toBe(1);
-    expect(DesktopBrowser.VERSION).toBe(1);
+    expect(DesktopBrowser.VERSION).toBe(2);
     expectTypeOf<DesktopBridge["browser"]>().toEqualTypeOf<
       DesktopBrowser.Bridge | undefined
     >();
@@ -53,7 +54,7 @@ describe("DesktopBrowser optional capability", () => {
     expectTypeOf<
       Parameters<DesktopBrowser.Bridge["clearSession"]>
     >().toEqualTypeOf<[request: Readonly<{ attachmentId: string }>]>();
-    expect(DesktopBrowser.VERSION).toBe(1);
+    expect(DesktopBrowser.VERSION).toBe(2);
   });
 
   it("requires explicit storage scope and permits omission only for blank creation URLs", () => {
@@ -82,9 +83,26 @@ describe("DesktopBrowser optional capability", () => {
     expectTypeOf<
       Parameters<DesktopBrowser.Bridge["openExternal"]>
     >().toEqualTypeOf<[request: DesktopBrowser.Target]>();
-    expectTypeOf<keyof DesktopBrowser.Layout>().toEqualTypeOf<
-      "sequence" | "rect" | "visible" | "borderRadius"
+    expectTypeOf<
+      DesktopBrowser.Bridge["presentation"]
+    >().toEqualTypeOf<"webview">();
+    expectTypeOf<
+      Parameters<DesktopBrowser.Bridge["reserveMount"]>
+    >().toEqualTypeOf<[request: DesktopBrowser.Target]>();
+    expectTypeOf<
+      Awaited<ReturnType<DesktopBrowser.Bridge["reserveMount"]>>
+    >().toEqualTypeOf<DesktopBrowser.GuestMount>();
+    expectTypeOf<
+      Parameters<DesktopBrowser.Bridge["setActive"]>
+    >().toEqualTypeOf<
+      [request: DesktopBrowser.Target & Readonly<{ active: boolean }>]
     >();
+    expectTypeOf<
+      Extract<
+        keyof DesktopBrowser.Bridge,
+        "layout" | "adoptWebContents" | "executeJavaScript" | "debugger"
+      >
+    >().toEqualTypeOf<never>();
     expectTypeOf<keyof DesktopBrowser.Target>().toEqualTypeOf<
       "attachmentId" | "pageId"
     >();
@@ -137,126 +155,83 @@ describe("DesktopBrowser URL admission", () => {
   );
 });
 
-describe("DesktopBrowser layout admission", () => {
-  const layout: DesktopBrowser.Layout = {
-    sequence: 1,
-    visible: true,
-    rect: { x: -10.5, y: 120, width: 1000.25, height: 600 },
+describe("DesktopBrowser guest mounts", () => {
+  const mount: DesktopBrowser.GuestMount = {
+    src: `${DesktopBrowser.MOUNT_URL_PREFIX}native-issued_claim-1`,
   };
 
-  it("preserves finite CSS pixels and accepts a hidden zero-size viewport", () => {
-    expect(DesktopBrowser.parseLayout(layout)).toEqual(layout);
-    expect(
-      DesktopBrowser.parseLayout({
-        sequence: 2,
-        visible: false,
-        rect: { x: 0, y: 0, width: 0, height: 0 },
-      })
-    ).not.toBeNull();
-    expect(Object.isFrozen(DesktopBrowser.parseLayout(layout)?.rect)).toBe(
-      true
+  it("accepts only the bounded immutable bootstrap projection", () => {
+    const parsed = DesktopBrowser.parseGuestMount(
+      JSON.parse(JSON.stringify(mount))
     );
-  });
-
-  it("refuses invalid revisions, unbounded geometry and caller-owned zoom", () => {
-    for (const sequence of [
-      0,
-      -1,
-      1.5,
-      Infinity,
-      Number.MAX_SAFE_INTEGER + 1,
-    ]) {
-      expect(DesktopBrowser.parseLayout({ ...layout, sequence })).toBeNull();
-    }
-    for (const [key, value] of [
-      ["x", Infinity],
-      ["y", NaN],
-      ["x", 1_000_001],
-      ["y", -1_000_001],
-      ["width", -1],
-      ["height", 16385],
-    ] as const) {
-      expect(
-        DesktopBrowser.parseLayout({
-          ...layout,
-          rect: { ...layout.rect, [key]: value },
-        })
-      ).toBeNull();
-    }
-    expect(DesktopBrowser.parseLayout({ ...layout, zoom: 2 })).toBeNull();
+    expect(parsed).toEqual(mount);
+    expect(Object.isFrozen(parsed)).toBe(true);
     expect(
-      DesktopBrowser.parseLayout({
-        ...layout,
-        rect: { ...layout.rect, windowId: "other" },
-      })
-    ).toBeNull();
-  });
-
-  it("preserves omitted radius for existing rectangular layouts", () => {
-    const parsed = DesktopBrowser.parseLayout(layout);
-    expect(parsed).toEqual(layout);
-    expect(parsed).not.toHaveProperty("borderRadius");
-    expect(
-      DesktopBrowser.parseLayout({ ...layout, borderRadius: undefined })
-    ).toEqual(layout);
-    expectTypeOf<DesktopBrowser.Layout["borderRadius"]>().toEqualTypeOf<
-      number | undefined
-    >();
-  });
-
-  it("round-trips fractional, zero and maximum viewport corner radii", () => {
-    for (const borderRadius of [0, 7.75, 8192]) {
-      const rounded: DesktopBrowser.Layout = { ...layout, borderRadius };
-      const parsed = DesktopBrowser.parseLayout(
-        JSON.parse(JSON.stringify(rounded))
-      );
-      expect(parsed).toEqual(rounded);
-      expect(Object.isFrozen(parsed)).toBe(true);
-      expect(Object.isFrozen(parsed?.rect)).toBe(true);
-    }
-    // Radius is presentation input; native applies the dimension clamp.
-    expect(
-      DesktopBrowser.parseLayout({
-        sequence: 2,
-        visible: false,
-        rect: { x: 0, y: 0, width: 0, height: 0 },
-        borderRadius: 7.75,
+      DesktopBrowser.parseGuestMount({
+        src: `${DesktopBrowser.MOUNT_URL_PREFIX}${"a".repeat(128)}`,
       })
     ).not.toBeNull();
+    // Syntax is not native admission; the parser cannot establish who issued a claim.
+    expect(DesktopBrowser.normalizeUrl(mount.src)).toBeNull();
   });
 
-  it("refuses malformed or unbounded corner radii and unsupported clip geometry", () => {
-    for (const borderRadius of [
-      -1,
-      NaN,
-      Infinity,
-      -Infinity,
-      8192.01,
-      "8px",
-      null,
-      {},
-      [],
-      { topLeft: 8 },
+  it.each([
+    null,
+    undefined,
+    [],
+    {},
+    { src: null },
+    { src: "" },
+    { src: "about:blank" },
+    { src: "https://example.com/" },
+    { src: "javascript:alert(1)" },
+    { src: "file:///tmp/guest" },
+    { src: "about:blank#mount=claim" },
+    { src: `${DesktopBrowser.MOUNT_URL_PREFIX}` },
+    { src: `${DesktopBrowser.MOUNT_URL_PREFIX}${"a".repeat(129)}` },
+    { src: `${DesktopBrowser.MOUNT_URL_PREFIX}claim?partition=app` },
+    { src: `${DesktopBrowser.MOUNT_URL_PREFIX}claim%2Fother` },
+    { src: `${DesktopBrowser.MOUNT_URL_PREFIX}claim\n` },
+    { src: `${DesktopBrowser.MOUNT_URL_PREFIX}🐈` },
+  ])("refuses a malformed or unbounded bootstrap: %j", (value) => {
+    expect(DesktopBrowser.parseGuestMount(value)).toBeNull();
+  });
+
+  it("rejects native options, guest IDs and geometry at the mount boundary", () => {
+    for (const extra of [
+      { webContentsId: 1 },
+      { partition: "persist:app" },
+      { preload: "/tmp/preload.js" },
+      { webPreferences: {} },
+      { rect: { x: 0, y: 0, width: 400, height: 300 } },
+      { visible: true },
+      { borderRadius: 8 },
+      { clip: {} },
     ])
-      expect(
-        DesktopBrowser.parseLayout({ ...layout, borderRadius })
-      ).toBeNull();
+      expect(DesktopBrowser.parseGuestMount({ ...mount, ...extra })).toBeNull();
+    expect(DesktopBrowser).not.toHaveProperty("parseLayout");
+    expect(DesktopBrowser).not.toHaveProperty("MAX_LAYOUT_EDGE");
+    expect(DesktopBrowser).not.toHaveProperty("MAX_LAYOUT_POSITION");
+  });
+
+  it("requires actual guest presence and represents preguest mount failure honestly", () => {
     expect(
-      DesktopBrowser.parseLayout({
-        ...layout,
-        clip: { rect: layout.rect, borderRadius: 8 },
-      })
-    ).toBeNull();
-    expect(
-      DesktopBrowser.parseLayout({ ...layout, borderRadius: 8, zoom: 2 })
-    ).toBeNull();
-    expect(
-      DesktopBrowser.parseLayout({
-        ...layout,
-        borderRadius: 8,
-        rect: { ...layout.rect, height: NaN },
-      })
-    ).toBeNull();
+      DesktopBrowser.parsePage(
+        page({
+          mounted: false,
+          failure: {
+            kind: "mount",
+            code: "timeout",
+            message: "The page could not be mounted.",
+          },
+        })
+      )
+    ).not.toBeNull();
+    expect(DesktopBrowser.parsePage(page({ mounted: true }))).not.toBeNull();
+    const { mounted: _missing, ...legacy } = page();
+    expect(DesktopBrowser.parsePage(legacy)).toBeNull();
+    for (const mounted of [undefined, null, 0, "false"])
+      expect(DesktopBrowser.parsePage({ ...page(), mounted })).toBeNull();
   });
 });
 
@@ -276,7 +251,7 @@ const thumbnail = (
 });
 
 describe("DesktopBrowser viewport thumbnails", () => {
-  it("keeps the presentation read independently optional on version-one hosts", () => {
+  it("keeps the presentation read independently optional on version-two hosts", () => {
     const older: Pick<DesktopBrowser.Bridge, "thumbnail"> = {};
     expect(older.thumbnail).toBeUndefined();
     expectTypeOf<
@@ -288,7 +263,7 @@ describe("DesktopBrowser viewport thumbnails", () => {
     expectTypeOf<keyof DesktopBrowser.Thumbnail>().toEqualTypeOf<
       "dataUrl" | "width" | "height"
     >();
-    expect(DesktopBrowser.VERSION).toBe(1);
+    expect(DesktopBrowser.VERSION).toBe(2);
   });
 
   it("accepts and freezes the bounded JPEG display projection", () => {
@@ -500,7 +475,7 @@ describe("DesktopBrowser authoritative state", () => {
       )
     ).toBeNull();
     expect(
-      DesktopBrowser.parseSnapshot({ ...snapshot(), version: 2 })
+      DesktopBrowser.parseSnapshot({ ...snapshot(), version: 1 })
     ).toBeNull();
     expect(
       DesktopBrowser.parseSnapshot({ ...snapshot(), ownerWindowId: 5 })

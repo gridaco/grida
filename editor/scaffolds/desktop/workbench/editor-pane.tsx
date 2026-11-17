@@ -295,8 +295,8 @@ export function EditorPane({
             )}
           >
             <div
-              data-browser-frame
-              className="relative h-full overflow-hidden rounded-lg border border-border bg-background shadow-[0_1px_2px_rgb(0_0_0/0.04),0_8px_24px_-8px_rgb(0_0_0/0.12)]"
+              tabIndex={-1}
+              className="grida-content-frame relative h-full overflow-hidden border-border bg-background shadow-[0_1px_2px_rgb(0_0_0/0.04),0_8px_24px_-8px_rgb(0_0_0/0.12)]"
             >
               {showStart ? (
                 <StartTabContent
