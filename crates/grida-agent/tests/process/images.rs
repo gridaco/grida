@@ -12,6 +12,9 @@ const GATEWAY_ENDPOINT: &str = "https://grida.co/api/v1/ai";
 const ARTIFACTS: &str = "co.grida/session/artifacts";
 const INPUT_IMAGE: &str = "co.grida/session/input-image";
 
+#[path = "tool_images.rs"]
+mod tool_images;
+
 #[path = "raster_images.rs"]
 mod raster_images;
 

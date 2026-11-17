@@ -55,9 +55,7 @@ export class WorkspaceSurfaceHost {
    */
   async restoreRelative(state: WorkspaceViewState.Tabs): Promise<void> {
     const expectedSnapshot = this.group.getSnapshot();
-    const restored = await Promise.all(
-      state.open.map((path) => this.resolveOpenableRelative(path))
-    );
+    const restored = await this.resolveRelativePaths(state.open);
     if (this.group.getSnapshot() !== expectedSnapshot) return;
 
     const paths = restored.filter((path): path is string => path !== null);
@@ -72,6 +70,14 @@ export class WorkspaceSurfaceHost {
           ? WorkbenchTab.file(requestedActive)
           : null,
     });
+  }
+
+  /** Resolve remembered file paths without mutating the tab group. */
+  async resolveRelativePaths(paths: readonly string[]): Promise<string[]> {
+    const resolved = await Promise.all(
+      paths.map((path) => this.resolveOpenableRelative(path))
+    );
+    return resolved.filter((path): path is string => path !== null);
   }
 
   private async resolveOpenableRelative(path: string): Promise<string | null> {

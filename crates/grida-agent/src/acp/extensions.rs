@@ -15,6 +15,7 @@ pub(super) mod library;
 mod lifecycle;
 mod model_change;
 mod processes;
+pub(super) mod tool_images;
 pub(super) use processes::PROCESSES;
 mod questions;
 mod routes;
@@ -138,6 +139,7 @@ fn capability_keys(
         .chain(input_images::capability(reviewer))
         .chain(input_images::chunks_capability(reviewer))
         .chain(input_images::queued_capability(reviewer))
+        .chain(tool_images::capability(reviewer))
         .chain([catalog::ORGANIZE, catalog::ARCHIVE_CATALOG])
         .chain(delete_chat.then_some(deletion::DELETE))
         .chain(delete_chat.then_some(deletion::PREVIEW))
@@ -558,6 +560,7 @@ pub(super) fn handlers(
         .extend(skills::handlers(host.clone(), sessions.clone()))
         .extend(summaries::handlers(host.clone(), sessions.clone()))
         .extend(input_images::handlers(host.clone(), sessions.clone()))
+        .extend(tool_images::handlers(host.clone(), sessions.clone()))
         .extend(gateway_billing::handlers(host.clone(), sessions.clone()))
         .extend(goals::handlers(
             host.clone(),

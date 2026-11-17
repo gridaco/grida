@@ -67,6 +67,19 @@ describe("tool-media — view_image", () => {
     expect(mediaError(err)).toBe("No file at /missing.png.");
     expect(mediaPath(err)).toBe("/missing.png");
   });
+
+  it("surfaces the native failed-tool message instead of silently showing only its path", () => {
+    const failed: ToolCallEntry = {
+      type: "tool-view_image",
+      toolCallId: "view-failed",
+      input: { path: "/missing.png" },
+      state: "output-error",
+      errorText: "The source image could not be read.",
+    } as ToolCallEntry;
+    expect(mediaError(failed)).toBe("The source image could not be read.");
+    expect(mediaImageSrc(failed)).toBeUndefined();
+    expect(mediaPath(failed)).toBe("/missing.png");
+  });
 });
 
 describe("tool-media — generate_image", () => {

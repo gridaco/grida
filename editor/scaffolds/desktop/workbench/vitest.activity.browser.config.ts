@@ -25,6 +25,8 @@ export default defineConfig(async () => {
         "react",
         "react-dom",
         "react-dom/client",
+        "sonner",
+        "next-themes",
         "react-resizable-panels",
         "@xterm/xterm",
         "@xterm/addon-fit",
@@ -55,6 +57,9 @@ export default defineConfig(async () => {
     },
     test: {
       include: [
+        "scaffolds/desktop/workbench/conversation-scrollbar.browser.tsx",
+        "scaffolds/desktop/workbench/native-chat-focus.browser.tsx",
+        "scaffolds/desktop/workbench/native-tool-image.browser.tsx",
         "scaffolds/desktop/workbench/native-message-revision.browser.tsx",
         "scaffolds/desktop/workbench/native-permission-mode.browser.tsx",
         "scaffolds/desktop/workbench/native-agent-activity.browser.tsx",

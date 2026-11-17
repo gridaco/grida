@@ -70,6 +70,7 @@ describe("ipc_admission", () => {
     expect(allowedFor("main", "/desktop/tools")).toEqual(
       allChannels.filter(
         (channel) =>
+          !channel.startsWith("grida:browser:") &&
           !channel.startsWith("grida:provider:endpoint:") &&
           !channel.startsWith("grida:hooks:") &&
           !channel.startsWith("grida:archives:") &&
@@ -79,6 +80,61 @@ describe("ipc_admission", () => {
           channel !== IPC_CHANNELS.WELCOME_CHAT_PROFILES &&
           !(documentFiles as readonly IpcChannel[]).includes(channel)
       )
+    );
+  });
+
+  it("admits browser control only from the main workspace shell", () => {
+    const browser = allChannels.filter(
+      (channel) =>
+        channel.startsWith("grida:browser:") &&
+        channel !== IPC_CHANNELS.BROWSER_CLEAR_BROWSING_DATA &&
+        channel !== IPC_CHANNELS.BROWSER_HISTORY_QUERY &&
+        channel !== IPC_CHANNELS.BROWSER_HISTORY_REMOVE &&
+        channel !== IPC_CHANNELS.BROWSER_CLEAR_HISTORY &&
+        channel !== IPC_CHANNELS.BROWSER_CLEAR_CACHE &&
+        channel !== IPC_CHANNELS.BROWSER_RESET_PERMISSIONS &&
+        channel !== IPC_CHANNELS.BROWSER_DOWNLOAD_PREFERENCES &&
+        channel !== IPC_CHANNELS.BROWSER_SET_DOWNLOAD_PROMPT &&
+        channel !== IPC_CHANNELS.BROWSER_CHOOSE_DOWNLOAD_DIRECTORY &&
+        channel !== IPC_CHANNELS.BROWSER_OPEN_PAGE
+    );
+    expect(browser.length).toBeGreaterThan(0);
+    for (const channel of browser) {
+      expect(allowedFor("main", "/desktop/workspace")).toContain(channel);
+      for (const route of [
+        "/desktop/settings",
+        "/desktop/welcome",
+        "/desktop/tools",
+        "/desktop/file",
+        "/desktop/auth/sign-in",
+      ]) {
+        expect(allowedFor("main", route)).not.toContain(channel);
+      }
+      expect(allowedFor("sign-in", "/desktop/auth/sign-in")).not.toContain(
+        channel
+      );
+      expect(allowedFor("onboarding", "/desktop/onboarding")).not.toContain(
+        channel
+      );
+    }
+  });
+
+  it("admits global browser clearing only from Main workspace or Settings", () => {
+    const channel = IPC_CHANNELS.BROWSER_CLEAR_BROWSING_DATA;
+    expect(allowedFor("main", "/desktop/settings")).toContain(channel);
+    expect(allowedFor("main", "/desktop/workspace")).toContain(channel);
+    for (const pathname of [
+      "/desktop/welcome",
+      "/desktop/file",
+      "/desktop/tools",
+      "/desktop/settings/other",
+    ])
+      expect(allowedFor("main", pathname)).not.toContain(channel);
+    expect(allowedFor("sign-in", "/desktop/auth/sign-in")).not.toContain(
+      channel
+    );
+    expect(allowedFor("onboarding", "/desktop/onboarding")).not.toContain(
+      channel
     );
   });
 
@@ -340,3 +396,23 @@ function allowedFor(
     ipc_admission.allows({ role, channel, pathname, selectedDocument })
   );
 }
+
+it("admits history metadata operations only from current Main workspace and Settings routes", () => {
+  for (const channel of [
+    IPC_CHANNELS.BROWSER_HISTORY_QUERY,
+    IPC_CHANNELS.BROWSER_HISTORY_REMOVE,
+  ]) {
+    expect(allowedFor("main", "/desktop/workspace")).toContain(channel);
+    expect(allowedFor("main", "/desktop/settings")).toContain(channel);
+    for (const pathname of [
+      "/desktop/tools",
+      "/desktop/welcome",
+      "/desktop/file",
+      "/desktop/settings/other",
+    ])
+      expect(allowedFor("main", pathname)).not.toContain(channel);
+    expect(allowedFor("sign-in", "/desktop/auth/sign-in")).not.toContain(
+      channel
+    );
+  }
+});

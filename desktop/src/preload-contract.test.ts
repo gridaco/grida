@@ -47,6 +47,11 @@ describe("Desktop preload agent seam", () => {
       /IPC_CHANNELS\.NATIVE_CHAT_READ_QUEUED_ATTACHMENT_PREVIEW,\s*attachmentId,\s*observationId,\s*inputId,\s*previewId/
     );
   });
+  it("keeps retained tool pixels on a dedicated token reader", () => {
+    expect(preloadSource).toMatch(
+      /readToolImage:\s*\(attachmentId, previewId\) =>\s*nativeChatInvoke\(\s*IPC_CHANNELS\.NATIVE_CHAT_READ_TOOL_IMAGE,\s*attachmentId,\s*previewId/
+    );
+  });
   it("publishes non-minting endpoint consent inspection and metadata operations through Main IPC", () => {
     expect(preloadSource).toMatch(
       /IPC_CHANNELS\.PROVIDER_ENDPOINT_AUTHORIZATION,\s*id,\s*baseUrl/

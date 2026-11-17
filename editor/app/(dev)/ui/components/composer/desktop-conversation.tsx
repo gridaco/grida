@@ -16,7 +16,6 @@ import {
 import { native_message_parts } from "@/lib/agent-chat/native-message-parts";
 import { turn_activity } from "@/lib/agent-chat/turn-activity";
 import { NativeTurnActivity } from "@/scaffolds/desktop/workbench/native-turn-activity";
-import styles from "@/scaffolds/desktop/workbench/agent-pane.module.css";
 import { DesktopConversationFixtures as fixtures } from "./desktop-conversation-fixtures";
 
 /** The Desktop transcript components with local, read-only example messages. */
@@ -69,8 +68,9 @@ export function DesktopConversation({
       resize={running ? "smooth" : "instant"}
     >
       <ConversationContent
+        scrollbar="custom"
         className="gap-4 px-3 py-4"
-        scrollClassName={`${styles.chatScroll} desktop-native-drag-scroll-viewport scroll-fade-y scroll-fade-4`}
+        scrollClassName="desktop-native-drag-scroll-viewport scroll-fade-y scroll-fade-4"
       >
         {messages.length === 0 ? (
           <ConversationEmptyState
@@ -96,8 +96,12 @@ export function DesktopConversation({
             )
           )
         )}
-        {running && messages.length > 0 && messages.at(-1)?.role === "user" && (
-          <PendingTurnIndicator />
+        {running && messages.length > 0 && (
+          <PendingTurnIndicator
+            key={example.id}
+            progress={messages}
+            immediate={messages.at(-1)?.role === "user"}
+          />
         )}
       </ConversationContent>
       <ConversationScrollButton aria-label="Scroll to latest message" />

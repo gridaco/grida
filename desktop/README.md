@@ -7,6 +7,12 @@ hosted editor under `/desktop/*`, exposes a path-scoped preload bridge,
 and supervises the native Rust chat host over private ACP pipes. A retained
 service sidecar keeps files, workspaces, recents, provider settings and media.
 
+Workspace content tabs also host an isolated built-in browser. Browser pages
+use DOM `<webview>` presentation under Main-owned admission and browser policy,
+and work independently of chat. See the
+[browser reference](./docs/browser.md) for navigation, shared history and website data, website support
+and live composition verification.
+
 The conversation master and durable chat execution live in the Rust workspace.
 Shared retained media operations live in `@grida/ai`; their HTTP adapters remain
 in `@grida/ai-host`. Desktop stays thin: windows, menus,
@@ -222,6 +228,17 @@ capabilities keep plain file cards. PDF, SVG
 and HTML have no chat preview, and folder cards remain free of size and
 preview metadata. Presentation changes neither
 provider perception nor filesystem authority.
+
+Captured tool images separately negotiate `co.grida/session/tool-images`.
+Successful tool results carry at most eight PNG image references; Main replaces
+their native media identities with opaque renderer tokens bound to the exact
+chat, turn, tool call and result part. `readToolImage` reads those prepared,
+retained pixels in chunks of at most 256 KiB, up to 384 KiB per image. It never
+rereads the original source path, invokes inference or reruns a tool. Retained
+images remain readable after source mutation or removal and after reopening
+the chat. Missing bytes report unavailable; failed tool results grant no read.
+Input-attachment and crop readers do not accept these identities. Older native
+hosts omit the image metadata and retain their readable tool-result text.
 
 Queued attachment display separately negotiates
 `co.grida/session/queued-input-image-chunks`. `queuedMessage` returns full text

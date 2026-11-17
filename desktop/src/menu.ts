@@ -5,6 +5,7 @@ import {
   MenuItemConstructorOptions,
   Menu,
   dialog,
+  session,
   type BaseWindow,
 } from "electron";
 import { existsSync, statSync } from "node:fs";
@@ -390,7 +391,13 @@ async function rebuild_application_menu_locked(
 function is_workspace_window(window: BrowserWindow): boolean {
   try {
     const url = new URL(window.webContents.getURL());
-    return url.pathname === "/desktop/workspace";
+    // GRIDA-SEC-016 — managed website windows never become workbench chrome
+    // by browsing an editor-shaped pathname in the isolated browser Session.
+    return (
+      window.webContents.session === session.defaultSession &&
+      url.origin === new URL(EDITOR_BASE_URL).origin &&
+      url.pathname === "/desktop/workspace"
+    );
   } catch {
     return false;
   }
@@ -401,7 +408,7 @@ function close_tab_or_window(baseWindow?: BaseWindow): void {
     baseWindow instanceof BrowserWindow
       ? baseWindow
       : BrowserWindow.getFocusedWindow();
-  if (!focusedWindow) return;
+  if (!focusedWindow || focusedWindow.isDestroyed()) return;
   if (is_workspace_window(focusedWindow)) {
     focusedWindow.webContents.send(
       IPC_CHANNELS.WORKSPACE_COMMAND,
@@ -410,6 +417,16 @@ function close_tab_or_window(baseWindow?: BaseWindow): void {
     return;
   }
   focusedWindow.close();
+}
+
+function open_start_tab(baseWindow?: BaseWindow): void {
+  const window =
+    baseWindow instanceof BrowserWindow
+      ? baseWindow
+      : BrowserWindow.getFocusedWindow();
+  if (!window || !is_workspace_window(window)) return;
+  window.webContents.focus();
+  window.webContents.send(IPC_CHANNELS.WORKSPACE_COMMAND, "workspace.tabs.new");
 }
 
 function toggle_workspace_terminal(baseWindow?: BaseWindow): void {
@@ -613,6 +630,12 @@ export default function create_menu(
     {
       label: "File",
       submenu: [
+        {
+          label: "New Tab",
+          accelerator: "CmdOrCtrl+T",
+          enabled: opts?.windowAdmission?.can_open() ?? true,
+          click: (_item, window) => open_start_tab(window),
+        },
         {
           label: "New Window",
           accelerator: "CmdOrCtrl+Shift+N",

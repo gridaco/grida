@@ -24,6 +24,8 @@ import {
   type ServicesSidecarInfo,
 } from "./main/services-sidecar-supervisor";
 import { registerIpcHandlers } from "./main/ipc-handlers";
+import { BrowserHistory } from "./main/browser-history";
+import { BrowserDownloads } from "./main/browser-downloads";
 import { disposeAllTerminals } from "./main/terminal-host";
 import { disposeAllWorkspaceWatches } from "./main/workspace-watcher-host";
 import { servicesSidecarClient } from "./main/services-sidecar-client";
@@ -131,6 +133,8 @@ registerWorkspaceMediaScheme();
 // main. Auxiliary document/settings/workspace windows are admitted and
 // registered through this controller only after it reaches `main`.
 let entryWindow: DesktopEntryWindow | null = null;
+let browserHost: ReturnType<typeof registerIpcHandlers> | undefined;
+let browserHistory: BrowserHistory | undefined;
 const workspaceReview = new NativeWorkspaceReview(
   new URL(EDITOR_BASE_URL).origin,
   (window) => entryWindow?.ipcRoleFor(window) === "main"
@@ -181,16 +185,37 @@ function destroyAfterIpcReply(window: BrowserWindow): void {
 }
 
 app.on("web-contents-created", (_event, contents) => {
+  // GRIDA-SEC-016 — installed before any renderer can create a webview. The
+  // browser host may not exist yet; absence is denial, never guest authority.
+  contents.on("will-attach-webview", (event, preferences, params) => {
+    if (browserHost)
+      browserHost.willAttach(contents, event, preferences, params);
+    else event.preventDefault();
+  });
+  contents.on("did-attach-webview", (_event, guest) => {
+    if (browserHost) browserHost.didAttach(contents, guest);
+    else if (!guest.isDestroyed()) guest.close({ waitForBeforeUnload: false });
+  });
+  browserHost?.createdContents(contents);
+
   const reconcileContainedAuthControl = (rawUrl: string) => {
     const path = DesktopEntryWindow.authControlPathForUrl(
       rawUrl,
       EDITOR_BASE_URL
     );
-    if (!path) return;
+    if (!path || contents.isDestroyed()) return;
 
     const controller = entryWindow;
     const source = BrowserWindow.fromWebContents(contents);
-    if (!controller || !source) return;
+    // GRIDA-SEC-016 — browsing /desktop/auth in a guest cannot alter the shell.
+    if (
+      !controller ||
+      !source ||
+      source.isDestroyed() ||
+      source.webContents !== contents ||
+      (source !== controller.window && controller.ipcRoleFor(source) === null)
+    )
+      return;
 
     // A contained auth navigation is only a signal to re-probe the cookie
     // session; the URL itself never grants or selects a native role. Hide the
@@ -854,6 +879,7 @@ app.on("ready", async () => {
       ]);
     },
     on_role_change: (role) => {
+      if (role !== "main") browserHost?.closeAll();
       refresh_recent_menu();
       if (role === "main") {
         dispatchPendingLaunchIntents();
@@ -864,7 +890,17 @@ app.on("ready", async () => {
   // Native-OS IPC handlers are needed before any window opens —
   // otherwise the renderer's first bridge call races the registration.
   const native = nativeDesktopAgent;
-  registerIpcHandlers({
+  try {
+    browserHistory = await BrowserHistory.open(app.getPath("userData"));
+  } catch {
+    console.warn("[grida] browser history is unavailable");
+  }
+  browserHost = registerIpcHandlers({
+    browser_history: browserHistory,
+    browser_downloads: new BrowserDownloads(
+      app.getPath("userData"),
+      app.getPath("downloads")
+    ),
     resolve_ipc_role: (window) => entryWindow?.ipcRoleFor(window) ?? null,
     open_settings: () => open_or_focus_settings(app, windowAdmission),
     archives: createDesktopArchives(
@@ -1039,12 +1075,18 @@ app.on("will-quit", (event) => {
   }
   entryWindow?.beginShutdown();
   if (
-    (!nativeDesktopAgent && !nativeEditorMcp && !nativeExternalRuns) ||
+    (!nativeDesktopAgent &&
+      !nativeEditorMcp &&
+      !nativeExternalRuns &&
+      !browserHistory) ||
     nativeQuitReady
   )
     return;
   event.preventDefault();
   nativeQuitDrain ??= Promise.allSettled([
+    browserHistory
+      ?.flush()
+      .catch(() => console.warn("[grida] browser history could not be saved")),
     nativeDesktopAgent?.close(),
     nativeEditorMcp?.close(),
     nativeExternalRuns?.close(),

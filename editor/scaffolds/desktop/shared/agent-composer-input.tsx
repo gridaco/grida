@@ -124,6 +124,7 @@ export type AgentComposerInputProps = {
    */
   draft?: { key: string; store: ComposerDrafts };
   placeholder?: string;
+  /** Focus on mount and when switching to another chat's restored draft. */
   autofocus?: boolean;
   /** Send dropped or pasted items to the surface's own attachment intake. */
   onAttachmentTransfer?: (event: ComposerTransfer.Event) => void;
@@ -217,7 +218,7 @@ function AgentComposerInner({
   const editOwner = draftKey ?? submissionScope;
   const [binding] = useState(() => new ComposerDraftBinding());
   useEffect(() => {
-    if (!draftKey || !draftStore) return;
+    if (!draftKey || !draftStore || !composer.ready) return;
     const meeting = binding.meet(draftKey);
     if (meeting === "held") return;
     if (meeting === "renamed") {
@@ -226,10 +227,22 @@ function AgentComposerInner({
     }
     const saved = draftStore.read(draftKey);
     if (binding.held !== null) composer.clear();
-    if (saved === null || restoreDocument(saved)) binding.restored(draftKey);
+    if (saved === null || restoreDocument(saved)) {
+      binding.restored(draftKey);
+      if (autofocus) composer.focus();
+    }
     // composer.clear is stable for a given editor, like restoreDocument.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [binding, draftKey, draftStore, readDocument, restoreDocument]);
+  }, [
+    binding,
+    draftKey,
+    draftStore,
+    readDocument,
+    restoreDocument,
+    composer.ready,
+    composer.focus,
+    autofocus,
+  ]);
   useEffect(() => {
     if (!draftKey || !draftStore || binding.held !== draftKey) return;
     draftStore.write(draftKey, editSession.document(editOwner, readDocument()));
@@ -497,7 +510,7 @@ function AgentComposerInner({
         onTransfer={editing ? () => {} : onAttachmentTransfer}
         placeholder={placeholder}
         className="px-3 pt-2"
-        editorClassName="min-h-9 max-h-48 overflow-y-auto text-[15px] leading-6"
+        editorClassName="min-h-9 max-h-48 overflow-y-auto text-[14px] leading-[23px] font-[375] text-[color:color-mix(in_srgb,var(--foreground)_90%,var(--background))]"
       />
       {notice && (
         <p className="px-3 pb-1 text-xs text-muted-foreground">{notice}</p>

@@ -39,6 +39,7 @@ mod sponsorship;
 pub(crate) mod subagent_activity;
 mod subagents;
 mod titles;
+pub(crate) mod tool_images;
 mod wakeups;
 pub use access::{PermissionModeReceipt, PermissionModeSnapshot, PermissionModeUpdate};
 pub use catalog::SessionCatalog;

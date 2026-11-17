@@ -116,6 +116,12 @@ async fn standard_acp_catalog_discovers_saved_workspace_sessions_without_loading
         [a_sessions[1].as_str(), a_sessions[0].as_str()]
     );
     assert!(second["result"]["nextCursor"].is_null());
+    assert!(second["result"]["sessions"][0].get("_meta").is_none());
+    assert!(
+        second["result"]["sessions"][1]["_meta"]["co.grida/lastActivityAtMs"]
+            .as_u64()
+            .is_some_and(|timestamp| timestamp > 0)
+    );
     let other = ws_rpc(&mut client, 8, "session/list", json!({"cwd":b.path()})).await;
     assert_eq!(ids(&other["result"]), [b_id.as_str()]);
     let unattached = ws_rpc(
@@ -158,6 +164,7 @@ async fn standard_acp_catalog_discovers_saved_workspace_sessions_without_loading
     let fork = fork["result"]["sessionId"].as_str().unwrap();
     let with_fork = ws_rpc(&mut client, 13, "session/list", json!({"cwd":a.path()})).await;
     assert_eq!(ids(&with_fork["result"])[0], fork);
+    assert!(with_fork["result"]["sessions"][0].get("_meta").is_none());
     terminate_shared_server(child).await;
 }
 
@@ -167,6 +174,7 @@ async fn organizer(url: &str) -> SharedSocket {
         .unwrap();
     let mut request = extension_initialize();
     request["clientCapabilities"]["_meta"]["co.grida/session/organize"] = 1.into();
+    request["clientCapabilities"]["_meta"]["co.grida/settings/archive-catalog"] = 1.into();
     let init = ws_rpc(&mut socket, 1, "initialize", request).await;
     assert_eq!(
         init["result"]["agentCapabilities"]["_meta"]["co.grida/session/organize"],
@@ -185,6 +193,25 @@ async fn archived_chat_keeps_its_turn_and_reopens_with_the_same_title() {
     let (first, url) = shared_server(&state, &endpoint.url).await;
     let mut socket = organizer(&url).await;
     let session = new_session(&mut socket, 2, workspace.path()).await;
+    let fresh = ws_rpc(
+        &mut socket,
+        20,
+        "_co.grida/session/catalog-entry",
+        json!({"sessionId":session}),
+    )
+    .await;
+    assert!(fresh["result"].get("lastActivityAtMs").is_none());
+    let forged = ws_rpc(
+        &mut socket,
+        21,
+        "_co.grida/session/organize",
+        json!({
+            "sessionId":session,"revision":0,"title":null,"archived":false,
+            "lastActivityAtMs":1,
+        }),
+    )
+    .await;
+    assert_eq!(forged["error"]["code"], -32602);
     let accepted = ws_rpc(
         &mut socket,
         3,
@@ -194,6 +221,17 @@ async fn archived_chat_keeps_its_turn_and_reopens_with_the_same_title() {
     .await;
     let turn = accepted["result"]["turnId"].as_str().unwrap();
     endpoint.request().await;
+    let running = ws_rpc(
+        &mut socket,
+        22,
+        "session/list",
+        json!({"cwd":workspace.path()}),
+    )
+    .await;
+    let started = running["result"]["sessions"][0]["_meta"]["co.grida/lastActivityAtMs"]
+        .as_u64()
+        .unwrap();
+    assert!(started > 0);
     let incomplete = ws_rpc(
         &mut socket,
         31,
@@ -211,6 +249,14 @@ async fn archived_chat_keeps_its_turn_and_reopens_with_the_same_title() {
     );
     let retry = ws_rpc(&mut socket, 5, "_co.grida/session/organize", draft).await;
     assert_eq!(retry["result"], archived["result"]);
+    let during = ws_rpc(
+        &mut socket,
+        24,
+        "_co.grida/session/catalog-entry",
+        json!({"sessionId":session}),
+    )
+    .await;
+    assert_eq!(during["result"]["lastActivityAtMs"], started);
     let stale = ws_rpc(
         &mut socket,
         6,
@@ -249,8 +295,40 @@ async fn archived_chat_keeps_its_turn_and_reopens_with_the_same_title() {
         snapshot["current"].is_null() && snapshot["latest"]["turnId"] == turn
     })
     .await;
+    let settled = ws_rpc(
+        &mut socket,
+        23,
+        "_co.grida/session/catalog-entry",
+        json!({"sessionId":session}),
+    )
+    .await;
+    let settled_at = settled["result"]["lastActivityAtMs"].as_u64().unwrap();
+    assert!(settled_at >= started);
+    let page = ws_rpc(
+        &mut socket,
+        25,
+        "_co.grida/settings/archive-catalog",
+        json!({"cwd":workspace.path()}),
+    )
+    .await;
+    assert_eq!(
+        page["result"],
+        json!({"entries":[{"sessionId":session,"title":"Reusable work","revision":1,"lastActivityAtMs":settled_at}],"nextCursor":null})
+    );
     drop(socket);
     terminate_shared_server(first).await;
+
+    let detached = Command::new(env!("CARGO_BIN_EXE_grida-agent"))
+        .args(["archive-catalog", "--state-dir"])
+        .arg(&state)
+        .arg("--cwd")
+        .arg(workspace.path())
+        .output()
+        .await
+        .unwrap();
+    assert!(detached.status.success(), "{detached:?}");
+    let detached: Value = serde_json::from_slice(&detached.stdout).unwrap();
+    assert_eq!(detached, page["result"]);
 
     let (second, url) = shared_server(&state, &endpoint.url).await;
     let mut socket = organizer(&url).await;
@@ -263,6 +341,10 @@ async fn archived_chat_keeps_its_turn_and_reopens_with_the_same_title() {
     .await;
     assert_eq!(ids(&list["result"]), [session.as_str()]);
     assert_eq!(list["result"]["sessions"][0]["title"], "Reusable work");
+    assert_eq!(
+        list["result"]["sessions"][0]["_meta"]["co.grida/lastActivityAtMs"],
+        settled_at
+    );
     let detached = ws_rpc(
         &mut socket,
         3,
@@ -286,7 +368,7 @@ async fn archived_chat_keeps_its_turn_and_reopens_with_the_same_title() {
         json!({"sessionId":session}),
     )
     .await;
-    assert_eq!(saved["result"], archived["result"]);
+    assert_eq!(saved["result"], settled["result"]);
     let restored = ws_rpc(
         &mut socket,
         6,
@@ -296,6 +378,7 @@ async fn archived_chat_keeps_its_turn_and_reopens_with_the_same_title() {
     .await;
     assert_eq!(restored["result"]["revision"], 2);
     assert_eq!(restored["result"]["archived"], false);
+    assert!(restored["result"].get("lastActivityAtMs").is_none());
     let active = ws_rpc(
         &mut socket,
         7,
@@ -305,6 +388,10 @@ async fn archived_chat_keeps_its_turn_and_reopens_with_the_same_title() {
     .await;
     assert_eq!(ids(&active["result"]), [session.as_str()]);
     assert_eq!(active["result"]["sessions"][0]["title"], "Reusable work");
+    assert_eq!(
+        active["result"]["sessions"][0]["_meta"]["co.grida/lastActivityAtMs"],
+        settled_at
+    );
     assert_eq!(
         session_snapshot(&mut socket, &session).await["latest"]["turnId"],
         turn
@@ -518,7 +605,7 @@ async fn settings_archives_are_scoped_metadata_without_attaching_or_model_execut
         .await
         .unwrap();
     assert_eq!(active.entries.len(), 1);
-    assert_eq!(active.entries[0].revision, 2);
+    assert_eq!(active.entries[0].entry.revision, 2);
     let id = agent_kit_core::SessionId::new(&session).unwrap();
     let view = host.inspect(id).await.unwrap();
     assert!(view.current.is_none() && view.latest.is_none());

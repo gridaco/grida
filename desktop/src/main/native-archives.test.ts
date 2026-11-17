@@ -48,6 +48,42 @@ function fixture() {
 }
 
 describe("Settings archives", () => {
+  it.each([false, true])(
+    "preserves retained activity using the active owner: %s",
+    async (open) => {
+      const { owner, execute, active } = fixture();
+      const atMs = 1_800_000_000_000;
+      const dated = {
+        entries: [{ ...page("saved").entries[0], lastActivityAtMs: atMs }],
+        nextCursor: null,
+      };
+      if (open)
+        active.mockReturnValue({
+          archiveCatalog: async () => dated,
+          unarchiveCatalog: async () => {},
+        });
+      else execute.mockResolvedValue(dated);
+      const result = await owner.list();
+      expect(result.entries[0]).toMatchObject({ lastActivityAtMs: atMs });
+      expect(result.entries[0].id).not.toBe("saved");
+      expect(execute).toHaveBeenCalledTimes(open ? 0 : 1);
+    }
+  );
+
+  it.each([null, -1, 0.5, "today", 8_640_000_000_000_001])(
+    "refuses an invalid retained activity timestamp: %s",
+    async (lastActivityAtMs) => {
+      const { owner, execute } = fixture();
+      execute.mockResolvedValue({
+        entries: [{ ...page("saved").entries[0], lastActivityAtMs }],
+        nextCursor: null,
+      });
+      const result = await owner.list();
+      expect(result.entries).toEqual([]);
+      expect(result.unavailableWorkspaces).toEqual(["First", "Second"]);
+    }
+  );
+
   it("lists across workspace stores in bounded pages and restores only issued metadata", async () => {
     const { owner, execute } = fixture();
     const first = await owner.list();

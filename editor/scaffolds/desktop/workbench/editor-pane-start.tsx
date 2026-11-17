@@ -1,13 +1,13 @@
 /**
- * Workspace-local Start surface. This is a faux tab shown only while the real
- * editor group is empty; it never enters tab history or the agent's open-surface
- * state.
+ * Workspace-local Start actions, shared by the empty workspace and the
+ * reusable Quick Start panel tab. They never enter the agent's open surfaces.
  */
 "use client";
 
 import { type ReactNode, useRef, useState } from "react";
 import {
   FolderOpenIcon,
+  GlobeIcon,
   ImagesIcon,
   Loader2Icon,
   PresentationIcon,
@@ -20,8 +20,10 @@ import type { WorkspaceCanvasCreation } from "./workspace-canvas-creation";
 export function EditorPaneStart({
   onOpenFileExplorer,
   onCreateCanvas,
+  onOpenBrowser,
 }: {
   onOpenFileExplorer: () => void;
+  onOpenBrowser?: () => void;
   onCreateCanvas: (editor: WorkspaceCanvasCreation.Editor) => Promise<void>;
 }) {
   const [creating, setCreating] =
@@ -65,6 +67,13 @@ export function EditorPaneStart({
             trailing={<Kbd>⌘B</Kbd>}
             onClick={onOpenFileExplorer}
           />
+          {onOpenBrowser && (
+            <StartAction
+              icon={<GlobeIcon />}
+              title="Open Browser"
+              onClick={onOpenBrowser}
+            />
+          )}
           <StartAction
             icon={
               creating === "board" ? (

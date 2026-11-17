@@ -34,13 +34,24 @@ messages.map((m, i) => (
   Grida tools expand to dedicated bodies (files, grep results, todos, commands,
   skills, images, questions); unknown tools fall back to a readable key/value
   summary.
+  Running tool labels shimmer, including a collapsed group's summary while any
+  call is running. Completed, failed and approval-waiting calls stay static.
+  Group icons and summary clauses share a ranking by action frequency, with
+  the most recently occurring action winning ties. File totals still count
+  distinct files; expanding a group keeps its calls in their original order.
 - **`question` tool** parts → only a passive record in the transcript ("asked you
   …" + the answered summary). The interactive prompt is **session-global**, not a
   transcript card — see below.
 
 Transcript-level indicators (rendered by the surface around the turn list, not
-per message): `PendingTurnIndicator` (pre-first-token) and `CompactionNotice`
-(where earlier context was summarized).
+per message): `PendingTurnIndicator` (labelled **Thinking**, immediately before
+first output and after 1.5 seconds of later quiet) and `CompactionNotice` (where
+earlier context was summarized). Pass a `progress` identity that changes only
+when streamed text or tool activity changes. Progress hides the pending indicator
+immediately and restarts its quiet delay; polling and history replay must not
+reset it. Set `immediate` while the active turn has no output yet. The surface
+hides it when paused, finished or waiting for the person,
+and keys it by turn identity to reset its elapsed counter.
 
 Only prose enters the user bubble's height measurement, collapse control,
 copy action and edit flow. Attachment-only messages do not create an empty
@@ -63,6 +74,15 @@ and releases its object URL on cleanup. A rejected or retired capability keeps
 the named fallback. The kit never resolves a filesystem path or discovers a
 preview URL. Ordinary image FileUIParts use their explicit raster data, blob or
 HTTP(S) source; file and custom schemes are not display capabilities.
+
+Successful `view_image` parts can carry retained `output.images` with opaque
+`previewId` values. Supply the separate `loadToolImage(previewId): Promise<Blob>`
+to `ChatMessageView` or `ToolCallGroupView`. It reuses the same retained-raster
+thumbnail/fullscreen viewer, bounded loading and URL cleanup as attachments;
+its host authorizes the exact tool result through a distinct read capability.
+The kit never rereads the displayed source path. Missing capability or bytes
+show **Preview unavailable**, and failed calls show their failure text without
+loading pixels. Legacy inline `{ok, mime, data}` results remain displayable.
 
 ## The agent's question (session-global)
 

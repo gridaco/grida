@@ -16,13 +16,35 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { PanelBottomIcon, PanelRightIcon, XIcon } from "lucide-react";
+import {
+  Loader2Icon,
+  PanelBottomIcon,
+  PanelRightIcon,
+  PlusIcon,
+  XIcon,
+} from "lucide-react";
 import { Toggle } from "@app/ui/components/toggle";
+import {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+} from "@app/ui/components/context-menu";
+import { Kbd } from "@app/ui/components/kbd";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@app/ui/components/tooltip";
 import { cn } from "@app/ui/lib/utils";
 import { getDesktopBridge, type Workspace } from "@/lib/desktop/bridge";
 import { DESKTOP_WINDOW_CONTROLS_RIGHT_INSET } from "@/scaffolds/desktop/chrome/title-bar";
 import { EditorPaneTab } from "./editor-pane-tab";
 import { EditorPaneStart } from "./editor-pane-start";
+import { BrowserPane } from "./browser-pane";
+import { BrowserTabIcon } from "./browser-tab-icon";
+import type { WorkspaceBrowserTabs } from "./workspace-browser-tabs";
 import { EditorTabPreview } from "./editor-tab-preview";
 import { TabNativeDragRegion } from "./tab-native-drag-region";
 import { TabPreviewController } from "./tab-preview-controller";
@@ -42,21 +64,27 @@ import {
   type WorkspaceWorkbenchCommand,
 } from "./workspace-workbench-keybindings";
 
+const START_PANEL_ID = "quick-start";
+
 export type EditorPaneProps = {
   workspace: Workspace;
   svgText?: WorkspaceSvgText;
   /** Content of the open panel tabs. */
   panels: WorkbenchPanels;
+  browsers?: WorkspaceBrowserTabs;
   /** Tab keys (`WorkbenchTab`) in strip order. */
   openTabs: readonly string[];
   activeTab: string | null;
   onSelectTab: (tab: string) => void;
-  onCloseTab: (tab: string) => void;
+  onCloseTab: (tab: string) => void | Promise<boolean>;
   onReopenClosedTab: () => void;
   /** Show the workspace-local faux Start tab while the real group is empty. */
   showStart: boolean;
   onOpenFileExplorer: () => void;
-  onCreateCanvas: (editor: WorkspaceCanvasCreation.Editor) => Promise<void>;
+  onCreateCanvas: (
+    editor: WorkspaceCanvasCreation.Editor,
+    replaceTab?: string
+  ) => Promise<void>;
   treeVisible: boolean;
   onToggleTree: () => void;
   hasBottomPane?: boolean;
@@ -73,6 +101,7 @@ export function EditorPane({
   workspace,
   svgText,
   panels,
+  browsers,
   openTabs,
   activeTab,
   onSelectTab,
@@ -90,6 +119,30 @@ export function EditorPane({
   onSaved,
   onFileTrashed,
 }: EditorPaneProps) {
+  const browserState = useSyncExternalStore(
+    browsers?.subscribe ?? noBrowserSubscription,
+    browsers?.getSnapshot ?? emptyBrowserSnapshot,
+    browsers?.getSnapshot ?? emptyBrowserSnapshot
+  );
+  const handleOpenStart = useCallback(() => {
+    if (showStart) return;
+    panels.show(
+      START_PANEL_ID,
+      {
+        title: "Quick Start",
+        content: (
+          <StartTabContent
+            browsers={browsers}
+            replaceTab={WorkbenchTab.panel(START_PANEL_ID)}
+            onOpenFileExplorer={onOpenFileExplorer}
+            onCreateCanvas={onCreateCanvas}
+          />
+        ),
+      },
+      () => {}
+    );
+    panels.reveal(START_PANEL_ID);
+  }, [showStart, panels, browsers, onOpenFileExplorer, onCreateCanvas]);
   const [dirtyPaths, setDirtyPaths] = useState<Set<string>>(() => new Set());
 
   const onTabDirtyChange = useCallback((relPath: string, dirty: boolean) => {
@@ -104,14 +157,14 @@ export function EditorPane({
   }, []);
 
   const handleClose = useCallback(
-    (tab: string) => {
+    async (tab: string): Promise<boolean> => {
       const relPath = WorkbenchTab.relPath(tab);
       if (relPath !== null && dirtyPaths.has(relPath)) {
         const name = relPath.split("/").pop() ?? relPath;
         const ok = window.confirm(
           `"${name}" has unsaved changes. Close anyway?`
         );
-        if (!ok) return;
+        if (!ok) return false;
       }
       if (relPath !== null)
         setDirtyPaths((prev) => {
@@ -120,9 +173,15 @@ export function EditorPane({
           next.delete(relPath);
           return next;
         });
-      onCloseTab(tab);
+      return (await onCloseTab(tab)) !== false;
     },
     [dirtyPaths, onCloseTab]
+  );
+  const handleCloseOthers = useCallback(
+    async (keep: string) => {
+      for (const tab of openTabs) if (tab !== keep) await handleClose(tab);
+    },
+    [openTabs, handleClose]
   );
   const shownPanels = useSyncExternalStore(
     panels.subscribe,
@@ -165,6 +224,56 @@ export function EditorPane({
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        !event.altKey &&
+        !event.isComposing
+      ) {
+        const action =
+          event.key === "+" || event.key === "="
+            ? "zoom-in"
+            : event.key === "-"
+              ? "zoom-out"
+              : event.key === "0"
+                ? "zoom-reset"
+                : !event.shiftKey && event.key.toLowerCase() === "p"
+                  ? "print"
+                  : null;
+        if (action && browsers?.commandActive(action)) {
+          event.preventDefault();
+          return;
+        }
+      }
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        !event.altKey &&
+        !event.shiftKey
+      ) {
+        if (
+          event.key.toLowerCase() === "f" &&
+          !event.isComposing &&
+          activeTab &&
+          WorkbenchTab.parse(activeTab).kind === "browser" &&
+          browsers?.findActive()
+        ) {
+          event.preventDefault();
+          return;
+        }
+        if (event.key.toLowerCase() === "t") {
+          event.preventDefault();
+          handleOpenStart();
+          return;
+        }
+        if (
+          event.key.toLowerCase() === "l" &&
+          activeTab &&
+          WorkbenchTab.parse(activeTab).kind === "browser"
+        ) {
+          event.preventDefault();
+          browsers?.focusLocation();
+          return;
+        }
+      }
       const command = matchWorkspaceWorkbenchKeybinding(event);
       if (!command) return;
       event.preventDefault();
@@ -173,6 +282,22 @@ export function EditorPane({
 
     function onWorkbenchCommand(event: Event) {
       const command = (event as CustomEvent<unknown>).detail;
+      if (
+        command === "workspace.tabs.new" ||
+        // Older native menus forward the former browser-specific command.
+        command === "workspace.browser.new"
+      ) {
+        handleOpenStart();
+        return;
+      }
+      if (command === "workspace.browser.find") {
+        browsers?.findActive();
+        return;
+      }
+      if (command === "workspace.browser.focus-location") {
+        browsers?.focusLocation();
+        return;
+      }
       if (!isWorkspaceWorkbenchCommand(command)) return;
       dispatchWorkspaceCommand(command);
     }
@@ -189,7 +314,7 @@ export function EditorPane({
         onWorkbenchCommand
       );
     };
-  }, [dispatchWorkspaceCommand]);
+  }, [dispatchWorkspaceCommand, handleOpenStart, browsers, activeTab]);
 
   return (
     <div className={cn("flex h-full w-full flex-col", className)}>
@@ -197,10 +322,14 @@ export function EditorPane({
         workspace={workspace}
         tabs={openTabs}
         panels={shownPanels}
+        browserEntries={browserState.entries}
+        browsers={browsers}
+        onOpenStart={handleOpenStart}
         activeTab={activeTab}
         dirtyPaths={dirtyPaths}
         onSelect={onSelectTab}
         onClose={handleClose}
+        onCloseOthers={handleCloseOthers}
         showStart={showStart}
         treeVisible={treeVisible}
         onToggleTree={onToggleTree}
@@ -218,9 +347,13 @@ export function EditorPane({
               hasBottomPane ? "pb-1.5" : "pb-3"
             )}
           >
-            <div className="relative h-full overflow-hidden rounded-lg border border-border bg-background shadow-[0_1px_2px_rgb(0_0_0/0.04),0_8px_24px_-8px_rgb(0_0_0/0.12)]">
+            <div
+              tabIndex={-1}
+              className="grida-content-frame relative h-full overflow-hidden border-border bg-background shadow-[0_1px_2px_rgb(0_0_0/0.04),0_8px_24px_-8px_rgb(0_0_0/0.12)]"
+            >
               {showStart ? (
-                <EditorPaneStart
+                <StartTabContent
+                  browsers={browsers}
                   onOpenFileExplorer={onOpenFileExplorer}
                   onCreateCanvas={onCreateCanvas}
                 />
@@ -237,6 +370,15 @@ export function EditorPane({
                       onDirtyChange={onTabDirtyChange}
                       onSaved={onSaved}
                     />
+                  ) : target.kind === "browser" ? (
+                    browsers && browserState.entries.get(target.id) ? (
+                      <BrowserPane
+                        key={tab}
+                        tabs={browsers}
+                        entry={browserState.entries.get(target.id)!}
+                        active={tab === activeTab}
+                      />
+                    ) : null
                   ) : (
                     <PanelTabContent
                       key={tab}
@@ -254,14 +396,53 @@ export function EditorPane({
   );
 }
 
+/** Shared by the empty workspace and the reusable Quick Start panel tab. */
+function StartTabContent({
+  browsers,
+  replaceTab,
+  onOpenFileExplorer,
+  onCreateCanvas,
+}: Pick<
+  EditorPaneProps,
+  "browsers" | "onOpenFileExplorer" | "onCreateCanvas"
+> & { replaceTab?: string }) {
+  const browserState = useSyncExternalStore(
+    browsers?.subscribe ?? noBrowserSubscription,
+    browsers?.getSnapshot ?? emptyBrowserSnapshot,
+    browsers?.getSnapshot ?? emptyBrowserSnapshot
+  );
+  return (
+    <div className="flex h-full flex-col">
+      {browserState.error && (
+        <p role="alert" className="px-6 pt-4 text-xs text-muted-foreground">
+          {browserState.error}
+        </p>
+      )}
+      <EditorPaneStart
+        onOpenFileExplorer={onOpenFileExplorer}
+        onCreateCanvas={(editor) => onCreateCanvas(editor, replaceTab)}
+        onOpenBrowser={
+          browserState.supported && browserState.ready && !browserState.error
+            ? () => browsers?.open(undefined, replaceTab)
+            : undefined
+        }
+      />
+    </div>
+  );
+}
+
 function EditorTitleBar({
   workspace,
   tabs,
   panels,
+  browserEntries,
+  browsers,
+  onOpenStart,
   activeTab,
   dirtyPaths,
   onSelect,
   onClose,
+  onCloseOthers,
   showStart,
   treeVisible,
   onToggleTree,
@@ -272,10 +453,14 @@ function EditorTitleBar({
   workspace: Workspace;
   tabs: readonly string[];
   panels: ReadonlyMap<string, WorkbenchPanel>;
+  browserEntries: ReadonlyMap<string, WorkspaceBrowserTabs.Entry>;
+  browsers?: WorkspaceBrowserTabs;
+  onOpenStart: () => void;
   activeTab: string | null;
   dirtyPaths: Set<string>;
   onSelect: (tab: string) => void;
   onClose: (tab: string) => void;
+  onCloseOthers: (keep: string) => Promise<void>;
   showStart: boolean;
   treeVisible: boolean;
   onToggleTree: () => void;
@@ -283,6 +468,11 @@ function EditorTitleBar({
   onToggleUtilities?: () => void;
   onFileTrashed?: (relPath: string) => void;
 }) {
+  const onlyQuickStart =
+    (showStart && tabs.length === 0) ||
+    (!showStart &&
+      tabs.length === 1 &&
+      tabs[0] === WorkbenchTab.panel(START_PANEL_ID));
   const railRef = useRef<HTMLDivElement | null>(null);
   const nativeDragExclusionLayerRef = useRef<HTMLDivElement | null>(null);
   const [previewController] = useState(() => new TabPreviewController());
@@ -294,10 +484,14 @@ function EditorTitleBar({
     previewController.reconcile(
       tabs.filter((tab) => {
         const target = WorkbenchTab.parse(tab);
-        return target.kind === "file" || !!panels.get(target.id)?.preview;
+        return (
+          target.kind === "file" ||
+          (target.kind === "browser" && browserEntries.has(target.id)) ||
+          (target.kind === "panel" && !!panels.get(target.id)?.preview)
+        );
       })
     );
-  }, [previewController, tabs, panels]);
+  }, [previewController, tabs, panels, browserEntries]);
 
   useEffect(() => {
     const dismiss = () => previewController.dismiss();
@@ -362,7 +556,7 @@ function EditorTitleBar({
         ref={railRef}
         role="tablist"
         aria-label="Open editors"
-        className="desktop-native-drag-scroll-viewport scroll-fade-x scroll-fade-3 no-scrollbar flex h-full min-w-0 flex-1 items-center gap-1 overflow-x-auto overscroll-x-contain pl-1.5 pr-2 scroll-pl-1.5 scroll-pr-2"
+        className="desktop-native-drag-scroll-viewport scroll-fade-x scroll-fade-3 no-scrollbar flex h-full min-w-0 flex-initial items-center gap-1 overflow-x-auto overscroll-x-contain pl-1.5 pr-2 scroll-pl-1.5 scroll-pr-2"
         onPointerLeave={(event) =>
           previewController.railLeave(event.pointerType)
         }
@@ -385,6 +579,26 @@ function EditorTitleBar({
               }
               previewController={previewController}
             />
+          ) : target.kind === "browser" ? (
+            <BrowserTabItem
+              key={tab}
+              tabKey={tab}
+              onCloseOthers={() => {
+                previewController.dismiss();
+                void onCloseOthers(tab);
+              }}
+              entry={browserEntries.get(target.id)}
+              previewController={previewController}
+              active={tab === activeTab}
+              onSelect={() => {
+                previewController.dismiss();
+                onSelect(tab);
+              }}
+              onClose={() => {
+                previewController.dismiss();
+                onClose(tab);
+              }}
+            />
           ) : (
             <PanelTabItem
               key={tab}
@@ -403,11 +617,33 @@ function EditorTitleBar({
             />
           );
         })}
-        {/* The parent title bar owns dragging. The stationary exclusions below
-            cover the occupied tab run (including inter-tab gaps); this genuinely
-            unused trailing space remains draggable. */}
-        <div role="presentation" className="h-full min-w-0 flex-1" />
       </div>
+      {!onlyQuickStart && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                aria-label="New tab"
+                onClick={onOpenStart}
+                className="desktop-no-drag mr-1 grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <PlusIcon className="size-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent
+              side="bottom"
+              sideOffset={6}
+              className="flex items-center gap-2"
+            >
+              New tab <Kbd>⌘T</Kbd>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+      {/* Let the rail shrink on overflow while keeping + visible. Unused
+          title-bar space belongs after + and remains natively draggable. */}
+      <div role="presentation" className="h-full min-w-0 flex-1" />
       {/* Chromium does not clip native app-region boxes to scrollports. Keep
           moving tab descendants region-free and mirror their visible interaction
           run (tabs plus following gaps) here. This layer is stationary and
@@ -442,6 +678,8 @@ function EditorTitleBar({
         revision={previewRevision}
         thumbnailCache={thumbnailCache}
         panels={panels}
+        browsers={browsers}
+        browserEntries={browserEntries}
       />
       {onToggleUtilities && (
         <Toggle
@@ -709,5 +947,84 @@ function PanelTabItem({
         previewController.pointerLeave(tabKey, event.pointerType)
       }
     />
+  );
+}
+
+const emptyBrowsers: WorkspaceBrowserTabs.State = {
+  supported: false,
+  ready: false,
+  entries: new Map(),
+  error: null,
+};
+const emptyBrowserSnapshot = () => emptyBrowsers;
+const noBrowserSubscription = () => () => {};
+
+function BrowserTabItem({
+  tabKey,
+  onCloseOthers,
+  entry,
+  active,
+  onSelect,
+  onClose,
+  previewController,
+}: {
+  tabKey: string;
+  entry?: WorkspaceBrowserTabs.Entry;
+  active: boolean;
+  onSelect(): void;
+  onClose(): void;
+  onCloseOthers(): void;
+  previewController: TabPreviewController;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (active)
+      ref.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [active]);
+  let title = entry?.page?.title;
+  if (!title && entry?.url) {
+    try {
+      title = new URL(entry.url).host;
+    } catch {}
+  }
+  return (
+    <ContextMenu
+      onOpenChange={(open) => {
+        if (open) previewController.dismiss();
+      }}
+    >
+      <ContextMenuTrigger asChild>
+        <WorkbenchPanelTab
+          ref={ref}
+          data-tab-native-drag-region-target={tabKey}
+          title={title || "Browser"}
+          icon={
+            entry?.page?.loading ? (
+              <Loader2Icon className="size-3.5 animate-spin" />
+            ) : (
+              <BrowserTabIcon favicon={entry?.favicon} />
+            )
+          }
+          active={active}
+          onSelect={onSelect}
+          onClose={onClose}
+          onPointerEnter={(event) =>
+            previewController.pointerEnter(
+              { tabKey, anchor: event.currentTarget },
+              event.pointerType
+            )
+          }
+          onPointerLeave={(event) =>
+            previewController.pointerLeave(tabKey, event.pointerType)
+          }
+        />
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem onSelect={onClose}>Close tab</ContextMenuItem>
+        <ContextMenuItem onSelect={onCloseOthers}>
+          Close other tabs
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }

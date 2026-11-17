@@ -1583,7 +1583,7 @@ mod tests {
             cwd: cwd.clone(),
             request: ChangeId::new("delete").unwrap(),
             expected_revision: before.revision,
-            expected_catalog_revision: catalog.revision,
+            expected_catalog_revision: catalog.entry.revision,
             expected_owned_children: None,
         })
         .await

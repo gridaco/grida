@@ -10,7 +10,12 @@ const execute = promisify(execFile);
 const MAX_HANDLES = 4096;
 const MAX_CURSORS = 64;
 type CatalogPage = {
-  entries: { sessionId: string; title: string | null; revision: number }[];
+  entries: {
+    sessionId: string;
+    title: string | null;
+    revision: number;
+    lastActivityAtMs?: number;
+  }[];
   nextCursor: string | null;
 };
 type Receipt = { workspace: Workspace; session: string; revision: number };
@@ -109,6 +114,9 @@ export class NativeArchives {
             workspace: workspace.name,
             title: entry.title,
             revision: entry.revision,
+            ...(entry.lastActivityAtMs !== undefined && {
+              lastActivityAtMs: entry.lastActivityAtMs,
+            }),
           };
         });
         state.after = page.nextCursor;
@@ -268,7 +276,12 @@ function readPage(value: unknown): CatalogPage {
           (typeof entry.title !== "string" ||
             Buffer.byteLength(entry.title) > 256)) ||
         !Number.isSafeInteger(entry.revision) ||
-        entry.revision < 0
+        entry.revision < 0 ||
+        (entry.lastActivityAtMs !== undefined &&
+          (typeof entry.lastActivityAtMs !== "number" ||
+            !Number.isSafeInteger(entry.lastActivityAtMs) ||
+            entry.lastActivityAtMs < 0 ||
+            entry.lastActivityAtMs > 8_640_000_000_000_000))
     ) ||
     new Set(page.entries.map((entry) => entry.sessionId)).size !==
       page.entries.length ||

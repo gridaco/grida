@@ -89,6 +89,7 @@ import * as chatgptSubscription from "@/lib/desktop/chatgpt-subscription";
 import { useChatGptSubscription } from "@/lib/desktop/chatgpt-subscription-react";
 import { HooksSettings } from "./_components/hooks-settings";
 import { AppearanceSettings } from "./_components/appearance-settings";
+import { BrowserSettings } from "./_components/browser-settings";
 import { ArchivedChatsSettings } from "./_components/archived-chats-settings";
 import { CreditsSection } from "./_components/credits-section";
 import { MediaModelReadiness } from "./_components/media-model-readiness";
@@ -152,6 +153,9 @@ export default function DesktopSettingsPage() {
           </TabsContent>
           <TabsContent value="appearance" className="m-0">
             <AppearanceSettings />
+          </TabsContent>
+          <TabsContent value="browser" className="m-0">
+            <BrowserSettings />
           </TabsContent>
           <TabsContent value="credits" className="m-0">
             <CreditsSection />

@@ -54,6 +54,8 @@ import type {
 import type { DesktopHooks, DesktopNativeChat } from "./native-chat";
 import type { DesktopNativeExternalAgent } from "./native-external-agent";
 import type { NativeEditorSurfaceSnapshot } from "./native-editor-surfaces";
+import type { DesktopBrowser } from "./browser";
+export { DesktopBrowser } from "./browser";
 export type * from "./native-chat";
 export type * from "./native-external-agent";
 export type * from "./native-subagents";
@@ -83,6 +85,8 @@ export type DesktopNativeCapabilities = {
    * desktop binary" and fall back to manual/pull refresh.
    */
   workspace_watch: boolean;
+  /** Optional browser; negotiate its version and presentation before use. */
+  browser?: boolean;
 };
 
 export type DesktopCapabilities = {
@@ -224,6 +228,8 @@ export type DesktopArchivedChat = Readonly<{
   workspace: string;
   title: string | null;
   revision: number;
+  /** Latest local turn's settlement or start time, when available. */
+  lastActivityAtMs?: number;
 }>;
 
 export type DesktopArchivedChatPage = Readonly<{
@@ -237,6 +243,8 @@ export type DesktopBridge = {
   protocol: typeof DESKTOP_BRIDGE_PROTOCOL;
   app: { version: string; platform: string };
   caps: DesktopCapabilities;
+  /** Older installed protocol-1 hosts omit this standalone capability. */
+  browser?: DesktopBrowser.Bridge;
   handshake: () => Promise<HandshakeResponse>;
   nativeChat?: DesktopNativeChat;
   /** Global config.toml hooks. Absent on older native builds. */

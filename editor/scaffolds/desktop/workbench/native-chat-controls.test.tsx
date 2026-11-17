@@ -91,6 +91,29 @@ it("refreshes the active chat picker so chats restored in Settings appear", () =
   expect(html).not.toContain("Lifecycle checks");
 });
 
+it("shows known activity beside its chat without reordering or dating unknown chats", () => {
+  const controller = new NativeChatController({} as DesktopNativeChat);
+  vi.spyOn(controller, "chatTitle").mockImplementation((id) => id);
+  vi.spyOn(controller, "chatLastActivityAtMs").mockImplementation((id) =>
+    id === "earlier-chat" ? Date.parse("2026-11-17T03:04:00.000Z") : undefined
+  );
+  const html = renderToStaticMarkup(
+    <NativeChatHeader
+      controller={controller}
+      state={{
+        ...controller.read(),
+        sessions: ["earlier-chat", "undated-chat"],
+      }}
+    />
+  );
+  expect(html.match(/<time\b/g)).toHaveLength(1);
+  expect(html).toContain('dateTime="2026-11-17T03:04:00.000Z"');
+  expect(html).toContain('title="Last activity: ');
+  expect(html.indexOf("earlier-chat")).toBeLessThan(
+    html.indexOf("undated-chat")
+  );
+});
+
 describe("chat options availability", () => {
   it.each([null, "new-chat-session"])(
     "hides the empty menu before chat details exist (selected: %s)",

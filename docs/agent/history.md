@@ -22,10 +22,17 @@ explicitly; Grida does not borrow a different chat's current composer choice.
 
 Open the chat list at the top left of the chat pane. It shows every chat in
 this workspace, whichever model it used; type to search, or choose **Older
-chats** to see more. Choose **New chat** (+) in the pane's header to start
-another. Selecting a
+chats** to see more. Choose **New chat** (+) in the pane's header to open a
+blank draft; the chat is created when you send its first message. Selecting a
 chat opens its transcript and saved work. Review any pending question or
 interruption before continuing. [Guide and interrupt work](./controls.md)
+
+On compatible Desktop builds, the chat list and **Settings → Archived chats**
+show the date of the latest turn's activity. This is its finish time, or its
+start time while unfinished, including stopped or failed work. Hover the date
+for the full local date and time. Renaming, archiving and reopening a chat do
+not change it. Chats without a recorded turn and older Desktop builds show no
+date.
 
 Long chats open at the latest messages. Scroll up to read earlier messages:
 they load above as you go, without moving what you are reading. Reading
@@ -45,7 +52,8 @@ Enter, or click elsewhere; Escape keeps the old one. A title you set is never
 replaced.
 
 **Archive chat** moves a chat out of the active list and lets any ongoing
-work continue. Open **Settings → Archived chats** to find archived chats across
+work continue. After confirmation, Desktop opens a new-chat draft and shows
+**Chat archived**. Open **Settings → Archived chats** to find archived chats across
 your workspaces, then choose **Unarchive** to return one to its workspace's
 active list. Restoring a chat does not open it or resume its work, and does not
 require a working model connection. The chat picker shows active chats only.

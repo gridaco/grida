@@ -92,4 +92,83 @@ describe("WorkspaceViewState", () => {
       active: "current.svg",
     });
   });
+  it("migrates version-one file state without inventing browser descriptors", () => {
+    const storage = new MemoryStorage();
+    storage.setItem(
+      "grida.workspaceViewState:workspace-a",
+      JSON.stringify({ version: 1, tabs: { open: ["a.svg"], active: "a.svg" } })
+    );
+    expect(WorkspaceViewState.read(storage, "workspace-a")).toEqual({
+      tabs: { open: ["a.svg"], active: "a.svg" },
+    });
+  });
+
+  it("preserves mixed ordering while discarding unsafe browser descriptors", () => {
+    const storage = new MemoryStorage();
+    WorkspaceViewState.remember(storage, "workspace-a", {
+      tabs: { open: ["a.svg"], active: "a.svg" },
+      content: {
+        open: [
+          {
+            kind: "browser",
+            id: "page",
+            url: "https://example.com/",
+          },
+          { kind: "file", relPath: "a.svg" },
+          {
+            kind: "browser",
+            id: "unsafe",
+            url: "file:///private/data",
+          },
+          {
+            kind: "browser",
+            id: "credentials",
+            url: "https://user:pass@example.com/",
+          },
+        ],
+        active: 0,
+      },
+    });
+    expect(WorkspaceViewState.read(storage, "workspace-a")?.content).toEqual({
+      open: [
+        {
+          kind: "browser",
+          id: "page",
+          url: "https://example.com/",
+        },
+        { kind: "file", relPath: "a.svg" },
+      ],
+      active: 0,
+    });
+  });
+  it("migrates native page IDs away and writes only URLs in version three", () => {
+    const storage = new MemoryStorage();
+    const key = "grida.workspaceViewState:workspace-a";
+    storage.setItem(
+      key,
+      JSON.stringify({
+        version: 2,
+        tabs: { open: [], active: null },
+        content: {
+          open: [
+            {
+              kind: "browser",
+              id: "tab",
+              pageId: "old-native",
+              url: "https://example.com/",
+            },
+          ],
+          active: 0,
+        },
+      })
+    );
+    const state = WorkspaceViewState.read(storage, "workspace-a")!;
+    expect(state.content?.open).toEqual([
+      { kind: "browser", id: "tab", url: "https://example.com/" },
+    ]);
+    WorkspaceViewState.remember(storage, "workspace-a", state);
+    const saved = JSON.parse(storage.getItem(key)!);
+    expect(saved.version).toBe(3);
+    expect(saved.content.open[0]).not.toHaveProperty("pageId");
+  });
 });

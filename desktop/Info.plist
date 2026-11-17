@@ -6,6 +6,17 @@
       <string>Grida</string>
       <key>CFBundleDisplayName</key>
       <string>Grida</string>
+      <!-- GRIDA-SEC-016: browser websites request explicit native device consent. -->
+      <key>NSCameraUsageDescription</key>
+      <string>Websites you allow in Grida's browser can use your camera.</string>
+      <key>NSMicrophoneUsageDescription</key>
+      <string>Websites you allow in Grida's browser can use your microphone.</string>
+      <key>NSLocationUsageDescription</key>
+      <string>Websites you allow in Grida's browser can use your location.</string>
+      <key>NSLocationWhenInUseUsageDescription</key>
+      <string>Websites you allow in Grida's browser can use your location while Grida is open.</string>
+      <key>NSBluetoothAlwaysUsageDescription</key>
+      <string>Grida's browser connects to Bluetooth devices you select for a website.</string>
       <key>CFBundleIdentifier</key>
       <string>co.grida.desktop</string>
       <key>CFBundleURLName</key>

@@ -11,16 +11,17 @@ Open Settings from the application menu, or press **Command+,** on macOS.
 Settings opens in its own window; opening it again focuses that window.
 Select a category in its sidebar:
 
-| Category        | What it contains                                                             |
-| --------------- | ---------------------------------------------------------------------------- |
-| Account         | Your Grida account and sign-out action.                                      |
-| Appearance      | Light, Dark or System theme, remembered on this device.                      |
-| Credits         | Your Grida AI credit information.                                            |
-| LLM Providers   | ChatGPT subscription, API-key providers and compatible text-model endpoints. |
-| Media Providers | Connections for image, video, audio and 3D generation.                       |
-| Hooks           | Global hook definitions, configuration diagnostics and command trust review. |
-| Archived chats  | Archived chats across local workspaces, with an Unarchive action.            |
-| About           | Desktop version and platform information.                                    |
+| Category        | What it contains                                                                                 |
+| --------------- | ------------------------------------------------------------------------------------------------ |
+| Account         | Your Grida account and sign-out action.                                                          |
+| Appearance      | Light, Dark or System theme, remembered on this device.                                          |
+| Browser         | [Downloads, site permissions, shared history and browser cleanup](../editor/desktop/browser.md). |
+| Credits         | Your Grida AI credit information.                                                                |
+| LLM Providers   | ChatGPT subscription, API-key providers and compatible text-model endpoints.                     |
+| Media Providers | Connections for image, video, audio and 3D generation.                                           |
+| Hooks           | Global hook definitions, configuration diagnostics and command trust review.                     |
+| Archived chats  | Archived chats across local workspaces, with an Unarchive action.                                |
+| About           | Desktop version and platform information.                                                        |
 
 ## Compatible endpoints and Ollama
 
@@ -50,6 +51,10 @@ Each row identifies a chat and its workspace. Choose **Unarchive** to return it
 to that workspace's active chat list. This does not open the chat, start model
 work or resume an unfinished turn. Archiving a chat still happens through that
 chat's options menu. Archive browsing and restoration live in Settings.
+Compatible builds also show the last turn's activity date, with the full local
+date and time on hover. This is when work last finished or, while unfinished,
+started; it is not the archive date. A chat without a recorded turn shows no
+date.
 [Reopen or organize a chat](./history.md#reopen-or-organize-a-chat)
 
 These categories require a Desktop build with their native capabilities. An
