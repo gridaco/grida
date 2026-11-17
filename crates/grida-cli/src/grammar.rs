@@ -530,9 +530,6 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Failure> {
                 let configure = *action == "configure";
                 tokens.allowed(true, if configure { &["key-stdin"] } else { &[] })?;
                 let provider = Provider::parse(provider)?;
-                if provider == Provider::Gg {
-                    return Err(Failure::usage());
-                }
                 if configure {
                     let key_stdin = tokens.flag("key-stdin");
                     if !key_stdin && (options.json || options.no_input) {

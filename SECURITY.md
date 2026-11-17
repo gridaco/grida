@@ -3718,9 +3718,10 @@ generation receipts without a fixed projection.
    variant and never discard media or change provider/model. Scalar parameters
    use the published field type, then the same normative SDK parser as JSON. It
    accepts no literal key argument, custom provider origin or raw provider-option
-   passthrough. `--key-stdin` cannot share stdin with JSON/text or select GG. Bundled
-   `MediaOperations` descriptors and the SDK's normative parser establish the
-   exact executable route and validate JSON before credential custody is opened.
+   passthrough. In execution commands, `--key-stdin` cannot share stdin with
+   JSON/text or select GG. Bundled `MediaOperations` descriptors and the SDK's
+   normative parser establish the exact executable route and validate JSON
+   before credential custody is opened.
    Ordinary listing/inspection needs no credential or network. An availability
    filter reports key presence or cached organization eligibility explicitly;
    neither establishes provider access or generation success.
@@ -3728,7 +3729,8 @@ generation receipts without a fixed projection.
    named process environment slots (`OPENROUTER_API_KEY`, `AI_GATEWAY_API_KEY`,
    `FAL_KEY`, `ELEVENLABS_API_KEY`, `TRIPO_API_KEY`), an explicitly allocated stdin key, or the
    shared provider owner under GRIDA-SEC-014. Execution
-   inspects only its selected provider; provider status may inspect all five.
+   inspects only its selected provider. Provider settings also admit the
+   standalone Grida Gateway key (`GG_API_KEY`) for shared-store consumers.
    There is no dotenv, repository, legacy Desktop file or account-store lookup.
    Stdin replaces the matching environment slot; successful explicit inputs bypass
    constructing or opening the stored-key owner for that provider. Missing inputs
@@ -3741,7 +3743,7 @@ generation receipts without a fixed projection.
    trusted SDK key reader receives secret strings. Status projects presence and
    source and plaintext storage mode; disposal drops private references. Explicit
    configure/remove commands mutate shared custody without opening account auth.
-   GG obtains an org-bound grant through
+   Native GG execution obtains an org-bound grant through
    the auth owner's guarded fixed exchange into invocation-owned media authority
    without opening a BYOK reader. The media transport never receives the account JWT.
 3. **Destination-bound egress.** The native HTTP owner admits credential-bearing requests
@@ -4038,11 +4040,11 @@ durable or discard unrelated OAuth records.
    input is bounded and validated before custody opens. The terminal is restored
    on success, failure, timeout or cancellation. Native home resolution reads no
    project file. Environment/stdin override selection happens before storage is
-   constructed; GG supplies no store capability. Configure/remove await durable
-   mutations through signals. Status and failures project only fixed safe metadata;
-   no key, prefix, parser excerpt or native error is printed. No account setup is
-   required. CLI configuration performs GRIDA-SEC-013's supported provider check
-   before opening custody; ordinary stored-key consumption uses static validation
+   constructed. Native GG execution uses its scoped login grant. Configure/remove
+   await durable mutations through signals. Status and failures project only
+   fixed safe metadata. No key, prefix, parser excerpt or native error is printed.
+   No account setup is required. CLI configuration performs GRIDA-SEC-013's
+   supported provider check before opening custody. Stored-key consumption uses static validation
    only. The TOML owner itself stays provider-opaque and never performs network I/O.
    Provider removal leaves account sessions and environment variables untouched.
 

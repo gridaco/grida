@@ -4,7 +4,8 @@ Show key presence and source after static validation, never key contents.
 No login or probes; configured does not mean provider-verified.
 Stored keys use shared plaintext credentials.toml with private permissions.
 OPENROUTER_API_KEY, AI_GATEWAY_API_KEY, FAL_KEY, ELEVENLABS_API_KEY, TRIPO_API_KEY.
-GG uses a separate Grida login and organization; no provider key.
+GG_API_KEY is the standalone Grida Gateway API key.
+Native AI execution with --provider gg uses Grida login and organization access.
 
 Credential file: ~/.grida/providers/credentials.toml
 With an absolute GRIDA_HOME: $GRIDA_HOME/providers/credentials.toml

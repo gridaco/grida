@@ -285,7 +285,7 @@ async fn execute(
             lines.extend([
                 "Stored keys use shared plaintext credentials.toml with private permissions."
                     .into(),
-                "gg: Grida login and organization required; access not checked.".into(),
+                "Native --provider gg execution requires Grida login and an organization. Access was not checked.".into(),
             ]);
             Ok(Output::new(
                 json!({"providers":providers,"storage":"shared_plaintext_file","gg":{"authentication":"grida_login","checked":false}}),
@@ -668,7 +668,17 @@ fn rigging_check_output(
 }
 fn provider_output(provider: &str, stored: bool, verification: Option<Value>) -> Output {
     let mut value = json!({"provider":provider,"stored":stored,"storage":"plaintext_file","shared":true,"environment_checked":false});
-    let mut lines=vec![if stored{format!("{provider}: saved to shared plaintext credentials.toml with private permissions.")}else{format!("{provider}: removed from shared credentials.toml. The provider key has not been revoked.")},"Desktop and CLI share stored keys. Environment overrides remain effective; Grida login is separate.".into()];
+    let result = if stored {
+        format!("{provider}: saved to shared plaintext credentials.toml with private permissions.")
+    } else {
+        format!(
+            "{provider}: removed from shared credentials.toml. Manage revocation with the provider."
+        )
+    };
+    let mut lines = vec![
+        result,
+        "Environment overrides remain effective. Grida login is managed separately.".into(),
+    ];
     if let Some(v) = verification {
         lines.push(if v["status"]=="accepted"{"Provider accepted the key check. Model access and available credits remain unverified."}else{"No suitable provider key check is available; saved with static validation only."}.into());
         value["verification"] = v;

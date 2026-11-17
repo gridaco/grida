@@ -5,6 +5,9 @@ Commands:
   configure <provider>    Save a shared provider API key
   remove <provider>       Remove a shared provider API key
 
+Supported providers are openrouter, vercel, fal, elevenlabs, tripo, and gg.
+Use gg to manage a standalone Grida Gateway API key (GG_API_KEY).
+
 Credential file: ~/.grida/providers/credentials.toml
 With an absolute GRIDA_HOME: $GRIDA_HOME/providers/credentials.toml
 Plaintext on macOS/Linux: providers directory 0700, file 0600.
