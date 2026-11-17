@@ -25,6 +25,20 @@ describe("cmath.rational", () => {
       expect(Math.abs(p / q - Math.PI)).toBeLessThan(0.1);
     });
 
+    test.each([
+      [6.525134, 1000, [6101, 935]],
+      [-6.525134, 1000, [-6101, 935]],
+      [Math.PI, 10, [22, 7]],
+      [Math.PI, 100, [311, 99]],
+    ])(
+      "returns the closer fraction for %s with a denominator up to %i",
+      (value, max_denominator, expected) => {
+        expect(
+          cmath.rational.approximateFraction(value, max_denominator)
+        ).toEqual(expected);
+      }
+    );
+
     test("should return undefined on invalid input", () => {
       expect(cmath.rational.approximateFraction(NaN)).toBeUndefined();
       expect(cmath.rational.approximateFraction(Infinity)).toBeUndefined();
