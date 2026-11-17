@@ -1,7 +1,8 @@
 Usage: grida ai providers remove <provider> [--json] [--no-input]
 
-Remove the stored key for Desktop and CLI. Environment keys remain effective.
-This does not revoke the key at its provider or sign out of Grida.
+Remove the key from the shared credential store. Environment keys remain effective.
+Use gg to remove the standalone Grida Gateway API key.
+Provider-side revocation and Grida sign-in are managed separately.
 
 Credential file: ~/.grida/providers/credentials.toml
 With an absolute GRIDA_HOME: $GRIDA_HOME/providers/credentials.toml

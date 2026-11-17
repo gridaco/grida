@@ -1,9 +1,10 @@
 Usage: grida ai providers configure <provider> [--key-stdin] [--json] [--no-input]
 
 Save an API key in shared plaintext credentials.toml with private permissions.
-Desktop and CLI use the same stored keys. No Grida login required.
+Configuration needs no Grida login.
+Use gg for a standalone Grida Gateway API key (GG_API_KEY, starts with sk-gg-v1-).
 Validate format, then check OpenRouter/Vercel AI Gateway/fal/Tripo once before saving.
-A failed check leaves stored keys unchanged. ElevenLabs saves unverified.
+A failed check leaves stored keys unchanged. ElevenLabs and gg use static validation only.
 Without --key-stdin, enter the key at a hidden terminal prompt.
 Automation requires --key-stdin; keys are never accepted as arguments.
 

@@ -1,7 +1,7 @@
 ---
 title: Grida CLI provider keys
-description: Configure BYOK API keys, locate credentials.toml, understand key precedence, and remove stored credentials.
-keywords: [grida, cli, byok, api keys, toml, credentials]
+description: Save and remove provider API keys, including Grida Gateway keys, and see which credential source the Grida CLI uses.
+keywords: [grida, cli, byok, api keys, grida gateway, credentials]
 sidebar_label: Providers
 sidebar_position: 4
 tags: [cli]
@@ -10,23 +10,26 @@ format: md
 
 # Grida CLI provider keys
 
-Use your own OpenRouter, Vercel AI Gateway, fal, or ElevenLabs account for media
-generation. Configure only the providers you need. BYOK requires no Grida login;
-GG uses a separate [Grida session](./auth.md) and organization.
+Use `grida ai providers` to manage keys for OpenRouter, Vercel AI Gateway, fal,
+ElevenLabs, Tripo, and standalone Grida Gateway. For the Gateway API key, use
+provider `gg`. Native `grida ai` execution with `--provider gg` uses your
+[Grida session](./auth.md) and selected organization.
 
 ## Configure a provider
 
 ```sh
 grida ai providers configure openrouter
 grida ai providers configure fal
+grida ai providers configure gg
 grida ai providers list
 ```
 
 Enter your key at the hidden prompt. Every selected key passes static validation.
-Configuration additionally checks OpenRouter, Vercel AI Gateway, and fal once before saving.
+Configuration also checks OpenRouter, Vercel AI Gateway, fal, and Tripo once
+before saving.
 A rejected or unavailable check leaves existing credentials unchanged.
-ElevenLabs has no suitable permission-neutral check and saves with verification
-marked `not_supported`.
+ElevenLabs and Grida Gateway use static validation only and save with verification
+marked `not_supported`. Grida Gateway keys begin with `sk-gg-v1-`.
 
 An accepted check proves only that the metadata read succeeded at that moment.
 It does not guarantee model access, credit, or generation success. Listing and
@@ -38,7 +41,7 @@ performs supported verification before saving.
 
 ## Where keys are stored
 
-Desktop and CLI share **plaintext** provider keys on macOS and Linux:
+Grida stores provider keys in a shared **plaintext** file on macOS and Linux:
 
 ```text
 ~/.grida/providers/credentials.toml
@@ -57,10 +60,13 @@ location and format link without opening the credential store.
 
 ## Override a stored key
 
-Precedence is stdin (`--key-stdin`), then the provider environment variable,
-then the shared file. Explicit stdin/environment keys bypass storage and are
-not saved. Blank or invalid explicit keys fail instead of falling back; unset
-the variable to use the stored key.
+For native AI operations that use provider keys, precedence is stdin
+(`--key-stdin`), then the provider environment variable, then the shared file.
+Explicit keys used for an operation are temporary.
+`grida ai providers list` shows the effective source for each configured provider
+key and keeps the key values private. It uses the environment first, then checks
+the shared file. A blank or invalid explicit key fails validation. Clear the
+environment variable to use the saved key.
 
 | Provider     | Environment variable |
 | ------------ | -------------------- |
@@ -68,6 +74,8 @@ the variable to use the stored key.
 | `vercel`     | `AI_GATEWAY_API_KEY` |
 | `fal`        | `FAL_KEY`            |
 | `elevenlabs` | `ELEVENLABS_API_KEY` |
+| `tripo`      | `TRIPO_API_KEY`      |
+| `gg`         | `GG_API_KEY`         |
 
 Windows preview users can use environment or stdin keys; shared file storage
 is not supported there yet. Provider keys and Grida sessions are separate.
@@ -76,10 +84,11 @@ is not supported there yet. Provider keys and Grida sessions are separate.
 
 ```sh
 grida ai providers remove fal
+grida ai providers remove gg
 ```
 
-This removes the shared stored key for CLI and Desktop. It does not revoke the
-key at fal, clear an environment override, or sign out of Grida.
+This removes the key from the shared file. Environment overrides remain
+effective. Manage key revocation with the provider that issued the key.
 
 ## Resolve storage errors
 

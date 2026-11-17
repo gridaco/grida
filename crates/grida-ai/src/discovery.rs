@@ -22,7 +22,7 @@ pub struct VoiceFilter {
 
 pub fn normalize_key(provider: &str, value: &str) -> Result<String> {
     if value.len() > 4096
-        || !["openrouter", "vercel", "fal", "elevenlabs", "tripo"].contains(&provider)
+        || !["openrouter", "vercel", "fal", "elevenlabs", "tripo", "gg"].contains(&provider)
     {
         return Err(bad());
     }
@@ -37,6 +37,7 @@ pub fn normalize_key(provider: &str, value: &str) -> Result<String> {
     match provider {
         "openrouter" if !key.starts_with("sk-or-") || key.len() == 6 => return Err(bad()),
         "vercel" if key == "vck_" => return Err(bad()),
+        "gg" if key.strip_prefix("sk-gg-v1-").is_none_or(str::is_empty) => return Err(bad()),
         "fal" => {
             let p = key.split(':').collect::<Vec<_>>();
             if p.len() != 2 || p.iter().any(|p| p.is_empty()) {
@@ -63,7 +64,7 @@ impl MediaClient {
             deadline: Instant::now() + Duration::from_secs(10),
         };
         s.check()?;
-        if provider == "elevenlabs" {
+        if matches!(provider, "elevenlabs" | "gg") {
             return Ok(json!({"status":"not_supported"}));
         }
         let url = match provider {

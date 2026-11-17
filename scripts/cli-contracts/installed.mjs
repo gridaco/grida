@@ -50,6 +50,9 @@ const account = [
   .join(".");
 const refresh = "synthetic-native-refresh";
 const grant = "synthetic.native.gg";
+const ggProviderKey = "sk-gg-v1-synthetic-fx-key";
+const ggEnvironmentKey = "sk-gg-v1-synthetic-env-key";
+const ggInvalidKey = "synthetic-invalid-gg-key";
 const png = Buffer.from("89504e470d0a1a0a", "hex");
 const inputPng = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=",
@@ -437,6 +440,10 @@ export async function proveInstalled({ binary, launcher, workdir }) {
   }
   async function run(argv, { stdin = "", exit = 0 } = {}) {
     const r = await start(argv, stdin).result;
+    for (const key of [ggProviderKey, ggEnvironmentKey, ggInvalidKey]) {
+      assert(!r.stdout.includes(key));
+      assert(!r.stderr.includes(key));
+    }
     assert.equal(r.signal, null);
     assert.equal(r.code, exit, r.stderr || r.stdout);
     assertInstalledStderr(r);
@@ -444,6 +451,22 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     for (const secret of [account, refresh, grant, issuedGrant])
       assert(!r.stdout.includes(secret));
     return argv.includes("--json") ? JSON.parse(r.stdout) : r.stdout;
+  }
+  async function checkGgProviderState(source) {
+    const status = await run(["ai", "providers", "list", "--json"]);
+    assert.deepEqual(
+      status.providers.find((p) => p.provider === "gg"),
+      {
+        provider: "gg",
+        environment: "GG_API_KEY",
+        configured: source !== null,
+        source,
+      }
+    );
+    assert.deepEqual(status.gg, {
+      authentication: "grida_login",
+      checked: false,
+    });
   }
   const checks = [];
   function holdRenewal(token) {
@@ -873,6 +896,33 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     );
     assert.equal(counts.size, 0);
     checks.push("installed_provider_configure_precedence_remove");
+    const configureGg = [
+      "ai",
+      "providers",
+      "configure",
+      "gg",
+      "--key-stdin",
+      "--no-input",
+      "--json",
+    ];
+    const ggConfigured = await run(configureGg, {
+      stdin: ggProviderKey + "\n",
+    });
+    assert.equal(ggConfigured.provider, "gg");
+    assert.equal(ggConfigured.stored, true);
+    assert.deepEqual(ggConfigured.verification, { status: "not_supported" });
+    await checkGgProviderState("file");
+    const credentialFile = path.join(storage, "providers", "credentials.toml");
+    const ggStored = await readFile(credentialFile, "utf8");
+    assert.match(ggStored, /^\[providers\.gg\]$/m);
+    assert(ggStored.includes(ggProviderKey));
+    assert.equal(
+      (await run(configureGg, { stdin: ggInvalidKey + "\n", exit: 1 })).error
+        .code,
+      "invalid_credentials"
+    );
+    assert.equal(await readFile(credentialFile, "utf8"), ggStored);
+    assert.equal(counts.size, 0);
     const offers = await run([
       "ai",
       "models",
@@ -1080,6 +1130,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
       "--json",
     ];
     const receipt = await run(generate);
+    assert.equal(counts.get("/api/v1/auth/gg"), before + 1);
     assert.equal(receipt.artifacts.length, 1);
     assert.equal(receipt.artifacts[0].sha256, sha(png));
     assert.deepEqual(await readFile(receipt.artifacts[0].path), png);
@@ -1152,6 +1203,18 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     releaseResponse?.();
     checks.push("installed_signal_cancellation");
     await checkAgent();
+    env.GG_API_KEY = ggEnvironmentKey;
+    await checkGgProviderState("environment");
+    const ggRemoved = await run(["ai", "providers", "remove", "gg", "--json"]);
+    assert.equal(ggRemoved.provider, "gg");
+    assert.equal(ggRemoved.stored, false);
+    await checkGgProviderState("environment");
+    delete env.GG_API_KEY;
+    await checkGgProviderState(null);
+    const ggStoreAfterRemove = await readFile(credentialFile, "utf8");
+    assert(!ggStoreAfterRemove.includes(ggProviderKey));
+    assert(!ggStoreAfterRemove.includes(ggEnvironmentKey));
+    checks.push("installed_gg_provider_configure_precedence_remove");
     const logout = await run(["auth", "logout", "--json"]);
     assert.equal(logout.revocation, "confirmed");
     assert.equal(

@@ -12,12 +12,13 @@ use std::{
 };
 use tokio_util::sync::CancellationToken;
 use zeroize::{Zeroize, Zeroizing};
-pub const PROVIDERS: [(&str, &str); 5] = [
+pub const PROVIDERS: [(&str, &str); 6] = [
     ("openrouter", "OPENROUTER_API_KEY"),
     ("vercel", "AI_GATEWAY_API_KEY"),
     ("fal", "FAL_KEY"),
     ("elevenlabs", "ELEVENLABS_API_KEY"),
     ("tripo", "TRIPO_API_KEY"),
+    ("gg", "GG_API_KEY"),
 ];
 fn failure(code: &str) -> Error {
     Error::new(

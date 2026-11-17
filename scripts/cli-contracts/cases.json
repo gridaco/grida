@@ -489,6 +489,8 @@
       "stdout": {
         "includes": [
           "Usage: grida ai providers configure <provider> [--key-stdin] [--json] [--no-input]",
+          "Grida Gateway API key",
+          "GG_API_KEY",
           "Documentation: https://grida.co/docs/cli/providers",
           "--no-input suppresses terminal interaction;"
         ]
@@ -515,6 +517,7 @@
       "stdout": {
         "includes": [
           "Usage: grida ai providers remove <provider> [--json] [--no-input]",
+          "standalone Grida Gateway API key",
           "Documentation: https://grida.co/docs/cli/providers",
           "--no-input suppresses terminal interaction;"
         ]
@@ -541,6 +544,8 @@
       "stdout": {
         "includes": [
           "Usage: grida ai providers list [--json]",
+          "standalone Grida Gateway API key",
+          "GG_API_KEY",
           "Documentation: https://grida.co/docs/cli/providers",
           "--no-input suppresses terminal interaction;"
         ]
@@ -1259,17 +1264,6 @@
     }
   },
   {
-    "id": "cli.invalid.provider-gg",
-    "argv": ["ai", "providers", "configure", "gg", "--key-stdin"],
-    "expected": {
-      "exit": 2,
-      "stdout": {
-        "text": ""
-      },
-      "stderr": "grida: Invalid command or options. Run grida --help or grida <command> --help. (invalid_usage)\n"
-    }
-  },
-  {
     "id": "cli.invalid.provider-key-argument",
     "argv": ["ai", "providers", "configure", "tripo", "secret-do-not-echo"],
     "expected": {
@@ -1907,6 +1901,53 @@
             "noInput": false,
             "command": "ai providers remove",
             "provider": "elevenlabs"
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "cli.parse.provider-configure-gg",
+    "mode": "parse",
+    "argv": [
+      "ai",
+      "providers",
+      "configure",
+      "gg",
+      "--key-stdin",
+      "--no-input",
+      "--json"
+    ],
+    "expected": {
+      "exit": 0,
+      "stderr": "",
+      "stdout": {
+        "json": {
+          "invocation": {
+            "json": true,
+            "noInput": true,
+            "command": "ai providers configure",
+            "provider": "gg",
+            "keyStdin": true
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "cli.parse.provider-remove-gg",
+    "mode": "parse",
+    "argv": ["ai", "providers", "remove", "gg", "--json"],
+    "expected": {
+      "exit": 0,
+      "stderr": "",
+      "stdout": {
+        "json": {
+          "invocation": {
+            "json": true,
+            "noInput": false,
+            "command": "ai providers remove",
+            "provider": "gg"
           }
         }
       }

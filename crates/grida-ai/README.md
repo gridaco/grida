@@ -17,7 +17,9 @@ before `MediaClient::execute` receives invocation authority. The executor checks
 the parsed contract again, preventing a changed public `Parsed` value from
 bypassing validation. Dynamic GG descriptors have a private frozen copy; changing
 the public descriptor cannot change its selected operation or validation schema.
-`verify`, `voices` and `gateway_catalogue` are explicitly networked operations.
+`verify` makes a provider request where a suitable check is supported.
+ElevenLabs and standalone Grida Gateway keys receive static validation only.
+`voices` and `gateway_catalogue` make explicit network requests.
 
 `gateway_catalogue` reads only `https://gateway.grida.ai/v1/models` and
 `/v1/endpoints` and `/schemas/operations.json`, without credentials.

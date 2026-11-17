@@ -100,13 +100,15 @@ async fn credential_checks_are_read_only_fixed_origin_and_project_no_account_dat
     }
     let fake = Fake::new(vec![]);
     let client = MediaClient::new(fake.clone());
-    assert_eq!(
-        client
-            .verify("elevenlabs", "synthetic", CancellationToken::new())
-            .await
-            .unwrap(),
-        json!({"status":"not_supported"})
-    );
+    for (provider, key) in [("elevenlabs", "synthetic"), ("gg", "sk-gg-v1-synthetic")] {
+        assert_eq!(
+            client
+                .verify(provider, key, CancellationToken::new())
+                .await
+                .unwrap(),
+            json!({"status":"not_supported"})
+        );
+    }
     let cancel = CancellationToken::new();
     cancel.cancel();
     assert_eq!(
@@ -151,6 +153,9 @@ async fn credential_errors_are_safe_and_requests_are_not_retried() {
         ("fal", "single"),
         ("tripo", "PASTE_TRIPO_KEY_HERE"),
         ("elevenlabs", "secret\nother"),
+        ("gg", "sk-gg-v1-"),
+        ("gg", "sk-or-synthetic"),
+        ("gg", "sk-gg-v1-synthetic\nother"),
     ] {
         assert_eq!(
             normalize_key(provider, key).unwrap_err().code,
