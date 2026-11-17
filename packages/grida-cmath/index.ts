@@ -354,26 +354,29 @@ namespace cmath {
    *
    * @example
    * // Normalize angles greater than 180 degrees
-   * const angle1 = toPrincipalAngle(270); // Returns -90
+   * const angle1 = cmath.principalAngle(270); // Returns -90
    *
    * @example
    * // Normalize angles less than -180 degrees
-   * const angle2 = toPrincipalAngle(-450); // Returns -90
+   * const angle2 = cmath.principalAngle(-450); // Returns -90
    *
    * @example
    * // Handle angles within the range [-180, 180)
-   * const angle3 = toPrincipalAngle(45); // Returns 45
+   * const angle3 = cmath.principalAngle(45); // Returns 45
    *
    * @example
    * // Normalize angles greater than 360 degrees
-   * const angle4 = toPrincipalAngle(540); // Returns 180
+   * const angle4 = cmath.principalAngle(540); // Returns -180
    *
    * @remarks
    * - Uses modular arithmetic to ensure the angle is wrapped to the desired range.
    * - This is commonly used in applications like computer graphics, navigation, and physics to standardize angle measurements.
    */
   export function principalAngle(angle: number): number {
-    return ((angle + 180) % 360) - 180;
+    const wrapped = angle % 360;
+    if (wrapped < -180) return wrapped + 360;
+    if (wrapped >= 180) return wrapped - 360;
+    return wrapped === 0 ? 0 : wrapped;
   }
 
   /**
@@ -675,16 +678,16 @@ namespace cmath {
       if (x === 0) return [0, 1];
 
       const sign = x < 0 ? -1 : 1;
-      x = Math.abs(x);
+      const target = Math.abs(x);
+      let tail = target;
 
       // Continued fraction approximation with denominator clamp
       let n0 = 0,
         d0 = 1;
       let n1 = 1,
         d1 = 0;
-      let a = Math.floor(x);
-
       while (true) {
+        const a = Math.floor(tail);
         const n2 = a * n1 + n0;
         const d2 = a * d1 + d0;
 
@@ -693,6 +696,10 @@ namespace cmath {
           const t = d1 === 0 ? 0 : Math.floor((max_denominator - d0) / d1);
           const n = t * n1 + n0;
           const d = t * d1 + d0;
+          // The last convergent can be closer than the clamped candidate.
+          if (d1 > 0 && Math.abs(target - n1 / d1) < Math.abs(target - n / d)) {
+            return [sign * n1, d1];
+          }
           const g = gcd(n, d);
           return [sign * (n / g), d / g];
         }
@@ -701,7 +708,7 @@ namespace cmath {
         const n2r = n2 / g;
         const d2r = d2 / g;
 
-        const frac = x - a;
+        const frac = tail - a;
         if (Math.abs(frac) < epsilon) {
           return [sign * n2r, d2r];
         }
@@ -711,8 +718,7 @@ namespace cmath {
         n1 = n2;
         d1 = d2;
 
-        x = 1 / frac;
-        a = Math.floor(x);
+        tail = 1 / frac;
       }
     }
   }
