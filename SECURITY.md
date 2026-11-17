@@ -858,7 +858,30 @@ a different credential. Renderer recovery preserves the selected profile's
 history boundary. Development worker/helper resources live outside Forge's
 build-cleanup directory and retain the same fixed-path and binary validation.
 
+**Retained tool-image observation.** The negotiated private-stdio tool-image
+reader exposes only the captured prepared PNG of an exact successful tool
+result. Session, turn, call, result-content index and retained media identity
+are checked against the owning turn before and after the integrity-checked
+storage read. It accepts no source path and cannot execute a tool or inference.
+Missing retained bytes are unavailable; they are never reconstructed from a
+changed source file. Reads are limited to the prepared-image byte budget and
+canonical bounded chunks.
+
+Desktop Main exchanges that metadata for a purpose-specific opaque token bound
+to the exact worker/session/result. Guarded IPC validates the current sender's
+attachment before and after reading, bounds concurrent reads and bytes, and
+validates the echoed chunk identity and raster framing. Tool-image tokens are
+not user-attachment or crop capabilities. The renderer receives only captured
+pixels through this reader, with no additional filesystem or model grant.
+
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-004 .` to enumerate.
+
+- Retained tool images: [native result authorization](crates/grida-agent/src/host/tool_images.rs),
+  [private ACP reader](crates/grida-agent/src/acp/extensions/tool_images.rs),
+  [native process regression](crates/grida-agent/tests/process/tool_images.rs),
+  [Main token and chunk owner](desktop/src/main/native-tool-images.ts) and
+  [its tests](desktop/src/main/native-tool-images.test.ts), with the existing
+  native chat process, chat adapter, guarded chat IPC and path-scoped preload.
 
 - The [native activity-order owner](crates/grida-agent/src/host/activity_order.rs)
   retains only public fact identities and bounded per-turn presentation

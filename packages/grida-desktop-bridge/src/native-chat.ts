@@ -220,6 +220,8 @@ export type NativeChatFileReferenceInput = Readonly<{
 export type NativeChatPage = Readonly<{
   sessionIds: readonly string[];
   titles?: readonly Readonly<{ sessionId: string; title: string }>[];
+  /** Latest local turn's settlement or start time; absent on older hosts. */
+  lastActivity?: readonly Readonly<{ sessionId: string; atMs: number }>[];
   nextCursor: string | null;
 }>;
 
@@ -260,6 +262,8 @@ export type NativeChatCatalogEntry = Readonly<{
   revision: number;
   title: string | null;
   archived: boolean;
+  /** Latest local turn activity, not archive time or exact message time. */
+  lastActivityAtMs?: number;
   deletionAvailable?: true;
 }>;
 
@@ -508,6 +512,14 @@ export type NativeChatActivityOutcome =
   | "cancelled"
   | "uncertain";
 
+/** Captured pixels from one successful tool result, retained by the native host. */
+export type NativeChatToolImage = Readonly<{
+  /** Main-issued identity for this exact chat, turn, call and result image. */
+  previewId: string;
+  mimeType: "image/png";
+  size: number;
+}>;
+
 /** One recorded tool call, in the order its message requested it. */
 export type NativeChatActivity = Readonly<{
   callId: string;
@@ -530,6 +542,10 @@ export type NativeChatActivity = Readonly<{
     truncated: boolean;
     /** The tool's structured result, when small. */
     structured?: unknown;
+    /** Bounded retained image metadata; bytes require the dedicated reader. */
+    images?: readonly NativeChatToolImage[];
+    /** Additional result images withheld by the bounded display projection. */
+    omittedImages?: number;
   }>;
 }>;
 
@@ -1099,6 +1115,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     attachmentId: string,
     previewId: string
   ): Promise<ArrayBuffer>;
+  /** Read captured tool-result pixels. Accepts no source path or attachment-image token. */
+  readToolImage?(attachmentId: string, previewId: string): Promise<ArrayBuffer>;
   saveArtifact?(
     attachmentId: string,
     observationId: string,

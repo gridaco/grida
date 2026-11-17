@@ -182,7 +182,10 @@ export function NativeSubagentActivity({
             initial="instant"
             resize={child?.current ? "smooth" : "instant"}
           >
-            <ConversationContent className="gap-4 p-0 pb-4">
+            <ConversationContent
+              scrollbar="custom"
+              className="mx-auto w-full max-w-2xl gap-4 p-0 pb-4"
+            >
               {view.activityAvailable && (
                 <NativeSubagentConversationView controller={controller} />
               )}

@@ -51,6 +51,10 @@ Each row identifies a chat and its workspace. Choose **Unarchive** to return it
 to that workspace's active chat list. This does not open the chat, start model
 work or resume an unfinished turn. Archiving a chat still happens through that
 chat's options menu. Archive browsing and restoration live in Settings.
+Compatible builds also show the last turn's activity date, with the full local
+date and time on hover. This is when work last finished or, while unfinished,
+started; it is not the archive date. A chat without a recorded turn shows no
+date.
 [Reopen or organize a chat](./history.md#reopen-or-organize-a-chat)
 
 These categories require a Desktop build with their native capabilities. An

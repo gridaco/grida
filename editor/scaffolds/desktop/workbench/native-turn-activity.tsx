@@ -19,11 +19,13 @@ export function NativeTurnActivity({
   renderMessage,
   subagentEvents = [],
   onOpenSubagent,
+  loadToolImage,
 }: {
   block: Extract<turn_activity.Block, { kind: "turn" }>;
   renderMessage: (message: NativeChatMessage) => ReactNode;
   subagentEvents?: readonly NativeSubagentLifecycleEvent[];
   onOpenSubagent?: (childId: string, inputId: string) => void;
+  loadToolImage?: (previewId: string) => Promise<Blob>;
 }) {
   const [expanded, setExpanded] = useState(false);
   // A stopped turn shows its partial work as is; there is no answer to keep
@@ -94,6 +96,7 @@ export function NativeTurnActivity({
             <ToolCallGroupView
               key={item.key}
               entries={item.calls.map(native_tool_parts.entry)}
+              loadToolImage={loadToolImage}
             />
           )
         )}
@@ -129,13 +132,15 @@ function SubagentEventRow({
   return (
     <button
       type="button"
-      className="flex w-full items-center gap-2 rounded-md py-1 text-left text-xs text-muted-foreground hover:text-foreground"
+      className="group/subagent flex w-full items-center gap-2 rounded-md py-1 text-left text-xs text-[color-mix(in_oklab,var(--color-muted-foreground)_80%,var(--color-foreground))]"
       onClick={() => onOpen?.(event.childId, event.inputId)}
       disabled={!onOpen}
     >
       <NativeSubagentIdentity childId={event.childId} className="size-5" />
       <span className="min-w-0 flex-1">
-        <span className="font-medium text-foreground">{event.name}</span>{" "}
+        <span className="font-medium transition-colors group-hover/subagent:text-foreground group-focus-visible/subagent:text-foreground">
+          {event.name}
+        </span>{" "}
         {event.kind === "started"
           ? "started working"
           : event.status === "failed"

@@ -22,9 +22,11 @@ is local guidance. The automatic empty-workspace tab does not enter the editor
 group. Opening any real or agent-owned tab replaces it; closing the final real
 tab reveals Quick Start again.
 
-The content-tab **+** button opens the same Quick Start actions in a single
+The content-tab **+** button and **New Tab** (⌘T / Ctrl+T), including while a browser page is focused, open the same Quick Start actions in a single
 closable panel tab alongside existing editors. Repeated presses reveal that
-tab rather than creating duplicates. Existing file and browser tabs stay alive.
+tab rather than creating duplicates. The **+** button is hidden when Quick
+Start is the only tab, including the automatic empty-workspace view. Existing
+file and browser tabs stay alive.
 Quick Start never appears in reopen history, the agent's list of open surfaces,
 or the remembered active artifact. The + button itself creates no browser page;
 **Open Browser** on Quick Start replaces that tab with a browser at the same

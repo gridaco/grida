@@ -19,6 +19,56 @@ function call(
 }
 
 describe("native_tool_parts", () => {
+  it("preserves retained image selectors without converting the viewed path into a display source", () => {
+    const images = [
+      {
+        previewId: "retained-tool-image",
+        mimeType: "image/png" as const,
+        size: 68,
+      },
+    ];
+    const part = native_tool_parts.entry(
+      call(
+        "view_image",
+        { path: "/fixture/workspace/source.png" },
+        {
+          text: "Viewed prepared image",
+          truncated: false,
+          images,
+        }
+      )
+    );
+    expect(part).toMatchObject({
+      type: "tool-view_image",
+      state: "output-available",
+      input: { path: "/fixture/workspace/source.png" },
+      output: { ok: true, images },
+    });
+    expect(part).not.toHaveProperty("output.data");
+  });
+
+  it("does not expose retained image selectors from a failed tool result", () => {
+    const part = native_tool_parts.entry(
+      call(
+        "view_image",
+        { path: "missing.png" },
+        {
+          text: "The viewed image could not be read.",
+          truncated: false,
+          images: [
+            { previewId: "not-authorized", mimeType: "image/png", size: 68 },
+          ],
+        },
+        "failed"
+      )
+    );
+    expect(part).toMatchObject({
+      state: "output-error",
+      errorText: "The viewed image could not be read.",
+    });
+    expect(part).not.toHaveProperty("output");
+  });
+
   it("shows a read with the file content the card counts", () => {
     const part = native_tool_parts.entry(
       call(

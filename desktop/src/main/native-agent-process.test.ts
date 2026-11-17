@@ -11,6 +11,7 @@ import {
 } from "./native-agent-process";
 import { NativeGatewayConnection } from "./native-gateway-connection";
 import { NativeInputImages } from "./native-input-images";
+import { NativeToolImages } from "./native-tool-images";
 import { NativeQueuedMessages } from "./native-queued-messages";
 import { NativeSelectedImages } from "./native-selected-images";
 import { NativeSubagentActivity } from "./native-subagent-activity";
@@ -82,6 +83,101 @@ lines.on('close', () => fs.writeFileSync(${JSON.stringify(receipt)}, 'eof'));
 }
 
 describe.skipIf(process.platform === "win32")("Native agent process", () => {
+  it("projects the same captured tool image during live updates and replay and reads only its exact result", async () => {
+    const bytes = Buffer.alloc(300 * 1024, 7);
+    bytes.set([137, 80, 78, 71, 13, 10, 26, 10]);
+    bytes.writeUInt32BE(13, 8);
+    bytes.write("IHDR", 12, "ascii");
+    bytes.writeUInt32BE(1, 16);
+    bytes.writeUInt32BE(1, 20);
+    const mediaId = "workspace-view/captured";
+    const test = fixture(
+      `
+      if(request.method==='session/new'){send({id:request.id,result:{sessionId:'chat'}});return;}
+      if(request.method==='${NativeToolImages.readMethod}'){
+        const p=request.params;
+        if(p.sessionId!=='chat'||p.turnId!=='turn'||p.toolCallId!=='view'||p.mediaId!=='${mediaId}'||p.contentIndex!==1)throw Error('foreign result selector');
+        const source=Buffer.from('${bytes.toString("base64")}','base64'),offset=p.offset,data=source.subarray(offset,offset+256*1024),next=offset+data.length;
+        send({id:request.id,result:{...p,mimeType:'image/png',totalBytes:source.length,data:data.toString('base64'),nextOffset:next===source.length?null:next}});return;
+      }
+      if(request.method!=='session/load')throw Error('unexpected request');
+      const window='${TRANSCRIPT_WINDOW}',read=request.params._meta?.[window];
+      if(!read){send({id:request.id,result:{}});return;}
+      const details={turnId:'turn',messageId:'work',activity:'read',outcome:'succeeded'};
+      const update={sessionUpdate:'tool_call',toolCallId:'view',title:'view_image',kind:'read',status:'completed',rawInput:{path:'/gone.png'},rawOutput:{text:'Viewed image',truncated:false,images:[{mediaId:'${mediaId}',contentIndex:1,mimeType:'image/png',totalBytes:${bytes.length}}]}};
+      send({method:'session/update',params:{sessionId:'chat',_meta:{'co.grida/session/updates':details},update}});
+      send({method:'session/update',params:{sessionId:'chat',_meta:{[window]:{requestId:read.requestId,...details}},update}});
+      const failed={...update,toolCallId:'failed-view',rawOutput:{...update.rawOutput,text:'Image access was denied'}};
+      send({method:'session/update',params:{sessionId:'chat',_meta:{[window]:{requestId:read.requestId,...details,outcome:'failed'}},update:failed}});
+      send({id:request.id,result:{_meta:{[window]:{requestId:read.requestId,view:1,older:null,turns:[]}}}});
+    `,
+      1,
+      { [TRANSCRIPT_WINDOW]: 1, [NativeToolImages.capability]: 1 }
+    );
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        ...test.options,
+        cwd: fs.realpathSync(test.root),
+      });
+      const session = await chat.create();
+      const live: unknown[] = [];
+      chat.subscribe(session, (value) => live.push(value));
+      const page = await chat.transcriptPage(session);
+      const image = page.messages[0].activity![0].output!.images![0];
+      expect(live).toMatchObject([
+        { kind: "activity", activity: { output: { images: [image] } } },
+      ]);
+      expect(image).toEqual({
+        previewId: expect.any(String),
+        mimeType: "image/png",
+        size: bytes.length,
+      });
+      expect(page.messages[0].activity![1]).toMatchObject({
+        callId: "failed-view",
+        outcome: "failed",
+        output: { text: "Image access was denied" },
+      });
+      expect(page.messages[0].activity![1].output!.images).toBeUndefined();
+      expect(JSON.stringify(page)).not.toContain(mediaId);
+      expect(
+        Buffer.from(await chat.readToolImage(session, image.previewId))
+      ).toEqual(bytes);
+      const foreign = await chat.load("foreign");
+      await expect(
+        chat.readToolImage(foreign, image.previewId)
+      ).rejects.toThrow("tool_image_unavailable");
+      await expect(chat.readToolImage(session, mediaId)).rejects.toThrow(
+        "tool_image_unavailable"
+      );
+      await expect(
+        chat.readAttachmentPreview(session, image.previewId)
+      ).rejects.toThrow("input_image_unavailable");
+    } finally {
+      await chat?.close();
+      test.close();
+    }
+  });
+
+  it.each([null, 1, 2])(
+    "negotiates tool-image readback independently (%s)",
+    async (version) => {
+      const test = fixture("send({id:request.id,result:requested});", 1, {
+        [NativeToolImages.capability]: version,
+      });
+      const agent = await NativeAgentProcess.start(test.options);
+      try {
+        expect(await agent.request("fixture/requested", {})).toMatchObject({
+          [NativeToolImages.capability]: 1,
+        });
+        expect(agent.acceptsToolImages).toBe(version === 1);
+      } finally {
+        await agent.close();
+        test.close();
+      }
+    }
+  );
+
   it("preserves retained message and individual call order across live chunks, replay and older pages", async () => {
     const test = fixture(
       `

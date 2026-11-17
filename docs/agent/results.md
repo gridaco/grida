@@ -50,6 +50,24 @@ Files without a supported preview, including PDFs, SVGs and HTML, remain file
 cards. Folder cards have no media preview or total size. An older Desktop
 build without retained-image reading support also keeps the file card.
 
+## Inspect an image the agent viewed
+
+Expand a turn's activity and its **Viewed image** action to see the captured
+image. Select the thumbnail to use the same fullscreen viewer, zoom, copy and
+download controls as attachment previews.
+
+This preview shows the retained, prepared PNG returned by that tool call. It
+can be smaller than the source file. Reopening the chat shows those same
+captured pixels, even if the source file changed or was deleted. Opening the
+preview does not read the source again, repeat the tool, or ask the model to
+run.
+
+If the captured bytes are missing, or the installed Desktop cannot read tool
+images, the action shows **Preview unavailable**. A failed image-viewing action
+shows its failure message instead of an image.
+
+Subagent transcripts do not yet show retained tool-image previews.
+
 ## Save a cropped image
 
 When the agent crops an image you attached, it crops the prepared pixels the

@@ -4,6 +4,8 @@ use super::*;
 
 const PAGE_SIZE: usize = 32;
 const MAX_LABEL_BYTES: usize = 256;
+const LATEST_TURN_ACTIVITY: &str = "SELECT COALESCE(settled_ms,started_ms) FROM turns
+     WHERE session=?1 ORDER BY ordinal DESC LIMIT 1";
 
 /// Return a stable scope for an immutable configuration this owner recognizes.
 pub type ScopeProjection = fn(&Envelope) -> Option<Fingerprint>;
@@ -18,6 +20,17 @@ pub struct CatalogEntry {
     pub label: Option<String>,
     /// Advances with every change to this entry; updates are conditional on it.
     pub revision: u64,
+}
+
+/// Catalog metadata with a read-only fact about its latest retained local turn.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CatalogRecord {
+    pub entry: CatalogEntry,
+    /// Wall-clock milliseconds since the Unix epoch from the latest turn by
+    /// execution ordinal: its first settlement time, or its start time until
+    /// settlement. Absent when the session has no local turn. This fact never
+    /// orders or authorizes work and is not a catalog mutation input.
+    pub latest_turn_activity_ms: Option<u64>,
 }
 
 /// One page of a scoped catalog listing in reverse creation order.
@@ -35,20 +48,21 @@ impl SqliteStore {
         session: SessionId,
     ) -> Result<CatalogEntry> {
         execute(Arc::clone(&self.inner), move |_, connection| {
-            let admitted: bool = connection
-                .query_row(
-                    "SELECT EXISTS(SELECT 1 FROM sessions WHERE id=?1 AND scope=?2)",
-                    params![session.as_str(), scope.bytes().as_slice()],
-                    |row| row.get(0),
-                )
-                .map_err(database_error)?;
-            if !admitted {
-                return Err(error(
-                    ErrorKind::Unavailable,
-                    "session_catalog_scope_mismatch",
-                ));
-            }
-            lookup(connection, &session)
+            scoped_lookup(connection, scope, &session)
+        })
+        .await
+    }
+
+    /// Read catalog metadata and the latest retained local turn's timing only
+    /// after verifying its owner-defined scope. Reads no turn snapshots.
+    pub async fn scoped_catalog_record(
+        &self,
+        scope: Fingerprint,
+        session: SessionId,
+    ) -> Result<CatalogRecord> {
+        execute(Arc::clone(&self.inner), move |_, connection| {
+            let entry = scoped_lookup(connection, scope, &session)?;
+            read_record(connection, entry)
         })
         .await
     }
@@ -63,6 +77,30 @@ impl SqliteStore {
     ) -> Result<CatalogPage> {
         execute(Arc::clone(&self.inner), move |_, connection| {
             read_page(connection, scope, bucket, after)
+        })
+        .await
+    }
+
+    /// Read the same bounded catalog page with the latest retained local
+    /// turn's timing. Adds one indexed lookup per returned entry without
+    /// reading configurations, queues, turn snapshots, or transcripts.
+    pub async fn list_catalog_records(
+        &self,
+        scope: Fingerprint,
+        bucket: u8,
+        after: Option<SessionId>,
+    ) -> Result<CatalogPage<CatalogRecord>> {
+        execute(Arc::clone(&self.inner), move |_, connection| {
+            let page = read_page(connection, scope, bucket, after)?;
+            let entries = page
+                .entries
+                .into_iter()
+                .map(|entry| read_record(connection, entry))
+                .collect::<Result<_>>()?;
+            Ok(CatalogPage {
+                entries,
+                next_after: page.next_after,
+            })
         })
         .await
     }
@@ -101,6 +139,16 @@ impl SqliteStore {
     pub async fn catalog_entry(&self, session: SessionId) -> Result<CatalogEntry> {
         execute(Arc::clone(&self.inner), move |_, connection| {
             lookup(connection, &session)
+        })
+        .await
+    }
+
+    /// Read catalog metadata and retained local turn timing without a scope
+    /// filter. The owner is responsible for authorizing the session identity.
+    pub async fn catalog_record(&self, session: SessionId) -> Result<CatalogRecord> {
+        execute(Arc::clone(&self.inner), move |_, connection| {
+            let entry = lookup(connection, &session)?;
+            read_record(connection, entry)
         })
         .await
     }
@@ -219,4 +267,69 @@ fn lookup(connection: &Connection, session: &SessionId) -> Result<CatalogEntry> 
         .map_err(database_error)?
         .ok_or_else(|| error(ErrorKind::InvalidInput, "session_catalog_entry_missing"))?;
     decode_entry(Ok(row))
+}
+
+fn scoped_lookup(
+    connection: &Connection,
+    scope: Fingerprint,
+    session: &SessionId,
+) -> Result<CatalogEntry> {
+    let admitted: bool = connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM sessions WHERE id=?1 AND scope=?2)",
+            params![session.as_str(), scope.bytes().as_slice()],
+            |row| row.get(0),
+        )
+        .map_err(database_error)?;
+    if !admitted {
+        return Err(error(
+            ErrorKind::Unavailable,
+            "session_catalog_scope_mismatch",
+        ));
+    }
+    lookup(connection, session)
+}
+
+fn read_record(connection: &Connection, entry: CatalogEntry) -> Result<CatalogRecord> {
+    let latest_turn_activity_ms = connection
+        .prepare_cached(LATEST_TURN_ACTIVITY)
+        .map_err(database_error)?
+        .query_row([entry.session.as_str()], |row| row.get::<_, i64>(0))
+        .optional()
+        .map_err(database_error)?
+        .map(unsigned)
+        .transpose()?;
+    Ok(CatalogRecord {
+        entry,
+        latest_turn_activity_ms,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn latest_turn_timing_uses_the_session_ordinal_index() {
+        let mut connection = Connection::open_in_memory().unwrap();
+        schema::install_for_test(&mut connection);
+        let mut statement = connection
+            .prepare(&format!("EXPLAIN QUERY PLAN {LATEST_TURN_ACTIVITY}"))
+            .unwrap();
+        let plan = statement
+            .query_map(["session"], |row| row.get::<_, String>(3))
+            .unwrap()
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .unwrap();
+        assert!(
+            plan.iter()
+                .any(|step| { step.contains("SEARCH") && step.contains("turns_by_session") }),
+            "{plan:?}"
+        );
+        assert!(
+            plan.iter()
+                .all(|step| !step.contains("SCAN") && !step.contains("TEMP B-TREE")),
+            "{plan:?}"
+        );
+    }
 }

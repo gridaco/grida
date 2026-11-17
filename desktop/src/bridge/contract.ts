@@ -170,6 +170,7 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_READ_ARTIFACT: "grida:native-chat:read-artifact",
   NATIVE_CHAT_READ_ATTACHMENT_PREVIEW:
     "grida:native-chat:read-attachment-preview",
+  NATIVE_CHAT_READ_TOOL_IMAGE: "grida:native-chat:read-tool-image",
   NATIVE_CHAT_SAVE_ARTIFACT: "grida:native-chat:save-artifact",
   NATIVE_CHAT_QUEUE: "grida:native-chat:queue",
   NATIVE_CHAT_ACCEPTS_QUEUED_TEXT_REPLACEMENT:

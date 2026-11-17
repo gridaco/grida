@@ -20,6 +20,7 @@ import {
 import { NativeImagePlacement } from "./native-image-placement";
 import { NativeFileReference } from "./native-file-reference";
 import { NativeInputImages } from "./native-input-images";
+import { NativeToolImages } from "./native-tool-images";
 import { NativeQueuedMessages } from "./native-queued-messages";
 import { NativeSubagentActivity } from "./native-subagent-activity";
 import { NativeActivityOrder } from "./native-activity-order";
@@ -161,6 +162,7 @@ export class NativeAgentProcess {
   private fileInput = false;
   private fileReference = false;
   private inputImages = false;
+  private toolImages = false;
   private inputImageChunks = false;
   private queuedMessages = false;
   private queuedTextReplacement = false;
@@ -284,6 +286,10 @@ export class NativeAgentProcess {
 
   get acceptsInputImages(): boolean {
     return this.connected && this.inputImages;
+  }
+
+  get acceptsToolImages(): boolean {
+    return this.connected && this.toolImages;
   }
 
   get acceptsInputImageChunks(): boolean {
@@ -668,6 +674,7 @@ export class NativeAgentProcess {
                 [NativeFileReference.capability]: 1,
                 [NativeInputImages.capability]: 1,
                 [NativeInputImages.chunkCapability]: 1,
+                [NativeToolImages.capability]: 1,
                 [NativeQueuedMessages.capability]: 1,
                 [NativeQueuedMessages.replaceTextCapability]: 1,
                 [NativeSelectedImages.capability]: 1,
@@ -742,6 +749,7 @@ export class NativeAgentProcess {
         advertised?.[NativeInputImages.capability] === 1;
       processOwner.inputImageChunks =
         advertised?.[NativeInputImages.chunkCapability] === 1;
+      processOwner.toolImages = advertised?.[NativeToolImages.capability] === 1;
       processOwner.queuedMessages =
         advertised?.[NativeQueuedMessages.capability] === 1;
       processOwner.queuedTextReplacement =

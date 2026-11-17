@@ -83,6 +83,14 @@ the transcript exceeds either bound. A replay does not stop the live turn.
 Navigating away releases attachments and subscriptions while accepted work
 stays owned by the native host.
 
+Chat listings may carry optional `lastActivity` entries pairing a session ID
+with `atMs`; organization entries and Settings archive rows use
+`lastActivityAtMs`. These are nonnegative integer Unix milliseconds within
+JavaScript's Date range. They describe the latest local turn's first settlement
+time, or start time while unfinished, rather than exact message or archive
+time. A chat without local turns or an older host omits the value. Listing
+order and cursors are unchanged; dates grant no attachment or control authority.
+
 Compatible native hosts supply optional `activityOrder` on exposed messages,
 individual tool calls and child lifecycle events. Positive safe-integer
 coordinates compare only within the owning turn; a child event names that
@@ -128,6 +136,19 @@ and child and cannot be moved to another window or chat. Closing the viewer
 starts no cancellation; reads start no inference and grant no ordinary child
 session attachment or control authority. Older hosts omit the methods or
 availability fact and keep their existing inspection/result behavior.
+
+Successful activity output can include `images`, at most eight retained
+`{ previewId, mimeType: "image/png", size }` descriptors, plus `omittedImages`
+when further result images were withheld. The independent optional
+`readToolImage(attachmentId, previewId)` reads the exact captured pixels, up to
+384 KiB per image. The opaque token belongs to the attached chat and its exact
+turn, successful tool call and result part; no source path or native media
+identity reaches this API. Missing retained bytes reject instead of rereading
+the source. Attachment and crop readers do not accept tool-image tokens. Reads
+start no inference and rerun no tool. Older preloads omit the reader; older
+native hosts omit the metadata, so keep a visible unavailable state alongside
+the tool's text. Native readback independently negotiates
+`co.grida/session/tool-images` before exposing metadata or sending a read.
 
 New hosts optionally expose `queuedMessage(attachmentId, observationId, inputId)`
 for full multiline text and attachment display metadata from an input still

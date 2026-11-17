@@ -30,6 +30,13 @@ import {
   ContextMenuContent,
   ContextMenuItem,
 } from "@app/ui/components/context-menu";
+import { Kbd } from "@app/ui/components/kbd";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@app/ui/components/tooltip";
 import { cn } from "@app/ui/lib/utils";
 import { getDesktopBridge, type Workspace } from "@/lib/desktop/bridge";
 import { DESKTOP_WINDOW_CONTROLS_RIGHT_INSET } from "@/scaffolds/desktop/chrome/title-bar";
@@ -461,6 +468,11 @@ function EditorTitleBar({
   onToggleUtilities?: () => void;
   onFileTrashed?: (relPath: string) => void;
 }) {
+  const onlyQuickStart =
+    (showStart && tabs.length === 0) ||
+    (!showStart &&
+      tabs.length === 1 &&
+      tabs[0] === WorkbenchTab.panel(START_PANEL_ID));
   const railRef = useRef<HTMLDivElement | null>(null);
   const nativeDragExclusionLayerRef = useRef<HTMLDivElement | null>(null);
   const [previewController] = useState(() => new TabPreviewController());
@@ -544,7 +556,7 @@ function EditorTitleBar({
         ref={railRef}
         role="tablist"
         aria-label="Open editors"
-        className="desktop-native-drag-scroll-viewport scroll-fade-x scroll-fade-3 no-scrollbar flex h-full min-w-0 flex-1 items-center gap-1 overflow-x-auto overscroll-x-contain pl-1.5 pr-2 scroll-pl-1.5 scroll-pr-2"
+        className="desktop-native-drag-scroll-viewport scroll-fade-x scroll-fade-3 no-scrollbar flex h-full min-w-0 flex-initial items-center gap-1 overflow-x-auto overscroll-x-contain pl-1.5 pr-2 scroll-pl-1.5 scroll-pr-2"
         onPointerLeave={(event) =>
           previewController.railLeave(event.pointerType)
         }
@@ -605,20 +617,33 @@ function EditorTitleBar({
             />
           );
         })}
-        {/* The parent title bar owns dragging. The stationary exclusions below
-            cover the occupied tab run (including inter-tab gaps); this genuinely
-            unused trailing space remains draggable. */}
-        <div role="presentation" className="h-full min-w-0 flex-1" />
       </div>
-      <button
-        type="button"
-        aria-label="Open Quick Start"
-        title="Open Quick Start"
-        onClick={onOpenStart}
-        className="desktop-no-drag mr-1 grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <PlusIcon className="size-3.5" />
-      </button>
+      {!onlyQuickStart && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                aria-label="New tab"
+                onClick={onOpenStart}
+                className="desktop-no-drag mr-1 grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <PlusIcon className="size-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent
+              side="bottom"
+              sideOffset={6}
+              className="flex items-center gap-2"
+            >
+              New tab <Kbd>⌘T</Kbd>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+      {/* Let the rail shrink on overflow while keeping + visible. Unused
+          title-bar space belongs after + and remains natively draggable. */}
+      <div role="presentation" className="h-full min-w-0 flex-1" />
       {/* Chromium does not clip native app-region boxes to scrollports. Keep
           moving tab descendants region-free and mirror their visible interaction
           run (tabs plus following gaps) here. This layer is stationary and

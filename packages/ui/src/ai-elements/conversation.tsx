@@ -1,8 +1,10 @@
 "use client";
 
 import { Button } from "@app/ui/components/button";
+import { ScrollBar } from "@app/ui/components/scroll-area";
 import { cn } from "@app/ui/lib/utils";
 import { ArrowDownIcon } from "lucide-react";
+import { ScrollArea as ScrollAreaPrimitive } from "radix-ui";
 import type { ComponentProps } from "react";
 import { useCallback } from "react";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
@@ -24,17 +26,56 @@ export const Conversation = ({ className, ...props }: ConversationProps) => (
 
 export type ConversationContentProps = ComponentProps<
   typeof StickToBottom.Content
->;
+> & {
+  scrollbar?: "native" | "custom";
+};
 
 export const ConversationContent = ({
   className,
+  scrollbar = "native",
   ...props
-}: ConversationContentProps) => (
-  <StickToBottom.Content
-    className={cn("flex flex-col gap-8 p-4", className)}
-    {...props}
-  />
-);
+}: ConversationContentProps) =>
+  scrollbar === "custom" ? (
+    <ConversationScrollAreaContent className={className} {...props} />
+  ) : (
+    <StickToBottom.Content
+      className={cn("flex flex-col gap-8 p-4", className)}
+      {...props}
+    />
+  );
+
+function ConversationScrollAreaContent({
+  className,
+  scrollClassName,
+  children,
+  ...props
+}: ComponentProps<typeof StickToBottom.Content>) {
+  const context = useStickToBottomContext();
+  return (
+    <ScrollAreaPrimitive.Root
+      type="scroll"
+      scrollHideDelay={800}
+      className="relative h-full min-h-0 min-w-0"
+    >
+      {/* Share one native viewport. Radix's table wrapper measures horizontal
+          overflow; a vertical-only transcript needs block layout to wrap. */}
+      <ScrollAreaPrimitive.Viewport
+        ref={context.scrollRef}
+        className={cn("size-full [&>div]:!block", scrollClassName)}
+        data-slot="scroll-area-viewport"
+      >
+        <div
+          {...props}
+          ref={context.contentRef}
+          className={cn("flex flex-col gap-8 p-4", className)}
+        >
+          {typeof children === "function" ? children(context) : children}
+        </div>
+      </ScrollAreaPrimitive.Viewport>
+      <ScrollBar className="z-10 w-2.5 border-0 bg-transparent p-0.5 data-[state=visible]:animate-in data-[state=visible]:fade-in-0 data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 duration-200 motion-reduce:animate-none [&_[data-slot=scroll-area-thumb]]:bg-foreground/35 [&_[data-slot=scroll-area-thumb]]:transition-[scale] [&_[data-slot=scroll-area-thumb]]:duration-150 [&_[data-slot=scroll-area-thumb]]:ease-out [&:hover_[data-slot=scroll-area-thumb]]:scale-x-125 motion-reduce:[&_[data-slot=scroll-area-thumb]]:transition-none" />
+    </ScrollAreaPrimitive.Root>
+  );
+}
 
 export type ConversationEmptyStateProps = ComponentProps<"div"> & {
   title?: string;

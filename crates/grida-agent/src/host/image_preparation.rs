@@ -14,8 +14,8 @@ pub(super) const MAX_PREPARED_BYTES: usize = 384 * 1024;
 const MAX_SOURCE_PIXELS: u64 = 64 * 1024 * 1024;
 const MAX_DECODE_BYTES: u64 = 256 * 1024 * 1024;
 const MAX_SOURCE_SIDE: u32 = 16_384;
-const MAX_PREPARED_SIDE: u32 = 2048;
-const MAX_PREPARED_PIXELS: u64 = 2 * 1024 * 1024;
+pub(super) const MAX_PREPARED_SIDE: u32 = 2048;
+pub(super) const MAX_PREPARED_PIXELS: u64 = 2 * 1024 * 1024;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

@@ -21,7 +21,25 @@ import type {
   NativeChatSelection,
   NativeChatSelectionState,
   NativeChatSelectionTarget,
+  NativeChatActivity,
+  NativeChatToolImage,
 } from "./index";
+
+describe("DesktopNativeChat retained tool images", () => {
+  it("keeps the dedicated reader optional and carries only opaque display metadata", () => {
+    const older: Pick<DesktopNativeChat, "readToolImage"> = {};
+    expect(older.readToolImage).toBeUndefined();
+    expectTypeOf<
+      NonNullable<NativeChatActivity["output"]>["images"]
+    >().toEqualTypeOf<readonly NativeChatToolImage[] | undefined>();
+    expectTypeOf<
+      Parameters<NonNullable<DesktopNativeChat["readToolImage"]>>
+    >().toEqualTypeOf<[attachmentId: string, previewId: string]>();
+    expectTypeOf<
+      Awaited<ReturnType<NonNullable<DesktopNativeChat["readToolImage"]>>>
+    >().toEqualTypeOf<ArrayBuffer>();
+  });
+});
 
 describe("DesktopNativeChat queued inspection", () => {
   it("keeps read-only queued inspection optional for older hosts", () => {

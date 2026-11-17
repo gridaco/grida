@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
+import { toast } from "sonner";
 import { app, useDesktopBridge } from "@/lib/desktop/bridge";
 import type {
   NativeChatEffort,
@@ -30,6 +31,7 @@ import {
 import { Button } from "@app/ui/components/button";
 import { cn } from "@app/ui/lib/utils";
 import { NativeEffortSlider } from "./native-effort-slider";
+import { ChatActivityDate } from "../shared/chat-activity-date";
 import {
   Popover,
   PopoverContent,
@@ -59,11 +61,14 @@ import {
 export function NativeChatHeader({
   controller,
   state,
+  onChatSelected,
 }: {
   controller: NativeChatController;
   state: NativeChatView;
+  onChatSelected?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const selecting = useRef(false);
   const renaming = useRef(false);
   const titleInput = useRef<HTMLInputElement>(null);
   const title = state.selected
@@ -78,7 +83,10 @@ export function NativeChatHeader({
         open={open}
         onOpenChange={(next) => {
           setOpen(next);
-          if (next) void controller.listChats(null, false);
+          if (next) {
+            selecting.current = false;
+            void controller.listChats(null, false);
+          }
         }}
       >
         <PopoverTrigger asChild>
@@ -92,7 +100,19 @@ export function NativeChatHeader({
             <ListIcon className="size-3.5" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="start" className="w-72 p-0">
+        <PopoverContent
+          align="start"
+          className="w-72 p-0"
+          onCloseAutoFocus={(event) => {
+            // Selecting a chat hands focus to its composer; dismissing the
+            // list still returns focus to its trigger.
+            if (selecting.current) {
+              event.preventDefault();
+              onChatSelected?.();
+            }
+            selecting.current = false;
+          }}
+        >
           <Command>
             <CommandInput placeholder="Search chats…" />
             <CommandList className="max-h-72">
@@ -106,6 +126,7 @@ export function NativeChatHeader({
                     value={`${controller.chatTitle(id)} ${id}`}
                     disabled={state.profileBusy}
                     onSelect={() => {
+                      selecting.current = true;
                       void controller.select(id);
                       setOpen(false);
                     }}
@@ -113,6 +134,9 @@ export function NativeChatHeader({
                     <span className="min-w-0 flex-1 truncate">
                       {controller.chatTitle(id)}
                     </span>
+                    <ChatActivityDate
+                      atMs={controller.chatLastActivityAtMs(id)}
+                    />
                     {state.selected === id && (
                       <CheckIcon className="size-3.5" />
                     )}
@@ -233,7 +257,11 @@ export function NativeChatHeader({
                 {!state.catalogEntry.archived && (
                   <DropdownMenuItem
                     disabled={state.catalogChanging}
-                    onSelect={() => void controller.setChatArchived(true)}
+                    onSelect={() => {
+                      void controller.setChatArchived(true).then((archived) => {
+                        if (archived) toast("Chat archived");
+                      });
+                    }}
                   >
                     Archive chat
                   </DropdownMenuItem>

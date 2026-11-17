@@ -904,6 +904,12 @@ const bridge: DesktopBridge = {
         attachmentId,
         previewId
       ),
+    readToolImage: (attachmentId, previewId) =>
+      nativeChatInvoke(
+        IPC_CHANNELS.NATIVE_CHAT_READ_TOOL_IMAGE,
+        attachmentId,
+        previewId
+      ),
     readArtifact: (attachmentId, observationId, artifactId) =>
       nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_READ_ARTIFACT,

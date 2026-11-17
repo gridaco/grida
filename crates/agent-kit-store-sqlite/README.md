@@ -110,6 +110,27 @@ and its own revision. Updating it leaves execution and history unchanged.
 An update or deletion at a stale entry revision is a conflict to reload and
 retry.
 
+`catalog_record`, `scoped_catalog_record`, and `list_catalog_records` add a
+read-only `latest_turn_activity_ms` fact alongside the writable `CatalogEntry`.
+For the latest retained local turn by execution ordinal, it is the first
+settlement time when recorded and otherwise its start time, in wall-clock
+milliseconds since the Unix epoch. A session without local turns has no value,
+including one with queued input or inherited history only. This is a retained execution fact;
+it does not order or authorize work, identify the latest message, or measure
+catalog creation or organization. Renaming, moving buckets and exact retries
+leave it unchanged. Reopening preserves it.
+
+The record page keeps the catalog's 32-entry bound, creation order, scope and
+cursor rules. It adds one lookup per returned entry through the existing
+session/ordinal turn index, reading just the timing columns. It reads no
+configuration, queue, turn snapshot or transcript, and does not read timing
+for the lookahead entry. The scoped record checks scope before reading timing;
+the unscoped record requires its owner to authorize the session identity, as
+with `catalog_entry`. `replace_catalog_entry` still accepts only catalog
+metadata, so an observed timestamp never becomes a write precondition or an
+authoritative write input. These projections add no schema, clock or write
+behavior.
+
 An optional owner projection links an immutable submission to an exact retained
 source turn in the acceptance transaction. A linked source turn must be
 retained, or the submission is refused. Reads are bounded and require the

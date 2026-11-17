@@ -115,6 +115,86 @@ it("rejects a chat launch outside the main-selected workspace", async () => {
   }
 });
 
+it("projects bounded catalog activity metadata and accepts older hosts without it", async () => {
+  const test = fixture();
+  const request = vi.fn<NativeAgentProcess["request"]>();
+  const start = vi.spyOn(NativeAgentProcess, "start").mockResolvedValueOnce({
+    request,
+    close: async () => {},
+  } as unknown as NativeAgentProcess);
+  let client: NativeAgentChat | undefined;
+  try {
+    client = await NativeAgentChat.start({
+      resourcesPath: test.root,
+      stateDirectory: test.stateDirectory,
+      cwd: test.cwd,
+      provider: "openai-compatible",
+      endpoint: "http://127.0.0.1:1/v1",
+      model: "fixture",
+    });
+    const atMs = 1_800_000_000_000;
+    const dated = {
+      sessionId: "dated",
+      cwd: test.cwd,
+      _meta: { "co.grida/lastActivityAtMs": atMs },
+    };
+    for (const archived of [false, true]) {
+      request.mockResolvedValueOnce({
+        sessions: [dated, { sessionId: "older", cwd: test.cwd }],
+      });
+      await expect(client.list(null, archived)).resolves.toEqual({
+        sessionIds: ["dated", "older"],
+        nextCursor: null,
+        lastActivity: [{ sessionId: "dated", atMs }],
+      });
+      expect(request).toHaveBeenLastCalledWith(
+        archived ? "_co.grida/session/list-archived" : "session/list",
+        { cwd: test.cwd }
+      );
+    }
+    request.mockResolvedValueOnce({
+      sessions: [{ sessionId: "older", cwd: test.cwd }],
+    });
+    await expect(client.list()).resolves.toEqual({
+      sessionIds: ["older"],
+      nextCursor: null,
+    });
+    for (const invalid of [null, -1, 1.5, "today", 8_640_000_000_000_001]) {
+      request.mockResolvedValueOnce({
+        sessions: [
+          { ...dated, _meta: { "co.grida/lastActivityAtMs": invalid } },
+        ],
+      });
+      await expect(client.list()).rejects.toThrow(
+        "native_chat_invalid_protocol_value"
+      );
+    }
+    request.mockResolvedValueOnce({ sessionId: "dated" });
+    const session = await client.create();
+    const entry = {
+      sessionId: "dated",
+      revision: 1,
+      title: null,
+      archived: false,
+    };
+    request.mockResolvedValueOnce({ ...entry, lastActivityAtMs: atMs });
+    await expect(client.catalogEntry(session)).resolves.toEqual({
+      ...entry,
+      lastActivityAtMs: atMs,
+    });
+    request.mockResolvedValueOnce(entry);
+    await expect(client.catalogEntry(session)).resolves.toEqual(entry);
+    request.mockResolvedValueOnce({ ...entry, lastActivityAtMs: -1 });
+    await expect(client.catalogEntry(session)).rejects.toThrow(
+      "native_chat_invalid_protocol_value"
+    );
+  } finally {
+    await client?.close();
+    start.mockRestore();
+    test.close();
+  }
+});
+
 it("opens a saved queue passively and resumes idle queued work on an exact observation", async () => {
   const test = fixture();
   const sessionId = "fixture-queue-session";

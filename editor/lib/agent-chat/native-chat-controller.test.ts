@@ -320,6 +320,103 @@ it("reads a recorded user PNG without submitting work and drops a stale chat res
   controller.disconnect();
 });
 
+it("reads only an observed successful tool image and refuses changed bytes or a retired chat", async () => {
+  const { bridge, transcripts, controller } = fixture();
+  const bytes = Uint8Array.from(
+    Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+      "base64"
+    )
+  ).buffer;
+  const image = {
+    previewId: "tool-preview",
+    mimeType: "image/png" as const,
+    size: bytes.byteLength,
+  };
+  transcripts.set("chat-a", [
+    {
+      messageId: "view-result",
+      turnId: "turn-chat-a",
+      role: "assistant",
+      text: "",
+      activity: [
+        {
+          callId: "view-call",
+          title: "view_image",
+          kind: "read",
+          outcome: "succeeded",
+          input: { path: "/fixture/workspace/source.png" },
+          output: { text: "Viewed image", truncated: false, images: [image] },
+        },
+      ],
+    },
+  ]);
+  const read = vi
+    .fn<NonNullable<DesktopNativeChat["readToolImage"]>>()
+    .mockResolvedValue(bytes);
+  bridge.readToolImage = read;
+  const submit = vi.spyOn(bridge, "submit");
+  await controller.select("chat-a");
+  await expect(controller.readToolImage("foreign-preview")).rejects.toThrow(
+    "tool_image_unavailable"
+  );
+  expect(read).not.toHaveBeenCalled();
+  const blob = await controller.readToolImage(image.previewId);
+  expect(blob.type).toBe("image/png");
+  expect(await blob.arrayBuffer()).toEqual(bytes);
+  expect(read).toHaveBeenCalledExactlyOnceWith("chat-a", image.previewId);
+
+  read.mockResolvedValueOnce(new ArrayBuffer(bytes.byteLength + 1));
+  await expect(controller.readToolImage(image.previewId)).rejects.toThrow(
+    "tool_image_unavailable"
+  );
+  const pending = Promise.withResolvers<ArrayBuffer>();
+  read.mockReturnValueOnce(pending.promise);
+  const loading = controller.readToolImage(image.previewId);
+  await controller.select("chat-b");
+  pending.resolve(bytes);
+  await expect(loading).rejects.toThrow("tool_image_unavailable");
+  expect(submit).not.toHaveBeenCalled();
+  controller.disconnect();
+});
+
+it.each(["running", "failed", "cancelled", "uncertain"] as const)(
+  "does not authorize an image attached to a %s tool activity",
+  async (outcome) => {
+    const { bridge, transcripts, controller } = fixture();
+    const read = vi.fn<NonNullable<DesktopNativeChat["readToolImage"]>>();
+    bridge.readToolImage = read;
+    transcripts.set("chat-a", [
+      {
+        messageId: "view-result",
+        role: "assistant",
+        text: "",
+        activity: [
+          {
+            callId: "view-call",
+            title: "view_image",
+            kind: "read",
+            outcome,
+            output: {
+              text: "Unavailable",
+              truncated: false,
+              images: [
+                { previewId: "tool-preview", mimeType: "image/png", size: 68 },
+              ],
+            },
+          },
+        ],
+      },
+    ]);
+    await controller.select("chat-a");
+    await expect(controller.readToolImage("tool-preview")).rejects.toThrow(
+      "tool_image_unavailable"
+    );
+    expect(read).not.toHaveBeenCalled();
+    controller.disconnect();
+  }
+);
+
 it("offers explicit connections before a failed default can open chat or history", async () => {
   const { bridge, controller } = fixture();
   const id = "c".repeat(64);
@@ -814,6 +911,118 @@ it("streams turn activity live and adopts recorded turns from each page", async 
     "work",
   ]);
   controller.disconnect();
+});
+
+it("advances visible progress only for new live output, independently of history and observation reads", async () => {
+  const { bridge, controller, running, updates } = fixture();
+  running.add("chat-a");
+  let latest: NativeChatTranscriptPage = {
+    view: 1,
+    older: "earlier",
+    messages: [],
+  };
+  const read = vi.fn<NonNullable<DesktopNativeChat["transcriptPage"]>>(
+    async (id, before) =>
+      id !== "chat-a"
+        ? { view: 1, older: null, messages: [] }
+        : before
+          ? {
+              view: 1,
+              older: null,
+              messages: [{ messageId: "old", role: "assistant", text: "Old" }],
+            }
+          : latest
+  );
+  bridge.transcriptPage = read;
+  try {
+    await controller.select("chat-a");
+    const live = updates.get("chat-a")!;
+    const text = {
+      kind: "text",
+      role: "assistant",
+      messageId: "work",
+      turnId: "turn-chat-a",
+      offsetBytes: 0,
+      replace: true,
+      text: "",
+    } as const;
+    expect(controller.read().progressRevision).toBe(0);
+    live({ ...text, role: "user", messageId: "echo", text: "Request" });
+    live(text);
+    expect(controller.read().progressRevision).toBe(0);
+    live({ ...text, text: "First" });
+    expect(controller.read().progressRevision).toBe(1);
+    live({ ...text, text: "First", replace: false });
+    live({ ...text, text: "First", activityOrder: 1 });
+    expect(controller.read().progressRevision).toBe(1);
+    live({ ...text, text: " second", replace: false, offsetBytes: 5 });
+    expect(controller.read().progressRevision).toBe(2);
+
+    const call = {
+      kind: "activity",
+      messageId: "work",
+      turnId: "turn-chat-a",
+      activity: {
+        callId: "call",
+        title: "read_file",
+        kind: "read",
+        outcome: "running",
+        input: { path: "notes.txt", limit: 20 },
+      },
+    } as const;
+    live(call);
+    expect(controller.read().progressRevision).toBe(3);
+    live({
+      ...call,
+      activity: {
+        ...call.activity,
+        input: { limit: 20, path: "notes.txt" },
+        activityOrder: 2,
+      },
+    });
+    expect(controller.read().progressRevision).toBe(3);
+    const result = {
+      ...call,
+      activity: {
+        ...call.activity,
+        outcome: "succeeded",
+        output: { text: "Read content", truncated: false },
+      },
+    } as const;
+    live(result);
+    live({ ...result, activity: { ...result.activity } });
+    live({ ...text, turnId: "foreign", text: "Stale" });
+    live({ ...call, turnId: "foreign" });
+    expect(controller.read().progressRevision).toBe(4);
+
+    latest = {
+      ...latest,
+      messages: controller.read().messages.map((message) => ({
+        ...message,
+        phase: "progress",
+      })),
+    };
+    live({ kind: "resync" });
+    await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() =>
+      expect(
+        controller
+          .read()
+          .messages.find((message) => message.messageId === "work")?.phase
+      ).toBe("progress")
+    );
+    expect(controller.read().progressRevision).toBe(4);
+    await controller.loadEarlierMessages();
+    expect(controller.read().messages[0].messageId).toBe("old");
+    expect(controller.read().progressRevision).toBe(4);
+
+    await controller.select("chat-b");
+    expect(controller.read().progressRevision).toBe(0);
+    live({ ...text, text: "Retired callback" });
+    expect(controller.read().progressRevision).toBe(0);
+  } finally {
+    controller.disconnect();
+  }
 });
 
 it("retains native first-publication positions through live text, replacement, call outcomes and replay", async () => {
@@ -5316,6 +5525,26 @@ it("drops a disposed startup reply", async () => {
   expect(publish).toHaveBeenCalledExactlyOnceWith("native-starting");
 });
 
+it("retains catalog activity by chat and drops it when a later page has no timestamp", async () => {
+  const { bridge, controller } = fixture();
+  const atMs = 1_800_000_000_000;
+  bridge.list = vi.fn<DesktopNativeChat["list"]>().mockResolvedValue({
+    sessionIds: ["chat-a", "chat-b"],
+    lastActivity: [{ sessionId: "chat-b", atMs }],
+    nextCursor: "v1/chat-b",
+  });
+  controller.connect(null);
+  await controller.listChats();
+  expect(controller.chatLastActivityAtMs("chat-a")).toBeUndefined();
+  expect(controller.chatLastActivityAtMs("chat-b")).toBe(atMs);
+  expect(controller.read().sessions).toEqual(["chat-a", "chat-b"]);
+  bridge.list = async () => ({ sessionIds: ["chat-c"], nextCursor: null });
+  await controller.listChats("v1/chat-b");
+  expect(controller.chatLastActivityAtMs("chat-b")).toBeUndefined();
+  expect(controller.chatLastActivityAtMs("chat-c")).toBeUndefined();
+  controller.disconnect();
+});
+
 it("uses catalog membership, retains an exact rename draft on conflict, and ignores a retired mutation reply", async () => {
   const { bridge, running, transcripts } = fixture();
   const entries = new Map<string, NativeChatCatalogEntry>([
@@ -5397,17 +5626,17 @@ it("uses catalog membership, retains an exact rename draft on conflict, and igno
   await vi.waitFor(() =>
     expect(list.mock.results.at(-1)?.value).toBe(stalePage.promise)
   );
-  await controller.setChatArchived(true);
+  await expect(controller.setChatArchived(true)).resolves.toBe(true);
   stalePage.resolve({ sessionIds: ["chat-a"], nextCursor: null });
   await refresh;
   expect(controller.read().sessions).not.toContain("chat-a");
-  expect(controller.read().selected).toBe("chat-a");
-  expect(controller.read().observation?.snapshot.current?.turnId).toBe(
-    "turn-chat-a"
-  );
-  expect(controller.read().messages[0]?.text).toBe("Working request.");
+  expect(controller.read().selected).toBeNull();
+  expect(controller.read().observation).toBeNull();
+  expect(controller.read().messages).toEqual([]);
+  expect(running.has("chat-a")).toBe(true);
   await controller.listChats(null, true);
   expect(controller.read().sessions).toContain("chat-a");
+  await controller.select("chat-a");
 
   const late = Promise.withResolvers<NativeChatCatalogEntry>();
   organize.mockReturnValueOnce(late.promise);

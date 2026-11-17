@@ -229,6 +229,17 @@ and HTML have no chat preview, and folder cards remain free of size and
 preview metadata. Presentation changes neither
 provider perception nor filesystem authority.
 
+Captured tool images separately negotiate `co.grida/session/tool-images`.
+Successful tool results carry at most eight PNG image references; Main replaces
+their native media identities with opaque renderer tokens bound to the exact
+chat, turn, tool call and result part. `readToolImage` reads those prepared,
+retained pixels in chunks of at most 256 KiB, up to 384 KiB per image. It never
+rereads the original source path, invokes inference or reruns a tool. Retained
+images remain readable after source mutation or removal and after reopening
+the chat. Missing bytes report unavailable; failed tool results grant no read.
+Input-attachment and crop readers do not accept these identities. Older native
+hosts omit the image metadata and retain their readable tool-result text.
+
 Queued attachment display separately negotiates
 `co.grida/session/queued-input-image-chunks`. `queuedMessage` returns full text
 and bounded display metadata for an input still in the exact observed queue;

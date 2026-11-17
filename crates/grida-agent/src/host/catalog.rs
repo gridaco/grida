@@ -1,14 +1,14 @@
 //! Workspace-scoped, transcript-free discovery of saved chats.
 
 use super::*;
-use agent_kit_store_sqlite::catalog::CatalogEntry;
+use agent_kit_store_sqlite::catalog::{CatalogEntry, CatalogRecord};
 
 const ACTIVE: u8 = 0;
 const ARCHIVED: u8 = 1;
 
 pub struct SessionCatalog {
     pub cwd: PathBuf,
-    pub entries: Vec<CatalogEntry>,
+    pub entries: Vec<CatalogRecord>,
     pub next_after: Option<SessionId>,
 }
 
@@ -18,6 +18,8 @@ pub struct ArchiveCatalogEntry {
     pub session_id: SessionId,
     pub title: Option<String>,
     pub revision: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_activity_at_ms: Option<u64>,
 }
 
 #[derive(Serialize)]
@@ -39,10 +41,11 @@ impl Host {
             entries: page
                 .entries
                 .into_iter()
-                .map(|entry| ArchiveCatalogEntry {
-                    session_id: entry.session,
-                    title: entry.label,
-                    revision: entry.revision,
+                .map(|record| ArchiveCatalogEntry {
+                    session_id: record.entry.session,
+                    title: record.entry.label,
+                    revision: record.entry.revision,
+                    last_activity_at_ms: record.latest_turn_activity_ms,
                 })
                 .collect(),
             next_cursor: page.next_after,
@@ -85,7 +88,7 @@ impl Host {
             .map_err(|_| problem(ErrorKind::Unavailable, "workspace_unavailable"))??;
         let page = self
             .store
-            .list_catalog(workspace_scope(&cwd)?, bucket(archived), after)
+            .list_catalog_records(workspace_scope(&cwd)?, bucket(archived), after)
             .await?;
         Ok(SessionCatalog {
             cwd,
@@ -94,10 +97,10 @@ impl Host {
         })
     }
 
-    pub(crate) async fn catalog_entry(&self, id: SessionId) -> Result<CatalogEntry> {
+    pub(crate) async fn catalog_entry(&self, id: SessionId) -> Result<CatalogRecord> {
         self.refuse_in_side_chat(&id, side_chats::Refusal::Catalog)
             .await?;
-        self.store.catalog_entry(id).await
+        self.store.catalog_record(id).await
     }
 
     pub(crate) async fn organize_session(
@@ -106,7 +109,7 @@ impl Host {
         revision: u64,
         title: Option<String>,
         archived: bool,
-    ) -> Result<CatalogEntry> {
+    ) -> Result<CatalogRecord> {
         let title = title.map(|title| title.trim().to_owned());
         if title
             .as_ref()
@@ -116,14 +119,21 @@ impl Host {
         }
         self.refuse_in_side_chat(&id, side_chats::Refusal::Catalog)
             .await?;
-        self.store
+        let entry = self
+            .store
             .replace_catalog_entry(CatalogEntry {
                 session: id,
                 bucket: bucket(archived),
                 label: title,
                 revision,
             })
-            .await
+            .await?;
+        // The placement receipt needs no fallible observation after commit.
+        // Current timing is available through the read-only entry and lists.
+        Ok(CatalogRecord {
+            entry,
+            latest_turn_activity_ms: None,
+        })
     }
 }
 

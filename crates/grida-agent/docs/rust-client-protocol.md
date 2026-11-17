@@ -38,7 +38,13 @@ The Grida profile advertises `sessionCapabilities.list` for standard v1
 `session/list` with an explicit absolute workspace `cwd`. The host canonicalizes
 that directory and reads the workspace's unarchived chats in newest-created
 order. Pages contain at most 32 `SessionInfo` records with the ID, working
-directory and optional title. Treat `nextCursor` as opaque and send it with
+directory and optional title. When local turn timing is retained, a record also
+has `_meta["co.grida/lastActivityAtMs"]`, an optional Unix-epoch millisecond
+integer. For the local turn with the latest execution ordinal, it is the first
+settlement time, or the start time until settlement. Sessions with no local turns omit
+the field, including forks that only have inherited history. This is recorded
+turn activity, not an exact last-message time; it never changes listing order.
+Treat `nextCursor` as opaque and send it with
 the same workspace.
 Listing leaves attachment, execution, and history unchanged. [ACP session listing](https://agentclientprotocol.com/protocol/v1/session-list)
 
@@ -46,17 +52,21 @@ Negotiate `co.grida/session/organize` version 1 for archived listing and
 catalog changes. `_co.grida/session/list-archived` accepts the standard
 workspace and cursor fields and returns the standard page shape.
 `_co.grida/session/catalog-entry` accepts an attached `sessionId` and
-returns `sessionId`, `title`, `archived`, and `revision`.
+returns `sessionId`, `title`, `archived`, and `revision`, plus optional
+`lastActivityAtMs` with the same retained-turn meaning as listing metadata.
 `_co.grida/session/organize` replaces the title and archive state at that
 revision. Send a null title to clear it. An already-matching value succeeds
 without another write. On a revision conflict, read the current entry before
 asking the user to reapply the edit. Archiving and restoring preserve chat
 identity and leave execution controls unchanged.
+Mutation receipts omit activity; read the entry or list again for that optional
+observation. Activity is never accepted as a catalog mutation input.
 
 Settings clients can negotiate `co.grida/settings/archive-catalog` version 1.
 `_co.grida/settings/archive-catalog` takes an absolute workspace `cwd` and an
 optional `cursor`, returning `{entries, nextCursor}`. Each entry has `sessionId`,
-`title` and `revision`. `_co.grida/settings/unarchive` takes `cwd`, `sessionId`
+`title`, `revision`, and optional `lastActivityAtMs` with the same meaning and
+omission rule. `_co.grida/settings/unarchive` takes `cwd`, `sessionId`
 and the observed `revision`. It restores only catalog placement and preserves
 the title. These operations need no attached session, provider, transcript read,
 or execution lease. Workspace scope excludes side chats and named children.
@@ -66,6 +76,9 @@ same metadata-only operation for an existing closed store; `--unarchive <id>
 --revision <revision>` restores an entry. An open store keeps its existing sole
 owner, so a supervisor must use that owner's protocol rather than spawning a
 second database owner.
+Normal and detached listings read the same bounded retained timing projection
+without decoding turn history, attaching a session, or starting work. Rename,
+archive, restore and exact retries do not manufacture a new activity time.
 
 On macOS and Linux, negotiate `co.grida/session/delete` version 1 on private
 stdio. Send `_co.grida/session/delete` with `sessionId`, absolute workspace
@@ -372,6 +385,52 @@ A queue basis contains `sessionId`, `requestId`, and
 `expectedControlRevision`. Snapshot returns the ordered queue and turn
 summaries, with `sessionRevision`, `controlRevision`, `historyPosition`,
 `journalPosition`, and turn `epoch` for conditional operations.
+
+### Retained tool-result images
+
+Private stdio clients on macOS and Linux can negotiate
+`co.grida/session/tool-images` version 1. Successful tool activity with an
+owning `turnId` then includes `rawOutput.images`: at most eight references
+containing `mediaId`, `contentIndex`, `mimeType: "image/png"`, and `totalBytes`.
+Live activity and attributed transcript-window replay use the same projection.
+Legacy replay without turn attribution omits these references. Failed calls
+retain readable result text and carry no image references. An optional
+`omittedImages` counts additional valid references, up to 1,024.
+
+Each reference addresses a captured, prepared PNG retained under the opaque
+`workspace-view/` media identity. The media ID is at most 512 UTF-8 bytes;
+`contentIndex` is a zero-based result-content index from 0 through 1,023, and
+`totalBytes` is positive and at most 393,216 (384 KiB). These metadata describe
+retained identity, not continued byte availability. The reference carries no
+source path, serialized storage descriptor, or download URL. It is separate
+from user-input images and crop artifacts.
+
+`_co.grida/session/read-tool-image-chunk` takes the attached `sessionId`, exact
+`turnId`, `toolCallId`, `mediaId`, `contentIndex`, and `offset`. Its response
+echoes all six fields and includes `mimeType: "image/png"`, `totalBytes`,
+standard-base64 `data` for at most 256 KiB, and `nextOffset` or `null`.
+Offsets start at zero; a second chunk starts at 262,144. Clients verify stable
+identities, MIME, total size and contiguous offsets, and display only a complete
+image within the 384 KiB bound.
+
+The host reads one exact committed local turn snapshot, independent of chat
+length, and requires one matching call with one successful result containing
+that exact retained media index and identity. It rechecks membership around a
+bounded digest-checked PNG read. A running turn's already-published result is
+readable before the rest of its work settles. Earlier retained local turns
+remain readable after context compaction or history revision; inherited seed
+media does not authorize a read in another session. Wrong or foreign session,
+turn, call, index or media, missing or changed bytes, unsupported media, and
+invalid offsets return `tool_image_unavailable`. No request starts inference,
+runs a tool, reopens the original source path, or changes prepared pixels.
+Capability negotiation grants observation only, under the existing private
+channel and outstanding-request limits.
+
+The [native process case](../tests/process/tool_images.rs) captures a JPEG as
+prepared PNG, reads its published result before settlement, replaces and deletes
+its source, reopens the host and compares the replayed identity and exact bytes. It also
+checks mismatches, failed calls, missing retained bytes and unsupported
+capability versions using a local fixture provider.
 
 ### Replace only queued user text
 

@@ -851,6 +851,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       nativeChat.readAttachmentPreview(event, id, preview)
   );
   guarded(
+    IPC_CHANNELS.NATIVE_CHAT_READ_TOOL_IMAGE,
+    (event, id: string, preview: unknown) =>
+      nativeChat.readToolImage(event, id, preview)
+  );
+  guarded(
     IPC_CHANNELS.NATIVE_CHAT_READ_ARTIFACT,
     (event, id: string, observation: string, artifact: unknown) =>
       nativeChat.readArtifact(event, id, observation, artifact)

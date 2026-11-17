@@ -36,12 +36,10 @@ export class SubagentTabPlacement implements SubagentPlacement {
             aria-label="Subagent activity"
             className="h-full min-h-0 overflow-hidden p-4"
           >
-            <div className="mx-auto h-full min-h-0 w-full max-w-3xl">
-              <NativeSubagentActivity
-                controller={presentation.controller}
-                heading={false}
-              />
-            </div>
+            <NativeSubagentActivity
+              controller={presentation.controller}
+              heading={false}
+            />
           </section>
         ),
       },

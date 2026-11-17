@@ -8,8 +8,8 @@
  *   - generate_image  → WHILE GENERATING (it's slow): the shimmering prompt
  *     plus optional references. DONE: the image first, then the prompt below.
  *
- * The image bytes are the result's base64 `data` (on the client transcript even
- * when the model-facing view omits/elides them). Kept in the editor kit, which
+ * Native viewed images carry opaque retained-result references and a host
+ * loader. Legacy inline results carry base64 `data`. Kept in the editor kit, which
  * owns the agent's tool vocabulary — the shared `@app/ui` primitives stay
  * tool-agnostic.
  */
@@ -18,6 +18,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { getToolName } from "ai";
 import { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
 import { FullscreenImagePreview } from "@/kits/image-preview";
+import { AttachmentImagePreview } from "./attachment-image-preview";
 import type { ToolCallEntry } from "@/lib/agent-chat/types";
 
 // The image generation tool name is a locked literal, like `skill` and
@@ -67,6 +68,9 @@ export function mediaImageSrc(entry: ToolCallEntry): string | undefined {
 
 /** The refusal message for an error result (`ok: false`), if any. */
 export function mediaError(entry: ToolCallEntry): string | undefined {
+  if (entry.state === "output-error")
+    return entry.errorText || "Couldn't view this image.";
+  if (entry.state === "output-denied") return "Image viewing was declined.";
   const out = asRecord("output" in entry ? entry.output : undefined);
   return out.ok === false ? str(out.message) : undefined;
 }
@@ -106,10 +110,25 @@ const imageClass = "max-h-96 max-w-full rounded-md border object-contain";
 const ELAPSED_REVEAL_AFTER_MS = 3000;
 
 /** `view_image`: the viewed path, then the image (or refusal message). */
-function ViewImageBody({ entry }: { entry: ToolCallEntry }): ReactNode {
+function ViewImageBody({
+  entry,
+  loadToolImage,
+}: {
+  entry: ToolCallEntry;
+  loadToolImage?: AttachmentImagePreview.Loader;
+}): ReactNode {
   const path = mediaPath(entry);
   const src = mediaImageSrc(entry);
   const error = mediaError(entry);
+  const output = asRecord("output" in entry ? entry.output : undefined);
+  const images =
+    output.ok === true && Array.isArray(output.images)
+      ? output.images.slice(0, 8).flatMap((value) => {
+          const image = asRecord(value);
+          const id = str(image.previewId);
+          return id && image.mimeType === "image/png" ? [id] : [];
+        })
+      : [];
   return (
     <div className="space-y-2">
       {path && (
@@ -120,7 +139,18 @@ function ViewImageBody({ entry }: { entry: ToolCallEntry }): ReactNode {
           {path}
         </div>
       )}
-      {src ? (
+      {error ? (
+        <div className="text-muted-foreground text-xs">{error}</div>
+      ) : images.length > 0 && loadToolImage ? (
+        images.map((previewId) => (
+          <AttachmentImagePreview.View
+            key={previewId}
+            previewId={previewId}
+            loader={loadToolImage}
+            name={path ?? "Viewed image"}
+          />
+        ))
+      ) : src ? (
         /* Interaction contract: test/desktop-agent-chat-media-preview.md */
         <FullscreenImagePreview
           src={src}
@@ -137,9 +167,11 @@ function ViewImageBody({ entry }: { entry: ToolCallEntry }): ReactNode {
             className={imageClass}
           />
         </FullscreenImagePreview>
-      ) : error ? (
-        <div className="text-muted-foreground text-xs">{error}</div>
-      ) : null}
+      ) : (
+        <div className="text-muted-foreground text-xs">
+          {isMediaPending(entry) ? "Viewing image…" : "Preview unavailable"}
+        </div>
+      )}
     </div>
   );
 }
@@ -317,12 +349,14 @@ export function formatElapsed(totalSeconds: number): string {
 /** The whole image-tool call body — dispatched by tool. No JSON, ever. */
 export function MediaToolContent({
   entry,
+  loadToolImage,
 }: {
   entry: ToolCallEntry;
+  loadToolImage?: AttachmentImagePreview.Loader;
 }): ReactNode {
   return isGenerateImageEntry(entry) ? (
     <GenerateImageBody entry={entry} />
   ) : (
-    <ViewImageBody entry={entry} />
+    <ViewImageBody entry={entry} loadToolImage={loadToolImage} />
   );
 }

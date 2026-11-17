@@ -5,6 +5,7 @@ import { ArchiveRestoreIcon, Loader2, RefreshCwIcon } from "lucide-react";
 import { Button } from "@app/ui/components/button";
 import { getDesktopBridge } from "@/lib/desktop/bridge";
 import { SettingsArchives } from "@/lib/desktop/settings-archives";
+import { ChatActivityDate } from "@/scaffolds/desktop/shared/chat-activity-date";
 
 export function ArchivedChatsSettings() {
   const [controller] = useState(
@@ -85,6 +86,7 @@ export function ArchivedChatsSettings() {
                     {chat.workspace}
                   </p>
                 </div>
+                <ChatActivityDate atMs={chat.lastActivityAtMs} />
                 <Button
                   size="sm"
                   variant="outline"

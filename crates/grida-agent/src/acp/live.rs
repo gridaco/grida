@@ -92,6 +92,12 @@ pub(super) async fn forward(
                         outcome,
                         update.result.as_deref(),
                         json!({"turnId": update.turn}),
+                        sessions
+                            .lock()
+                            .unwrap()
+                            .negotiated
+                            .contains(super::extensions::tool_images::CAPABILITY)
+                            .then_some(&update.session),
                     );
                     if sessions
                         .lock()

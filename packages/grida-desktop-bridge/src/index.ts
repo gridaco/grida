@@ -228,6 +228,8 @@ export type DesktopArchivedChat = Readonly<{
   workspace: string;
   title: string | null;
   revision: number;
+  /** Latest local turn's settlement or start time, when available. */
+  lastActivityAtMs?: number;
 }>;
 
 export type DesktopArchivedChatPage = Readonly<{

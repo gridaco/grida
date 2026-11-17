@@ -74,6 +74,13 @@ export namespace native_tool_parts {
     if (!output) return undefined;
     const structured = record(output.structured);
     switch (tool) {
+      case "view_image":
+        return {
+          ...structured,
+          ok: true,
+          images: output.images ?? [],
+          omittedImages: output.omittedImages,
+        };
       case "read_file":
         return { content: output.text, truncated: output.truncated };
       case "edit_file":
