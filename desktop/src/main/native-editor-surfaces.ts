@@ -115,32 +115,23 @@ export class NativeEditorSurfaceEndpoints {
     });
   }
 
-  async browserTool(value: unknown, signal: AbortSignal) {
-    if (!value || typeof value !== "object" || Array.isArray(value))
-      return null;
-    const {
+  browserBusy(value: unknown) {
+    const request = this.browserRequest(value);
+    if (!request) return null;
+    const { sessionId, endpointId, callId } = request;
+    return {
       sessionId,
       endpointId,
       callId,
-      operation,
-      arguments: args,
-      timeoutMs,
-    } = value as Record<string, unknown>;
-    if (
-      Object.keys(value).length !== 6 ||
-      !Object.hasOwn(value, "arguments") ||
-      typeof sessionId !== "string" ||
-      !SESSION_ID.test(sessionId) ||
-      !NativeEditorSvgText.isId(endpointId) ||
-      !NativeEditorSvgText.isId(callId) ||
-      typeof operation !== "string" ||
-      !/^[a-z_]{1,64}$/.test(operation) ||
-      typeof timeoutMs !== "number" ||
-      !Number.isSafeInteger(timeoutMs) ||
-      timeoutMs < 1 ||
-      timeoutMs > 120_000
-    )
-      return null;
+      result: { disposition: "not_dispatched" as const, error: "backend_busy" },
+    };
+  }
+
+  async browserTool(value: unknown, signal: AbortSignal) {
+    const request = this.browserRequest(value);
+    if (!request) return null;
+    const { sessionId, endpointId, callId, operation, args, timeoutMs } =
+      request;
     const endpoint = this.current(sessionId, endpointId);
     const denied = {
       disposition: "not_dispatched" as const,
@@ -166,6 +157,35 @@ export class NativeEditorSurfaceEndpoints {
           : { disposition: "unknown", error: "outcome_unknown" }
       );
     return reply(result);
+  }
+
+  private browserRequest(value: unknown) {
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      return null;
+    const {
+      sessionId,
+      endpointId,
+      callId,
+      operation,
+      arguments: args,
+      timeoutMs,
+    } = value as Record<string, unknown>;
+    if (
+      Object.keys(value).length !== 6 ||
+      !Object.hasOwn(value, "arguments") ||
+      typeof sessionId !== "string" ||
+      !SESSION_ID.test(sessionId) ||
+      !NativeEditorSvgText.isId(endpointId) ||
+      !NativeEditorSvgText.isId(callId) ||
+      typeof operation !== "string" ||
+      !/^[a-z_]{1,64}$/.test(operation) ||
+      typeof timeoutMs !== "number" ||
+      !Number.isSafeInteger(timeoutMs) ||
+      timeoutMs < 1 ||
+      timeoutMs > 120_000
+    )
+      return null;
+    return { sessionId, endpointId, callId, operation, args, timeoutMs };
   }
 
   async svgText(value: unknown) {

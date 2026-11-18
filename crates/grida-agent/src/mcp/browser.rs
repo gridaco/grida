@@ -137,15 +137,14 @@ impl Pipe {
         mut responses: mpsc::Receiver<Response>,
     ) -> Result<()> {
         let mut dispatched = BTreeMap::<BindingId, Dispatched>::new();
+        let mut maintenance =
+            tokio::time::interval_at(tokio::time::Instant::now() + POLL_TIME, POLL_TIME);
+        maintenance.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         loop {
             tokio::select! {
                 biased;
-                response = responses.recv() => {
-                    let Some(response) = response else { return Ok(()); };
-                    let pending = dispatched.remove(&response.request_id).ok_or_else(pipe_error)?;
-                    let _ = pending.reply.send(response.result);
-                }
-                _ = tokio::time::sleep(POLL_TIME), if !dispatched.is_empty() => {
+                // Cancellation and drain deadlines must progress during continuous reply traffic.
+                _ = maintenance.tick(), if !dispatched.is_empty() => {
                     let now = Instant::now();
                     for (id, pending) in &mut dispatched {
                         if let Some(drain) = pending.drain_deadline {
@@ -160,6 +159,11 @@ impl Pipe {
                             pending.drain_deadline = Some(drain);
                         }
                     }
+                }
+                response = responses.recv() => {
+                    let Some(response) = response else { return Ok(()); };
+                    let pending = dispatched.remove(&response.request_id).ok_or_else(pipe_error)?;
+                    let _ = pending.reply.send(response.result);
                 }
                 pending = self.0.recv(), if dispatched.len() < MAX_PENDING => {
                     let Some(pending) = pending else { return Ok(()); };
@@ -300,5 +304,66 @@ mod tests {
         host.close();
         writer.shutdown().await.unwrap();
         pipe.await.unwrap().unwrap();
+    }
+
+    #[tokio::test]
+    async fn elapsed_cancellation_poll_runs_with_an_unrelated_reply_ready() {
+        let (outgoing, incoming) = mpsc::channel(MAX_PENDING);
+        let (replies, responses) = mpsc::channel(MAX_PENDING);
+        let (peer, output) = tokio::io::duplex(4096);
+        let mut frames = BufReader::new(peer).lines();
+        let mut dispatch = std::pin::pin!(Pipe(incoming).dispatch(output, responses));
+
+        let cancellation = CancellationToken::new();
+        let mut waiters = Vec::new();
+        for (id, cancellation) in [
+            ("cancelled", cancellation.clone()),
+            ("unrelated", CancellationToken::new()),
+        ] {
+            let (reply, waiter) = oneshot::channel();
+            waiters.push(waiter);
+            outgoing
+                .send(Pending {
+                    request_id: BindingId::new(id).unwrap(),
+                    operation: "browser_open".to_owned(),
+                    arguments: json!({"url":"http://127.0.0.1/"}),
+                    deadline: Instant::now() + Duration::from_secs(3),
+                    cancellation,
+                    reply,
+                })
+                .await
+                .unwrap();
+        }
+        assert!(futures_util::poll!(&mut dispatch).is_pending());
+        for id in ["cancelled", "unrelated"] {
+            let frame: Value =
+                serde_json::from_str(&frames.next_line().await.unwrap().unwrap()).unwrap();
+            assert_eq!(frame["requestId"], id);
+        }
+
+        cancellation.cancel();
+        replies
+            .send(
+                serde_json::from_value(json!({
+                    "requestId":"unrelated",
+                    "result":{"disposition":"dispatched_verified"}
+                }))
+                .unwrap(),
+            )
+            .await
+            .unwrap();
+        // The dispatcher resumes with both maintenance and a reply ready.
+        tokio::time::sleep(POLL_TIME * 2).await;
+        assert!(futures_util::poll!(&mut dispatch).is_pending());
+        assert!(waiters[1].try_recv().is_ok());
+        let frame = tokio::time::timeout(POLL_TIME, frames.next_line())
+            .await
+            .expect("a ready reply must not postpone cancellation")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&frame).unwrap(),
+            json!({"cancelRequestId":"cancelled"})
+        );
     }
 }

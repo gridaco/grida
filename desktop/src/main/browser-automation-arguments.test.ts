@@ -32,3 +32,30 @@ describe("browser automation keyboard arguments", () => {
     });
   });
 });
+
+describe("browser automation navigation and wait arguments", () => {
+  const target = { kind: "background", pageId: "page" };
+
+  it("requires the document guard for navigation except a target-wide stop", () => {
+    expect(
+      Arguments.parse("browser_navigate", { target, action: { kind: "stop" } })
+    ).toMatchObject({ target, action: { kind: "stop" } });
+    expect(() =>
+      Arguments.parse("browser_navigate", {
+        target,
+        action: { kind: "reload" },
+      })
+    ).toThrow("invalid_arguments");
+  });
+
+  it("allows 512 Unicode code points for a wait text condition", () => {
+    const waitForText = (text: string) =>
+      Arguments.parse("browser_wait", {
+        target,
+        condition: { kind: "text", text },
+      });
+    const text = "界🙂".repeat(256);
+    expect(waitForText(text)).toMatchObject({ condition: { text } });
+    expect(() => waitForText(text + "🙂")).toThrow("invalid_arguments");
+  });
+});

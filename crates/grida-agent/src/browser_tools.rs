@@ -112,7 +112,7 @@ fn spec(name: &str) -> Option<(&'static str, Value, CapabilityEffect)> {
             Read,
         ),
         "browser_navigate" => (
-            "Navigate the exact page guarded by its current document and return navigation readiness where applicable.",
+            "Navigate the exact page guarded by its current document and return navigation readiness. For stop, omit documentId to interrupt the target's pending load.",
             page(
                 json!({"action": variants([
                     tagged("goto", json!({"url":url()}), &["url"]),
@@ -121,7 +121,7 @@ fn spec(name: &str) -> Option<(&'static str, Value, CapabilityEffect)> {
                     tagged("reload", json!({}), &[]),
                     tagged("stop", json!({}), &[]),
                 ])}),
-                &["documentId", "action"],
+                &["action"],
             ),
             Mutation,
         ),
@@ -303,7 +303,13 @@ fn timeout() -> Value {
 
 pub(crate) fn validate(name: &str, arguments: &Value) -> Result<()> {
     let (_, schema, _) = spec(name).ok_or_else(invalid)?;
-    if !matches_schema(&schema, arguments) {
+    if !matches_schema(&schema, arguments, false) {
+        return Err(invalid());
+    }
+    if name == "browser_navigate"
+        && arguments["action"]["kind"] != "stop"
+        && arguments.get("documentId").is_none()
+    {
         return Err(invalid());
     }
     if name == "browser_evaluate"
@@ -330,11 +336,11 @@ pub(crate) fn validate(name: &str, arguments: &Value) -> Result<()> {
 
 // Only the closed schema vocabulary constructed above is needed here. Using
 // the same schema for discovery and admission prevents them drifting apart.
-fn matches_schema(schema: &Value, value: &Value) -> bool {
+fn matches_schema(schema: &Value, value: &Value, count_code_points: bool) -> bool {
     if let Some(variants) = schema["oneOf"].as_array() {
         return variants
             .iter()
-            .filter(|variant| matches_schema(variant, value))
+            .filter(|variant| matches_schema(variant, value, count_code_points))
             .take(2)
             .count()
             == 1;
@@ -354,12 +360,19 @@ fn matches_schema(schema: &Value, value: &Value) -> bool {
             }) && object.iter().all(|(key, value)| {
                 schema["properties"]
                     .get(key)
-                    .is_some_and(|schema| matches_schema(schema, value))
+                    // The wait's text condition has a Unicode limit. The other
+                    // string fields retain their transport byte limits.
+                    .is_some_and(|schema| matches_schema(schema, value, key == "text"))
             })
         }),
         Some("string") => value.as_str().is_some_and(|text| {
-            text.len() >= schema["minLength"].as_u64().unwrap_or(0) as usize
-                && text.len() <= schema["maxLength"].as_u64().unwrap_or(u64::MAX) as usize
+            let length = if count_code_points {
+                text.chars().count()
+            } else {
+                text.len()
+            };
+            length >= schema["minLength"].as_u64().unwrap_or(0) as usize
+                && length <= schema["maxLength"].as_u64().unwrap_or(u64::MAX) as usize
                 && (schema["format"] != "uri"
                     || reqwest::Url::parse(text).is_ok_and(|url| {
                         matches!(url.scheme(), "http" | "https") && url.host().is_some()
@@ -373,7 +386,7 @@ fn matches_schema(schema: &Value, value: &Value) -> bool {
         Some("array") => value.as_array().is_some_and(|array| {
             array.len() <= schema["maxItems"].as_u64().unwrap_or(0) as usize
                 && array.iter().enumerate().all(|(index, item)| {
-                    matches_schema(&schema["items"], item)
+                    matches_schema(&schema["items"], item, count_code_points)
                         && (schema["uniqueItems"] != true || !array[..index].contains(item))
                 })
         }),
@@ -586,6 +599,32 @@ pub(crate) fn uncertain() -> ToolOutcome {
 mod tests {
     use super::*;
     use agent_kit_core::BindingId;
+
+    #[test]
+    fn wait_text_limit_counts_unicode_code_points() {
+        let mut args = json!({
+            "target": {"kind": "workbench", "tabId": "tab"},
+            "condition": {"kind": "text", "text": "界🙂".repeat(256)},
+        });
+        assert!(validate("browser_wait", &args).is_ok());
+        args["condition"]["text"] = json!("🙂".repeat(513));
+        assert!(validate("browser_wait", &args).is_err());
+        args["condition"] = json!({"kind": "url", "url": "界".repeat(1366)});
+        assert!(validate("browser_wait", &args).is_err());
+    }
+
+    #[test]
+    fn only_stop_allows_navigation_without_a_document_guard() {
+        let mut args = json!({
+            "target": {"kind": "workbench", "tabId": "tab"},
+            "action": {"kind": "stop"},
+        });
+        assert!(validate("browser_navigate", &args).is_ok());
+        args["action"]["kind"] = json!("reload");
+        assert!(validate("browser_navigate", &args).is_err());
+        args["documentId"] = json!("document");
+        assert!(validate("browser_navigate", &args).is_ok());
+    }
 
     #[test]
     fn browser_capture_projection_is_bound_to_the_verified_call() {

@@ -16,6 +16,7 @@ import { NativeQueuedMessages } from "./native-queued-messages";
 import { NativeSelectedImages } from "./native-selected-images";
 import { NativeSubagentActivity } from "./native-subagent-activity";
 import { NativeActivityOrder } from "./native-activity-order";
+import { NativeEditorSurfaceEndpoints } from "./native-editor-surfaces";
 
 function state() {
   const root = fs.mkdtempSync(
@@ -1186,6 +1187,80 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
         pong: true,
       });
     } finally {
+      try {
+        await agent?.close();
+      } finally {
+        test.close();
+      }
+    }
+  });
+
+  it("rejects an excess browser operation and keeps the worker connected", async () => {
+    const callId = (index: number) =>
+      `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`;
+    const test = fixture(
+      `
+      if (request.method === 'fixture/browser-flood') {
+        globalThis.flood = request.id;
+        for (let index = 1; index <= 17; index++) {
+          send({id:'browser-'+index,method:'${NativeEditorSurfaceEndpoints.browserMethod}',params:{
+            sessionId:'session',endpointId:request.params.endpointId,
+            callId:'00000000-0000-4000-8000-'+String(index).padStart(12,'0'),
+            operation:'browser_snapshot',arguments:{},timeoutMs:5000
+          }});
+        }
+      } else if (request.method === undefined && request.id === 'browser-17') {
+        send({id:globalThis.flood,result:request.result});
+      } else if (request.method === 'fixture/ping') {
+        send({id:request.id,result:{pong:true}});
+      }
+    `,
+      1,
+      {}
+    );
+    const admitted = Promise.withResolvers<void>();
+    let invoked = 0;
+    let agent: NativeAgentProcess | undefined;
+    try {
+      agent = await NativeAgentProcess.start({
+        ...test.options,
+        providerNetwork: { prepare: () => null },
+      });
+      const lease = agent.registerEditorSurfaces(
+        "session",
+        { active: null, open: [], truncated: false },
+        () => {},
+        undefined,
+        undefined,
+        undefined,
+        {
+          ready: () => true,
+          invoke: async () => {
+            invoked++;
+            await admitted.promise;
+            return { disposition: "not_dispatched" };
+          },
+          close: () => {},
+        }
+      );
+      const selection = lease!.selection();
+      expect(selection.editorBrowserTools).toBe(true);
+      const endpointId = selection.editorEndpointId;
+      await expect(
+        agent.request("fixture/browser-flood", { endpointId })
+      ).resolves.toEqual({
+        sessionId: "session",
+        endpointId,
+        callId: callId(17),
+        result: { disposition: "not_dispatched", error: "backend_busy" },
+      });
+      expect(invoked).toBe(16);
+      expect(agent.connected).toBe(true);
+      await expect(agent.request("fixture/ping", {})).resolves.toEqual({
+        pong: true,
+      });
+    } finally {
+      admitted.resolve();
       try {
         await agent?.close();
       } finally {

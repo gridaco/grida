@@ -69,6 +69,10 @@ navigation, including redirects. Use `browser_snapshot({ target })` to get
 the current `documentId`. A full-document replacement invalidates the old
 document guard and its refs. Select the relevant element in the snapshot.
 
+To interrupt a pending load, call `browser_navigate` with the target and
+`action: { kind: "stop" }`. Omitting `documentId` applies Stop to the target's
+current load. Other navigation actions require a current document guard.
+
 For example, with the observed document ID and button ref, a click uses:
 
 ```json
@@ -95,6 +99,9 @@ authority and can change site state. Supply a callable function as
 `functionText`, for example `"value => document.title.includes(value)"`, and
 its JSON argument as `arg`. Use the result or returned error before deciding
 whether to repeat an effect.
+An evaluation that stops waiting for an unresolved page promise can retire the
+private debugger connection. Observe the page again to obtain fresh document
+and element handles. A timeout leaves any page effects uncertain.
 
 ## Media and outcomes
 

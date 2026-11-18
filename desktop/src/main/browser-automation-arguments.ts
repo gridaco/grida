@@ -40,7 +40,11 @@ export namespace BrowserAutomationArguments {
   export type Operation =
     | { tool: "browser_open"; url: string }
     | (Page & { tool: "browser_snapshot"; documentId?: string })
-    | (Guarded & { tool: "browser_navigate"; action: Navigate })
+    | (Page & {
+        tool: "browser_navigate";
+        documentId?: string;
+        action: Navigate;
+      })
     | (Guarded & { tool: "browser_action"; action: Action })
     | (Page & {
         tool: "browser_wait";
@@ -84,11 +88,13 @@ export namespace BrowserAutomationArguments {
           "documentId",
           "action",
         ]);
+        const operation = navigate(action);
         return {
           tool,
           target: parseTarget(target),
-          documentId: id(documentId),
-          action: navigate(action),
+          documentId:
+            operation.kind === "stop" ? optionalId(documentId) : id(documentId),
+          action: operation,
         };
       }
       case "browser_action": {
@@ -315,8 +321,12 @@ export namespace BrowserAutomationArguments {
         const { state } = object(args, ["state"]);
         return { kind, state: choice(state, ["dom-content-loaded", "load"]) };
       }
-      case "text":
-        return { kind, text: string(object(args, ["text"]).text, 512) };
+      case "text": {
+        const { text } = object(args, ["text"]);
+        if (typeof text !== "string" || !text.length || [...text].length > 512)
+          return invalid();
+        return { kind, text };
+      }
       case "url":
         return { kind, url: string(object(args, ["url"]).url, 4096) };
       case "ref": {

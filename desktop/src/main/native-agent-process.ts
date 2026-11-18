@@ -1128,38 +1128,37 @@ export class NativeAgentProcess {
           message.method === NativeEditorSurfaceEndpoints.browserMethod
         ) {
           const id = message.id;
-          if (
-            this.editorBrowserRequests.has(id) ||
-            this.editorBrowserRequests.size >= REQUEST_LIMIT
-          )
-            throw new Error("native_agent_browser_request_limit");
+          if (this.editorBrowserRequests.has(id))
+            throw new Error("native_agent_browser_request_id_reused");
+          const reply = (result: unknown) => {
+            if (!this.connected) return;
+            this.write({
+              jsonrpc: "2.0",
+              id,
+              ...(result
+                ? { result }
+                : { error: { code: -32602, message: "Invalid params" } }),
+            });
+          };
+          if (this.editorBrowserRequests.size >= REQUEST_LIMIT) {
+            reply(this.editorEndpoints.browserBusy(message.params));
+            return;
+          }
           const controller = new AbortController();
           this.editorBrowserRequests.set(id, controller);
           void this.editorEndpoints
             .browserTool(message.params, controller.signal)
-            .then(
-              (result) => {
-                if (this.connected)
-                  this.write({
-                    jsonrpc: "2.0",
-                    id,
-                    ...(result
-                      ? { result }
-                      : { error: { code: -32602, message: "Invalid params" } }),
-                  });
-              },
-              () => {
-                if (this.connected)
-                  this.write({
-                    jsonrpc: "2.0",
-                    id,
-                    error: {
-                      code: -32603,
-                      message: "Browser reply unverified",
-                    },
-                  });
-              }
-            )
+            .then(reply, () => {
+              if (this.connected)
+                this.write({
+                  jsonrpc: "2.0",
+                  id,
+                  error: {
+                    code: -32603,
+                    message: "Browser reply unverified",
+                  },
+                });
+            })
             .catch(() => this.disconnect("native_agent_browser_reply_failed"))
             .finally(() => this.editorBrowserRequests.delete(id));
           return;

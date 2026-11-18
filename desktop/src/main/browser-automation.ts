@@ -172,9 +172,9 @@ export class BrowserAutomation {
       (guest.changingDocument || !contents.getURL())
     )
       return { data: this.#pending(page) };
-    await guest.attach(request);
     switch (operation.tool) {
       case "browser_snapshot": {
+        await guest.attach(request);
         const document = await this.#document(
           guest,
           request,
@@ -185,6 +185,7 @@ export class BrowserAutomation {
         };
       }
       case "browser_diagnostics": {
+        await guest.attach(request);
         const document = await this.#document(
           guest,
           request,
@@ -201,6 +202,7 @@ export class BrowserAutomation {
         };
       }
       case "browser_capture": {
+        await guest.attach(request);
         const document = await this.#document(
           guest,
           request,
@@ -210,8 +212,11 @@ export class BrowserAutomation {
       }
       case "browser_navigate":
         return this.#effect(guest, request, async () => {
-          await this.#document(guest, request, operation.documentId);
           const kind = operation.action.kind;
+          if (operation.documentId !== undefined) {
+            await guest.attach(request);
+            await this.#document(guest, request, operation.documentId);
+          }
           if (
             (kind === "back" && !page.snapshot().canGoBack) ||
             (kind === "forward" && !page.snapshot().canGoForward)
@@ -228,8 +233,9 @@ export class BrowserAutomation {
           return { data: { navigated: kind !== "stop", readiness } };
         });
       case "browser_action":
-        return this.#effect(guest, request, () =>
-          this.#input(request, async () => {
+        return this.#effect(guest, request, async () => {
+          await guest.attach(request);
+          return this.#input(request, async () => {
             const document = await this.#document(
               guest,
               request,
@@ -249,10 +255,11 @@ export class BrowserAutomation {
             } finally {
               request.releaseAutomation();
             }
-          })
-        );
+          });
+        });
       case "browser_evaluate":
         return this.#effect(guest, request, async () => {
+          await guest.attach(request);
           const document = await this.#document(
             guest,
             request,
@@ -843,6 +850,7 @@ export class BrowserAutomation {
     const entry = state.refs.get(ref);
     if (!entry || entry.documentId !== document.id) fail("stale_ref");
     const sessionId = entry.frame.sessionId;
+    let node: ResolvedNode | undefined;
     try {
       const frame = await guest.frame(request, entry.frame.id, sessionId);
       if (!frame || frame.loaderId !== entry.frame.loaderId) fail("stale_ref");
@@ -853,20 +861,18 @@ export class BrowserAutomation {
         sessionId
       );
       if (!object.objectId) fail("stale_ref");
-      const node = { objectId: object.objectId, sessionId, frame: entry.frame };
+      node = { objectId: object.objectId, sessionId, frame: entry.frame };
       const connected = await this.#nodeCall<boolean>(
         guest,
         request,
         node,
         "function() { return this.isConnected; }"
       );
-      if (!connected) {
-        this.#release(guest, node);
-        fail("stale_ref");
-      }
+      if (!connected) fail("stale_ref");
       guest.assertDocument(document);
       return node;
     } catch (error) {
+      if (node) this.#release(guest, node);
       request.guard();
       if (error instanceof Arguments.Error) throw error;
       fail("stale_ref");
@@ -977,25 +983,9 @@ export class BrowserAutomation {
         continue;
       }
       const guest = this.#guest(contents, page.target.kind === "background");
-      if (navigation) {
-        if (
-          (navigation.guest && navigation.guest !== guest) ||
-          guest.navigationSequence > navigation.baseline + 1
-        )
-          fail("navigation_superseded");
-        const attempt = guest.navigation(navigation.baseline + 1);
-        if (
-          attempt &&
-          navigation.expectedUrl &&
-          attempt.initialUrl !== navigation.expectedUrl
-        )
-          fail("navigation_superseded");
-        if (attempt?.state === "failed" || page.snapshot().failure)
-          fail("navigation_failed");
-        if (!navigation.guest || attempt?.state !== "committed") {
-          await request.pause();
-          continue;
-        }
+      if (navigation && !this.#navigationCommitted(page, guest, navigation)) {
+        await request.pause();
+        continue;
       }
       if (guest.changingDocument) {
         if (guard?.kind === "document") fail("stale_document");
@@ -1009,6 +999,8 @@ export class BrowserAutomation {
       }
       this.#requireUnblocked(page, guest);
       await guest.attach(request);
+      if (navigation && !this.#navigationCommitted(page, guest, navigation))
+        fail("navigation_superseded");
       const document = await this.#document(
         guest,
         request,
@@ -1024,6 +1016,8 @@ export class BrowserAutomation {
         )
       ) {
         request.guard();
+        if (navigation && !this.#navigationCommitted(page, guest, navigation))
+          fail("navigation_superseded");
         if (page.contents() !== contents) fail("stale_document");
         guest.assertDocument(document);
         return {
@@ -1035,6 +1029,27 @@ export class BrowserAutomation {
       }
       await request.pause();
     }
+  }
+
+  #navigationCommitted(
+    page: BrowserAutomationPage,
+    guest: Guest,
+    navigation: Navigation
+  ): boolean {
+    const sequence = navigation.baseline + 1;
+    const attempt = guest.navigation(sequence);
+    if (
+      page.contents() !== guest.contents ||
+      (navigation.guest && navigation.guest !== guest) ||
+      guest.navigationSequence > sequence ||
+      (attempt &&
+        navigation.expectedUrl &&
+        attempt.initialUrl !== navigation.expectedUrl)
+    )
+      fail("navigation_superseded");
+    if (attempt?.state === "failed" || page.snapshot().failure)
+      fail("navigation_failed");
+    return navigation.guest === guest && attempt?.state === "committed";
   }
 
   async #matches(

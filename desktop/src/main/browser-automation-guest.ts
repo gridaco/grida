@@ -163,7 +163,8 @@ export class BrowserAutomationGuest {
     request: BrowserAutomationGuest.Request,
     method: string,
     params: Record<string, unknown> = {},
-    sessionId?: string
+    sessionId?: string,
+    detachOnAbort = false
   ): Promise<T> {
     request.guard();
     if (!this.#debuggerOwned || !this.contents.debugger.isAttached())
@@ -175,7 +176,30 @@ export class BrowserAutomationGuest {
     ) as Promise<T>;
     if (method.startsWith("Input.") || request.trackBrowserEffects)
       request.trackInput(command);
-    return request.wait(command);
+    if (!detachOnAbort) return request.wait(command);
+
+    const generation = this.#debuggerGeneration;
+    let pending = true;
+    const settled = () => {
+      pending = false;
+    };
+    void command.then(settled, settled);
+    try {
+      return await request.wait(command);
+    } catch (error) {
+      // CDP's execution timeout does not bound waiting for a returned promise.
+      // Detaching releases this pending reply. The script's effects may persist.
+      if (
+        pending &&
+        request.signal.aborted &&
+        !this.contents.isDestroyed() &&
+        generation === this.#debuggerGeneration &&
+        this.#debuggerOwned &&
+        this.contents.debugger.isAttached()
+      )
+        this.contents.debugger.detach();
+      throw error;
+    }
   }
 
   async root(
@@ -301,7 +325,8 @@ export class BrowserAutomationGuest {
         awaitPromise: true,
         ...(timeout === undefined ? {} : { timeout }),
       },
-      frame.sessionId
+      frame.sessionId,
+      timeout !== undefined
     );
   }
 
@@ -443,6 +468,7 @@ export class BrowserAutomationGuest {
 
 export namespace BrowserAutomationGuest {
   export type Request = {
+    readonly signal: AbortSignal;
     guard(): void;
     wait<T>(value: Promise<T>): Promise<T>;
     readonly trackBrowserEffects: boolean;

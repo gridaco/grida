@@ -50,10 +50,13 @@ console.error('fixture startup diagnostic');
 
 async function main() {
   app.dock?.hide();
+  const slowResponse = Promise.withResolvers();
   const server = http.createServer((req, res) => {
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     if (req.url.startsWith("/redirect")) {
       res.writeHead(302, { Location: "/fixture" }).end();
+    } else if (req.url === "/slow") {
+      slowResponse.resolve(res);
     } else if (req.url.startsWith("/fixture")) res.end(appHtml);
     else if (req.url.startsWith("/frame-content")) res.end(appHtml);
     else if (req.url.startsWith("/frames")) {
@@ -205,6 +208,121 @@ async function main() {
     arg: "Saved Saffron",
   });
   assert.equal(evaluated.value, true);
+
+  phase = "release a node when its connectivity check is cancelled";
+  const observedPage = host.resolveAutomationPage(scope, second.target);
+  const observedGuest = observedPage.contents();
+  const guestDebugger = observedGuest.debugger;
+  const sendCommand = guestDebugger.sendCommand.bind(guestDebugger);
+  const released = Promise.withResolvers();
+  const cancel = new AbortController();
+  let objectId;
+  guestDebugger.sendCommand = (method, params, sessionId) => {
+    const reply = sendCommand(method, params, sessionId);
+    if (
+      method === "Runtime.callFunctionOn" &&
+      params.functionDeclaration.includes("this.isConnected")
+    ) {
+      objectId = params.objectId;
+      cancel.abort();
+    }
+    if (method === "Runtime.releaseObject" && params.objectId === objectId)
+      released.resolve();
+    return reply;
+  };
+  try {
+    assert.deepEqual(
+      await service.invoke(
+        scope,
+        "browser_action",
+        {
+          target: second.target,
+          documentId: second.documentId,
+          action: { kind: "click", ref: second.save },
+        },
+        cancel.signal
+      ),
+      { disposition: "not_dispatched", error: "cancelled" }
+    );
+    await released.promise;
+  } finally {
+    guestDebugger.sendCommand = sendCommand;
+  }
+
+  phase = "recover after an unresolved evaluation";
+  const abandoned = await call("browser_evaluate", {
+    target: second.target,
+    documentId: second.documentId,
+    functionText: "() => new Promise(() => {})",
+    timeoutMs: 250,
+  });
+  assert.deepEqual(abandoned, { disposition: "unknown", error: "timeout" });
+  const { data: recovered } = await ok("browser_snapshot", {
+    target: second.target,
+  });
+  assert.notEqual(recovered.documentId, second.documentId);
+
+  phase = "stop a pending navigation";
+  const { data: slow } = await ok("browser_navigate", {
+    target: second.target,
+    documentId: recovered.documentId,
+    action: { kind: "goto", url: `${origin}/slow` },
+  });
+  const response = await slowResponse.promise;
+  const stopped = once(response, "close");
+  assert.equal(
+    (await ok("browser_snapshot", { target: second.target })).data.documentId,
+    null
+  );
+  await ok("browser_navigate", {
+    target: second.target,
+    action: { kind: "stop" },
+  });
+  await stopped;
+  assert.deepEqual(
+    await call("browser_wait", {
+      target: second.target,
+      readiness: slow.readiness,
+      condition: { kind: "ready", state: "load" },
+    }),
+    { disposition: "not_dispatched", error: "navigation_failed" }
+  );
+
+  phase = "reject a navigation replaced during debugger attach";
+  const { data: opened } = await ok("browser_open", {
+    url: `${origin}/fixture?first`,
+  });
+  await wait(opened.target, opened.readiness);
+  const racingGuest = host
+    .resolveAutomationPage(scope, opened.target)
+    .contents();
+  const racingDebugger = racingGuest.debugger;
+  racingDebugger.detach();
+  const sendRacing = racingDebugger.sendCommand.bind(racingDebugger);
+  racingDebugger.sendCommand = (method, params, sessionId) => {
+    const pending = sendRacing(method, params, sessionId);
+    return method === "Page.enable"
+      ? pending.then(async (value) => {
+          await racingGuest.loadURL(`${origin}/fixture?second`);
+          return value;
+        })
+      : pending;
+  };
+  try {
+    assert.deepEqual(
+      await call("browser_wait", {
+        target: opened.target,
+        readiness: opened.readiness,
+        condition: { kind: "ready", state: "load" },
+      }),
+      { disposition: "not_dispatched", error: "navigation_superseded" }
+    );
+  } finally {
+    racingDebugger.sendCommand = sendRacing;
+  }
+  await ok("browser_close", { target: opened.target });
+
+  phase = "stale document after navigation";
   const { data: navigated } = await ok("browser_navigate", {
     target: first.target,
     documentId: first.documentId,
