@@ -1888,7 +1888,11 @@ fn extension_initialize() -> Value {
 
 #[cfg(unix)]
 #[tokio::test]
-async fn abrupt_host_exit_retains_interrupted_turn_and_blocks_replacement() {
+async fn abrupt_host_exit_requires_explicit_stop_before_a_new_turn_can_run() {
+    use lifecycle::{
+        prompt_request, queue_basis, session_snapshot, task_basis, terminate_shared_server,
+        wait_for_snapshot,
+    };
     use std::os::unix::process::ExitStatusExt;
 
     let temporary = TempDir::new().unwrap();
@@ -1896,7 +1900,7 @@ async fn abrupt_host_exit_retains_interrupted_turn_and_blocks_replacement() {
     let workspace = TempDir::new().unwrap();
     let mut endpoint = Endpoint::start(vec![
         Reply::Hold("Started."),
-        Reply::Finished("Unexpected replacement."),
+        Reply::Finished("Follow-up completed."),
     ])
     .await;
     let mut child = spawn_serve(&state, &endpoint.url);
@@ -1990,7 +1994,99 @@ async fn abrupt_host_exit_retains_interrupted_turn_and_blocks_replacement() {
         endpoint.requests.try_recv(),
         Err(mpsc::error::TryRecvError::Empty)
     ));
-    endpoint.abort().await;
+
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = connect_shared(&url, Some(SERVER_TOKEN), None, None)
+        .await
+        .unwrap();
+    let mut capabilities = extension_initialize();
+    capabilities["clientCapabilities"]["_meta"]["co.grida/session/turn-summary"] = json!(1);
+    let initialized = ws_rpc(&mut socket, 1, "initialize", capabilities).await;
+    assert_eq!(initialized["result"]["protocolVersion"], 1);
+    let loaded = ws_rpc(
+        &mut socket,
+        2,
+        "session/load",
+        json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]}),
+    )
+    .await;
+    assert!(loaded.get("result").is_some(), "{loaded}");
+    let reopened = session_snapshot(&mut socket, &session).await;
+    let original_turn = current["binding"]["turn"].as_str().unwrap();
+    assert_eq!(reopened["current"]["turnId"], original_turn);
+    assert_eq!(reopened["current"]["disposition"], "interrupted");
+    let stopped = ws_rpc(
+        &mut socket,
+        3,
+        "_co.grida/session/stop",
+        task_basis(&reopened, &session, "end-interrupted"),
+    )
+    .await;
+    assert_eq!(
+        stopped["result"]["requestId"], "end-interrupted",
+        "{stopped}"
+    );
+    let settled = wait_for_snapshot(&mut socket, &session, |snapshot| {
+        snapshot["current"].is_null()
+    })
+    .await;
+    assert_eq!(settled["latest"]["turnId"], original_turn);
+    assert_eq!(settled["latest"]["status"], "cancelled");
+    assert_eq!(settled["admissionPaused"], true);
+    let summary = ws_rpc(
+        &mut socket,
+        4,
+        "_co.grida/session/turn-summary",
+        json!({"sessionId":session,"turnId":original_turn}),
+    )
+    .await;
+    assert_eq!(summary["result"]["unresolvedOperations"], 1, "{summary}");
+    assert!(endpoint.requests.try_recv().is_err());
+
+    let follow_up = "Continue from the interrupted turn.";
+    let queued = ws_rpc(
+        &mut socket,
+        5,
+        "_co.grida/session/enqueue",
+        prompt_request(&session, "follow-up", follow_up),
+    )
+    .await;
+    assert_eq!(queued["result"]["disposition"], "queued", "{queued}");
+    let held = session_snapshot(&mut socket, &session).await;
+    assert_eq!(held["queuedInputs"], 1);
+    assert!(held["current"].is_null());
+    assert!(endpoint.requests.try_recv().is_err());
+    let resumed = ws_rpc(
+        &mut socket,
+        6,
+        "_co.grida/session/resume-queue",
+        queue_basis(&held, &session, "release-follow-up"),
+    )
+    .await;
+    assert_eq!(
+        resumed["result"]["requestId"], "release-follow-up",
+        "{resumed}"
+    );
+    let request = endpoint.request().await;
+    let messages = request["messages"].as_array().unwrap();
+    assert_eq!(messages.last().unwrap()["content"], follow_up);
+    assert_eq!(
+        messages
+            .iter()
+            .filter(|message| message["role"] == "user" && message["content"] == "Hold")
+            .count(),
+        1,
+        "{request}"
+    );
+    let complete = wait_for_snapshot(&mut socket, &session, |snapshot| {
+        snapshot["current"].is_null() && snapshot["latest"]["status"] == "succeeded"
+    })
+    .await;
+    assert_ne!(complete["latest"]["turnId"], original_turn);
+
+    drop(socket);
+    terminate_shared_server(host).await;
+    endpoint.done().await;
 }
 
 #[tokio::test]

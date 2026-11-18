@@ -5971,7 +5971,7 @@ function text(
   content: string,
   offsetBytes: number,
   replace = false
-): NativeChatUpdate {
+): Extract<NativeChatUpdate, { kind: "text" }> {
   return {
     kind: "text",
     role: "assistant",
@@ -6465,6 +6465,116 @@ describe("Native workspace chat controller", () => {
       expect(controller.read().messages).toEqual([
         message("a", "Complete durable text"),
       ]);
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("renews lost live observation on the same host without starting work", async () => {
+    const { controller, bridge, running, updates, transcripts } = fixture();
+    const subscribe = vi.spyOn(bridge, "subscribe");
+    const status = vi.spyOn(bridge, "status");
+    const submit = vi.spyOn(bridge, "submit");
+    try {
+      running.add("a");
+      await controller.select("a");
+      const retired = updates.get("a")!;
+      retired(text("a", "Provisional", 0));
+      transcripts.set("a", [message("a", "Committed text")]);
+      subscribe.mockRejectedValueOnce(
+        new Error("native_chat_subscription_unavailable")
+      );
+      retired({ kind: "closed", reason: "delivery_limit" });
+      await vi.waitFor(() =>
+        expect(controller.read().connectionRecovery).toBe("disconnected")
+      );
+      expect(subscribe).toHaveBeenCalledTimes(2);
+      expect(controller.read().messages).toEqual([
+        message("a", "Committed text"),
+      ]);
+      await controller.repair();
+      expect(controller.read().connectionRecovery).toBeNull();
+      expect(subscribe).toHaveBeenCalledTimes(3);
+      expect(status).not.toHaveBeenCalled();
+      expect(submit).not.toHaveBeenCalled();
+      const next = { ...text("a", "After reconnect", 0), messageId: "next" };
+      retired(next);
+      expect(controller.read().messages).toHaveLength(1);
+      updates.get("a")!(next);
+      expect(controller.read().messages.at(-1)?.text).toBe("After reconnect");
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("reattaches the same chat after host loss and resolves a pending send by its original receipt", async () => {
+    const { controller, bridge, updates, transcripts } = fixture();
+    const observe = bridge.observe;
+    let hostExited = false;
+    vi.spyOn(bridge, "observe").mockImplementation(async (id) => {
+      if (hostExited && id === "a")
+        throw new Error("native_chat_scope_changed");
+      return observe.call(bridge, "a");
+    });
+    vi.spyOn(bridge, "transcript").mockImplementation(async () => {
+      return transcripts.get("a") ?? [];
+    });
+    const load = vi.spyOn(bridge, "load");
+    const create = vi.spyOn(bridge, "create");
+    const control = vi.spyOn(bridge, "control");
+    const status = vi
+      .spyOn(bridge, "status")
+      .mockResolvedValueOnce("native-unavailable")
+      .mockResolvedValueOnce("native-ready");
+    const submit = vi
+      .spyOn(bridge, "submit")
+      .mockRejectedValueOnce(new Error("lost_reply"));
+    try {
+      await controller.select("a");
+      const retired = updates.get("a")!;
+      await expect(controller.submit("One accepted prompt")).rejects.toThrow(
+        "lost_reply"
+      );
+      const inputId = submit.mock.calls[0]![1];
+      hostExited = true;
+      controller.checkObservation();
+      await vi.waitFor(() =>
+        expect(controller.read().connectionRecovery).toBe("disconnected")
+      );
+      controller.checkObservation();
+      expect(status).toHaveBeenCalledExactlyOnceWith(true);
+      expect(controller.canSubmit).toBe(false);
+
+      load.mockResolvedValueOnce({ attachmentId: "a-renewed", sessionId: "a" });
+      transcripts.set("a", [message("a", "Saved answer")]);
+      const receipt = vi.spyOn(bridge, "inputReceipt").mockResolvedValueOnce({
+        sessionId: "a",
+        inputId,
+        disposition: "claimed",
+        inputPosition: 1,
+        turnId: "turn-a",
+      });
+      await controller.repair();
+      expect(controller.read().connectionRecovery).toBeNull();
+      expect(load.mock.calls).toEqual([["a"], ["a"]]);
+      expect(controller.read().selected).toBe("a");
+      expect(controller.read().messages).toEqual([
+        message("a", "Saved answer"),
+      ]);
+      retired({ ...text("a", "Old host output", 0), messageId: "old" });
+      expect(controller.read().messages).toHaveLength(1);
+      expect(receipt).not.toHaveBeenCalled();
+      expect(submit).toHaveBeenCalledTimes(1);
+      expect(control).not.toHaveBeenCalled();
+      expect(create).not.toHaveBeenCalled();
+
+      await controller.submit("One accepted prompt");
+      expect(receipt).toHaveBeenCalledExactlyOnceWith("a-renewed", inputId);
+      expect(submit).toHaveBeenCalledTimes(1);
+      await controller.submit("A separate follow-up");
+      expect(submit).toHaveBeenCalledTimes(2);
+      expect(submit.mock.calls[1]![0]).toBe("a-renewed");
+      expect(submit.mock.calls[1]![1]).not.toBe(inputId);
     } finally {
       controller.disconnect();
     }

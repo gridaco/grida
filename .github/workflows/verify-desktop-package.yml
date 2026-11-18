@@ -85,3 +85,12 @@ jobs:
 
       - name: Verify package and make unsigned installers
         run: pnpm run make --arch="${{ matrix.arch }}"
+
+      - name: Verify chat recovery with the packaged native host
+        if: matrix.image == 'macos-26' && matrix.arch == 'arm64'
+        shell: bash
+        run: |
+          export GRIDA_DESKTOP_TEST_NATIVE_RESOURCES="$PWD/out/Grida-darwin-arm64/Grida.app/Contents/Resources"
+          test -d "$GRIDA_DESKTOP_TEST_NATIVE_RESOURCES"
+          pnpm exec vitest run src/main/native-agent-chat.test.ts src/main/native-chat-store.test.ts \
+            -t 'continues a reopened chat|recovers one native acceptance|restarts an exited native host'

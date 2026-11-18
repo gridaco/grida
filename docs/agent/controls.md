@@ -109,6 +109,24 @@ example, when the model sends a tool request Grida cannot read, and the turn
 ends instead of letting the model try again. Work already done stays in the
 workspace. Review it, then send a new message to continue.
 
+## Reconnect to a chat
+
+If a saved chat loses live updates, Desktop tries to restore them. While it is
+disconnected, you can still read the saved messages already on screen and keep
+writing your draft. Choose **Reconnect** if the automatic attempt ends. This
+restores the view of the same chat without sending a message or starting its queue.
+
+If a message was awaiting confirmation, retry that same draft to check whether
+it was already accepted. Desktop uses the original send identity so checking
+doesn't create a second turn.
+
+If the agent process ended during a turn, the chat can show that the turn was
+interrupted. Review any partial work, then choose **End interrupted turn** to
+settle it, or **Finish ending turn** if it was already stopping. This keeps
+the work and any unresolved effects on record. You can then send a new message
+in the same chat. If the queue is held, choose **Resume queue** when you're
+ready for waiting messages to start.
+
 ## Stop running processes
 
 A command the agent starts can keep running after its turn, such as a

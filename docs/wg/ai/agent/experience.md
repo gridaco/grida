@@ -572,6 +572,10 @@ notifications are a separate delivery choice.
 Closing a conversation view or losing its connection preserves accepted work
 under the execution environment's stated lifetime. Reopening the conversation
 shows the latest task state, pending questions, queue, and available results.
+Restoring observation never grants authority to repeat an action or release a
+held queue. When automatic reconnection ends, the conversation keeps its last
+available history and the unsent draft. The person can try reconnecting again
+to that conversation.
 
 The product tells the person where the work runs and what keeps it alive. A local
 task depends on its local execution environment. A task offered as remote work
@@ -581,6 +585,9 @@ After an execution restart, the conversation identifies work recovered, work
 interrupted, and operations whose outcome still needs checking. The next action
 uses that information. Repeating an external action requires evidence that doing
 so is safe or a fresh decision from the person.
+If interrupted work blocks a new request, the person can explicitly end it,
+keep the accounting for known and uncertain effects, and continue in the same
+conversation. Ending it leaves held work subject to its existing controls.
 
 If a generation service accepted a job before the connection failed, returning
 to the task should first recover that job's result or status. The person should

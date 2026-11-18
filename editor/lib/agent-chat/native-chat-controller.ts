@@ -289,6 +289,7 @@ export type NativeChatView = Readonly<{
   /** A send is awaiting acceptance/reconciliation, including initial chat setup. */
   submitting: boolean;
   repairing: boolean;
+  connectionRecovery: "reconnecting" | "disconnected" | null;
   error: string | null;
 }>;
 
@@ -323,8 +324,11 @@ type Scope = {
   /** Suppress ordinary sends and selection changes while the handoff is pending. */
   preparedStart?: true;
   attachment?: NativeChatAttachment;
-  /** Main retired this handle while recovering a failed connection change. */
+  /** This handle can no longer observe the chat. */
   retiredAttachment?: true;
+  subscription?: { id?: string };
+  observationUnavailable?: true;
+  recovery?: "queued" | "running" | "exhausted";
   stopEditorSurfaceUpdates?: () => void;
   stopEditorSurfaceOpen?: () => void;
   stopEditorSvgText?: () => void;
@@ -527,6 +531,7 @@ const EMPTY: NativeChatView = Object.freeze({
   acting: false,
   submitting: false,
   repairing: false,
+  connectionRecovery: null,
   error: null,
 });
 
@@ -1744,7 +1749,10 @@ export class NativeChatController {
       messageContext: previous.messageContext,
       pending: previous.pending,
       pendingGoalStart: previous.pendingGoalStart,
+      pendingGoalControl: previous.pendingGoalControl,
       pendingCommand: previous.pendingCommand,
+      pendingRevision: previous.pendingRevision,
+      pendingQueueChange: previous.pendingQueueChange,
       startsWithMessage: previous.startsWithMessage,
       submission: previous.submission,
       draftReady: previous.draftRestored ? Promise.resolve() : undefined,
@@ -2050,6 +2058,8 @@ export class NativeChatController {
     } catch (error) {
       if (this.owns(scope)) {
         if (deletedAttachment(error)) this.forgetDeletedChat(scope);
+        else if (!prepared && !this.fixed && observationTransportFailure(error))
+          this.requestObservationRecovery(scope, error);
         else
           this.update({
             error: describe(
@@ -2077,6 +2087,8 @@ export class NativeChatController {
       (!this.scope.draftReady || this.scope.draftRestored === true) &&
       !this.scope.pendingRestoreFailed &&
       !this.view.loading &&
+      !this.view.connectionRecovery &&
+      this.view.observation?.snapshot.current?.disposition !== "interrupted" &&
       !this.view.profileBusy &&
       !this.view.permissionModeBusy &&
       !this.view.permissionModeUncertain &&
@@ -3962,7 +3974,13 @@ export class NativeChatController {
     editorContextId?: string
   ): Promise<void> {
     let scope = this.scope;
-    if (!scope || scope.id !== scopeId || this.view.profileBusy)
+    if (
+      !scope ||
+      scope.id !== scopeId ||
+      this.view.profileBusy ||
+      this.view.connectionRecovery ||
+      this.view.observation?.snapshot.current?.disposition === "interrupted"
+    )
       throw new Error("native_chat_not_ready");
     if (!scope.draftRestored) await this.restoreDraft(scope);
     if (!this.owns(scope) || scope.pendingRestoreFailed)
@@ -5062,6 +5080,7 @@ export class NativeChatController {
   get canResumeQueue(): boolean {
     const snapshot = this.view.observation?.snapshot;
     return (
+      !this.view.connectionRecovery &&
       !!this.bridge.editQueue &&
       !!snapshot &&
       !snapshot.current &&
@@ -5081,6 +5100,7 @@ export class NativeChatController {
       !scope?.attachment ||
       !scope.observation ||
       !this.bridge.editQueue ||
+      this.view.connectionRecovery ||
       this.view.acting ||
       ((action.action === "replace" || action.action === "replaceText") &&
         scope.observation.snapshot.pendingGoalId === action.inputId)
@@ -5413,6 +5433,7 @@ export class NativeChatController {
     if (
       !scope?.attachment ||
       this.view.acting ||
+      this.view.connectionRecovery ||
       !scope.observation?.snapshot.current
     )
       return;
@@ -5449,8 +5470,11 @@ export class NativeChatController {
     const scope = this.scope;
     if (!scope || (!scope.attachment && !scope.requested && !this.fixed))
       return;
-    if (scope.retiredAttachment) {
-      await this.select(this.view.selected, { reattach: true });
+    if (scope.recovery || scope.retiredAttachment) {
+      if (!this.recoveryBlocked()) {
+        if (!scope.recovery) this.update({ error: null });
+        await this.reconnectObservation(scope);
+      }
       return;
     }
     scope.replay = true;
@@ -5464,6 +5488,77 @@ export class NativeChatController {
     } catch (error) {
       if (this.owns(scope))
         this.update({ error: describe(error, "Couldn't open this chat.") });
+    }
+  }
+
+  /** Recheck the retained state when returning to a mounted chat. */
+  checkObservation(): void {
+    const scope = this.scope;
+    if (scope?.attachment && !scope.recovery) void this.refresh(scope);
+  }
+
+  private recoveryBlocked(): boolean {
+    return (
+      this.view.loading ||
+      this.view.acting ||
+      this.view.submitting ||
+      this.view.profileBusy ||
+      this.view.attachmentReading ||
+      !!this.view.commandRunning ||
+      this.view.permissionModeBusy ||
+      this.view.revisionSubmitting
+    );
+  }
+
+  private requestObservationRecovery(scope: Scope, error?: unknown): void {
+    if (retiredChatAttachment(error)) scope.retiredAttachment = true;
+    if (scope.recovery) return;
+    scope.recovery = "queued";
+    this.update({ connectionRecovery: "reconnecting" });
+  }
+
+  private async reconnectObservation(scope: Scope): Promise<void> {
+    if (!this.owns(scope) || scope.recovery === "running") return;
+    scope.recovery = "running";
+    this.update({ connectionRecovery: "reconnecting" });
+    try {
+      if (scope.attachment && !scope.retiredAttachment) {
+        scope.replay = true;
+        await scope.refreshing;
+        await this.refresh(scope);
+        if (!this.owns(scope)) return;
+        if (!scope.observationUnavailable) await this.renewSubscription(scope);
+      }
+      if (!this.owns(scope)) return;
+      if (scope.retiredAttachment || !scope.attachment) {
+        // A fixed side chat's attachment is owned by its parent. It cannot
+        // independently load or create a replacement session.
+        if (this.fixed || (await this.bridge.status(true)) !== "native-ready")
+          throw new Error("native_chat_unavailable");
+        if (!this.owns(scope)) return;
+        if (scope.attachment) scope = this.replaceRouteScope(scope);
+        scope.recovery = "running";
+        await this.open(scope);
+        await this.readInputCapabilities(scope);
+        await this.refresh(scope);
+      }
+      if (!this.owns(scope)) return;
+      if (
+        scope.retiredAttachment ||
+        scope.observationUnavailable ||
+        !scope.subscription?.id
+      )
+        throw new Error("native_chat_observation_unavailable");
+      scope.recovery = undefined;
+      this.update({ connectionRecovery: null });
+    } catch (error) {
+      if (!this.owns(scope)) return;
+      if (deletedAttachment(error)) {
+        this.forgetDeletedChat(scope);
+        return;
+      }
+      scope.recovery = "exhausted";
+      this.update({ connectionRecovery: "disconnected" });
     }
   }
 
@@ -5967,6 +6062,10 @@ export class NativeChatController {
 
   private queueRelease(scope: Scope | undefined): void {
     if (!scope) return;
+    const subscription = scope.subscription?.id;
+    scope.subscription = undefined;
+    if (subscription)
+      void this.bridge.unsubscribe(subscription).catch(() => {});
     scope.permissionConfirmation?.resolve(false);
     scope.permissionConfirmation = undefined;
     clearTimeout(scope.timer);
@@ -6334,6 +6433,9 @@ export class NativeChatController {
         }
         this.publishMessages(scope);
       })
+      .then(() => {
+        scope.observationUnavailable = undefined;
+      })
       .catch((error: unknown) => {
         observable = false;
         if (!this.owns(scope)) return;
@@ -6341,8 +6443,14 @@ export class NativeChatController {
           this.forgetDeletedChat(scope);
           return;
         }
+        scope.observationUnavailable = true;
         scope.subagents?.dispose();
         scope.subagents = undefined;
+        if (observationTransportFailure(error)) {
+          this.update({ subagents: null });
+          this.requestObservationRecovery(scope, error);
+          return;
+        }
         this.update({
           subagents: null,
           error: describe(error, "Couldn't refresh this chat. Try Refresh."),
@@ -6673,8 +6781,8 @@ export class NativeChatController {
       scope.gaps.clear();
       scope.replay = true;
       this.publishMessages(scope, true);
-      if (update.kind === "closed") void this.renewSubscription(scope);
-      void this.refresh(scope);
+      if (update.kind === "closed") this.requestObservationRecovery(scope);
+      else void this.refresh(scope);
       return;
     }
     const known = scope.observation?.snapshot.current;
@@ -6766,24 +6874,26 @@ export class NativeChatController {
   }
 
   private async renewSubscription(scope: Scope): Promise<void> {
+    if (scope.subscription || !this.owns(scope)) return;
+    const subscription: NonNullable<Scope["subscription"]> = {};
+    scope.subscription = subscription;
     try {
       const attachment = this.attachment(scope);
       const id = await this.bridge.subscribe(
         attachment.attachmentId,
         (update) => {
-          if (this.owns(scope) && scope.attachment === attachment)
-            this.receive(scope, update);
+          if (!this.owns(scope) || scope.subscription !== subscription) return;
+          if (update.kind === "closed") scope.subscription = undefined;
+          this.receive(scope, update);
         }
       );
-      if (!this.owns(scope)) await this.bridge.unsubscribe(id).catch(() => {});
+      if (scope.subscription === subscription) subscription.id = id;
+      else await this.bridge.unsubscribe(id).catch(() => {});
     } catch (error) {
-      if (this.owns(scope) && deletedAttachment(error))
-        this.forgetDeletedChat(scope);
-      if (this.owns(scope))
-        this.update({
-          error:
-            "Live updates are unavailable. Use Refresh to read committed messages.",
-        });
+      if (!this.owns(scope) || scope.subscription !== subscription) return;
+      scope.subscription = undefined;
+      if (deletedAttachment(error)) this.forgetDeletedChat(scope);
+      else this.requestObservationRecovery(scope, error);
     }
   }
 
@@ -6828,6 +6938,12 @@ export class NativeChatController {
     for (const listener of this.listeners) listener();
     if (focus && wasBlocked && !this.focusBlocked())
       queueMicrotask(() => void this.applyFocus(focus));
+    const scope = this.scope;
+    if (scope?.recovery === "queued" && !this.recoveryBlocked())
+      queueMicrotask(() => {
+        if (scope.recovery === "queued" && !this.recoveryBlocked())
+          void this.reconnectObservation(scope);
+      });
   }
 
   private sessionChoices(entry = this.view.catalogEntry): readonly string[] {
@@ -7020,6 +7136,23 @@ function deletedAttachment(error: unknown): boolean {
   return (
     error instanceof Error &&
     error.message.includes("native_chat_session_deleted")
+  );
+}
+
+function retiredChatAttachment(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    /\bnative_(?:chat_(?:scope_changed|attachment_unavailable|unavailable|closed)|agent_(?:disconnected|(?:input|output|diagnostics)_failed))\b/.test(
+      error.message
+    )
+  );
+}
+
+function observationTransportFailure(error: unknown): boolean {
+  return (
+    retiredChatAttachment(error) ||
+    (error instanceof Error &&
+      /\bnative_agent_request_timeout\b/.test(error.message))
   );
 }
 

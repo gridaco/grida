@@ -523,9 +523,16 @@ function NativeChatPane({
     state.subagents?.read ?? readNoActivity
   );
   useEffect(() => {
-    const refresh = () => void controller.readProfiles();
+    const refresh = () => {
+      void controller.readProfiles();
+      controller.checkObservation();
+    };
     window.addEventListener("focus", refresh);
-    return () => window.removeEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", refresh);
+    };
   }, [controller]);
   // One preview per staged draft; a new draft object means a new attachment.
   const attachmentPreview = useMemo(
@@ -547,7 +554,8 @@ function NativeChatPane({
   } | null>(null);
   const snapshot = state.observation?.snapshot;
   const editHistory = controller.canReviseHistory && !state.revisionDraft;
-  const turn = snapshot?.current;
+  const turn = state.connectionRecovery ? null : snapshot?.current;
+  const interrupted = turn?.disposition === "interrupted";
   const running =
     turn?.disposition === "running" && !turn.paused && !turn.cancelled;
   const canResume = controller.hasPausedTurn;
@@ -558,7 +566,10 @@ function NativeChatPane({
   const resumable = canResume && !(goalTurn && state.goal?.goal?.paused);
   // Show Resume as soon as Pause is chosen; it waits for the pause to settle.
   const pausing =
-    !!turn && !turn.cancelled && (state.pausing === turn.turnId || turn.paused);
+    !!turn &&
+    !interrupted &&
+    !turn.cancelled &&
+    (state.pausing === turn.turnId || turn.paused);
   const approval =
     turn?.disposition === "suspended" && !turn.paused && !turn.cancelled
       ? state.approvals[0]
@@ -820,7 +831,54 @@ function NativeChatPane({
             Opening edit…
           </div>
         ) : null}
-        {error && (
+        {state.connectionRecovery === "reconnecting" && (
+          <div
+            role="status"
+            className="px-3 pt-2 text-xs text-muted-foreground"
+          >
+            Reconnecting to this chat…
+          </div>
+        )}
+        {state.connectionRecovery === "disconnected" && (
+          <div
+            role="alert"
+            className="flex items-center gap-2 px-3 pt-2 text-xs"
+          >
+            <span className="flex-1">
+              This chat is disconnected. Saved messages are still visible.
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              onClick={() => void controller.repair()}
+            >
+              Reconnect
+            </Button>
+          </div>
+        )}
+        {interrupted && (
+          <div
+            role="status"
+            className="flex items-center gap-2 px-3 pt-2 text-xs"
+          >
+            <span className="flex-1">
+              {turn.cancelled
+                ? "This turn was interrupted before it finished stopping."
+                : "This turn was interrupted. Review any partial work before continuing."}
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              disabled={state.acting}
+              onClick={() => void controller.control("stop")}
+            >
+              {turn.cancelled ? "Finish ending turn" : "End interrupted turn"}
+            </Button>
+          </div>
+        )}
+        {error && !state.connectionRecovery && (
           <div
             role="alert"
             className="flex items-center gap-2 px-3 pt-2 text-xs text-destructive"
