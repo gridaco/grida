@@ -46,9 +46,12 @@ settings change. The host owns endpoint discovery, credential custody, model
 selection, and funding. Request bodies have no debug projection. Failures
 expose a classification and a fixed code.
 
-Inference distinguishes a transport failure known to precede dispatch from an
-interrupted attempt. HTTP timeouts and server errors preserve dispatch
-uncertainty. Recognized provider codes distinguish unavailable models, quota
+Inference distinguishes transport failure before dispatch from an interrupted
+attempt. The transport can report a proved connection refusal, which supplies
+positive evidence that the request could not execute. Generic unavailability
+covers other preflight failures and carries no signal that the cause is safe to
+retry. HTTP timeouts and server errors preserve dispatch uncertainty.
+Recognized provider codes distinguish unavailable models, quota
 and rate limits for every adapter. A context limit is recognized where the
 protocol reports a distinct signal: the `context_length_exceeded` error code,
 or the Anthropic `model_context_window_exceeded` stop reason. A request-size

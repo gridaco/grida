@@ -70,6 +70,7 @@ zeroize = "1"
 rustix = { version = "1", features = ["fs", "process"] }
 
 [dev-dependencies]
+rusqlite = { version = "0.40", features = ["bundled"] }
 socket2 = "0.6"
 tokio = { version = "1", features = ["net", "process"] }
 tokio-util = { version = "0.7", features = ["compat"] }

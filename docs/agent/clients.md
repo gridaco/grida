@@ -712,12 +712,16 @@ turn; Desktop does not show them in the chat.
 
 ## Follow a provider retry
 
-When Grida Gateway or the Responses API rejects a request before starting it
-and asks for a short delay, the host can make one more attempt with the same
-model and connection. The turn stays running while it waits; Pause or Stop
-apply. A downstream failure can leave the result uncertain, so review any
-partial work before trying again. To use a different provider, choose another
-model for the next turn.
+The native host can make one more attempt with the same model and connection
+after a verified rate-limit rejection with a short delay. A direct HTTP
+connection refusal can also get one retry when the host can prove the
+generation request was never sent. The turn stays running while it waits.
+Pause or Stop still apply, and clients can read the retry time from the
+session snapshot.
+
+When the result is uncertain, review any partial work before trying again.
+You can send a new message in the same chat after the failed turn. To use a
+different provider, choose another model for the next turn.
 
 ## Use durable client operations
 

@@ -80,7 +80,11 @@ fn previews(page: &Value) -> Vec<&str> {
         .collect()
 }
 
-async fn load_transcript(socket: &mut SharedSocket, session: &str, cwd: &Path) -> Vec<String> {
+pub(super) async fn load_transcript(
+    socket: &mut SharedSocket,
+    session: &str,
+    cwd: &Path,
+) -> Vec<String> {
     timeout(WAIT, async {
         let id = 500;
         let request = json!({"jsonrpc":"2.0","id":id,"method":"session/load",

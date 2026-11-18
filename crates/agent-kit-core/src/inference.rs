@@ -444,6 +444,8 @@ pub struct InferenceFailure {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DispatchEvidence {
+    /// The transport refused the connection before dispatch, or the
+    /// provider rejected the request before executing it.
     RejectedBeforeExecution,
 }
 

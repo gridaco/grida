@@ -294,11 +294,13 @@ When work is delegated, the main task remains responsible for integrating the
 results. The person can see outstanding delegated work and any part that needs
 attention. A completed task has accounted for the work required by its request.
 
-If a provider is temporarily unavailable, the agent shows that it is waiting or
-retrying and remains interruptible. Retries are bounded. Sign-in, quota, refusal,
-and invalid-configuration problems explain their specific recovery path. Any
-fallback follows the selected provider policy and is visible. A retry preserves
-the work already performed and its known usage.
+When a temporary provider failure can be shown to precede execution, the agent
+can wait and retry within a bounded policy. It makes the wait observable and
+remains interruptible. If the provider might have acted, the agent preserves
+the work already performed and its known usage, and reports the uncertain
+outcome. Sign-in, quota, refusal, and invalid-configuration problems explain
+their specific recovery path. Any fallback follows the selected provider policy
+and is visible.
 
 A malformed tool request can be corrected without losing the conversation.
 Repeated failed corrections eventually produce a clear limitation or request

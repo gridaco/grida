@@ -149,6 +149,20 @@ explicit end before more work can run. A retry of a send awaiting confirmation
 uses its original input identity. [Return to ongoing work](https://grida.co/docs/wg/ai/agent/experience#return-to-ongoing-work)
 owns the experience.
 
+- The [native acceptance cases](../tests/process/acceptance.rs) contrast a
+  reply the submitting client never reads with a real SQLite submission
+  transaction that rolls back. A replacement host recovers the original input
+  and turn identities with their current disposition, without redispatch. It
+  rejects changed content under the same input ID. The failed transaction
+  leaves prior history and queue position intact, with no receipt or provider
+  call. After storage is writable, the same input ID can be accepted and
+  completed once.
+- The [native outbound MCP cases](../tests/process/outbound_mcp.rs) independently
+  observe one tool call. After a truncated model response or a killed owner,
+  reopening retains the tool result and the unresolved inference. A distinct
+  turn succeeds in the original session with the recorded tool result in its
+  model context. The interrupted case settles through explicit Stop and queue
+  release.
 - The [built-host adapter cases](../../../desktop/src/main/native-agent-chat.test.ts)
   exercise truncated provider output, same-chat follow-up after restart, and
   lost acknowledgement after durable acceptance. They count requests and
@@ -821,20 +835,32 @@ remains open, and native Windows command execution remains deferred.
 The complete input budget, error classification, and recovery path need explicit
 contracts even when the happy path is one model request.
 
-| Pressure case                                            | Required result                                                                                                                   |
-| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Messages fit but tool schemas/framing exceed the budget  | Measure the complete prepared input and retain its exact/upper-bound/estimated basis.                                             |
-| Rate limiting includes retry-delay advice                | Show waiting, honor the bounded policy, and allow Stop/Pause during backoff without an occupied inference permit.                 |
-| Authentication, quota, or refusal prevents a request     | Give its specific outcome and recovery path. Do not treat it as an endless transient retry.                                       |
-| A stream fails after one of its tools ran                | Retain that tool's actual outcome and reconcile before continuation or repetition. Fresh call IDs cannot hide a duplicate effect. |
-| A model emits malformed arguments or an unavailable tool | Preserve a correlated pre-execution error for bounded correction. Infrastructure failure remains distinguishable.                 |
-| Compaction finishes after input or lineage changes       | Validate its covered basis and preserve later input. Reject an incompatible candidate without replacing the live view.            |
-| Compaction fails or still leaves input too large         | Retain previous context and stop after bounded recovery with a clear explanation.                                                 |
+| Pressure case                                            | Required result                                                                                                                      |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Messages fit but tool schemas/framing exceed the budget  | Measure the complete prepared input and retain its exact/upper-bound/estimated basis.                                                |
+| Rate limiting includes retry-delay advice                | Show waiting, honor the bounded policy, and allow Stop/Pause during backoff without an occupied inference permit.                    |
+| A connection fails before the provider receives input    | Distinguish verified refusal from an ambiguous transport failure. Use the same bounded retry reservation only for eligible evidence. |
+| Authentication, quota, or refusal prevents a request     | Give its specific outcome and recovery path. Do not treat it as an endless transient retry.                                          |
+| A stream fails after one of its tools ran                | Retain that tool's actual outcome and reconcile before continuation or repetition. Fresh call IDs cannot hide a duplicate effect.    |
+| A model emits malformed arguments or an unavailable tool | Preserve a correlated pre-execution error for bounded correction. Infrastructure failure remains distinguishable.                    |
+| Compaction finishes after input or lineage changes       | Validate its covered basis and preserve later input. Reject an incompatible candidate without replacing the live view.               |
+| Compaction fails or still leaves input too large         | Retain previous context and stop after bounded recovery with a clear explanation.                                                    |
 
 Counting the provider representation of the complete request, and classifying
 a retryable failure separately from the wait that reports progress and handles
 cancellation, are the mechanisms these contracts need. Retry counts and
 compaction strategy remain product decisions.
+
+For R10, the [native process case](../tests/process.rs) exercises a direct
+connection refusal through its one retry, then a lost reply after the peer
+receives the request. It checks two attempts without execution in the first
+case, one received request and an uncertain result in the second, and a
+successful follow-up in the same session. The
+[master tests](../../grida-agent-master/tests/durable.rs) exercise Stop and a
+retained retry deadline across restart. The
+[supervised Responses cases](../tests/process/responses.rs) cover verified
+rate-limit advice and exhaustion. Generic transport failures from the
+supervisor cannot establish a transient connection refusal.
 
 ### Lifecycle hooks
 

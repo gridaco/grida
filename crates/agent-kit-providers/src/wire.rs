@@ -101,6 +101,17 @@ impl WireStream {
                             "transport_unavailable",
                         );
                     }
+                    Err(TransportFailure::ConnectRefused) => {
+                        return Incoming::Failure(
+                            InferenceStatus::Failed,
+                            InferenceFailure {
+                                kind: FailureKind::Transient,
+                                code: "transport_connect_refused".into(),
+                                retry_after_ms: None,
+                                dispatch: Some(DispatchEvidence::RejectedBeforeExecution),
+                            },
+                        );
+                    }
                     Err(TransportFailure::Interrupted) => {
                         return failure(
                             InferenceStatus::Interrupted,
@@ -284,7 +295,7 @@ pub(crate) async fn count_openai_input(
             TransportFailure::Unavailable => {
                 count_failure("input_measurement_unavailable", FailureKind::Configuration)
             }
-            TransportFailure::Interrupted => {
+            TransportFailure::ConnectRefused | TransportFailure::Interrupted => {
                 count_failure("input_measurement_interrupted", FailureKind::Transient)
             }
         })?;
