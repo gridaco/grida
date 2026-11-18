@@ -798,6 +798,8 @@ const bridge: DesktopBridge = {
         inputId,
         text
       ),
+    captureEditorContext: () =>
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_CAPTURE_EDITOR_CONTEXT),
     submitInRegime: (
       action,
       attachmentId,
@@ -806,7 +808,8 @@ const bridge: DesktopBridge = {
       operatingRegime,
       effort,
       editorSvgTargetId,
-      selectionRevision
+      selectionRevision,
+      editorContextId
     ) =>
       nativeChatInvoke(
         action === "enqueue"
@@ -816,13 +819,15 @@ const bridge: DesktopBridge = {
         inputId,
         text,
         operatingRegime,
-        ...(selectionRevision !== undefined
-          ? [effort, editorSvgTargetId, selectionRevision]
-          : editorSvgTargetId !== undefined
-            ? [effort, editorSvgTargetId]
-            : effort === undefined
-              ? []
-              : [effort])
+        ...(editorContextId !== undefined
+          ? [effort, editorSvgTargetId, selectionRevision, editorContextId]
+          : selectionRevision !== undefined
+            ? [effort, editorSvgTargetId, selectionRevision]
+            : editorSvgTargetId !== undefined
+              ? [effort, editorSvgTargetId]
+              : effort === undefined
+                ? []
+                : [effort])
       ),
     enqueue: (attachmentId, inputId, text) =>
       nativeChatInvoke(
@@ -865,7 +870,8 @@ const bridge: DesktopBridge = {
       text,
       operatingRegime,
       effort,
-      selectionRevision
+      selectionRevision,
+      editorContextId
     ) =>
       nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_SUBMIT_LIBRARY_SELECTION,
@@ -874,7 +880,11 @@ const bridge: DesktopBridge = {
         text,
         operatingRegime,
         effort,
-        ...(selectionRevision === undefined ? [] : [selectionRevision])
+        ...(editorContextId !== undefined
+          ? [selectionRevision, editorContextId]
+          : selectionRevision === undefined
+            ? []
+            : [selectionRevision])
       ),
     acceptsFile: () => nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_FILE),
     ...(!selectedDocumentChatRoute() && {
@@ -1230,6 +1240,10 @@ const bridge: DesktopBridge = {
         };
       },
     },
+    prepareFxFile: (request) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_PREPARE_FX_FILE, request),
+    resolveFxPreview: (entry) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_RESOLVE_FX_PREVIEW, entry),
     choose: () => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_CHOOSE),
     open: (rootPath) =>
       ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_REOPEN, rootPath),

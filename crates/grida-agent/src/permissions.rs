@@ -116,6 +116,7 @@ pub struct PermissionProfile {
     command_denials: Vec<ProtectedPath>,
     command: Option<CommandProfile>,
     hooks_only: bool,
+    bundled_skills: Vec<String>,
     completion_hook: Option<ReviewedHookCommand>,
     before_tool_hook: Option<ReviewedHookCommand>,
     lifecycle_hooks: Vec<ReviewedLifecycleHook>,
@@ -295,6 +296,7 @@ impl PermissionProfile {
             command_denials,
             command,
             hooks_only: false,
+            bundled_skills: Vec::new(),
             completion_hook: None,
             before_tool_hook: None,
             lifecycle_hooks: Vec::new(),
@@ -307,6 +309,16 @@ impl PermissionProfile {
             initial_mode: PermissionMode::Restricted,
             unconfined: false,
         })
+    }
+
+    pub(crate) fn with_bundled_skills(mut self, names: Vec<String>) -> Result<Self> {
+        crate::skills::validate_optional_bundled(&names)?;
+        self.bundled_skills = names;
+        Ok(self)
+    }
+
+    pub(crate) fn bundled_skills(&self) -> &[String] {
+        &self.bundled_skills
     }
 
     pub(crate) fn with_full_access(

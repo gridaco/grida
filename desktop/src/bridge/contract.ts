@@ -58,6 +58,8 @@ export const IPC_CHANNELS = {
   BROWSER_SET_ACTIVE: "grida:browser:set-active",
   BROWSER_CLOSE: "grida:browser:close",
   BROWSER_OPEN_EXTERNAL: "grida:browser:open-external",
+  BROWSER_PREPARE_FX_FILE: "grida:browser:prepare-fx-file",
+  BROWSER_RESOLVE_FX_PREVIEW: "grida:browser:resolve-fx-preview",
   BROWSER_CLEAR_BROWSING_DATA: "grida:browser:clear-browsing-data",
   BROWSER_FIND: "grida:browser:find",
   BROWSER_STOP_FIND: "grida:browser:stop-find",
@@ -139,6 +141,8 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_EDITOR_SVG_TEXT: "grida:native-chat:editor-svg-text",
   NATIVE_CHAT_EDITOR_SVG_TEXT_RESULT:
     "grida:native-chat:editor-svg-text-result",
+  NATIVE_CHAT_CAPTURE_EDITOR_CONTEXT:
+    "grida:native-chat:capture-editor-context",
   NATIVE_CHAT_SUBMIT: "grida:native-chat:submit",
   NATIVE_CHAT_ENQUEUE: "grida:native-chat:enqueue",
   NATIVE_CHAT_ACCEPTS_EFFORT: "grida:native-chat:accepts-effort",

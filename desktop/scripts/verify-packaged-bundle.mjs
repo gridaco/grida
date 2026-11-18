@@ -22,6 +22,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { verifyBundledPrograms } from "./bundled-programs.mjs";
 import { verifyNativeAgentRuntime } from "./native-agent-package.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -108,6 +109,8 @@ if (process.argv[3] === "--native-agent") {
   const resources = path.dirname(asar);
   const ran = await verifyNativeAgentRuntime(resources, platform, arch);
   console.log("✔ packaged native agent executables verified.");
+  if (verifyBundledPrograms(resources, platform, arch))
+    console.log("✔ packaged FX engine verified.");
   if (ran)
     console.log(
       "✔ packaged native agent ACP startup, reopen and EOF verified."

@@ -56,6 +56,60 @@ const HOOKS = {
   results: [],
 } as const;
 
+it("keeps the captured editor observation on its exact workbench, chat and input", async () => {
+  const sample = {
+    kind: "selection",
+    surface: "workflow-viewer",
+    sampledAt: 123,
+    payload: { selection: "original" },
+  };
+  const browserTools = {
+    captureEditorObservation: vi.fn<() => Promise<typeof sample>>(
+      async () => sample
+    ),
+  } as unknown as NonNullable<ConstructorParameters<typeof NativeChatIpc>[12]>;
+  const { ipc, first, second, chat } = setup(
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    browserTools
+  );
+  expect(await ipc.captureEditorContext(first.event)).toBeNull();
+  Object.defineProperty(chat, "acceptsEditorContext", { value: true });
+  const { attachmentId } = await ipc.create(first.event);
+  const other = await ipc.create(second.event);
+  const captureId = await ipc.captureEditorContext(first.event);
+  expect(captureId).toMatch(/^[a-f0-9-]{36}$/);
+  sample.payload.selection = "new";
+  const enqueue = vi.spyOn(chat, "enqueue");
+  const send = (event: IpcMainInvokeEvent, attachment: string, input: string) =>
+    ipc.enqueue(
+      event,
+      attachment,
+      input,
+      "Explain.",
+      "act",
+      undefined,
+      undefined,
+      undefined,
+      captureId
+    );
+  await expect(send(second.event, other.attachmentId, "input")).rejects.toThrow(
+    "native_chat_editor_context_unavailable"
+  );
+  await send(first.event, attachmentId, "input");
+  await send(first.event, attachmentId, "input");
+  expect(enqueue.mock.calls.map((call) => call.at(-1))).toEqual([
+    { ...sample, payload: { selection: "original" } },
+    { ...sample, payload: { selection: "original" } },
+  ]);
+  await expect(send(first.event, attachmentId, "different")).rejects.toThrow(
+    "native_chat_editor_context_unavailable"
+  );
+});
+
 it("reports desired-binding image eligibility without borrowing another active model or activating it", async () => {
   const text = "a".repeat(64),
     image = "b".repeat(64);
@@ -556,7 +610,8 @@ function setup(
   selectArtifactDestination?: (sender: WebContents) => Promise<string | null>,
   hookReview?: ConstructorParameters<typeof NativeChatIpc>[10],
   profiles?: ConstructorParameters<typeof NativeChatIpc>[5],
-  selections?: ConstructorParameters<typeof NativeChatIpc>[11]
+  selections?: ConstructorParameters<typeof NativeChatIpc>[11],
+  browserTools?: ConstructorParameters<typeof NativeChatIpc>[12]
 ) {
   const first = windowAt();
   const second = windowAt();
@@ -787,7 +842,8 @@ function setup(
       undefined,
       undefined,
       hookReview,
-      selections
+      selections,
+      browserTools
     ),
     emit: (sessionId: string, update: NativeChatStreamUpdate) => {
       for (const listener of listeners.get(sessionId) ?? []) listener(update);

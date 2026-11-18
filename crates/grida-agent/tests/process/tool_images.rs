@@ -276,6 +276,7 @@ async fn native_browser_capture_requires_act_and_projects_correlated_pixels() {
     const EDITOR: &str = "co.grida/session/editor-surfaces";
     const PRESENTATION: &str = "co.grida/session/editor-surface-open";
     const BROWSER: &str = "co.grida/session/browser-tools";
+    const EDITOR_CONTEXT: &str = "co.grida/session/editor-context";
     const ENDPOINT: &str = "6f9619ff-8b86-4011-b42d-00c04fc964ff";
     let root = TempDir::new().unwrap();
     let base = root.path().canonicalize().unwrap();
@@ -298,6 +299,7 @@ async fn native_browser_capture_requires_act_and_projects_correlated_pixels() {
     offer["clientCapabilities"]["_meta"][EDITOR] = 1.into();
     offer["clientCapabilities"]["_meta"][PRESENTATION] = 1.into();
     offer["clientCapabilities"]["_meta"][BROWSER] = 1.into();
+    offer["clientCapabilities"]["_meta"][EDITOR_CONTEXT] = 1.into();
     offer["clientCapabilities"]["_meta"]["co.grida/provider/egress"] = 1.into();
     offer["clientCapabilities"]["_meta"]["co.grida/session/updates"] = 1.into();
     let ready = client.request("initialize", offer).await;
@@ -314,6 +316,8 @@ async fn native_browser_capture_requires_act_and_projects_correlated_pixels() {
             "sessionId": session,
             "inputId": id,
             "prompt": [{"type":"text","text":"Capture the fixture."}],
+            "editorContext": {"kind":"selection","surface":"workflow-viewer","sampledAt":1700000000123_u64,
+                "payload":{"selection":"selected-step"}},
             "operatingRegime": regime,
             "editorEndpointId": ENDPOINT,
             "editorPresentation": true,
@@ -428,6 +432,7 @@ async fn native_browser_capture_requires_act_and_projects_correlated_pixels() {
     let instructions = requests[0]["instructions"].as_str().unwrap();
     assert!(instructions.contains("first meaningful renderable checkpoint"));
     assert!(instructions.contains("For new browser work, use browser_open"));
+    assert!(requests[0]["input"].to_string().contains("selected-step"));
     assert!(
         requests[0]["tools"]
             .as_array()

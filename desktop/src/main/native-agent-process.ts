@@ -106,6 +106,7 @@ export type NativeAgentLaunch = {
   capabilities?: Readonly<Record<string, 1>>;
   onSessionUpdate?: (params: unknown) => void;
 };
+const EDITOR_CONTEXT = "co.grida/session/editor-context";
 
 type Pending = {
   resolve: (result: unknown) => void;
@@ -204,6 +205,7 @@ export class NativeAgentProcess {
   private editorSurfaceOpen = false;
   private editorSvgText = false;
   private editorBrowserTools = false;
+  private editorContext = false;
   private readonly editorBrowserRequests = new Map<
     string | number,
     BrowserRequest
@@ -288,6 +290,10 @@ export class NativeAgentProcess {
 
   get acceptsActivityOrder(): boolean {
     return this.connected && this.activityOrder;
+  }
+
+  get acceptsEditorContext(): boolean {
+    return this.connected && this.editorContext;
   }
 
   get acceptsChildGatewayBilling(): boolean {
@@ -522,7 +528,8 @@ export class NativeAgentProcess {
           await NativeCommandProfiles.launch(
             options.resourcesPath,
             options.workspace.primary.path,
-            hooks
+            hooks,
+            options.workspace.protectedPaths
           )
         )
       : undefined;
@@ -677,6 +684,7 @@ export class NativeAgentProcess {
                   [NativeAgentGoals.namedChildCapability]: 1,
                 }),
                 [NativeEditorSurfaceEndpoints.capability]: 1,
+                ...(options.workspace && { [EDITOR_CONTEXT]: 1 }),
                 ...(providerEgress && {
                   [NativeEditorSurfaceEndpoints.openCapability]: 1,
                   [NativeEditorSurfaceEndpoints.svgTextCapability]: 1,
@@ -830,6 +838,8 @@ export class NativeAgentProcess {
       processOwner.editorBrowserTools =
         processOwner.editorSurfaces &&
         advertised?.[NativeEditorSurfaceEndpoints.browserCapability] === 1;
+      processOwner.editorContext =
+        options.workspace !== undefined && advertised?.[EDITOR_CONTEXT] === 1;
       processOwner.ready = true;
       return processOwner;
     } catch (error) {

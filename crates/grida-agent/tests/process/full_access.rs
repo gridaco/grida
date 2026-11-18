@@ -332,6 +332,90 @@ async fn default_denies_network_and_outside_writes_full_access_allows_both_and_c
     endpoint.done().await;
 }
 
+#[tokio::test]
+#[ignore = "requires the current native helper and working Seatbelt or bubblewrap"]
+async fn confined_commands_run_projected_programs_under_install_exclusion() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let fixture = fixture(false);
+    let root = fixture.primary.parent().unwrap();
+    let install = root.join("install");
+    let runtime = root.join("command-runtime");
+    let bin = runtime.join("bin");
+    fs::create_dir(&install).unwrap();
+    fs::create_dir_all(&bin).unwrap();
+    fs::write(install.join("application"), b"excluded").unwrap();
+
+    let mut profile: Value = serde_json::from_slice(&fs::read(&fixture.profile).unwrap()).unwrap();
+    let helper = &mut profile["command"]["helper"];
+    let installed_helper = install.join("agent-kit-sandbox-helper");
+    let projected_helper = runtime.join("agent-kit-sandbox-helper");
+    fs::copy(helper["path"].as_str().unwrap(), &installed_helper).unwrap();
+    fs::copy(&installed_helper, &projected_helper).unwrap();
+    fs::set_permissions(&projected_helper, fs::Permissions::from_mode(0o500)).unwrap();
+    helper["path"] = json!(projected_helper);
+
+    let program = bin.join("bundled-check");
+    fs::write(
+        &program,
+        "#!/bin/sh\nprintf 'bundled execution verified\\n'\n",
+    )
+    .unwrap();
+    fs::set_permissions(&program, fs::Permissions::from_mode(0o500)).unwrap();
+    profile["protectedPaths"] = json!([install]);
+    profile["command"]["runtimePaths"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!(bin));
+    profile["command"]["environment"]["PATH"] = json!(
+        std::env::join_paths([
+            bin.as_path(),
+            std::path::Path::new("/usr/bin"),
+            std::path::Path::new("/bin")
+        ])
+        .unwrap()
+        .into_string()
+        .unwrap()
+    );
+    fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
+
+    let quote =
+        |path: &std::path::Path| format!("'{}'", path.to_str().unwrap().replace('\'', "'\\''"));
+    let command = format!(
+        "test \"$(command -v bundled-check)\" = {} && bundled-check && ! /bin/cat {} && ! /bin/chmod u+w {}",
+        quote(&program),
+        quote(&install.join("application")),
+        quote(&program),
+    );
+    let endpoint = Endpoint::start(vec![
+        tool(
+            "exec_command",
+            json!({"access":"read_write","cmd":command,"yield_time_ms":1000}),
+        ),
+        Reply::Choose(Box::new(|request| {
+            let result = last_tool(request);
+            assert_eq!(result["structured"]["completion"]["code"], 0, "{result}");
+            assert!(
+                result["content"]
+                    .to_string()
+                    .contains("bundled execution verified"),
+                "{result}"
+            );
+            Reply::Finished("Verified the confined command result.")
+        })),
+    ])
+    .await;
+    let mut client = start(&fixture, &endpoint.url, true).await;
+    let id = session(&mut client, &fixture).await;
+    prompt(&mut client, &id).await;
+    assert_eq!(
+        fs::metadata(program).unwrap().permissions().mode() & 0o777,
+        0o500
+    );
+    client.close().await;
+    endpoint.done().await;
+}
+
 fn npm_executable() -> PathBuf {
     if let Some(path) = std::env::var_os("GRIDA_AGENT_TEST_NPM") {
         return PathBuf::from(path);

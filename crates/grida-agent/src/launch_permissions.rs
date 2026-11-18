@@ -82,6 +82,8 @@ struct Command {
     /// Programs start from the host's environment, minus Grida's own variables.
     #[serde(default)]
     inherit_environment: bool,
+    #[serde(default)]
+    bundled_skills: Vec<String>,
     /// Programs start from this environment instead, for a host whose own
     /// environment is not the person's (a desktop app captures their shell's).
     environment: Option<BTreeMap<String, String>>,
@@ -278,6 +280,12 @@ pub fn load_permission_profile_excluding(
     for hook in &hooks {
         write.push(hook.command.executable.path.clone());
     }
+    let bundled_skills = profile
+        .command
+        .as_ref()
+        .filter(|command| !command.hooks_only)
+        .map(|command| command.bundled_skills.clone())
+        .unwrap_or_default();
     let command = if let Some(command) = profile.command {
         validate_command_paths(&command)?;
         write.push(command.helper.path.clone());
@@ -368,6 +376,7 @@ pub fn load_permission_profile_excluding(
     let profile = profile.with_lifecycle_hooks(hooks, hooks_only)?;
     Ok(Arc::new(
         profile
+            .with_bundled_skills(bundled_skills)?
             .with_goal_read_verifications(goal_read_verifications)?
             .with_full_access(allow_full_access, initial_permission_mode)?,
     ))

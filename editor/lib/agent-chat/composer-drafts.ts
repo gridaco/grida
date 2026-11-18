@@ -66,6 +66,7 @@ export type ComposerDraftPending = Readonly<{
   selectionRevision?: number;
   allowLibrarySelection: boolean;
   editorSvgTargetId?: string;
+  editorContextId?: string;
   attachment?:
     | StoredDraftAttachment
     | Readonly<{
@@ -586,7 +587,10 @@ function validPending(value: ComposerDraftPending): boolean {
         value.selectionRevision < 1)) ||
     (value.editorSvgTargetId !== undefined &&
       (typeof value.editorSvgTargetId !== "string" ||
-        value.editorSvgTargetId.length > 256))
+        value.editorSvgTargetId.length > 256)) ||
+    (value.editorContextId !== undefined &&
+      (typeof value.editorContextId !== "string" ||
+        !/^[a-f0-9-]{36}$/.test(value.editorContextId)))
   )
     return false;
   if (
@@ -601,6 +605,7 @@ function validPending(value: ComposerDraftPending): boolean {
           "selectionRevision",
           "allowLibrarySelection",
           "editorSvgTargetId",
+          "editorContextId",
           "attachment",
         ].includes(key)
     )

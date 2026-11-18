@@ -367,6 +367,27 @@ export class DesktopBrowserHost {
     );
   }
 
+  automationWorkspace(scope: BrowserAutomationScope): {
+    workspaceId: string;
+    current(): boolean;
+  } {
+    const owner = this.#automationWorkbench(scope);
+    const attachmentId = owner.attachmentId;
+    return {
+      workspaceId: owner.workspaceId,
+      current: () => {
+        try {
+          return (
+            this.#automationWorkbench(scope) === owner &&
+            owner.attachmentId === attachmentId
+          );
+        } catch {
+          return false;
+        }
+      },
+    };
+  }
+
   resolveAutomationPage(
     scope: BrowserAutomationScope,
     target: BrowserAutomationTarget

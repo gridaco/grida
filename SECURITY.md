@@ -927,6 +927,13 @@ pixels through this reader, with no additional filesystem or model grant.
   the archive. Installer makers require a fresh package that passed this check.
   Build output custody stays with the packaging owner. Launch-time trust and
   helper identity remain enforced by the native host.
+- [Bundled command staging](desktop/scripts/bundled-programs.mjs) checks the
+  exact platform package and copies the executable into app resources before
+  signing. [Command runtime projection](desktop/src/main/native-command-runtime.ts)
+  checks the copy against the app resource, places it outside the installation
+  and command write grants, and keeps the installation exclusion in effect.
+  The command profile exposes the fixed program directory and verifies the
+  projected launcher helper. Host-owned lookups use the installed resource.
 - [Native agent process owner](desktop/src/main/native-agent-process.ts) and
   [its fixtures](desktop/src/main/native-agent-process.test.ts) start the fixed
   resource executable without a shell. They select the child environment,
@@ -4543,6 +4550,21 @@ caller is the actual privileged top-level workbench document.
    opener's requirement at creation. Managed windows consult their owning page.
    Page evaluation runs with ordinary website authority. Browser
    image results have their own bounded, exact tool-result custody.
+8. **FX viewer observations and file intent.** Desktop probes the app-carried
+   executable against the admitted workspace root and checks the live service
+   instance. Main correlates the exact top-level browser document and its
+   portable FX subject with that response. Page data remains untrusted. A
+   bounded selection sample requires the same selected workbench tab and
+   document; an arbitrary browser page receives no FX bridge or credentials.
+   The exact first-party workbench can explicitly prepare a portable file from
+   its selected viewer. A browser guest has no channel to invoke this action.
+   Main rechecks the current guest, document, service and registered workspace
+   before resolving the reference. A source goes through ordinary workspace
+   file admission. Recorded artifacts use one bounded workspace read. Main
+   verifies the size and digest of those exact bytes and returns only an
+   allowlisted inert raster snapshot. The snapshot has no path or write target.
+   A portable preview lookup uses the current workbench workspace and returns
+   only the current service readiness or destination. It never starts FX.
 
 **Limits.** Browser pages retain normal web networking, including reachable
 local services; this is not the native command sandbox. Local services must
@@ -4575,6 +4597,11 @@ outside that tool surface. Users can open DevTools for an actual owned page.
   `desktop/src/main/browser-automation-guest.ts`, and
   `desktop/src/main/desktop-browser-tools.ts` — fixed background shell,
   admitted target and document checks, typed operations and bounded captures.
+- `desktop/src/main/fx-viewer.ts` and its tests — exact project service and
+  document correlation, bounded FX observations, independent file authorization
+  and workspace-relative resolution results.
+- `desktop/src/main/fx-workspace-files.ts` and its tests — workbench-only file
+  preparation, workspace containment, and immutable verified raster snapshots.
 - `desktop/src/main/browser-favicon.ts` and its tests — bounded, isolated
   favicon fetching and document-lifetime cache.
 - `desktop/src/main/browser-legacy-profiles.ts` and its tests — narrowly

@@ -1,6 +1,7 @@
 import {
   NativeEditorSurfaces,
   type DesktopBridge,
+  type DesktopFxViewer,
   type NativeEditorSurfaceSnapshot,
 } from "@grida/desktop-bridge";
 import { WorkspaceArtifact } from "@/lib/desktop/workspace-artifact";
@@ -36,17 +37,59 @@ export class WorkspaceSurfaceHost {
     path: string,
     requireCurrent: () => boolean = () => true
   ): Promise<void> {
-    if (!requireCurrent()) return;
+    await this.tryOpen(path, requireCurrent);
+  }
+
+  private async tryOpen(
+    path: string,
+    requireCurrent: () => boolean
+  ): Promise<boolean> {
+    if (!requireCurrent()) return false;
     const relPath = WorkspaceArtifact.fromAgentPath(path);
-    if (relPath === null) return;
+    if (relPath === null) return false;
     const expectedSnapshot = this.group.getSnapshot();
     const target = await this.resolveOpenableRelative(relPath);
     if (
-      target !== null &&
-      requireCurrent() &&
-      this.group.getSnapshot() === expectedSnapshot
+      target === null ||
+      !requireCurrent() ||
+      this.group.getSnapshot() !== expectedSnapshot
     )
-      this.group.open(WorkbenchTab.file(target));
+      return false;
+    this.group.open(WorkbenchTab.file(target));
+    return true;
+  }
+
+  /** Product chooses when to call this and where to present a read-only artifact. */
+  async openFxFile(
+    request: DesktopFxViewer.FileRequest,
+    prepare: DesktopBridge["workspaces"]["prepareFxFile"],
+    presentArtifact: (artifact: DesktopFxViewer.Artifact) => boolean,
+    requireCurrent: () => boolean = () => true
+  ): Promise<"opened" | DesktopFxViewer.FileOutcome> {
+    if (!prepare) return "unavailable";
+    const expected = this.group.getSnapshot();
+    const current = () =>
+      requireCurrent() && this.group.getSnapshot() === expected;
+    if (!current()) return "stale";
+    let result: DesktopFxViewer.FileResult;
+    try {
+      result = await prepare(request);
+    } catch {
+      return "unavailable";
+    }
+    if (!current()) return "stale";
+    if (result.kind !== "ready") return result.kind;
+    if (result.file.kind === "artifact") {
+      try {
+        return presentArtifact(result.file) ? "opened" : "unavailable";
+      } catch {
+        return "unknown";
+      }
+    }
+    const file = WorkspaceArtifact.toAgentPath(result.file.relativePath);
+    if (!file) return "unavailable";
+    const opened = await this.tryOpen(file, current);
+    return opened ? "opened" : current() ? "unavailable" : "stale";
   }
 
   /**

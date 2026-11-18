@@ -1359,6 +1359,80 @@ it("keeps the captured SVG target when the same submission reply is lost", async
   }
 });
 
+it("retries the explicitly supplied editor context without sampling a new one", async () => {
+  const { bridge } = fixture();
+  const id = crypto.randomUUID();
+  bridge.captureEditorContext = vi.fn<
+    NonNullable<DesktopNativeChat["captureEditorContext"]>
+  >(async () => id);
+  const send = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(
+    async (_action, sessionId, inputId) => ({
+      sessionId,
+      inputId,
+      disposition: "claimed",
+      inputPosition: 1,
+      turnId: "turn-workbench",
+    })
+  );
+  send.mockRejectedValueOnce(new Error("fixture lost reply"));
+  bridge.submitInRegime = send;
+  const controller = new NativeChatController(bridge);
+  try {
+    await controller.select("workbench");
+    await expect(
+      controller.submit("Read this selection.", undefined, id)
+    ).rejects.toThrow("fixture lost reply");
+    await controller.submit("Read this selection.");
+    expect(send.mock.calls[0]?.at(-1)).toBe(id);
+    expect(send.mock.calls[1]).toEqual(send.mock.calls[0]);
+    expect(bridge.captureEditorContext).not.toHaveBeenCalled();
+  } finally {
+    controller.disconnect();
+  }
+});
+
+it("sends ordinary text but does not strip a pending observation on an older preload", async () => {
+  const { bridge, controller } = fixture();
+  const send = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(
+    async (_action, sessionId, inputId) => ({
+      sessionId,
+      inputId,
+      disposition: "claimed",
+      inputPosition: 1,
+      turnId: "turn-workbench",
+    })
+  );
+  bridge.submitInRegime = send;
+  const drafts = durableDrafts();
+  await drafts.writePending("workspace:workbench", {
+    text: "Read this selection.",
+    inputId: "pending-observation",
+    mode: "submit",
+    operatingRegime: "act",
+    allowLibrarySelection: false,
+    editorContextId: crypto.randomUUID(),
+  });
+  controller.keepDrafts(drafts, "workspace");
+  try {
+    await controller.select("workbench");
+    await expect(controller.submit("Read this selection.")).rejects.toThrow(
+      "Select the editor item again"
+    );
+    expect(send).not.toHaveBeenCalled();
+    await controller.submit("Send ordinary text.");
+    expect(send).toHaveBeenCalledExactlyOnceWith(
+      "submit",
+      "workbench",
+      expect.any(String),
+      "Send ordinary text.",
+      "act"
+    );
+    expect(send.mock.calls[0][2]).not.toBe("pending-observation");
+  } finally {
+    controller.disconnect();
+  }
+});
+
 it("queues an Act follow-up with the captured SVG target", async () => {
   const { bridge, running } = fixture();
   running.add("workbench");

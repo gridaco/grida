@@ -1086,8 +1086,8 @@ An identified Submit or Enqueue then carries `editorEndpointId`, the opaque
 UUID of the Desktop editor endpoint that owns the workspace view, and may set
 `editorPresentation: true` when the open capability is negotiated. The input
 retains that binding, including while it waits in the queue, and the turn's
-editor tools target only that endpoint. Both operations apply the same
-checks: Act, text-only prompt, and the negotiated capabilities.
+editor tools target only that endpoint. Both operations require Act, a text
+prompt with optional editor context, and the negotiated capabilities.
 
 | Direction      | Method                               | Parameters and result                                                                                                                                                                   |
 | -------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1127,6 +1127,22 @@ read and at most 4 KiB of valid SVG text. A verified response echoes the four
 identities and carries `result`. Applied and unchanged replacement results
 report `saved: false`. Unavailable or stale targets supply a domain failure.
 Malformed, lost, or uncorrelated replies leave the tool outcome uncertain.
+
+The private supervisor and agent can negotiate
+`co.grida/session/editor-context` version 1. Submit and Enqueue may then
+include `editorContext` with a `kind`, `surface`, `sampledAt` in epoch
+milliseconds, and an object `payload` validated by the supervisor. The two
+identifiers use lowercase ASCII letters, digits and hyphens with a leading
+letter and a 64-byte limit. The observation has an 8 KiB encoded limit and
+bounded JSON nesting. It accompanies nonblank user text and carries no tool
+authority. A context part does not extend an editor or browser lease.
+
+The host retains the observation with the input and labels it as observed
+data for inference. Identified retries compare the original observation and
+sample time. Queue text edits retain them and require the edited text to
+remain nonblank. Transcript and queue projections name the observation
+without reproducing its payload as user prose. Omit the field if the agent
+does not negotiate it.
 
 The private Desktop supervisor can negotiate `co.grida/media/generate-image`
 version 1 for a captured saved BYOK image route. Ordinary Act work can offer

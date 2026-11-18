@@ -133,6 +133,33 @@ describe("Desktop native agent package", () => {
       createPackage(source: string, target: string): Promise<void>;
     };
     try {
+      // The installer guard uses a foreign target, whose optional npm
+      // package is intentionally absent from the host's normal install.
+      const packages = path.join(root, "node_modules");
+      const fx = "@grida/fx";
+      const version = manifest.devDependencies?.[fx];
+      const fxTarget = `${fx}-${platform}-${arch}-gnu`;
+      const engine = path.join(packages, fxTarget);
+      fs.mkdirSync(path.join(packages, fx), { recursive: true });
+      fs.mkdirSync(path.join(engine, "bin"), { recursive: true });
+      fs.writeFileSync(
+        path.join(packages, fx, "package.json"),
+        JSON.stringify({
+          name: fx,
+          version,
+          optionalDependencies: { [fxTarget]: version },
+        })
+      );
+      fs.writeFileSync(
+        path.join(engine, "package.json"),
+        JSON.stringify({ name: fxTarget, version })
+      );
+      fs.writeFileSync(path.join(engine, "LICENSE"), "fixture license");
+      fs.writeFileSync(
+        path.join(engine, "bin", "grida-fx"),
+        fixtureBinary({ os: platform, cpu: arch })
+      );
+      vi.stubEnv("NODE_PATH", packages);
       vi.stubEnv("GRIDA_DESKTOP_NATIVE_ARTIFACTS", undefined);
       await expect(prePackage(forge, platform, arch)).rejects.toThrow(
         "Desktop packaging requires an absolute native artifact root"

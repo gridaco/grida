@@ -396,7 +396,9 @@ impl Projection {
         if message.role != Role::User {
             return Ok(());
         }
-        for link in attachment_links(message) {
+        let observation =
+            crate::host::editor_observation::is_observation(message).then(editor_context_link);
+        for link in observation.into_iter().chain(attachment_links(message)) {
             let chunk =
                 ContentChunk::new(ContentBlock::ResourceLink(link)).message_id(message.id.as_str());
             let mut notification = SessionNotification::new(
@@ -694,8 +696,9 @@ fn shorten(text: &str, maximum: usize) -> (String, bool) {
 /// A message's readable text. A person's attachments are not text; they are
 /// presented as links (`attachment_links`).
 fn visible_parts(message: &Message) -> impl Iterator<Item = Cow<'_, str>> {
-    message.content.iter().filter_map(|content| {
-        if !matches!(message.role, Role::User | Role::Assistant) {
+    let observation = crate::host::editor_observation::is_observation(message);
+    message.content.iter().filter_map(move |content| {
+        if observation || !matches!(message.role, Role::User | Role::Assistant) {
             return None;
         }
         match content {
@@ -708,6 +711,10 @@ fn visible_parts(message: &Message) -> impl Iterator<Item = Cow<'_, str>> {
 /// URI scheme naming an attachment the host retains for a chat. Clients
 /// cannot resolve it; it identifies the attachment within the transcript.
 pub(crate) const RETAINED_ATTACHMENT_URI: &str = "urn:grida:retained-attachment:";
+
+pub(super) fn editor_context_link() -> ResourceLink {
+    ResourceLink::new("Editor context", "urn:grida:editor-context")
+}
 
 fn attachment_links(message: &Message) -> impl Iterator<Item = ResourceLink> + '_ {
     message.content.iter().filter_map(move |content| {

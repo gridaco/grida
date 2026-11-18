@@ -5,12 +5,14 @@ use sha2::{Digest, Sha256};
 
 const REPLACE_TEXT: &str = "co.grida/session/replace-text";
 const QUEUED: &str = "co.grida/session/queued-input-image-chunks";
+const EDITOR_CONTEXT: &str = "co.grida/session/editor-context";
 
 fn initialize() -> Value {
     let mut value = input_image_initialize();
     for key in [
         REPLACE_TEXT,
         QUEUED,
+        EDITOR_CONTEXT,
         "co.grida/session/selected-image",
         "co.grida/session/file-reference",
         "co.grida/goal/start",
@@ -37,6 +39,126 @@ fn edit(
     text: &str,
 ) -> Value {
     json!({"queue":queue_basis(view,session,request),"inputId":input,"replacementInputId":replacement,"text":text})
+}
+
+#[tokio::test]
+async fn editor_context_keeps_the_accepted_sample_through_retry_edit_and_restart() {
+    let workspace = TempDir::new().unwrap();
+    let directory = TempDir::new().unwrap();
+    let state = directory.path().join("state");
+    let mut endpoint = Endpoint::start_protocol(
+        ProviderProtocol::Responses,
+        vec![Reply::Hold("Existing work."), Reply::Finished("Reviewed.")],
+        Some(TEST_CREDENTIAL),
+    )
+    .await;
+    let mut client = stdio(&state, &endpoint.url, IMAGE_MODEL);
+    let ready = client.request("initialize", initialize()).await;
+    assert_eq!(
+        ready["result"]["agentCapabilities"]["_meta"][EDITOR_CONTEXT],
+        1
+    );
+    let created = client
+        .request(
+            "session/new",
+            json!({"cwd":workspace.path(),"mcpServers":[]}),
+        )
+        .await;
+    let session = created["result"]["sessionId"].as_str().unwrap();
+    client
+        .request(
+            "_co.grida/session/submit",
+            super::super::lifecycle::prompt_request(session, "active", "Wait."),
+        )
+        .await;
+    endpoint.request().await;
+
+    let observation = json!({
+        "kind":"selection","surface":"workflow-viewer","sampledAt":1700000000123_u64,
+        "payload":{"subject":"run-abcd","selection":"node-original"}
+    });
+    let submission = json!({
+        "sessionId":session,"inputId":"observed","editorContext":observation,
+        "prompt":[{"type":"text","text":"Explain the selected node."}]
+    });
+    let accepted = client
+        .request("_co.grida/session/enqueue", submission.clone())
+        .await;
+    assert_eq!(accepted["result"]["disposition"], "queued", "{accepted}");
+    let mut changed = submission.clone();
+    changed["editorContext"]["payload"]["selection"] = "node-new".into();
+    let conflict = client.request("_co.grida/session/enqueue", changed).await;
+    assert_eq!(
+        conflict["error"]["data"], "submission_input_changed",
+        "{conflict}"
+    );
+    let view = snapshot(&mut client, session).await;
+    let empty = client
+        .request(
+            "_co.grida/session/replace-text",
+            edit(&view, session, "clear", "observed", "cleared", " "),
+        )
+        .await;
+    assert_eq!(
+        empty["error"]["data"], "editor_context_requires_text",
+        "{empty}"
+    );
+    let revised = client
+        .request(
+            "_co.grida/session/replace-text",
+            edit(
+                &view,
+                session,
+                "change",
+                "observed",
+                "edited",
+                "Explain the earlier selection.",
+            ),
+        )
+        .await;
+    assert!(revised["result"].is_object(), "{revised}");
+    let view = snapshot(&mut client, session).await;
+    let projected = queued(&mut client, session, "edited", &view).await;
+    assert_eq!(projected["prompt"][1]["name"], "Editor context");
+    assert!(
+        !projected.to_string().contains("node-original"),
+        "{projected}"
+    );
+    client
+        .request("_co.grida/session/stop", task_basis(&view, session, "hold"))
+        .await;
+    settled(&mut client, session).await;
+    client.close().await;
+
+    let mut client = stdio(&state, &endpoint.url, IMAGE_MODEL);
+    client.request("initialize", initialize()).await;
+    client
+        .request(
+            "session/load",
+            json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]}),
+        )
+        .await;
+    let view = snapshot(&mut client, session).await;
+    assert_eq!(
+        queued(&mut client, session, "edited", &view).await,
+        projected
+    );
+    let resumed = client
+        .request(
+            "_co.grida/session/resume-queue",
+            queue_basis(&view, session, "continue"),
+        )
+        .await;
+    assert!(resumed["result"].is_object(), "{resumed}");
+    let input = endpoint.request().await["input"].to_string();
+    assert!(input.contains("Explain the earlier selection."), "{input}");
+    assert!(input.contains("node-original"), "{input}");
+    assert!(input.contains("1700000000123"), "{input}");
+    assert!(!input.contains("node-new"), "{input}");
+    let settled = settled(&mut client, session).await;
+    assert!(settled["current"].is_null(), "{settled}");
+    client.close().await;
+    endpoint.done().await;
 }
 
 #[tokio::test]

@@ -48,6 +48,7 @@ import type {
   NativeChatSnapshot,
   NativeChatTurnSummary,
   NativeChatUpdate,
+  NativeEditorObservation,
   NativeHookInfo,
   NativeHookInspection,
 } from "@grida/desktop-bridge";
@@ -171,6 +172,7 @@ export type ActiveNativeChat = Readonly<{
         | "listBackgroundProcesses"
         | "stopBackgroundProcesses"
         | "registerEditorSurfaces"
+        | "acceptsEditorContext"
         | "inspectHooks"
         | "reviewHook"
         | "installHook"
@@ -235,6 +237,14 @@ type Owner = {
   active: ActiveNativeChat;
   attachments: Map<string, Attachment>;
   retired: Set<string>;
+  editorContexts: Map<
+    string,
+    {
+      observation: NativeEditorObservation;
+      inputId?: string;
+      session?: NativeChatSession;
+    }
+  >;
   subscriptions: Map<string, Subscription>;
   pending: number;
   listing: boolean;
@@ -1919,6 +1929,62 @@ export class NativeChatIpc {
     this.svgTextReplies.respond(attachment.id, callId, value);
   }
 
+  async captureEditorContext(
+    event: IpcMainInvokeEvent
+  ): Promise<string | null> {
+    if (
+      ipc_sender.pathname(event.senderFrame?.url) !== "/desktop/workspace" ||
+      !this.scope(event.sender, event.senderFrame)?.chat.acceptsEditorContext
+    )
+      return null;
+    const owner = this.owner(event);
+    const observation = await this.browserTools?.captureEditorObservation(
+      owner.sender
+    );
+    this.revalidate(owner);
+    if (!observation) return null;
+    const encoded = JSON.stringify(observation);
+    const identifier = /^[a-z][a-z0-9-]{0,63}$/;
+    if (
+      Buffer.byteLength(encoded) > MAX_UPDATE_BYTES ||
+      !identifier.test(observation.kind) ||
+      !identifier.test(observation.surface) ||
+      !Number.isSafeInteger(observation.sampledAt) ||
+      observation.sampledAt < 1 ||
+      !record(observation.payload)
+    )
+      throw new Error("native_chat_editor_context_invalid");
+    const id = randomUUID();
+    if (owner.editorContexts.size >= MAX_ATTACHMENTS) {
+      const oldest = owner.editorContexts.keys().next().value;
+      if (oldest) owner.editorContexts.delete(oldest);
+    }
+    owner.editorContexts.set(id, {
+      observation: JSON.parse(encoded) as NativeEditorObservation,
+    });
+    return id;
+  }
+
+  private editorContext(
+    owner: Owner,
+    attachment: Attachment,
+    inputId: string,
+    id: unknown
+  ): NativeEditorObservation | undefined {
+    if (id === undefined) return undefined;
+    const capture = token(id) ? owner.editorContexts.get(id) : undefined;
+    if (
+      !capture ||
+      !owner.active.chat.acceptsEditorContext ||
+      (capture.inputId !== undefined && capture.inputId !== inputId) ||
+      (capture.session !== undefined && capture.session !== attachment.session)
+    )
+      throw new Error("native_chat_editor_context_unavailable");
+    capture.inputId = inputId;
+    capture.session = attachment.session;
+    return capture.observation;
+  }
+
   async submit(
     event: IpcMainInvokeEvent,
     attachmentId: string,
@@ -1927,7 +1993,8 @@ export class NativeChatIpc {
     regime?: unknown,
     effort?: unknown,
     svgTargetId?: unknown,
-    selectionRevision?: unknown
+    selectionRevision?: unknown,
+    editorContextId?: unknown
   ) {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const prior = await this.selectionAdmission(
@@ -1953,7 +2020,12 @@ export class NativeChatIpc {
       inputId,
       text,
       mode,
-      ...submitSelections(surfaces, selected, selectionRevision)
+      ...submitSelections(
+        surfaces,
+        selected,
+        selectionRevision,
+        this.editorContext(owner, attachment, inputId, editorContextId)
+      )
     );
     this.revalidate(owner, attachment);
     return result;
@@ -1967,7 +2039,8 @@ export class NativeChatIpc {
     regime?: unknown,
     effort?: unknown,
     svgTargetId?: unknown,
-    selectionRevision?: unknown
+    selectionRevision?: unknown,
+    editorContextId?: unknown
   ) {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const prior = await this.selectionAdmission(
@@ -1993,7 +2066,12 @@ export class NativeChatIpc {
       inputId,
       text,
       mode,
-      ...submitSelections(surfaces, selected, selectionRevision)
+      ...submitSelections(
+        surfaces,
+        selected,
+        selectionRevision,
+        this.editorContext(owner, attachment, inputId, editorContextId)
+      )
     );
     this.revalidate(owner, attachment);
     return result;
@@ -2011,7 +2089,8 @@ export class NativeChatIpc {
     text: string,
     regime?: unknown,
     effort?: unknown,
-    selectionRevision?: unknown
+    selectionRevision?: unknown,
+    editorContextId?: unknown
   ): Promise<NativeChatAcceptance> {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const prior = await this.selectionAdmission(
@@ -2032,7 +2111,12 @@ export class NativeChatIpc {
       inputId,
       text,
       mode,
-      ...submitSelections(surfaces, agentEffort(effort), selectionRevision)
+      ...submitSelections(
+        surfaces,
+        agentEffort(effort),
+        selectionRevision,
+        this.editorContext(owner, attachment, inputId, editorContextId)
+      )
     );
     this.revalidate(owner, attachment);
     return result;
@@ -3161,6 +3245,7 @@ export class NativeChatIpc {
       active,
       attachments: new Map(),
       retired: new Set(),
+      editorContexts: new Map(),
       subscriptions: new Map(),
       pending: 0,
       listing: false,
@@ -3657,12 +3742,21 @@ function agentEffort(value: unknown): NativeChatEffort | undefined {
 function submitSelections(
   surfaces: NativeEditorSurfaceSelection | undefined,
   effort: NativeChatEffort | undefined,
-  selectionRevision?: unknown
+  selectionRevision?: unknown,
+  editorContext?: NativeEditorObservation
 ): [
   surfaces?: NativeEditorSurfaceSelection,
   effort?: NativeChatEffort,
   selectionRevision?: number,
+  editorContext?: NativeEditorObservation,
 ] {
+  if (editorContext)
+    return [
+      surfaces,
+      effort,
+      selectionRevision as number | undefined,
+      editorContext,
+    ];
   if (selectionRevision !== undefined)
     return [surfaces, effort, selectionRevision as number];
   if (effort) return [surfaces, effort];

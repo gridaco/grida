@@ -28,7 +28,10 @@ mod summaries;
 mod wakeups;
 
 use super::{ConnectionSessions, host_error, prompt_part, prompt_parts, unavailable};
-use crate::host::{DurableSubmission, Host, InputSettings, PromptRequest, SubmissionContext};
+use crate::host::{
+    DurableSubmission, EditorObservation, Host, InputSettings, PromptPart, PromptRequest,
+    SubmissionContext,
+};
 use agent_client_protocol::v1::schema::{ContentBlock, Meta};
 use agent_client_protocol::{
     Client, Error, HandleDispatchFrom, JsonRpcRequest, JsonRpcResponse, Result, on_receive_request,
@@ -53,6 +56,7 @@ const IMAGE_INTAKE: &str = "co.grida/session/selected-image";
 /// A prompt `resource_link` with a `file:` URI names a local file or directory by
 /// reference: the host records its path and facts and never reads it.
 const FILE_REFERENCE: &str = "co.grida/session/file-reference";
+const EDITOR_CONTEXT: &str = "co.grida/session/editor-context";
 const SNAPSHOT: &str = "co.grida/session/snapshot";
 const STOP: &str = "co.grida/session/stop";
 const OPERATING_REGIME: &str = "co.grida/session/operating-regime";
@@ -158,6 +162,7 @@ fn capability_keys(
         .chain(reviewer.then_some(selection::CAPABILITY))
         .chain(reviewer.then_some(permission_mode::CAPABILITY))
         .chain(reviewer.then_some(FILE_REFERENCE))
+        .chain(reviewer.then_some(EDITOR_CONTEXT))
         .chain(reviewer.then_some(super::projection::TRANSCRIPT_WINDOW))
         .chain(reviewer.then_some(super::projection::ACTIVITY_ORDER))
 }
@@ -187,6 +192,7 @@ struct Submit {
     #[serde(default)]
     editor_browser_tools: bool,
     editor_svg_target_id: Option<BindingId>,
+    editor_context: Option<EditorObservation>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -265,6 +271,18 @@ fn identified_prompt(
         });
     }
     Ok(parts)
+}
+
+fn append_editor_context(
+    parts: &mut Vec<PromptPart>,
+    observation: Option<EditorObservation>,
+    sessions: &Mutex<ConnectionSessions>,
+) -> Result<()> {
+    if let Some(observation) = observation {
+        require(sessions, EDITOR_CONTEXT, None)?;
+        parts.push(PromptPart::EditorObservation { observation });
+    }
+    Ok(())
 }
 
 /// The file references among a prompt's blocks, aligned with the blocks. Only a
@@ -596,7 +614,7 @@ pub(super) fn handlers(
                         request.editor_svg_target_id.as_ref(),
                         request.allow_wakeups,
                     )?;
-                    let parts = identified_prompt(
+                    let mut parts = identified_prompt(
                         request.prompt,
                         image_intake,
                         embedded_context,
@@ -605,6 +623,7 @@ pub(super) fn handlers(
                         &submit_sessions,
                         request.allow_wakeups || request.editor_endpoint_id.is_some(),
                     )?;
+                    append_editor_context(&mut parts, request.editor_context, &submit_sessions)?;
                     let accepted = submit_host
                         .submit_prompt_with_context(
                             PromptRequest {

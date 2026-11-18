@@ -138,6 +138,28 @@ describe("ipc_admission", () => {
     );
   });
 
+  it("allows FX preview and file operations only in the main workbench", () => {
+    for (const channel of [
+      IPC_CHANNELS.BROWSER_PREPARE_FX_FILE,
+      IPC_CHANNELS.BROWSER_RESOLVE_FX_PREVIEW,
+    ]) {
+      expect(allowedFor("main", "/desktop/workspace")).toContain(channel);
+      for (const route of [
+        "/desktop/file",
+        "/desktop/settings",
+        "/desktop/tools",
+        "/desktop/welcome",
+      ])
+        expect(allowedFor("main", route)).not.toContain(channel);
+      expect(allowedFor("sign-in", "/desktop/auth/sign-in")).not.toContain(
+        channel
+      );
+      expect(allowedFor("onboarding", "/desktop/onboarding")).not.toContain(
+        channel
+      );
+    }
+  });
+
   it("admits document I/O only from the main standalone file route", () => {
     for (const channel of documentFiles) {
       expect(allowedFor("main", "/desktop/file")).toContain(channel);

@@ -320,6 +320,7 @@ fn append_entry(
 
 pub fn is_editable_user(message: &Message) -> bool {
     message.role == Role::User
+        && message.provenance.kind != ProvenanceKind::Observed
         && message.provenance.source != questions::ANSWER_SOURCE
         && message
             .content
@@ -348,10 +349,16 @@ fn lower_message(
             },
             phase: message.phase,
             content,
-            provenance: Provenance {
-                source: "retained_history".into(),
-                kind: ProvenanceKind::Transformed,
-                fingerprint: Some(fingerprint),
+            provenance: if role == Role::User && message.provenance.kind == ProvenanceKind::Observed
+            {
+                // Host observations remain attributed as data, including in derived chats.
+                message.provenance
+            } else {
+                Provenance {
+                    source: "retained_history".into(),
+                    kind: ProvenanceKind::Transformed,
+                    fingerprint: Some(fingerprint),
+                }
             },
         })
     };

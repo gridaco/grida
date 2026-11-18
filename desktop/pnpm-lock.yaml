@@ -84,6 +84,9 @@ importers:
       '@grida/desktop-bridge':
         specifier: link:../packages/grida-desktop-bridge
         version: link:../packages/grida-desktop-bridge
+      '@grida/fx':
+        specifier: 0.9.0
+        version: 0.9.0
       '@grida/home':
         specifier: link:../packages/grida-home
         version: link:../packages/grida-home
@@ -335,6 +338,33 @@ packages:
 
   '@gar/promisify@1.1.3':
     resolution: {integrity: sha512-k2Ty1JcVojjJFwrg/ThKi2ujJ7XNLYaFGNB/bWT9wGR+oSMJHMa5w+CUq6p/pVrKeNNgA7pCqEcjSnHVoqJQFw==}
+
+  '@grida/fx-darwin-arm64@0.9.0':
+    resolution: {integrity: sha512-7Zg70HDXF3Dj3gEeHvswqP+gTKM7Kp1cdBvlT3xqHCe+0ZJ31c5kJZeA+hmbJ0TTZdFrdMO3SYVXLpX3qR4vEA==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@grida/fx-darwin-x64@0.9.0':
+    resolution: {integrity: sha512-FUAfqInZTBY8PtEaNWCO6HWskVyyILgyZpa+B9D/WJG3BnWpbN/N4u4blOqLiX7Pz/Ivm+wSOhtFAJLLstnRfw==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@grida/fx-linux-arm64-gnu@0.9.0':
+    resolution: {integrity: sha512-Xack6C3IvA9XmYaHXKMMB/g9ilaCnG6de9TqzC5cMlOAV6euqcm4XOqNsjAB1snYwayyUvPL22MMmfsqHWEBIQ==}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  '@grida/fx-linux-x64-gnu@0.9.0':
+    resolution: {integrity: sha512-t87OKx8dtSe+uxJObVdKvGfn3TitoPmlLwmdft+t6x/wMMPuCMVrIIcaxKpi6j/azVu+2/j84mD5C0NSanJvHw==}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  '@grida/fx@0.9.0':
+    resolution: {integrity: sha512-PWEMPs97S2oGjMF3mLCnxL8BnnqB2NfRPaXtUhNScAkNhOCpxTo72t5FJ/RqZ/IXEFLDevih39ITio8iGWNz0w==}
+    engines: {node: '>=18'}
+    hasBin: true
 
   '@hono/node-server@1.19.14':
     resolution: {integrity: sha512-GwtvgtXxnWsucXvbQXkRgqksiH2Qed37H9xHZocE5sA3N8O8O8/8FA3uclQXxXVzc9XBZuEOMK7+r02FmSpHtw==}
@@ -3379,6 +3409,25 @@ snapshots:
     optional: true
 
   '@gar/promisify@1.1.3': {}
+
+  '@grida/fx-darwin-arm64@0.9.0':
+    optional: true
+
+  '@grida/fx-darwin-x64@0.9.0':
+    optional: true
+
+  '@grida/fx-linux-arm64-gnu@0.9.0':
+    optional: true
+
+  '@grida/fx-linux-x64-gnu@0.9.0':
+    optional: true
+
+  '@grida/fx@0.9.0':
+    optionalDependencies:
+      '@grida/fx-darwin-arm64': 0.9.0
+      '@grida/fx-darwin-x64': 0.9.0
+      '@grida/fx-linux-arm64-gnu': 0.9.0
+      '@grida/fx-linux-x64-gnu': 0.9.0
 
   '@hono/node-server@1.19.14(hono@4.12.23)':
     dependencies:

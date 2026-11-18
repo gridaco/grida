@@ -50,6 +50,7 @@ import type {
   NativeChatTokenUsage,
   NativeChatTurn,
   NativeChatTurnSummary,
+  NativeEditorObservation,
   NativeEditorSurfaceSnapshot,
   NativeSubagentAssignmentInput,
   NativeSubagentCreate,
@@ -993,6 +994,10 @@ export class NativeAgentChat {
     );
   }
 
+  get acceptsEditorContext(): boolean {
+    return this.process.acceptsEditorContext;
+  }
+
   submit(
     session: NativeChatSession,
     inputId: string,
@@ -1000,12 +1005,14 @@ export class NativeAgentChat {
     operatingRegime?: NativeChatOperatingRegime,
     editorSurfaces?: NativeEditorSurfaceSelection,
     effort?: NativeChatEffort,
-    selectionRevision?: number
+    selectionRevision?: number,
+    editorContext?: NativeEditorObservation
   ): Promise<NativeChatAcceptance> {
     return this.send("submit", session, inputId, text, operatingRegime, {
       editorSurfaces,
       effort,
       selectionRevision,
+      editorContext,
     });
   }
 
@@ -1016,12 +1023,14 @@ export class NativeAgentChat {
     operatingRegime?: NativeChatOperatingRegime,
     editorSurfaces?: NativeEditorSurfaceSelection,
     effort?: NativeChatEffort,
-    selectionRevision?: number
+    selectionRevision?: number,
+    editorContext?: NativeEditorObservation
   ): Promise<NativeChatAcceptance> {
     return this.send("enqueue", session, inputId, text, operatingRegime, {
       editorSurfaces,
       effort,
       selectionRevision,
+      editorContext,
     });
   }
 
@@ -1055,7 +1064,8 @@ export class NativeAgentChat {
     operatingRegime?: NativeChatOperatingRegime,
     editorSurfaces?: NativeEditorSurfaceSelection,
     effort?: NativeChatEffort,
-    selectionRevision?: number
+    selectionRevision?: number,
+    editorContext?: NativeEditorObservation
   ): Promise<NativeChatAcceptance> {
     if (!this.acceptsLibrarySelection)
       return Promise.reject(
@@ -1066,6 +1076,7 @@ export class NativeAgentChat {
       editorSurfaces,
       effort,
       selectionRevision,
+      editorContext,
     });
   }
 
@@ -1285,6 +1296,7 @@ export class NativeAgentChat {
       editorSurfaces?: NativeEditorSurfaceSelection;
       effort?: NativeChatEffort;
       selectionRevision?: number;
+      editorContext?: NativeEditorObservation;
     } = {}
   ): Promise<NativeChatAcceptance> {
     const sessionId = this.requireAttached(session);
@@ -1298,6 +1310,7 @@ export class NativeAgentChat {
       editorSurfaces,
       effort,
       selectionRevision,
+      editorContext,
     } = options;
     if (
       selectionRevision !== undefined &&
@@ -1308,6 +1321,8 @@ export class NativeAgentChat {
       throw new Error("native_chat_selection_invalid");
     if (effort === "ultra" && !this.acceptsEffort)
       throw new Error("native_chat_effort_unavailable");
+    if (editorContext && !this.acceptsEditorContext)
+      throw new Error("native_chat_editor_context_unavailable");
     return acceptance(
       await this.process.request(`_co.grida/session/${mode}`, {
         sessionId,
@@ -1325,6 +1340,7 @@ export class NativeAgentChat {
           _meta: { "co.grida/selectionRevision": selectionRevision },
         }),
         ...(allowLibrarySelection && { allowLibrarySelection }),
+        ...(editorContext && { editorContext }),
         ...(operatingRegime === "act" &&
           !image &&
           !selectedImage &&

@@ -19,6 +19,22 @@ export type NativeChatDraftAttachment = NativeChatAttachment &
   }>;
 
 export type NativeChatOperatingRegime = "act" | "plan";
+
+type EditorObservationValue =
+  | null
+  | boolean
+  | number
+  | string
+  | readonly EditorObservationValue[]
+  | { readonly [key: string]: EditorObservationValue | undefined };
+
+/** Bounded data observed by a Desktop-owned editor, without any tool authority. */
+export type NativeEditorObservation = Readonly<{
+  kind: string;
+  surface: string;
+  sampledAt: number;
+  payload: Readonly<Record<string, EditorObservationValue | undefined>>;
+}>;
 /** Full access deliberately removes command filesystem and network confinement. */
 export type NativeChatPermissionMode = "restricted" | "full_access";
 export type NativeChatPermissionReview = Readonly<{
@@ -1023,6 +1039,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     attachmentId: string,
     invoke: (request: NativeEditorSvgText.Request) => NativeEditorSvgText.Result
   ): () => void;
+  /** Freeze the current workbench observation. Only its opaque ID leaves Main. */
+  captureEditorContext?(): Promise<string | null>;
   submit(
     attachmentId: string,
     inputId: string,
@@ -1041,7 +1059,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     operatingRegime: NativeChatOperatingRegime,
     effort?: NativeChatEffort,
     editorSvgTargetId?: string,
-    selectionRevision?: number
+    selectionRevision?: number,
+    editorContextId?: string
   ): Promise<NativeChatAcceptance>;
   acceptsEffort?(): Promise<boolean>;
   acceptsGoalEffort?(): Promise<boolean>;
@@ -1064,7 +1083,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     text: string,
     operatingRegime?: NativeChatOperatingRegime,
     effort?: NativeChatEffort,
-    selectionRevision?: number
+    selectionRevision?: number,
+    editorContextId?: string
   ): Promise<NativeChatAcceptance>;
   acceptsFile?(): Promise<boolean>;
   submitImage?(

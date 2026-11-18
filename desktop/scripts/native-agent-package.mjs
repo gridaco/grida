@@ -34,7 +34,7 @@ function executables(os, cpu) {
     : ["grida-agent", "agent-kit-sandbox-helper"];
 }
 
-function readExecutable(file, os, cpu, packaged = false) {
+export function readExecutable(file, os, cpu, packaged = false) {
   const before = fs.lstatSync(file);
   assert(before.isFile(), "Native agent artifact must be a regular file");
   const descriptor = fs.openSync(

@@ -31,7 +31,8 @@ Host fixtures use a stand-in `@grida/fx` that publication refuses.
 FX releases first. To move `grida` to a new FX: once `@grida/fx` is on npm, pin
 it in `packages/grida-cli/package.json`, bump `grida`'s version, refresh
 `pnpm-lock.yaml`, and merge; the usual release follows. A pin naming an
-unpublished FX cannot prepare a candidate.
+unpublished FX cannot prepare a candidate. Coordinate the Desktop pin with the
+CLI update using the [maintainer guidance for externals](../../.agents/skills/externals/SKILL.md).
 
 ## Update notice
 

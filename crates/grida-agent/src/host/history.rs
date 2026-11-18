@@ -834,6 +834,14 @@ fn history_message(
     if !matches!(message.role, Role::User | Role::Assistant) {
         return None;
     }
+    if super::editor_observation::is_observation(message) {
+        return Some(HistoryMessage {
+            anchor,
+            role: message.role,
+            editable: false,
+            preview: "Editor context".into(),
+        });
+    }
     let mut text = message.content.iter().filter_map(|part| match part {
         Content::Text(value) if !value.is_empty() => Some(Cow::Borrowed(value.as_str())),
         Content::Media(media) if is_retained_image(media) => {

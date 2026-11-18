@@ -120,3 +120,27 @@ Managed website windows and prompts can require manual intervention. A human
 can use the regular browser controls and DevTools. The automation contract is
 the Grida tool catalog. Supported browser actions and result formats are defined
 by the catalog rather than the private Electron debugger interface.
+
+## FX viewer integration
+
+The first-party workbench can call `workspaces.resolveFxPreview` with a
+portable FX catalog entry. Main admits the current workspace and resolves the
+entry against the exact project's service status. The returned URL belongs to
+the current service instance. Keep that URL and any live tab or document ID
+outside the retained entry. Service readiness lets the workbench request
+navigation. The browser tools can then verify the document that loaded.
+
+Open and reveal through the existing browser tools. Use the current document ID
+and confirm the viewer's subject before calling its page API. A context capture
+uses the exact selected workbench document and returns a bounded observation
+for an explicit chat input. Native chat retains the observation with the
+accepted input. It still validates live browser calls independently.
+
+For an explicit workbench action, `workspaces.prepareFxFile` accepts the
+selected browser tab's ID and an FX portable file reference. Main verifies the
+current viewer document and resolves the reference within the admitted
+workspace. Source files use the ordinary workspace document path. Supported
+raster artifacts return a bounded snapshot checked against the recorded size
+and digest for read-only presentation. The FX guest has no native file API.
+See the [FX file contract](https://github.com/gridaco/fx/blob/main/spec/files.md)
+and the [native editor context protocol](../../crates/grida-agent/docs/rust-client-protocol.md#editor-surfaces).

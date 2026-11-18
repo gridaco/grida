@@ -390,6 +390,7 @@ type Scope = {
     }>;
     allowLibrarySelection: boolean;
     editorSvgTargetId?: string;
+    editorContextId?: string;
   };
   awaitingTurn?: string;
 };
@@ -3704,7 +3705,11 @@ export class NativeChatController {
       this.update({ effort });
   }
 
-  async submit(text: string, scopeId = this.view.scope): Promise<void> {
+  async submit(
+    text: string,
+    scopeId = this.view.scope,
+    editorContextId?: string
+  ): Promise<void> {
     const scope = this.scope;
     if (!scope || scope.id !== scopeId)
       throw new Error("native_chat_not_ready");
@@ -3712,7 +3717,7 @@ export class NativeChatController {
     scope.submission = submission;
     this.update({ submitting: true });
     try {
-      await this.submitInScope(text, scopeId);
+      await this.submitInScope(text, scopeId, editorContextId);
     } finally {
       // Route activation can replace this scope during the same send. A real
       // chat switch starts without this token and must keep its own feedback.
@@ -3724,7 +3729,11 @@ export class NativeChatController {
     }
   }
 
-  private async submitInScope(text: string, scopeId: number): Promise<void> {
+  private async submitInScope(
+    text: string,
+    scopeId: number,
+    editorContextId?: string
+  ): Promise<void> {
     let scope = this.scope;
     if (!scope || scope.id !== scopeId || this.view.profileBusy)
       throw new Error("native_chat_not_ready");
@@ -3792,6 +3801,18 @@ export class NativeChatController {
     if (!this.canSubmit || !text.trim())
       throw new Error("native_chat_not_ready");
     const retained = this.retainedSend(scope, text);
+    if (
+      (editorContextId !== undefined ||
+        retained?.editorContextId !== undefined) &&
+      (!this.bridge.submitInRegime ||
+        scope.selectedAttachment ||
+        this.view.goalIntent ||
+        this.view.steering ||
+        (editorContextId !== undefined &&
+          retained &&
+          retained.editorContextId !== editorContextId))
+    )
+      throw new Error("native_chat_editor_context_unavailable");
     const directory =
       scope.selectedAttachment?.kind === "reference" &&
       scope.selectedAttachment.mimeType === DIRECTORY_MIME_TYPE;
@@ -3858,6 +3879,7 @@ export class NativeChatController {
       scope = await this.activateSelection(scope);
       await this.open(scope);
       const attachment = this.attachment(scope);
+      const submissionScope = scope;
       if (retained && retained.operatingRegime !== operatingRegime)
         throw new Error("native_chat_pending_regime_changed");
       if (retained && retained.effort !== effort)
@@ -3887,6 +3909,7 @@ export class NativeChatController {
           !selectedAttachment &&
           !(scope.stopEditorSvgText && svgTarget),
         editorSvgTargetId: scope.stopEditorSvgText ? svgTarget : undefined,
+        editorContextId,
       };
       let accepted;
       try {
@@ -3919,6 +3942,8 @@ export class NativeChatController {
         this.attachment(scope);
         if (scope.pending !== pending)
           throw new Error("native_chat_scope_changed");
+        if (pending.editorContextId && !this.bridge.captureEditorContext)
+          throw new Error("native_chat_editor_context_unavailable");
         if (next) await this.endPausedTurn(scope);
         if (pending.attachment?.kind === "image") {
           if (!this.bridge.submitSelectedImage || !pending.operatingRegime)
@@ -3992,15 +4017,22 @@ export class NativeChatController {
         } else if (pending.allowLibrarySelection) {
           if (!this.bridge.submitWithLibrarySelection)
             throw new Error("native_chat_library_selection_unavailable");
+          const options: [
+            selectionRevision?: number,
+            editorContextId?: string,
+          ] =
+            pending.editorContextId !== undefined
+              ? [pending.selectionRevision, pending.editorContextId]
+              : pending.selectionRevision !== undefined
+                ? [pending.selectionRevision]
+                : [];
           accepted = await this.bridge.submitWithLibrarySelection(
             attachment.attachmentId,
             pending.inputId,
             pending.text,
             pending.operatingRegime,
             pending.effort,
-            ...(pending.selectionRevision !== undefined
-              ? [pending.selectionRevision]
-              : [])
+            ...options
           );
         } else if (pending.operatingRegime) {
           if (!this.bridge.submitInRegime)
@@ -4009,18 +4041,26 @@ export class NativeChatController {
             effort?: NativeChatEffort,
             svgTargetId?: string,
             selectionRevision?: number,
+            editorContextId?: string,
           ] =
-            pending.selectionRevision !== undefined
+            pending.editorContextId !== undefined
               ? [
                   pending.effort,
                   pending.editorSvgTargetId,
                   pending.selectionRevision,
+                  pending.editorContextId,
                 ]
-              : pending.editorSvgTargetId
-                ? [pending.effort, pending.editorSvgTargetId]
-                : pending.effort
-                  ? [pending.effort]
-                  : [];
+              : pending.selectionRevision !== undefined
+                ? [
+                    pending.effort,
+                    pending.editorSvgTargetId,
+                    pending.selectionRevision,
+                  ]
+                : pending.editorSvgTargetId
+                  ? [pending.effort, pending.editorSvgTargetId]
+                  : pending.effort
+                    ? [pending.effort]
+                    : [];
           accepted = await this.bridge.submitInRegime(
             pending.mode,
             attachment.attachmentId,
@@ -4045,7 +4085,20 @@ export class NativeChatController {
         // Recover an earlier receipt without authorizing an unsupported resend.
         accepted = await this.bridge
           .inputReceipt(attachment.attachmentId, pending.inputId)
-          .catch(() => {
+          .catch(async (receiptError: unknown) => {
+            if (
+              error instanceof Error &&
+              error.message === "native_chat_editor_context_unavailable" &&
+              receiptError instanceof Error &&
+              receiptError.message === "input_unavailable" &&
+              this.owns(submissionScope) &&
+              submissionScope.pending === pending
+            ) {
+              await this.discardPending(submissionScope);
+              throw new Error(
+                "Select the editor item again to send this draft."
+              );
+            }
             throw error;
           });
       }

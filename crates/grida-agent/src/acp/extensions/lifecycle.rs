@@ -49,6 +49,7 @@ struct Enqueue {
     #[serde(default)]
     editor_browser_tools: bool,
     editor_svg_target_id: Option<BindingId>,
+    editor_context: Option<EditorObservation>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -217,7 +218,7 @@ pub(super) fn handlers(
                         request.editor_svg_target_id.as_ref(),
                         false,
                     )?;
-                    let parts = identified_prompt(
+                    let mut parts = identified_prompt(
                         request.prompt,
                         image_intake,
                         embedded_context,
@@ -226,6 +227,7 @@ pub(super) fn handlers(
                         &enqueue.1,
                         request.editor_endpoint_id.is_some(),
                     )?;
+                    append_editor_context(&mut parts, request.editor_context, &enqueue.1)?;
                     let accepted = enqueue
                         .0
                         .enqueue_with_context(
@@ -478,6 +480,9 @@ async fn edit_queue(host: &Host, queue: QueueBasis, edit: QueueEdit) -> Result<Q
 pub(super) fn prompt_block(part: PromptPart) -> ContentBlock {
     match part {
         PromptPart::Text { text } => text.into(),
+        PromptPart::EditorObservation { .. } => {
+            ContentBlock::ResourceLink(crate::acp::projection::editor_context_link())
+        }
         PromptPart::ResourceLink {
             name,
             uri,
