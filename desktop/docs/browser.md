@@ -288,6 +288,12 @@ while Grida remains running. Pending destination selection still requires its
 live owner. Full browser reset cancels retained jobs. Downloads are never opened
 or executed automatically, and this feature makes no malware-scanning claim.
 
+Background automation pages cannot download files. Main requires a native save
+dialog for downloads from workbench tabs that the agent opened, navigated, or
+used for evaluation or input. The rule applies for the tab's lifetime and to
+tabs and windows opened from it so a delayed response still prompts after the
+agent's task ends.
+
 ## Architecture and rollout
 
 Browser protocol **4**, with `presentation: "webview"`, is independent of the

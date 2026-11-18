@@ -164,7 +164,7 @@ export class BrowserAutomationGuest {
     method: string,
     params: Record<string, unknown> = {},
     sessionId?: string,
-    detachOnAbort = false
+    options?: { detachOnAbort?: boolean; discard?: (result: T) => void }
   ): Promise<T> {
     request.guard();
     if (!this.#debuggerOwned || !this.contents.debugger.isAttached())
@@ -176,7 +176,7 @@ export class BrowserAutomationGuest {
     ) as Promise<T>;
     if (method.startsWith("Input.") || request.trackBrowserEffects)
       request.trackInput(command);
-    if (!detachOnAbort) return request.wait(command);
+    if (!options) return request.wait(command);
 
     const generation = this.#debuggerGeneration;
     let pending = true;
@@ -187,9 +187,19 @@ export class BrowserAutomationGuest {
     try {
       return await request.wait(command);
     } catch (error) {
+      if (options.discard) {
+        const discard = options.discard;
+        void command
+          .then((result) => {
+            if (generation === this.#debuggerGeneration && this.#debuggerOwned)
+              discard(result);
+          })
+          .catch(() => {});
+      }
       // CDP's execution timeout does not bound waiting for a returned promise.
       // Detaching releases this pending reply. The script's effects may persist.
       if (
+        options.detachOnAbort &&
         pending &&
         request.signal.aborted &&
         !this.contents.isDestroyed() &&
@@ -200,6 +210,22 @@ export class BrowserAutomationGuest {
         this.contents.debugger.detach();
       throw error;
     }
+  }
+
+  releaseObject(
+    objectId: string,
+    sessionId: string | undefined,
+    generation: number
+  ): void {
+    if (
+      generation === this.#debuggerGeneration &&
+      this.#debuggerOwned &&
+      !this.contents.isDestroyed() &&
+      this.contents.debugger.isAttached()
+    )
+      void this.contents.debugger
+        .sendCommand("Runtime.releaseObject", { objectId }, sessionId)
+        .catch(() => {});
   }
 
   async root(
@@ -326,7 +352,7 @@ export class BrowserAutomationGuest {
         ...(timeout === undefined ? {} : { timeout }),
       },
       frame.sessionId,
-      timeout !== undefined
+      timeout === undefined ? undefined : { detachOnAbort: true }
     );
   }
 

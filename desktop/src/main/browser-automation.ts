@@ -858,10 +858,25 @@ export class BrowserAutomation {
         request,
         "DOM.resolveNode",
         { backendNodeId: entry.backendNodeId },
-        sessionId
+        sessionId,
+        {
+          discard: ({ object }) => {
+            if (object.objectId)
+              guest.releaseObject(
+                object.objectId,
+                sessionId,
+                document.generation
+              );
+          },
+        }
       );
       if (!object.objectId) fail("stale_ref");
-      node = { objectId: object.objectId, sessionId, frame: entry.frame };
+      node = {
+        objectId: object.objectId,
+        sessionId,
+        frame: entry.frame,
+        generation: document.generation,
+      };
       const connected = await this.#nodeCall<boolean>(
         guest,
         request,
@@ -902,14 +917,7 @@ export class BrowserAutomation {
   }
 
   #release(guest: Guest, node: ResolvedNode): void {
-    if (!guest.contents.isDestroyed() && guest.contents.debugger.isAttached())
-      void guest.contents.debugger
-        .sendCommand(
-          "Runtime.releaseObject",
-          { objectId: node.objectId },
-          node.sessionId
-        )
-        .catch(() => {});
+    guest.releaseObject(node.objectId, node.sessionId, node.generation);
   }
 
   #diagnostics(
@@ -1212,6 +1220,7 @@ type ResolvedNode = {
   objectId: string;
   frame: Guest.ElementFrame;
   sessionId?: string;
+  generation: number;
 };
 type Viewport = {
   id: string;

@@ -92,6 +92,7 @@ type Page = {
   state: { -readonly [K in keyof DesktopBrowser.Page]: DesktopBrowser.Page[K] };
   referrer?: LoadURLOptions["httpReferrer"];
   navigation: number;
+  confirmDownloads: boolean;
   automationMounts?: Set<(guest: WebContents) => void>;
 };
 type Owner = {
@@ -351,6 +352,7 @@ export class DesktopBrowserHost {
     const descriptor = this.#create(owner, this.#url(rawUrl), {
       openerPageId: null,
       disposition: "foreground",
+      confirmDownloads: true,
     });
     if (!owner.window.isVisible()) owner.window.showInactive();
     return this.#automationPage(scope, owner, owner.pages.get(descriptor.id)!);
@@ -504,6 +506,7 @@ export class DesktopBrowserHost {
       beginInput: () => {
         requireCurrent();
         const guest = this.#guest(page);
+        page.confirmDownloads = true;
         this.#automationInputs.set(
           guest,
           (this.#automationInputs.get(guest) ?? 0) + 1
@@ -516,6 +519,7 @@ export class DesktopBrowserHost {
       },
       navigate: (action: BrowserAutomationNavigation, url?: string) => {
         requireCurrent();
+        if (action !== "stop") page.confirmDownloads = true;
         this.#navigate(owner, page, action, url);
       },
       close: async () => {
@@ -550,8 +554,9 @@ export class DesktopBrowserHost {
     created?: {
       openerPageId: string | null;
       disposition: "foreground" | "background";
-    },
-    referrer?: LoadURLOptions["httpReferrer"]
+      referrer?: LoadURLOptions["httpReferrer"];
+      confirmDownloads?: true;
+    }
   ): DesktopBrowser.Page {
     if (!this.#live(owner) || this.#clearing)
       throw new Error("browser_attachment_expired");
@@ -559,6 +564,9 @@ export class DesktopBrowserHost {
       throw new Error("browser_page_limit");
     const id = randomUUID();
     const browserSession = this.#session();
+    const opener = created?.openerPageId
+      ? owner.pages.get(created.openerPageId)
+      : undefined;
     const page: Page = {
       guest: null,
       retiring: new Set(),
@@ -578,8 +586,11 @@ export class DesktopBrowserHost {
       mount: null,
       active: !!owner.background,
       rendered: false,
-      referrer,
+      referrer: created?.referrer,
       navigation: 0,
+      confirmDownloads: !!(
+        created?.confirmDownloads || opener?.confirmDownloads
+      ),
       state: {
         id,
         mounted: false,
@@ -601,7 +612,8 @@ export class DesktopBrowserHost {
         attachmentId: owner.attachmentId!,
         revision: owner.revision,
         page: { ...page.state },
-        ...created,
+        openerPageId: created.openerPageId,
+        disposition: created.disposition,
       } satisfies DesktopBrowser.Event);
     } else this.#changed(owner, page);
     return { ...page.state };
@@ -1238,7 +1250,10 @@ export class DesktopBrowserHost {
         item,
         contents,
         site.window,
-        site.live
+        site.live,
+        // Chromium can start a download after a tool and its input marker have
+        // settled. Keep confirmation attached to the page, including its popups.
+        site.page.confirmDownloads
       );
     });
     this.#browserSession = browserSession;
@@ -1654,7 +1669,7 @@ export class DesktopBrowserHost {
       this.#resourceNotice(owner);
       return false;
     }
-    this.#create(owner, url, { openerPageId, disposition }, referrer);
+    this.#create(owner, url, { openerPageId, disposition, referrer });
     return true;
   }
   #location(raw: unknown): string | null {

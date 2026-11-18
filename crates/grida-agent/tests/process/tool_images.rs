@@ -274,6 +274,7 @@ async fn retained_tool_images_read_exact_prepared_pixels_after_source_deletion_a
 #[tokio::test]
 async fn native_browser_capture_requires_act_and_projects_correlated_pixels() {
     const EDITOR: &str = "co.grida/session/editor-surfaces";
+    const PRESENTATION: &str = "co.grida/session/editor-surface-open";
     const BROWSER: &str = "co.grida/session/browser-tools";
     const ENDPOINT: &str = "6f9619ff-8b86-4011-b42d-00c04fc964ff";
     let root = TempDir::new().unwrap();
@@ -295,6 +296,7 @@ async fn native_browser_capture_requires_act_and_projects_correlated_pixels() {
     let mut client = StdioClient::from_child(child);
     let mut offer = initialize();
     offer["clientCapabilities"]["_meta"][EDITOR] = 1.into();
+    offer["clientCapabilities"]["_meta"][PRESENTATION] = 1.into();
     offer["clientCapabilities"]["_meta"][BROWSER] = 1.into();
     offer["clientCapabilities"]["_meta"]["co.grida/provider/egress"] = 1.into();
     offer["clientCapabilities"]["_meta"]["co.grida/session/updates"] = 1.into();
@@ -314,6 +316,7 @@ async fn native_browser_capture_requires_act_and_projects_correlated_pixels() {
             "prompt": [{"type":"text","text":"Capture the fixture."}],
             "operatingRegime": regime,
             "editorEndpointId": ENDPOINT,
+            "editorPresentation": true,
             "editorBrowserTools": true
         })
     };
@@ -334,6 +337,10 @@ async fn native_browser_capture_requires_act_and_projects_correlated_pixels() {
         .unwrap();
     let mut replies = [
         Reply::Tool(
+            "surface_open",
+            r#"{"target":{"kind":"file","path":"/poster.canvas"}}"#,
+        ),
+        Reply::Tool(
             "browser_capture",
             r#"{"target":{"kind":"background","pageId":"page"},"documentId":"document"}"#,
         ),
@@ -344,8 +351,9 @@ async fn native_browser_capture_requires_act_and_projects_correlated_pixels() {
     let mut requests = Vec::new();
     let mut completed = 0;
     let mut accepted = false;
+    let mut file_revealed = false;
     let mut image_update = None;
-    while !accepted || image_update.is_none() || completed < 2 {
+    while !accepted || image_update.is_none() || completed < 3 {
         let frame = client.read_frame().await;
         let params = &frame["params"];
         if frame["id"] == id {
@@ -379,6 +387,23 @@ async fn native_browser_capture_requires_act_and_projects_correlated_pixels() {
             Some("_co.grida/editor/browser-tool") => {
                 assert_eq!(params["sessionId"], session);
                 assert_eq!(params["endpointId"], ENDPOINT);
+                if params["operation"] == "surface_open" {
+                    assert_eq!(
+                        params["arguments"]["target"],
+                        json!({"kind":"file","path":"/poster.canvas"})
+                    );
+                    file_revealed = true;
+                    client
+                        .respond(
+                            &frame["id"],
+                            json!({
+                                "sessionId":session,"endpointId":ENDPOINT,"callId":params["callId"],
+                                "result":{"disposition":"unknown"}
+                            }),
+                        )
+                        .await;
+                    continue;
+                }
                 assert_eq!(params["operation"], "browser_capture");
                 assert_eq!(params["arguments"]["documentId"], "document");
                 assert!(
@@ -398,7 +423,11 @@ async fn native_browser_capture_requires_act_and_projects_correlated_pixels() {
             image_update = Some(params.clone());
         }
     }
-    assert_eq!(requests.len(), 2);
+    assert!(file_revealed);
+    assert_eq!(requests.len(), 3);
+    let instructions = requests[0]["instructions"].as_str().unwrap();
+    assert!(instructions.contains("first meaningful renderable checkpoint"));
+    assert!(instructions.contains("For new browser work, use browser_open"));
     assert!(
         requests[0]["tools"]
             .as_array()
@@ -406,7 +435,7 @@ async fn native_browser_capture_requires_act_and_projects_correlated_pixels() {
             .iter()
             .any(|tool| tool["name"] == "browser_capture")
     );
-    let pixels = requests[1]["input"]
+    let pixels = requests[2]["input"]
         .as_array()
         .unwrap()
         .iter()

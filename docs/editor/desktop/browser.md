@@ -170,6 +170,11 @@ Downloads save to your system Downloads folder by default. In
 **Ask where to save each download**. Existing files are kept; another download
 with the same name receives a different filename.
 
+Tabs the agent opens or interacts with always ask where to save a download.
+This includes downloads from tabs or windows opened by those pages.
+For a download from a page the agent opened in the background, open its URL
+in a browser tab first.
+
 Accepted downloads continue when their tab closes while Desktop remains
 running. Files are not opened automatically. Clearing browsing data does not
 delete files you have saved.

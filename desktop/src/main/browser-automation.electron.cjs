@@ -209,54 +209,82 @@ async function main() {
   });
   assert.equal(evaluated.value, true);
 
-  phase = "release a node when its connectivity check is cancelled";
   const observedPage = host.resolveAutomationPage(scope, second.target);
   const observedGuest = observedPage.contents();
   const guestDebugger = observedGuest.debugger;
   const sendCommand = guestDebugger.sendCommand.bind(guestDebugger);
-  const released = Promise.withResolvers();
-  const cancel = new AbortController();
-  let objectId;
-  guestDebugger.sendCommand = (method, params, sessionId) => {
-    const reply = sendCommand(method, params, sessionId);
-    if (
-      method === "Runtime.callFunctionOn" &&
-      params.functionDeclaration.includes("this.isConnected")
-    ) {
-      objectId = params.objectId;
-      cancel.abort();
+  for (const command of ["DOM.resolveNode", "Runtime.callFunctionOn"]) {
+    phase = `release a node after cancelling ${command}`;
+    const released = Promise.withResolvers();
+    const cancel = new AbortController();
+    let objectId;
+    guestDebugger.sendCommand = (method, params, sessionId) => {
+      const reply = sendCommand(method, params, sessionId);
+      if (method === command && method === "DOM.resolveNode") {
+        cancel.abort();
+        return reply.then((result) => {
+          objectId = result.object.objectId;
+          return result;
+        });
+      }
+      if (
+        method === command &&
+        method === "Runtime.callFunctionOn" &&
+        params.functionDeclaration.includes("this.isConnected")
+      ) {
+        objectId = params.objectId;
+        cancel.abort();
+      }
+      if (method === "Runtime.releaseObject" && params.objectId === objectId)
+        released.resolve();
+      return reply;
+    };
+    try {
+      assert.deepEqual(
+        await service.invoke(
+          scope,
+          "browser_action",
+          {
+            target: second.target,
+            documentId: second.documentId,
+            action: { kind: "click", ref: second.save },
+          },
+          cancel.signal
+        ),
+        { disposition: "not_dispatched", error: "cancelled" }
+      );
+      await released.promise;
+    } finally {
+      guestDebugger.sendCommand = sendCommand;
     }
-    if (method === "Runtime.releaseObject" && params.objectId === objectId)
-      released.resolve();
-    return reply;
-  };
-  try {
-    assert.deepEqual(
-      await service.invoke(
-        scope,
-        "browser_action",
-        {
-          target: second.target,
-          documentId: second.documentId,
-          action: { kind: "click", ref: second.save },
-        },
-        cancel.signal
-      ),
-      { disposition: "not_dispatched", error: "cancelled" }
-    );
-    await released.promise;
-  } finally {
-    guestDebugger.sendCommand = sendCommand;
   }
 
   phase = "recover after an unresolved evaluation";
-  const abandoned = await call("browser_evaluate", {
-    target: second.target,
-    documentId: second.documentId,
-    functionText: "() => new Promise(() => {})",
-    timeoutMs: 250,
-  });
-  assert.deepEqual(abandoned, { disposition: "unknown", error: "timeout" });
+  const stopEvaluation = new AbortController();
+  guestDebugger.sendCommand = (method, params, sessionId) => {
+    const reply = sendCommand(method, params, sessionId);
+    if (
+      method === "Runtime.evaluate" &&
+      params.expression.includes("new Promise")
+    )
+      stopEvaluation.abort();
+    return reply;
+  };
+  try {
+    const abandoned = await service.invoke(
+      scope,
+      "browser_evaluate",
+      {
+        target: second.target,
+        documentId: second.documentId,
+        functionText: "() => new Promise(() => {})",
+      },
+      stopEvaluation.signal
+    );
+    assert.deepEqual(abandoned, { disposition: "unknown", error: "cancelled" });
+  } finally {
+    guestDebugger.sendCommand = sendCommand;
+  }
   const { data: recovered } = await ok("browser_snapshot", {
     target: second.target,
   });
@@ -447,6 +475,12 @@ async function main() {
   })()`);
   host.setActive(event, { attachmentId, pageId, active: true });
   const selected = (await wait(foreground.target, readiness)).data;
+  // Navigation readiness does not imply a composited frame for a new webview.
+  await foreground
+    .contents()
+    .executeJavaScript(
+      "new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))"
+    );
   await ok("browser_capture", {
     target: foreground.target,
     documentId: selected.documentId,

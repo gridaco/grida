@@ -101,7 +101,8 @@ its JSON argument as `arg`. Use the result or returned error before deciding
 whether to repeat an effect.
 An evaluation that stops waiting for an unresolved page promise can retire the
 private debugger connection. Observe the page again to obtain fresh document
-and element handles. A timeout leaves any page effects uncertain.
+and element handles. Concurrent reads on that connection can fail and may be
+repeated against the current page. A timeout leaves any page effects uncertain.
 
 ## Media and outcomes
 

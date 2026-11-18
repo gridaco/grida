@@ -55,7 +55,11 @@ pub(crate) fn definitions(
                 CapabilityDefinition {
                     tool: ToolDefinition {
                         id: ToolId::new(*name)?,
-                        version: if name.starts_with("surface_") { 3 } else { 1 },
+                        version: match *name {
+                            grida_agent_master::presentation::OPEN => grida_agent_master::presentation::TARGETED_VERSION,
+                            "surface_list_open" => 3,
+                            _ => 1,
+                        },
                         description: description.into(),
                         input: InputFormat::Json(input),
                         max_input_bytes: MAX_INPUT_BYTES,
@@ -87,7 +91,7 @@ fn spec(name: &str) -> Option<(&'static str, Value, CapabilityEffect)> {
             Read,
         ),
         "surface_open" => (
-            "Open or select a workbench surface explicitly requested by the user. Use browser_open for new background browser work.",
+            "Present a workspace file as described by artifact guidance, or explicitly show a URL or existing tab in the workbench. Use browser_open for new background browser work.",
             object(
                 json!({
                     "target": variants([
@@ -113,16 +117,7 @@ fn spec(name: &str) -> Option<(&'static str, Value, CapabilityEffect)> {
         ),
         "browser_navigate" => (
             "Navigate the exact page guarded by its current document and return navigation readiness. For stop, omit documentId to interrupt the target's pending load.",
-            page(
-                json!({"action": variants([
-                    tagged("goto", json!({"url":url()}), &["url"]),
-                    tagged("back", json!({}), &[]),
-                    tagged("forward", json!({}), &[]),
-                    tagged("reload", json!({}), &[]),
-                    tagged("stop", json!({}), &[]),
-                ])}),
-                &["action"],
-            ),
+            navigation(),
             Mutation,
         ),
         "browser_action" => (
@@ -186,6 +181,26 @@ fn spec(name: &str) -> Option<(&'static str, Value, CapabilityEffect)> {
         ),
         _ => return None,
     })
+}
+
+fn navigation() -> Value {
+    let mut schema = variants([
+        page(
+            json!({"action": tagged("stop", json!({}), &[])}),
+            &["action"],
+        ),
+        page(
+            json!({"action": variants([
+                tagged("goto", json!({"url":url()}), &["url"]),
+                tagged("back", json!({}), &[]),
+                tagged("forward", json!({}), &[]),
+                tagged("reload", json!({}), &[]),
+            ])}),
+            &["documentId", "action"],
+        ),
+    ]);
+    schema["type"] = json!("object");
+    schema
 }
 
 fn actions() -> Value {
@@ -304,12 +319,6 @@ fn timeout() -> Value {
 pub(crate) fn validate(name: &str, arguments: &Value) -> Result<()> {
     let (_, schema, _) = spec(name).ok_or_else(invalid)?;
     if !matches_schema(&schema, arguments, false) {
-        return Err(invalid());
-    }
-    if name == "browser_navigate"
-        && arguments["action"]["kind"] != "stop"
-        && arguments.get("documentId").is_none()
-    {
         return Err(invalid());
     }
     if name == "browser_evaluate"
@@ -615,12 +624,15 @@ mod tests {
 
     #[test]
     fn only_stop_allows_navigation_without_a_document_guard() {
+        let (_, schema, _) = spec("browser_navigate").unwrap();
+        assert_eq!(schema["type"], "object");
         let mut args = json!({
             "target": {"kind": "workbench", "tabId": "tab"},
             "action": {"kind": "stop"},
         });
         assert!(validate("browser_navigate", &args).is_ok());
         args["action"]["kind"] = json!("reload");
+        assert!(!matches_schema(&schema, &args, false));
         assert!(validate("browser_navigate", &args).is_err());
         args["documentId"] = json!("document");
         assert!(validate("browser_navigate", &args).is_ok());

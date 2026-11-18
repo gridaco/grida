@@ -26,6 +26,7 @@ export class BrowserDownloads {
   readonly #file: string;
   #directory: string | null = null;
   #ask = false;
+  #confirming = false;
   #tail: Promise<void> = Promise.resolve();
   readonly #items = new Set<DownloadItem>();
 
@@ -149,7 +150,8 @@ export class BrowserDownloads {
     item: DownloadItem,
     contents: WebContents,
     parent: BrowserWindow,
-    isLive: () => boolean
+    isLive: () => boolean,
+    confirmDownload = false
   ): void {
     if (!isLive() || contents.isDestroyed() || parent.isDestroyed()) {
       event.preventDefault();
@@ -176,11 +178,21 @@ export class BrowserDownloads {
       const directory = this.#directory ?? this.defaultDirectory;
       const name = BrowserDownloads.filename(item.getFilename());
       let destination: string;
-      if (this.#ask) {
-        const chosen = dialog.showSaveDialogSync(parent, {
-          title: "Save browser download",
-          defaultPath: path.join(directory, name),
-        });
+      if (this.#ask || confirmDownload) {
+        if (this.#confirming) {
+          event.preventDefault();
+          return;
+        }
+        this.#confirming = true;
+        let chosen: string | undefined;
+        try {
+          chosen = dialog.showSaveDialogSync(parent, {
+            title: "Save browser download",
+            defaultPath: path.join(directory, name),
+          });
+        } finally {
+          this.#confirming = false;
+        }
         if (
           !chosen ||
           !isLive() ||

@@ -46,6 +46,7 @@ import {
 
 const FRAME_LIMIT = 1024 * 1024;
 const REQUEST_LIMIT = 16;
+const BROWSER_BUSY_REPLY_LIMIT = 8 * 1024;
 const START_TIMEOUT_MS = 10_000;
 const SHUTDOWN_TIMEOUT_MS = 12_000;
 const KILL_TIMEOUT_MS = 2_000;
@@ -198,6 +199,8 @@ export class NativeAgentProcess {
     string | number,
     AbortController
   >();
+  private readonly browserBusyReplies = new Map<string | number, Buffer>();
+  private browserBusyReplyBytes = 0;
   private chatSelection = false;
   private permissionMode = false;
   private readonly commandCapabilities = new Set<string>();
@@ -238,6 +241,7 @@ export class NativeAgentProcess {
     });
     child.once("error", () => this.disconnect("native_agent_spawn_failed"));
     child.stdin.on("error", () => this.disconnect("native_agent_input_failed"));
+    child.stdin.on("drain", () => this.flushBrowserBusyReplies());
     child.stdout.on("error", () =>
       this.disconnect("native_agent_output_failed")
     );
@@ -991,13 +995,44 @@ export class NativeAgentProcess {
 
   private write(message: object): void {
     const bytes = Buffer.from(JSON.stringify(message) + "\n");
+    if (!this.tryWrite(bytes)) throw new Error("native_agent_frame_limit");
+  }
+
+  private tryWrite(bytes: Buffer): boolean {
     if (
       bytes.length > FRAME_LIMIT ||
       this.child.stdin.writableLength + bytes.length > FRAME_LIMIT
-    ) {
-      throw new Error("native_agent_frame_limit");
-    }
+    )
+      return false;
     this.child.stdin.write(bytes);
+    return true;
+  }
+
+  private writeBrowserBusyReply(id: string | number, message: object): void {
+    const bytes = Buffer.from(JSON.stringify(message) + "\n");
+    if (this.tryWrite(bytes)) return;
+    // The caller can time out if this queue also fills. The operation was never
+    // dispatched, and its refusal must not disconnect the shared worker.
+    if (this.browserBusyReplyBytes + bytes.length > BROWSER_BUSY_REPLY_LIMIT)
+      return;
+    this.browserBusyReplies.set(id, bytes);
+    this.browserBusyReplyBytes += bytes.length;
+  }
+
+  private flushBrowserBusyReplies(): void {
+    if (!this.connected) return;
+    for (const [id, bytes] of this.browserBusyReplies) {
+      if (!this.tryWrite(bytes)) return;
+      this.removeBrowserBusyReply(id);
+    }
+  }
+
+  private removeBrowserBusyReply(id: string | number): void {
+    const bytes = this.browserBusyReplies.get(id);
+    if (bytes) {
+      this.browserBusyReplyBytes -= bytes.length;
+      this.browserBusyReplies.delete(id);
+    }
   }
 
   private receive(chunk: Buffer): void {
@@ -1128,37 +1163,45 @@ export class NativeAgentProcess {
           message.method === NativeEditorSurfaceEndpoints.browserMethod
         ) {
           const id = message.id;
-          if (this.editorBrowserRequests.has(id))
+          if (
+            this.editorBrowserRequests.has(id) ||
+            this.browserBusyReplies.has(id)
+          )
             throw new Error("native_agent_browser_request_id_reused");
-          const reply = (result: unknown) => {
-            if (!this.connected) return;
-            this.write({
-              jsonrpc: "2.0",
-              id,
-              ...(result
-                ? { result }
-                : { error: { code: -32602, message: "Invalid params" } }),
-            });
-          };
+          const reply = (result: unknown) => ({
+            jsonrpc: "2.0",
+            id,
+            ...(result
+              ? { result }
+              : { error: { code: -32602, message: "Invalid params" } }),
+          });
           if (this.editorBrowserRequests.size >= REQUEST_LIMIT) {
-            reply(this.editorEndpoints.browserBusy(message.params));
+            this.writeBrowserBusyReply(
+              id,
+              reply(this.editorEndpoints.browserBusy(message.params))
+            );
             return;
           }
           const controller = new AbortController();
           this.editorBrowserRequests.set(id, controller);
           void this.editorEndpoints
             .browserTool(message.params, controller.signal)
-            .then(reply, () => {
-              if (this.connected)
-                this.write({
-                  jsonrpc: "2.0",
-                  id,
-                  error: {
-                    code: -32603,
-                    message: "Browser reply unverified",
-                  },
-                });
-            })
+            .then(
+              (result) => {
+                if (this.connected) this.write(reply(result));
+              },
+              () => {
+                if (this.connected)
+                  this.write({
+                    jsonrpc: "2.0",
+                    id,
+                    error: {
+                      code: -32603,
+                      message: "Browser reply unverified",
+                    },
+                  });
+              }
+            )
             .catch(() => this.disconnect("native_agent_browser_reply_failed"))
             .finally(() => this.editorBrowserRequests.delete(id));
           return;
@@ -1195,6 +1238,7 @@ export class NativeAgentProcess {
         if (typeof id === "number" || typeof id === "string") {
           this.gatewayBillingRequests.get(id)?.abort();
           this.editorBrowserRequests.get(id)?.abort();
+          this.removeBrowserBusyReply(id);
         }
         this.imageGeneration?.cancel(id);
         this.imagePlacement?.cancel(id);
@@ -1258,6 +1302,8 @@ export class NativeAgentProcess {
     for (const controller of this.editorBrowserRequests.values())
       controller.abort();
     this.editorBrowserRequests.clear();
+    this.browserBusyReplies.clear();
+    this.browserBusyReplyBytes = 0;
     this.editorEndpoints.close();
   }
 

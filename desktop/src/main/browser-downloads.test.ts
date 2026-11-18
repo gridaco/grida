@@ -37,7 +37,7 @@ function fixture() {
   let live = true;
   const contents = { isDestroyed: () => false } as WebContents;
   const parent = { isDestroyed: () => false } as BrowserWindow;
-  const accept = (name = "report.txt") => {
+  const accept = (name = "report.txt", confirmDownload = false) => {
     const item = Object.assign(new EventEmitter(), {
       getFilename: () => name,
       setSavePath: vi.fn<(filePath: string) => void>(),
@@ -49,7 +49,8 @@ function fixture() {
       item as unknown as DownloadItem,
       contents,
       parent,
-      () => live
+      () => live,
+      confirmDownload
     );
     return {
       item,
@@ -91,6 +92,29 @@ it("retains accepted jobs beyond source withdrawal and cancels only on an explic
   expect(f.accept().event.preventDefault).toHaveBeenCalledOnce();
   f.manager.cancelAll();
   expect(a.item.cancel).toHaveBeenCalledOnce();
+});
+
+it("requires a native save choice for an automation-exposed page without changing download preferences", () => {
+  const f = fixture();
+  const first = f.accept("report.txt", true);
+  expect(first.event.preventDefault).toHaveBeenCalledOnce();
+  expect(first.saved()).toBeUndefined();
+  expect(fs.readdirSync(f.downloads)).toEqual([]);
+
+  dialogs.showSaveDialogSync.mockImplementationOnce(() => {
+    const queued = f.accept("queued.txt", true);
+    expect(queued.event.preventDefault).toHaveBeenCalledOnce();
+    expect(queued.saved()).toBeUndefined();
+    return path.join(f.downloads, "approved.txt");
+  });
+  expect(f.accept("report.txt", true).saved()).toBe(
+    path.join(f.downloads, "approved.txt")
+  );
+  expect(dialogs.showSaveDialogSync).toHaveBeenCalledTimes(2);
+  expect(f.manager.preferences().askBeforeDownload).toBe(false);
+  expect(f.accept("ordinary.txt").saved()).toBe(
+    path.join(f.downloads, "ordinary.txt")
+  );
 });
 
 it("persists the optional save prompt privately and never accepts a caller path", async () => {

@@ -2901,7 +2901,8 @@ impl Host {
                     } else {
                         " This model connection cannot receive browser captures. Use browser snapshots for inspection and report the screenshot limitation if asked."
                     });
-                } else if stored.editor_presentation {
+                }
+                if stored.editor_presentation {
                     config.instructions.push_str("\n\n");
                     config
                         .instructions

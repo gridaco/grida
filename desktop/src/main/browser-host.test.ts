@@ -989,7 +989,8 @@ it("delegates accepted downloads independently of tab lifetime and cancels jobs 
     item,
     guest,
     f.window,
-    expect.any(Function)
+    expect.any(Function),
+    false
   );
   await f.host.detach(f.event, f.attached.attachmentId);
   expect(item.cancel).not.toHaveBeenCalled();
@@ -997,6 +998,93 @@ it("delegates accepted downloads independently of tab lifetime and cancels jobs 
   mock.confirm.mockResolvedValueOnce({ response: 1 });
   await f.host.clearBrowsingData(settingsFixture().event);
   expect(downloads.cancelAll).toHaveBeenCalledOnce();
+});
+
+it("requires confirmation for delayed automation downloads and their child pages", async () => {
+  const downloads = {
+    accept: vi.fn<(...args: unknown[]) => void>(),
+    cancelAll: vi.fn<(...args: unknown[]) => void>(),
+  } as unknown as BrowserDownloads;
+  const f = await fixture(undefined, undefined, undefined, downloads);
+  const opener = f.create();
+  const guest = mock.guests.at(-1)!;
+  let live = true;
+  const scope = {
+    id: "download-test",
+    sender: f.event.sender,
+    frame: f.event.senderFrame!,
+    live: () => live,
+  };
+  const observed = f.host.resolveAutomationPage(scope, {
+    kind: "workbench",
+    tabId: opener.id,
+  });
+  const downloadFrom = (source: WebContents) => {
+    const event = { preventDefault: vi.fn<() => void>() };
+    const item = {};
+    guest.session!.emit("will-download", event, item, source);
+    return event;
+  };
+  const lastConfirmation = () => vi.mocked(downloads.accept).mock.lastCall?.[5];
+
+  // Observing the page and stopping a load keep ordinary download preferences.
+  observed.snapshot();
+  observed.navigate("stop");
+  downloadFrom(native(guest));
+  expect(lastConfirmation()).toBe(false);
+
+  const release = observed.beginInput();
+  release();
+  live = false;
+  f.host.revokeAutomation(scope.id);
+  expect(observed.current()).toBe(false);
+  downloadFrom(native(guest));
+  expect(lastConfirmation()).toBe(true);
+
+  const leaf = "https://example.com/child";
+  const popup = openWindow(guest, leaf);
+  const popupContents = popup.createWindow!(
+    popup.overrideBrowserWindowOptions!
+  );
+  downloadFrom(popupContents);
+  expect(lastConfirmation()).toBe(true);
+
+  f.host.setActive(f.event, { ...f.target(opener), active: true });
+  guest.mainFrame.url = guest.url;
+  f.host.guestLink(
+    {
+      sender: native(guest),
+      senderFrame: guest.mainFrame,
+    } as unknown as import("electron").IpcMainEvent,
+    {
+      url: leaf,
+      documentUrl: guest.url,
+      disposition: "foreground",
+    }
+  );
+  expect(openWindow(guest, leaf).action).toBe("deny");
+  const child = f.host.snapshot(f.event, f.attached.attachmentId).pages.at(-1)!;
+  expect(child.id).not.toBe(opener.id);
+  downloadFrom(native(f.mount(child).guest));
+  expect(lastConfirmation()).toBe(true);
+
+  const nextScope = { ...scope, id: "next-download-test", live: () => true };
+  const newPage = f.host.openWorkbenchAutomationPage(nextScope, leaf);
+  downloadFrom(native(f.mount(newPage.snapshot()).guest));
+  expect(lastConfirmation()).toBe(true);
+
+  const unrelated = f.create();
+  const otherGuest = mock.guests.at(-1)!;
+  const otherPage = f.host.resolveAutomationPage(nextScope, {
+    kind: "workbench",
+    tabId: unrelated.id,
+  });
+  downloadFrom(native(otherGuest));
+  expect(lastConfirmation()).toBe(false);
+  otherPage.navigate("goto", leaf);
+  downloadFrom(native(otherGuest));
+  expect(lastConfirmation()).toBe(true);
+  f.host.closeAll();
 });
 
 function compositorImage() {

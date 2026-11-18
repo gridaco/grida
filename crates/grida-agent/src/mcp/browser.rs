@@ -59,6 +59,11 @@ struct Response {
     result: Reply,
 }
 
+struct ReceivedResponse {
+    frame: Response,
+    received_at: Instant,
+}
+
 pub(super) fn tools() -> Result<(ToolHost, Pipe)> {
     let (outgoing, incoming) = mpsc::channel(MAX_PENDING);
     let host = ToolHost::new(browser_tools::definitions(|operation| {
@@ -134,7 +139,7 @@ impl Pipe {
     async fn dispatch(
         mut self,
         mut output: impl AsyncWrite + Unpin,
-        mut responses: mpsc::Receiver<Response>,
+        mut responses: mpsc::Receiver<ReceivedResponse>,
     ) -> Result<()> {
         let mut dispatched = BTreeMap::<BindingId, Dispatched>::new();
         let mut maintenance =
@@ -143,7 +148,16 @@ impl Pipe {
         loop {
             tokio::select! {
                 biased;
-                // Cancellation and drain deadlines must progress during continuous reply traffic.
+                // Process received replies before expiring a drain. At most MAX_PENDING
+                // valid replies can run before maintenance, which precedes new dispatches.
+                response = responses.recv() => {
+                    let Some(ReceivedResponse { frame, received_at }) = response else { return Ok(()); };
+                    let pending = dispatched.remove(&frame.request_id).ok_or_else(pipe_error)?;
+                    if pending.drain_deadline.is_some_and(|deadline| received_at >= deadline) {
+                        return Err(pipe_error());
+                    }
+                    let _ = pending.reply.send(frame.result);
+                }
                 _ = maintenance.tick(), if !dispatched.is_empty() => {
                     let now = Instant::now();
                     for (id, pending) in &mut dispatched {
@@ -159,11 +173,6 @@ impl Pipe {
                             pending.drain_deadline = Some(drain);
                         }
                     }
-                }
-                response = responses.recv() => {
-                    let Some(response) = response else { return Ok(()); };
-                    let pending = dispatched.remove(&response.request_id).ok_or_else(pipe_error)?;
-                    let _ = pending.reply.send(response.result);
                 }
                 pending = self.0.recv(), if dispatched.len() < MAX_PENDING => {
                     let Some(pending) = pending else { return Ok(()); };
@@ -195,7 +204,7 @@ impl Pipe {
 
 async fn read_responses(
     input: impl AsyncRead + Unpin,
-    replies: mpsc::Sender<Response>,
+    replies: mpsc::Sender<ReceivedResponse>,
 ) -> Result<()> {
     let mut input = BufReader::new(input);
     let mut bytes = Vec::new();
@@ -212,8 +221,13 @@ async fn read_responses(
         if bytes.len() > browser_tools::MAX_REPLY_BYTES || bytes.pop() != Some(b'\n') {
             return Err(pipe_error());
         }
-        let response = serde_json::from_slice::<Response>(&bytes).map_err(|_| pipe_error())?;
-        if replies.send(response).await.is_err() {
+        let received_at = Instant::now();
+        let frame = serde_json::from_slice(&bytes).map_err(|_| pipe_error())?;
+        if replies
+            .send(ReceivedResponse { frame, received_at })
+            .await
+            .is_err()
+        {
             return Ok(());
         }
     }
@@ -251,6 +265,17 @@ mod tests {
     use agent_kit_core::ToolId;
     use agent_kit_core::messages::OutcomeStatus;
     use serde_json::json;
+
+    fn observed_reply(id: &str) -> ReceivedResponse {
+        ReceivedResponse {
+            frame: serde_json::from_value(json!({
+                "requestId":id,
+                "result":{"disposition":"dispatched_verified"}
+            }))
+            .unwrap(),
+            received_at: Instant::now(),
+        }
+    }
 
     #[tokio::test]
     async fn cancellation_names_only_the_dispatched_browser_call_and_drains_its_reply() {
@@ -342,16 +367,7 @@ mod tests {
         }
 
         cancellation.cancel();
-        replies
-            .send(
-                serde_json::from_value(json!({
-                    "requestId":"unrelated",
-                    "result":{"disposition":"dispatched_verified"}
-                }))
-                .unwrap(),
-            )
-            .await
-            .unwrap();
+        replies.send(observed_reply("unrelated")).await.unwrap();
         // The dispatcher resumes with both maintenance and a reply ready.
         tokio::time::sleep(POLL_TIME * 2).await;
         assert!(futures_util::poll!(&mut dispatch).is_pending());
@@ -365,5 +381,86 @@ mod tests {
             serde_json::from_str::<Value>(&frame).unwrap(),
             json!({"cancelRequestId":"cancelled"})
         );
+    }
+
+    async fn delayed_drain(reply_queued_before_expiry: bool) {
+        let (outgoing, incoming) = mpsc::channel(MAX_PENDING);
+        let (replies, responses) = mpsc::channel(MAX_PENDING);
+        let (peer, output) = tokio::io::duplex(4096);
+        let mut frames = BufReader::new(peer).lines();
+        let mut dispatch = std::pin::pin!(Pipe(incoming).dispatch(output, responses));
+
+        let cancellation = CancellationToken::new();
+        let mut waiters = Vec::new();
+        for (id, cancellation) in [
+            ("cancelled", cancellation.clone()),
+            ("unrelated", CancellationToken::new()),
+        ] {
+            let (reply, waiter) = oneshot::channel();
+            waiters.push(waiter);
+            outgoing
+                .send(Pending {
+                    request_id: BindingId::new(id).unwrap(),
+                    operation: "browser_open".to_owned(),
+                    arguments: json!({"url":"http://127.0.0.1/"}),
+                    deadline: Instant::now() + Duration::from_secs(10),
+                    cancellation,
+                    reply,
+                })
+                .await
+                .unwrap();
+        }
+        assert!(futures_util::poll!(&mut dispatch).is_pending());
+        for id in ["cancelled", "unrelated"] {
+            let frame = tokio::time::timeout(Duration::from_secs(1), frames.next_line())
+                .await
+                .unwrap()
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                serde_json::from_str::<Value>(&frame).unwrap()["requestId"],
+                id
+            );
+        }
+
+        cancellation.cancel();
+        tokio::time::sleep(POLL_TIME * 2).await;
+        assert!(futures_util::poll!(&mut dispatch).is_pending());
+        let frame = tokio::time::timeout(POLL_TIME, frames.next_line())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&frame).unwrap(),
+            json!({"cancelRequestId":"cancelled"})
+        );
+
+        if reply_queued_before_expiry {
+            replies.send(observed_reply("cancelled")).await.unwrap();
+            replies.send(observed_reply("unrelated")).await.unwrap();
+        }
+        // Model the dispatcher resuming after backpressure on a write.
+        tokio::time::sleep(DRAIN_TIME + POLL_TIME).await;
+        if reply_queued_before_expiry {
+            assert!(futures_util::poll!(&mut dispatch).is_pending());
+            assert!(waiters.iter_mut().all(|waiter| waiter.try_recv().is_ok()));
+        } else {
+            replies.send(observed_reply("cancelled")).await.unwrap();
+            assert!(matches!(
+                futures_util::poll!(&mut dispatch),
+                std::task::Poll::Ready(Err(_))
+            ));
+        }
+    }
+
+    #[tokio::test]
+    async fn a_timely_queued_reply_survives_a_delayed_drain_check() {
+        delayed_drain(true).await;
+    }
+
+    #[tokio::test]
+    async fn a_reply_received_after_the_drain_deadline_retires_the_pipe() {
+        delayed_drain(false).await;
     }
 }

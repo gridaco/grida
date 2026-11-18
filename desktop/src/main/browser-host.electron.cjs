@@ -7,6 +7,7 @@ const assert = require("node:assert/strict");
 const { pathToFileURL } = require("node:url");
 const { DesktopBrowserHost } = require(process.argv[2]);
 const resultPath = process.argv[3];
+const downloadOnly = process.argv[5] === "download";
 process.umask(0o077);
 app.commandLine.appendSwitch("use-mock-keychain");
 app.setPath("userData", process.argv[4]);
@@ -104,7 +105,18 @@ app
         JSON.stringify(preloadMarker) +
         ", 'ran')"
     );
+    let finishDownload;
     const guestOrigin = await serve((request, response) => {
+      if (request.url === "/download") {
+        finishDownload = () => {
+          response.writeHead(200, {
+            "Content-Type": "text/plain",
+            "Content-Disposition": 'attachment; filename="browser-proof.txt"',
+          });
+          response.end("download routing fixture");
+        };
+        return;
+      }
       response.setHeader(
         "Content-Type",
         request.url === "/animation.js" ? "text/javascript" : "text/html"
@@ -140,7 +152,7 @@ app
       );
     });
     const window = new BrowserWindow({
-      show: true,
+      show: !downloadOnly,
       width: 800,
       height: 600,
       webPreferences: {
@@ -164,10 +176,19 @@ app
     await new Promise((resolve) => setTimeout(resolve, 50));
     assert.equal(earlyAttached, false);
     window.webContents.off("did-attach-webview", early);
+    const downloadConfirmations = [];
     host = new DesktopBrowserHost({
       editorOrigin: origin,
       admitWindow: (candidate) => windows.has(candidate),
       workspaceExists: async () => true,
+      downloads: {
+        accept: (event, _item, _source, _parent, _live, confirmDownload) => {
+          // Exercise Chromium's will-download and Main's policy without a dialog.
+          event.preventDefault();
+          downloadConfirmations.push(confirmDownload);
+        },
+        cancelAll: () => {},
+      },
     });
     const event = eventFor(window);
     const { attachmentId } = await host.attach(event, "eac20941e6a410aa");
@@ -177,6 +198,39 @@ app
     });
     const request = targetFor(attachmentId, page);
     let guest = await mount(window, attachmentId, page, "guest");
+    if (downloadOnly) {
+      mark("delayed foreground download confirmation");
+      let scopeLive = true;
+      const workbenchScope = {
+        id: "download-automation-scope",
+        sender: window.webContents,
+        frame: event.senderFrame,
+        live: () => scopeLive,
+      };
+      const workbenchTarget = host.resolveAutomationPage(workbenchScope, {
+        kind: "workbench",
+        tabId: page.id,
+      });
+      const startDownload = async () => {
+        finishDownload = undefined;
+        await guest.executeJavaScript("location.href = '/download'; true");
+        await waitFor(() => !!finishDownload);
+      };
+      await startDownload();
+      finishDownload();
+      await waitFor(() => downloadConfirmations.length === 1);
+      const releaseInput = workbenchTarget.beginInput();
+      await startDownload();
+      releaseInput();
+      scopeLive = false;
+      host.revokeAutomation(workbenchScope.id);
+      finishDownload();
+      await waitFor(() => downloadConfirmations.length === 2);
+      assert.deepEqual(downloadConfirmations, [false, true]);
+      fs.writeFileSync(resultPath, JSON.stringify({ downloadConfirmations }));
+      app.exit(0);
+      return;
+    }
     assert.equal(guest.hostWebContents, window.webContents);
     assert.equal(pageFor(window, attachmentId, page.id).mounted, true);
     assert.equal(
