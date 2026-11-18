@@ -26,7 +26,7 @@ export class BrowserDownloads {
   readonly #file: string;
   #directory: string | null = null;
   #ask = false;
-  #confirming = false;
+  #confirmation: { droppedDownloads: boolean } | null = null;
   #tail: Promise<void> = Promise.resolve();
   readonly #items = new Set<DownloadItem>();
 
@@ -157,6 +157,12 @@ export class BrowserDownloads {
       event.preventDefault();
       return;
     }
+    const needsConfirmation = this.#ask || confirmDownload;
+    if (needsConfirmation && this.#confirmation) {
+      this.#confirmation.droppedDownloads = true;
+      event.preventDefault();
+      return;
+    }
     let reserved: { file: string; dev: number; ino: number } | undefined;
     const release = () => {
       if (!reserved) return;
@@ -178,12 +184,9 @@ export class BrowserDownloads {
       const directory = this.#directory ?? this.defaultDirectory;
       const name = BrowserDownloads.filename(item.getFilename());
       let destination: string;
-      if (this.#ask || confirmDownload) {
-        if (this.#confirming) {
-          event.preventDefault();
-          return;
-        }
-        this.#confirming = true;
+      if (needsConfirmation) {
+        const confirmation = { droppedDownloads: false };
+        this.#confirmation = confirmation;
         let chosen: string | undefined;
         try {
           chosen = dialog.showSaveDialogSync(parent, {
@@ -191,7 +194,25 @@ export class BrowserDownloads {
             defaultPath: path.join(directory, name),
           });
         } finally {
-          this.#confirming = false;
+          this.#confirmation = null;
+          // Report reentrant cancellations together after the Save dialog and
+          // the original will-download callback have both unwound.
+          if (confirmation.droppedDownloads)
+            void Promise.resolve()
+              .then(() => {
+                if (
+                  isLive() &&
+                  !contents.isDestroyed() &&
+                  !parent.isDestroyed()
+                )
+                  return dialog.showMessageBox(parent, {
+                    type: "info",
+                    message: "A browser download was canceled",
+                    detail:
+                      "A save dialog was already open. Retry the download.",
+                  });
+              })
+              .catch(() => {});
         }
         if (
           !chosen ||

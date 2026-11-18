@@ -3418,7 +3418,8 @@ impl Host {
         else {
             return Ok(None);
         };
-        lifecycle::check_input(&view.input, &request.parts)?;
+        let editor_browser_tools =
+            lifecycle::check_input(&view.input, &request.parts)?.editor_browser_tools;
         let settings = InputSettings::for_input(&view.input)?;
         settings.require_effort(request.effort, request.reasoning)?;
         if request
@@ -3440,6 +3441,12 @@ impl Host {
             return Err(problem(
                 ErrorKind::Conflict,
                 "submission_library_selection_changed",
+            ));
+        }
+        if editor_browser_tools != context.editor_browser_tools {
+            return Err(problem(
+                ErrorKind::Conflict,
+                "submission_browser_tools_changed",
             ));
         }
         Ok(Some(DurableSubmission {

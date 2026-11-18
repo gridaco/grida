@@ -1300,6 +1300,103 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
     }
   );
 
+  it.each([{ revoked: false }, { revoked: true }])(
+    "delivers a browser capture through stdin pressure (owner revoked: $revoked)",
+    async ({ revoked }) => {
+      const callId = "00000000-0000-4000-8000-000000000001";
+      const test = fixture(
+        `
+      if (request.method === 'fixture/ping') {
+        globalThis.ping = request.id;
+      } else if (request.method === 'fixture/capture') {
+        globalThis.capture = request.id;
+        send({id:'capture',method:'${NativeEditorSurfaceEndpoints.browserMethod}',params:{
+          sessionId:'session',endpointId:request.params.endpointId,
+          callId:'${callId}',operation:'browser_capture',arguments:{},timeoutMs:5000
+        }});
+      } else if (request.method === undefined && request.id === 'capture') {
+        send({id:globalThis.capture,result:request.result});
+        send({id:globalThis.ping,result:{pong:true}});
+      }
+    `,
+        1,
+        {}
+      );
+      const entered = Promise.withResolvers<void>();
+      const complete = Promise.withResolvers<void>();
+      const image = {
+        mimeType: "image/jpeg" as const,
+        base64: Buffer.alloc(256 * 1024, 7).toString("base64"),
+      };
+      let agent: NativeAgentProcess | undefined;
+      try {
+        agent = await NativeAgentProcess.start({
+          ...test.options,
+          providerNetwork: { prepare: () => null },
+        });
+        const stdin = agent["child"].stdin;
+        const frameLimit = 1024 * 1024;
+        const method = "fixture/pad";
+        const paddingFrameBytes = Buffer.byteLength(
+          JSON.stringify({ jsonrpc: "2.0", method, params: { padding: "" } }) +
+            "\n"
+        );
+        const lease = agent.registerEditorSurfaces(
+          "session",
+          { active: null, open: [], truncated: false },
+          () => {},
+          undefined,
+          undefined,
+          undefined,
+          {
+            ready: () => true,
+            invoke: async () => {
+              stdin.cork();
+              agent!.notify(method, {
+                padding: "x".repeat(frameLimit - paddingFrameBytes),
+              });
+              entered.resolve();
+              await complete.promise;
+              return { disposition: "dispatched_verified", image };
+            },
+            close: () => {},
+          }
+        );
+        const { editorEndpointId: endpointId } = lease!.selection();
+        const replies = Promise.all([
+          agent.request("fixture/ping", {}, 3000),
+          agent.request("fixture/capture", { endpointId }, 3000),
+        ]);
+        await Promise.race([entered.promise, replies]);
+        complete.resolve();
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        expect(agent.connected).toBe(true);
+        expect(stdin.writableLength).toBe(frameLimit);
+        if (revoked) lease!.close();
+        stdin.uncork();
+        await expect(replies).resolves.toEqual([
+          { pong: true },
+          {
+            sessionId: "session",
+            endpointId,
+            callId,
+            result: revoked
+              ? { disposition: "unknown", error: "outcome_unknown" }
+              : { disposition: "dispatched_verified", image },
+          },
+        ]);
+      } finally {
+        complete.resolve();
+        agent?.["child"].stdin.uncork();
+        try {
+          await agent?.close();
+        } finally {
+          test.close();
+        }
+      }
+    }
+  );
+
   it("keeps a transcript page intact when a legacy replay overlaps it", async () => {
     const test = fixture(
       `

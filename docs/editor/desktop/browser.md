@@ -171,9 +171,13 @@ Downloads save to your system Downloads folder by default. In
 with the same name receives a different filename.
 
 Tabs the agent opens or interacts with always ask where to save a download.
-This includes downloads from tabs or windows opened by those pages.
-For a download from a page the agent opened in the background, open its URL
-in a browser tab first.
+New tabs opened from one of those tabs inherit its confirmation requirement.
+Website pop-up windows follow their owning tab's requirement.
+If another download needs confirmation while a Save dialog is open, Grida
+asks you to retry that download after the dialog closes.
+To download from a site the agent opened in the background, open the site in a
+visible browser tab and start the download there. If you already have a direct
+download link, you can open it in the browser tab.
 
 Accepted downloads continue when their tab closes while Desktop remains
 running. Files are not opened automatically. Clearing browsing data does not

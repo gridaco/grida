@@ -1103,8 +1103,10 @@ means the request was dispatched, not that a renderer displayed the file.
 
 The client and agent can negotiate `co.grida/session/browser-tools` version 1
 alongside editor surfaces. An eligible Act text input carries
-`editorBrowserTools: true` and its exact `editorEndpointId`. The reverse
-`_co.grida/editor/browser-tool` request includes `sessionId`, `endpointId`,
+`editorBrowserTools: true` and its exact `editorEndpointId`. Submit and Enqueue
+retries using the same `inputId` must repeat the accepted browser opt-in.
+Omission is equivalent to `false`. Changing the opt-in returns a conflict.
+The reverse `_co.grida/editor/browser-tool` request includes `sessionId`, `endpointId`,
 `callId`, `operation`, `arguments`, and a bounded `timeoutMs`. The reply
 echoes the three identities and carries `result` with dispatch disposition,
 bounded structured data or a domain error, and optional JPEG bytes for a

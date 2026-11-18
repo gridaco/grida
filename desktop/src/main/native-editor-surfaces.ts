@@ -45,6 +45,14 @@ type Endpoint = {
   calls: Map<string, { path: string; requested: boolean }>;
 };
 
+type BrowserResult = Awaited<ReturnType<DesktopBrowserToolLease["invoke"]>>;
+export type NativeEditorBrowserReply = Readonly<{
+  sessionId: string;
+  endpointId: string;
+  callId: string;
+  result: BrowserResult;
+}>;
+
 export class NativeEditorSurfaceEndpoints {
   static readonly capability = "co.grida/session/editor-surfaces";
   static readonly readMethod = "_co.grida/editor/surface-list-open";
@@ -115,7 +123,7 @@ export class NativeEditorSurfaceEndpoints {
     });
   }
 
-  browserBusy(value: unknown) {
+  browserBusy(value: unknown): NativeEditorBrowserReply | null {
     const request = this.browserRequest(value);
     if (!request) return null;
     const { sessionId, endpointId, callId } = request;
@@ -127,7 +135,10 @@ export class NativeEditorSurfaceEndpoints {
     };
   }
 
-  async browserTool(value: unknown, signal: AbortSignal) {
+  async browserTool(
+    value: unknown,
+    signal: AbortSignal
+  ): Promise<NativeEditorBrowserReply | null> {
     const request = this.browserRequest(value);
     if (!request) return null;
     const { sessionId, endpointId, callId, operation, args, timeoutMs } =
@@ -137,9 +148,12 @@ export class NativeEditorSurfaceEndpoints {
       disposition: "not_dispatched" as const,
       error: "owner_revoked",
     };
-    const reply = (
-      result: Awaited<ReturnType<DesktopBrowserToolLease["invoke"]>>
-    ) => ({ sessionId, endpointId, callId, result });
+    const reply = (result: BrowserResult) => ({
+      sessionId,
+      endpointId,
+      callId,
+      result,
+    });
     if (!endpoint?.browser?.ready()) return reply(denied);
     const deadline = AbortSignal.timeout(timeoutMs);
     const result = await endpoint.browser.invoke(
@@ -147,16 +161,42 @@ export class NativeEditorSurfaceEndpoints {
       args,
       AbortSignal.any([signal, deadline])
     );
+    const response = reply(result);
     if (
       this.current(sessionId, endpointId) !== endpoint ||
       !endpoint.browser.ready()
     )
-      return reply(
+      return this.revokedBrowserReply(response);
+    return response;
+  }
+
+  browserReplyGuard(reply: NativeEditorBrowserReply) {
+    const revoked = this.revokedBrowserReply(reply);
+    const { sessionId, endpointId } = revoked;
+    const endpoint = this.endpoints.get(endpointId);
+    return () =>
+      endpoint &&
+      this.current(sessionId, endpointId) === endpoint &&
+      endpoint.browser?.ready()
+        ? undefined
+        : revoked;
+  }
+
+  private revokedBrowserReply({
+    sessionId,
+    endpointId,
+    callId,
+    result,
+  }: NativeEditorBrowserReply): NativeEditorBrowserReply {
+    return {
+      sessionId,
+      endpointId,
+      callId,
+      result:
         result.disposition === "not_dispatched"
-          ? denied
-          : { disposition: "unknown", error: "outcome_unknown" }
-      );
-    return reply(result);
+          ? { disposition: "not_dispatched", error: "owner_revoked" }
+          : { disposition: "unknown", error: "outcome_unknown" },
+    };
   }
 
   private browserRequest(value: unknown) {

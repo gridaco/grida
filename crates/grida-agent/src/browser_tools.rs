@@ -34,6 +34,7 @@ pub(crate) const NAMES: &[&str] = &[
 pub(crate) const MAX_INPUT_BYTES: usize = 40 * 1024;
 pub(crate) const MAX_REPLY_BYTES: usize = 448 * 1024;
 const MAX_IMAGE_BYTES: usize = 256 * 1024;
+const MAX_IMAGE_SIDE: u32 = 1024;
 const IMAGE_MIME: &str = "image/jpeg";
 const IMAGE_PREFIX: &str = "browser-capture/";
 const IMAGE_LOCATOR: &str = "browser-result-jpeg:";
@@ -500,7 +501,32 @@ impl Reply {
                     return uncertain();
                 };
                 let media = match capture {
-                    Capture::Mcp => scoped_jpeg(&call.binding, image.base64),
+                    Capture::Mcp => {
+                        // The JPEG decoder tolerates some truncation. Require
+                        // the complete frame marker as well as decodable pixels
+                        // before giving the client the owner's original bytes.
+                        let verified = bytes.ends_with(&[0xff, 0xd9])
+                            && matches!(
+                                tokio::task::spawn_blocking(move || {
+                                    let mut reader = image::ImageReader::with_format(
+                                        std::io::Cursor::new(bytes),
+                                        image::ImageFormat::Jpeg,
+                                    );
+                                    let mut limits = image::Limits::default();
+                                    limits.max_image_width = Some(MAX_IMAGE_SIDE);
+                                    limits.max_image_height = Some(MAX_IMAGE_SIDE);
+                                    limits.max_alloc = Some(u64::from(MAX_IMAGE_SIDE).pow(2) * 4);
+                                    reader.limits(limits);
+                                    reader.decode().is_ok()
+                                })
+                                .await,
+                                Ok(true)
+                            );
+                        if !verified {
+                            return uncertain();
+                        }
+                        scoped_jpeg(&call.binding, image.base64)
+                    }
                     Capture::Native(Some(retain)) => {
                         let result = tokio::task::spawn_blocking(move || {
                             let normalized = crate::host::image_preparation::prepare(&bytes)?;
@@ -558,7 +584,7 @@ impl Image {
             image::ImageReader::with_format(std::io::Cursor::new(&bytes), image::ImageFormat::Jpeg)
                 .into_dimensions()
                 .ok()?;
-        (width > 0 && height > 0 && width.max(height) <= 1024).then_some(bytes)
+        (width > 0 && height > 0 && width.max(height) <= MAX_IMAGE_SIDE).then_some(bytes)
     }
 }
 
@@ -653,5 +679,65 @@ mod tests {
         assert_eq!(mcp_image(&media, &other), None);
         media.locator = "file:///tmp/browser-capture.jpg".into();
         assert_eq!(mcp_image(&media, &owned), None);
+    }
+
+    #[tokio::test]
+    async fn mcp_capture_requires_complete_decodable_jpeg_pixels() {
+        let call = CapabilityCall {
+            binding: CallBinding {
+                id: BindingId::new("verified-call").unwrap(),
+                endpoint: BindingId::new("desktop").unwrap(),
+            },
+            capability: ToolId::new(CAPTURE).unwrap(),
+            version: 1,
+            arguments: json!({}),
+            cancellation: agent_kit_core::CancellationToken::new(),
+            deadline: Instant::now() + OWNER_CALL_TIME,
+            max_output_bytes: MAX_REPLY_BYTES,
+        };
+        let mut jpeg = Vec::new();
+        image::codecs::jpeg::JpegEncoder::new(&mut jpeg)
+            .encode(&[42; 16 * 16 * 3], 16, 16, image::ExtendedColorType::Rgb8)
+            .unwrap();
+        let scan = jpeg
+            .windows(2)
+            .position(|bytes| bytes == [0xff, 0xda])
+            .unwrap();
+        let scan_header = u16::from_be_bytes([jpeg[scan + 2], jpeg[scan + 3]]) as usize;
+        let incomplete = &jpeg[..scan + 2 + scan_header];
+        // Point the first scan component at a missing Huffman table. The
+        // dimensions and closing marker survive, but pixels cannot decode.
+        let mut malformed = jpeg.clone();
+        malformed[scan + 6] = 0x33;
+        for (bytes, status) in [
+            (&jpeg[..], OutcomeStatus::Succeeded),
+            (incomplete, OutcomeStatus::Uncertain),
+            (&malformed[..], OutcomeStatus::Uncertain),
+        ] {
+            let base64 = STANDARD.encode(bytes);
+            let image = Image {
+                mime_type: IMAGE_MIME.into(),
+                base64: base64.clone(),
+            };
+            // Both have readable headers, including the complete scan header.
+            assert_eq!(image.decode().as_deref(), Some(bytes));
+            let outcome = Reply {
+                disposition: Disposition::DispatchedVerified,
+                data: None,
+                error: None,
+                image: Some(image),
+            }
+            .outcome(&call, Capture::Mcp)
+            .await;
+            assert_eq!(outcome.status, status);
+            if status == OutcomeStatus::Succeeded {
+                assert!(matches!(
+                    outcome.content.as_slice(),
+                    [ResultContent::Media(media)] if mcp_image(media, &call.binding) == Some(&base64)
+                ));
+            } else {
+                assert!(outcome.content.is_empty());
+            }
+        }
     }
 }

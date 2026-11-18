@@ -1022,32 +1022,37 @@ it("requires confirmation for delayed automation downloads and their child pages
   const downloadFrom = (source: WebContents) => {
     const event = { preventDefault: vi.fn<() => void>() };
     const item = {};
+    const calls = vi.mocked(downloads.accept).mock.calls;
+    const before = calls.length;
     guest.session!.emit("will-download", event, item, source);
-    return event;
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(before + 1);
+    const [acceptedEvent, acceptedItem, acceptedSource, , , confirmation] =
+      calls[before];
+    expect(acceptedEvent).toBe(event);
+    expect(acceptedItem).toBe(item);
+    expect(acceptedSource).toBe(source);
+    return confirmation;
   };
-  const lastConfirmation = () => vi.mocked(downloads.accept).mock.lastCall?.[5];
 
   // Observing the page and stopping a load keep ordinary download preferences.
   observed.snapshot();
   observed.navigate("stop");
-  downloadFrom(native(guest));
-  expect(lastConfirmation()).toBe(false);
+  expect(downloadFrom(native(guest))).toBe(false);
 
   const release = observed.beginInput();
   release();
   live = false;
   f.host.revokeAutomation(scope.id);
   expect(observed.current()).toBe(false);
-  downloadFrom(native(guest));
-  expect(lastConfirmation()).toBe(true);
+  expect(downloadFrom(native(guest))).toBe(true);
 
   const leaf = "https://example.com/child";
   const popup = openWindow(guest, leaf);
   const popupContents = popup.createWindow!(
     popup.overrideBrowserWindowOptions!
   );
-  downloadFrom(popupContents);
-  expect(lastConfirmation()).toBe(true);
+  expect(downloadFrom(popupContents)).toBe(true);
 
   f.host.setActive(f.event, { ...f.target(opener), active: true });
   guest.mainFrame.url = guest.url;
@@ -1065,13 +1070,11 @@ it("requires confirmation for delayed automation downloads and their child pages
   expect(openWindow(guest, leaf).action).toBe("deny");
   const child = f.host.snapshot(f.event, f.attached.attachmentId).pages.at(-1)!;
   expect(child.id).not.toBe(opener.id);
-  downloadFrom(native(f.mount(child).guest));
-  expect(lastConfirmation()).toBe(true);
+  expect(downloadFrom(native(f.mount(child).guest))).toBe(true);
 
   const nextScope = { ...scope, id: "next-download-test", live: () => true };
   const newPage = f.host.openWorkbenchAutomationPage(nextScope, leaf);
-  downloadFrom(native(f.mount(newPage.snapshot()).guest));
-  expect(lastConfirmation()).toBe(true);
+  expect(downloadFrom(native(f.mount(newPage.snapshot()).guest))).toBe(true);
 
   const unrelated = f.create();
   const otherGuest = mock.guests.at(-1)!;
@@ -1079,11 +1082,9 @@ it("requires confirmation for delayed automation downloads and their child pages
     kind: "workbench",
     tabId: unrelated.id,
   });
-  downloadFrom(native(otherGuest));
-  expect(lastConfirmation()).toBe(false);
+  expect(downloadFrom(native(otherGuest))).toBe(false);
   otherPage.navigate("goto", leaf);
-  downloadFrom(native(otherGuest));
-  expect(lastConfirmation()).toBe(true);
+  expect(downloadFrom(native(otherGuest))).toBe(true);
   f.host.closeAll();
 });
 

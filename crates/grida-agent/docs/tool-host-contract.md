@@ -129,7 +129,8 @@ existing operation. Native capture media is scoped to the owning tool result.
 A lost reply after a browser mutation remains uncertain. Repeating a call is
 a new operation.
 
-Browser-enabled workspace turns keep the primary-artifact presentation policy.
+Workspace turns with `editorPresentation` receive primary-artifact checkpoint
+guidance even when `editorBrowserTools` enables the browser catalog.
 A file reveal through the trusted workbench remains auxiliary when its reply is
 unconfirmed. URL opens, tab selection and explicit focus retain ordinary
 uncertain-outcome handling.

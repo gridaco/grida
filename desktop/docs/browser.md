@@ -290,9 +290,12 @@ or executed automatically, and this feature makes no malware-scanning claim.
 
 Background automation pages cannot download files. Main requires a native save
 dialog for downloads from workbench tabs that the agent opened, navigated, or
-used for evaluation or input. The rule applies for the tab's lifetime and to
-tabs and windows opened from it so a delayed response still prompts after the
-agent's task ends.
+used for evaluation or input. The rule applies for the tab's lifetime, so a
+delayed response still prompts after the agent's task ends. A new child tab
+inherits the rule when its opener already requires confirmation. A managed
+website window uses its owning tab's current rule.
+If another download needs confirmation while a Save dialog is open, Main
+cancels it and displays a retry notice after the dialog closes.
 
 ## Architecture and rollout
 

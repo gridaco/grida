@@ -1413,27 +1413,16 @@ impl Host {
     }
 }
 
-pub(super) fn check_input(input: &Submission, parts: &[PromptPart]) -> Result<()> {
-    if input.payload.schema().as_str() != INPUT_SCHEMA {
+pub(super) fn check_input(input: &Submission, parts: &[PromptPart]) -> Result<StoredPrompt> {
+    if input.payload.schema().as_str() != INPUT_SCHEMA || input.payload.version() != INPUT_VERSION {
         return Err(problem(
             ErrorKind::Unsupported,
             "unsupported_submission_schema",
         ));
     }
-    let same = match input.payload.version() {
-        INPUT_VERSION => {
-            let previous: StoredPrompt = decode_input(input)?;
-            previous.goal.is_none() && images::same_prompt(&previous.parts, parts)
-        }
-        _ => {
-            return Err(problem(
-                ErrorKind::Unsupported,
-                "unsupported_submission_schema",
-            ));
-        }
-    };
-    if !same {
+    let previous: StoredPrompt = decode_input(input)?;
+    if previous.goal.is_some() || !images::same_prompt(&previous.parts, parts) {
         return Err(problem(ErrorKind::Conflict, "submission_input_changed"));
     }
-    Ok(())
+    Ok(previous)
 }

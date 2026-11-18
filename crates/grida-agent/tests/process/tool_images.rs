@@ -435,6 +435,21 @@ async fn native_browser_capture_requires_act_and_projects_correlated_pixels() {
             .iter()
             .any(|tool| tool["name"] == "browser_capture")
     );
+    let inputs = requests[1]["input"].as_array().unwrap();
+    let reveal_call = inputs
+        .iter()
+        .find(|item| item["type"] == "function_call" && item["name"] == "surface_open")
+        .expect("recorded file reveal");
+    let reveal_output = inputs
+        .iter()
+        .find(|item| {
+            item["type"] == "function_call_output" && item["call_id"] == reveal_call["call_id"]
+        })
+        .expect("correlated file reveal result");
+    let reveal_result: Value =
+        serde_json::from_str(reveal_output["output"].as_str().unwrap()).unwrap();
+    assert_eq!(reveal_result["status"], "uncertain");
+    assert_eq!(reveal_result["structured"]["disposition"], "unknown");
     let pixels = requests[2]["input"]
         .as_array()
         .unwrap()
@@ -472,5 +487,24 @@ async fn native_browser_capture_requires_act_and_projects_correlated_pixels() {
             .unwrap(),
         pixels
     );
+    let turn = live["_meta"]["co.grida/session/updates"]["turnId"]
+        .as_str()
+        .unwrap();
+    let final_state = settled(&mut client, session).await;
+    assert_eq!(final_state["latest"]["turnId"], turn);
+    assert_eq!(final_state["latest"]["status"], "succeeded");
+    for method in ["_co.grida/session/submit", "_co.grida/session/enqueue"] {
+        let exact = submission("act-capture", "act");
+        let retained = client.request(method, exact.clone()).await;
+        assert_eq!(retained["result"]["turnId"], turn, "{retained}");
+        assert_eq!(retained["result"]["disposition"], "completed", "{retained}");
+        let mut changed = exact;
+        changed["editorBrowserTools"] = false.into();
+        let rejected = client.request(method, changed).await;
+        assert_eq!(
+            rejected["error"]["data"], "submission_browser_tools_changed",
+            "{rejected}"
+        );
+    }
     assert!(client.finish().await.status.success());
 }

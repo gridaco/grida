@@ -101,12 +101,9 @@ it("requires a native save choice for an automation-exposed page without changin
   expect(first.saved()).toBeUndefined();
   expect(fs.readdirSync(f.downloads)).toEqual([]);
 
-  dialogs.showSaveDialogSync.mockImplementationOnce(() => {
-    const queued = f.accept("queued.txt", true);
-    expect(queued.event.preventDefault).toHaveBeenCalledOnce();
-    expect(queued.saved()).toBeUndefined();
-    return path.join(f.downloads, "approved.txt");
-  });
+  dialogs.showSaveDialogSync.mockReturnValueOnce(
+    path.join(f.downloads, "approved.txt")
+  );
   expect(f.accept("report.txt", true).saved()).toBe(
     path.join(f.downloads, "approved.txt")
   );
@@ -114,6 +111,30 @@ it("requires a native save choice for an automation-exposed page without changin
   expect(f.manager.preferences().askBeforeDownload).toBe(false);
   expect(f.accept("ordinary.txt").saved()).toBe(
     path.join(f.downloads, "ordinary.txt")
+  );
+});
+
+it("reports canceled concurrent downloads once after the open Save dialog closes", async () => {
+  const f = fixture();
+  await f.manager.setPrompt({ askBeforeDownload: true });
+  dialogs.showSaveDialogSync.mockImplementationOnce(() => {
+    for (const name of ["second.txt", "third.txt"]) {
+      const blocked = f.accept(name);
+      expect(blocked.event.preventDefault).toHaveBeenCalledOnce();
+      expect(blocked.saved()).toBeUndefined();
+    }
+    expect(dialogs.showMessageBox).not.toHaveBeenCalled();
+    return path.join(f.downloads, "approved.txt");
+  });
+  expect(f.accept().saved()).toBe(path.join(f.downloads, "approved.txt"));
+  expect(dialogs.showSaveDialogSync).toHaveBeenCalledOnce();
+  await Promise.resolve();
+  expect(dialogs.showMessageBox).toHaveBeenCalledExactlyOnceWith(
+    f.parent,
+    expect.objectContaining({
+      message: "A browser download was canceled",
+      detail: "A save dialog was already open. Retry the download.",
+    })
   );
 });
 

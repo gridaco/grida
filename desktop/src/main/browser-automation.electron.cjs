@@ -259,41 +259,56 @@ async function main() {
     }
   }
 
-  phase = "recover after an unresolved evaluation";
-  const stopEvaluation = new AbortController();
-  guestDebugger.sendCommand = (method, params, sessionId) => {
-    const reply = sendCommand(method, params, sessionId);
-    if (
-      method === "Runtime.evaluate" &&
-      params.expression.includes("new Promise")
-    )
-      stopEvaluation.abort();
-    return reply;
-  };
-  try {
-    const abandoned = await service.invoke(
-      scope,
-      "browser_evaluate",
-      {
-        target: second.target,
-        documentId: second.documentId,
-        functionText: "() => new Promise(() => {})",
-      },
-      stopEvaluation.signal
-    );
-    assert.deepEqual(abandoned, { disposition: "unknown", error: "cancelled" });
-  } finally {
-    guestDebugger.sendCommand = sendCommand;
+  let recoveredDocument = second.documentId;
+  for (const error of ["cancelled", "timeout"]) {
+    phase = `recover after evaluation returns ${error}`;
+    const stopEvaluation = new AbortController();
+    let reachedEvaluation = false;
+    guestDebugger.sendCommand = (method, params, sessionId) => {
+      const reply = sendCommand(method, params, sessionId);
+      if (
+        method === "Runtime.evaluate" &&
+        params.expression.includes("new Promise")
+      ) {
+        reachedEvaluation = true;
+        if (error === "cancelled") stopEvaluation.abort();
+      }
+      return reply;
+    };
+    try {
+      const abandoned = await service.invoke(
+        scope,
+        "browser_evaluate",
+        {
+          target: second.target,
+          documentId: recoveredDocument,
+          functionText: "() => new Promise(() => {})",
+          ...(error === "timeout" ? { timeoutMs: 2000 } : {}),
+        },
+        stopEvaluation.signal
+      );
+      assert(reachedEvaluation, "The effect never reached the guest debugger.");
+      assert.deepEqual(abandoned, { disposition: "unknown", error });
+    } finally {
+      guestDebugger.sendCommand = sendCommand;
+    }
+    const { data: recovered } = await ok("browser_snapshot", {
+      target: second.target,
+    });
+    assert.notEqual(recovered.documentId, recoveredDocument);
+    recoveredDocument = recovered.documentId;
+    const { data: nextEvaluation } = await ok("browser_evaluate", {
+      target: second.target,
+      documentId: recoveredDocument,
+      functionText: "() => document.title",
+    });
+    assert.equal(nextEvaluation.value, "Browser Tools Fixture");
   }
-  const { data: recovered } = await ok("browser_snapshot", {
-    target: second.target,
-  });
-  assert.notEqual(recovered.documentId, second.documentId);
 
   phase = "stop a pending navigation";
   const { data: slow } = await ok("browser_navigate", {
     target: second.target,
-    documentId: recovered.documentId,
+    documentId: recoveredDocument,
     action: { kind: "goto", url: `${origin}/slow` },
   });
   const response = await slowResponse.promise;
@@ -476,11 +491,20 @@ async function main() {
   host.setActive(event, { attachmentId, pageId, active: true });
   const selected = (await wait(foreground.target, readiness)).data;
   // Navigation readiness does not imply a composited frame for a new webview.
-  await foreground
-    .contents()
-    .executeJavaScript(
-      "new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))"
-    );
+  let frameTimer;
+  await Promise.race([
+    foreground
+      .contents()
+      .executeJavaScript(
+        "new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))"
+      ),
+    new Promise((_, reject) => {
+      frameTimer = setTimeout(
+        () => reject(new Error("Timed out waiting for workbench frames")),
+        5000
+      );
+    }),
+  ]).finally(() => clearTimeout(frameTimer));
   await ok("browser_capture", {
     target: foreground.target,
     documentId: selected.documentId,

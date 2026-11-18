@@ -4536,8 +4536,9 @@ caller is the actual privileged top-level workbench document.
    dispatch and keeps it outside human external-app and workbench shortcuts.
    Background pages cannot start a native download. A workbench page opened or
    changed by automation requires a fresh native save choice for each download.
-   This follows the page and descendants through navigation and survives lease
-   withdrawal because Chromium may report a download after the tool settles.
+   The requirement survives navigation and lease withdrawal because Chromium
+   may report a download after the tool settles. New child tabs inherit their
+   opener's requirement at creation. Managed windows consult their owning page.
    Page evaluation runs with ordinary website authority. Browser
    image results have their own bounded, exact tool-result custody.
 

@@ -168,9 +168,13 @@ impl Pipe {
                         } else if pending.cancellation.is_cancelled()
                             || pending.reply.is_closed() || pending.deadline <= now
                         {
-                            let drain = now + DRAIN_TIME;
-                            write_frame(&mut output, &Cancel { cancel_request_id: id }, drain).await?;
-                            pending.drain_deadline = Some(drain);
+                            write_frame(
+                                &mut output,
+                                &Cancel { cancel_request_id: id },
+                                Instant::now() + DRAIN_TIME,
+                            ).await?;
+                            // The owner only gets a full drain window after its cancel is sent.
+                            pending.drain_deadline = Some(Instant::now() + DRAIN_TIME);
                         }
                     }
                 }
@@ -381,6 +385,79 @@ mod tests {
             serde_json::from_str::<Value>(&frame).unwrap(),
             json!({"cancelRequestId":"cancelled"})
         );
+    }
+
+    #[tokio::test]
+    async fn each_cancellation_gets_a_full_drain_window_after_its_write_flushes() {
+        let (outgoing, incoming) = mpsc::channel(MAX_PENDING);
+        let (replies, responses) = mpsc::channel(MAX_PENDING);
+        let (peer, output) = tokio::io::duplex(1);
+        let pipe = tokio::spawn(Pipe(incoming).dispatch(output, responses));
+        let mut frames = BufReader::new(peer);
+        let cancellation = CancellationToken::new();
+        let mut waiters = Vec::new();
+        for (id, cancellation) in [
+            ("first", cancellation.clone()),
+            ("second", cancellation.clone()),
+            ("unrelated", CancellationToken::new()),
+        ] {
+            let (reply, waiter) = oneshot::channel();
+            waiters.push(waiter);
+            outgoing
+                .send(Pending {
+                    request_id: BindingId::new(id).unwrap(),
+                    operation: "browser_open".to_owned(),
+                    arguments: json!({"url":"http://127.0.0.1/"}),
+                    deadline: Instant::now() + Duration::from_secs(10),
+                    cancellation,
+                    reply,
+                })
+                .await
+                .unwrap();
+            let mut line = String::new();
+            tokio::time::timeout(Duration::from_secs(1), frames.read_line(&mut line))
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                serde_json::from_str::<Value>(&line).unwrap()["requestId"],
+                id
+            );
+        }
+
+        cancellation.cancel();
+        let prefix = tokio::time::timeout(Duration::from_secs(1), frames.read_u8())
+            .await
+            .unwrap()
+            .unwrap();
+        let pre_flush_deadline = Instant::now() + DRAIN_TIME;
+        // The first frame cannot flush while the one-byte transport is full.
+        tokio::time::sleep(POLL_TIME * 25).await;
+        for (id, mut line) in [
+            ("first", char::from(prefix).to_string()),
+            ("second", String::new()),
+        ] {
+            tokio::time::timeout(Duration::from_secs(1), frames.read_line(&mut line))
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                serde_json::from_str::<Value>(&line).unwrap(),
+                json!({"cancelRequestId":id})
+            );
+        }
+        replies.send(observed_reply("first")).await.unwrap();
+        tokio::time::sleep_until((pre_flush_deadline + POLL_TIME).into()).await;
+        replies.send(observed_reply("second")).await.unwrap();
+        replies.send(observed_reply("unrelated")).await.unwrap();
+        for waiter in waiters {
+            tokio::time::timeout(Duration::from_secs(1), waiter)
+                .await
+                .unwrap()
+                .unwrap();
+        }
+        drop(outgoing);
+        pipe.await.unwrap().unwrap();
     }
 
     async fn delayed_drain(reply_queued_before_expiry: bool) {
