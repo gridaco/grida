@@ -474,6 +474,8 @@ struct StoredPrompt {
     editor_endpoint: Option<BindingId>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     editor_presentation: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    editor_browser_tools: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     editor_svg_target: Option<BindingId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -536,6 +538,7 @@ struct SubmissionPolicy {
     allow_image_placement: bool,
     editor_endpoint: Option<BindingId>,
     editor_presentation: bool,
+    editor_browser_tools: bool,
     editor_svg_target: Option<BindingId>,
     operating_regime: OperatingRegime,
     subagent: Option<grida_agent_master::subagents::Assignment>,
@@ -670,6 +673,7 @@ pub(crate) struct SubmissionContext {
     pub allow_library_selection: bool,
     pub editor_endpoint: Option<BindingId>,
     pub editor_presentation: bool,
+    pub editor_browser_tools: bool,
     pub editor_svg_target: Option<BindingId>,
 }
 
@@ -1744,6 +1748,7 @@ impl Host {
                 self.prepare_input(
                     execution,
                     session,
+                    &cwd,
                     input,
                     subagent.as_ref(),
                     side,
@@ -1866,6 +1871,7 @@ impl Host {
                 self.prepare_input(
                     execution,
                     session,
+                    &cwd,
                     input,
                     subagent.as_ref(),
                     side,
@@ -2435,6 +2441,7 @@ impl Host {
                 .is_some_and(image_generation::DesktopImageGeneration::placement),
             editor_endpoint: None,
             editor_presentation: false,
+            editor_browser_tools: false,
             editor_svg_target: None,
             operating_regime,
             subagent: None,
@@ -2462,6 +2469,7 @@ impl Host {
             allow_image_placement,
             editor_endpoint,
             editor_presentation,
+            editor_browser_tools,
             editor_svg_target,
             operating_regime,
             subagent,
@@ -2671,6 +2679,7 @@ impl Host {
                 allow_image_placement,
                 editor_endpoint,
                 editor_presentation,
+                editor_browser_tools,
                 editor_svg_target,
                 guidance,
                 skills,
@@ -2685,10 +2694,12 @@ impl Host {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn prepare_input(
         &self,
         execution: &Execution,
         session: &SessionId,
+        cwd: &Path,
         input: &Submission,
         subagent_profile: Option<&grida_agent_master::subagents::Profile>,
         side: bool,
@@ -2834,6 +2845,7 @@ impl Host {
                             || stored.allow_image_placement
                             || stored.editor_endpoint.is_some()
                             || stored.editor_presentation
+                            || stored.editor_browser_tools
                             || stored.editor_svg_target.is_some()
                             || stored.guidance.is_some()
                             || stored.skills.is_some()
@@ -2879,6 +2891,17 @@ impl Host {
                     return Err(problem(ErrorKind::Conflict, "retained_act_requires_act"));
                 }
                 stored.operating_regime.apply(&mut config);
+                if stored.editor_browser_tools {
+                    config.instructions.push_str("\n\n");
+                    config
+                        .instructions
+                        .push_str(crate::browser_tools::INSTRUCTIONS);
+                    config.instructions.push_str(if image_tool_results {
+                        " Keep browser captures as image results."
+                    } else {
+                        " This model connection cannot receive browser captures. Use browser snapshots for inspection and report the screenshot limitation if asked."
+                    });
+                }
                 if stored.editor_presentation {
                     config.instructions.push_str("\n\n");
                     config
@@ -2908,16 +2931,26 @@ impl Host {
                             "invalid_editor_surface_scope",
                         ));
                     }
+                    let browser_capture = if stored.editor_browser_tools && image_tool_results {
+                        execution.retained_inputs.as_ref().map(|images| {
+                            images.browser_image_capture(session.clone(), cwd.to_owned())
+                        })
+                    } else {
+                        None
+                    };
                     host_tools.push(Arc::new(host_tools::HostTools::editor(
                         self.editor_surfaces.tool_host(
                             session.clone(),
                             endpoint.clone(),
                             stored.editor_presentation,
                             stored.editor_svg_target.clone(),
+                            stored.editor_browser_tools,
+                            browser_capture,
                         )?,
                         endpoint.clone(),
                         stored.editor_presentation,
                         stored.editor_svg_target.is_some(),
+                        stored.editor_browser_tools,
                     )?));
                 }
                 if !cancellation_only && let Some(binding) = &stored.desktop_image_generation {
@@ -3358,9 +3391,18 @@ impl Host {
                 "editor_surface_requires_workspace_act_text",
             ));
         }
+        if context.editor_browser_tools
+            && (editor_endpoint.is_none() || !self.editor_surfaces.browser_tools_available())
+        {
+            return Err(problem(
+                ErrorKind::Unsupported,
+                "browser_tools_require_attached_act",
+            ));
+        }
         policy.editor_endpoint = editor_endpoint;
         policy.editor_presentation = context.editor_presentation;
         policy.editor_svg_target = editor_svg_target;
+        policy.editor_browser_tools = context.editor_browser_tools;
         Ok(())
     }
 
@@ -3376,7 +3418,8 @@ impl Host {
         else {
             return Ok(None);
         };
-        lifecycle::check_input(&view.input, &request.parts)?;
+        let editor_browser_tools =
+            lifecycle::check_input(&view.input, &request.parts)?.editor_browser_tools;
         let settings = InputSettings::for_input(&view.input)?;
         settings.require_effort(request.effort, request.reasoning)?;
         if request
@@ -3398,6 +3441,12 @@ impl Host {
             return Err(problem(
                 ErrorKind::Conflict,
                 "submission_library_selection_changed",
+            ));
+        }
+        if editor_browser_tools != context.editor_browser_tools {
+            return Err(problem(
+                ErrorKind::Conflict,
+                "submission_browser_tools_changed",
             ));
         }
         Ok(Some(DurableSubmission {

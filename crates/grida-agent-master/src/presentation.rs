@@ -1,8 +1,8 @@
 //! Auxiliary workspace presentation in the product harness.
 
 use agent_kit_core::inference::InputFormat;
-use agent_kit_core::messages::OutcomeStatus;
-use agent_kit_core::tools::{RecoveryKind, ToolDefinition};
+use agent_kit_core::messages::{OutcomeStatus, ToolArguments};
+use agent_kit_core::tools::{Invocation, RecoveryKind, ToolDefinition};
 use agent_kit_core::turn::{OperationInput, OperationState, TurnState};
 use agent_kit_core::{OperationId, Result, ToolId, TurnId};
 use agent_kit_runtime::{InvokeOutcome, OperationKey, StepToolOutcome, Turn};
@@ -10,6 +10,7 @@ use serde_json::json;
 
 pub const OPEN: &str = "surface_open";
 pub const PRINCIPAL: &str = "live-editor";
+pub const TARGETED_VERSION: u32 = 3;
 pub const MAX_PATH_BYTES: usize = 4096;
 pub const INSTRUCTIONS: &str = "When producing or editing a primary artifact, request surface_open at the first meaningful renderable checkpoint so the user can follow the work. Keep working after the request. Open the existing primary artifact before substantial edits when it is not already visible. Reopen it only when the user asks or the primary artifact changes. Treat presentation as optional and verify the artifact independently.";
 
@@ -43,7 +44,38 @@ pub fn unconfirmed(operation: &OperationState, turn: &TurnId) -> bool {
     grants.authority.principal.as_str() == PRINCIPAL
         && grants.authority.scope.as_str() == turn.as_str()
         && matches!(grants.grants.as_slice(), [grant] if grant.as_str() == OPEN)
-        && definition().is_ok_and(|definition| invocation.definition() == &definition)
+        && (definition().is_ok_and(|definition| invocation.definition() == &definition)
+            || targeted_file_reveal(invocation))
+}
+
+fn targeted_file_reveal(invocation: &Invocation) -> bool {
+    let tool = invocation.definition();
+    if tool.id.as_str() != OPEN || tool.version != TARGETED_VERSION {
+        return false;
+    }
+    let ToolArguments::Json(arguments) = invocation.arguments() else {
+        return false;
+    };
+    let Some(arguments) = arguments.as_object() else {
+        return false;
+    };
+    let Some(target) = arguments
+        .get("target")
+        .and_then(serde_json::Value::as_object)
+    else {
+        return false;
+    };
+    // Only a file reveal has the same effect as the original presentation.
+    arguments.len() == 1 + usize::from(arguments.contains_key("presentation"))
+        && arguments
+            .get("presentation")
+            .is_none_or(|mode| mode.as_str() == Some("reveal"))
+        && target.len() == 2
+        && target.get("kind").and_then(serde_json::Value::as_str) == Some("file")
+        && target
+            .get("path")
+            .and_then(serde_json::Value::as_str)
+            .is_some()
 }
 
 pub(super) fn blocks_continuation(
@@ -81,7 +113,6 @@ fn unconfirmed_call(
 mod tests {
     use super::*;
     use agent_kit_core::authority::{AuthorityBinding, GrantSelection};
-    use agent_kit_core::messages::ToolArguments;
     use agent_kit_core::tools::{Inventory, Invocation, InvocationContext, Tool, ToolOutcome};
     use agent_kit_core::turn::{AttemptRecord, OperationOutcome, OperationRecord};
     use agent_kit_core::{AttemptId, BindingId, BoxFuture, GrantId, PrincipalId, ScopeId};
@@ -103,18 +134,18 @@ mod tests {
         }
     }
 
-    fn invocation(definition: ToolDefinition, id: &OperationId) -> OperationInput {
+    fn invocation(
+        definition: ToolDefinition,
+        id: &OperationId,
+        arguments: serde_json::Value,
+    ) -> OperationInput {
         let tool = definition.id.clone();
         let mut inventory = Inventory::new();
         inventory.insert(Arc::new(Handler(definition))).unwrap();
         let prepared = inventory
             .snapshot(std::slice::from_ref(&tool))
             .unwrap()
-            .prepare(
-                id.clone(),
-                &tool,
-                ToolArguments::Json(json!({"path":"/poster.canvas"})),
-            )
+            .prepare(id.clone(), &tool, ToolArguments::Json(arguments))
             .unwrap();
         OperationInput::Tool(prepared.invocation().clone())
     }
@@ -126,7 +157,7 @@ mod tests {
         let mut operation = OperationState {
             record: OperationRecord {
                 id: id.clone(),
-                input: invocation(definition().unwrap(), &id),
+                input: invocation(definition().unwrap(), &id, json!({"path":"/poster.canvas"})),
                 origin: None,
                 source_call: None,
                 grants: GrantSelection {
@@ -156,7 +187,36 @@ mod tests {
         operation.record.grants.authority.principal = original;
         let mut other = definition().unwrap();
         other.version -= 1;
-        operation.record.input = invocation(other, &id);
+        operation.record.input = invocation(other, &id, json!({"path":"/poster.canvas"}));
         assert!(!unconfirmed(&operation, &turn));
+
+        let mut targeted = definition().unwrap();
+        targeted.version = TARGETED_VERSION;
+        for (arguments, auxiliary) in [
+            (
+                json!({"target":{"kind":"file","path":"/poster.canvas"}}),
+                true,
+            ),
+            (
+                json!({"target":{"kind":"file","path":"/poster.canvas"},"presentation":"reveal"}),
+                true,
+            ),
+            (
+                json!({"target":{"kind":"file","path":"/poster.canvas"},"presentation":"focus"}),
+                false,
+            ),
+            (
+                json!({"target":{"kind":"url","url":"https://example.com"}}),
+                false,
+            ),
+            (json!({"target":{"kind":"tab","tabId":"tab"}}), false),
+            (
+                json!({"target":{"kind":"file","path":"/poster.canvas","url":"https://example.com"}}),
+                false,
+            ),
+        ] {
+            operation.record.input = invocation(targeted.clone(), &id, arguments);
+            assert_eq!(unconfirmed(&operation, &turn), auxiliary);
+        }
     }
 }

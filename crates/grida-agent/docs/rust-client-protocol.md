@@ -1101,6 +1101,18 @@ endpoint, listing fails as unavailable and presentation reports
 `requested: false` with reason `editor_unavailable`. A `requested: true` result
 means the request was dispatched, not that a renderer displayed the file.
 
+The client and agent can negotiate `co.grida/session/browser-tools` version 1
+alongside editor surfaces. An eligible Act text input carries
+`editorBrowserTools: true` and its exact `editorEndpointId`. Submit and Enqueue
+retries using the same `inputId` must repeat the accepted browser opt-in.
+Omission is equivalent to `false`. Changing the opt-in returns a conflict.
+The reverse `_co.grida/editor/browser-tool` request includes `sessionId`, `endpointId`,
+`callId`, `operation`, `arguments`, and a bounded `timeoutMs`. The reply
+echoes the three identities and carries `result` with dispatch disposition,
+bounded structured data or a domain error, and optional JPEG bytes for a
+browser capture. JSON-RPC cancellation closes the outstanding request against
+that endpoint. Legacy file requests keep their existing method and schema.
+
 The client and agent negotiate
 `co.grida/session/editor-svg-text` version 1 alongside editor surfaces.
 An Act text submission or queued input may carry `editorSvgTargetId` with its

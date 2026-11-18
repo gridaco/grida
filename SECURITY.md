@@ -1397,14 +1397,20 @@ pixels through this reader, with no additional filesystem or model grant.
   request before the SDK can route it. It shares one
   [loopback bearer perimeter](crates/grida-agent/src/loopback_bearer.rs) with
   the shared ACP listener, so both apply the same checks. The bearer value is
-  removed before dispatch. The headless and live profiles each expose one reviewed capability
-  independently of chat, provider, and workspace storage.
+  removed before dispatch. Discovery and dispatch use only the capability grants
+  selected at export startup. The headless and default live profiles select
+  one capability each. The explicit browser export selects the reviewed
+  browser and workbench catalog independently of chat and provider startup.
   [Main's live export owner](desktop/src/main/native-editor-mcp-export.ts)
   captures a separate private bearer and the exact selected workspace. Only
   its first current, authenticated workbench frame can publish bounded
   workspace-relative paths. Navigation, destruction, sign-out, or identity
   change withdraws the view without retargeting. The [private pipe](crates/grida-agent/src/mcp/editor.rs)
   correlates each read and retires on framing, timeout, or connection failure.
+  The [browser MCP adapter](crates/grida-agent/src/mcp/browser.rs) and
+  [native editor adapter](crates/grida-agent/src/editor_surfaces/browser.rs)
+  use the [shared browser catalog](crates/grida-agent/src/browser_tools.rs)
+  and correlate each bounded result with its own call and endpoint.
 - The outbound [MCP client](crates/grida-agent/src/mcp_client.rs) captures
   only a trusted source's explicitly selected tools. Its
   [HTTP transport](crates/grida-agent/src/mcp_client/http.rs) sends the
@@ -4517,6 +4523,26 @@ caller is the actual privileged top-level workbench document.
    removal and clearing; queued writes and stale title updates cannot restore
    removed entries. Its fixed private file is read with regular-file, size and
    no-follow checks and atomically replaced with owner-only permissions.
+7. **Explicit automation custody.** Main admits a background shell from its
+   own fixed bundled document and binds it to a live browser tool scope and an
+   exact workbench frame. The shell starts hidden without the application
+   preload and can mount only the one guest admitted by its native-issued
+   claim. The authorizing workbench bounds pending and live background pages.
+   Background pages stay outside workbench presentation. Scope loss,
+   global data clearing and guest teardown retire their authority. Native Act
+   and the opt-in authenticated MCP export route calls to exact Main-owned
+   targets. Browser tools receive opaque page or tab handles and bounded domain
+   results. The private debugger resolves actual guest contents, and document,
+   frame and viewport guards limit interaction and capture to the requested
+   live page. Main marks trusted automation input for the exact guest through
+   dispatch and keeps it outside human external-app and workbench shortcuts.
+   Background pages cannot start a native download. A workbench page opened or
+   changed by automation requires a fresh native save choice for each download.
+   The requirement survives navigation and lease withdrawal because Chromium
+   may report a download after the tool settles. New child tabs inherit their
+   opener's requirement at creation. Managed windows consult their owning page.
+   Page evaluation runs with ordinary website authority. Browser
+   image results have their own bounded, exact tool-result custody.
 
 **Limits.** Browser pages retain normal web networking, including reachable
 local services; this is not the native command sandbox. Local services must
@@ -4533,16 +4559,22 @@ document request. Some programmatic local document loaders also bypass
 cancellable navigation and request hooks. The session request guard is not a
 preexecution barrier against the trusted embedder's existing scripting power.
 This boundary therefore does not isolate a guest's website contents from its authorized workbench. It isolates guest websites from native
-application authority and unrelated profiles. No agent tool, MCP server or
-agent debugger transport is supplied. The user can open native DevTools for an
-actual owned page; typed utility commands expose no arbitrary scripts, debugger
-messages or remote-debugging endpoint. Main retains the actual registered guest
-for native commands and any separately authorized future automation integration.
+application authority and unrelated profiles. An authorized browser tool can
+interact with its site and read site data through the exact guest. Website
+networking and the shared profile apply to browser tool pages. Raw debugger
+commands, remote debugging, native files and application credentials remain
+outside that tool surface. Users can open DevTools for an actual owned page.
 
 **Files bound by this id.**
 
 - `desktop/src/main/browser-host.ts` — fixed guest preferences, profiles,
   admission, mount correlation, leases, navigation, downloads and teardown.
+- `desktop/src/main/browser-automation-window.ts`,
+  `desktop/src/main/browser-automation.ts`,
+  `desktop/src/main/browser-automation-arguments.ts`,
+  `desktop/src/main/browser-automation-guest.ts`, and
+  `desktop/src/main/desktop-browser-tools.ts` — fixed background shell,
+  admitted target and document checks, typed operations and bounded captures.
 - `desktop/src/main/browser-favicon.ts` and its tests — bounded, isolated
   favicon fetching and document-lifetime cache.
 - `desktop/src/main/browser-legacy-profiles.ts` and its tests — narrowly

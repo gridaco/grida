@@ -55,6 +55,7 @@ import {
 } from "@/scaffolds/desktop/chrome/title-bar";
 import { LastWorkspaceMarker } from "@/scaffolds/desktop/shared/last-workspace-marker";
 import {
+  getDesktopBridge,
   terminal as bridgeTerminal,
   workspaces as workspacesNs,
   type Workspace,
@@ -209,6 +210,16 @@ export function WorkspaceWorkbench({
         workspacesNs.publishEditorSurfaces
       );
   }, [restoreSettled, surfaceHost]);
+
+  useEffect(() => {
+    const automation = getDesktopBridge()?.workspaces.automation;
+    if (restoreSettled && automation?.version === 1)
+      return surfaceHost.bindAutomation(
+        automation,
+        () => browsers.activeAutomationPageId(),
+        browsers.subscribe
+      );
+  }, [browsers, restoreSettled, surfaceHost]);
 
   // File admission and native page attachment settle before the Start surface.
   useEffect(() => {

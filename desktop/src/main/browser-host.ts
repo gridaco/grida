@@ -31,6 +31,55 @@ import type { BrowserDownloads } from "./browser-downloads";
 import { BrowserPageTools } from "./browser-page-tools";
 import { BrowserFindDialog } from "./browser-find-dialog";
 import { BrowserExternalLinks } from "./browser-external-links";
+import {
+  AUTOMATION_SHELL_URL,
+  createBrowserAutomationWindow,
+  focusBrowserAutomationGuest,
+  mountBrowserAutomationGuest,
+} from "./browser-automation-window";
+
+/** Main-to-Main capability. Renderer/model arguments cannot supply this scope. */
+export type BrowserAutomationScope = Readonly<{
+  id: string;
+  sender: WebContents;
+  frame: WebFrameMain;
+  live(): boolean;
+}>;
+
+export type BrowserAutomationTarget =
+  | { kind: "background"; pageId: string }
+  | { kind: "workbench"; tabId: string };
+
+export type BrowserAutomationBlocker =
+  | "popup"
+  | "permission"
+  | "certificate"
+  | "authentication"
+  | "download"
+  | "beforeunload";
+
+export type BrowserAutomationNavigation =
+  | "goto"
+  | "back"
+  | "forward"
+  | "reload"
+  | "stop";
+
+export type BrowserAutomationPage = Readonly<{
+  target: BrowserAutomationTarget;
+  current(): boolean;
+  visible(): boolean;
+  snapshot(): DesktopBrowser.Page;
+  contents(): WebContents | null;
+  watchGuest(listener: (guest: WebContents) => void): () => void;
+  blocker(): BrowserAutomationBlocker | null;
+  prepareInput(): Promise<void>;
+  beginInput(): () => void;
+  navigate(action: BrowserAutomationNavigation, url?: string): void;
+  close(): Promise<boolean>;
+}>;
+
+type Sender = Pick<IpcMainInvokeEvent, "sender" | "senderFrame">;
 
 type Page = {
   guest: WebContents | null;
@@ -43,6 +92,8 @@ type Page = {
   state: { -readonly [K in keyof DesktopBrowser.Page]: DesktopBrowser.Page[K] };
   referrer?: LoadURLOptions["httpReferrer"];
   navigation: number;
+  confirmDownloads: boolean;
+  automationMounts?: Set<(guest: WebContents) => void>;
 };
 type Owner = {
   window: BrowserWindow;
@@ -55,6 +106,11 @@ type Owner = {
   pages: Map<string, Page>;
   disposers: (() => void)[];
   thumbnail: { page: Page; token: symbol } | null;
+  background?: {
+    scope: BrowserAutomationScope;
+    workbench: Owner;
+    blocker: BrowserAutomationBlocker | null;
+  };
 };
 type Popup = {
   window: BrowserWindow;
@@ -81,6 +137,7 @@ const PERMISSION_CLOSE_TIMEOUT_MS = 2_000;
 /** Browser execution and document-scoped guest admission, independent of agents. */
 export class DesktopBrowserHost {
   readonly #owners = new Map<number, Owner>();
+  readonly #automationInputs = new WeakMap<WebContents, number>();
   #browserSession: Session | undefined;
   #sitePolicy: BrowserSitePolicy | undefined;
   readonly #popups = new Map<WebContents, Popup>();
@@ -201,6 +258,278 @@ export class DesktopBrowserHost {
   ): DesktopBrowser.Snapshot {
     return this.#snapshot(this.#attached(event, attachmentId));
   }
+
+  /** Open an isolated, never-presented owner for exactly one background guest. */
+  async openAutomationPage(
+    scope: BrowserAutomationScope,
+    rawUrl: string,
+    signal?: AbortSignal,
+    onGuest?: (guest: WebContents) => void
+  ): Promise<BrowserAutomationPage> {
+    const workbench = this.#automationWorkbench(scope);
+    const url = this.#url(rawUrl);
+    signal?.throwIfAborted();
+    let backgroundPages = 0;
+    for (const owner of this.#owners.values()) {
+      if (
+        owner.background?.workbench === workbench &&
+        ++backgroundPages >= DesktopBrowser.MAX_PAGES
+      )
+        throw new Error("browser_page_limit");
+    }
+    const window = createBrowserAutomationWindow();
+    const owner: Owner = {
+      window,
+      shell: window.webContents,
+      shellId: window.webContents.id,
+      workspaceId: workbench.workspaceId,
+      attachmentId: randomUUID(),
+      frame: null,
+      revision: 0,
+      pages: new Map(),
+      disposers: [],
+      thumbnail: null,
+      background: { scope, workbench, blocker: null },
+    };
+    // Register pending owners before awaiting load so clear/revocation can
+    // destroy the window even before its shell can issue a mount claim.
+    this.#owners.set(owner.shellId, owner);
+    const retire = () => this.#retire(owner);
+    window.once("show", retire);
+    window.once("focus", retire);
+    owner.disposers.push(() => {
+      window.off("show", retire);
+      window.off("focus", retire);
+    });
+    signal?.addEventListener("abort", retire, { once: true });
+    try {
+      await window.loadURL(AUTOMATION_SHELL_URL);
+      signal?.throwIfAborted();
+      owner.frame = owner.shell.mainFrame;
+      if (!this.#live(owner) || this.#clearing)
+        throw new Error("browser_attachment_expired");
+      this.#watchOwner(owner);
+      const descriptor = this.#create(owner, url);
+      const page = owner.pages.get(descriptor.id)!;
+      const result = this.#automationPage(scope, owner, page);
+      const claim = this.#reserveMount(owner, page);
+      const attached = new Promise<void>((resolve, reject) => {
+        const stopWatching = result.watchGuest((guest) => {
+          stopWatching();
+          try {
+            onGuest?.(guest);
+            resolve();
+          } catch (error) {
+            reject(error);
+          }
+        });
+        owner.disposers.push(() =>
+          reject(new Error("browser_attachment_expired"))
+        );
+      });
+      // If the mount never produces an authenticated guest, its timer retires
+      // the background owner and rejects the attachment promise.
+      await Promise.all([
+        attached,
+        mountBrowserAutomationGuest(owner.shell, claim.src),
+      ]);
+      signal?.throwIfAborted();
+      if (!result.current()) throw new Error("browser_attachment_expired");
+      return result;
+    } catch (error) {
+      await this.#destroy(owner);
+      throw error;
+    } finally {
+      signal?.removeEventListener("abort", retire);
+    }
+  }
+
+  openWorkbenchAutomationPage(
+    scope: BrowserAutomationScope,
+    rawUrl: string
+  ): BrowserAutomationPage {
+    const owner = this.#automationWorkbench(scope);
+    const descriptor = this.#create(owner, this.#url(rawUrl), {
+      openerPageId: null,
+      disposition: "foreground",
+      confirmDownloads: true,
+    });
+    if (!owner.window.isVisible()) owner.window.showInactive();
+    return this.#automationPage(scope, owner, owner.pages.get(descriptor.id)!);
+  }
+
+  automationWorkbenchPages(
+    scope: BrowserAutomationScope
+  ): BrowserAutomationPage[] {
+    const owner = this.#automationWorkbench(scope);
+    return [...owner.pages.values()].map((page) =>
+      this.#automationPage(scope, owner, page)
+    );
+  }
+
+  resolveAutomationPage(
+    scope: BrowserAutomationScope,
+    target: BrowserAutomationTarget
+  ): BrowserAutomationPage {
+    const workbench = this.#automationWorkbench(scope);
+    const owner =
+      target.kind === "workbench"
+        ? workbench
+        : [...this.#owners.values()].find(
+            (candidate) =>
+              candidate.background?.scope.id === scope.id &&
+              candidate.background.workbench === workbench &&
+              candidate.pages.has(target.pageId)
+          );
+    const page = owner?.pages.get(
+      target.kind === "workbench" ? target.tabId : target.pageId
+    );
+    if (!owner || !page || !this.#live(owner))
+      throw new Error("browser_page_unavailable");
+    return this.#automationPage(scope, owner, page);
+  }
+
+  presentWorkbenchAutomationPage(
+    scope: BrowserAutomationScope,
+    tabId: string,
+    focus: boolean
+  ): boolean {
+    const owner = this.#automationWorkbench(scope);
+    if (!owner.pages.has(tabId)) return false;
+    if (focus) {
+      owner.window.show();
+      owner.window.focus();
+    } else if (!owner.window.isVisible()) owner.window.showInactive();
+    if (this.#automationWorkbench(scope) !== owner || !owner.pages.has(tabId))
+      return false;
+    owner.shell.send(IPC_CHANNELS.BROWSER_PRESENT_PAGE, {
+      attachmentId: owner.attachmentId!,
+      pageId: tabId,
+      focus,
+    });
+    return true;
+  }
+
+  revokeAutomation(scopeId: string): void {
+    for (const owner of this.#owners.values())
+      if (owner.background?.scope.id === scopeId) this.#retire(owner);
+  }
+
+  #automationWorkbench(scope: BrowserAutomationScope): Owner {
+    if (!scope.live() || this.#clearing)
+      throw new Error("browser_attachment_expired");
+    this.#shell({ sender: scope.sender, senderFrame: scope.frame });
+    const owner = this.#owners.get(scope.sender.id);
+    if (
+      !owner ||
+      owner.background ||
+      owner.frame !== scope.frame ||
+      !this.#live(owner)
+    )
+      throw new Error("browser_attachment_expired");
+    return owner;
+  }
+
+  #automationPage(
+    scope: BrowserAutomationScope,
+    owner: Owner,
+    page: Page
+  ): BrowserAutomationPage {
+    const target: BrowserAutomationTarget = owner.background
+      ? { kind: "background", pageId: page.state.id }
+      : { kind: "workbench", tabId: page.state.id };
+    const current = () => {
+      try {
+        const workbench = this.#automationWorkbench(scope);
+        return (
+          (owner.background?.workbench ?? owner) === workbench &&
+          this.#live(owner) &&
+          owner.pages.get(page.state.id) === page
+        );
+      } catch {
+        return false;
+      }
+    };
+    const requireCurrent = () => {
+      if (!current()) throw new Error("browser_attachment_expired");
+    };
+    return Object.freeze({
+      target: Object.freeze(target),
+      current,
+      visible: () =>
+        current() &&
+        (owner.background
+          ? false
+          : page.active &&
+            owner.window.isVisible() &&
+            !owner.window.isMinimized()),
+      snapshot: () => {
+        requireCurrent();
+        return { ...page.state };
+      },
+      contents: () =>
+        current() && page.guest && !page.guest.isDestroyed()
+          ? page.guest
+          : null,
+      watchGuest: (listener: (guest: WebContents) => void) => {
+        requireCurrent();
+        const listeners = (page.automationMounts ??= new Set());
+        listeners.add(listener);
+        if (page.guest && !page.guest.isDestroyed()) listener(page.guest);
+        return () => {
+          listeners.delete(listener);
+        };
+      },
+      blocker: () => {
+        requireCurrent();
+        return owner.background?.blocker ?? null;
+      },
+      prepareInput: async () => {
+        requireCurrent();
+        const visible = () =>
+          page.active &&
+          owner.window.isVisible() &&
+          !owner.window.isMinimized();
+        if (!owner.background && !visible())
+          throw new Error("browser_target_not_visible");
+        const guest = this.#guest(page);
+        const focused = await focusBrowserAutomationGuest(
+          owner.shell,
+          guest.id
+        );
+        requireCurrent();
+        if (!owner.background && !visible())
+          throw new Error("browser_target_not_visible");
+        if (!focused || page.guest !== guest)
+          throw new Error("browser_input_focus_unavailable");
+      },
+      beginInput: () => {
+        requireCurrent();
+        const guest = this.#guest(page);
+        page.confirmDownloads = true;
+        this.#automationInputs.set(
+          guest,
+          (this.#automationInputs.get(guest) ?? 0) + 1
+        );
+        return () => {
+          const count = this.#automationInputs.get(guest) ?? 0;
+          if (count <= 1) this.#automationInputs.delete(guest);
+          else this.#automationInputs.set(guest, count - 1);
+        };
+      },
+      navigate: (action: BrowserAutomationNavigation, url?: string) => {
+        requireCurrent();
+        if (action !== "stop") page.confirmDownloads = true;
+        this.#navigate(owner, page, action, url);
+      },
+      close: async () => {
+        requireCurrent();
+        if (!owner.background) return this.#requestClose(owner, page);
+        await this.#destroy(owner);
+        return true;
+      },
+    });
+  }
   detach(event: IpcMainInvokeEvent, attachmentId: unknown): Promise<void> {
     return this.#destroy(this.#attached(event, attachmentId));
   }
@@ -225,8 +554,9 @@ export class DesktopBrowserHost {
     created?: {
       openerPageId: string | null;
       disposition: "foreground" | "background";
-    },
-    referrer?: LoadURLOptions["httpReferrer"]
+      referrer?: LoadURLOptions["httpReferrer"];
+      confirmDownloads?: true;
+    }
   ): DesktopBrowser.Page {
     if (!this.#live(owner) || this.#clearing)
       throw new Error("browser_attachment_expired");
@@ -234,6 +564,9 @@ export class DesktopBrowserHost {
       throw new Error("browser_page_limit");
     const id = randomUUID();
     const browserSession = this.#session();
+    const opener = created?.openerPageId
+      ? owner.pages.get(created.openerPageId)
+      : undefined;
     const page: Page = {
       guest: null,
       retiring: new Set(),
@@ -251,10 +584,13 @@ export class DesktopBrowserHost {
         changed: () => this.#changed(owner, page),
       }),
       mount: null,
-      active: false,
+      active: !!owner.background,
       rendered: false,
-      referrer,
+      referrer: created?.referrer,
       navigation: 0,
+      confirmDownloads: !!(
+        created?.confirmDownloads || opener?.confirmDownloads
+      ),
       state: {
         id,
         mounted: false,
@@ -276,7 +612,8 @@ export class DesktopBrowserHost {
         attachmentId: owner.attachmentId!,
         revision: owner.revision,
         page: { ...page.state },
-        ...created,
+        openerPageId: created.openerPageId,
+        disposition: created.disposition,
       } satisfies DesktopBrowser.Event);
     } else this.#changed(owner, page);
     return { ...page.state };
@@ -287,6 +624,9 @@ export class DesktopBrowserHost {
     raw: unknown
   ): DesktopBrowser.GuestMount {
     const [owner, page] = this.#target(event, raw);
+    return this.#reserveMount(owner, page);
+  }
+  #reserveMount(owner: Owner, page: Page): DesktopBrowser.GuestMount {
     if (page.guest || page.state.failure)
       throw new Error("browser_mount_unavailable");
     if (page.mount) return Object.freeze({ src: page.mount.src });
@@ -342,7 +682,7 @@ export class DesktopBrowserHost {
       webSecurity: true,
       allowRunningInsecureContent: false,
       preload: path.join(__dirname, "browser-guest-preload.js"),
-      disableDialogs: false,
+      disableDialogs: !!mount.owner.background,
       safeDialogs: true,
       // Additional stock-runtime hardening; the public window-open handler
       // installed before website load is the authoritative popup policy.
@@ -395,6 +735,13 @@ export class DesktopBrowserHost {
     page.state.failure = null;
     this.#observe(owner, page, guest);
     this.#changed(owner, page);
+    for (const listener of page.automationMounts ?? []) {
+      try {
+        listener(guest);
+      } catch {
+        // A Main consumer cannot interrupt browser admission or policy.
+      }
+    }
     if (page.state.url) {
       const restorable = DesktopBrowser.normalizeUrl(page.state.url);
       if (restorable) this.#load(owner, page, restorable);
@@ -421,41 +768,61 @@ export class DesktopBrowserHost {
   navigate(event: IpcMainInvokeEvent, raw: unknown): void {
     const request = this.#record(raw);
     const [owner, page] = this.#target(event, request);
-    this.#load(owner, page, this.#url(request.url));
+    this.#navigate(owner, page, "goto", request.url);
   }
   back(event: IpcMainInvokeEvent, raw: unknown): void {
     const [owner, page] = this.#target(event, raw);
-    const guest = this.#guest(page);
-    if (guest.navigationHistory.canGoBack()) {
-      page.navigation++;
-      page.state.loading = true;
-      this.#changed(owner, page);
-      guest.navigationHistory.goBack();
-    }
+    this.#navigate(owner, page, "back");
   }
   forward(event: IpcMainInvokeEvent, raw: unknown): void {
     const [owner, page] = this.#target(event, raw);
-    const guest = this.#guest(page);
-    if (guest.navigationHistory.canGoForward()) {
-      page.navigation++;
-      page.state.loading = true;
-      this.#changed(owner, page);
-      guest.navigationHistory.goForward();
-    }
+    this.#navigate(owner, page, "forward");
   }
   reload(event: IpcMainInvokeEvent, raw: unknown): void {
     const [owner, page] = this.#target(event, raw);
-    page.favicon.clear();
-    page.state.failure = null;
-    page.navigation++;
-    page.rendered = false;
-    page.state.loading = !!page.guest && !!page.state.url;
-    this.#changed(owner, page);
-    if (page.guest && !page.guest.isDestroyed()) page.guest.reload();
+    this.#navigate(owner, page, "reload");
   }
   stop(event: IpcMainInvokeEvent, raw: unknown): void {
-    const [, page] = this.#target(event, raw);
-    page.guest?.stop();
+    const [owner, page] = this.#target(event, raw);
+    this.#navigate(owner, page, "stop");
+  }
+  #navigate(
+    owner: Owner,
+    page: Page,
+    action: BrowserAutomationNavigation,
+    rawUrl?: unknown
+  ): void {
+    if (action === "goto") {
+      this.#load(owner, page, this.#url(rawUrl));
+      return;
+    }
+    if (action === "stop") {
+      page.guest?.stop();
+      return;
+    }
+    if (action === "reload") {
+      page.favicon.clear();
+      page.state.failure = null;
+      page.navigation++;
+      page.rendered = false;
+      page.state.loading = !!page.guest && !!page.state.url;
+      this.#changed(owner, page);
+      if (owner.background) owner.background.blocker = null;
+      if (page.guest && !page.guest.isDestroyed()) page.guest.reload();
+      return;
+    }
+    const { navigationHistory } = this.#guest(page);
+    const canGo =
+      action === "back"
+        ? navigationHistory.canGoBack()
+        : navigationHistory.canGoForward();
+    if (!canGo) return;
+    page.navigation++;
+    page.state.loading = true;
+    this.#changed(owner, page);
+    if (owner.background) owner.background.blocker = null;
+    if (action === "back") navigationHistory.goBack();
+    else navigationHistory.goForward();
   }
   focus(event: IpcMainInvokeEvent, raw: unknown): void {
     const [owner, page] = this.#target(event, raw);
@@ -702,6 +1069,10 @@ export class DesktopBrowserHost {
       for (const popup of this.#popups.values()) this.#forcePopup(popup);
       const closing: Promise<void>[] = [];
       for (const owner of this.#owners.values()) {
+        if (owner.background) {
+          closing.push(this.#destroy(owner));
+          continue;
+        }
         for (const page of owner.pages.values())
           closing.push(this.#close(owner, page));
       }
@@ -733,7 +1104,7 @@ export class DesktopBrowserHost {
     for (const owner of this.#owners.values()) this.#retire(owner);
   }
 
-  #shell(event: IpcMainInvokeEvent): BrowserWindow {
+  #shell(event: Sender): BrowserWindow {
     if (event.sender.isDestroyed()) throw new Error("browser_owner_invalid");
     const window = BrowserWindow.fromWebContents(event.sender);
     if (
@@ -865,6 +1236,11 @@ export class DesktopBrowserHost {
     );
     browserSession.on("will-download", (event, item, contents) => {
       const site = this.#site(contents);
+      if (site?.owner.background) {
+        event.preventDefault();
+        this.#blocked(site.owner, "download");
+        return;
+      }
       if (!site || !this.options.downloads) {
         event.preventDefault();
         return;
@@ -874,7 +1250,10 @@ export class DesktopBrowserHost {
         item,
         contents,
         site.window,
-        site.live
+        site.live,
+        // Chromium can start a download after a tool and its input marker have
+        // settled. Keep confirmation attached to the page, including its popups.
+        site.page.confirmDownloads
       );
     });
     this.#browserSession = browserSession;
@@ -887,6 +1266,7 @@ export class DesktopBrowserHost {
     page.state.url = url;
     page.state.failure = null;
     page.state.loading = page.guest !== null;
+    if (owner.background) owner.background.blocker = null;
     this.#changed(owner, page);
     const httpReferrer = page.referrer;
     page.referrer = undefined;
@@ -976,6 +1356,7 @@ export class DesktopBrowserHost {
       if (!details.isSameDocument) {
         page.favicon.clear();
         page.rendered = false;
+        if (owner.background) owner.background.blocker = null;
       }
     });
     const refresh = () => {
@@ -1150,12 +1531,14 @@ export class DesktopBrowserHost {
     });
     contents.on("before-input-event", (event, input) => {
       if (!current() || !this.#live(owner)) return;
+      if (owner.background) return;
       // CSS visibility does not reliably clear native guest focus. Inactive
       // pages must not consume even queued keyboard/composition events.
       if (!page.active) {
         event.preventDefault();
         return;
       }
+      if (this.#automationInputs.has(contents)) return;
       if (input.type !== "keyDown" || input.isAutoRepeat || input.isComposing)
         return;
       const key = input.key.toLowerCase();
@@ -1238,7 +1621,11 @@ export class DesktopBrowserHost {
     source?: { origin: string; isCurrent(): boolean }
   ): void {
     const site = this.#site(contents);
-    if (!site) return;
+    if (!site || this.#automationInputs.has(contents)) return;
+    if (site.owner.background) {
+      this.#blocked(site.owner, "permission");
+      return;
+    }
     const visible = () =>
       site.live() &&
       site.window.isVisible() &&
@@ -1253,7 +1640,12 @@ export class DesktopBrowserHost {
     });
   }
   #resourceNotice(owner: Owner): void {
-    if (!this.#live(owner) || this.#resourceNotices.has(owner)) return;
+    if (
+      owner.background ||
+      !this.#live(owner) ||
+      this.#resourceNotices.has(owner)
+    )
+      return;
     this.#resourceNotices.add(owner);
     void dialog
       .showMessageBox(owner.window, {
@@ -1272,12 +1664,12 @@ export class DesktopBrowserHost {
     disposition: "foreground" | "background",
     referrer?: LoadURLOptions["httpReferrer"]
   ): boolean {
-    if (!this.#live(owner) || this.#clearing) return false;
+    if (owner.background || !this.#live(owner) || this.#clearing) return false;
     if (owner.pages.size >= DesktopBrowser.MAX_PAGES) {
       this.#resourceNotice(owner);
       return false;
     }
-    this.#create(owner, url, { openerPageId, disposition }, referrer);
+    this.#create(owner, url, { openerPageId, disposition, referrer });
     return true;
   }
   #location(raw: unknown): string | null {
@@ -1332,7 +1724,13 @@ export class DesktopBrowserHost {
   /** Private preload intents are admitted by actual guest/frame, never app IPC. */
   guestLink(event: IpcMainEvent, raw: unknown): void {
     const site = this.#site(event.sender);
-    if (!site || !site.live() || event.senderFrame !== event.sender.mainFrame)
+    if (
+      !site ||
+      site.owner.background ||
+      this.#automationInputs.has(event.sender) ||
+      !site.live() ||
+      event.senderFrame !== event.sender.mainFrame
+    )
       return;
     if (!this.#popups.has(event.sender) && !site.page.active) return;
     const request = this.#record(raw);
@@ -1376,11 +1774,33 @@ export class DesktopBrowserHost {
       window: parent,
       isLive: live,
       isActive: active,
+      ...(owner.background && {
+        blockPrompt: (kind) => this.#blocked(owner, kind),
+      }),
     });
     contents.on("did-start-navigation", (details) => {
       if (details.isMainFrame) this.#linkIntents.delete(contents);
     });
     contents.once("destroyed", () => this.#sitePolicy?.unregister(contents));
+    if (owner.background) {
+      contents.setWindowOpenHandler(() => {
+        this.#blocked(owner, "popup");
+        return { action: "deny" };
+      });
+      contents.on("login", (event, _details, _auth, callback) => {
+        event.preventDefault();
+        this.#blocked(owner, "authentication");
+        callback();
+      });
+      contents.on("will-prevent-unload", (event) => {
+        if (this.#permissionReloads.has(contents) || !live()) {
+          event.preventDefault();
+          return;
+        }
+        this.#blocked(owner, "beforeunload");
+      });
+      return;
+    }
     const registerPopup = (window: BrowserWindow, disposition: string) => {
       const guest = window.webContents;
       if (!live() || guest.session !== this.#session() || this.#clearing) {
@@ -1466,6 +1886,7 @@ export class DesktopBrowserHost {
       // evidence through the hardened factory and Session permission handler.
       if (
         !live() ||
+        this.#automationInputs.has(contents) ||
         (!this.#location(details.url) &&
           !BrowserExternalLinks.parse(details.url))
       )
@@ -1714,6 +2135,7 @@ export class DesktopBrowserHost {
       if (
         !live() ||
         !active() ||
+        this.#automationInputs.has(contents) ||
         input.type !== "keyDown" ||
         input.isComposing ||
         input.isAutoRepeat
@@ -1778,6 +2200,10 @@ export class DesktopBrowserHost {
         );
       }
     });
+  }
+  #blocked(owner: Owner, reason: BrowserAutomationBlocker): void {
+    if (owner.background && this.#live(owner) && !this.#clearing)
+      owner.background.blocker = reason;
   }
   #reloadPermissions(contents: WebContents): Promise<void> {
     if (contents.isDestroyed()) return Promise.resolve();
@@ -1993,8 +2419,8 @@ export class DesktopBrowserHost {
       const request = DesktopBrowser.Management.parseOpenPage(raw);
       if (!request) throw new Error("browser_url_invalid");
       check();
-      const owner = [...this.#owners.values()].find((candidate) =>
-        this.#live(candidate)
+      const owner = [...this.#owners.values()].find(
+        (candidate) => !candidate.background && this.#live(candidate)
       );
       if (!owner) return false;
       if (!this.#openTab(owner, request.url, null, "foreground")) return false;
@@ -2013,7 +2439,7 @@ export class DesktopBrowserHost {
       if (details.isMainFrame && !details.isSameDocument) retire();
     };
     const inPage = (_event: unknown, url: string, isMainFrame: boolean) => {
-      if (isMainFrame && this.#workspace(url) !== owner.workspaceId) retire();
+      if (isMainFrame && !this.#ownerLocation(owner, url)) retire();
     };
     const failed = (
       _event: unknown,
@@ -2118,6 +2544,10 @@ export class DesktopBrowserHost {
     if (mount.guest && !mount.guest.isDestroyed())
       mount.guest.close({ waitForBeforeUnload: false });
     if (!live) return;
+    if (mount.owner.background) {
+      this.#retire(mount.owner);
+      return;
+    }
     mount.page.state.failure = {
       kind: "mount",
       code,
@@ -2127,6 +2557,7 @@ export class DesktopBrowserHost {
   }
   #blur(owner: Owner, page: Page): void {
     if (
+      !owner.background &&
       page.guest &&
       !page.guest.isDestroyed() &&
       page.guest.isFocused() &&
@@ -2149,7 +2580,7 @@ export class DesktopBrowserHost {
         }
     }
     page.state.revision = ++owner.revision;
-    if (this.#live(owner))
+    if (!owner.background && this.#live(owner))
       owner.shell.send(IPC_CHANNELS.BROWSER_CHANGED, {
         type: "changed",
         attachmentId: owner.attachmentId!,
@@ -2163,10 +2594,20 @@ export class DesktopBrowserHost {
       owner.attachmentId !== null &&
       !owner.shell.isDestroyed() &&
       !owner.window.isDestroyed() &&
-      this.options.admitWindow(owner.window) &&
       owner.frame === owner.shell.mainFrame &&
-      owner.workspaceId === this.#workspace(owner.shell.getURL())
+      this.#ownerLocation(owner, owner.shell.getURL()) &&
+      (owner.background
+        ? !owner.window.isVisible() &&
+          !owner.window.isFocused() &&
+          owner.background.scope.live() &&
+          this.#live(owner.background.workbench)
+        : this.options.admitWindow(owner.window))
     );
+  }
+  #ownerLocation(owner: Owner, url: string): boolean {
+    return owner.background
+      ? url === AUTOMATION_SHELL_URL
+      : owner.workspaceId === this.#workspace(url);
   }
   #snapshot(owner: Owner): DesktopBrowser.Snapshot {
     return {
@@ -2207,7 +2648,7 @@ export class DesktopBrowserHost {
       return result;
     });
     owner.revision++;
-    if (this.#live(owner))
+    if (!owner.background && this.#live(owner))
       owner.shell.send(IPC_CHANNELS.BROWSER_CHANGED, {
         type: "closed",
         attachmentId: owner.attachmentId!,
@@ -2224,9 +2665,17 @@ export class DesktopBrowserHost {
     if (this.#owners.get(owner.shellId) === owner)
       this.#owners.delete(owner.shellId);
     for (const dispose of owner.disposers.splice(0)) dispose();
-    await Promise.all(
-      [...owner.pages.values()].map((page) => this.#close(owner, page))
+    const closing = [...owner.pages.values()].map((page) =>
+      this.#close(owner, page)
     );
+    if (owner.background) {
+      if (!owner.window.isDestroyed()) owner.window.destroy();
+    } else {
+      for (const candidate of this.#owners.values())
+        if (candidate.background?.workbench === owner)
+          closing.push(this.#destroy(candidate));
+    }
+    await Promise.all(closing);
   }
   #retire(owner: Owner): void {
     void this.#destroy(owner).catch(() =>

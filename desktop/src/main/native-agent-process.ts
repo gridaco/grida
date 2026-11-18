@@ -27,9 +27,11 @@ import { NativeActivityOrder } from "./native-activity-order";
 import { NativeSelectedImages } from "./native-selected-images";
 import {
   NativeEditorSurfaceEndpoints,
+  type NativeEditorBrowserReply,
   type NativeEditorSurfaceDelivery,
   type NativeEditorSvgTextDelivery,
 } from "./native-editor-surfaces";
+import type { DesktopBrowserToolLease } from "./desktop-browser-tools";
 import {
   NativeAgentPermissions,
   type NativeWorkspaceSelection,
@@ -45,6 +47,7 @@ import {
 
 const FRAME_LIMIT = 1024 * 1024;
 const REQUEST_LIMIT = 16;
+const BROWSER_BUSY_REPLY_LIMIT = 8 * 1024;
 const START_TIMEOUT_MS = 10_000;
 const SHUTDOWN_TIMEOUT_MS = 12_000;
 const KILL_TIMEOUT_MS = 2_000;
@@ -108,6 +111,14 @@ type Pending = {
   resolve: (result: unknown) => void;
   reject: (error: Error) => void;
   timer: ReturnType<typeof setTimeout>;
+};
+
+type BrowserRequest = {
+  controller: AbortController;
+  reply?: {
+    bytes: Buffer;
+    ifRevoked?: () => NativeEditorBrowserReply | undefined;
+  };
 };
 
 type GatewayAttempt = Readonly<{
@@ -192,6 +203,13 @@ export class NativeAgentProcess {
   private editorSurfaces = false;
   private editorSurfaceOpen = false;
   private editorSvgText = false;
+  private editorBrowserTools = false;
+  private readonly editorBrowserRequests = new Map<
+    string | number,
+    BrowserRequest
+  >();
+  private readonly browserBusyReplies = new Map<string | number, Buffer>();
+  private browserBusyReplyBytes = 0;
   private chatSelection = false;
   private permissionMode = false;
   private readonly commandCapabilities = new Set<string>();
@@ -662,6 +680,7 @@ export class NativeAgentProcess {
                 ...(providerEgress && {
                   [NativeEditorSurfaceEndpoints.openCapability]: 1,
                   [NativeEditorSurfaceEndpoints.svgTextCapability]: 1,
+                  [NativeEditorSurfaceEndpoints.browserCapability]: 1,
                 }),
                 [NativeAgentArtifacts.capability]: 1,
                 [NativeAgentBackgroundProcesses.capability]: 1,
@@ -808,6 +827,9 @@ export class NativeAgentProcess {
       processOwner.editorSvgText =
         processOwner.editorSurfaces &&
         advertised?.[NativeEditorSurfaceEndpoints.svgTextCapability] === 1;
+      processOwner.editorBrowserTools =
+        processOwner.editorSurfaces &&
+        advertised?.[NativeEditorSurfaceEndpoints.browserCapability] === 1;
       processOwner.ready = true;
       return processOwner;
     } catch (error) {
@@ -893,7 +915,8 @@ export class NativeAgentProcess {
     requireCurrent: () => void,
     deliver: NativeEditorSurfaceDelivery | undefined,
     revision?: number,
-    svgText?: NativeEditorSvgTextDelivery
+    svgText?: NativeEditorSvgTextDelivery,
+    browser?: DesktopBrowserToolLease
   ) {
     if (this.connected && this.editorSurfaces)
       return this.editorEndpoints.register(
@@ -902,7 +925,8 @@ export class NativeAgentProcess {
         requireCurrent,
         this.editorSurfaceOpen ? deliver : undefined,
         revision,
-        this.editorSvgText ? svgText : undefined
+        this.editorSvgText ? svgText : undefined,
+        this.editorBrowserTools ? browser : undefined
       );
   }
 
@@ -958,7 +982,7 @@ export class NativeAgentProcess {
     this.cancelGatewayBillingRequests();
     this.imageGeneration?.close();
     this.imagePlacement?.close();
-    this.editorEndpoints.close();
+    this.closeEditorEndpoints();
     this.child.stdin.end();
     const exit = await bounded(this.exited, SHUTDOWN_TIMEOUT_MS);
     if (exit && !this.ready) return;
@@ -979,13 +1003,120 @@ export class NativeAgentProcess {
 
   private write(message: object): void {
     const bytes = Buffer.from(JSON.stringify(message) + "\n");
+    if (!this.tryWrite(bytes)) throw new Error("native_agent_frame_limit");
+  }
+
+  private tryWrite(bytes: Buffer): boolean {
     if (
       bytes.length > FRAME_LIMIT ||
       this.child.stdin.writableLength + bytes.length > FRAME_LIMIT
-    ) {
-      throw new Error("native_agent_frame_limit");
+    )
+      return false;
+    // A deferred frame can need space even when the writer never signals drain.
+    this.child.stdin.write(bytes, (error) => {
+      if (error) return;
+      try {
+        this.flushBrowserReplies();
+      } catch {
+        this.disconnect("native_agent_browser_reply_failed");
+      }
+    });
+    return true;
+  }
+
+  private browserReplyFrame(
+    id: string | number,
+    result?: NativeEditorBrowserReply | null
+  ): Buffer {
+    const message = {
+      jsonrpc: "2.0",
+      id,
+      ...(result
+        ? { result }
+        : {
+            error:
+              result === null
+                ? { code: -32602, message: "Invalid params" }
+                : { code: -32603, message: "Browser reply unverified" },
+          }),
+    };
+    return Buffer.from(JSON.stringify(message) + "\n");
+  }
+
+  private completeBrowserRequest(
+    id: string | number,
+    request: BrowserRequest,
+    result?: NativeEditorBrowserReply | null
+  ): void {
+    if (!this.connected) return;
+    if (request.controller.signal.aborted) {
+      this.editorBrowserRequests.delete(id);
+      return;
     }
-    this.child.stdin.write(bytes);
+    const bytes = this.browserReplyFrame(id, result);
+    const reply =
+      bytes.length <= FRAME_LIMIT
+        ? {
+            bytes,
+            ifRevoked: result
+              ? this.editorEndpoints.browserReplyGuard(result)
+              : undefined,
+          }
+        : { bytes: this.browserReplyFrame(id) };
+    if (reply.bytes.length > FRAME_LIMIT)
+      throw new Error("native_agent_frame_limit");
+    // A completed request keeps its admitted slot until its one bounded frame
+    // is written or canceled. This keeps the stdin cap and the admission cap.
+    if (this.tryWriteBrowserReply(id, reply))
+      this.editorBrowserRequests.delete(id);
+    else request.reply = reply;
+  }
+
+  private tryWriteBrowserReply(
+    id: string | number,
+    reply: NonNullable<BrowserRequest["reply"]>
+  ): boolean {
+    const revoked = reply.ifRevoked?.();
+    if (revoked) {
+      reply.bytes = this.browserReplyFrame(id, revoked);
+      reply.ifRevoked = undefined;
+    }
+    return this.tryWrite(reply.bytes);
+  }
+
+  private writeBrowserBusyReply(
+    id: string | number,
+    result: NativeEditorBrowserReply | null
+  ): void {
+    const bytes = this.browserReplyFrame(id, result);
+    if (this.tryWrite(bytes)) return;
+    // The caller can time out if this queue also fills. The operation was never
+    // dispatched, and its refusal must not disconnect the shared worker.
+    if (this.browserBusyReplyBytes + bytes.length > BROWSER_BUSY_REPLY_LIMIT)
+      return;
+    this.browserBusyReplies.set(id, bytes);
+    this.browserBusyReplyBytes += bytes.length;
+  }
+
+  private flushBrowserReplies(): void {
+    if (!this.connected) return;
+    for (const [id, request] of this.editorBrowserRequests) {
+      if (!request.reply) continue;
+      if (!this.tryWriteBrowserReply(id, request.reply)) return;
+      this.editorBrowserRequests.delete(id);
+    }
+    for (const [id, bytes] of this.browserBusyReplies) {
+      if (!this.tryWrite(bytes)) return;
+      this.removeBrowserBusyReply(id);
+    }
+  }
+
+  private removeBrowserBusyReply(id: string | number): void {
+    const bytes = this.browserBusyReplies.get(id);
+    if (bytes) {
+      this.browserBusyReplyBytes -= bytes.length;
+      this.browserBusyReplies.delete(id);
+    }
   }
 
   private receive(chunk: Buffer): void {
@@ -1112,6 +1243,36 @@ export class NativeAgentProcess {
         }
         if (
           this.connected &&
+          this.editorBrowserTools &&
+          message.method === NativeEditorSurfaceEndpoints.browserMethod
+        ) {
+          const id = message.id;
+          if (
+            this.editorBrowserRequests.has(id) ||
+            this.browserBusyReplies.has(id)
+          )
+            throw new Error("native_agent_browser_request_id_reused");
+          if (this.editorBrowserRequests.size >= REQUEST_LIMIT) {
+            this.writeBrowserBusyReply(
+              id,
+              this.editorEndpoints.browserBusy(message.params)
+            );
+            return;
+          }
+          const controller = new AbortController();
+          const request = { controller };
+          this.editorBrowserRequests.set(id, request);
+          void this.editorEndpoints
+            .browserTool(message.params, controller.signal)
+            .then(
+              (result) => this.completeBrowserRequest(id, request, result),
+              () => this.completeBrowserRequest(id, request)
+            )
+            .catch(() => this.disconnect("native_agent_browser_reply_failed"));
+          return;
+        }
+        if (
+          this.connected &&
           this.editorSurfaces &&
           (message.method === NativeEditorSurfaceEndpoints.readMethod ||
             (this.editorSurfaceOpen &&
@@ -1139,8 +1300,13 @@ export class NativeAgentProcess {
         this.providerEgress?.cancel(message.params);
       } else if (message.method === "$/cancel_request") {
         const id = object(message.params)?.requestId;
-        if (typeof id === "number" || typeof id === "string")
+        if (typeof id === "number" || typeof id === "string") {
           this.gatewayBillingRequests.get(id)?.abort();
+          const request = this.editorBrowserRequests.get(id);
+          request?.controller.abort();
+          if (request?.reply) this.editorBrowserRequests.delete(id);
+          this.removeBrowserBusyReply(id);
+        }
         this.imageGeneration?.cancel(id);
         this.imagePlacement?.cancel(id);
       } else if (message.method === "session/update") {
@@ -1185,7 +1351,7 @@ export class NativeAgentProcess {
     this.cancelGatewayBillingRequests();
     this.imageGeneration?.close();
     this.imagePlacement?.close();
-    this.editorEndpoints.close();
+    this.closeEditorEndpoints();
     this.providerRequests.clear();
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timer);
@@ -1197,6 +1363,15 @@ export class NativeAgentProcess {
   private disconnect(code: string): void {
     this.fail(new Error(code));
     void this.close().catch(() => {});
+  }
+
+  private closeEditorEndpoints(): void {
+    for (const request of this.editorBrowserRequests.values())
+      request.controller.abort();
+    this.editorBrowserRequests.clear();
+    this.browserBusyReplies.clear();
+    this.browserBusyReplyBytes = 0;
+    this.editorEndpoints.close();
   }
 
   private cancelGatewayBillingRequests(): void {

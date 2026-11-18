@@ -48,6 +48,7 @@ import { NativeDesktopAgent } from "./main/native-desktop-agent";
 import { NativeDesktopProfile } from "./main/native-desktop-profile";
 import { NativeMcpLaunch } from "./main/native-mcp-launch";
 import { NativeEditorMcpExport } from "./main/native-editor-mcp-export";
+import type { DesktopBrowserTools } from "./main/desktop-browser-tools";
 import { NativeExternalRuns } from "./main/native-external-runs";
 import {
   nativeWorkspaceCatalog,
@@ -134,6 +135,7 @@ registerWorkspaceMediaScheme();
 // registered through this controller only after it reaches `main`.
 let entryWindow: DesktopEntryWindow | null = null;
 let browserHost: ReturnType<typeof registerIpcHandlers> | undefined;
+let browserTools: DesktopBrowserTools | undefined;
 let browserHistory: BrowserHistory | undefined;
 const workspaceReview = new NativeWorkspaceReview(
   new URL(EDITOR_BASE_URL).origin,
@@ -772,6 +774,8 @@ app.on("ready", async () => {
               );
             },
             workspaceRoot: async (id) => (await catalog.fileGrant(id)).root,
+            browserLease: (sender, frame, requireCurrent) =>
+              browserTools?.lease(sender, frame, requireCurrent),
           }
         );
       }
@@ -897,6 +901,9 @@ app.on("ready", async () => {
   }
   browserHost = registerIpcHandlers({
     browser_history: browserHistory,
+    on_browser_tools: (tools) => {
+      browserTools = tools;
+    },
     browser_downloads: new BrowserDownloads(
       app.getPath("userData"),
       app.getPath("downloads")

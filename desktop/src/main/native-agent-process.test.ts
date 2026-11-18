@@ -16,6 +16,7 @@ import { NativeQueuedMessages } from "./native-queued-messages";
 import { NativeSelectedImages } from "./native-selected-images";
 import { NativeSubagentActivity } from "./native-subagent-activity";
 import { NativeActivityOrder } from "./native-activity-order";
+import { NativeEditorSurfaceEndpoints } from "./native-editor-surfaces";
 
 function state() {
   const root = fs.mkdtempSync(
@@ -1193,6 +1194,208 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
       }
     }
   });
+
+  it.each([{ backpressure: false }, { backpressure: true }])(
+    "rejects an excess browser operation (backpressure: $backpressure)",
+    async ({ backpressure }) => {
+      const callId = (index: number) =>
+        `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`;
+      const test = fixture(
+        `
+      if (request.method === 'fixture/browser-flood') {
+        globalThis.flood = request.id;
+        for (let index = 1; index <= 17; index++) {
+          send({id:'browser-'+index,method:'${NativeEditorSurfaceEndpoints.browserMethod}',params:{
+            sessionId:'session',endpointId:request.params.endpointId,
+            callId:'00000000-0000-4000-8000-'+String(index).padStart(12,'0'),
+            operation:'browser_snapshot',arguments:{},timeoutMs:5000
+          }});
+        }
+        send({method:'session/update',params:'browser-flood-sent'});
+      } else if (request.method === undefined && request.id === 'browser-17') {
+        send({id:globalThis.flood,result:request.result});
+      } else if (request.method === 'fixture/ping') {
+        send({id:request.id,result:{pong:true}});
+      }
+    `,
+        1,
+        {}
+      );
+      const admitted = Promise.withResolvers<void>();
+      const floodSent = Promise.withResolvers<void>();
+      let invoked = 0;
+      let agent: NativeAgentProcess | undefined;
+      try {
+        agent = await NativeAgentProcess.start({
+          ...test.options,
+          providerNetwork: { prepare: () => null },
+          onSessionUpdate: (params) => {
+            if (params === "browser-flood-sent") floodSent.resolve();
+          },
+        });
+        const stdin = agent["child"].stdin;
+        const method = "fixture/pad";
+        const paddingFrameBytes = Buffer.byteLength(
+          JSON.stringify({ jsonrpc: "2.0", method, params: { padding: "" } }) +
+            "\n"
+        );
+        const frameLimit = 1024 * 1024;
+        const lease = agent.registerEditorSurfaces(
+          "session",
+          { active: null, open: [], truncated: false },
+          () => {},
+          undefined,
+          undefined,
+          undefined,
+          {
+            ready: () => true,
+            invoke: async () => {
+              invoked++;
+              if (backpressure && invoked === 16) {
+                // Hold the full writable backlog until Main processes the excess request.
+                stdin.cork();
+                agent!.notify(method, {
+                  padding: "x".repeat(frameLimit - paddingFrameBytes),
+                });
+              }
+              await admitted.promise;
+              return { disposition: "not_dispatched" };
+            },
+            close: () => {},
+          }
+        );
+        const selection = lease!.selection();
+        expect(selection.editorBrowserTools).toBe(true);
+        const endpointId = selection.editorEndpointId;
+        const flood = agent.request(
+          "fixture/browser-flood",
+          { endpointId },
+          3_000
+        );
+        await Promise.race([floodSent.promise, flood]);
+        expect(stdin.writableLength === frameLimit).toBe(backpressure);
+        stdin.uncork();
+        await expect(flood).resolves.toEqual({
+          sessionId: "session",
+          endpointId,
+          callId: callId(17),
+          result: { disposition: "not_dispatched", error: "backend_busy" },
+        });
+        expect(invoked).toBe(16);
+        expect(agent.connected).toBe(true);
+        await expect(agent.request("fixture/ping", {}, 3_000)).resolves.toEqual(
+          {
+            pong: true,
+          }
+        );
+      } finally {
+        admitted.resolve();
+        agent?.["child"].stdin.uncork();
+        try {
+          await agent?.close();
+        } finally {
+          test.close();
+        }
+      }
+    }
+  );
+
+  it.each([{ revoked: false }, { revoked: true }])(
+    "delivers a browser capture through stdin pressure (owner revoked: $revoked)",
+    async ({ revoked }) => {
+      const callId = "00000000-0000-4000-8000-000000000001";
+      const test = fixture(
+        `
+      if (request.method === 'fixture/ping') {
+        globalThis.ping = request.id;
+      } else if (request.method === 'fixture/capture') {
+        globalThis.capture = request.id;
+        send({id:'capture',method:'${NativeEditorSurfaceEndpoints.browserMethod}',params:{
+          sessionId:'session',endpointId:request.params.endpointId,
+          callId:'${callId}',operation:'browser_capture',arguments:{},timeoutMs:5000
+        }});
+      } else if (request.method === undefined && request.id === 'capture') {
+        send({id:globalThis.capture,result:request.result});
+        send({id:globalThis.ping,result:{pong:true}});
+      }
+    `,
+        1,
+        {}
+      );
+      const entered = Promise.withResolvers<void>();
+      const complete = Promise.withResolvers<void>();
+      const image = {
+        mimeType: "image/jpeg" as const,
+        base64: Buffer.alloc(256 * 1024, 7).toString("base64"),
+      };
+      let agent: NativeAgentProcess | undefined;
+      try {
+        agent = await NativeAgentProcess.start({
+          ...test.options,
+          providerNetwork: { prepare: () => null },
+        });
+        const stdin = agent["child"].stdin;
+        const frameLimit = 1024 * 1024;
+        const method = "fixture/pad";
+        const paddingFrameBytes = Buffer.byteLength(
+          JSON.stringify({ jsonrpc: "2.0", method, params: { padding: "" } }) +
+            "\n"
+        );
+        const lease = agent.registerEditorSurfaces(
+          "session",
+          { active: null, open: [], truncated: false },
+          () => {},
+          undefined,
+          undefined,
+          undefined,
+          {
+            ready: () => true,
+            invoke: async () => {
+              stdin.cork();
+              agent!.notify(method, {
+                padding: "x".repeat(frameLimit - paddingFrameBytes),
+              });
+              entered.resolve();
+              await complete.promise;
+              return { disposition: "dispatched_verified", image };
+            },
+            close: () => {},
+          }
+        );
+        const { editorEndpointId: endpointId } = lease!.selection();
+        const replies = Promise.all([
+          agent.request("fixture/ping", {}, 3000),
+          agent.request("fixture/capture", { endpointId }, 3000),
+        ]);
+        await Promise.race([entered.promise, replies]);
+        complete.resolve();
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        expect(agent.connected).toBe(true);
+        expect(stdin.writableLength).toBe(frameLimit);
+        if (revoked) lease!.close();
+        stdin.uncork();
+        await expect(replies).resolves.toEqual([
+          { pong: true },
+          {
+            sessionId: "session",
+            endpointId,
+            callId,
+            result: revoked
+              ? { disposition: "unknown", error: "outcome_unknown" }
+              : { disposition: "dispatched_verified", image },
+          },
+        ]);
+      } finally {
+        complete.resolve();
+        agent?.["child"].stdin.uncork();
+        try {
+          await agent?.close();
+        } finally {
+          test.close();
+        }
+      }
+    }
+  );
 
   it("keeps a transcript page intact when a legacy replay overlaps it", async () => {
     const test = fixture(

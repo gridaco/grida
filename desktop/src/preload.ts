@@ -413,6 +413,38 @@ ipcRenderer.on(IPC_CHANNELS.BROWSER_CHANGED, (_event, raw: unknown) => {
   if (event) for (const handler of browserHandlers) handler(event);
 });
 window.addEventListener("pagehide", () => browserHandlers.clear());
+const browserPresentationHandlers = new Set<
+  (request: DesktopBrowser.Presentation) => void
+>();
+ipcRenderer.on(IPC_CHANNELS.BROWSER_PRESENT_PAGE, (_event, raw: unknown) => {
+  const request = DesktopBrowser.parsePresentation(raw);
+  if (request)
+    for (const handler of browserPresentationHandlers) handler(request);
+});
+const automationFileHandlers = new Set<
+  (request: { path: string; expiresAtMs: number }) => void
+>();
+ipcRenderer.on(
+  IPC_CHANNELS.WORKSPACE_OPEN_AUTOMATION_FILE,
+  (_event, raw: unknown) => {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return;
+    const { path, expiresAtMs } = raw as Record<string, unknown>;
+    if (
+      Object.keys(raw).length !== 2 ||
+      !NativeEditorSurfaces.isPath(path) ||
+      typeof expiresAtMs !== "number" ||
+      !Number.isSafeInteger(expiresAtMs) ||
+      expiresAtMs <= Date.now()
+    )
+      return;
+    for (const handler of automationFileHandlers)
+      handler({ path, expiresAtMs });
+  }
+);
+window.addEventListener("pagehide", () => {
+  browserPresentationHandlers.clear();
+  automationFileHandlers.clear();
+});
 const historyHandlers = new Set<
   (change: DesktopBrowser.History.Change) => void
 >();
@@ -527,6 +559,12 @@ const bridge: DesktopBridge = {
       browserHandlers.add(handler);
       return () => {
         browserHandlers.delete(handler);
+      };
+    },
+    subscribePresentation: (handler) => {
+      browserPresentationHandlers.add(handler);
+      return () => {
+        browserPresentationHandlers.delete(handler);
       };
     },
   },
@@ -1177,6 +1215,21 @@ const bridge: DesktopBridge = {
         IPC_CHANNELS.WORKSPACE_PUBLISH_EDITOR_SURFACES,
         snapshot
       ),
+    automation: {
+      version: 1,
+      publish: (snapshot, activePageId) =>
+        ipcRenderer.invoke(
+          IPC_CHANNELS.WORKSPACE_PUBLISH_AUTOMATION_SURFACES,
+          snapshot,
+          activePageId
+        ),
+      onOpenFile: (handler) => {
+        automationFileHandlers.add(handler);
+        return () => {
+          automationFileHandlers.delete(handler);
+        };
+      },
+    },
     choose: () => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_CHOOSE),
     open: (rootPath) =>
       ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_REOPEN, rootPath),

@@ -86,6 +86,7 @@ export class WorkspaceBrowserTabs {
       | "subscribe"
       | "restore"
       | "open"
+      | "activate"
       | "close"
       | "replace"
       | "closeMatching"
@@ -99,6 +100,38 @@ export class WorkspaceBrowserTabs {
     return () => this.listeners.delete(listener);
   };
   getSnapshot = (): WorkspaceBrowserTabs.State => this.state;
+
+  activeAutomationPageId(): string | null {
+    const key = this.group.getSnapshot().active;
+    if (!key) return null;
+    const tab = WorkbenchTab.parse(key);
+    return tab.kind === "browser"
+      ? (this.entries.get(tab.id)?.page?.id ?? null)
+      : null;
+  }
+
+  private present = (request: DesktopBrowser.Presentation): void => {
+    if (request.attachmentId !== this.attachment) return;
+    const tab = this.group.getSnapshot().tabs.find((key) => {
+      const entry = WorkbenchTab.parse(key);
+      return (
+        entry.kind === "browser" &&
+        this.entries.get(entry.id)?.page?.id === request.pageId
+      );
+    });
+    if (!tab) return;
+    this.group.activate(tab);
+    const entry = WorkbenchTab.parse(tab);
+    if (request.focus && entry.kind === "browser")
+      requestAnimationFrame(() => {
+        if (
+          this.group.getSnapshot().active === tab &&
+          this.attachment === request.attachmentId &&
+          this.entries.get(entry.id)?.page?.id === request.pageId
+        )
+          this.mounts?.focus(entry.id);
+      });
+  };
 
   async start(
     storage: WorkspaceBrowserTabs.Storage,
@@ -150,6 +183,8 @@ export class WorkspaceBrowserTabs {
     if (this.bridge) {
       const bridge = this.bridge;
       this.unsubscribers.push(bridge.subscribe(this.onEvent));
+      if (bridge.subscribePresentation)
+        this.unsubscribers.push(bridge.subscribePresentation(this.present));
       try {
         const attached = DesktopBrowser.parseSnapshot(
           await bridge.attach(this.workspaceId)

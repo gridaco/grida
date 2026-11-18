@@ -254,6 +254,11 @@ fn command() -> Command {
                     Arg::new("server-token-env")
                         .long("server-token-env")
                         .required(true),
+                )
+                .arg(
+                    Arg::new("browser-tools")
+                        .long("browser-tools")
+                        .action(clap::ArgAction::SetTrue),
                 ),
         )
         .subcommand(
@@ -467,7 +472,11 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
                 .expect("required token environment"),
         )?;
         if name == "serve-editor-mcp" {
-            mcp::serve_editor(options, process::shutdown_signal()).await?;
+            if args.get_flag("browser-tools") {
+                mcp::serve_editor_browser(options, process::shutdown_signal()).await?;
+            } else {
+                mcp::serve_editor(options, process::shutdown_signal()).await?;
+            }
         } else {
             mcp::serve_headless(options, process::shutdown_signal()).await?;
         }

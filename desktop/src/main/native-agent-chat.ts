@@ -69,6 +69,7 @@ import type {
   NativeEditorSurfaceSelection,
   NativeEditorSvgTextDelivery,
 } from "./native-editor-surfaces";
+import type { DesktopBrowserToolLease } from "./desktop-browser-tools";
 import type { NativeApprovalReview } from "./native-agent-permissions";
 import { NativeAgentDeletion } from "./native-agent-deletion";
 import { NativeAgentCommands } from "./native-agent-commands";
@@ -978,7 +979,8 @@ export class NativeAgentChat {
     requireCurrent: () => void,
     deliver: NativeEditorSurfaceDelivery | undefined,
     revision?: number,
-    svgText?: NativeEditorSvgTextDelivery
+    svgText?: NativeEditorSvgTextDelivery,
+    browser?: DesktopBrowserToolLease
   ) {
     return this.process.registerEditorSurfaces(
       this.requireAttached(session),
@@ -986,7 +988,8 @@ export class NativeAgentChat {
       requireCurrent,
       deliver,
       revision,
-      svgText
+      svgText,
+      browser
     );
   }
 

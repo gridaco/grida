@@ -66,6 +66,14 @@ struct CallEvidence {
 }
 
 pub(crate) fn verified_owner_receipt(outcome: &ToolOutcome) -> Option<Envelope> {
+    verified_call_evidence(outcome)?.owner_receipt
+}
+
+pub(crate) fn verified_call_binding(outcome: &ToolOutcome) -> Option<CallBinding> {
+    verified_call_evidence(outcome).map(|evidence| evidence.binding)
+}
+
+fn verified_call_evidence(outcome: &ToolOutcome) -> Option<CallEvidence> {
     let receipt = outcome.receipt.as_ref()?;
     if receipt.schema().as_str() != CALL_EVIDENCE_SCHEMA
         || receipt.version() != 1
@@ -74,7 +82,7 @@ pub(crate) fn verified_owner_receipt(outcome: &ToolOutcome) -> Option<Envelope> 
         return None;
     }
     let evidence: CallEvidence = serde_json::from_slice(receipt.bytes()).ok()?;
-    evidence.owner_receipt.filter(|_| evidence.reply_verified)
+    evidence.reply_verified.then_some(evidence)
 }
 
 /// The owning implementation validates its domain schema and supplies outcome

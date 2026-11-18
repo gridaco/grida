@@ -112,6 +112,7 @@ async fn parent(host: &Host, root: &Path, ultra: bool) -> (ClaimedTurn, StoredPr
                 allow_image_placement: false,
                 editor_endpoint: None,
                 editor_presentation: false,
+                editor_browser_tools: false,
                 editor_svg_target: None,
                 operating_regime: OperatingRegime::Act,
                 subagent: None,
@@ -785,6 +786,7 @@ async fn workers_keep_captured_model_reasoning_permissions_and_project_material_
             .prepare_input(
                 host.execution().unwrap(),
                 &request.claim.session,
+                &configuration.cwd,
                 &request.input,
                 configuration.subagent.as_ref(),
                 false,

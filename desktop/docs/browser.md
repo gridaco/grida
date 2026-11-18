@@ -56,6 +56,24 @@ document, its Back/Forward history, form contents or scroll. Moving a tab to
 another window reconstructs its address: stock Electron provides no supported
 live-guest adoption contract here.
 
+## Agent browser pages
+
+The browser tools can address the exact displayed workbench tab or an
+independent background page. Main creates one never-shown window for each
+background page. Its fixed sandboxed shell mounts one guest using the same
+one-use claim, exact guest registration, browser Session and destination policy
+as a workbench tab. Background owners cannot be selected by workbench
+presentation. The owner and guest close together on scope loss. Shared browser
+data clearing applies to both target kinds.
+
+The browser operation service checks document, frame and viewport identity
+before interaction and around capture. Trusted input dispatch is coordinated
+inside Main. Native Act and the optional MCP export use the same catalog and
+execution results through their captured authority. Website prompts that would
+require user interaction are reported as background blockers.
+[Browser automation reference](./browser-automation.md) ·
+[Tool-host contract](../../crates/grida-agent/docs/tool-host-contract.md)
+
 ## Live locations and recorded addresses
 
 Main distinguishes a bounded live location from a persistable destination.
@@ -270,6 +288,15 @@ while Grida remains running. Pending destination selection still requires its
 live owner. Full browser reset cancels retained jobs. Downloads are never opened
 or executed automatically, and this feature makes no malware-scanning claim.
 
+Background automation pages cannot download files. Main requires a native save
+dialog for downloads from workbench tabs that the agent opened, navigated, or
+used for evaluation or input. The rule applies for the tab's lifetime, so a
+delayed response still prompts after the agent's task ends. A new child tab
+inherits the rule when its opener already requires confirmation. A managed
+website window uses its owning tab's current rule.
+If another download needs confirmation while a Save dialog is open, Main
+cancels it and displays a retry notice after the dialog closes.
+
 ## Architecture and rollout
 
 Browser protocol **4**, with `presentation: "webview"`, is independent of the
@@ -333,7 +360,8 @@ that authority. `javascript:` may execute without a document request. Native
 request/navigation guards and asynchronous containment of forbidden documents
 are not a universal preexecution barrier against trusted embedder scripting.
 Generated browser documents remain sandboxed website content. Human DevTools
-inspection adds no agent tool, MCP server or product automation transport.
+inspects the selected guest. The [browser tools](#agent-browser-pages) use
+their captured workbench lease for automation.
 
 Guest failure leaves a recoverable tab without taking down the workbench.
 Retry reloads a living guest or mounts a replacement after destruction. Owner

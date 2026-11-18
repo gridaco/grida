@@ -76,6 +76,7 @@ async fn legacy_serialized_input_selects_original_profile_and_does_not_gain_imag
         .prepare_input(
             execution,
             &session,
+            &super::session_configuration(&view).unwrap().cwd,
             &input,
             None,
             false,
@@ -106,6 +107,7 @@ async fn legacy_serialized_input_selects_original_profile_and_does_not_gain_imag
         .prepare_input(
             execution,
             &session,
+            &super::session_configuration(&view).unwrap().cwd,
             &old,
             None,
             false,

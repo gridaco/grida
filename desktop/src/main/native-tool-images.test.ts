@@ -38,6 +38,23 @@ function fixture() {
 }
 
 describe("NativeToolImages", () => {
+  it("projects a purpose-scoped browser capture to its exact native result", () => {
+    const owner = new NativeToolImages();
+    const mediaId = "browser-capture/5a990ee4-d7ee-446d-93e3-fd5c89fd6259";
+    const [image] = owner.project("chat", "turn", "call", [
+      { ...descriptor, mediaId },
+    ]);
+    expect(owner.require("chat", image.previewId).mediaId).toBe(mediaId);
+    expect(() => owner.require("another-chat", image.previewId)).toThrow(
+      "tool_image_unavailable"
+    );
+    expect(() =>
+      owner.project("chat", "turn", "call", [
+        { ...descriptor, mediaId: "browser-capture/arbitrary" },
+      ])
+    ).toThrow("tool_image_unavailable");
+  });
+
   it("keeps stable opaque identities for replay and assembles captured bytes in two bounded chunks", async () => {
     const f = fixture();
     expect(f.owner.project("chat", "turn", "call", [descriptor])).toEqual([

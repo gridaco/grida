@@ -270,3 +270,241 @@ async fn retained_tool_images_read_exact_prepared_pixels_after_source_deletion_a
     assert!(older.finish().await.status.success());
     endpoint.done().await;
 }
+
+#[tokio::test]
+async fn native_browser_capture_requires_act_and_projects_correlated_pixels() {
+    const EDITOR: &str = "co.grida/session/editor-surfaces";
+    const PRESENTATION: &str = "co.grida/session/editor-surface-open";
+    const BROWSER: &str = "co.grida/session/browser-tools";
+    const ENDPOINT: &str = "6f9619ff-8b86-4011-b42d-00c04fc964ff";
+    let root = TempDir::new().unwrap();
+    let base = root.path().canonicalize().unwrap();
+    fs::set_permissions(&base, fs::Permissions::from_mode(0o700)).unwrap();
+    let workspace = base.join("workspace");
+    fs::create_dir(&workspace).unwrap();
+    let child = server(
+        &base.join("state"),
+        "http://127.0.0.1:43172/v1",
+        IMAGE_MODEL,
+    )
+    .args(["--stdio", "--supervised-provider"])
+    .stdin(Stdio::piped())
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped())
+    .spawn()
+    .unwrap();
+    let mut client = StdioClient::from_child(child);
+    let mut offer = initialize();
+    offer["clientCapabilities"]["_meta"][EDITOR] = 1.into();
+    offer["clientCapabilities"]["_meta"][PRESENTATION] = 1.into();
+    offer["clientCapabilities"]["_meta"][BROWSER] = 1.into();
+    offer["clientCapabilities"]["_meta"]["co.grida/provider/egress"] = 1.into();
+    offer["clientCapabilities"]["_meta"]["co.grida/session/updates"] = 1.into();
+    let ready = client.request("initialize", offer).await;
+    assert_eq!(
+        ready["result"]["agentCapabilities"]["_meta"][BROWSER], 1,
+        "{ready}"
+    );
+    let created = client
+        .request("session/new", json!({"cwd":workspace,"mcpServers":[]}))
+        .await;
+    let session = created["result"]["sessionId"].as_str().unwrap();
+    let submission = |id: &str, regime: &str| {
+        json!({
+            "sessionId": session,
+            "inputId": id,
+            "prompt": [{"type":"text","text":"Capture the fixture."}],
+            "operatingRegime": regime,
+            "editorEndpointId": ENDPOINT,
+            "editorPresentation": true,
+            "editorBrowserTools": true
+        })
+    };
+    let refused = client
+        .request(
+            "_co.grida/session/submit",
+            submission("plan-capture", "plan"),
+        )
+        .await;
+    assert!(refused["error"].is_object(), "{refused}");
+
+    let id = client
+        .send("_co.grida/session/submit", submission("act-capture", "act"))
+        .await;
+    let mut jpeg = Vec::new();
+    image::codecs::jpeg::JpegEncoder::new(&mut jpeg)
+        .encode(&[121, 18, 96], 1, 1, image::ExtendedColorType::Rgb8)
+        .unwrap();
+    let mut replies = [
+        Reply::Tool(
+            "surface_open",
+            r#"{"target":{"kind":"file","path":"/poster.canvas"}}"#,
+        ),
+        Reply::Tool(
+            "browser_capture",
+            r#"{"target":{"kind":"background","pageId":"page"},"documentId":"document"}"#,
+        ),
+        Reply::Finished("Captured the fixture."),
+    ]
+    .into_iter();
+    let mut chunk = None;
+    let mut requests = Vec::new();
+    let mut completed = 0;
+    let mut accepted = false;
+    let mut file_revealed = false;
+    let mut image_update = None;
+    while !accepted || image_update.is_none() || completed < 3 {
+        let frame = client.read_frame().await;
+        let params = &frame["params"];
+        if frame["id"] == id {
+            assert!(frame["result"].is_object(), "{frame}");
+            accepted = true;
+        }
+        match frame["method"].as_str() {
+            Some("_co.grida/provider/exchange") => {
+                let result = match params["action"].as_str() {
+                    Some("open") => {
+                        let body = STANDARD
+                            .decode(params["initial"].as_str().unwrap())
+                            .unwrap();
+                        requests.push(serde_json::from_slice::<Value>(&body).unwrap());
+                        chunk = Some(STANDARD.encode(fixture_body(
+                            replies.next().expect("one fixture reply per request"),
+                            ProviderProtocol::Responses,
+                        )));
+                        json!({"status":"accepted"})
+                    }
+                    Some("dispatch") => json!({"status":"ready","httpStatus":200}),
+                    Some("read") => match chunk.take() {
+                        Some(data) => json!({"status":"chunk","data":data}),
+                        None => json!({"status":"end"}),
+                    },
+                    _ => panic!("unexpected fixture exchange: {frame}"),
+                };
+                client.respond(&frame["id"], result).await;
+            }
+            Some("_co.grida/provider/cancel") => completed += 1,
+            Some("_co.grida/editor/browser-tool") => {
+                assert_eq!(params["sessionId"], session);
+                assert_eq!(params["endpointId"], ENDPOINT);
+                if params["operation"] == "surface_open" {
+                    assert_eq!(
+                        params["arguments"]["target"],
+                        json!({"kind":"file","path":"/poster.canvas"})
+                    );
+                    file_revealed = true;
+                    client
+                        .respond(
+                            &frame["id"],
+                            json!({
+                                "sessionId":session,"endpointId":ENDPOINT,"callId":params["callId"],
+                                "result":{"disposition":"unknown"}
+                            }),
+                        )
+                        .await;
+                    continue;
+                }
+                assert_eq!(params["operation"], "browser_capture");
+                assert_eq!(params["arguments"]["documentId"], "document");
+                assert!(
+                    params["timeoutMs"]
+                        .as_u64()
+                        .is_some_and(|ms| ms > 0 && ms < 8000)
+                );
+                client.respond(&frame["id"], json!({
+                    "sessionId":session,"endpointId":ENDPOINT,"callId":params["callId"],
+                    "result":{"disposition":"dispatched_verified","data":{"documentId":"document"},
+                        "image":{"mimeType":"image/jpeg","base64":STANDARD.encode(&jpeg)}}
+                })).await;
+            }
+            _ => {}
+        }
+        if params["update"]["rawOutput"]["images"].is_array() {
+            image_update = Some(params.clone());
+        }
+    }
+    assert!(file_revealed);
+    assert_eq!(requests.len(), 3);
+    let instructions = requests[0]["instructions"].as_str().unwrap();
+    assert!(instructions.contains("first meaningful renderable checkpoint"));
+    assert!(instructions.contains("For new browser work, use browser_open"));
+    assert!(
+        requests[0]["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|tool| tool["name"] == "browser_capture")
+    );
+    let inputs = requests[1]["input"].as_array().unwrap();
+    let reveal_call = inputs
+        .iter()
+        .find(|item| item["type"] == "function_call" && item["name"] == "surface_open")
+        .expect("recorded file reveal");
+    let reveal_output = inputs
+        .iter()
+        .find(|item| {
+            item["type"] == "function_call_output" && item["call_id"] == reveal_call["call_id"]
+        })
+        .expect("correlated file reveal result");
+    let reveal_result: Value =
+        serde_json::from_str(reveal_output["output"].as_str().unwrap()).unwrap();
+    assert_eq!(reveal_result["status"], "uncertain");
+    assert_eq!(reveal_result["structured"]["disposition"], "unknown");
+    let pixels = requests[2]["input"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|part| part["output"].as_array().into_iter().flatten())
+        .find_map(|part| {
+            part["image_url"]
+                .as_str()
+                .and_then(|url| url.strip_prefix("data:image/png;base64,"))
+        })
+        .map(|data| STANDARD.decode(data).unwrap())
+        .expect("retained PNG capture");
+    let live = image_update.unwrap();
+    let media = &live["update"]["rawOutput"]["images"][0];
+    let namespace = media["mediaId"]
+        .as_str()
+        .unwrap()
+        .strip_prefix("browser-capture/")
+        .unwrap();
+    assert!(uuid::Uuid::parse_str(namespace).is_ok());
+    let read = client
+        .request(
+            READ,
+            json!({
+                "sessionId":session,
+                "turnId":live["_meta"]["co.grida/session/updates"]["turnId"],
+                "toolCallId":live["update"]["toolCallId"],
+                "mediaId":media["mediaId"],"contentIndex":media["contentIndex"],"offset":0
+            }),
+        )
+        .await;
+    assert_eq!(
+        STANDARD
+            .decode(read["result"]["data"].as_str().unwrap())
+            .unwrap(),
+        pixels
+    );
+    let turn = live["_meta"]["co.grida/session/updates"]["turnId"]
+        .as_str()
+        .unwrap();
+    let final_state = settled(&mut client, session).await;
+    assert_eq!(final_state["latest"]["turnId"], turn);
+    assert_eq!(final_state["latest"]["status"], "succeeded");
+    for method in ["_co.grida/session/submit", "_co.grida/session/enqueue"] {
+        let exact = submission("act-capture", "act");
+        let retained = client.request(method, exact.clone()).await;
+        assert_eq!(retained["result"]["turnId"], turn, "{retained}");
+        assert_eq!(retained["result"]["disposition"], "completed", "{retained}");
+        let mut changed = exact;
+        changed["editorBrowserTools"] = false.into();
+        let rejected = client.request(method, changed).await;
+        assert_eq!(
+            rejected["error"]["data"], "submission_browser_tools_changed",
+            "{rejected}"
+        );
+    }
+    assert!(client.finish().await.status.success());
+}

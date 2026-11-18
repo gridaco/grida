@@ -21,12 +21,13 @@ pub(crate) struct ToolImage {
 }
 
 fn reference(media: &MediaRef, owner: &SessionId, index: usize) -> Option<ToolImage> {
+    let id = media.id.as_str();
+    let browser_capture = id
+        .strip_prefix(super::retained_inputs::BROWSER_CAPTURE)
+        .is_some_and(|suffix| suffix.len() == 36 && uuid::Uuid::parse_str(suffix).is_ok());
     if index >= MAX_CONTENT
-        || !media
-            .id
-            .as_str()
-            .starts_with(super::retained_inputs::WORKSPACE_VIEW)
-        || media.id.as_str().len() > 512
+        || (!id.starts_with(super::retained_inputs::WORKSPACE_VIEW) && !browser_capture)
+        || id.len() > 512
     {
         return None;
     }

@@ -333,6 +333,16 @@ export type DesktopBridge = {
     publish_editor_surfaces?: (
       snapshot: NativeEditorSurfaceSnapshot
     ) => Promise<boolean>;
+    automation?: {
+      readonly version: 1;
+      publish(
+        snapshot: NativeEditorSurfaceSnapshot,
+        activePageId: string | null
+      ): Promise<boolean>;
+      onOpenFile(
+        handler: (request: { path: string; expiresAtMs: number }) => void
+      ): () => void;
+    };
     /** Open the exact directory selected in a native folder picker. */
     choose?: () => Promise<Workspace | null>;
     open: (rootPath: string) => Promise<Workspace>;

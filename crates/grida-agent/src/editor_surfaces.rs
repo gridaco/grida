@@ -23,6 +23,7 @@ const MAX_OPEN_PATHS: usize = 50;
 const SNAPSHOT_BYTES: usize = 16 * 1024;
 const REPLY_TIMEOUT: Duration = Duration::from_secs(2);
 
+mod browser;
 mod svg_text;
 pub(crate) use svg_text::{CAPABILITY as SVG_TEXT_CAPABILITY, READ_TEXT, REPLACE_TEXT};
 
@@ -35,14 +36,22 @@ struct DesktopConnection {
     client: ConnectionTo<Client>,
     presentation: bool,
     svg_text: bool,
+    browser: bool,
 }
 
 impl EditorSurfaces {
-    pub(crate) fn attach(&self, client: ConnectionTo<Client>, presentation: bool, svg_text: bool) {
+    pub(crate) fn attach(
+        &self,
+        client: ConnectionTo<Client>,
+        presentation: bool,
+        svg_text: bool,
+        browser: bool,
+    ) {
         *self.connection.lock().unwrap() = Some(DesktopConnection {
             client,
             presentation,
             svg_text,
+            browser,
         });
     }
 
@@ -68,13 +77,40 @@ impl EditorSurfaces {
             .map(|connection| connection.client.clone())
     }
 
+    fn browser_client(&self) -> Option<ConnectionTo<Client>> {
+        self.connection
+            .lock()
+            .unwrap()
+            .as_ref()
+            .filter(|connection| connection.browser)
+            .map(|connection| connection.client.clone())
+    }
+
+    pub(crate) fn browser_tools_available(&self) -> bool {
+        self.browser_client().is_some()
+    }
+
     pub(crate) fn tool_host(
         &self,
         session: SessionId,
         endpoint: BindingId,
         present: bool,
         svg_target: Option<BindingId>,
+        browser: bool,
+        browser_capture: Option<Arc<crate::file_tools::ImageCapture>>,
     ) -> Result<ToolHost> {
+        if browser {
+            let mut capabilities = browser::tools(
+                self.clone(),
+                session.clone(),
+                endpoint.clone(),
+                browser_capture,
+            )?;
+            if let Some(target) = svg_target {
+                capabilities.extend(svg_text::tools(self.clone(), session, endpoint, target)?);
+            }
+            return ToolHost::new(capabilities);
+        }
         let mut capabilities = vec![(
             open_surfaces_definition()?,
             Arc::new(Observe {
@@ -401,7 +437,7 @@ impl OpenSurfacesSnapshot {
     }
 }
 
-fn valid_path(path: &str) -> bool {
+pub(crate) fn valid_path(path: &str) -> bool {
     path.len() <= MAX_PATH_BYTES
         && !path.contains(['\0', '\\'])
         && path.strip_prefix('/').is_some_and(|relative| {

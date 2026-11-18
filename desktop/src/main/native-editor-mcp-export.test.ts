@@ -131,3 +131,135 @@ function workbench() {
     event: { sender, senderFrame: frame } as unknown as IpcMainInvokeEvent,
   };
 }
+
+it.runIf(Boolean(resources) && process.platform !== "win32")(
+  "correlates independent browser calls on the opt-in native export and revokes them with the owner",
+  async () => {
+    const base = await fs.mkdtemp(
+      path.join(await fs.realpath(os.tmpdir()), "grida-browser-mcp-")
+    );
+    const root = path.join(base, "workspace");
+    const profile = path.join(base, "browser");
+    const held = Promise.withResolvers<void>();
+    let owner: NativeEditorMcpExport | undefined;
+    try {
+      await Promise.all(
+        [root, profile].map((directory) => fs.mkdir(directory, { mode: 0o700 }))
+      );
+      await fs.writeFile(
+        path.join(profile, "native-mcp-export.bearer"),
+        token,
+        { mode: 0o600 }
+      );
+      const socket = net.createServer();
+      socket.listen(0, "127.0.0.1");
+      await once(socket, "listening");
+      const port = socket.address();
+      if (!port || typeof port === "string")
+        throw new Error("fixture_socket_invalid");
+      await new Promise<void>((resolve, reject) =>
+        socket.close((error) => (error ? reject(error) : resolve()))
+      );
+      const url = `http://127.0.0.1:${port.port}/mcp`;
+      const admitted = workbench();
+      const entered = Promise.withResolvers<void>();
+      const close = vi.fn<() => void>();
+      owner = await NativeEditorMcpExport.start(
+        [
+          `--native-chat-export-mcp-root=${root}`,
+          `--native-chat-export-mcp-listen=${url}`,
+          "--native-chat-export-mcp-browser",
+        ],
+        profile,
+        resources!,
+        {
+          editorOrigin: origin,
+          admits: () => true,
+          workspaceRoot: async () => root,
+          browserLease: (sender, frame, requireCurrent) => {
+            expect(sender).toBe(admitted.sender);
+            expect(frame).toBe(admitted.event.senderFrame);
+            return {
+              ready: () => true,
+              close,
+              invoke: async (operation, args) => {
+                requireCurrent();
+                expect(operation).toBe("browser_open");
+                const marker = (args as { url: string }).url;
+                if (marker.endsWith("/first")) {
+                  entered.resolve();
+                  await held.promise;
+                }
+                return { disposition: "dispatched_verified", data: { marker } };
+              },
+            };
+          },
+        }
+      );
+      expect(await owner!.publish(admitted.event, empty)).toBe(true);
+      let id = 0;
+      const invoke = async (marker: string) => {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${token}`,
+            accept: "application/json, text/event-stream",
+            "content-type": "application/json",
+            "mcp-protocol-version": "2026-07-28",
+            "mcp-method": "tools/call",
+            "mcp-name": "browser_open",
+          },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: ++id,
+            method: "tools/call",
+            params: {
+              name: "browser_open",
+              arguments: { url: marker },
+              _meta: {
+                "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+                "io.modelcontextprotocol/clientInfo": {
+                  name: "fixture",
+                  version: "1",
+                },
+                "io.modelcontextprotocol/clientCapabilities": {},
+              },
+            },
+          }),
+          signal: AbortSignal.timeout(4000),
+        });
+        expect(response.status).toBe(200);
+        return (await response.json()).result;
+      };
+      const firstUrl = "http://localhost:3000/first";
+      const secondUrl = "http://localhost:3000/second";
+      const first = invoke(firstUrl);
+      // Retain a rejection handler in case a later fixture assertion fails.
+      void first.catch(() => {});
+      await entered.promise;
+      expect(await invoke(secondUrl)).toMatchObject({
+        isError: false,
+        structuredContent: { marker: secondUrl },
+      });
+      held.resolve();
+      expect(await first).toMatchObject({
+        isError: false,
+        structuredContent: { marker: firstUrl },
+      });
+      admitted.sender.emit("did-start-navigation", { isMainFrame: true });
+      expect(close).toHaveBeenCalledTimes(1);
+      expect(await invoke(secondUrl)).toMatchObject({
+        isError: true,
+        structuredContent: {
+          error: "owner_revoked",
+          disposition: "not_dispatched",
+        },
+      });
+    } finally {
+      held.resolve();
+      await owner?.close();
+      await fs.rm(base, { recursive: true, force: true });
+    }
+  },
+  15_000
+);

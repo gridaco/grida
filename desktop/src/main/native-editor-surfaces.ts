@@ -6,6 +6,7 @@ import {
   type NativeEditorSurfaceOpen,
   type NativeEditorSurfaceSnapshot,
 } from "@grida/desktop-bridge";
+import type { DesktopBrowserToolLease } from "./desktop-browser-tools";
 
 const MAX_ENDPOINTS = 32;
 const MAX_PRESENTATION_CALLS = 64;
@@ -23,6 +24,7 @@ export type NativeEditorSurfaceSelection = Readonly<{
   editorEndpointId: string;
   editorPresentation?: true;
   editorSvgTargetId?: string;
+  editorBrowserTools?: true;
 }>;
 
 export type NativeEditorSurfaceDelivery = (
@@ -39,8 +41,17 @@ type Endpoint = {
   revision?: number;
   deliver?: NativeEditorSurfaceDelivery;
   svgText?: NativeEditorSvgTextDelivery;
+  browser?: DesktopBrowserToolLease;
   calls: Map<string, { path: string; requested: boolean }>;
 };
+
+type BrowserResult = Awaited<ReturnType<DesktopBrowserToolLease["invoke"]>>;
+export type NativeEditorBrowserReply = Readonly<{
+  sessionId: string;
+  endpointId: string;
+  callId: string;
+  result: BrowserResult;
+}>;
 
 export class NativeEditorSurfaceEndpoints {
   static readonly capability = "co.grida/session/editor-surfaces";
@@ -49,6 +60,8 @@ export class NativeEditorSurfaceEndpoints {
   static readonly openMethod = "_co.grida/editor/surface-open";
   static readonly svgTextCapability = "co.grida/session/editor-svg-text";
   static readonly svgTextMethod = "_co.grida/editor/svg-selected-text";
+  static readonly browserCapability = "co.grida/session/browser-tools";
+  static readonly browserMethod = "_co.grida/editor/browser-tool";
 
   private readonly endpoints = new Map<string, Endpoint>();
 
@@ -58,7 +71,8 @@ export class NativeEditorSurfaceEndpoints {
     requireCurrent: () => void,
     deliver?: NativeEditorSurfaceDelivery,
     revision?: number,
-    svgText?: NativeEditorSvgTextDelivery
+    svgText?: NativeEditorSvgTextDelivery,
+    browser?: DesktopBrowserToolLease
   ): NativeEditorSurfaceLease {
     requireCurrent();
     if (this.endpoints.size >= MAX_ENDPOINTS)
@@ -71,6 +85,7 @@ export class NativeEditorSurfaceEndpoints {
       revision,
       deliver,
       svgText,
+      browser,
       calls: new Map(),
     };
     this.endpoints.set(id, endpoint);
@@ -85,6 +100,10 @@ export class NativeEditorSurfaceEndpoints {
         ...(editorSvgTargetId &&
           this.endpoints.get(id) === endpoint &&
           endpoint.svgText && { editorSvgTargetId }),
+        ...(this.endpoints.get(id) === endpoint &&
+          endpoint.browser?.ready() && {
+            editorBrowserTools: true as const,
+          }),
       }),
       update: (next: NativeEditorSurfaceSnapshot, revision?: number) => {
         if (this.endpoints.get(id) !== endpoint) return;
@@ -99,9 +118,114 @@ export class NativeEditorSurfaceEndpoints {
         endpoint.revision = revision;
       },
       close: () => {
-        this.endpoints.delete(id);
+        this.release(id);
       },
     });
+  }
+
+  browserBusy(value: unknown): NativeEditorBrowserReply | null {
+    const request = this.browserRequest(value);
+    if (!request) return null;
+    const { sessionId, endpointId, callId } = request;
+    return {
+      sessionId,
+      endpointId,
+      callId,
+      result: { disposition: "not_dispatched" as const, error: "backend_busy" },
+    };
+  }
+
+  async browserTool(
+    value: unknown,
+    signal: AbortSignal
+  ): Promise<NativeEditorBrowserReply | null> {
+    const request = this.browserRequest(value);
+    if (!request) return null;
+    const { sessionId, endpointId, callId, operation, args, timeoutMs } =
+      request;
+    const endpoint = this.current(sessionId, endpointId);
+    const denied = {
+      disposition: "not_dispatched" as const,
+      error: "owner_revoked",
+    };
+    const reply = (result: BrowserResult) => ({
+      sessionId,
+      endpointId,
+      callId,
+      result,
+    });
+    if (!endpoint?.browser?.ready()) return reply(denied);
+    const deadline = AbortSignal.timeout(timeoutMs);
+    const result = await endpoint.browser.invoke(
+      operation,
+      args,
+      AbortSignal.any([signal, deadline])
+    );
+    const response = reply(result);
+    if (
+      this.current(sessionId, endpointId) !== endpoint ||
+      !endpoint.browser.ready()
+    )
+      return this.revokedBrowserReply(response);
+    return response;
+  }
+
+  browserReplyGuard(reply: NativeEditorBrowserReply) {
+    const revoked = this.revokedBrowserReply(reply);
+    const { sessionId, endpointId } = revoked;
+    const endpoint = this.endpoints.get(endpointId);
+    return () =>
+      endpoint &&
+      this.current(sessionId, endpointId) === endpoint &&
+      endpoint.browser?.ready()
+        ? undefined
+        : revoked;
+  }
+
+  private revokedBrowserReply({
+    sessionId,
+    endpointId,
+    callId,
+    result,
+  }: NativeEditorBrowserReply): NativeEditorBrowserReply {
+    return {
+      sessionId,
+      endpointId,
+      callId,
+      result:
+        result.disposition === "not_dispatched"
+          ? { disposition: "not_dispatched", error: "owner_revoked" }
+          : { disposition: "unknown", error: "outcome_unknown" },
+    };
+  }
+
+  private browserRequest(value: unknown) {
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      return null;
+    const {
+      sessionId,
+      endpointId,
+      callId,
+      operation,
+      arguments: args,
+      timeoutMs,
+    } = value as Record<string, unknown>;
+    if (
+      Object.keys(value).length !== 6 ||
+      !Object.hasOwn(value, "arguments") ||
+      typeof sessionId !== "string" ||
+      !SESSION_ID.test(sessionId) ||
+      !NativeEditorSvgText.isId(endpointId) ||
+      !NativeEditorSvgText.isId(callId) ||
+      typeof operation !== "string" ||
+      !/^[a-z_]{1,64}$/.test(operation) ||
+      typeof timeoutMs !== "number" ||
+      !Number.isSafeInteger(timeoutMs) ||
+      timeoutMs < 1 ||
+      timeoutMs > 120_000
+    )
+      return null;
+    return { sessionId, endpointId, callId, operation, args, timeoutMs };
   }
 
   async svgText(value: unknown) {
@@ -215,11 +339,17 @@ export class NativeEditorSurfaceEndpoints {
       endpoint.requireCurrent();
       return endpoint;
     } catch {
-      this.endpoints.delete(endpointId);
+      this.release(endpointId);
     }
   }
 
+  private release(endpointId: string): void {
+    const endpoint = this.endpoints.get(endpointId);
+    this.endpoints.delete(endpointId);
+    endpoint?.browser?.close();
+  }
+
   close(): void {
-    this.endpoints.clear();
+    for (const id of this.endpoints.keys()) this.release(id);
   }
 }

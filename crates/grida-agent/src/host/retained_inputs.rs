@@ -20,6 +20,7 @@ use std::sync::{Arc, Mutex};
 const STORAGE: &str = "retained-inputs";
 const SELECTED_IMAGE: &str = "input/";
 pub(super) const WORKSPACE_VIEW: &str = "workspace-view/";
+pub(super) const BROWSER_CAPTURE: &str = "browser-capture/";
 pub(super) const WORKSPACE_REFERENCE: &str = "workspace-reference/";
 pub(super) const LIBRARY_SELECTION: &str = "library-selection/";
 const LIMITS: ScratchLimits = ScratchLimits {
@@ -151,6 +152,23 @@ impl RetainedInputs {
         self.workspace_png_capture(session, cwd, WORKSPACE_VIEW)
     }
 
+    pub(super) fn browser_image_capture(
+        self: &Arc<Self>,
+        session: SessionId,
+        cwd: PathBuf,
+    ) -> Arc<ImageCapture> {
+        let storage = self.clone();
+        Arc::new(move |bytes| {
+            if bytes.len() > super::image_preparation::MAX_PREPARED_BYTES {
+                return Err(problem(ErrorKind::LimitExceeded, "image_preparation_limit"));
+            }
+            let digest: [u8; 32] = Sha256::digest(&bytes).into();
+            let identity = Fingerprint::of(&(BROWSER_CAPTURE, digest))?;
+            let asset = storage.retain_png(&session, &cwd, BROWSER_CAPTURE, identity, &bytes)?;
+            media(&asset)
+        })
+    }
+
     pub(super) fn workspace_reference_capture(
         self: &Arc<Self>,
         session: SessionId,
@@ -272,7 +290,9 @@ impl RetainedInputs {
             &protected,
             &asset,
             maximum.min(
-                if retained_raster(media).is_some() || media.id.as_str().starts_with(WORKSPACE_VIEW)
+                if retained_raster(media).is_some()
+                    || media.id.as_str().starts_with(WORKSPACE_VIEW)
+                    || media.id.as_str().starts_with(BROWSER_CAPTURE)
                 {
                     super::image_preparation::MAX_PREPARED_BYTES
                 } else {

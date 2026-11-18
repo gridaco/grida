@@ -82,6 +82,7 @@ pub(super) fn validate_worker_shape(stored: &StoredPrompt) -> Result<()> {
         || stored.allow_image_placement
         || stored.editor_endpoint.is_some()
         || stored.editor_presentation
+        || stored.editor_browser_tools
         || stored.editor_svg_target.is_some()
         || !matches!(
             stored.max_steps,
@@ -1054,6 +1055,7 @@ impl Host {
         captured.allow_image_placement = false;
         captured.editor_endpoint = None;
         captured.editor_presentation = false;
+        captured.editor_browser_tools = false;
         captured.editor_svg_target = None;
         captured.completion_checks = Some(completion_checks::worker_checks(
             captured.completion_checks.take(),
@@ -1178,6 +1180,7 @@ impl Host {
         let prepared = self.prepare_input(
             execution,
             &session,
+            &config.cwd,
             &request.input,
             Some(profile),
             false,
