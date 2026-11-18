@@ -49,6 +49,7 @@ fn edit(
 async fn supplied_message_context_separates_model_text_and_display_on_cold_replay() {
     const CAPTION: &str = "<sample> typed literally </sample>";
     const MODEL_TEXT: &str = "<sample> supplemental inference text </sample>";
+    const QUEUED_MODEL_TEXT: &str = "<sample> queued inference text </sample>";
     const FIXTURE: &str = "display-only value";
     let workspace = TempDir::new().unwrap();
     let directory = TempDir::new().unwrap();
@@ -119,7 +120,8 @@ async fn supplied_message_context_separates_model_text_and_display_on_cold_repla
         .await;
     endpoint.request().await;
     let submission = json!({
-        "sessionId":session,"inputId":"queued-context","messageContext":context,
+        "sessionId":session,"inputId":"queued-context",
+        "messageContext":{"modelText":QUEUED_MODEL_TEXT,"displayParts":display},
         "prompt":[{"type":"text","text":"Earlier caption."}]
     });
     let accepted = client
@@ -147,7 +149,7 @@ async fn supplied_message_context_separates_model_text_and_display_on_cold_repla
     assert_eq!(expected["displayParts"], display);
     assert_eq!(expected["textOnly"], false);
     assert_eq!(expected["textEditable"], true);
-    assert!(!expected.to_string().contains(MODEL_TEXT));
+    assert!(!expected.to_string().contains(QUEUED_MODEL_TEXT));
     client
         .request("_co.grida/session/stop", task_basis(&view, session, "hold"))
         .await;
@@ -178,7 +180,7 @@ async fn supplied_message_context_separates_model_text_and_display_on_cold_repla
     let request = endpoint.request().await;
     let inference = request.to_string();
     assert!(inference.contains(CAPTION), "{inference}");
-    assert!(inference.contains(MODEL_TEXT), "{inference}");
+    assert!(inference.contains(QUEUED_MODEL_TEXT), "{inference}");
     assert!(!inference.contains(FIXTURE), "{inference}");
     let user_content: Vec<_> = request["input"]
         .as_array()
@@ -191,7 +193,7 @@ async fn supplied_message_context_separates_model_text_and_display_on_cold_repla
     assert!(
         user_content
             .iter()
-            .any(|text| text.contains(MODEL_TEXT) && !text.contains(CAPTION)),
+            .any(|text| text.contains(QUEUED_MODEL_TEXT) && !text.contains(CAPTION)),
         "{request}"
     );
     settled(&mut client, session).await;
@@ -210,6 +212,7 @@ async fn supplied_message_context_separates_model_text_and_display_on_cold_repla
             break;
         }
         assert!(!frame.to_string().contains(MODEL_TEXT), "{frame}");
+        assert!(!frame.to_string().contains(QUEUED_MODEL_TEXT), "{frame}");
         let params = &frame["params"];
         let update = &params["update"];
         let meta = &params["_meta"][TRANSCRIPT_WINDOW];
@@ -261,6 +264,7 @@ async fn supplied_message_context_separates_model_text_and_display_on_cold_repla
     assert!(continued["result"].is_object(), "{continued}");
     let inference = endpoint.request().await.to_string();
     assert!(inference.contains(MODEL_TEXT), "{inference}");
+    assert!(!inference.contains(QUEUED_MODEL_TEXT), "{inference}");
     assert!(!inference.contains(FIXTURE), "{inference}");
     assert!(!inference.contains("Initial answer."), "{inference}");
     settled(&mut client, fork).await;
@@ -385,6 +389,20 @@ async fn editor_context_keeps_the_accepted_sample_through_retry_edit_and_restart
     assert!(!input.contains("node-new"), "{input}");
     let settled = settled(&mut client, session).await;
     assert!(settled["current"].is_null(), "{settled}");
+    let history = client
+        .request("_co.grida/session/history", json!({"sessionId":session}))
+        .await;
+    let messages = history["result"]["messages"].as_array().unwrap();
+    let editable = |preview: &str| {
+        messages
+            .iter()
+            .find(|message| message["preview"] == preview)
+            .unwrap()["editable"]
+            .as_bool()
+            .unwrap()
+    };
+    assert!(editable("Wait."));
+    assert!(!editable("Explain the earlier selection."));
     client.close().await;
     endpoint.done().await;
 }

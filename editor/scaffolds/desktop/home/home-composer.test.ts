@@ -248,6 +248,43 @@ describe("HomeComposer", () => {
     expect(host.open).toHaveBeenCalledExactlyOnceWith(workspace);
   });
 
+  it.each([false, true])(
+    "retries the same approved chat after the default effort arrives (unverified grant: %s)",
+    async (unverified) => {
+      const { composer, host } = setup();
+      const { access, prepared } = fullAccess();
+      if (unverified)
+        access.start.mockRejectedValueOnce(
+          new Error("native_chat_permission_mode_unverified")
+        );
+      else vi.mocked(host.stash).mockReturnValueOnce(false);
+      composer.selectPermissionMode(
+        "full_access",
+        { workspace, defaultWorkspace: host.defaultWorkspace },
+        access
+      );
+      composer.answerPermissionReview(true);
+      await vi.waitFor(() =>
+        expect(composer.read().permissionMode).toBe("full_access")
+      );
+      await expect(composer.submit(input, host)).rejects.toThrow(
+        unverified ? "Send again to check the same chat" : "Couldn't keep"
+      );
+      expect(host.open).not.toHaveBeenCalled();
+      composer.initializeEffort("medium");
+      await composer.submit(input, host);
+      expect(access.start).toHaveBeenCalledTimes(unverified ? 2 : 1);
+      expect(access.start.mock.calls[0][1]).not.toHaveProperty("effort");
+      if (unverified)
+        expect(access.start.mock.calls[1]).toEqual(access.start.mock.calls[0]);
+      expect(host.stash).toHaveBeenLastCalledWith(
+        workspace.id,
+        expect.objectContaining({ preparedSessionId: prepared.sessionId })
+      );
+      expect(host.open).toHaveBeenCalledExactlyOnceWith(workspace);
+    }
+  );
+
   it("cancels immediately while Main is still preparing the review", async () => {
     const { composer, drafts, host } = setup();
     const { access, review } = fullAccess();

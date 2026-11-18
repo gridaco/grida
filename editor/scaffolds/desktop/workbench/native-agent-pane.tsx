@@ -642,10 +642,10 @@ function NativeChatPane({
         actions={
           message.role === "user"
             ? {
-                // Only plain-text requests can be edited; a request with an
-                // attachment or one that started a goal cannot be resubmitted.
+                // Inline revision is for plain-text requests.
                 ...(editHistory &&
                   !message.attachments?.length &&
+                  !message.displayParts?.length &&
                   !goalStart && {
                     onEdit: (messageId: string) =>
                       void controller.prepareRevision(messageId),
@@ -1065,7 +1065,7 @@ function NativeChatPane({
                         variant="ghost"
                         size="icon-xs"
                         aria-label="Remove message context"
-                        disabled={state.acting || state.submitting}
+                        disabled={!controller.canRemoveMessageContext}
                         onClick={() =>
                           controller.removeMessageContext(state.scope)
                         }

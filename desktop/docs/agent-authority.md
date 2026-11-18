@@ -290,9 +290,11 @@ bound to that frame. Approval is kept until Send, revocation or navigation.
 On Send, Main consumes the approval once, creates the exact chat with the
 current model and effort, and applies Full access before handing back its
 session identity. The Welcome operation carries no message and issues no
-workspace attachment. Changes require an idle chat, an empty queue and no
-running command processes; the process list and Stop controls remain the
-owner of those processes.
+workspace attachment. When a permission reply is unverified, sending the
+same request from the current Welcome frame checks the original grant and
+chat. Navigation still revokes the review. Changes require an idle chat, an
+empty queue and no running command processes. The process list and Stop
+controls remain the owner of those processes.
 
 Full access uses a separate explicit unconfined native scope. It permits
 ordinary-user filesystem, internet and local-network access and intentionally

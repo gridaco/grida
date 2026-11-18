@@ -738,6 +738,89 @@ describe("NativeChatSelections", () => {
     expect(owner.readDefaults()).toBeNull();
   });
 
+  it.each(["same owner", "reopen"])(
+    "reclaims a Welcome reservation after its directory sync fails (%s)",
+    async (recovery) => {
+      const configured = options();
+      const acknowledgments = vi.fn<NativeChatSelections.Options["query"]>(
+        configured.query
+      );
+      let owner = await NativeChatSelections.open({
+        ...configured,
+        query: acknowledgments,
+      });
+      const ordinaryId = randomUUID();
+      await owner.read("workspace", null, ordinaryId);
+      const ordinary = await owner.prepareCreation("workspace", ordinaryId);
+      const welcomeId = randomUUID();
+      const canonicalDirectory = await fs.realpath(directory);
+      const openFile = fs.open;
+      let failed = false;
+      vi.spyOn(fs, "open").mockImplementation(async (...args) => {
+        const handle = await openFile(...args);
+        if (args[0] === canonicalDirectory && !failed)
+          vi.spyOn(handle, "sync").mockImplementationOnce(async () => {
+            failed = true;
+            throw new Error("directory_sync_failed_after_publish");
+          });
+        return handle;
+      });
+      await expect(
+        owner.prepareNewChat(
+          "workspace",
+          welcomeId,
+          { profileId: a, effort: "high" },
+          () => {}
+        )
+      ).rejects.toThrow("directory_sync");
+      const filename = path.join(directory, "chat-selections.json");
+      const before = JSON.parse(await fs.readFile(filename, "utf8"));
+      expect(before.drafts[welcomeId].welcome).toBe(true);
+      const { sessionId, requestId } = before.drafts[welcomeId].promotion;
+      if (recovery === "reopen")
+        owner = await NativeChatSelections.open({
+          ...configured,
+          query: acknowledgments,
+        });
+      await owner.recover();
+      const after = JSON.parse(await fs.readFile(filename, "utf8"));
+      expect(after.completed).toEqual([welcomeId]);
+      expect(acknowledgments).toHaveBeenCalledExactlyOnceWith(
+        "workspace",
+        sessionId,
+        "ack",
+        { operationId: requestId }
+      );
+      expect(await owner.prepareCreation("workspace", ordinaryId)).toEqual(
+        ordinary
+      );
+    }
+  );
+
+  it("leaves an in-flight Welcome creation to its current owner", async () => {
+    const configured = options();
+    const query = vi.fn<NativeChatSelections.Options["query"]>(
+      configured.query
+    );
+    const owner = await NativeChatSelections.open({ ...configured, query });
+    const draftId = randomUUID();
+    const creation = await owner.prepareNewChat(
+      "workspace",
+      draftId,
+      { profileId: a, effort: "high" },
+      () => {}
+    );
+    await owner.recover();
+    expect(query).not.toHaveBeenCalled();
+    await owner.finishCreation("workspace", draftId);
+    expect(query).toHaveBeenCalledExactlyOnceWith(
+      "workspace",
+      creation.sessionId,
+      "ack",
+      { operationId: creation.requestId }
+    );
+  });
+
   it("inherits only effort when creating a new chat whose context fixes the route", async () => {
     const configured = options();
     configured.initial = async (workspace) =>

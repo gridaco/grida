@@ -86,6 +86,17 @@ const MAX_DELIVERY_BYTES = 1024 * 1024;
 const MAX_DELIVERY_CHUNKS = 4096;
 const TOKEN = /^[a-f0-9-]{36}$/;
 const PERMISSION_REVIEW_TTL_MS = 5 * 60_000;
+const WELCOME_PERMISSION_UNVERIFIED = new Set([
+  "native_agent_request_timeout",
+  "native_agent_disconnected",
+  "native_agent_input_failed",
+  "native_agent_output_failed",
+  "native_agent_invalid_response",
+  "native_chat_permission_mode_invalid_response",
+  "sqlite_commit_unconfirmed",
+  "store_task_interrupted",
+  "control_worker_interrupted",
+]);
 
 export type NativeWelcomeWorkspace = Readonly<{
   workspaceId: string;
@@ -97,6 +108,11 @@ type WelcomePermissionReview = {
   id: string;
   phase: "pending" | "confirmed" | "starting";
   workspace?: NativeWelcomeWorkspace;
+  grant?: {
+    sessionId: string;
+    profileId: string | null;
+    effort: NativeChatEffort | undefined;
+  };
   check(): void;
   stopExpiry(): void;
   release(): void;
@@ -1105,6 +1121,9 @@ export class NativeChatIpc {
     if (!this.startup || !this.selections || !this.resolveWelcomeWorkspace)
       throw new Error("native_chat_permission_mode_unavailable");
     const { workspaceId, profileId, effort } = welcomePermissionChoice(value);
+    const prior = review.grant;
+    if (prior && (profileId !== prior.profileId || effort !== prior.effort))
+      throw new Error("native_chat_permission_mode_review_changed");
     review.phase = "starting";
     try {
       const { directoryIdentity } = workspace;
@@ -1154,48 +1173,83 @@ export class NativeChatIpc {
         )
           throw new Error("native_chat_scope_changed");
       };
-      const creation = await this.selections.prepareNewChat(
-        workspaceId,
-        review.id,
-        {
-          profileId,
-          effort: effort ?? this.selections.readDefaults()?.effort ?? "medium",
-        },
-        check
-      );
       let session: NativeChatSession;
-      try {
+      if (prior) {
+        session = await chat.load(prior.sessionId);
         check();
-        session = await chat.createSelected(creation);
-      } finally {
-        // Welcome reviews are one use. Retire the reservation even if the
-        // native reply was lost so its cleanup can recover without a resend.
-        await this.selections.finishCreation(workspaceId, review.id);
+        if (session.id !== prior.sessionId)
+          throw new Error("native_chat_permission_mode_invalid_response");
+      } else {
+        const creation = await this.selections.prepareNewChat(
+          workspaceId,
+          review.id,
+          {
+            profileId,
+            effort:
+              effort ?? this.selections.readDefaults()?.effort ?? "medium",
+          },
+          check
+        );
+        try {
+          check();
+          session = await chat.createSelected(creation);
+        } finally {
+          // Finalize the creation receipt even if its native reply was lost.
+          await this.selections.finishCreation(workspaceId, review.id);
+        }
+        check();
+        if (session.id !== creation.sessionId)
+          throw new Error("native_chat_permission_mode_invalid_response");
+        const state = await chat.permissionMode(session);
+        check();
+        if (
+          state.sessionId !== session.id ||
+          state.revision !== 0 ||
+          state.mode !== "restricted" ||
+          !state.available.includes("full_access")
+        )
+          throw new Error("native_chat_permission_mode_unavailable");
+        review.grant = { sessionId: session.id, profileId, effort };
       }
-      check();
-      if (session.id !== creation.sessionId)
-        throw new Error("native_chat_permission_mode_invalid_response");
-      const state = await chat.permissionMode(session);
-      check();
-      if (
-        state.sessionId !== session.id ||
-        state.revision !== 0 ||
-        state.mode !== "restricted" ||
-        !state.available.includes("full_access")
-      )
-        throw new Error("native_chat_permission_mode_unavailable");
+      // A current review authorizes exactly one revision-0 grant. Native can
+      // replay its receipt using the same session and operation identities.
       const updated = await chat.setPermissionMode(
         session,
-        state.revision,
-        randomUUID(),
+        0,
+        review.id,
         "full_access"
       );
       check();
-      if (updated.sessionId !== session.id || updated.mode !== "full_access")
+      if (
+        updated.sessionId !== session.id ||
+        updated.revision !== 1 ||
+        updated.mode !== "full_access"
+      )
         throw new Error("native_chat_permission_mode_invalid_response");
+      if (prior) {
+        const current = await chat.permissionMode(session);
+        check();
+        if (
+          current.sessionId !== session.id ||
+          current.revision !== updated.revision ||
+          current.mode !== updated.mode
+        )
+          throw new Error("native_chat_permission_mode_review_changed");
+      }
       return { sessionId: session.id, profileId };
+    } catch (error) {
+      if (
+        review.grant &&
+        error instanceof Error &&
+        WELCOME_PERMISSION_UNVERIFIED.has(error.message)
+      ) {
+        review.check();
+        review.phase = "confirmed";
+        throw new Error("native_chat_permission_mode_unverified");
+      }
+      throw error;
     } finally {
-      review.release();
+      if (review.phase === "starting") review.release();
     }
   }
 

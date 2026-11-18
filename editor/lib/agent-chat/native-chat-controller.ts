@@ -693,15 +693,18 @@ export class NativeChatController {
       this.update({ draftMessageContext: messageContext ?? null });
   }
 
+  get canRemoveMessageContext(): boolean {
+    return (
+      !!this.scope?.messageContext &&
+      !this.scope.pendingGoalStart &&
+      !this.view.acting &&
+      !this.view.submitting
+    );
+  }
+
   removeMessageContext(scopeId: number): void {
     const scope = this.scope;
-    if (
-      !scope ||
-      scope.id !== scopeId ||
-      this.view.acting ||
-      this.view.submitting
-    )
-      return;
+    if (!scope || scope.id !== scopeId || !this.canRemoveMessageContext) return;
     void this.discardPending(scope).catch(() => {});
     this.setDraftMessageContext(scope, undefined);
   }
@@ -2126,6 +2129,7 @@ export class NativeChatController {
       this.bridge.submitInRegime &&
       this.bridge.publishEditorSurfaces &&
       this.bridge.onEditorSvgText &&
+      !scope.messageContext &&
       !scope.selectedAttachment &&
       !this.view.goalIntent &&
       !this.view.steering
@@ -3964,12 +3968,17 @@ export class NativeChatController {
     if (!this.owns(scope) || scope.pendingRestoreFailed)
       throw new Error("native_chat_retry_storage_unavailable");
     const messageContext = scope.messageContext;
-    const normalized = text
-      .trim()
-      .replace(/^\/(?:plan|goal)\s+/, "")
-      .trim();
     const original =
-      this.retainedSend(scope, text) ?? this.retainedSend(scope, normalized);
+      this.retainedSend(scope, text) ??
+      (messageContext
+        ? undefined
+        : this.retainedSend(
+            scope,
+            text
+              .trim()
+              .replace(/^\/(?:plan|goal)\s+/, "")
+              .trim()
+          ));
     if (scope.pending && !original) await this.discardPending(scope);
     if (original && !this.view.acting && !this.view.loading) {
       this.update({ acting: true });
@@ -4360,9 +4369,7 @@ export class NativeChatController {
               submissionScope.pending === pending
             ) {
               await this.discardPending(submissionScope);
-              throw new Error(
-                "Select the editor item again to send this draft."
-              );
+              throw new Error("native_chat_editor_context_reselect");
             }
             throw error;
           });
@@ -7185,6 +7192,8 @@ function describeSideRefusal(error: unknown): string {
 
 function describe(error: unknown, fallback: string): string {
   if (!(error instanceof Error)) return fallback;
+  if (error.message === "native_chat_editor_context_reselect")
+    return "Select the editor item again to send this draft.";
   if (error.message.includes("native_chat_message_context_unavailable"))
     return MESSAGE_CONTEXT_UNAVAILABLE;
   if (error.message.includes("native_chat_model_change_"))

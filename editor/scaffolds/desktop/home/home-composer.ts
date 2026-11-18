@@ -31,10 +31,8 @@ export class HomeComposer {
     host: HomeComposer.FullAccess;
     reviewId: string;
     workspaceId: string;
-    prepared?: {
-      request: HomeComposer.AccessRequest;
-      chat: HomeComposer.PreparedChat;
-    };
+    request?: HomeComposer.AccessRequest;
+    prepared?: HomeComposer.PreparedChat;
   }>;
   private copiedTemplate?: Readonly<{
     workspaceId: string;
@@ -275,11 +273,11 @@ export class HomeComposer {
       this.resetPermissionMode();
       throw new Error("Choose Full access again for this project.");
     }
-    const prepared = approval.prepared?.request;
+    const previous = approval.request;
     if (
-      prepared &&
-      (prepared.profileId !== request.profileId ||
-        prepared.effort !== request.effort)
+      previous &&
+      (previous.profileId !== request.profileId ||
+        (this.effortChosen && previous.effort !== request.effort))
     )
       throw new Error(
         "Restore the model and effort used to prepare this Full access chat, or choose Default to start a different chat."
@@ -291,22 +289,34 @@ export class HomeComposer {
     request: HomeComposer.AccessRequest
   ): Promise<HomeComposer.PreparedChat> {
     const approval = this.requireApprovedAccess(request);
-    if (approval.prepared) return approval.prepared.chat;
+    if (approval.prepared) return approval.prepared;
+    const original = approval.request ?? request;
+    const attempt = { ...approval, request: original };
+    this.approvedAccess = attempt;
     let chat: HomeComposer.PreparedChat;
     try {
-      chat = await approval.host.start(approval.reviewId, request);
+      chat = await attempt.host.start(attempt.reviewId, original);
     } catch (cause) {
-      if (this.approvedAccess === approval) this.resetPermissionMode();
+      if (
+        this.approvedAccess === attempt &&
+        cause instanceof Error &&
+        cause.message === "native_chat_permission_mode_unverified"
+      )
+        throw new Error(
+          "Couldn't confirm Full access yet. Send again to check the same chat.",
+          { cause }
+        );
+      if (this.approvedAccess === attempt) this.resetPermissionMode();
       throw new Error(
         "Couldn't start the Full access chat. Your draft is still here.",
         { cause }
       );
     }
-    if (this.approvedAccess !== approval)
+    if (this.approvedAccess !== attempt)
       throw new Error(
         "Full access approval changed. Your draft is still here."
       );
-    this.approvedAccess = { ...approval, prepared: { request, chat } };
+    this.approvedAccess = { ...attempt, prepared: chat };
     return chat;
   }
 

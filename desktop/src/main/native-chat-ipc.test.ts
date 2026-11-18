@@ -3195,19 +3195,20 @@ describe("Welcome Full access review", () => {
         available: ["restricted", "full_access"],
       })
     );
+    const permissionMode = vi.fn<NonNullable<typeof chat.permissionMode>>(
+      async (session) => ({
+        sessionId: session.id,
+        revision: 0,
+        mode: "restricted",
+        available: ["restricted", "full_access"],
+      })
+    );
     Object.assign(chat, {
       acceptsSelection: true,
       acceptsPermissionMode: true,
       createSelected: create,
       setPermissionMode: setPermission,
-      permissionMode: vi.fn<NonNullable<typeof chat.permissionMode>>(
-        async (session) => ({
-          sessionId: session.id,
-          revision: 0,
-          mode: "restricted",
-          available: ["restricted", "full_access"],
-        })
-      ),
+      permissionMode,
     });
     const submit = vi.spyOn(chat, "submit");
     const query = vi.fn<NativeChatSelections.Options["query"]>(
@@ -3250,6 +3251,7 @@ describe("Welcome Full access review", () => {
       ensure,
       resolveWorkspace,
       setPermission,
+      permissionMode,
       submit,
       query,
       directory,
@@ -3473,6 +3475,64 @@ describe("Welcome Full access review", () => {
       );
       expect(f.setPermission).not.toHaveBeenCalled();
       expect(f.submit).not.toHaveBeenCalled();
+    } finally {
+      fs.rmSync(f.directory, { recursive: true, force: true });
+    }
+  });
+
+  it("recovers an unverified grant on the original Welcome chat", async () => {
+    const f = await welcomePermissionSetup();
+    try {
+      f.setPermission.mockRejectedValueOnce(
+        new Error("native_agent_request_timeout")
+      );
+      const review = await confirmedReview(f);
+      await expect(
+        f.ipc.startWelcomeFullAccess(f.event, review.reviewId, CHOICE)
+      ).rejects.toThrow("native_chat_permission_mode_unverified");
+      const [{ sessionId }] = f.create.mock.calls[0];
+      await expect(
+        f.ipc.startWelcomeFullAccess(f.event, review.reviewId, {
+          ...CHOICE,
+          effort: "low",
+        })
+      ).rejects.toThrow("native_chat_permission_mode_review_changed");
+      f.permissionMode.mockResolvedValueOnce({
+        sessionId,
+        revision: 1,
+        mode: "full_access",
+        available: ["restricted", "full_access"],
+      });
+      await expect(
+        f.ipc.startWelcomeFullAccess(f.event, review.reviewId, CHOICE)
+      ).resolves.toEqual({ sessionId, profileId: PROFILE });
+      expect(f.create).toHaveBeenCalledOnce();
+      expect(f.setPermission.mock.calls).toEqual([
+        [{ id: sessionId }, 0, review.reviewId, "full_access"],
+        [{ id: sessionId }, 0, review.reviewId, "full_access"],
+      ]);
+      expect(f.submit).not.toHaveBeenCalled();
+    } finally {
+      fs.rmSync(f.directory, { recursive: true, force: true });
+    }
+  });
+
+  it("revokes permission reconciliation when the Welcome frame navigates", async () => {
+    const f = await welcomePermissionSetup();
+    try {
+      f.setPermission.mockRejectedValueOnce(
+        new Error("native_agent_request_timeout")
+      );
+      const review = await confirmedReview(f);
+      await expect(
+        f.ipc.startWelcomeFullAccess(f.event, review.reviewId, CHOICE)
+      ).rejects.toThrow("native_chat_permission_mode_unverified");
+      f.contents.emit("did-navigate-in-page", {}, WELCOME_URL, true);
+      await expect(
+        f.ipc.startWelcomeFullAccess(f.event, review.reviewId, CHOICE)
+      ).rejects.toThrow("native_chat_permission_mode_review_changed");
+      expect(f.setPermission).toHaveBeenCalledOnce();
+      expect(f.create).toHaveBeenCalledOnce();
     } finally {
       fs.rmSync(f.directory, { recursive: true, force: true });
     }

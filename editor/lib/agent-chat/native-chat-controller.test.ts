@@ -1402,6 +1402,25 @@ it("retries the explicitly supplied editor context without sampling a new one", 
   }
 });
 
+it("asks for reselection when the host confirms an expired capture was never accepted", async () => {
+  const { bridge, controller } = fixture();
+  bridge.captureEditorContext = async () => null;
+  bridge.submitInRegime = vi
+    .fn<NonNullable<DesktopNativeChat["submitInRegime"]>>()
+    .mockRejectedValueOnce(new Error("native_chat_editor_context_unavailable"));
+  try {
+    await controller.select("workbench");
+    await expect(
+      controller.submit("Read this selection.", undefined, crypto.randomUUID())
+    ).rejects.toThrow("native_chat_editor_context_reselect");
+    expect(controller.read().error).toBe(
+      "Select the editor item again to send this draft."
+    );
+  } finally {
+    controller.disconnect();
+  }
+});
+
 it("sends ordinary text but does not strip a pending observation on an older preload", async () => {
   const { bridge, controller } = fixture();
   const send = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(
@@ -1427,7 +1446,10 @@ it("sends ordinary text but does not strip a pending observation on an older pre
   try {
     await controller.select("workbench");
     await expect(controller.submit("Read this selection.")).rejects.toThrow(
-      "Select the editor item again"
+      "native_chat_editor_context_reselect"
+    );
+    expect(controller.read().error).toBe(
+      "Select the editor item again to send this draft."
     );
     expect(send).not.toHaveBeenCalled();
     await controller.submit("Send ordinary text.");
@@ -6850,6 +6872,79 @@ describe("a first message chosen before the chat opened", () => {
         expect.objectContaining({ text, messageContext })
       );
       expect(drafts.readMessageContext(controller.draftKey()!)).toBeNull();
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("sends an edited contextual draft with its literal slash prefix", async () => {
+    const { controller, bridge, submit } = sending();
+    const submitMessage = vi
+      .fn<NonNullable<DesktopNativeChat["submitMessage"]>>(
+        (attachment, request) =>
+          submit(attachment, request.inputId, request.text)
+      )
+      .mockRejectedValueOnce(new Error("fixture lost reply"));
+    bridge.submitMessage = submitMessage;
+    const receipt = vi.spyOn(bridge, "inputReceipt");
+    const text = "Check the layout";
+    try {
+      expect(
+        await controller.startChat(null, () => ({ text, messageContext }))
+      ).toBe(text);
+      const [first] = submitMessage.mock.calls;
+      receipt.mockResolvedValue({
+        sessionId: "first",
+        inputId: first[1].inputId,
+        disposition: "claimed",
+        inputPosition: 1,
+        turnId: "turn-first",
+      });
+      await controller.submit(`/plan ${text}`);
+      expect(receipt).toHaveBeenCalledOnce();
+      expect(submitMessage).toHaveBeenCalledTimes(2);
+      expect(submitMessage.mock.calls[1][1]).toMatchObject({
+        text: `/plan ${text}`,
+        operatingRegime: "act",
+        messageContext,
+      });
+      expect(submitMessage.mock.calls[1][1].inputId).not.toBe(first[1].inputId);
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("keeps the context of an unconfirmed goal available for retry", async () => {
+    const { controller, bridge } = sending();
+    bridge.submitMessage =
+      vi.fn<NonNullable<DesktopNativeChat["submitMessage"]>>();
+    bridge.goal = async () => ({ observationId: null, goal: null });
+    const start = vi
+      .fn<NonNullable<DesktopNativeChat["startGoal"]>>(
+        async (sessionId, inputId) => ({
+          sessionId,
+          inputId,
+          disposition: "queued",
+          inputPosition: 1,
+          turnId: null,
+        })
+      )
+      .mockRejectedValueOnce(new Error("native_chat_goal_start_unverified"));
+    bridge.startGoal = start;
+    const text = "Check the layout";
+    try {
+      expect(
+        await controller.startChat(null, () => ({ text, messageContext }), {
+          goal: true,
+        })
+      ).toBe(text);
+      expect(controller.canRemoveMessageContext).toBe(false);
+      controller.removeMessageContext(controller.read().scope);
+      expect(controller.read().draftMessageContext).toEqual(messageContext);
+      await controller.submit(text);
+      expect(start).toHaveBeenCalledTimes(2);
+      expect(start.mock.calls[1]).toEqual(start.mock.calls[0]);
+      expect(controller.read().draftMessageContext).toBeNull();
     } finally {
       controller.disconnect();
     }

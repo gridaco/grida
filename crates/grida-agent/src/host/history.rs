@@ -9,8 +9,9 @@ use agent_kit_store_sqlite::history::{
     ReplayWindow, RetainedHistory, SeededSession,
 };
 use grida_agent_master::conversation_seed::{
-    ConversationAnchor, ConversationCut, ConversationSeed, ConversationSource, SeedEntry,
-    SeedOmissions, SeedProvenance, is_editable_user,
+    AUTHORED_INPUT_PREFIX, ConversationAnchor, ConversationCut, ConversationSeed,
+    ConversationSource, EDITOR_OBSERVATION_SOURCE, SeedEntry, SeedOmissions, SeedProvenance,
+    is_editable_user,
 };
 use grida_agent_master::history::{model_context, project};
 use grida_agent_master::side_chat::inherited_records;
@@ -337,31 +338,55 @@ impl Host {
             }
         });
         let inherited_messages = inherited.iter().flat_map(|seed| {
-            seed.provenance()
+            let pairs = seed
+                .provenance()
                 .entries
                 .iter()
                 .filter(|entry| entry.message.is_some())
-                .zip(seed.records())
-                .skip(hidden)
+                .zip(seed.records());
+            let observed: BTreeSet<_> = pairs
+                .clone()
                 .filter_map(|(entry, HistoryRecord::Message(message))| {
+                    observation_input(message, &entry.origin.message)
+                        .map(|input| (&entry.origin.session, &entry.origin.turn, input))
+                })
+                .collect();
+            pairs
+                .skip(hidden)
+                .filter_map(move |(entry, HistoryRecord::Message(message))| {
+                    let origin = &entry.origin;
+                    let has_observation = input_suffix(&origin.message, AUTHORED_INPUT_PREFIX)
+                        .is_some_and(|input| {
+                            observed.contains(&(&origin.session, &origin.turn, input))
+                        });
                     history_message(
                         message,
                         ConversationAnchor::Inherited {
                             message: message.id.clone(),
                         },
-                        entry.editable,
+                        entry.editable && !has_observation,
                     )
                 })
         });
+        let observed: BTreeSet<_> = retained
+            .records
+            .iter()
+            .filter_map(|item| {
+                let HistoryRecord::Message(message) = &item.record;
+                observation_input(message, &message.id).map(|input| (&item.turn, input))
+            })
+            .collect();
         let local = retained.records.iter().filter_map(|item| {
             let HistoryRecord::Message(message) = &item.record;
+            let has_observation = input_suffix(&message.id, AUTHORED_INPUT_PREFIX)
+                .is_some_and(|input| observed.contains(&(&item.turn, input)));
             history_message(
                 message,
                 ConversationAnchor::Turn {
                     turn: item.turn.clone(),
                     message: message.id.clone(),
                 },
-                is_editable_user(message),
+                is_editable_user(message) && !has_observation,
             )
         });
         let mut messages: Vec<_> = inherited_messages
@@ -855,6 +880,19 @@ pub(super) fn lower_seed(
         records,
         provenance,
     })
+}
+
+/// Authored messages and their separate observations share the same input suffix.
+fn input_suffix<'a>(message: &'a MessageId, source: &str) -> Option<&'a str> {
+    let (prefix, input) = message.as_str().split_once('/')?;
+    (prefix == source).then_some(input)
+}
+
+fn observation_input<'a>(message: &Message, original: &'a MessageId) -> Option<&'a str> {
+    if !super::editor_observation::is_observation(message) {
+        return None;
+    }
+    input_suffix(original, EDITOR_OBSERVATION_SOURCE)
 }
 
 fn history_message(

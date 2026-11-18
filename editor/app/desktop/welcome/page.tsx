@@ -239,7 +239,10 @@ function WelcomeSurface({
   // Null targets the managed default workspace; an explicit choice is honored
   // for text, references and templates alike.
   const [target, setTarget] = useState<Workspace | null>(null);
-  useEffect(() => composer.resetPermissionMode(), [composer, target?.id]);
+  useEffect(
+    () => composer.resetPermissionMode(),
+    [composer, preset, target?.id]
+  );
   const composerDraft = useMemo(
     () => composer.draftFor(target?.id ?? "default"),
     [composer, target?.id]
