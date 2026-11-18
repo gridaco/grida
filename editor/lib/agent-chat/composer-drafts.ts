@@ -17,9 +17,11 @@
  * which only lives in memory, so it stays with the draft until Desktop
  * restarts.
  */
-import type {
-  NativeChatEffort,
-  NativeChatOperatingRegime,
+import {
+  parseNativeChatMessageContext,
+  type NativeChatEffort,
+  type NativeChatMessageContext,
+  type NativeChatOperatingRegime,
 } from "@grida/desktop-bridge";
 
 export type ComposerDraftModes = Readonly<{ plan?: true; goal?: true }>;
@@ -67,6 +69,7 @@ export type ComposerDraftPending = Readonly<{
   allowLibrarySelection: boolean;
   editorSvgTargetId?: string;
   editorContextId?: string;
+  messageContext?: NativeChatMessageContext;
   attachment?:
     | StoredDraftAttachment
     | Readonly<{
@@ -108,10 +111,15 @@ export class ComposerDrafts {
   static readonly maxStoredDrafts = 50;
 
   static readonly modesPrefix = "grida.composer-draft-modes.v1:";
+  static readonly contextPrefix = "grida.composer-draft-context.v1:";
   static readonly pendingPrefix = "grida.composer-pending.v1:";
 
   private readonly memory = new Map<string, unknown>();
   private readonly modes = new Map<string, ComposerDraftModes>();
+  private readonly contexts = new Map<
+    string,
+    NativeChatMessageContext | null
+  >();
   private readonly attachments = new Map<
     string,
     ComposerDraftAttachment | null
@@ -145,6 +153,7 @@ export class ComposerDrafts {
         this.read(target) !== null ||
         modes.plan ||
         modes.goal ||
+        this.readMessageContext(target) ||
         (await this.readAttachment(target)) ||
         (await this.readPending(target));
       claim = { target, done: !!occupied };
@@ -248,6 +257,12 @@ export class ComposerDrafts {
       if ((await this.readPending(key))?.inputId !== inputId) return;
       if (this.attachments.get(key) === attachment)
         this.attachments.set(key, null);
+      if (
+        current.messageContext &&
+        JSON.stringify(this.readMessageContext(key)) ===
+          JSON.stringify(current.messageContext)
+      )
+        this.writeMessageContext(key, null);
       if (this.blobs) await this.blobs.delete(this.pendingKey(key));
       this.storage?.removeItem(ComposerDrafts.pendingPrefix + key);
       if (this.pending.get(key)?.inputId === inputId)
@@ -308,6 +323,38 @@ export class ComposerDrafts {
         );
     } catch {
       // Memory still holds the modes for this session.
+    }
+  }
+
+  /** Context supplied alongside the draft and restored before retrying. */
+  readMessageContext(key: string): NativeChatMessageContext | null {
+    if (this.contexts.has(key)) return this.contexts.get(key) ?? null;
+    try {
+      const raw = this.storage?.getItem(ComposerDrafts.contextPrefix + key);
+      const context = raw
+        ? parseNativeChatMessageContext(JSON.parse(raw))
+        : null;
+      this.contexts.set(key, context);
+      return context;
+    } catch {
+      return null;
+    }
+  }
+
+  writeMessageContext(
+    key: string,
+    context: NativeChatMessageContext | null
+  ): void {
+    this.contexts.set(key, context);
+    try {
+      if (context)
+        this.storage?.setItem(
+          ComposerDrafts.contextPrefix + key,
+          JSON.stringify(context)
+        );
+      else this.storage?.removeItem(ComposerDrafts.contextPrefix + key);
+    } catch {
+      // The current draft keeps its context in memory if storage is full.
     }
   }
 
@@ -408,6 +455,11 @@ export class ComposerDrafts {
       if (doc !== null && this.read(to) === null) {
         this.write(to, doc);
         this.write(from, null);
+      }
+      const context = this.readMessageContext(from);
+      if (context && !this.readMessageContext(to)) {
+        this.writeMessageContext(to, context);
+        this.writeMessageContext(from, null);
       }
       const modes = this.readModes(from);
       const target = this.readModes(to);
@@ -588,6 +640,8 @@ function validPending(value: ComposerDraftPending): boolean {
     (value.editorSvgTargetId !== undefined &&
       (typeof value.editorSvgTargetId !== "string" ||
         value.editorSvgTargetId.length > 256)) ||
+    (value.messageContext !== undefined &&
+      !parseNativeChatMessageContext(value.messageContext)) ||
     (value.editorContextId !== undefined &&
       (typeof value.editorContextId !== "string" ||
         !/^[a-f0-9-]{36}$/.test(value.editorContextId)))
@@ -606,6 +660,7 @@ function validPending(value: ComposerDraftPending): boolean {
           "allowLibrarySelection",
           "editorSvgTargetId",
           "editorContextId",
+          "messageContext",
           "attachment",
         ].includes(key)
     )

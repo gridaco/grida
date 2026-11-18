@@ -637,6 +637,23 @@ const bridge: DesktopBridge = {
       profiles: () => nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_PROFILES),
       welcomeProfiles: () =>
         nativeChatInvoke(IPC_CHANNELS.WELCOME_CHAT_PROFILES),
+      prepareWelcomeFullAccess: (workspaceId) =>
+        nativeChatInvoke(
+          IPC_CHANNELS.WELCOME_CHAT_PREPARE_FULL_ACCESS,
+          workspaceId
+        ),
+      answerWelcomeFullAccess: (reviewId, confirmed) =>
+        nativeChatInvoke(
+          IPC_CHANNELS.WELCOME_CHAT_ANSWER_FULL_ACCESS,
+          reviewId,
+          confirmed
+        ),
+      startWelcomeFullAccess: (reviewId, request) =>
+        nativeChatInvoke(
+          IPC_CHANNELS.WELCOME_CHAT_START_FULL_ACCESS,
+          reviewId,
+          request
+        ),
       selectProfile: (selection) =>
         nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_SELECT_PROFILE, selection),
     }),
@@ -800,6 +817,12 @@ const bridge: DesktopBridge = {
       ),
     captureEditorContext: () =>
       nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_CAPTURE_EDITOR_CONTEXT),
+    submitMessage: (attachmentId, input) =>
+      nativeChatInvoke(
+        IPC_CHANNELS.NATIVE_CHAT_SUBMIT_MESSAGE,
+        attachmentId,
+        input
+      ),
     submitInRegime: (
       action,
       attachmentId,

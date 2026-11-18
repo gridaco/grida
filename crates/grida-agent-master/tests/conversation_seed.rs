@@ -9,7 +9,8 @@ use agent_kit_core::{
     ToolCallId, ToolId, TurnId,
 };
 use grida_agent_master::conversation_seed::{
-    ConversationAnchor, ConversationCut, ConversationSeed, ConversationSource, SeedOmissionKind,
+    ConversationAnchor, ConversationCut, ConversationSeed, ConversationSource,
+    EDITOR_OBSERVATION_SOURCE, MESSAGE_CONTEXT_SOURCE, SeedOmissionKind,
 };
 
 fn message(id: &str, role: Role, source: &str, content: Vec<Content>) -> HistoryRecord {
@@ -214,6 +215,94 @@ fn further_derivation_preserves_origin_and_can_cut_before_inherited_user() {
     .unwrap();
     assert!(revision.provenance().entries.is_empty());
     assert!(revision.into_parts().unwrap().0.is_empty());
+}
+
+#[test]
+fn fork_through_an_input_keeps_its_observed_context_and_stops_before_later_records() {
+    const INPUT: &str = "input/request";
+    let observed = |id: &str, source: &str, value: &str| {
+        let HistoryRecord::Message(mut record) =
+            message(id, Role::User, source, vec![Content::Text(value.into())]);
+        record.provenance.kind = ProvenanceKind::Observed;
+        HistoryRecord::Message(record)
+    };
+    let context = observed(
+        "message-context/input/request",
+        MESSAGE_CONTEXT_SOURCE,
+        "selected reference guidance",
+    );
+    let observation = observed(
+        "editor-context/request",
+        EDITOR_OBSERVATION_SOURCE,
+        "captured editor selection",
+    );
+    let unrelated = observed(
+        "message-context/input/another-request",
+        MESSAGE_CONTEXT_SOURCE,
+        "separate input context",
+    );
+    let reply = text("answer", Role::Assistant, "a later answer");
+    let through_input = ConversationCut::Through(anchor(INPUT));
+    let before_reply = [
+        text(INPUT, Role::User, "Use this material."),
+        context.clone(),
+        observation,
+        unrelated.clone(),
+    ];
+    let direct = ConversationSeed::lower(
+        source("source"),
+        through_input.clone(),
+        None,
+        before_reply
+            .iter()
+            .cloned()
+            .chain([reply.clone()])
+            .map(local),
+    )
+    .unwrap();
+    assert_eq!(direct.provenance().cut, through_input);
+    assert_eq!(direct.records().len(), 3);
+    assert_eq!(
+        direct.provenance().entries[2].origin.message.as_str(),
+        "editor-context/request"
+    );
+
+    let complete = ConversationSeed::lower(
+        source("source"),
+        ConversationCut::Through(anchor("answer")),
+        None,
+        before_reply.into_iter().chain([reply.clone()]).map(local),
+    )
+    .unwrap();
+    let authored = complete.provenance().entries[0].message.clone().unwrap();
+    let seeded = ConversationSeed::lower(
+        source("first-fork"),
+        ConversationCut::Through(ConversationAnchor::Inherited { message: authored }),
+        Some(complete),
+        std::iter::empty(),
+    )
+    .unwrap();
+    assert_eq!(seeded.records(), direct.records());
+
+    let display_only = ConversationSeed::lower(
+        source("source"),
+        through_input,
+        None,
+        [
+            message(INPUT, Role::User, "fixture", Vec::new()),
+            context,
+            unrelated,
+            reply,
+        ]
+        .into_iter()
+        .map(local),
+    )
+    .unwrap();
+    let (records, retained) = display_only.into_parts().unwrap();
+    let reopened = ConversationSeed::from_parts(records, &retained).unwrap();
+    assert_eq!(reopened.provenance().entries.len(), 2);
+    assert!(reopened.provenance().entries[0].message.is_none());
+    assert_eq!(reopened.records(), &direct.records()[1..2]);
 }
 
 #[test]

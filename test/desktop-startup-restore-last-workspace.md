@@ -7,7 +7,7 @@ tags: [startup, workspace, welcome, restore, launch-intent]
 status: untested
 severity: high
 date: 2026-07-23
-updated: 2026-07-23
+updated: 2026-11-19
 automatable: false
 covered_by:
   - desktop/src/main/startup-window-policy.test.ts
@@ -69,6 +69,17 @@ implicit restoration.
     relaunch.
     - Expected: B opens. This experiment restores one last-focused surface, not
       the complete multi-window session.
+11. From the restored workbench, edit a file without saving, select another tab,
+    then click **Home** and dismiss the confirmation.
+    - Expected: the workbench stays open and the edit remains in its tab.
+12. Return to the edited tab, save the edit, and click **Home** again.
+    - Expected: the same window stays on Welcome without a confirmation or an
+      automatic redirect. Back returns to the workspace.
+13. Open a workspace from Home in the same window. Check the workspace title
+    bar. Click **Home**, then go Back from Home and check the workspace title
+    bar again.
+    - Expected: Home appears first. The arrow that would return to Home is
+      hidden in both cases. Back remains available from Home to the workspace.
 
 ## Notes
 

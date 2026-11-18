@@ -337,6 +337,7 @@ function QueueRow({
         preview={item.goalStart?.objective ?? item.preview}
         label={label}
         attachments={item.attachments}
+        displayParts={item.displayParts}
         readImage={(previewId) =>
           controller.readQueuedAttachmentPreview(item.inputId, previewId)
         }

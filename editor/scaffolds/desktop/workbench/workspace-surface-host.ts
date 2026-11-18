@@ -30,7 +30,7 @@ export class WorkspaceSurfaceHost {
       "getSnapshot" | "open" | "restore" | "subscribe"
     >
   ) {
-    this.svgText = new WorkspaceSvgText(this.group.getSnapshot);
+    this.svgText = new WorkspaceSvgText(this.group);
   }
 
   async open(

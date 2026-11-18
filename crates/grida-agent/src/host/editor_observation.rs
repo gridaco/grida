@@ -3,13 +3,13 @@
 use super::{PromptPart, problem};
 use agent_kit_core::messages::{Content, Message, Provenance, ProvenanceKind, Role};
 use agent_kit_core::{ChangeId, ErrorKind, Fingerprint, MessageId, Result};
+use grida_agent_master::conversation_seed::EDITOR_OBSERVATION_SOURCE as SOURCE;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 const MAX_BYTES: usize = 8 * 1024;
 const MAX_DEPTH: usize = 8;
 const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
-const SOURCE: &str = "editor-context";
 
 /// A message-time observation from an editor hosted by the submitting client.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -96,7 +96,9 @@ pub(super) fn validate_parts(parts: &[PromptPart]) -> Result<()> {
 pub(super) fn is_editor_text(part: &PromptPart) -> bool {
     matches!(
         part,
-        PromptPart::Text { .. } | PromptPart::EditorObservation { .. }
+        PromptPart::Text { .. }
+            | PromptPart::EditorObservation { .. }
+            | PromptPart::MessageContext { .. }
     )
 }
 

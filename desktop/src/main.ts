@@ -926,7 +926,10 @@ app.on("ready", async () => {
     ...(native && {
       resolve_native_chat: (_window, workspaceId, profileId) =>
         native.currentForWindow(workspaceId, profileId),
-      ensure_native_chat: (workspaceId) => native.ensure(workspaceId),
+      ensure_native_chat: (workspaceId, requireCurrent) =>
+        native.ensure(workspaceId, requireCurrent),
+      resolve_welcome_chat_workspace: (workspaceId) =>
+        native.welcomeWorkspace(workspaceId),
       forget_native_workspace: (workspaceId) =>
         native.forgetWorkspace(workspaceId),
       resolve_native_deck: workspaceCatalog

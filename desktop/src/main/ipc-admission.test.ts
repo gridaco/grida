@@ -77,7 +77,7 @@ describe("ipc_admission", () => {
           !nativeChat.includes(channel) &&
           !nativeExternal.includes(channel) &&
           channel !== workspacePublish &&
-          channel !== IPC_CHANNELS.WELCOME_CHAT_PROFILES &&
+          !channel.startsWith("grida:welcome:chat-") &&
           !(documentFiles as readonly IpcChannel[]).includes(channel)
       )
     );
@@ -264,8 +264,12 @@ describe("ipc_admission", () => {
     }
   });
 
-  it("admits Welcome connection choices only on the exact Welcome route", () => {
-    const channel = IPC_CHANNELS.WELCOME_CHAT_PROFILES;
+  it.each([
+    IPC_CHANNELS.WELCOME_CHAT_PROFILES,
+    IPC_CHANNELS.WELCOME_CHAT_PREPARE_FULL_ACCESS,
+    IPC_CHANNELS.WELCOME_CHAT_ANSWER_FULL_ACCESS,
+    IPC_CHANNELS.WELCOME_CHAT_START_FULL_ACCESS,
+  ])("admits %s only on the exact Welcome route", (channel) => {
     expect(allowedFor("main", "/desktop/welcome")).toContain(channel);
     for (const route of [
       "/desktop/welcome/extra",

@@ -22,6 +22,8 @@ export namespace chat_vocabulary {
   /** On-message context parts that render as chips instead of text. */
   export const CONTEXT_PARTS = {
     files: "data-user_file_attachments",
+    svgTextSelection: "data-svg-text-selection",
+    messageContext: "data-message-context",
   } as const;
 
   /** Context part type → the marker name shown on its chip. */

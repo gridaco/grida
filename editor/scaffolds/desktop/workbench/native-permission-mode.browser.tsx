@@ -7,17 +7,21 @@ import type {
   NativeChatPermissionMode,
 } from "@grida/desktop-bridge";
 import { NativeChatController } from "@/lib/agent-chat/native-chat-controller";
+import { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
+import type { Workspace } from "@/lib/desktop/bridge";
 import { ComposerProvider } from "@/kits/composer";
+import { HomeComposer } from "../home/home-composer";
+import { AgentComposerInput } from "../shared/agent-composer-input";
 import { AgentComposerTools } from "../shared/agent-composer-tools";
 import { AgentPermissionConfirmation } from "../shared/agent-permission-confirmation";
 import "@/app/ui.css";
 
 const CHAT = "9ecc5ef1-4d6b-4100-ac28-2632ccdc562a";
-const resources: { root: Root; controller: NativeChatController }[] = [];
+const resources: { root: Root; controller?: NativeChatController }[] = [];
 afterEach(() => {
   for (const { root, controller } of resources.splice(0)) {
     act(() => root.unmount());
-    controller.disconnect();
+    controller?.disconnect();
   }
   document.body.replaceChildren();
 });
@@ -170,6 +174,130 @@ async function openReview() {
     .element(page.getByText("What can the agent access?"))
     .not.toBeInTheDocument();
 }
+
+it("opens the Home dialog on selection before Desktop answers and sends without a second prompt", async () => {
+  (
+    globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+  ).IS_REACT_ACT_ENVIRONMENT = true;
+  await page.viewport(720, 720);
+  const composer = new HomeComposer(new ComposerDrafts(null, null));
+  const workspace = { id: "studio", name: "Studio project" } as Workspace;
+  const pending =
+    Promise.withResolvers<
+      Awaited<ReturnType<HomeComposer.FullAccess["prepare"]>>
+    >();
+  const access = {
+    prepare: () => pending.promise,
+    answer: vi.fn<HomeComposer.FullAccess["answer"]>(async () => {}),
+    start: vi.fn<HomeComposer.FullAccess["start"]>(async () => ({
+      sessionId: CHAT,
+      profileId: null,
+    })),
+  } satisfies HomeComposer.FullAccess;
+  const host = {
+    defaultWorkspace: async () => workspace,
+    stash: vi.fn<HomeComposer.Host["stash"]>(() => true),
+    open: vi.fn<HomeComposer.Host["open"]>(),
+  } satisfies HomeComposer.Host;
+  function Home() {
+    const view = useSyncExternalStore(composer.subscribe, composer.read);
+    return (
+      <section aria-label="Home" className="mx-auto mt-64 max-w-lg">
+        <AgentComposerInput
+          catalog={{ commands: [], mentions: [] }}
+          awaitSubmission
+          isStreaming={false}
+          submitting={view.busy}
+          canSubmit={!view.busy && !view.permissionBusy}
+          onStop={() => {}}
+          onSubmit={(text) =>
+            composer.submit(
+              {
+                text,
+                prompt: text,
+                profileId: null,
+                target: null,
+                references: [],
+              },
+              host
+            )
+          }
+          toolbarStart={
+            <AgentComposerTools
+              actions={[]}
+              access={{
+                mode: view.permissionMode,
+                available: true,
+                staged: true,
+                busy: view.busy || view.permissionBusy,
+                onChange: (mode) =>
+                  composer.selectPermissionMode(
+                    mode,
+                    { workspace, defaultWorkspace: host.defaultWorkspace },
+                    access
+                  ),
+              }}
+            />
+          }
+        />
+        <AgentPermissionConfirmation
+          review={view.permissionReview}
+          onAnswer={composer.answerPermissionReview}
+        />
+      </section>
+    );
+  }
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  resources.push({ root });
+  await act(async () => root.render(<Home />));
+  const input = container.querySelector<HTMLElement>(
+    '[contenteditable="true"]'
+  )!;
+  await act(async () => userEvent.fill(input, "First message"));
+  await click("Access: Default");
+  await click(/^Full access/);
+  const dialog = page.getByRole("alertdialog");
+  await expect.element(dialog).toHaveAccessibleName("Enable Full access?");
+  await expect
+    .element(dialog)
+    .toHaveTextContent("For this chat in Studio project.");
+  expect(host.open).not.toHaveBeenCalled();
+  await click("Cancel");
+  await expect.element(dialog).not.toBeInTheDocument();
+  expect(input.textContent).toBe("First message");
+  expect(container.textContent).not.toContain("Couldn't confirm the send");
+  expect(host.stash).not.toHaveBeenCalled();
+  expect(host.open).not.toHaveBeenCalled();
+  expect(access.start).not.toHaveBeenCalled();
+  await act(async () =>
+    pending.resolve({
+      reviewId: "review-token",
+      chatTitle: "New chat",
+      workspaceName: workspace.name,
+    })
+  );
+  expect(access.answer).toHaveBeenCalledExactlyOnceWith("review-token", false);
+  await click("Access: Default");
+  await click(/^Full access/);
+  await expect.element(dialog).toBeVisible();
+  await click("Enable Full access");
+  await expect
+    .element(
+      page.getByRole("button", { name: "Access: Full access", exact: true })
+    )
+    .toBeEnabled();
+  expect(access.start).not.toHaveBeenCalled();
+  expect(host.open).not.toHaveBeenCalled();
+  await click("Send");
+  await expect.element(dialog).not.toBeInTheDocument();
+  expect(host.stash).toHaveBeenCalledExactlyOnceWith(
+    workspace.id,
+    expect.objectContaining({ text: "First message", preparedSessionId: CHAT })
+  );
+  expect(host.open).toHaveBeenCalledExactlyOnceWith(workspace);
+});
 
 it("keeps the picker closed through compact confirmation, cancellation and exact-chat enablement", async () => {
   const f = await setup();

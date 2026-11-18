@@ -1343,13 +1343,24 @@ it("keeps the captured SVG target when the same submission reply is lost", async
       truncated: false,
     }),
     subscribeToEditorSurfaces: () => () => {},
-    svgText: { capture, invoke: () => ({ kind: "unavailable" }) },
+    svgText: {
+      hasSelection: () => true,
+      subscribe: () => () => {},
+      capture,
+      invoke: () => ({ kind: "unavailable" }),
+    },
   });
   try {
     await controller.select("workbench");
+    expect(controller.readComposerSvgText()).toBe(true);
+    expect(capture).not.toHaveBeenCalled();
+    controller.selectOperatingRegime("plan");
+    expect(controller.readComposerSvgText()).toBe(false);
+    controller.selectOperatingRegime("act");
     await expect(controller.submit("Read this SVG selection.")).rejects.toThrow(
       "fixture lost reply"
     );
+    expect(controller.readComposerSvgText()).toBe(false);
     await controller.submit("Read this SVG selection.");
     expect(send.mock.calls[0]?.at(-1)).toBe(target);
     expect(send.mock.calls[1]).toEqual(send.mock.calls[0]);
@@ -1459,7 +1470,12 @@ it("queues an Act follow-up with the captured SVG target", async () => {
       truncated: false,
     }),
     subscribeToEditorSurfaces: () => () => {},
-    svgText: { capture: () => target, invoke: () => ({ kind: "unavailable" }) },
+    svgText: {
+      hasSelection: () => true,
+      subscribe: () => () => {},
+      capture: () => target,
+      invoke: () => ({ kind: "unavailable" }),
+    },
   });
   try {
     await controller.select("workbench");
@@ -6747,8 +6763,8 @@ describe("a first message chosen before the chat opened", () => {
   const PROFILE = "9".repeat(64);
 
   function firstMessage(text = "Make a launch poster") {
-    let waiting: string | null = text;
-    const take = vi.fn<() => string | null>(() => {
+    let waiting: { text: string } | null = { text };
+    const take = vi.fn<() => { text: string } | null>(() => {
       const taken = waiting;
       waiting = null;
       return taken;
@@ -6773,6 +6789,71 @@ describe("a first message chosen before the chat opened", () => {
     f.bridge.selectProfile = choose;
     return { ...f, create, submit, choose };
   }
+
+  const messageContext = {
+    modelText: "<desktop-context>Use the selected example.</desktop-context>",
+    displayParts: [
+      { kind: "test.references", version: 1, data: { title: "Sample" } },
+    ],
+  };
+
+  it("sends a context-only first message through the ordinary chat", async () => {
+    const { controller, bridge, submit } = sending();
+    const submitMessage = vi.fn<
+      NonNullable<DesktopNativeChat["submitMessage"]>
+    >((attachment, request) =>
+      submit(attachment, request.inputId, request.text)
+    );
+    bridge.submitMessage = submitMessage;
+    try {
+      expect(
+        await controller.startChat(null, () => ({ text: "", messageContext }))
+      ).toBeNull();
+      expect(submitMessage).toHaveBeenCalledExactlyOnceWith(
+        "first",
+        expect.objectContaining({
+          action: "submit",
+          text: "",
+          messageContext,
+        })
+      );
+      expect(controller.read().draftMessageContext).toBeNull();
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("keeps the authored text and context together when the host refuses it", async () => {
+    const { controller, bridge, submit } = sending();
+    const drafts = durableDrafts();
+    controller.keepDrafts(drafts, "workspace");
+    const text = "Literal <reference> text";
+    try {
+      expect(
+        await controller.startChat(null, () => ({ text, messageContext }))
+      ).toBe(text);
+      expect(submit).not.toHaveBeenCalled();
+      expect(controller.read().error).toContain("Update Grida Desktop");
+      expect(controller.read().draftMessageContext).toEqual(messageContext);
+      expect(drafts.readMessageContext(controller.draftKey()!)).toEqual(
+        messageContext
+      );
+      const submitMessage = vi.fn<
+        NonNullable<DesktopNativeChat["submitMessage"]>
+      >((attachment, request) =>
+        submit(attachment, request.inputId, request.text)
+      );
+      bridge.submitMessage = submitMessage;
+      await controller.submit(text);
+      expect(submitMessage).toHaveBeenCalledExactlyOnceWith(
+        "first",
+        expect.objectContaining({ text, messageContext })
+      );
+      expect(drafts.readMessageContext(controller.draftKey()!)).toBeNull();
+    } finally {
+      controller.disconnect();
+    }
+  });
 
   it("opens a new chat on the chosen connection and sends the message once", async () => {
     const { bridge, create, submit, choose } = sending();
@@ -7504,7 +7585,9 @@ describe("recommended model connections", () => {
     bridge.selectProfile = vi.fn<
       NonNullable<DesktopNativeChat["selectProfile"]>
     >(async () => {});
-    const take = vi.fn<() => string>(() => "Use this connection");
+    const take = vi.fn<() => { text: string }>(() => ({
+      text: "Use this connection",
+    }));
     try {
       await controller.startChat(selection.read().profileId, take);
       expect(bridge.selectProfile).toHaveBeenCalledExactlyOnceWith({
@@ -7550,7 +7633,9 @@ describe("recommended model connections", () => {
     bridge.selectProfile = async () => {
       throw new Error("native_chat_profile_unavailable");
     };
-    const take = vi.fn<() => string>(() => "Keep the subscription draft");
+    const take = vi.fn<() => { text: string }>(() => ({
+      text: "Keep the subscription draft",
+    }));
     try {
       expect(await controller.startChat(selection.read().profileId, take)).toBe(
         "Keep the subscription draft"

@@ -6,6 +6,8 @@ use sha2::{Digest, Sha256};
 const REPLACE_TEXT: &str = "co.grida/session/replace-text";
 const QUEUED: &str = "co.grida/session/queued-input-image-chunks";
 const EDITOR_CONTEXT: &str = "co.grida/session/editor-context";
+const MESSAGE_CONTEXT: &str = "co.grida/session/message-context";
+const TRANSCRIPT_WINDOW: &str = "co.grida/session/transcript-window";
 
 fn initialize() -> Value {
     let mut value = input_image_initialize();
@@ -13,6 +15,8 @@ fn initialize() -> Value {
         REPLACE_TEXT,
         QUEUED,
         EDITOR_CONTEXT,
+        MESSAGE_CONTEXT,
+        TRANSCRIPT_WINDOW,
         "co.grida/session/selected-image",
         "co.grida/session/file-reference",
         "co.grida/goal/start",
@@ -39,6 +43,230 @@ fn edit(
     text: &str,
 ) -> Value {
     json!({"queue":queue_basis(view,session,request),"inputId":input,"replacementInputId":replacement,"text":text})
+}
+
+#[tokio::test]
+async fn supplied_message_context_separates_model_text_and_display_on_cold_replay() {
+    const CAPTION: &str = "<sample> typed literally </sample>";
+    const MODEL_TEXT: &str = "<sample> supplemental inference text </sample>";
+    const FIXTURE: &str = "display-only value";
+    let workspace = TempDir::new().unwrap();
+    let directory = TempDir::new().unwrap();
+    let state = directory.path().join("state");
+    let mut endpoint = Endpoint::start_protocol(
+        ProviderProtocol::Responses,
+        vec![
+            Reply::Finished("Initial answer."),
+            Reply::Hold("Existing work."),
+            Reply::Finished("Accepted."),
+            Reply::Finished("Continued in the fork."),
+        ],
+        Some(TEST_CREDENTIAL),
+    )
+    .await;
+    let mut client = stdio(&state, &endpoint.url, IMAGE_MODEL);
+    let ready = client.request("initialize", initialize()).await;
+    assert_eq!(
+        ready["result"]["agentCapabilities"]["_meta"][MESSAGE_CONTEXT],
+        1
+    );
+    let created = client
+        .request(
+            "session/new",
+            json!({"cwd":workspace.path(),"mcpServers":[]}),
+        )
+        .await;
+    let session = created["result"]["sessionId"].as_str().unwrap();
+    let display = json!([
+        {"kind":"example.selection","version":1,"data":{"label":FIXTURE}},
+        {"kind":"example.note","version":2,"data":{"order":2}}
+    ]);
+    let context = json!({"modelText":MODEL_TEXT,"displayParts":display});
+    let picked =
+        json!({"sessionId":session,"inputId":"picked","messageContext":context,"prompt":[]});
+    let mut invalid = picked.clone();
+    invalid["messageContext"]["displayParts"][0]["version"] = 0.into();
+    let rejected = client.request("_co.grida/session/submit", invalid).await;
+    assert_eq!(rejected["error"]["data"], "message_context_invalid");
+    let accepted = client
+        .request("_co.grida/session/submit", picked.clone())
+        .await;
+    assert!(accepted["result"].is_object(), "{accepted}");
+    let request = endpoint.request().await;
+    let inference = request.to_string();
+    assert!(inference.contains(MODEL_TEXT), "{inference}");
+    assert!(!inference.contains(FIXTURE), "{inference}");
+    assert!(request["input"].as_array().unwrap().iter().all(|item| {
+        item["role"] != "user"
+            || item["content"]
+                .as_str()
+                .is_some_and(|text| !text.is_empty())
+    }));
+    settled(&mut client, session).await;
+    let mut changed = picked;
+    changed["messageContext"]["modelText"] = "Different.".into();
+    let conflict = client.request("_co.grida/session/submit", changed).await;
+    assert_eq!(
+        conflict["error"]["data"], "submission_input_changed",
+        "{conflict}"
+    );
+
+    client
+        .request(
+            "_co.grida/session/submit",
+            super::super::lifecycle::prompt_request(session, "active", "Wait."),
+        )
+        .await;
+    endpoint.request().await;
+    let submission = json!({
+        "sessionId":session,"inputId":"queued-context","messageContext":context,
+        "prompt":[{"type":"text","text":"Earlier caption."}]
+    });
+    let accepted = client
+        .request("_co.grida/session/enqueue", submission)
+        .await;
+    assert_eq!(accepted["result"]["disposition"], "queued", "{accepted}");
+    let view = snapshot(&mut client, session).await;
+    let edited = client
+        .request(
+            "_co.grida/session/replace-text",
+            edit(
+                &view,
+                session,
+                "edit-context",
+                "queued-context",
+                "edited-context",
+                CAPTION,
+            ),
+        )
+        .await;
+    assert!(edited["result"].is_object(), "{edited}");
+    let view = snapshot(&mut client, session).await;
+    let expected = queued(&mut client, session, "edited-context", &view).await;
+    assert_eq!(expected["prompt"], json!([{"type":"text","text":CAPTION}]));
+    assert_eq!(expected["displayParts"], display);
+    assert_eq!(expected["textOnly"], false);
+    assert_eq!(expected["textEditable"], true);
+    assert!(!expected.to_string().contains(MODEL_TEXT));
+    client
+        .request("_co.grida/session/stop", task_basis(&view, session, "hold"))
+        .await;
+    settled(&mut client, session).await;
+    client.close().await;
+
+    let mut client = stdio(&state, &endpoint.url, IMAGE_MODEL);
+    client.request("initialize", initialize()).await;
+    let loaded = client
+        .request(
+            "session/load",
+            json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]}),
+        )
+        .await;
+    assert!(loaded["result"].is_object(), "{loaded}");
+    let view = snapshot(&mut client, session).await;
+    assert_eq!(
+        queued(&mut client, session, "edited-context", &view).await,
+        expected
+    );
+    let resumed = client
+        .request(
+            "_co.grida/session/resume-queue",
+            queue_basis(&view, session, "continue-context"),
+        )
+        .await;
+    assert!(resumed["result"].is_object(), "{resumed}");
+    let request = endpoint.request().await;
+    let inference = request.to_string();
+    assert!(inference.contains(CAPTION), "{inference}");
+    assert!(inference.contains(MODEL_TEXT), "{inference}");
+    assert!(!inference.contains(FIXTURE), "{inference}");
+    let user_content: Vec<_> = request["input"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|item| item["role"] == "user")
+        .filter_map(|item| item["content"].as_str())
+        .collect();
+    assert!(user_content.contains(&CAPTION), "{request}");
+    assert!(
+        user_content
+            .iter()
+            .any(|text| text.contains(MODEL_TEXT) && !text.contains(CAPTION)),
+        "{request}"
+    );
+    settled(&mut client, session).await;
+    let replay = client
+        .send(
+            "session/load",
+            json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[],
+                "_meta":{TRANSCRIPT_WINDOW:{"kind":"read","requestId":"context-page"}}}),
+        )
+        .await;
+    let mut projected = Vec::new();
+    loop {
+        let frame = client.read_frame().await;
+        if frame["id"] == replay {
+            assert!(frame["result"].is_object(), "{frame}");
+            break;
+        }
+        assert!(!frame.to_string().contains(MODEL_TEXT), "{frame}");
+        let params = &frame["params"];
+        let update = &params["update"];
+        let meta = &params["_meta"][TRANSCRIPT_WINDOW];
+        if meta.get("displayParts").is_some() {
+            assert_eq!(meta["requestId"], "context-page");
+            assert!(
+                meta["turnId"].is_string() && update["messageId"].is_string(),
+                "{frame}"
+            );
+            assert_eq!(update["sessionUpdate"], "user_message_chunk");
+            assert_eq!(meta["displayParts"], display);
+            projected.push(update["content"]["text"].as_str().unwrap().to_owned());
+        }
+    }
+    assert_eq!(projected, ["", CAPTION]);
+
+    let history = client
+        .request("_co.grida/session/history", json!({"sessionId":session}))
+        .await;
+    let authored = history["result"]["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|message| message["preview"] == "Message context")
+        .expect("display-only message has a retained anchor");
+    let forked = client
+        .request(
+            "_co.grida/session/fork",
+            json!({"sessionId":session,"requestId":"fork-display-only",
+                "expectedHistory":history["result"]["basis"],"anchor":authored["anchor"]}),
+        )
+        .await;
+    let fork = forked["result"]["sessionId"]
+        .as_str()
+        .unwrap_or_else(|| panic!("{forked}"));
+    let loaded = client
+        .request(
+            "session/load",
+            json!({"sessionId":fork,"cwd":workspace.path(),"mcpServers":[]}),
+        )
+        .await;
+    assert!(loaded["result"].is_object(), "{loaded}");
+    let continued = client
+        .request(
+            "_co.grida/session/submit",
+            super::super::lifecycle::prompt_request(fork, "follow-up", "Continue the request."),
+        )
+        .await;
+    assert!(continued["result"].is_object(), "{continued}");
+    let inference = endpoint.request().await.to_string();
+    assert!(inference.contains(MODEL_TEXT), "{inference}");
+    assert!(!inference.contains(FIXTURE), "{inference}");
+    assert!(!inference.contains("Initial answer."), "{inference}");
+    settled(&mut client, fork).await;
+
+    client.close().await;
+    endpoint.done().await;
 }
 
 #[tokio::test]

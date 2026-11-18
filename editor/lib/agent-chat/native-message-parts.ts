@@ -4,18 +4,25 @@ import type { ChatMessage } from "./types";
 import { video_attachment } from "./video-attachment";
 
 /**
- * A native chat message as the chat kit's message parts: its text, and the
- * files a person attached. Retained PNGs carry only an opaque preview selector;
+ * A native chat message as the chat kit's text, editor context and attachments.
+ * Retained PNGs carry only an opaque preview selector;
  * references keep their bounded poster and dimensions from the composer.
  */
 export namespace native_message_parts {
   export function of(message: NativeChatMessage): ChatMessage["parts"] {
-    const parts = [
-      { type: "text", text: message.text },
-    ] as ChatMessage["parts"];
-    if (message.role !== "user" || !message.attachments?.length) return parts;
-    return [
-      {
+    const parts: ChatMessage["parts"] = [];
+    if (message.role === "user" && message.svgTextSelection)
+      parts.push({
+        type: chat_vocabulary.CONTEXT_PARTS.svgTextSelection,
+        data: true,
+      });
+    if (message.role === "user" && message.displayParts?.length)
+      parts.push({
+        type: chat_vocabulary.CONTEXT_PARTS.messageContext,
+        data: message.displayParts,
+      });
+    if (message.role === "user" && message.attachments?.length)
+      parts.push({
         type: chat_vocabulary.CONTEXT_PARTS.files,
         // The chip names each file; the bytes stay with the host.
         data: {
@@ -41,8 +48,8 @@ export namespace native_message_parts {
                   }
           ),
         },
-      } as unknown as ChatMessage["parts"][number],
-      ...parts,
-    ];
+      });
+    parts.push({ type: "text", text: message.text });
+    return parts;
   }
 }

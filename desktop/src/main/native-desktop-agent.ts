@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { lstatSync, realpathSync } from "node:fs";
+import path from "node:path";
 import {
   CHATGPT_PROVIDER_ID,
   GG_PROVIDER_ID,
@@ -288,6 +289,20 @@ export class NativeDesktopAgent {
         return { root: workspace.root };
       }
     );
+  }
+
+  /** Ground the permission review in the registered directory, without a worker. */
+  welcomeWorkspace(workspaceId: string) {
+    return this.withWorkspace(workspaceId, async (workspace, check) => {
+      check();
+      if (!workspace.identity)
+        throw new Error("native_chat_permission_mode_unavailable");
+      return {
+        workspaceId: workspace.id,
+        workspaceName: path.basename(workspace.root) || "This project",
+        directoryIdentity: workspace.identity,
+      };
+    });
   }
 
   async ensure(

@@ -90,6 +90,8 @@ import { AnsweredQuestionSummary, isQuestionEntry } from "./question-card";
 import { workspace_links } from "./workspace-links";
 import { FullscreenImagePreview } from "@/kits/image-preview";
 import { AttachmentImagePreview } from "./attachment-image-preview";
+import { EditorSelectionIndicator } from "./editor-selection-indicator";
+import { MessageContextParts } from "./message-context-parts";
 import { ChatMessageEditor, type ChatMessageEdit } from "./message-editor";
 import { WorkingIndicator } from "./working-indicator";
 import {
@@ -180,6 +182,14 @@ export function ChatMessageView({
       .map((part) => part.text)
       .join("");
     const hasText = text.trim().length > 0;
+    const svgTextSelection = message.parts.some(
+      (part) =>
+        part.type === chat_vocabulary.CONTEXT_PARTS.svgTextSelection &&
+        part.data === true
+    );
+    const messageContext = message.parts.find(
+      (part) => part.type === chat_vocabulary.CONTEXT_PARTS.messageContext
+    );
     // Perceived images and host-supplied resources stay outside the prose
     // bubble. Neither their labels nor their previews become copyable text.
     const images = message.parts.filter(
@@ -193,6 +203,17 @@ export function ChatMessageView({
     );
     return (
       <Message from="user">
+        {svgTextSelection && !edit && (
+          <EditorSelectionIndicator kind="svg-text" className="self-end" />
+        )}
+        {messageContext &&
+          "data" in messageContext &&
+          Array.isArray(messageContext.data) && (
+            <MessageContextParts
+              parts={messageContext.data}
+              className="justify-end"
+            />
+          )}
         <UserMessageAttachments
           contexts={contexts}
           images={images}

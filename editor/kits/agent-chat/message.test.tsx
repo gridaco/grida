@@ -3,6 +3,16 @@ import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChatMessage } from "@/lib/agent-chat/types";
 import { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
+import { native_message_parts } from "@/lib/agent-chat/native-message-parts";
+import {
+  IMAGE_REFERENCE_PART,
+  imagesMessageContext,
+} from "@/lib/desktop/images-message-context";
+import {
+  slidesTemplateMessageContext,
+  SLIDES_TEMPLATE_PART,
+} from "@/lib/desktop/slides-message-context";
+import { workflowMessageContext } from "@/lib/desktop/workflow-message-context";
 import { ChatMessageView, type ChatMessageActions } from "./message";
 
 const actions = vi.hoisted(
@@ -32,6 +42,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 function files(entries: unknown[]): ChatMessage["parts"][number] {
@@ -67,6 +78,284 @@ function region(html: string, attribute: string): string | null {
 }
 
 describe("user message attachments", () => {
+  it("keeps workflow references and model-only context out of authored prose", async () => {
+    const context = workflowMessageContext([
+      {
+        number: 1,
+        title: 'Pet & "friend" <draft>',
+        showcaseUrl: "https://grida.co/fx/workflows/pet",
+        sourceUrl: "https://github.com/gridaco/fx/tree/main/examples/pet",
+        templateId: "pet",
+        posterUrl: "https://fx-cdn.grida.co/showcase/artifacts/pet.webp",
+      },
+    ]);
+    expect(context.modelText).toContain("<grida-desktop-context>");
+    expect(context.modelText).toContain(
+      'title="Pet &amp; &quot;friend&quot; &lt;draft&gt;" template-id="pet"'
+    );
+    expect(context.modelText).toContain("<reminder>");
+    expect(context.modelText).not.toContain("pet.webp");
+
+    const parts = native_message_parts.of({
+      messageId: "ask",
+      role: "user",
+      text: "Only my prompt.",
+      displayParts: context.displayParts,
+    });
+    const html = render(parts);
+    const references = region(html, 'aria-label="Workflow references"');
+    const prose = region(html, 'aria-label="Message text"');
+    expect(references).toContain('href="https://grida.co/fx/workflows/pet"');
+    expect(references).toContain("pet.webp");
+    expect(prose).toContain("Only my prompt.");
+    expect(prose).not.toContain("Pet");
+    expect(html).not.toContain("Use Grida FX for this request");
+    expect(html).not.toContain("github.com");
+    const copy = vi.fn<(text: string) => Promise<void>>(async () => {});
+    vi.stubGlobal("window", {});
+    vi.stubGlobal("navigator", { clipboard: { writeText: copy } });
+    vi.useFakeTimers();
+    await actions
+      .find(({ tooltip }) => tooltip === "Copy")
+      ?.onClick?.({} as never);
+    expect(copy).toHaveBeenCalledExactlyOnceWith("Only my prompt.");
+    vi.unstubAllGlobals();
+
+    const picksOnly = render(
+      native_message_parts.of({
+        messageId: "pick",
+        role: "user",
+        text: "",
+        displayParts: context.displayParts,
+      })
+    );
+    expect(region(picksOnly, 'aria-label="Message text"')).toBeNull();
+    expect(
+      region(picksOnly, 'aria-label="Workflow references"')
+    ).not.toBeNull();
+  });
+
+  it("renders only recognized reference display versions and public showcase links", () => {
+    const context = workflowMessageContext([]);
+    expect(context.modelText).not.toContain("<references>");
+    expect(context.displayParts).toEqual([]);
+
+    const html = render([
+      {
+        type: chat_vocabulary.CONTEXT_PARTS.messageContext,
+        data: [
+          {
+            kind: "fx.workflow-references",
+            version: 2,
+            data: {
+              references: [
+                {
+                  number: 1,
+                  title: "Future format",
+                  showcaseUrl: "https://grida.co/fx/workflows/pet",
+                },
+              ],
+            },
+          },
+          {
+            kind: "fx.workflow-references",
+            version: 1,
+            data: {
+              references: [
+                {
+                  number: 1,
+                  title: "Unsafe reference",
+                  showcaseUrl: "file:///private/secret",
+                },
+                {
+                  number: 2,
+                  title: "Valid reference",
+                  showcaseUrl: "https://grida.co/fx/workflows/pet",
+                  posterUrl: "https://example.org/untrusted.webp",
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ]);
+    expect(html).toContain("Valid reference");
+    expect(html).not.toContain("Future format");
+    expect(html).not.toContain("Unsafe reference");
+    expect(html).not.toContain("untrusted.webp");
+  });
+
+  it("renders selected Library image references outside authored prose", () => {
+    vi.stubEnv("NEXT_PUBLIC_GRIDA_LIBRARY_STORAGE_PROVIDER", "tigris");
+    vi.stubEnv("NEXT_PUBLIC_GRIDA_LIBRARY_ASSET_ORIGIN", undefined);
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:54321");
+    const publicUrl = `https://library.grida.co/${"a".repeat(64)}.png`;
+    const localUrl =
+      "http://127.0.0.1:54321/storage/v1/object/public/library/example%20image.webp";
+    const context = imagesMessageContext([
+      { id: "first", title: 'Warm & "bright"', url: publicUrl },
+      { id: "second", title: "Soft light", url: localUrl },
+    ]);
+    expect(context.modelText).toBe(
+      [
+        "<grida-desktop-context>",
+        "  <images>",
+        "    <references>",
+        `      <reference title="Warm &amp; &quot;bright&quot;" url="${publicUrl}" />`,
+        `      <reference title="Soft light" url="${localUrl}" />`,
+        "    </references>",
+        "    <reminder>Create an image for this request.</reminder>",
+        "  </images>",
+        "</grida-desktop-context>",
+      ].join("\n")
+    );
+    const html = render(
+      native_message_parts.of({
+        messageId: "pick",
+        role: "user",
+        text: "Draw a fox.",
+        displayParts: context.displayParts,
+      })
+    );
+    const references = region(html, 'aria-label="Image references"');
+    const prose = region(html, 'aria-label="Message text"');
+    expect(references).toContain(`href="${publicUrl}"`);
+    expect(references).toContain(`src="${publicUrl}"`);
+    expect(references).toContain(`href="${localUrl}"`);
+    expect(references).toContain(`src="${localUrl}"`);
+    expect(references?.indexOf(publicUrl)).toBeLessThan(
+      references?.indexOf(localUrl) ?? -1
+    );
+    expect(prose).toContain("Draw a fox.");
+    expect(prose).not.toContain("Warm");
+    expect(prose).not.toContain(publicUrl);
+    expect(html).not.toContain("Create an image for this request.");
+
+    const modeOnly = imagesMessageContext([]);
+    expect(modeOnly.modelText).toContain("<images>");
+    expect(modeOnly.modelText).not.toContain("<references>");
+    expect(modeOnly.displayParts).toEqual([]);
+  });
+
+  it("ignores unknown Images display versions and URLs outside the Library", () => {
+    vi.stubEnv("NEXT_PUBLIC_GRIDA_LIBRARY_STORAGE_PROVIDER", "tigris");
+    vi.stubEnv(
+      "NEXT_PUBLIC_GRIDA_LIBRARY_ASSET_ORIGIN",
+      "https://assets.example.test"
+    );
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://project.supabase.co");
+    const publicUrl = `https://assets.example.test/${"a".repeat(64)}.png`;
+    const html = render([
+      {
+        type: chat_vocabulary.CONTEXT_PARTS.messageContext,
+        data: [
+          {
+            ...IMAGE_REFERENCE_PART,
+            version: 2,
+            data: { references: [{ title: "Future image", url: publicUrl }] },
+          },
+          {
+            ...IMAGE_REFERENCE_PART,
+            data: {
+              references: [
+                { title: "Current image", url: publicUrl },
+                { title: "Unsafe scheme", url: "javascript:alert(1)" },
+                { title: "Offsite image", url: "https://evil.test/image.png" },
+                {
+                  title: "Private bucket",
+                  url: "https://project.supabase.co/storage/v1/object/sign/library/private.png",
+                },
+                {
+                  title: "Encoded separator",
+                  url: "https://project.supabase.co/storage/v1/object/public/library/%2Fprivate.png",
+                },
+                {
+                  title: "Signed URL",
+                  url: `${publicUrl}?token=secret`,
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ]);
+    const references = region(html, 'aria-label="Image references"');
+    expect(references).toContain("Current image");
+    expect(references?.match(/<img(?=\s)/g)).toHaveLength(1);
+    expect(html).not.toContain("Future image");
+    expect(html).not.toContain("Unsafe scheme");
+    expect(html).not.toContain("Offsite image");
+    expect(html).not.toContain("Private bucket");
+    expect(html).not.toContain("Encoded separator");
+    expect(html).not.toContain("Signed URL");
+  });
+
+  it("keeps different context parts in their supplied order", () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://project.supabase.co");
+    const image = imagesMessageContext([
+      {
+        id: "image",
+        title: "Palette reference",
+        url: "https://project.supabase.co/storage/v1/object/public/library/palette.png",
+      },
+    ]);
+    const template = slidesTemplateMessageContext({
+      title: "Pitch deck",
+      path: "pitch.canvas",
+      slides: 6,
+    });
+    const html = render(
+      native_message_parts.of({
+        messageId: "ask",
+        role: "user",
+        text: "Make a proposal.",
+        displayParts: [...image.displayParts, ...template.displayParts],
+      })
+    );
+    const context = region(html, 'aria-label="Message context"');
+    expect(context).toContain("Palette reference");
+    expect(context).toContain("Pitch deck");
+    expect(context?.indexOf("Palette reference")).toBeLessThan(
+      context?.indexOf("Pitch deck") ?? -1
+    );
+  });
+
+  it.each(["My bakery pitch.", ""])(
+    "keeps the Slides template chip outside authored prose (%j)",
+    (text) => {
+      const context = slidesTemplateMessageContext({
+        title: "Startup Pitch",
+        slides: 12,
+        path: "copied-private-path.canvas",
+      });
+      const html = render(
+        native_message_parts.of({
+          messageId: "ask",
+          role: "user",
+          text,
+          displayParts: [
+            ...context.displayParts,
+            {
+              ...SLIDES_TEMPLATE_PART,
+              version: 2,
+              data: { title: "Future Slides template" },
+            },
+          ],
+        })
+      );
+      const templates = region(html, 'aria-label="Slides templates"');
+      const prose = region(html, 'aria-label="Message text"');
+      expect(templates).toContain("Startup Pitch");
+      expect(prose === null).toBe(!text);
+      expect(prose ?? "").toContain(text);
+      expect(prose ?? "").not.toContain("Startup Pitch");
+      expect(context.modelText).toContain("copied-private-path.canvas");
+      expect(html).not.toContain("copied-private-path.canvas");
+      expect(html).not.toContain("Edit that deck and keep its visual system");
+      expect(html).not.toContain("Future Slides template");
+    }
+  );
+
   it("preserves every other admitted context marker as a chip outside the text bubble", () => {
     const markers = chat_vocabulary.CONTEXT_MARKERS as Record<string, string>;
     markers["data-related-material"] = "Related material";

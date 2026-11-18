@@ -320,6 +320,176 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
     }
   });
 
+  it("sends message context separately and replays a display-only user message", async () => {
+    const capability = "co.grida/session/message-context";
+    const displayParts = [
+      { kind: "sample.references", version: 1, data: { label: "A reference" } },
+    ];
+    const messageContext = {
+      modelText: "<sample><reference /></sample>",
+      displayParts,
+    };
+    const literal = "<sample>My own words</sample>";
+    const test = fixture(
+      `
+      if (request.method === 'session/new') { send({id:request.id,result:{sessionId:'chat'}}); return; }
+      const { inputId, prompt, messageContext } = request.params;
+      const expectContext = ${JSON.stringify(messageContext)};
+      if (request.method === '_co.grida/session/submit' || request.method === '_co.grida/session/enqueue') {
+        const empty = request.method.endsWith('/submit');
+        const expected = empty ? [] : [{type:'text',text:${JSON.stringify(literal)}}];
+        if (!requested['${capability}'] || JSON.stringify(messageContext) !== JSON.stringify(expectContext)
+            || JSON.stringify(prompt) !== JSON.stringify(expected)) throw Error('incorrect separation');
+        send({id:request.id,result:{sessionId:'chat',inputId,inputPosition:1,turnId:empty?'turn':null,disposition:empty?'claimed':'queued'}}); return;
+      }
+      if (request.method !== 'session/load') throw Error('unexpected fixture method');
+      const window='${TRANSCRIPT_WINDOW}',read=request.params._meta[window];
+      const chunk=(role,messageId,text,requestId=read.requestId)=>send({
+        method:'session/update',params:{sessionId:'chat',
+          _meta:{[window]:{requestId,turnId:'turn',displayParts:expectContext.displayParts}},
+          update:{sessionUpdate:role,messageId,content:{type:'text',text}}
+        }
+      });
+      chunk('user_message_chunk','other','','other-request');
+      chunk('user_message_chunk','pick-only','');
+      chunk('agent_message_chunk','reply','I see it.');
+      send({id:request.id,result:{_meta:{[window]:{requestId:read.requestId,view:1,older:null,turns:[]}}}});
+      `,
+      1,
+      { [TRANSCRIPT_WINDOW]: 1, [capability]: 1 }
+    );
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        ...test.options,
+        cwd: fs.realpathSync(test.root),
+      });
+      const session = await chat.create();
+      await expect(
+        chat.submitMessage(session, {
+          text: "",
+          inputId: "only-context",
+          operatingRegime: "act",
+          messageContext,
+        })
+      ).resolves.toMatchObject({ inputId: "only-context" });
+      await expect(
+        chat.submitMessage(session, {
+          action: "enqueue",
+          text: literal,
+          inputId: "authored-context",
+          operatingRegime: "plan",
+          messageContext,
+        })
+      ).resolves.toMatchObject({ inputId: "authored-context" });
+      expect((await chat.transcriptPage(session)).messages).toEqual([
+        {
+          messageId: "pick-only",
+          turnId: "turn",
+          role: "user",
+          text: "",
+          displayParts,
+        },
+        {
+          messageId: "reply",
+          turnId: "turn",
+          role: "assistant",
+          text: "I see it.",
+        },
+      ]);
+    } finally {
+      await chat?.close();
+      test.close();
+    }
+  });
+
+  it("refuses supplied message context when the host lacks the capability", async () => {
+    const test = fixture(
+      `if (request.method === 'session/new') { send({id:request.id,result:{sessionId:'chat'}}); return; }
+      throw Error('unexpected fixture method');`,
+      1,
+      { [TRANSCRIPT_WINDOW]: 1, "co.grida/session/message-context": null }
+    );
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        ...test.options,
+        cwd: fs.realpathSync(test.root),
+      });
+      const session = await chat.create();
+      await expect(
+        chat.submitMessage(session, {
+          text: "My own words",
+          inputId: "unsupported",
+          operatingRegime: "act",
+          messageContext: { modelText: "Extra context", displayParts: [] },
+        })
+      ).rejects.toThrow("native_chat_message_context_unavailable");
+    } finally {
+      await chat?.close();
+      test.close();
+    }
+  });
+
+  it("keeps the SVG selection marker on its exact user message during transcript replay", async () => {
+    const test = fixture(
+      `
+      if (request.method === 'session/new') { send({id:request.id,result:{sessionId:'chat'}}); return; }
+      if (request.method !== 'session/load') throw Error('unexpected fixture method');
+      const window='${TRANSCRIPT_WINDOW}',read=request.params._meta[window];
+      const chunk=(role,messageId,text,extra={},sessionId='chat')=>send({
+        method:'session/update',params:{sessionId,
+          _meta:{[window]:{requestId:read.requestId,turnId:'turn',...extra}},
+          update:{sessionUpdate:role,messageId,content:{type:'text',text}}
+        }
+      });
+      chunk('user_message_chunk','selected','Make the ',{svgTextSelection:true});
+      chunk('user_message_chunk','selected','heading shorter.');
+      chunk('user_message_chunk','plain','Ordinary request.');
+      chunk('user_message_chunk','plain','wrong request',{requestId:'other',svgTextSelection:true});
+      chunk('user_message_chunk','plain','wrong chat',{svgTextSelection:true},'other');
+      chunk('user_message_chunk','plain',' Invalid marker.',{svgTextSelection:'true'});
+      chunk('user_message_chunk','plain',' No turn.',{turnId:undefined,svgTextSelection:true});
+      chunk('agent_message_chunk','reply','Done.',{svgTextSelection:true});
+      send({id:request.id,result:{_meta:{[window]:{requestId:read.requestId,view:1,older:null,turns:[]}}}});
+      `,
+      1,
+      { [TRANSCRIPT_WINDOW]: 1 }
+    );
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        ...test.options,
+        cwd: fs.realpathSync(test.root),
+      });
+      const session = await chat.create();
+      expect((await chat.transcriptPage(session)).messages).toEqual([
+        {
+          messageId: "selected",
+          turnId: "turn",
+          role: "user",
+          text: "Make the heading shorter.",
+          svgTextSelection: true,
+        },
+        {
+          messageId: "plain",
+          turnId: "turn",
+          role: "user",
+          text: "Ordinary request. Invalid marker. No turn.",
+        },
+        {
+          messageId: "reply",
+          turnId: "turn",
+          role: "assistant",
+          text: "Done.",
+        },
+      ]);
+    } finally {
+      await chat?.close();
+      test.close();
+    }
+  });
+
   it.each([
     { activityOrder: 0 },
     { activityOrder: Number.MAX_SAFE_INTEGER + 1 },
@@ -506,13 +676,16 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
 
   it("inspects queued image text and exact bytes without widening text-only replacement", async () => {
     const uri = "urn:grida:retained-attachment:queued-image";
+    const displayParts = [
+      { kind: "sample.reference", version: 1, data: { title: "A reference" } },
+    ];
     const test = fixture(
       `
       if (request.method === 'session/new') { send({id:request.id,result:{sessionId:'chat'}}); return; }
       if (request.method === '_co.grida/session/snapshot') { send({id:request.id,result:{sessionId:request.params.sessionId,sessionRevision:3,queuedInputs:1,queue:[{inputId:'queued',inputPosition:2,settings:{}}],admissionPaused:true,current:null,latest:null}}); return; }
       if (request.method === '${NativeQueuedMessages.inspectMethod}') {
         if(request.params.sessionId!=='chat'||request.params.inputId!=='queued'||request.params.expectedSessionRevision!==3) throw Error('wrong queue basis');
-        send({id:request.id,result:{inputId:'queued',textOnly:false,prompt:[{type:'text',text:'Full text\\nsecond line'},{type:'resource_link',name:'original.webp',uri:'${uri}',mimeType:'image/webp',size:3}]}});return;
+        send({id:request.id,result:{inputId:'queued',textOnly:false,displayParts:${JSON.stringify(displayParts)},prompt:[{type:'text',text:'Full text\\nsecond line'},{type:'resource_link',name:'original.webp',uri:'${uri}',mimeType:'image/webp',size:3}]}});return;
       }
       if (request.method === '${NativeQueuedMessages.readMethod}') {
         if(request.params.sessionId!=='chat'||request.params.inputId!=='queued'||request.params.expectedSessionRevision!==3||request.params.attachmentUri!=='${uri}'||request.params.offset!==0)throw Error('wrong queue image basis');
@@ -522,7 +695,11 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
       throw Error('unexpected effect '+request.method);
     `,
       1,
-      { [NativeQueuedMessages.capability]: 1 }
+      {
+        [NativeQueuedMessages.capability]: 1,
+        [TRANSCRIPT_WINDOW]: 1,
+        "co.grida/session/message-context": 1,
+      }
     );
     let chat: NativeAgentChat | undefined;
     try {
@@ -538,6 +715,7 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
           inputId: "queued",
           preview: "Full text\nsecond line",
           textOnly: false,
+          displayParts,
           attachments: [
             {
               name: "original.webp",
@@ -550,6 +728,7 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
       ]);
       const message = await chat.queuedMessage(session, basis, "queued");
       expect(message.text).toBe("Full text\nsecond line");
+      expect(message.displayParts).toEqual(displayParts);
       expect(JSON.stringify(message)).not.toContain(uri);
       const token = message.attachments![0].previewId!;
       expect(

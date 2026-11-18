@@ -551,9 +551,14 @@ every main-process IPC handler validates `event.senderFrame.url`.
 **Explicit Full access.** The ordinary restricted profile retains all command
 and filesystem exclusions below. A trusted launch can separately opt into
 Full access, and Desktop Main requires an in-app confirmation for the exact
-attached chat before selecting it. The private, negotiated permission-mode
-operation is not a model tool. The host records the per-chat selection and
-captures it with accepted work; another chat and newly created chats remain
+chat before selecting it. In a workspace the review is tied to the current
+attachment. On Home, Main validates the registered destination and binds a
+short-lived review to the current Welcome frame and one reserved new chat.
+Confirmation marks the reservation approved. Starting the chat consumes that
+approval once and applies Full access. Home receives the session identity
+without an attachment or a send capability. The private,
+negotiated permission-mode operation is not a model tool. The host records the
+per-chat selection and captures it with accepted work; other new chats remain
 restricted. Changes require an idle chat, an empty queue and no running
 command process. Workers inherit their assignment's captured posture.
 
@@ -798,6 +803,11 @@ and malformed values cannot widen the policy.
 deny (provider CDNs still excluded). The alternative — proxying library images
 through `grida-workspace:` like generated media — was rejected: the library is
 first-party public read-only storage, and the product keeps its pins as URLs.
+
+**FX showcase previews.** Desktop Home renders pinned posters and clips from
+the public FX CDN. The Desktop CSP allows `https://fx-cdn.grida.co/showcase/`
+for `img-src` and `media-src` only. The gallery requests these assets with
+anonymous CORS.
 
 For a native workbench chat attachment, the [Library selection action](<editor/app/(library)/library/attachment.ts>)
 requires an authenticated catalog UUID and reads its exact first-party bucket

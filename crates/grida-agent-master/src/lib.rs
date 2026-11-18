@@ -999,7 +999,7 @@ impl Master {
         if execution.hooks.selects(HookEvent::BeforeInput, None) {
             moments.extend(view.state.history().records().iter().filter_map(|record| {
                 let HistoryRecord::Message(message) = record;
-                (message.role == Role::User).then(|| HookMoment::BeforeInput {
+                lifecycle_hooks::is_input_boundary(message).then(|| HookMoment::BeforeInput {
                     message: message.clone(),
                 })
             }));

@@ -59,6 +59,7 @@ import type { DesktopFxViewer } from "./fx-viewer";
 export { DesktopBrowser } from "./browser";
 export type { DesktopFxViewer } from "./fx-viewer";
 export type * from "./native-chat";
+export * from "./native-chat-message-context";
 export type * from "./native-external-agent";
 export type * from "./native-subagents";
 export { NativeEditorSurfaces } from "./native-editor-surfaces";
@@ -147,6 +148,10 @@ export type SaveDialogOptions = {
 export type NavigationState = {
   can_go_back: boolean;
   can_go_forward: boolean;
+  /** Present when the previous Desktop history entry is the plain Home route. */
+  back_destination?: "home";
+  /** Present when the next Desktop history entry is the plain Home route. */
+  forward_destination?: "home";
 };
 
 export const DESKTOP_HOST_APP_IDS = [

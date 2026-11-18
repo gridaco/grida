@@ -5,7 +5,7 @@ const NATIVE_CHAT_CHANNELS = new Set<string>(
   Object.entries(IPC_CHANNELS)
     .filter(
       ([key]) =>
-        key.startsWith("NATIVE_CHAT_") || key === "WELCOME_CHAT_PROFILES"
+        key.startsWith("NATIVE_CHAT_") || key.startsWith("WELCOME_CHAT_")
     )
     .map(([, channel]) => channel)
 );

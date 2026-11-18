@@ -39,6 +39,8 @@ struct QueuedMessageResponse {
     text_only: bool,
     text_editable: bool,
     prompt: Vec<ContentBlock>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    display_parts: Vec<DisplayPart>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -75,9 +77,9 @@ impl fmt::Debug for QueuedImageChunkResponse {
     }
 }
 
-fn queued_prompt_block(part: PromptPart) -> ContentBlock {
+fn queued_prompt_block(part: PromptPart) -> Option<ContentBlock> {
     let prefix = crate::acp::projection::RETAINED_ATTACHMENT_URI;
-    match part {
+    Some(match part {
         PromptPart::RetainedImage { asset } => ContentBlock::ResourceLink(
             ResourceLink::new("image.png", format!("{prefix}{}", asset.id()))
                 .mime_type("image/png".to_owned())
@@ -95,8 +97,8 @@ fn queued_prompt_block(part: PromptPart) -> ContentBlock {
             )
             .size(i64::try_from(work.asset().size()).ok()),
         ),
-        other => lifecycle::prompt_block(other),
-    }
+        other => return lifecycle::prompt_block(other),
+    })
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -258,7 +260,8 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                         input_id: request.input_id,
                         text_only: matches!(parts.as_slice(), [PromptPart::Text { .. }]),
                         text_editable,
-                        prompt: parts.into_iter().map(queued_prompt_block).collect(),
+                        display_parts: display_parts(&parts, &queued_message_sessions),
+                        prompt: parts.into_iter().filter_map(queued_prompt_block).collect(),
                     })
                 }
                 .await;

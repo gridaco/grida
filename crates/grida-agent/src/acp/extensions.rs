@@ -31,6 +31,7 @@ use super::{ConnectionSessions, host_error, prompt_part, prompt_parts, unavailab
 use crate::host::{
     DurableSubmission, EditorObservation, Host, InputSettings, PromptPart, PromptRequest,
     SubmissionContext,
+    message_context::{DisplayPart, MessageContext},
 };
 use agent_client_protocol::v1::schema::{ContentBlock, Meta};
 use agent_client_protocol::{
@@ -57,6 +58,7 @@ const IMAGE_INTAKE: &str = "co.grida/session/selected-image";
 /// reference: the host records its path and facts and never reads it.
 const FILE_REFERENCE: &str = "co.grida/session/file-reference";
 const EDITOR_CONTEXT: &str = "co.grida/session/editor-context";
+pub(super) const MESSAGE_CONTEXT: &str = "co.grida/session/message-context";
 const SNAPSHOT: &str = "co.grida/session/snapshot";
 const STOP: &str = "co.grida/session/stop";
 const OPERATING_REGIME: &str = "co.grida/session/operating-regime";
@@ -163,6 +165,7 @@ fn capability_keys(
         .chain(reviewer.then_some(permission_mode::CAPABILITY))
         .chain(reviewer.then_some(FILE_REFERENCE))
         .chain(reviewer.then_some(EDITOR_CONTEXT))
+        .chain(reviewer.then_some(MESSAGE_CONTEXT))
         .chain(reviewer.then_some(super::projection::TRANSCRIPT_WINDOW))
         .chain(reviewer.then_some(super::projection::ACTIVITY_ORDER))
 }
@@ -193,6 +196,7 @@ struct Submit {
     editor_browser_tools: bool,
     editor_svg_target_id: Option<BindingId>,
     editor_context: Option<EditorObservation>,
+    message_context: Option<MessageContext>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -283,6 +287,32 @@ fn append_editor_context(
         parts.push(PromptPart::EditorObservation { observation });
     }
     Ok(())
+}
+
+fn append_message_context(
+    parts: &mut Vec<PromptPart>,
+    context: Option<MessageContext>,
+    sessions: &Mutex<ConnectionSessions>,
+) -> Result<()> {
+    if let Some(context) = context {
+        require(sessions, MESSAGE_CONTEXT, None)?;
+        parts.push(PromptPart::MessageContext { context });
+    }
+    Ok(())
+}
+
+fn display_parts(parts: &[PromptPart], sessions: &Mutex<ConnectionSessions>) -> Vec<DisplayPart> {
+    if !sessions
+        .lock()
+        .unwrap()
+        .negotiated
+        .contains(MESSAGE_CONTEXT)
+    {
+        return Vec::new();
+    }
+    crate::host::message_context::context(parts)
+        .map(|context| context.display_parts.clone())
+        .unwrap_or_default()
 }
 
 /// The file references among a prompt's blocks, aligned with the blocks. Only a
@@ -624,6 +654,7 @@ pub(super) fn handlers(
                         request.allow_wakeups || request.editor_endpoint_id.is_some(),
                     )?;
                     append_editor_context(&mut parts, request.editor_context, &submit_sessions)?;
+                    append_message_context(&mut parts, request.message_context, &submit_sessions)?;
                     let accepted = submit_host
                         .submit_prompt_with_context(
                             PromptRequest {

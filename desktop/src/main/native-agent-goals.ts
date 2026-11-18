@@ -5,9 +5,11 @@ import type {
   NativeChatGoalObjective,
   NativeChatGoalReceipt,
   NativeChatGoalRequest,
+  NativeChatGoalStartInput,
   NativeChatGoalStatus,
   NativeChatGoalUsage,
 } from "@grida/desktop-bridge";
+import { parseNativeChatMessageContext } from "@grida/desktop-bridge";
 
 const OBJECTIVE_LIMIT = 8192;
 const CRITERION_LIMIT = 1024;
@@ -74,7 +76,7 @@ export class NativeAgentGoals {
     ) => Promise<unknown>
   ) {}
 
-  private static readRequest(value: unknown): NativeChatGoalRequest {
+  private static readRequest(value: unknown): NativeChatGoalStartInput {
     const input = object(value);
     const allowance =
       input.allowance === undefined ? undefined : object(input.allowance);
@@ -105,6 +107,12 @@ export class NativeAgentGoals {
       input.namedChildId === undefined
         ? undefined
         : identity(input.namedChildId);
+    const messageContext =
+      input.messageContext === undefined
+        ? undefined
+        : parseNativeChatMessageContext(input.messageContext);
+    if (messageContext === null)
+      throw new Error("native_chat_message_context_invalid");
     if (
       Object.keys(input).length !==
         3 +
@@ -113,6 +121,7 @@ export class NativeAgentGoals {
           Number(effort !== undefined) +
           Number(maxCostMills !== undefined) +
           Number(namedChildId !== undefined) +
+          Number(messageContext !== undefined) +
           Number(selectionRevision !== undefined) ||
       (allowance !== undefined && Object.keys(allowance).length !== 2)
     )
@@ -138,6 +147,7 @@ export class NativeAgentGoals {
       ...(effort && { effort }),
       ...(namedChildId && { namedChildId }),
       ...(maxCostMills !== undefined && { maxCostMills }),
+      ...(messageContext && { messageContext }),
     };
   }
 
@@ -184,6 +194,7 @@ export class NativeAgentGoals {
       fundedReview: boolean;
       namedChild: boolean;
       spending?: boolean;
+      messageContext?: boolean;
     }
   ): Promise<unknown> {
     const {
@@ -196,7 +207,10 @@ export class NativeAgentGoals {
       namedChildId,
       maxCostMills,
       selectionRevision,
+      messageContext,
     } = NativeAgentGoals.readRequest(request);
+    if (messageContext && !capabilities.messageContext)
+      throw new Error("native_chat_message_context_unavailable");
     if (maxCostMills !== undefined && !capabilities.spending)
       throw new Error("native_chat_goal_spending_unavailable");
     if (effort === "ultra" && !capabilities.fundedReview)
@@ -216,6 +230,7 @@ export class NativeAgentGoals {
         _meta: { "co.grida/selectionRevision": selectionRevision },
       }),
       prompt: [{ type: "text", text: objective }],
+      ...(messageContext && { messageContext }),
       ...(effort === "ultra" && { effort }),
       ...(regime && { operatingRegime: regime }),
       ...(maxCostMills !== undefined && { maxCostMills }),

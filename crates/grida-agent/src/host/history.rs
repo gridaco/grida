@@ -89,6 +89,13 @@ pub(super) struct PriorContext {
     pub(super) disclosure: Option<String>,
 }
 
+#[derive(Default)]
+pub(crate) struct TranscriptInputFacts {
+    pub(crate) goal_starts: BTreeSet<TurnId>,
+    pub(crate) svg_text_selections: BTreeSet<MessageId>,
+    pub(crate) display_parts: BTreeMap<MessageId, Vec<message_context::DisplayPart>>,
+}
+
 impl Host {
     pub(crate) async fn transcript_window(
         &self,
@@ -146,7 +153,20 @@ impl Host {
         session: SessionId,
         turns: Vec<TurnId>,
     ) -> Result<Vec<TurnId>> {
-        let mut started = Vec::new();
+        let facts = self.transcript_input_facts(session, &turns).await?;
+        Ok(turns
+            .into_iter()
+            .filter(|turn| facts.goal_starts.contains(turn))
+            .collect())
+    }
+
+    /// Display facts from immutable input captures for the replayed local turns.
+    pub(crate) async fn transcript_input_facts(
+        &self,
+        session: SessionId,
+        turns: &[TurnId],
+    ) -> Result<TranscriptInputFacts> {
+        let mut facts = TranscriptInputFacts::default();
         for turn in turns {
             for input in self
                 .store
@@ -158,12 +178,23 @@ impl Host {
                 }
                 let stored: StoredPrompt = decode_input(&input)?;
                 if matches!(stored.goal, Some(goals::GoalInput::Start(_))) {
-                    started.push(turn);
-                    break;
+                    facts.goal_starts.insert(turn.clone());
+                }
+                if stored.editor_svg_target.is_some() {
+                    facts
+                        .svg_text_selections
+                        .insert(prompt_message_id(&input.id)?);
+                }
+                if let Some(context) = message_context::context(&stored.parts)
+                    && !context.display_parts.is_empty()
+                {
+                    facts
+                        .display_parts
+                        .insert(prompt_message_id(&input.id)?, context.display_parts.clone());
                 }
             }
         }
-        Ok(started)
+        Ok(facts)
     }
 
     pub(crate) async fn fork_latest(
@@ -402,7 +433,7 @@ impl Host {
         }
         let (message, origin) =
             selected.ok_or_else(|| problem(ErrorKind::Unavailable, "history_anchor_missing"))?;
-        if !is_editable_user(message) {
+        if !is_editable_user(message) || message_context::has_context(message) {
             return Err(revision_target_unavailable());
         }
         let (anchor, turn, original) = match origin {
@@ -831,7 +862,9 @@ fn history_message(
     anchor: ConversationAnchor,
     editable: bool,
 ) -> Option<HistoryMessage> {
-    if !matches!(message.role, Role::User | Role::Assistant) {
+    if !matches!(message.role, Role::User | Role::Assistant)
+        || message_context::is_supplemental(message)
+    {
         return None;
     }
     if super::editor_observation::is_observation(message) {
@@ -852,7 +885,9 @@ fn history_message(
             .map(Cow::Owned),
         _ => None,
     });
-    let first = text.next()?;
+    let first = text.next().or_else(|| {
+        message_context::has_context(message).then_some(Cow::Borrowed("Message context"))
+    })?;
     let mut preview = String::new();
     for piece in std::iter::once(first).chain(text) {
         let remaining = HISTORY_PREVIEW_BYTES.saturating_sub(preview.len());
@@ -864,19 +899,20 @@ fn history_message(
     Some(HistoryMessage {
         anchor,
         role: message.role,
-        editable,
+        editable: editable && !message_context::has_context(message),
         preview,
     })
 }
 
 fn visible_message(message: &Message) -> bool {
     matches!(message.role, Role::User | Role::Assistant)
-        && message.content.iter().any(|part| {
+        && !message_context::is_supplemental(message)
+        && (message_context::has_context(message) || message.content.iter().any(|part| {
             matches!(part, Content::Text(text) if !text.is_empty())
                 || matches!(part, Content::Media(media) if is_retained_image(media))
                 || matches!(part, Content::Media(media) if grida_agent_master::retained_file::display(media).is_some())
                 || matches!(part, Content::Media(media) if grida_agent_master::file_reference::reference(media).is_some())
-        })
+        }))
 }
 
 /// A resource attached by reference, named in a history preview without its path.

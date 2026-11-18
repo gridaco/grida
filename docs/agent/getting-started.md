@@ -39,9 +39,21 @@ can send it yourself. [Choose a model](./models-and-usage.md#choose-a-model)
 
 To start from a slides template, choose **Slides** on the left, pick a
 template and send, with or without a description. Grida copies the template
-into the project as its own deck, named after the template, and asks the agent
-to adapt that deck. References you add from the gallery are sent as links in
-the first message.
+into the project as its own deck and asks the agent to adapt that copy. The
+chat shows the template as a separate chip beside your words. Add a description
+when starting a Goal or sending a non-image file or folder with the template.
+References you add from the gallery are sent as links in the first message.
+
+To start from an FX example, choose **Workflows** and click one or more cards.
+Use the pill numbers to refer to the examples in your request. Send with a
+description or with the picks alone. The chat shows your words and the
+selected examples as separate chips. The agent can use the public showcase
+and source links to inspect the parts your request calls for.
+
+To create an image, choose **Images**. You can type a request, select Library
+images as references, or do both. The chat shows a thumbnail for each selected
+image beside your words. The agent receives the image links and image creation
+guidance as context.
 
 ## Work in a project
 
@@ -65,8 +77,8 @@ reach only the files within the deck.
 ## Attach an image
 
 Choose **+ → Image**, or drop or paste one PNG, JPEG, WebP or GIF into the
-composer, then describe what you want. **+ → Library** adds a selected Library
-image. A message accepts one attachment.
+composer, then describe what you want. In a project chat, **+ → Library**
+can attach one selected Library image. A message accepts one attachment.
 
 On a model that takes images, the first request includes actual prepared
 pixels. An image picked from disk also includes its verified original path;
@@ -135,14 +147,16 @@ shows an update message and keeps the draft and current attachment.
 
 Open an SVG or a slide in Desktop and select one plain text element. Without
 the **Plan** badge, send a message asking the agent to read or replace it, for
-example “Make this heading shorter.” The change appears in the editor and can
+example “Make this heading shorter.” The composer shows **SVG text selection**
+when the selection can go with your message. Look above the sent message to
+see whether it carried the selection. The change appears in the editor and can
 be undone there; use the editor's **Save** command to write it to disk. If
 another program has changed the file, the save dialog handles the conflict.
 
 Switching tabs or slides, changing the selection, or editing the document
 before the agent acts makes the selected text unavailable; select it again
-and send a new message. Queued messages and messages with the **Plan** badge
-cannot edit the selection.
+and send a new message. A queued message keeps its original selection, which
+can become unavailable while it waits. **Plan** messages omit the selection.
 
 ## Current limits
 

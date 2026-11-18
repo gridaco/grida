@@ -70,6 +70,7 @@ import {
   NativeChatIpc,
   type ActiveNativeChat,
   type NativeChatNestedDeckOwner,
+  type NativeWelcomeWorkspace,
 } from "./native-chat-ipc";
 import type { NativeDocumentFiles } from "./native-document-files";
 import type { WorkspaceMediaGrant } from "./workspace-media-registry";
@@ -107,7 +108,13 @@ type RegisterIpcHandlersOptions = {
     profileId?: string
   ) => ActiveNativeChat | null;
   /** Present when this main process has selected native chat mode. */
-  ensure_native_chat?: (workspaceId: string) => Promise<void>;
+  ensure_native_chat?: (
+    workspaceId: string,
+    requireCurrent?: () => void
+  ) => Promise<void>;
+  resolve_welcome_chat_workspace?: (
+    workspaceId: string
+  ) => Promise<NativeWelcomeWorkspace>;
   native_chat_disabled?: boolean;
   native_chat_selections?: NativeChatSelections;
   forget_native_workspace?: (workspaceId: string) => Promise<void>;
@@ -298,7 +305,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       },
     },
     options.native_chat_selections,
-    browserTools
+    browserTools,
+    options.resolve_welcome_chat_workspace
   );
   const externalAgent = new NativeExternalRunIpc(
     EDITOR_ORIGIN,
@@ -564,6 +572,30 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     return nativeChat.welcomeProfiles(event);
   });
   guarded(
+    IPC_CHANNELS.WELCOME_CHAT_PREPARE_FULL_ACCESS,
+    (event, ...args: unknown[]) => {
+      if (args.length !== 1)
+        throw new Error("native_chat_permission_mode_invalid");
+      return nativeChat.prepareWelcomeFullAccess(event, args[0]);
+    }
+  );
+  guarded(
+    IPC_CHANNELS.WELCOME_CHAT_ANSWER_FULL_ACCESS,
+    (event, ...args: unknown[]) => {
+      if (args.length !== 2)
+        throw new Error("native_chat_permission_mode_invalid");
+      return nativeChat.answerWelcomeFullAccess(event, args[0], args[1]);
+    }
+  );
+  guarded(
+    IPC_CHANNELS.WELCOME_CHAT_START_FULL_ACCESS,
+    (event, ...args: unknown[]) => {
+      if (args.length !== 2)
+        throw new Error("native_chat_permission_mode_invalid");
+      return nativeChat.startWelcomeFullAccess(event, args[0], args[1]);
+    }
+  );
+  guarded(
     IPC_CHANNELS.NATIVE_CHAT_SELECT_PROFILE,
     (event, selection: unknown) => nativeChat.selectProfile(event, selection)
   );
@@ -740,6 +772,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_CAPTURE_EDITOR_CONTEXT, (event) =>
     nativeChat.captureEditorContext(event)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_SUBMIT_MESSAGE,
+    (event, attachmentId: string, input: unknown) =>
+      nativeChat.submitMessage(event, attachmentId, input)
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_SUBMIT,
@@ -1615,14 +1652,12 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
 
   guarded(IPC_CHANNELS.WINDOW_NAVIGATION_BACK, (event) => {
     const history = event.sender.navigationHistory;
-    // Second check here is robust against a stale UI (e.g. a click in
-    // flight when the history just collapsed).
-    if (history.canGoBack()) history.goBack();
+    if (desktopNavigationTarget(history, -1)) history.goToOffset(-1);
   });
 
   guarded(IPC_CHANNELS.WINDOW_NAVIGATION_FORWARD, (event) => {
     const history = event.sender.navigationHistory;
-    if (history.canGoForward()) history.goForward();
+    if (desktopNavigationTarget(history, 1)) history.goToOffset(1);
   });
 
   guarded(
@@ -1748,17 +1783,28 @@ function parsePreferredApps(raw: readonly unknown[]): HostAppId[] {
   return ids;
 }
 
-/**
- * Compute the current `{canGoBack, canGoForward}` for a webContents.
- * Exported so `attachNavigationEvents` (called from `window.ts` at
- * window-creation time) can publish initial state immediately rather
- * than waiting for the first `did-navigate*` to fire.
- */
+/** Resolve the exact history step that this Desktop window can take. */
+function desktopNavigationTarget(
+  history: WebContents["navigationHistory"],
+  offset: -1 | 1
+): string | null {
+  // Chromium's goBack/goForward may skip intervening entries. Use the same
+  // exact offset for the snapshot and the action, and recheck it on invoke.
+  if (!history.canGoToOffset(offset)) return null;
+  const url = history.getEntryAtIndex(history.getActiveIndex() + offset)?.url;
+  return url && ipc_sender.isAllowed(url, EDITOR_ORIGIN) ? url : null;
+}
+
 export function computeNavigationState(wc: WebContents): NavigationState {
   const history = wc.navigationHistory;
+  const back = desktopNavigationTarget(history, -1);
+  const forward = desktopNavigationTarget(history, 1);
+  const home = `${EDITOR_ORIGIN}/desktop/welcome`;
   return {
-    can_go_back: history.canGoBack(),
-    can_go_forward: history.canGoForward(),
+    can_go_back: back !== null,
+    can_go_forward: forward !== null,
+    ...(back === home && { back_destination: "home" }),
+    ...(forward === home && { forward_destination: "home" }),
   };
 }
 
@@ -1792,7 +1838,9 @@ export function attachNavigationEvents(window: BrowserWindow): void {
       last &&
       lastUrl === url &&
       last.can_go_back === next.can_go_back &&
-      last.can_go_forward === next.can_go_forward
+      last.can_go_forward === next.can_go_forward &&
+      last.back_destination === next.back_destination &&
+      last.forward_destination === next.forward_destination
     ) {
       return;
     }

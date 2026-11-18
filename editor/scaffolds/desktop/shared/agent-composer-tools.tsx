@@ -52,7 +52,9 @@ export function AgentComposerTools({
           className="w-80 rounded-xl p-1 text-sm"
         >
           <p className="px-2 pt-1.5 pb-1 text-xs text-muted-foreground">
-            What can the agent access?
+            {access?.staged
+              ? "What can the new chat access?"
+              : "What can the agent access?"}
           </p>
           <button
             type="button"
@@ -100,7 +102,9 @@ export function AgentComposerTools({
           </button>
           {!access?.available && (
             <p className="px-2 py-1.5 text-xs text-muted-foreground">
-              Open a project in a supported Desktop build to choose Full access.
+              {access?.staged
+                ? "Full access requires a compatible Desktop build."
+                : "Open a project in a supported Desktop build to choose Full access."}
             </p>
           )}
           {access?.onRetry && access.error && (
@@ -156,6 +160,7 @@ export namespace AgentComposerTools {
     access?: Readonly<{
       mode: NativeChatPermissionMode;
       available: boolean;
+      staged?: boolean;
       uncertain?: boolean;
       onRetry?(): void;
       busy: boolean;

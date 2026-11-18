@@ -2,6 +2,8 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import type { IpcMainInvokeEvent, WebContents } from "electron";
 import type {
   NativeChatSnapshot,
@@ -14,8 +16,9 @@ import {
   NativeChatIpc,
   type ActiveNativeChat,
   type NativeChatProfileOwner,
+  type NativeWelcomeWorkspace,
 } from "./native-chat-ipc";
-import type { NativeChatSelections } from "./native-chat-selections";
+import { NativeChatSelections } from "./native-chat-selections";
 import type { NativeChatSession } from "./native-agent-chat";
 import type { NativeSavedChatDeletionPreview } from "./native-agent-deletion";
 import { NativeEditorSurfaceEndpoints } from "./native-editor-surfaces";
@@ -3036,7 +3039,7 @@ describe("native chat IPC", () => {
     );
     for (const key of Object.keys(IPC_CHANNELS).filter(
       (key) =>
-        (key.startsWith("NATIVE_CHAT_") || key === "WELCOME_CHAT_PROFILES") &&
+        (key.startsWith("NATIVE_CHAT_") || key.startsWith("WELCOME_CHAT_")) &&
         key !== "NATIVE_CHAT_UPDATE" &&
         key !== "NATIVE_CHAT_EDITOR_SURFACE_OPEN" &&
         key !== "NATIVE_CHAT_EDITOR_SVG_TEXT"
@@ -3151,6 +3154,354 @@ describe("Welcome connection choices", () => {
       ipc.welcomeProfiles(windowAt(WELCOME_URL).event)
     ).resolves.toBeNull();
     expect(welcome).not.toHaveBeenCalled();
+  });
+});
+
+describe("Welcome Full access review", () => {
+  const WELCOME_URL = `${ORIGIN}/desktop/welcome`;
+  const PROFILE = "b".repeat(64);
+  const CHOICE = {
+    workspaceId: WORKSPACE,
+    profileId: PROFILE,
+    effort: "high",
+  } as const;
+  const DIRECTORY = { device: "1", inode: "2", birthTimeNs: "3" };
+
+  async function welcomePermissionSetup() {
+    const directory = fs.mkdtempSync(
+      path.join(fs.realpathSync(os.tmpdir()), "welcome-native-chat-")
+    );
+    const { chat } = setup();
+    const window = windowAt(WELCOME_URL);
+    const create = vi.fn<NonNullable<typeof chat.createSelected>>(
+      async ({ sessionId }) => ({ id: sessionId })
+    );
+    const choose = vi.fn<NativeChatProfileOwner["select"]>(async () => {});
+    const ensure = vi.fn<(id: string, check?: () => void) => Promise<void>>(
+      async () => {}
+    );
+    const resolveWorkspace = vi.fn<
+      (id: string) => Promise<NativeWelcomeWorkspace>
+    >(async (id) => ({
+      workspaceId: id,
+      workspaceName: "Example project",
+      directoryIdentity: DIRECTORY,
+    }));
+    const setPermission = vi.fn<NonNullable<typeof chat.setPermissionMode>>(
+      async (session, revision, _request, mode) => ({
+        sessionId: session.id,
+        revision: revision + 1,
+        mode,
+        available: ["restricted", "full_access"],
+      })
+    );
+    Object.assign(chat, {
+      acceptsSelection: true,
+      acceptsPermissionMode: true,
+      createSelected: create,
+      setPermissionMode: setPermission,
+      permissionMode: vi.fn<NonNullable<typeof chat.permissionMode>>(
+        async (session) => ({
+          sessionId: session.id,
+          revision: 0,
+          mode: "restricted",
+          available: ["restricted", "full_access"],
+        })
+      ),
+    });
+    const submit = vi.spyOn(chat, "submit");
+    const query = vi.fn<NativeChatSelections.Options["query"]>(
+      async () => ({})
+    );
+    const selections = await NativeChatSelections.open({
+      userDataPath: directory,
+      choice: async (_workspaceId, connectionId) => ({
+        connectionId,
+        model: "fixture-model",
+      }),
+      query,
+    });
+    const ipc = new NativeChatIpc(
+      ORIGIN,
+      (_sender, workspaceId, profileId) => ({
+        workspaceId,
+        directoryIdentity: DIRECTORY,
+        profileId: profileId ?? null,
+        chat,
+      }),
+      { admits: () => true, ensure },
+      undefined,
+      undefined,
+      { list: async () => ({ choices: [], saved: [] }), select: choose },
+      undefined,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      selections,
+      undefined,
+      resolveWorkspace
+    );
+    return {
+      ...window,
+      ipc,
+      create,
+      choose,
+      ensure,
+      resolveWorkspace,
+      setPermission,
+      submit,
+      query,
+      directory,
+    };
+  }
+
+  async function confirmedReview(
+    f: Awaited<ReturnType<typeof welcomePermissionSetup>>
+  ) {
+    const review = await f.ipc.prepareWelcomeFullAccess(f.event, WORKSPACE);
+    await f.ipc.answerWelcomeFullAccess(f.event, review.reviewId, true);
+    return review;
+  }
+
+  it("approves without creating a chat and starts once with the model and effort supplied at send time", async () => {
+    const f = await welcomePermissionSetup();
+    try {
+      const review = await f.ipc.prepareWelcomeFullAccess(f.event, WORKSPACE);
+      expect(review).toEqual({
+        reviewId: expect.any(String),
+        workspaceName: "Example project",
+        chatTitle: "New chat",
+      });
+      await expect(
+        f.ipc.startWelcomeFullAccess(f.event, review.reviewId, CHOICE)
+      ).rejects.toThrow("native_chat_permission_mode_review_changed");
+      await f.ipc.answerWelcomeFullAccess(f.event, review.reviewId, true);
+      expect(f.create).not.toHaveBeenCalled();
+      expect(f.choose).not.toHaveBeenCalled();
+      expect(f.ensure).not.toHaveBeenCalled();
+      expect(fs.readdirSync(f.directory)).toEqual([]);
+      const longDraft = vi
+        .spyOn(Date, "now")
+        .mockReturnValue(Date.now() + 600_000);
+      const result = await f.ipc
+        .startWelcomeFullAccess(f.event, review.reviewId, CHOICE)
+        .finally(() => longDraft.mockRestore());
+      expect(result).toEqual({
+        sessionId: expect.any(String),
+        profileId: PROFILE,
+      });
+      expect(f.choose).toHaveBeenCalledExactlyOnceWith(
+        WORKSPACE,
+        { kind: "new", id: PROFILE },
+        expect.any(Function)
+      );
+      expect(f.create).toHaveBeenCalledExactlyOnceWith({
+        sessionId: result!.sessionId,
+        firstInputId: expect.any(String),
+        requestId: expect.any(String),
+        selection: {
+          connectionId: PROFILE,
+          model: "fixture-model",
+          effort: "high",
+        },
+      });
+      expect(f.setPermission).toHaveBeenCalledExactlyOnceWith(
+        { id: result!.sessionId },
+        0,
+        expect.any(String),
+        "full_access"
+      );
+      expect(f.submit).not.toHaveBeenCalled();
+      await expect(
+        f.ipc.startWelcomeFullAccess(f.event, review.reviewId, CHOICE)
+      ).rejects.toThrow("native_chat_permission_mode_review_changed");
+      await expect(f.ipc.create(f.event)).rejects.toThrow(
+        "native_chat_unavailable"
+      );
+    } finally {
+      fs.rmSync(f.directory, { recursive: true, force: true });
+    }
+  });
+
+  it("does not let another window answer and consumes cancellation without creating a chat", async () => {
+    const f = await welcomePermissionSetup();
+    try {
+      const review = await f.ipc.prepareWelcomeFullAccess(f.event, WORKSPACE);
+      await expect(
+        f.ipc.answerWelcomeFullAccess(
+          windowAt(WELCOME_URL).event,
+          review.reviewId,
+          true
+        )
+      ).rejects.toThrow("native_chat_permission_mode_review_changed");
+      await expect(
+        f.ipc.answerWelcomeFullAccess(f.event, review.reviewId, false)
+      ).resolves.toBeUndefined();
+      await expect(
+        f.ipc.answerWelcomeFullAccess(f.event, review.reviewId, true)
+      ).rejects.toThrow("native_chat_permission_mode_review_changed");
+      expect(f.choose).not.toHaveBeenCalled();
+      expect(f.create).not.toHaveBeenCalled();
+      expect(f.setPermission).not.toHaveBeenCalled();
+    } finally {
+      fs.rmSync(f.directory, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects another window's start and revokes a confirmed reservation when access returns to Default", async () => {
+    const f = await welcomePermissionSetup();
+    try {
+      const review = await confirmedReview(f);
+      await expect(
+        f.ipc.startWelcomeFullAccess(
+          windowAt(WELCOME_URL).event,
+          review.reviewId,
+          CHOICE
+        )
+      ).rejects.toThrow("native_chat_permission_mode_review_changed");
+      await f.ipc.answerWelcomeFullAccess(f.event, review.reviewId, false);
+      await expect(
+        f.ipc.startWelcomeFullAccess(f.event, review.reviewId, CHOICE)
+      ).rejects.toThrow("native_chat_permission_mode_review_changed");
+      expect(f.create).not.toHaveBeenCalled();
+      expect(f.setPermission).not.toHaveBeenCalled();
+    } finally {
+      fs.rmSync(f.directory, { recursive: true, force: true });
+    }
+  });
+
+  it("consumes the confirmation if a different workspace tries to start", async () => {
+    const f = await welcomePermissionSetup();
+    try {
+      const review = await confirmedReview(f);
+      await expect(
+        f.ipc.startWelcomeFullAccess(f.event, review.reviewId, {
+          ...CHOICE,
+          workspaceId: "other-workspace",
+        })
+      ).rejects.toThrow("native_chat_scope_changed");
+      await expect(
+        f.ipc.startWelcomeFullAccess(f.event, review.reviewId, CHOICE)
+      ).rejects.toThrow("native_chat_permission_mode_review_changed");
+      expect(f.create).not.toHaveBeenCalled();
+      expect(f.setPermission).not.toHaveBeenCalled();
+    } finally {
+      fs.rmSync(f.directory, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses the review if the workspace directory changes", async () => {
+    const f = await welcomePermissionSetup();
+    try {
+      const review = await confirmedReview(f);
+      f.resolveWorkspace.mockResolvedValueOnce({
+        workspaceId: WORKSPACE,
+        workspaceName: "Example project",
+        directoryIdentity: { ...DIRECTORY, inode: "changed" },
+      });
+      await expect(
+        f.ipc.startWelcomeFullAccess(f.event, review.reviewId, CHOICE)
+      ).rejects.toThrow("native_chat_scope_changed");
+      expect(f.choose).not.toHaveBeenCalled();
+      expect(f.create).not.toHaveBeenCalled();
+      expect(f.setPermission).not.toHaveBeenCalled();
+    } finally {
+      fs.rmSync(f.directory, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    { ...CHOICE, effort: "very-high" },
+    { ...CHOICE, effort: undefined },
+    { ...CHOICE, sessionId: "caller-supplied" },
+    { ...CHOICE, workspaceId: "/arbitrary/path" },
+  ])(
+    "refuses malformed Welcome starts before looking up a workspace again",
+    async (request) => {
+      const f = await welcomePermissionSetup();
+      try {
+        const review = await confirmedReview(f);
+        await expect(
+          f.ipc.startWelcomeFullAccess(f.event, review.reviewId, request)
+        ).rejects.toThrow(/native_chat_(permission_mode|effort)_invalid/);
+        expect(f.resolveWorkspace).toHaveBeenCalledOnce();
+        expect(f.create).not.toHaveBeenCalled();
+      } finally {
+        fs.rmSync(f.directory, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it("revokes an in-flight start on navigation", async () => {
+    const f = await welcomePermissionSetup();
+    try {
+      const review = await confirmedReview(f);
+      const ready = Promise.withResolvers<void>();
+      f.ensure.mockReturnValueOnce(ready.promise);
+      const answer = f.ipc.startWelcomeFullAccess(f.event, review.reviewId, {
+        ...CHOICE,
+        profileId: null,
+      });
+      await vi.waitFor(() => expect(f.ensure).toHaveBeenCalledOnce());
+      f.contents.emit("did-start-navigation", { isMainFrame: true });
+      ready.resolve();
+      await expect(answer).rejects.toThrow(
+        "native_chat_permission_mode_review_changed"
+      );
+      expect(f.create).not.toHaveBeenCalled();
+      expect(f.setPermission).not.toHaveBeenCalled();
+    } finally {
+      fs.rmSync(f.directory, { recursive: true, force: true });
+    }
+  });
+
+  it("retires an unverified creation without applying permission or resending", async () => {
+    const f = await welcomePermissionSetup();
+    try {
+      f.create.mockRejectedValueOnce(new Error("native_agent_request_timeout"));
+      const review = await confirmedReview(f);
+      await expect(
+        f.ipc.startWelcomeFullAccess(f.event, review.reviewId, CHOICE)
+      ).rejects.toThrow("native_agent_request_timeout");
+      const [{ sessionId, requestId }] = f.create.mock.calls[0];
+      expect(f.query).toHaveBeenCalledExactlyOnceWith(
+        WORKSPACE,
+        sessionId,
+        "ack",
+        { operationId: requestId }
+      );
+      expect(f.setPermission).not.toHaveBeenCalled();
+      expect(f.submit).not.toHaveBeenCalled();
+    } finally {
+      fs.rmSync(f.directory, { recursive: true, force: true });
+    }
+  });
+
+  it("rechecks the original review after finalizing the blank chat", async () => {
+    const f = await welcomePermissionSetup();
+    const finalizing = Promise.withResolvers<unknown>();
+    try {
+      const review = await confirmedReview(f);
+      f.query.mockReturnValueOnce(finalizing.promise);
+      const answer = f.ipc.startWelcomeFullAccess(
+        f.event,
+        review.reviewId,
+        CHOICE
+      );
+      await vi.waitFor(() => expect(f.query).toHaveBeenCalledOnce());
+      f.contents.emit("did-start-navigation", { isMainFrame: true });
+      finalizing.resolve(null);
+      await expect(answer).rejects.toThrow(
+        "native_chat_permission_mode_review_changed"
+      );
+      expect(f.create).toHaveBeenCalledOnce();
+      expect(f.setPermission).not.toHaveBeenCalled();
+      expect(f.submit).not.toHaveBeenCalled();
+    } finally {
+      finalizing.resolve(null);
+      fs.rmSync(f.directory, { recursive: true, force: true });
+    }
   });
 });
 

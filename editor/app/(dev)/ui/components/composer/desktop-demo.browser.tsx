@@ -557,6 +557,51 @@ it("renders production Markdown, recorded work, streaming and empty conversation
   ).toBeNull();
 });
 
+it("shows the live SVG selection for eligible sends and keeps the sent indicator after deselection", async () => {
+  const container = await mountConversationDemo();
+  await selectConversation(container, "svg-selection");
+  const surface = container.querySelector<HTMLElement>(
+    '[data-testid="desktop-composer-surface"]'
+  )!;
+  const transcript = conversation(container);
+  const countIndicators = (root: HTMLElement) =>
+    root.textContent?.match(/SVG text selection/g)?.length ?? 0;
+  expect(countIndicators(surface)).toBe(2);
+  expect(countIndicators(transcript)).toBe(1);
+
+  await selectAddMenuAction(container, "Plan mode");
+  expect(countIndicators(surface)).toBe(1);
+  await selectAddMenuAction(container, "Plan mode");
+  expect(countIndicators(surface)).toBe(2);
+
+  const composer = surface.querySelector<HTMLElement>(
+    '[contenteditable="true"]'
+  )!;
+  const selection = Array.from(container.querySelectorAll("label"))
+    .find((label) => label.textContent?.trim() === "SVG text selected")!
+    .querySelector("input")!;
+  const send = async (text: string) =>
+    act(async () => {
+      await userEvent.fill(composer, text);
+      await userEvent.click(
+        surface.querySelector<HTMLButtonElement>('button[aria-label="Send"]')!
+      );
+    });
+  await send("Read this selection.");
+  await expect.poll(() => countIndicators(transcript)).toBe(2);
+  await act(async () => userEvent.click(selection));
+  expect(countIndicators(surface)).toBe(2);
+
+  await send("This message has no selection.");
+  await expect
+    .poll(() => transcript.textContent)
+    .toContain("This message has no selection.");
+  expect(countIndicators(transcript)).toBe(2);
+  expect(
+    transcript.querySelector('[aria-label="Message attachments"]')
+  ).toBeNull();
+});
+
 it("uses production attachment cards, retained-image loading and fullscreen inspection", async () => {
   const container = await mountConversationDemo();
   await selectConversation(container, "attachments");

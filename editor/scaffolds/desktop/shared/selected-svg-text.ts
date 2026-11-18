@@ -18,22 +18,52 @@ type Target = Surface &
 /** One editable text selection captured in a live SVG editor. */
 export class SelectedSvgText {
   private target: Target | undefined;
+  private readonly listeners = new Set<() => void>();
+  private observedEditor: SvgEditor | undefined;
+  private stopObservingEditor: (() => void) | undefined;
+  private stopObservingSurface: (() => void) | undefined;
+  private selectionAvailable = false;
 
-  constructor(private readonly surface: () => Surface | undefined) {}
+  constructor(
+    private readonly surface: () => Surface | undefined,
+    private readonly observeSurface?: (listener: () => void) => () => void
+  ) {}
+
+  /** Read the selection for display without capturing a tool target. */
+  readonly hasSelection = (): boolean =>
+    this.listeners.size > 0
+      ? this.selectionAvailable
+      : this.readSelection() !== undefined;
+
+  readonly subscribe = (listener: () => void): (() => void) => {
+    this.listeners.add(listener);
+    if (this.listeners.size === 1) {
+      this.selectionAvailable = this.readSelection() !== undefined;
+      this.stopObservingSurface = this.observeSurface?.(() =>
+        this.surfaceChanged()
+      );
+      this.observeEditor();
+    }
+    return () => {
+      this.listeners.delete(listener);
+      if (this.listeners.size !== 0) return;
+      this.stopObservingSurface?.();
+      this.stopObservingSurface = undefined;
+      this.stopObservingEditor?.();
+      this.stopObservingEditor = undefined;
+      this.observedEditor = undefined;
+    };
+  };
 
   capture(): string | undefined {
     if (this.target && this.isCurrent(this.target)) return this.target.id;
     this.withdraw();
-    const surface = this.surface();
-    if (!surface || surface.editor.state.mode !== "select") return;
-    const { editor } = surface;
-    const selected = editor.read_selected_text();
-    if (selected?.tag !== "text" || !NativeEditorSvgText.isText(selected.text))
-      return;
+    const selection = this.readSelection();
+    if (!selection) return;
+    const { editor } = selection;
     const target: Target = {
       id: crypto.randomUUID(),
-      ...surface,
-      node: selected.id,
+      ...selection,
       version: editor.state.content_version,
       unwatch: editor.subscribe(() => {
         if (this.target === target && !this.isCurrent(target)) this.withdraw();
@@ -94,7 +124,33 @@ export class SelectedSvgText {
 
   surfaceChanged(): void {
     if (this.target && !this.isCurrent(this.target)) this.withdraw();
+    if (!this.listeners.size) return;
+    this.observeEditor();
+    this.publishSelection();
   }
+
+  private readSelection(): (Surface & { node: NodeId }) | undefined {
+    const surface = this.surface();
+    if (!surface || surface.editor.state.mode !== "select") return;
+    const selected = surface.editor.read_selected_text();
+    if (selected?.tag === "text" && NativeEditorSvgText.isText(selected.text))
+      return { ...surface, node: selected.id };
+  }
+
+  private observeEditor(): void {
+    const editor = this.surface()?.editor;
+    if (editor === this.observedEditor) return;
+    this.stopObservingEditor?.();
+    this.observedEditor = editor;
+    this.stopObservingEditor = editor?.subscribe(this.publishSelection);
+  }
+
+  private readonly publishSelection = (): void => {
+    const available = this.readSelection() !== undefined;
+    if (available === this.selectionAvailable) return;
+    this.selectionAvailable = available;
+    for (const listener of this.listeners) listener();
+  };
 
   private withdraw(): void {
     const target = this.target;

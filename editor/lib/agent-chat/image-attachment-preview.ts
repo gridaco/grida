@@ -60,6 +60,13 @@ export namespace image_attachment_preview {
     }
   }
 
+  /** Explicit image intake also accepts the extension when the OS MIME is generic. */
+  export function selectedMediaType(
+    file: Pick<File, "name" | "type">
+  ): MediaType | undefined {
+    return mediaType(file) ?? mediaType({ name: file.name, type: "" });
+  }
+
   /** No source object URL is needed; even a late decoded bitmap is closed. */
   export async function probe(
     file: File,

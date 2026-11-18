@@ -120,9 +120,14 @@ export namespace ipc_admission {
         ) {
           return pathname === "/desktop/workspace";
         }
-        // The Welcome composer lists connections for a chat it hands to the
-        // workspace it opens; it never reaches a workspace chat itself.
-        if (channel === IPC_CHANNELS.WELCOME_CHAT_PROFILES) {
+        // Welcome can list connections and prepare one new chat, but receives
+        // no workspace attachment or input capability.
+        if (
+          channel === IPC_CHANNELS.WELCOME_CHAT_PROFILES ||
+          channel === IPC_CHANNELS.WELCOME_CHAT_PREPARE_FULL_ACCESS ||
+          channel === IPC_CHANNELS.WELCOME_CHAT_ANSWER_FULL_ACCESS ||
+          channel === IPC_CHANNELS.WELCOME_CHAT_START_FULL_ACCESS
+        ) {
           return pathname === "/desktop/welcome";
         }
         if (

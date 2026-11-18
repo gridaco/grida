@@ -652,6 +652,9 @@ fn child_row(view: &SessionView, profile: &grida_agent_master::subagents::Profil
 
 fn visible_bytes(record: &HistoryRecord) -> usize {
     let HistoryRecord::Message(message) = record;
+    if super::message_context::is_supplemental(message) {
+        return 0;
+    }
     message
         .content
         .iter()
@@ -696,7 +699,7 @@ fn project_messages(
     }
     records.iter().filter_map(|record| {
         let HistoryRecord::Message(message) = &record.record;
-        if !matches!(message.role, Role::User | Role::Assistant) { return None; }
+        if !matches!(message.role, Role::User | Role::Assistant) || super::message_context::is_supplemental(message) { return None; }
         let text: String = message.content.iter().filter_map(|part| match part { Content::Text(text) => Some(text.as_str()), _ => None }).collect();
         let (text, mut truncated) = shortened(&text, MAX_TEXT_BYTES);
         let mut activity = Vec::new();

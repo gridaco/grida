@@ -1,14 +1,23 @@
-import type { NativeChatEffort } from "@grida/desktop-bridge";
+import {
+  parseNativeChatMessageContext,
+  type DesktopNativeChat,
+  type NativeChatEffort,
+  type NativeChatPermissionMode,
+  type NativeChatPermissionReview,
+} from "@grida/desktop-bridge";
 import { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
+import { image_attachment_preview } from "@/lib/agent-chat/image-attachment-preview";
 import type { ComposerTransfer } from "@/kits/composer";
+import type { PermissionReviewProject } from "../shared/agent-permission-confirmation";
 import type { Workspace } from "@/lib/desktop/bridge";
+import { slidesTemplateMessageContext } from "@/lib/desktop/slides-message-context";
 import {
   welcome_message,
   type WelcomeMessage,
   type WelcomeTemplate,
 } from "@/lib/desktop/welcome-message";
 
-/** Unsent Home intent. Native capabilities are checked after workspace admission. */
+/** Unsent intent and the review required before opening a Full access chat. */
 export class HomeComposer {
   static readonly key = "desktop-home";
   private static readonly drafts = new ComposerDrafts();
@@ -17,12 +26,31 @@ export class HomeComposer {
   private restoration?: Promise<void>;
   private effortChosen = false;
   private effortInitialized = false;
+  private permissionDecision?: PromiseWithResolvers<boolean>;
+  private approvedAccess?: Readonly<{
+    host: HomeComposer.FullAccess;
+    reviewId: string;
+    workspaceId: string;
+    prepared?: {
+      request: HomeComposer.AccessRequest;
+      chat: HomeComposer.PreparedChat;
+    };
+  }>;
+  private copiedTemplate?: Readonly<{
+    workspaceId: string;
+    name: string;
+    copy: WelcomeTemplate;
+  }>;
   private view: HomeComposer.View;
 
   constructor(readonly drafts = HomeComposer.drafts) {
     const modes = drafts.readModes(HomeComposer.key);
     this.view = {
       effort: "standard",
+      permissionMode: "restricted",
+      permissionReview: null,
+      permissionBusy: false,
+      permissionError: null,
       plan: !!modes.plan,
       goal: !!modes.goal,
       attachment: null,
@@ -72,6 +100,61 @@ export class HomeComposer {
     if (this.view.busy) return;
     this.effortChosen = true;
     this.update({ effort });
+  };
+
+  selectPermissionMode = (
+    mode: NativeChatPermissionMode,
+    destination: HomeComposer.Destination,
+    host: HomeComposer.FullAccess | undefined
+  ): void => {
+    if (this.view.busy || this.view.permissionBusy) return;
+    if (mode === "restricted") {
+      this.resetPermissionMode();
+      return;
+    }
+    if (!host || this.approvedAccess) return;
+    const decision = Promise.withResolvers<boolean>();
+    this.permissionDecision = decision;
+    this.update({
+      permissionReview: {
+        workspaceName: destination.workspace?.name ?? "your default project",
+        workspaceId: destination.workspace?.id,
+      },
+      permissionBusy: true,
+      permissionError: null,
+    });
+    void this.reviewFullAccess(destination, host, decision);
+  };
+
+  answerPermissionReview = (confirmed: boolean): void => {
+    if (!this.view.permissionReview) return;
+    if (!confirmed) {
+      this.resetPermissionMode();
+      return;
+    }
+    this.permissionDecision?.resolve(true);
+    this.update({ permissionReview: null });
+  };
+
+  resetPermissionMode = (): void => {
+    this.permissionDecision?.resolve(false);
+    this.permissionDecision = undefined;
+    const approval = this.approvedAccess;
+    this.approvedAccess = undefined;
+    if (approval && !approval.prepared)
+      void approval.host.answer(approval.reviewId, false).catch(() => {});
+    if (
+      this.view.permissionBusy ||
+      this.view.permissionError ||
+      this.view.permissionMode !== "restricted"
+    ) {
+      this.update({
+        permissionMode: "restricted",
+        permissionReview: null,
+        permissionBusy: false,
+        permissionError: null,
+      });
+    }
   };
 
   /** A late catalog refresh cannot replace an explicit composer choice. */
@@ -142,40 +225,181 @@ export class HomeComposer {
     void this.drafts.writeAttachment(HomeComposer.key, null);
   }
 
+  private async reviewFullAccess(
+    destination: HomeComposer.Destination,
+    host: HomeComposer.FullAccess,
+    decision: PromiseWithResolvers<boolean>
+  ): Promise<void> {
+    let review: NativeChatPermissionReview | undefined;
+    try {
+      const workspace =
+        destination.workspace ?? (await destination.defaultWorkspace());
+      if (this.permissionDecision !== decision) return;
+      if (!workspace) throw new Error("No default workspace available.");
+      review = await host.prepare(workspace.id);
+      if (this.permissionDecision === decision && this.view.permissionReview)
+        this.update({
+          permissionReview: {
+            workspaceName: review.workspaceName,
+            workspaceId: workspace.id,
+          },
+        });
+      if (!(await decision.promise) || this.permissionDecision !== decision)
+        return;
+      await host.answer(review.reviewId, true);
+      if (this.permissionDecision !== decision) return;
+      this.approvedAccess = {
+        host,
+        reviewId: review.reviewId,
+        workspaceId: workspace.id,
+      };
+      this.update({ permissionMode: "full_access" });
+    } catch {
+      if (this.permissionDecision === decision)
+        this.update({
+          permissionError: "Couldn't enable Full access for this project.",
+        });
+    } finally {
+      if (review && this.approvedAccess?.reviewId !== review.reviewId)
+        void host.answer(review.reviewId, false).catch(() => {});
+      if (this.permissionDecision === decision) {
+        this.permissionDecision = undefined;
+        this.update({ permissionReview: null, permissionBusy: false });
+      }
+    }
+  }
+
+  private requireApprovedAccess(request: HomeComposer.AccessRequest) {
+    const approval = this.approvedAccess;
+    if (!approval || request.workspaceId !== approval.workspaceId) {
+      this.resetPermissionMode();
+      throw new Error("Choose Full access again for this project.");
+    }
+    const prepared = approval.prepared?.request;
+    if (
+      prepared &&
+      (prepared.profileId !== request.profileId ||
+        prepared.effort !== request.effort)
+    )
+      throw new Error(
+        "Restore the model and effort used to prepare this Full access chat, or choose Default to start a different chat."
+      );
+    return approval;
+  }
+
+  private async startApprovedChat(
+    request: HomeComposer.AccessRequest
+  ): Promise<HomeComposer.PreparedChat> {
+    const approval = this.requireApprovedAccess(request);
+    if (approval.prepared) return approval.prepared.chat;
+    let chat: HomeComposer.PreparedChat;
+    try {
+      chat = await approval.host.start(approval.reviewId, request);
+    } catch (cause) {
+      if (this.approvedAccess === approval) this.resetPermissionMode();
+      throw new Error(
+        "Couldn't start the Full access chat. Your draft is still here.",
+        { cause }
+      );
+    }
+    if (this.approvedAccess !== approval)
+      throw new Error(
+        "Full access approval changed. Your draft is still here."
+      );
+    this.approvedAccess = { ...approval, prepared: { request, chat } };
+    return chat;
+  }
+
+  private async copyTemplate(
+    workspaceId: string,
+    template: HomeComposer.Template
+  ): Promise<WelcomeTemplate> {
+    const copied = this.copiedTemplate;
+    if (copied?.workspaceId === workspaceId && copied.name === template.name)
+      return copied.copy;
+    const copy = await template.copy(workspaceId);
+    this.copiedTemplate = { workspaceId, name: template.name, copy };
+    return copy;
+  }
+
   /** Prepare one first request before navigating; failures retain the staged draft. */
   async submit(
     input: HomeComposer.Input,
     host: HomeComposer.Host
   ): Promise<void> {
     if (this.view.busy) throw new Error("A workspace is already opening.");
-    this.update({ busy: true });
+    if (this.view.permissionBusy)
+      throw new Error("Full access is still being reviewed.");
+    this.update({ busy: true, permissionError: null });
     let opened = false;
     try {
       await this.restore();
+      if (
+        input.messageContext &&
+        !parseNativeChatMessageContext(input.messageContext)
+      )
+        throw new Error(
+          "The selected references are too large to send together. Remove some and try again."
+        );
       const intent = this.view;
       const workspace = input.target ?? (await host.defaultWorkspace());
       if (!workspace)
         throw new Error("No default workspace available on this host.");
-      const template = await input.copyTemplate?.(workspace.id);
       const hasRequest =
         !!input.text.trim() ||
-        !!template ||
+        !!input.template ||
         input.references.length > 0 ||
+        !!input.messageContext?.displayParts.length ||
         !!intent.attachment;
       if (hasRequest) {
-        const text =
-          welcome_message.compose({
-            text: input.prompt,
-            references: input.references,
-            template,
-          }) ?? "Inspect the attached file.";
+        const contextRequested = input.messageContext || input.template;
+        if (contextRequested && intent.goal && !input.text.trim())
+          throw new Error("Write an objective before starting a goal.");
+        if (
+          contextRequested &&
+          intent.attachment &&
+          !input.text.trim() &&
+          (intent.attachment.kind === "directory" ||
+            !image_attachment_preview.selectedMediaType(intent.attachment.file))
+        )
+          throw new Error(
+            "Write a message to send this attachment with the selected context."
+          );
+        const effort =
+          this.effortChosen || this.effortInitialized
+            ? intent.effort
+            : undefined;
+        const accessRequest =
+          intent.permissionMode === "full_access"
+            ? {
+                workspaceId: workspace.id,
+                profileId: input.profileId,
+                ...(effort && { effort }),
+              }
+            : undefined;
+        if (accessRequest) this.requireApprovedAccess(accessRequest);
+        const template = input.template
+          ? await this.copyTemplate(workspace.id, input.template)
+          : undefined;
+        const messageContext = template
+          ? slidesTemplateMessageContext(template)
+          : input.messageContext;
+        const text = messageContext
+          ? input.text
+          : (welcome_message.compose({
+              text: input.prompt,
+              references: input.references,
+            }) ?? "Inspect the attached file.");
+        const prepared =
+          accessRequest && (await this.startApprovedChat(accessRequest));
         if (
           !host.stash(workspace.id, {
             text,
-            profileId: input.profileId,
-            ...((this.effortChosen || this.effortInitialized) && {
-              effort: intent.effort,
-            }),
+            ...(messageContext && { messageContext }),
+            profileId: prepared ? prepared.profileId : input.profileId,
+            ...(prepared
+              ? { preparedSessionId: prepared.sessionId }
+              : effort && { effort }),
             operatingRegime: intent.plan ? "plan" : "act",
             goal: intent.goal,
             ...(intent.attachment && { attachment: intent.attachment }),
@@ -193,7 +417,9 @@ export class HomeComposer {
 
   /** The workspace now owns the handed-off request. */
   accepted(): void {
+    this.copiedTemplate = undefined;
     this.clearAttachment();
+    this.resetPermissionMode();
     this.update({ plan: false, goal: false });
     this.saveModes();
   }
@@ -212,8 +438,23 @@ export class HomeComposer {
 
 export namespace HomeComposer {
   export type Attachment = Readonly<{ kind: "file" | "directory"; file: File }>;
+  export type FullAccess = Readonly<{
+    prepare: NonNullable<DesktopNativeChat["prepareWelcomeFullAccess"]>;
+    answer: NonNullable<DesktopNativeChat["answerWelcomeFullAccess"]>;
+    start: NonNullable<DesktopNativeChat["startWelcomeFullAccess"]>;
+  }>;
+  export type AccessRequest = Parameters<FullAccess["start"]>[1];
+  export type PreparedChat = Awaited<ReturnType<FullAccess["start"]>>;
+  export type Destination = Readonly<{
+    workspace: Workspace | null;
+    defaultWorkspace(): Promise<Workspace | null>;
+  }>;
   export type View = Readonly<{
     effort: NativeChatEffort;
+    permissionMode: NativeChatPermissionMode;
+    permissionReview: PermissionReviewProject | null;
+    permissionBusy: boolean;
+    permissionError: string | null;
     plan: boolean;
     goal: boolean;
     attachment: Attachment | null;
@@ -226,7 +467,12 @@ export namespace HomeComposer {
     profileId: string | null;
     target: Workspace | null;
     references: readonly { title: string; url: string }[];
-    copyTemplate?: (workspaceId: string) => Promise<WelcomeTemplate>;
+    messageContext?: WelcomeMessage["messageContext"];
+    template?: Template;
+  }>;
+  export type Template = Readonly<{
+    name: string;
+    copy(workspaceId: string): Promise<WelcomeTemplate>;
   }>;
   export type Host = Readonly<{
     defaultWorkspace(): Promise<Workspace | null>;

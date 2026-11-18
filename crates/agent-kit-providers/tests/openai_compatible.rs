@@ -744,6 +744,24 @@ async fn completed_tool_arguments_and_message_ids_are_attempt_scoped() {
 }
 
 #[tokio::test]
+async fn request_lowering_omits_empty_user_records_and_keeps_authored_text() {
+    let transport = FixtureTransport::new([Ok(response(text_response("done"), false))]);
+    let provider = adapter(transport.clone());
+    let mut request = request();
+    request
+        .messages
+        .insert(0, message("empty-user", Role::User, Vec::new()));
+    let authored = request.messages[1].content.clone();
+    execute(&provider, request, "only-content").await;
+    let body: Value =
+        serde_json::from_slice(&transport.requests.lock().unwrap()[0].0.body).unwrap();
+    let [Content::Text(text)] = authored.as_slice() else {
+        panic!("an authored text fixture");
+    };
+    assert_eq!(body["messages"], json!([{"role":"user","content":text}]));
+}
+
+#[tokio::test]
 async fn request_lowering_preserves_tool_result_correlation_and_uses_wire_names() {
     let transport = FixtureTransport::new([Ok(response(text_response("done"), false))]);
     let provider = adapter(transport.clone());

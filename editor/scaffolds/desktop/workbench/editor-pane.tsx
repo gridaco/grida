@@ -1,8 +1,7 @@
 /**
  * Workspace editor region: a persistent title bar over the focused tab.
  *
- * Open, active, and close state lives in `workspace-workbench.tsx`; this
- * component owns only transient per-file dirty state for the title bar. Tabs
+ * Open, active, close, and dirty state lives in `workspace-workbench.tsx`. Tabs
  * are keyed through `WorkbenchTab`: a file tab shows its viewer and file
  * menu; a panel tab shows the content its owner placed in `WorkbenchPanels`.
  */
@@ -75,6 +74,8 @@ export type EditorPaneProps = {
   /** Tab keys (`WorkbenchTab`) in strip order. */
   openTabs: readonly string[];
   activeTab: string | null;
+  dirtyPaths: ReadonlySet<string>;
+  onTabDirtyChange: (relPath: string, dirty: boolean) => void;
   onSelectTab: (tab: string) => void;
   onCloseTab: (tab: string) => void | Promise<boolean>;
   onReopenClosedTab: () => void;
@@ -104,6 +105,8 @@ export function EditorPane({
   browsers,
   openTabs,
   activeTab,
+  dirtyPaths,
+  onTabDirtyChange,
   onSelectTab,
   onCloseTab,
   onReopenClosedTab,
@@ -143,45 +146,11 @@ export function EditorPane({
     );
     panels.reveal(START_PANEL_ID);
   }, [showStart, panels, browsers, onOpenFileExplorer, onCreateCanvas]);
-  const [dirtyPaths, setDirtyPaths] = useState<Set<string>>(() => new Set());
-
-  const onTabDirtyChange = useCallback((relPath: string, dirty: boolean) => {
-    setDirtyPaths((prev) => {
-      const had = prev.has(relPath);
-      if (had === dirty) return prev;
-      const next = new Set(prev);
-      if (dirty) next.add(relPath);
-      else next.delete(relPath);
-      return next;
-    });
-  }, []);
-
-  const handleClose = useCallback(
-    async (tab: string): Promise<boolean> => {
-      const relPath = WorkbenchTab.relPath(tab);
-      if (relPath !== null && dirtyPaths.has(relPath)) {
-        const name = relPath.split("/").pop() ?? relPath;
-        const ok = window.confirm(
-          `"${name}" has unsaved changes. Close anyway?`
-        );
-        if (!ok) return false;
-      }
-      if (relPath !== null)
-        setDirtyPaths((prev) => {
-          if (!prev.has(relPath)) return prev;
-          const next = new Set(prev);
-          next.delete(relPath);
-          return next;
-        });
-      return (await onCloseTab(tab)) !== false;
-    },
-    [dirtyPaths, onCloseTab]
-  );
   const handleCloseOthers = useCallback(
     async (keep: string) => {
-      for (const tab of openTabs) if (tab !== keep) await handleClose(tab);
+      for (const tab of openTabs) if (tab !== keep) await onCloseTab(tab);
     },
-    [openTabs, handleClose]
+    [openTabs, onCloseTab]
   );
   const shownPanels = useSyncExternalStore(
     panels.subscribe,
@@ -194,7 +163,7 @@ export function EditorPane({
       switch (command) {
         case "workspace.tabs.close-active": {
           if (activeTab) {
-            handleClose(activeTab);
+            void onCloseTab(activeTab);
             return;
           }
           void getDesktopBridge()?.window.close();
@@ -219,7 +188,7 @@ export function EditorPane({
         }
       }
     },
-    [activeTab, openTabs, onSelectTab, handleClose, onReopenClosedTab]
+    [activeTab, openTabs, onSelectTab, onCloseTab, onReopenClosedTab]
   );
 
   useEffect(() => {
@@ -328,7 +297,7 @@ export function EditorPane({
         activeTab={activeTab}
         dirtyPaths={dirtyPaths}
         onSelect={onSelectTab}
-        onClose={handleClose}
+        onClose={onCloseTab}
         onCloseOthers={handleCloseOthers}
         showStart={showStart}
         treeVisible={treeVisible}
@@ -457,7 +426,7 @@ function EditorTitleBar({
   browsers?: WorkspaceBrowserTabs;
   onOpenStart: () => void;
   activeTab: string | null;
-  dirtyPaths: Set<string>;
+  dirtyPaths: ReadonlySet<string>;
   onSelect: (tab: string) => void;
   onClose: (tab: string) => void;
   onCloseOthers: (keep: string) => Promise<void>;

@@ -107,6 +107,7 @@ export type NativeAgentLaunch = {
   onSessionUpdate?: (params: unknown) => void;
 };
 const EDITOR_CONTEXT = "co.grida/session/editor-context";
+const MESSAGE_CONTEXT = "co.grida/session/message-context";
 
 type Pending = {
   resolve: (result: unknown) => void;
@@ -206,6 +207,7 @@ export class NativeAgentProcess {
   private editorSvgText = false;
   private editorBrowserTools = false;
   private editorContext = false;
+  private messageContext = false;
   private readonly editorBrowserRequests = new Map<
     string | number,
     BrowserRequest
@@ -294,6 +296,10 @@ export class NativeAgentProcess {
 
   get acceptsEditorContext(): boolean {
     return this.connected && this.editorContext;
+  }
+
+  get acceptsMessageContext(): boolean {
+    return this.connected && this.messageContext;
   }
 
   get acceptsChildGatewayBilling(): boolean {
@@ -685,6 +691,7 @@ export class NativeAgentProcess {
                 }),
                 [NativeEditorSurfaceEndpoints.capability]: 1,
                 ...(options.workspace && { [EDITOR_CONTEXT]: 1 }),
+                [MESSAGE_CONTEXT]: 1,
                 ...(providerEgress && {
                   [NativeEditorSurfaceEndpoints.openCapability]: 1,
                   [NativeEditorSurfaceEndpoints.svgTextCapability]: 1,
@@ -840,6 +847,8 @@ export class NativeAgentProcess {
         advertised?.[NativeEditorSurfaceEndpoints.browserCapability] === 1;
       processOwner.editorContext =
         options.workspace !== undefined && advertised?.[EDITOR_CONTEXT] === 1;
+      processOwner.messageContext =
+        processOwner.transcriptWindow && advertised?.[MESSAGE_CONTEXT] === 1;
       processOwner.ready = true;
       return processOwner;
     } catch (error) {

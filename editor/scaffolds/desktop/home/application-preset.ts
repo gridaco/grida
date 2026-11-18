@@ -10,9 +10,15 @@ import {
   ImageIcon,
   PresentationIcon,
   VideoIcon,
+  WorkflowIcon,
 } from "lucide-react";
 
-export type ApplicationPresetId = "general" | "image" | "video" | "slides";
+export type ApplicationPresetId =
+  | "general"
+  | "slides"
+  | "image"
+  | "workflows"
+  | "video";
 
 export interface ApplicationPresetSpec {
   id: ApplicationPresetId;
@@ -21,20 +27,19 @@ export interface ApplicationPresetSpec {
   /** Icon-only rail glyph + composer chip glyph. */
   icon: ComponentType<{ className?: string }>;
   /**
-   * One-line, marketable pitch for the mode — the body of the rail's
-   * tutorial-style hover card.
+   * Short description for the rail's hover card.
    */
   description: string;
   /**
-   * Public path to the hover card's 16:9 artwork. A static asset (not inline
-   * SVG) so it can later be swapped for a proper gif/image without a code change
-   * — drop a replacement at the same path under `editor/public`.
-   *
-   * Doubles as the "is this a marketable mode?" marker: the neutral `general`
-   * (Home) base omits it, so the rail shows a plain label (not a hover card) and
-   * the composer stamps no chip for it. The three modes carry it.
+   * Public path to the hover card's 16:9 artwork. Presets without artwork use a plain tooltip.
    */
   art?: string;
+  /** Tone of the artwork behind the hover-card caption. */
+  artTone?: "light" | "dark";
+  /** Still artwork for viewers who prefer reduced motion. */
+  reducedMotionArt?: string;
+  /** User intent prepended to the first message. */
+  promptPrefix?: string;
   /**
    * Marks a mode as not-yet-available: the rail shows it dimmed + non-clickable
    * with a "coming soon" hint, and it can't be selected as the active preset.
@@ -58,25 +63,35 @@ export namespace ApplicationPreset {
       id: "slides",
       label: "Slides",
       icon: PresentationIcon,
-      description:
-        "Go from a topic to a full, editable deck. Structured slides in seconds.",
+      description: "Create editable decks.",
       art: "/assets/desktop-home/presets/slides.svg",
+      artTone: "light",
+      reducedMotionArt: "/assets/desktop-home/presets/slides.svg#still",
+      promptPrefix: "Create an editable slide deck.",
     },
     {
       id: "image",
       label: "Images",
       icon: ImageIcon,
-      description:
-        "Generate product shots, logos, and illustrations from a single sentence.",
+      description: "Generate images from a prompt.",
       art: "/assets/desktop-home/presets/image.svg",
+      reducedMotionArt: "/assets/desktop-home/presets/image.svg#still",
+    },
+    {
+      id: "workflows",
+      label: "Workflows",
+      icon: WorkflowIcon,
+      description: "Build and run FX workflows.",
+      art: "/assets/desktop-home/presets/workflows.svg",
+      reducedMotionArt: "/assets/desktop-home/presets/workflows.svg#still",
     },
     {
       id: "video",
       label: "Videos",
       icon: VideoIcon,
-      description:
-        "Turn a prompt into short looping motion — logo reveals, pans, and animations.",
+      description: "Generate short video loops.",
       art: "/assets/desktop-home/presets/video.svg",
+      reducedMotionArt: "/assets/desktop-home/presets/video.svg#still",
       comingSoon: true,
     },
   ];
@@ -85,14 +100,16 @@ export namespace ApplicationPreset {
     return list.find((p) => p.id === id) ?? list[0];
   }
 
+  export function fromParam(value: string | null): ApplicationPresetId {
+    return (
+      list.find((preset) => preset.id === value && !preset.comingSoon)?.id ??
+      DEFAULT
+    );
+  }
+
   /** Preserve the user's words and make the selected output explicit. */
   export function prompt(id: ApplicationPresetId, text: string): string {
-    const intent =
-      id === "slides"
-        ? "Create an editable slide deck."
-        : id === "image"
-          ? "Create an image."
-          : "";
+    const intent = byId(id).promptPrefix;
     return [intent, text.trim()].filter(Boolean).join("\n\n");
   }
 }

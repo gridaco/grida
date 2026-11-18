@@ -1,6 +1,7 @@
 "use client";
 
 import type { NativeChatPermissionReview } from "@grida/desktop-bridge";
+import { toast } from "sonner";
 import {
   FolderIcon,
   GlobeIcon,
@@ -17,16 +18,27 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@app/ui/components/alert-dialog";
+import { hostApps, useDesktopBridge } from "@/lib/desktop/bridge";
 
-/** Review one host-bound Full access choice for the currently attached chat. */
+export type PermissionReviewProject = Pick<
+  NativeChatPermissionReview,
+  "workspaceName"
+> & {
+  workspaceId?: string;
+};
+
+/** Review one host-bound Full access choice for an exact chat. */
 export function AgentPermissionConfirmation({
   review,
   onAnswer,
 }: {
-  review: NativeChatPermissionReview | null;
+  review: PermissionReviewProject | null;
   onAnswer(confirmed: boolean): void;
 }) {
+  const canOpenFolder =
+    typeof useDesktopBridge()?.host_apps?.open_workspace === "function";
   if (!review) return null;
+  const { workspaceName, workspaceId } = review;
   return (
     <AlertDialog
       open={review !== null}
@@ -47,10 +59,29 @@ export function AgentPermissionConfirmation({
               Enable Full access?
             </AlertDialogTitle>
             <AlertDialogDescription
-              className="truncate text-xs"
-              title={`For this chat in ${review.workspaceName}.`}
+              className="flex min-w-0 items-baseline text-xs"
+              title={`For this chat in ${workspaceName}.`}
             >
-              For this chat in {review.workspaceName}.
+              <span className="shrink-0">For this chat in&nbsp;</span>
+              {canOpenFolder && workspaceId ? (
+                <button
+                  type="button"
+                  className="min-w-0 cursor-pointer truncate text-left underline underline-offset-2 hover:text-foreground focus-visible:text-foreground"
+                  title="Open project folder"
+                  onClick={() =>
+                    void hostApps
+                      .openWorkspace({ workspaceId, appId: "finder" })
+                      .catch(() =>
+                        toast.error("Couldn't open the project folder.")
+                      )
+                  }
+                >
+                  {workspaceName}
+                </button>
+              ) : (
+                <span className="truncate">{workspaceName}</span>
+              )}
+              <span>.</span>
             </AlertDialogDescription>
           </div>
         </AlertDialogHeader>

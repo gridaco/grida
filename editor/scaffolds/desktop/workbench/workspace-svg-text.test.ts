@@ -13,7 +13,7 @@ const source =
 function fixture() {
   const editor = createSvgEditor({ svg: source });
   const group = new EditorGroup();
-  const owner = new WorkspaceSvgText(group.getSnapshot);
+  const owner = new WorkspaceSvgText(group);
   const close = owner.register("poster.svg", editor);
   group.open(file("poster.svg"));
   const select = (name: string) =>
@@ -75,6 +75,27 @@ it("retires selection and tab changes even after returning to the same SVG", () 
     expect(owner.capture()).toBeUndefined();
     expect(editor.serialize()).toBe(source);
   } finally {
+    close();
+  }
+});
+
+it("observes eligible SVG text only in the active tab", () => {
+  const { group, owner, select, call, close } = fixture();
+  const changes: boolean[] = [];
+  const unsubscribe = owner.subscribe(() => changes.push(owner.hasSelection()));
+  try {
+    expect(owner.hasSelection()).toBe(true);
+    const target = owner.capture()!;
+    select("mixed");
+    expect(call(target, { kind: "read" })).toEqual({ kind: "unavailable" });
+    select("other");
+    select("title");
+    group.open(file("other.svg"));
+    group.activate(file("poster.svg"));
+    close();
+    expect(changes).toEqual([false, true, false, true, false]);
+  } finally {
+    unsubscribe();
     close();
   }
 });

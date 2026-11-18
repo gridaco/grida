@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
-import type { NativeChatMessageAttachment } from "@grida/desktop-bridge";
+import type {
+  NativeChatDisplayPart,
+  NativeChatMessageAttachment,
+} from "@grida/desktop-bridge";
+import { MessageContextParts } from "@/kits/agent-chat/message-context-parts";
 import { FileIcon, ImageIcon, ListEndIcon } from "lucide-react";
 import {
   HoverCard,
@@ -17,6 +21,7 @@ export function NativeQueuedMessagePreview({
   preview,
   label = preview ?? "Message with other content",
   attachments = [],
+  displayParts,
   readText,
   readImage,
 }: NativeQueuedMessagePreview.Props) {
@@ -90,6 +95,9 @@ export function NativeQueuedMessagePreview({
         sideOffset={8}
         className="w-96 max-w-[calc(100vw-2rem)] rounded-xl p-3"
       >
+        {displayParts?.length ? (
+          <MessageContextParts parts={displayParts} className="mb-2" />
+        ) : null}
         <NativeQueuedMessagePreview.Content
           text={state.text}
           loading={state.loading}
@@ -109,6 +117,7 @@ export namespace NativeQueuedMessagePreview {
     preview: string | null;
     label?: string;
     attachments?: readonly NativeChatMessageAttachment[];
+    displayParts?: readonly NativeChatDisplayPart[];
     /** Observer-only read; opening the preview never edits the queued input. */
     readText?: () => Promise<string>;
     /** An attachment capability from this queued message, never a path or URL. */

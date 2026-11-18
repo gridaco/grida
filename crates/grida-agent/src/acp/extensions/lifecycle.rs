@@ -50,6 +50,7 @@ struct Enqueue {
     editor_browser_tools: bool,
     editor_svg_target_id: Option<BindingId>,
     editor_context: Option<EditorObservation>,
+    message_context: Option<MessageContext>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -68,6 +69,8 @@ struct InputResponse {
     text_only: bool,
     text_editable: bool,
     prompt: Vec<ContentBlock>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    display_parts: Vec<DisplayPart>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -228,6 +231,7 @@ pub(super) fn handlers(
                         request.editor_endpoint_id.is_some(),
                     )?;
                     append_editor_context(&mut parts, request.editor_context, &enqueue.1)?;
+                    append_message_context(&mut parts, request.message_context, &enqueue.1)?;
                     let accepted = enqueue
                         .0
                         .enqueue_with_context(
@@ -278,7 +282,12 @@ pub(super) fn handlers(
                         settings: inspected.settings,
                         text_editable: inspected.text_editable,
                         text_only: matches!(inspected.parts.as_slice(), [PromptPart::Text { .. }]),
-                        prompt: inspected.parts.into_iter().map(prompt_block).collect(),
+                        display_parts: display_parts(&inspected.parts, &input.1),
+                        prompt: inspected
+                            .parts
+                            .into_iter()
+                            .filter_map(prompt_block)
+                            .collect(),
                     })
                 }
                 .await;
@@ -477,8 +486,9 @@ async fn edit_queue(host: &Host, queue: QueueBasis, edit: QueueEdit) -> Result<Q
     .map_err(host_error)
 }
 
-pub(super) fn prompt_block(part: PromptPart) -> ContentBlock {
-    match part {
+pub(super) fn prompt_block(part: PromptPart) -> Option<ContentBlock> {
+    Some(match part {
+        PromptPart::MessageContext { .. } => return None,
         PromptPart::Text { text } => text.into(),
         PromptPart::EditorObservation { .. } => {
             ContentBlock::ResourceLink(crate::acp::projection::editor_context_link())
@@ -506,5 +516,5 @@ pub(super) fn prompt_block(part: PromptPart) -> ContentBlock {
         PromptPart::FileReference { reference } => {
             ContentBlock::ResourceLink(crate::acp::projection::file_reference_link(&reference))
         }
-    }
+    })
 }

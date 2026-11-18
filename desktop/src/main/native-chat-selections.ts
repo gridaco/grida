@@ -333,6 +333,55 @@ export class NativeChatSelections {
   }
 
   /** Persist stable creation and first-input identities before creating a session. */
+  prepareNewChat(
+    workspaceId: string,
+    draftId: string,
+    choice: { profileId: string | null; effort: NativeChatEffort },
+    check: () => void
+  ) {
+    return this.exclusive(async () => {
+      check();
+      workspace(workspaceId);
+      identity(draftId);
+      profile(choice.profileId);
+      const chosenEffort =
+        choice.effort === "standard" ? "medium" : choice.effort;
+      effort(chosenEffort);
+      await this.recoverPending();
+      this.requireReceiptCapacity();
+      if (this.state.drafts[draftId]) throw invalid();
+      if (
+        Object.keys(this.state.drafts).length -
+          (this.state.completed?.length ?? 0) >=
+        MAX_DRAFTS
+      )
+        throw new Error("native_chat_draft_limit");
+      const selected = {
+        ...(await this.options.choice(workspaceId, choice.profileId)),
+        effort: chosenEffort,
+      };
+      selection(selected);
+      if (selected.connectionId !== choice.profileId) throw invalid();
+      const promotion = chatCreation(draftId);
+      check();
+      await this.save({
+        ...this.state,
+        defaults: selected,
+        drafts: {
+          ...this.state.drafts,
+          [draftId]: {
+            workspaceId,
+            revision: 1,
+            selection: selected,
+            promotion,
+          },
+        },
+      });
+      return { ...promotion, selection: selected };
+    });
+  }
+
+  /** Persist stable creation and first-input identities before creating a session. */
   prepareCreation(
     workspaceId: string,
     draftId: string,
@@ -361,11 +410,7 @@ export class NativeChatSelections {
           current.model !== draft.selection.model
         )
           throw new Error("native_chat_selection_unavailable");
-        const promotion = {
-          sessionId: creationIdentity(draftId, "session"),
-          requestId: creationIdentity(draftId, "request"),
-          firstInputId: creationIdentity(draftId, "input"),
-        };
+        const promotion = chatCreation(draftId);
         check();
         await this.save({
           ...this.state,
@@ -826,6 +871,13 @@ function creationIdentity(
   bytes[8] = (bytes[8]! & 0x3f) | 0x80;
   const hex = bytes.toString("hex");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+function chatCreation(draftId: string) {
+  return {
+    sessionId: creationIdentity(draftId, "session"),
+    requestId: creationIdentity(draftId, "request"),
+    firstInputId: creationIdentity(draftId, "input"),
+  };
 }
 function addAcknowledgment(
   items: State["acknowledgments"],

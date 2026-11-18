@@ -1,14 +1,67 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" preserveAspectRatio="xMidYMid slice">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180">
+  <title>A deck cycling through a paper fan, a staircase, and a set of arches</title>
   <defs>
-    <linearGradient id="ap-art-slides" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#2f574e" />
-      <stop offset="1" stop-color="#5e877b" />
-    </linearGradient>
+    <rect id="sheet" x="83" y="47" width="154" height="87" rx="3" />
+    <clipPath id="screen"><use href="#sheet" /></clipPath>
+    <path id="fold" d="M0 0h-48a48 48 0 0 1 1.64-12.42Z" />
+    <g id="pleat">
+      <use href="#fold" fill="#ffb994" />
+      <use href="#fold" transform="rotate(15)" fill="#ff7858" />
+    </g>
+    <g id="cover">
+      <rect width="154" height="87" fill="#272423" />
+      <g transform="translate(77 68)">
+        <use href="#pleat" />
+        <use href="#pleat" transform="rotate(30)" />
+        <use href="#pleat" transform="rotate(60)" />
+        <use href="#pleat" transform="rotate(90)" />
+        <use href="#pleat" transform="rotate(120)" />
+        <use href="#pleat" transform="rotate(150)" />
+      </g>
+    </g>
+    <g id="step">
+      <path d="m0 0 20 0 16-8H16Z" fill="#ffe1b8" />
+      <path d="M0 0h20v10H0Z" fill="#51352f" />
+      <path d="m20 0 16-8V2l-16 8Z" fill="#965446" />
+    </g>
   </defs>
-  <rect width="320" height="180" fill="url(#ap-art-slides)" />
-  <rect x="104" y="60" width="128" height="80" rx="12" fill="#f3f0ea" fill-opacity="0.30" />
-  <rect x="88" y="46" width="128" height="80" rx="12" fill="#f3f0ea" />
-  <rect x="104" y="62" width="60" height="10" rx="5" fill="#4e7a6e" />
-  <rect x="104" y="84" width="96" height="6" rx="3" fill="#d5cfc4" />
-  <rect x="104" y="98" width="72" height="6" rx="3" fill="#d5cfc4" />
+  <style>
+    @media (prefers-reduced-motion: no-preference) {
+      /* Start 120ms before the first transition. Later slides get the full hold. */
+      #still:not(:target) .pages { animation: advance 9s cubic-bezier(.4, 0, .2, 1) -2.4s infinite; }
+    }
+    @keyframes advance {
+      0%, 28% { transform: translateX(0); }
+      33.333%, 61.333% { transform: translateX(-154px); }
+      66.667%, 94.667% { transform: translateX(-308px); }
+      100% { transform: translateX(-462px); }
+    }
+  </style>
+  <rect width="320" height="180" fill="#f2ddd0" />
+  <use href="#sheet" transform="rotate(6 160 124)" fill="#c9816d" />
+  <use href="#sheet" transform="rotate(-4 160 124)" fill="#f8a583" />
+  <g id="still">
+    <g clip-path="url(#screen)">
+      <g transform="translate(83 47)">
+        <g class="pages">
+          <use href="#cover" />
+          <g transform="translate(154)">
+            <rect width="154" height="87" fill="#eb896b" />
+            <use href="#step" transform="translate(29 58)" />
+            <use href="#step" transform="translate(49 48)" />
+            <use href="#step" transform="translate(69 38)" />
+            <use href="#step" transform="translate(89 28)" />
+          </g>
+          <g transform="translate(308)">
+            <rect width="154" height="87" fill="#ffe1b8" />
+            <path d="M37 67V55a40 40 0 0 1 80 0v12" fill="#272423" />
+            <path d="M48 67V55a29 29 0 0 1 58 0v12" fill="#f49573" />
+            <path d="M59 67V55a18 18 0 0 1 36 0v12" fill="#272423" />
+            <path d="M70 67V55a7 7 0 0 1 14 0v12" fill="#ffe1b8" />
+          </g>
+          <use href="#cover" x="462" />
+        </g>
+      </g>
+    </g>
+  </g>
 </svg>
