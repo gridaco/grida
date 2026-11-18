@@ -12,6 +12,7 @@ import {
   providers,
   rigging,
   secrets,
+  workspaces,
 } from "./bridge";
 
 function installBridge(bridge: Record<string, unknown>) {
@@ -21,12 +22,87 @@ function installBridge(bridge: Record<string, unknown>) {
   });
 }
 
+type ReadWorkspaceSvg = NonNullable<
+  DesktopBridge["workspaces"]["read_svg_document"]
+>;
+type ReadWorkspaceText = DesktopBridge["workspaces"]["read_file"];
+
 afterEach(() => {
   vi.restoreAllMocks();
   Reflect.deleteProperty(globalThis, "window");
 });
 
 describe("desktop bridge client contract", () => {
+  it("reads SVG documents through the optional host method while generic text keeps its own reader", async () => {
+    const svg = { content: "<svg/>", mtime: 123 };
+    const readSvg = vi.fn<ReadWorkspaceSvg>().mockResolvedValue(svg);
+    const readText = vi
+      .fn<ReadWorkspaceText>()
+      .mockResolvedValue({ content: "text", mtime: 456 });
+    installBridge({
+      grida: {
+        protocol: DESKTOP_BRIDGE_PROTOCOL,
+        workspaces: { read_svg_document: readSvg, read_file: readText },
+      },
+    });
+
+    expect(workspaces.supportsSvgDocumentReads()).toBe(true);
+    await expect(
+      workspaces.readSvgDocument("workspace", "slides/cover.SVG")
+    ).resolves.toEqual(svg);
+    expect(readSvg).toHaveBeenCalledExactlyOnceWith(
+      "workspace",
+      "slides/cover.SVG"
+    );
+    await workspaces.readFile("workspace", "slides/cover.SVG");
+    await workspaces.readSvgDocument("workspace", "slides/custom-extension");
+    expect(readText.mock.calls).toEqual([
+      ["workspace", "slides/cover.SVG"],
+      ["workspace", "slides/custom-extension"],
+    ]);
+  });
+
+  it("uses the legacy text reader when the host lacks SVG document reads", async () => {
+    const svg = { content: "<svg/>", mtime: 123 };
+    const readText = vi.fn<ReadWorkspaceText>().mockResolvedValue(svg);
+    installBridge({
+      grida: {
+        protocol: DESKTOP_BRIDGE_PROTOCOL,
+        workspaces: { read_file: readText },
+      },
+    });
+
+    expect(workspaces.supportsSvgDocumentReads()).toBe(false);
+    await expect(
+      workspaces.readSvgDocument("workspace", "cover.svg")
+    ).resolves.toEqual(svg);
+    expect(readText).toHaveBeenCalledExactlyOnceWith("workspace", "cover.svg");
+  });
+
+  it("surfaces the SVG filename and exact size and limit without retrying", async () => {
+    const maxSize = 8 * 1024 * 1024;
+    const readSvg = vi.fn<ReadWorkspaceSvg>().mockResolvedValue({
+      error: "file-too-large",
+      size: maxSize + 1,
+      max_size: maxSize,
+    });
+    const readText = vi.fn<ReadWorkspaceText>();
+    installBridge({
+      grida: {
+        protocol: DESKTOP_BRIDGE_PROTOCOL,
+        workspaces: { read_svg_document: readSvg, read_file: readText },
+      },
+    });
+
+    const number = new Intl.NumberFormat();
+    await expect(
+      workspaces.readSvgDocument("workspace", "slides/cover.svg")
+    ).rejects.toThrow(
+      `“cover.svg” is ${number.format(maxSize + 1)} bytes. The SVG document limit is 8 MiB (${number.format(maxSize)} bytes).`
+    );
+    expect(readText).not.toHaveBeenCalled();
+  });
+
   it("uses the optional consent query and detected-model update without falling back to Save", async () => {
     const authorization = vi
       .fn<

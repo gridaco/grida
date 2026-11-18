@@ -48,6 +48,7 @@ import type {
   WorkspaceFsEntry,
   WorkspaceReadFileBytesResult,
   WorkspaceReadFileResult,
+  WorkspaceReadSvgDocumentResult,
   WorkspaceWriteFileResult,
 } from "@grida/daemon";
 
@@ -119,6 +120,7 @@ export type {
   WorkspaceFsEntry,
   WorkspaceReadFileBytesResult,
   WorkspaceReadFileResult,
+  WorkspaceReadSvgDocumentResult,
   WorkspaceWriteFileResult,
 };
 
@@ -377,6 +379,11 @@ export type DesktopBridge = {
       workspaceId: string,
       relPath: string
     ) => Promise<WorkspaceReadFileResult>;
+    /** Read SVG document source with its own finite allowance. Older hosts omit this method. */
+    read_svg_document?: (
+      workspaceId: string,
+      relPath: string
+    ) => Promise<WorkspaceReadSvgDocumentResult>;
     read_file_bytes: (
       workspaceId: string,
       relPath: string

@@ -1292,6 +1292,13 @@ const bridge: DesktopBridge = {
         relPath,
         "text"
       ),
+    read_svg_document: (workspaceId, relPath) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.WORKSPACE_READ,
+        workspaceId,
+        relPath,
+        "svg-document"
+      ),
     read_file_bytes: (workspaceId, relPath) =>
       ipcRenderer.invoke(
         IPC_CHANNELS.WORKSPACE_READ,

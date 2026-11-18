@@ -207,12 +207,48 @@ it.runIf(
       await expect(read("large.bin", "bytes")).rejects.toThrow(
         "file-too-large"
       );
+      const svgLimit = 8 * 1024 * 1024;
+      const slideName = "slide.SVG";
+      const slide = path.join(project, slideName);
+      const start =
+        '<svg xmlns="http://www.w3.org/2000/svg"><image href="media/picture.png" width="1" height="1"/><!--';
+      const end = "--></svg>";
+      const source =
+        start + " ".repeat(svgLimit - start.length - end.length) + end;
+      const readSvg = (file: string) =>
+        servicesSidecarClient.readWorkspaceSvgDocument(saved.id, file, signal);
+      await fs.writeFile(slide, source);
+      await expect(read(slideName, "text")).rejects.toThrow("file-too-large");
+      const opened = await readSvg(slideName);
+      if (!("content" in opened))
+        throw new Error("The limit must be inclusive");
+      expect(opened.content === source).toBe(true);
+      const edited = opened.content.replace('width="1"', 'width="2"');
+      await save(slideName, edited, opened.mtime);
+      const reopened = await readSvg(slideName);
+      expect("content" in reopened && reopened.content === edited).toBe(true);
+      await fs.truncate(slide, svgLimit + 1);
+      await expect(readSvg(slideName)).resolves.toEqual({
+        error: "file-too-large",
+        size: svgLimit + 1,
+        max_size: svgLimit,
+      });
+      await expect(readSvg("medium.bin")).rejects.toThrow(
+        "not-an-svg-document"
+      );
+      await expect(readSvg("../outside.svg")).rejects.toThrow(
+        "path-escapes-workspace"
+      );
       await fs.writeFile(outside, "must not be read");
       await fs.symlink(outside, path.join(project, "escape.txt"));
+      await fs.symlink(outside, path.join(project, "escape.svg"));
       await expect(read("../outside.txt", "text")).rejects.toThrow(
         "path-escapes-workspace"
       );
       await expect(read("escape.txt", "text")).rejects.toThrow(
+        /workspace_path_outside_root|path_authority_unavailable/
+      );
+      await expect(readSvg("escape.svg")).rejects.toThrow(
         /workspace_path_outside_root|path_authority_unavailable/
       );
       await fs.mkdir(path.join(project, ".git"));

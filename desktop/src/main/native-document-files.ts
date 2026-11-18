@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { StringDecoder } from "node:string_decoder";
-import { ProtectedRoots } from "@grida/daemon/server";
+import { ProtectedRoots, SvgDocumentRead } from "@grida/daemon/server";
 import type { FileReadResult, FileWriteResult } from "../bridge/contract";
 import { NativeDocumentIdentities } from "./native-document-identities";
 import {
@@ -183,6 +183,7 @@ export class NativeDocumentFiles {
           : grant.path,
       };
     } catch (error) {
+      if (error instanceof SvgDocumentRead.TooLarge) owner.check();
       throw publicError(error);
     } finally {
       leave();
@@ -273,6 +274,8 @@ export class NativeDocumentFiles {
         const opened = await this.workers.openDocument(grant, signal);
         let content: string;
         try {
+          if (SvgDocumentRead.isPath(grant.path))
+            SvgDocumentRead.checkSize(grant.path, opened.size);
           content = await documentText(opened, signal);
         } catch (error) {
           await opened.close().catch(() => {});
@@ -452,7 +455,10 @@ function publicError(error: unknown): Error {
     if (error.status === 409) return changed();
     return unavailable();
   }
-  return error instanceof DocumentError ? error : unavailable();
+  return error instanceof DocumentError ||
+    error instanceof SvgDocumentRead.TooLarge
+    ? error
+    : unavailable();
 }
 
 function unavailable() {

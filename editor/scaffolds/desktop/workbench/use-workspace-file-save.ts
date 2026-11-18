@@ -173,7 +173,7 @@ export function useWorkspaceFileSave({
       setConflict(null);
       setSaveError(null);
       try {
-        const r = await workspacesNs.readFile(workspaceId, relPath);
+        const r = await workspacesNs.readSvgDocument(workspaceId, relPath);
         // Echo suppression: our own save produces a watcher
         // `changed` event for this same file, which lands here once the buffer
         // is clean again. A dependency-only refresh deliberately bypasses this:

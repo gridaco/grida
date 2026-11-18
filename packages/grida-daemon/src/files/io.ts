@@ -33,6 +33,7 @@ import os from "node:os";
 import { atomicWrite } from "../storage/atomic-write";
 import path from "node:path";
 import type { FileRegistry } from "./registry";
+import { SvgDocumentRead } from "./svg-document";
 
 export namespace filesIo {
   export class DocIdNotFoundError extends Error {
@@ -76,12 +77,7 @@ export namespace filesIo {
   ): Promise<ReadResult> {
     const entry = registry.getEntry(docId);
     if (!entry) throw new DocIdNotFoundError(docId);
-    // Read content + stat in parallel — they're independent.
-    const [content, stat] = await Promise.all([
-      fs.readFile(entry.path, "utf8"),
-      fs.stat(entry.path),
-    ]);
-    const mtime = stat.mtimeMs;
+    const { content, mtime } = await readText(entry.path);
     registry._setMtime(docId, mtime);
     return {
       content,
@@ -120,6 +116,18 @@ export namespace filesIo {
     registry._setMtime(docId, mtime);
     return { mtime };
   }
+}
+
+async function readText(filename: string) {
+  if (SvgDocumentRead.isPath(filename)) {
+    const { bytes, mtime } = await SvgDocumentRead.read(filename);
+    return { content: bytes.toString("utf8"), mtime };
+  }
+  const [content, stat] = await Promise.all([
+    fs.readFile(filename, "utf8"),
+    fs.stat(filename),
+  ]);
+  return { content, mtime: stat.mtimeMs };
 }
 
 /**

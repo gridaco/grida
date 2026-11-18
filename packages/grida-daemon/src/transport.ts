@@ -21,6 +21,7 @@ import type {
   WorkspaceFsEntry,
   WorkspaceReadFileBytesResult,
   WorkspaceReadFileResult,
+  WorkspaceReadSvgDocumentResult,
   WorkspaceWriteFileResult,
 } from "./protocol/resources";
 
@@ -297,6 +298,14 @@ export namespace DaemonTransport {
           workspace_id: workspaceId,
           rel_path: relPath,
         }),
+      read_svg_document: async (
+        workspaceId: string,
+        relPath: string
+      ): Promise<WorkspaceReadSvgDocumentResult> =>
+        await this.postJson<WorkspaceReadSvgDocumentResult>(
+          "/workspaces/readfile",
+          { workspace_id: workspaceId, rel_path: relPath, svg_document: true }
+        ),
       read_file_bytes: async (
         workspaceId: string,
         relPath: string

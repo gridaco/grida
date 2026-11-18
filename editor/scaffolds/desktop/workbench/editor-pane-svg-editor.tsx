@@ -3,7 +3,7 @@
  * the editor pane ships today. Shares the `content_version` snapshot
  * dirty trick with the file window's single-file surface
  * (`scaffolds/desktop/file/single-file-svg-surface.tsx`) but talks to the
- * workspace fs surface (`workspaces.readFile` / `writeFile`) rather than the
+ * workspace fs surface (`workspaces.readSvgDocument` / `writeFile`) rather than the
  * services sidecar's docId registry, because workspace tabs already address by
  * `{workspaceId, relPath}` (and so get the mtime-safe conflict path the
  * single-document window has no need for).
@@ -60,7 +60,7 @@ export function EditorPaneSvgEditor({
     let cancelled = false;
     setState({ kind: "loading" });
     workspacesNs
-      .readFile(workspaceId, relPath)
+      .readSvgDocument(workspaceId, relPath)
       .then((r) => {
         if (cancelled) return;
         setState({ kind: "ready", content: r.content, mtime: r.mtime });
@@ -89,9 +89,6 @@ export function EditorPaneSvgEditor({
       <div className="mx-auto flex h-full max-w-sm flex-col items-center justify-center gap-2 px-6 text-center">
         <AlertCircleIcon className="size-5 text-destructive" />
         <p className="text-sm text-destructive">{state.message}</p>
-        <p className="text-xs text-muted-foreground">
-          The editor reads text files up to 1 MiB.
-        </p>
       </div>
     );
   }

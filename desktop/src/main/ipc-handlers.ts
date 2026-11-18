@@ -1169,25 +1169,35 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         !workspaceIdValue(id) ||
         typeof relative !== "string" ||
         Buffer.byteLength(relative) > 4096 ||
-        (kind !== "text" && kind !== "bytes" && kind !== "directory")
+        (kind !== "text" &&
+          kind !== "bytes" &&
+          kind !== "directory" &&
+          kind !== "svg-document")
       )
         throw new Error("workspace_read_invalid");
       return await windowRequest(
         event,
         "workspace_read_unavailable",
-        async (signal) =>
-          kind === "directory"
-            ? await servicesSidecarClient.readWorkspaceDirectory(
-                id,
-                relative,
-                signal
-              )
-            : await servicesSidecarClient.readWorkspaceFile(
-                id,
-                relative,
-                kind,
-                signal
-              )
+        async (signal) => {
+          if (kind === "directory")
+            return await servicesSidecarClient.readWorkspaceDirectory(
+              id,
+              relative,
+              signal
+            );
+          if (kind === "svg-document")
+            return await servicesSidecarClient.readWorkspaceSvgDocument(
+              id,
+              relative,
+              signal
+            );
+          return await servicesSidecarClient.readWorkspaceFile(
+            id,
+            relative,
+            kind,
+            signal
+          );
+        }
       );
     }
   );

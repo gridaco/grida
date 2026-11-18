@@ -23,5 +23,6 @@ export type {
   WorkspaceFsEntry,
   WorkspaceReadFileBytesResult,
   WorkspaceReadFileResult,
+  WorkspaceReadSvgDocumentResult,
   WorkspaceWriteFileResult,
 } from "./protocol/resources";

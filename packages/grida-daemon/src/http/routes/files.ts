@@ -21,6 +21,7 @@
 import type { Hono } from "hono";
 import { filesIo } from "../../files/io";
 import type { FileRegistry } from "../../files/registry";
+import { SvgDocumentRead } from "../../files/svg-document";
 import { body, v } from "../validate";
 
 export function registerFilesRoutes(app: Hono, registry: FileRegistry) {
@@ -38,6 +39,9 @@ export function registerFilesRoutes(app: Hono, registry: FileRegistry) {
     } catch (err) {
       if (err instanceof filesIo.DocIdNotFoundError) {
         return c.json({ error: "docId not registered" }, 404);
+      }
+      if (err instanceof SvgDocumentRead.TooLarge) {
+        return c.json({ error: err.message, code: "file-too-large" }, 400);
       }
       throw err;
     }
