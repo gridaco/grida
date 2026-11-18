@@ -1,5 +1,6 @@
 // GRIDA-SEC-004 — typed public identities and renderer-owned File input only.
 import { describe, expect, expectTypeOf, it } from "vitest";
+import { parseNativeChatMessageContext } from "./index";
 import type {
   DesktopNativeChat,
   NativeChatAcceptance,
@@ -24,6 +25,38 @@ import type {
   NativeChatActivity,
   NativeChatToolImage,
 } from "./index";
+
+describe("Native chat message context", () => {
+  it("preserves bounded text and ordered versioned display data", () => {
+    const context = {
+      modelText: "<sample>Reference evidence</sample>",
+      displayParts: [
+        { kind: "sample.reference", version: 1, data: { label: ["First", 1] } },
+        { kind: "sample.reference", version: 2, data: { label: ["Next", 2] } },
+      ],
+    };
+    expect(parseNativeChatMessageContext(context)).toEqual(context);
+  });
+
+  it("refuses non-JSON data, bad identifiers, and byte overflow", () => {
+    const valid = { modelText: "Reference evidence", displayParts: [] };
+    const cycle: Record<string, unknown> = {};
+    cycle.self = cycle;
+    for (const part of [
+      { kind: "UPPER", version: 1, data: {} },
+      { kind: "sample.reference", version: 65536, data: {} },
+      { kind: "sample.reference", version: 1, data: cycle },
+      { kind: "sample.reference", version: 1, data: { value: Infinity } },
+    ]) {
+      expect(
+        parseNativeChatMessageContext({ ...valid, displayParts: [part] })
+      ).toBeNull();
+    }
+    expect(
+      parseNativeChatMessageContext({ ...valid, modelText: "🧩".repeat(4096) })
+    ).toBeNull();
+  });
+});
 
 describe("DesktopNativeChat retained tool images", () => {
   it("keeps the dedicated reader optional and carries only opaque display metadata", () => {

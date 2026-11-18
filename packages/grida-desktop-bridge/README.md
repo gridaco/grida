@@ -53,6 +53,14 @@ the calling window mounted. Check that this optional method exists before
 offering the action: older protocol-1 hosts do not expose it. Native Main owns
 the destination and authenticated window admission.
 
+`window.navigation` describes one adjacent entry in each direction in the
+Desktop window's own history. Back and Forward take that exact step when the
+entry is still within the Desktop route allowlist. The optional
+`back_destination` and `forward_destination` fields are `"home"` only for the
+plain Home route. Startup restoration and other parameterized routes have no
+marker. Older hosts can omit both markers. The bridge publishes destination
+markers and availability without exposing history URLs, titles or page state.
+
 `nativeChat` is an optional Desktop namespace. Check `status()` in the
 current workspace. If it reports `native-starting`, call `status(true)` to
 start the workspace chat. Known setup failures are fixed readiness values.
@@ -71,6 +79,15 @@ On the Welcome screen, `welcomeProfiles()` lists the saved-endpoint and
 built-in provider-key connections a first chat can choose before its
 workspace opens. It starts nothing; the opened workspace selects the choice
 as a new connection.
+When all three optional Welcome Full access methods exist, the app can
+prepare an expiring review for one new chat in the selected registered
+workspace. Answer it in the same Welcome frame. Confirmed reservations
+survive the review timeout and can be revoked before use. Answering creates no
+chat. Start consumes the confirmation once, applies Full access to the
+returned chat with the requested model and effort, and sends no input. Open
+that exact session in the selected workspace to attach and submit through the
+ordinary API. The confirmation does not authorize another window, workspace,
+or chat.
 An unknown result after startup is unavailable. The app issues an attachment for each
 renderer that creates or loads a chat. Submit keeps the caller's input ID.
 Pause, Resume, and Stop use an observation issued for that attachment.
@@ -82,6 +99,23 @@ Reads are bounded at 1 MiB and 1,024 messages and report an explicit error if
 the transcript exceeds either bound. A replay does not stop the live turn.
 Navigating away releases attachments and subscriptions while accepted work
 stays owned by the native host.
+
+Compatible transcript pages mark a user message with `svgTextSelection: true`
+when it carried a live SVG text binding at send. The historical fact exposes
+no content, file path or target ID and grants no access. Older hosts omit it.
+
+`submitMessage` accepts a named request carrying authored text and passive
+message context. Context has model-facing text and ordered, versioned display
+parts. Attachment submissions and Goal starts can carry the same context.
+Transcript and queue projections expose the display parts with the authored
+text. The bound is 16 KiB for the encoded context, including at most 16 display
+parts. An unsupported host reports `native_chat_message_context_unavailable`.
+
+Desktop features build both representations from the same captured selection.
+Keep each feature's model vocabulary and display renderer in Desktop and teach
+the model that vocabulary in the appropriate skill. Workflows is the first
+consumer. The native host treats the display schema as opaque and supplies
+model context at the request's existing authority.
 
 Chat listings may carry optional `lastActivity` entries pairing a session ID
 with `atMs`; organization entries and Settings archive rows use

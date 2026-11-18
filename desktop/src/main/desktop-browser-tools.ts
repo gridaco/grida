@@ -9,6 +9,7 @@ import {
 import {
   DesktopBrowser,
   NativeEditorSurfaces,
+  type DesktopFxViewer,
   type NativeEditorSurfaceSnapshot,
 } from "@grida/desktop-bridge";
 import { IPC_CHANNELS } from "../bridge/contract";
@@ -20,6 +21,7 @@ import type {
   BrowserAutomationScope,
   DesktopBrowserHost,
 } from "./browser-host";
+import type { FxViewer, FxViewerFileOutcome } from "./fx-viewer";
 
 const MAX_INVENTORY_BYTES = 64 * 1024;
 
@@ -29,6 +31,7 @@ type Publication = {
   files: NativeEditorSurfaceSnapshot;
   fileIds: Map<string, string>;
   activePageId: string | null;
+  activeRevision: number;
 };
 
 export type DesktopBrowserToolLease = Readonly<{
@@ -45,7 +48,10 @@ export class DesktopBrowserTools {
   private readonly pages: BrowserAutomation;
   private readonly workbenches = new WeakMap<WebContents, Publication>();
 
-  constructor(private readonly browser: DesktopBrowserHost) {
+  constructor(
+    private readonly browser: DesktopBrowserHost,
+    private readonly fxViewer?: FxViewer
+  ) {
     this.pages = new BrowserAutomation(browser);
   }
 
@@ -83,8 +89,110 @@ export class DesktopBrowserTools {
       files,
       fileIds,
       activePageId,
+      activeRevision:
+        (previous?.activeRevision ?? 0) +
+        (previous?.frame === frame &&
+        previous.href === frame.url &&
+        previous.activePageId === activePageId
+          ? 0
+          : 1),
     });
     return true;
+  }
+
+  async captureEditorObservation(sender: WebContents, signal?: AbortSignal) {
+    if (!this.fxViewer) return null;
+    const selected = this.selectedFxPage(sender);
+    return selected
+      ? this.fxViewer.captureSelected(
+          selected,
+          signal ?? AbortSignal.timeout(6000)
+        )
+      : null;
+  }
+
+  async activateFxViewerFile(
+    sender: WebContents,
+    pageId: string,
+    reference: unknown,
+    opening: Parameters<FxViewer["activateFile"]>[2],
+    signal: AbortSignal
+  ): Promise<FxViewerFileOutcome> {
+    if (!this.fxViewer) return "unavailable";
+    const selected = this.selectedFxPage(sender);
+    return selected?.tabId === pageId
+      ? this.fxViewer.activateFile(selected, reference, opening, signal)
+      : "stale";
+  }
+
+  async resolveFxPreview(
+    sender: WebContents,
+    entry: unknown
+  ): Promise<DesktopFxViewer.Preview> {
+    const unavailable = { state: "unavailable" } as const;
+    if (!this.fxViewer || sender.isDestroyed()) return unavailable;
+    const scope = this.workbenchScope(sender, sender.mainFrame);
+    try {
+      const lease = this.browser.automationWorkspace(scope);
+      const result = await this.fxViewer.resolvePreview(
+        { workspaceId: lease.workspaceId, entry },
+        AbortSignal.timeout(5000)
+      );
+      return lease.current() ? result : unavailable;
+    } catch {
+      return unavailable;
+    }
+  }
+
+  private workbenchScope(
+    sender: WebContents,
+    frame: WebFrameMain,
+    href = frame.url
+  ): BrowserAutomationScope {
+    return {
+      id: randomUUID(),
+      sender,
+      frame,
+      live: () =>
+        !sender.isDestroyed() &&
+        !sender.isLoadingMainFrame() &&
+        sender.mainFrame === frame &&
+        frame.url === href,
+    };
+  }
+
+  private selectedFxPage(sender: WebContents) {
+    const publication = this.workbenches.get(sender);
+    if (!publication?.activePageId || sender.isDestroyed()) return null;
+    const { frame, href, activePageId: tabId, activeRevision } = publication;
+    const workspaceId = new URL(href).searchParams.get("id");
+    if (!workspaceId || !/^[a-f0-9]{16}$/.test(workspaceId)) return null;
+    const auth = this.workbenchScope(sender, frame, href);
+    try {
+      const page = this.browser.resolveAutomationPage(auth, {
+        kind: "workbench",
+        tabId,
+      });
+      const { url } = page.snapshot();
+      if (!url) return null;
+      return {
+        url,
+        workspaceId,
+        tabId,
+        selected: () => {
+          const latest = this.workbenches.get(sender);
+          return (
+            latest?.activeRevision === activeRevision &&
+            latest?.activePageId === tabId &&
+            page.visible()
+          );
+        },
+        observe: (url: string, script: string, signal: AbortSignal) =>
+          this.pages.observeWorkbenchDocument(page, url, script, signal),
+      };
+    } catch {
+      return null;
+    }
   }
 
   lease(

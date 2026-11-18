@@ -50,18 +50,25 @@ export function AgentPane({
   const params = useSearchParams();
   const initialSession = params.get("session");
   const chat = bridge?.nativeChat;
-  // Read per workspace; the chat takes the text only when it sends.
+  // Read per workspace; the chat takes the complete request when it sends.
   const workspaceId = workspace.id;
   const firstMessage = useMemo<NativeFirstMessage | undefined>(() => {
     const message = initialSession ? null : welcome_message.peek(workspaceId);
-    return message
-      ? {
-          profileId: message.profileId,
-          composer: message,
-          waiting: () => welcome_message.peek(workspaceId) !== null,
-          take: () => welcome_message.take(workspaceId),
-        }
-      : undefined;
+    if (!message) return;
+    // An older pane may still be finishing setup when Home replaces its handoff.
+    // Consume only the request with the same prepared chat identity.
+    const waiting = () => {
+      const pending = welcome_message.peek(workspaceId);
+      return (
+        !!pending && pending.preparedSessionId === message.preparedSessionId
+      );
+    };
+    return {
+      profileId: message.profileId,
+      composer: message,
+      waiting,
+      take: () => (waiting() ? welcome_message.takeMessage(workspaceId) : null),
+    };
   }, [workspaceId, initialSession]);
   // The route can still be resolving the next workspace after navigation.
   const ready = !!chat && params.get("id") === workspace.id;

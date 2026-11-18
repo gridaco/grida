@@ -7,14 +7,18 @@ tags: [welcome, workspace, composer, native-chat, template, model]
 status: untested
 severity: high
 date: 2026-11-13
-updated: 2026-11-16
+updated: 2026-11-19
 automatable: partial
 covered_by:
   [
     editor/lib/desktop/welcome-message.test.ts,
+    editor/scaffolds/desktop/home/home-composer.test.ts,
     editor/lib/agent-chat/native-chat-controller.test.ts,
+    editor/lib/agent-chat/native-chat-selection-controller.test.ts,
+    editor/scaffolds/desktop/workbench/native-permission-mode.browser.tsx,
     editor/scaffolds/desktop/workbench/workspace-canvas-creation.test.ts,
     desktop/src/main/native-chat-ipc.test.ts,
+    desktop/src/main/native-desktop-agent.test.ts,
     desktop/src/main/ipc-admission.test.ts,
   ]
 ---
@@ -36,11 +40,30 @@ choice first — the chat says the Welcome message wasn't sent and puts its text
 in the composer. When chat cannot open in the workspace at all, the
 unavailability notice says the message wasn't sent.
 
+When Full access is selected on Home, the same confirmation as a workspace
+chat appears immediately. Confirming keeps the composer on Home and lets the
+person continue drafting. Send opens the exact approved chat with Full access.
+Cancel keeps the draft and Default access. If copying a selected Slides
+template fails, the composer keeps the approval and draft for retry. If the
+handoff fails after the chat is prepared, retrying from the same Home composer
+with the same model and effort reuses the prepared chat and copied deck.
+
 A picked slides template is copied into the selected destination workspace as
-its own deck before the workspace opens, and the first message names that copy
-so the agent adapts it in place. References are listed as links in the first
-message. Selecting Slides or Images makes that requested outcome explicit;
-those presets do not change model capabilities or grant additional access.
+its own deck before the workspace opens. The first message shows the template
+as a separate chip and the agent receives the copied deck path and editing
+instructions as context. References are listed as links in the first message.
+Selecting Slides without a template adds the requested outcome to the first
+message. Selecting Images supplies image creation guidance and any selected
+Library image links as context. The chat shows Library reference thumbnails
+beside the user's words and can start from the picks alone. Selecting Workflows
+asks the workspace agent to use Grida FX and follow the `desktop-fx` skill when
+available. Picked workflows travel as numbered reference chips outside the
+message text. The same selections supply showcase and source links to the
+agent as context. Their numbers follow the current
+selection order and close any gaps after removal. Sending picks alone starts
+a chat with the chips. The agent decides how to use the examples.
+The chat keeps its selected model and access. Opening a workspace with an empty
+composer starts no turn.
 
 A staged file or image keeps its original File through the same-window route
 transition. A reload before consumption retains the request and attachment name,
@@ -62,8 +85,9 @@ attachment also keeps it with an explanation instead of omitting it.
 4. Return to Welcome, pick a slides template, leave the text empty, and send.
    - Expected: a deck named after the template (for example
      `startup-pitch.canvas`, or `startup-pitch 2.canvas` when that exists)
-     appears in the workspace; the first message names it and the agent edits
-     that deck.
+     appears in the workspace. The first message has the template chip and
+     the agent edits that copy. Repeat with a typed request and copy the sent
+     message. The message bubble and clipboard contain only the typed request.
 5. Remove the provider key used in step 3 in Settings, return to Welcome
    (where that model is no longer offered), choose **Default** while signed
    out of Grida with no other provider key, type a request, and send.
@@ -85,6 +109,36 @@ attachment also keeps it with an explanation instead of omitting it.
 10. Choose an existing destination workspace and pick a reference or template.
     - Expected: the request, reference links and any copied deck use that chosen
       workspace rather than switching to the default destination.
+11. On Home, type a request and choose Full access.
+    - Expected: the Full access dialog appears immediately on Home. Cancel
+      keeps the message and Default access. Choose Full access again and
+      confirm. Home remains open. Send to open the approved new chat and
+      start the message with Full access. No second confirmation appears.
+12. On Workflows, click three cards. Hover a composer chip and use a card's
+    Open button. Remove reference 2, reselect that card, then remove it again.
+    Send “Use the approach from 1 and the layout from 2.”
+    - Expected: each chip shows its cover and previews the same media as the
+      card on hover. In a narrow window, additional chip rows wrap above the
+      first row. The Open button takes you to the public showcase and
+      preserves the picks. Removing the second pick moves the remaining
+      reference 3 to 2. Reselecting the removed card adds it back as reference 3. The transcript shows your words and separate chips for references 1
+      and 2. Copy the message and reload the chat. The clipboard contains
+      your words, and the chips return with the same numbers after reload.
+13. Return to Workflows, pick Pet, and send with the text field empty.
+    - Expected: a regular chat starts with the Pet chip as reference 1. The
+      agent receives its FX template ID and can interpret the pick or ask a
+      question.
+14. On Images, select Library images and send a description. Copy the sent
+    message and reload the chat.
+    - Expected: the bubble and clipboard contain the description. Click a
+      reference thumbnail to open the Library image. The thumbnails return
+      after reload, and the agent receives the image creation intent and links.
+15. On Images, select one Library image and send with the text field empty.
+    - Expected: a regular chat starts with the reference thumbnail.
+16. On Images or Workflows, attach a folder or an ordinary file and send with
+    the text field empty.
+    - Expected: Home asks for a message and keeps the attachment and picks.
+      Adding text lets the draft proceed to the workspace.
 
 ## Notes
 

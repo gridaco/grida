@@ -57,10 +57,14 @@ Process output, cancellation and cleanup reporting remain available in Full
 access, but an unconfined program can escape normal process-group cleanup;
 Grida does not promise isolation from hostile same-user code.
 
-Full access needs a compatible native Desktop build. Older builds keep Default
-and do not offer the choice. Before opening a project, the welcome composer
-cannot grant access to a chat. Automatic approval review, sometimes called
-**Approve for me**, is not offered by Desktop.
+On Home, choosing **Full access** opens the same confirmation immediately.
+Confirm to select Full access for the new chat in your chosen project. You can
+keep drafting and change the model or effort before sending. Cancel keeps the
+draft and Default access. Changing the project resets access to Default.
+
+Full access needs a compatible native Desktop build. Older builds keep Default.
+Automatic approval review, sometimes called **Approve for me**, is not offered
+by Desktop.
 
 ## What the agent cannot reach
 

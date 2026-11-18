@@ -466,21 +466,23 @@ async fn serve_connection(
                         if let Some(projection::ReplayRequest::Read { request_id, before }) = mode {
                             load_sessions.lock().unwrap().ensure_attached(&id)?;
                             let window = load_host.transcript_window(id.clone(), before, projection::visible_record_bytes).await.map_err(host_error)?;
+                            let turn_ids = window.turns.iter().map(|turn| turn.id.clone()).collect::<Vec<_>>();
+                            let input_facts = load_host
+                                .transcript_input_facts(id, &turn_ids)
+                                .await
+                                .map_err(host_error)?;
                             let mut projection = Projection::new(request.session_id).with_tool_images(
                                 { let state = load_sessions.lock().unwrap(); state.negotiated.contains(extensions::tool_images::CAPABILITY) }
                             ).with_activity_order(
                                 load_sessions.lock().unwrap().negotiated.contains(projection::ACTIVITY_ORDER)
                                     .then(|| load_host.activity_order.clone()));
                             projection.correlate_replay(request_id.clone());
-                            projection.replay_window(&connection, &load_delivery, window.records, &window.turns).await?;
-                            let goal_starts = load_host
-                                .goal_start_turns(id.clone(), window.turns.iter().map(|turn| turn.id.clone()).collect::<Vec<_>>())
-                                .await
-                                .map_err(host_error)?;
+                            let message_context = load_sessions.lock().unwrap().negotiated.contains(extensions::MESSAGE_CONTEXT);
+                            projection.replay_window(&connection, &load_delivery, window.records, &window.turns, &input_facts, message_context).await?;
                             let turns: Vec<_> = window
                                 .turns
                                 .iter()
-                                .map(|turn| projection::turn_facts(turn, goal_starts.contains(&turn.id)))
+                                .map(|turn| projection::turn_facts(turn, input_facts.goal_starts.contains(&turn.id)))
                                 .collect();
                             return Ok(LoadSessionResponse::new().meta(serde_json::Map::from_iter([(
                                 projection::TRANSCRIPT_WINDOW.into(),

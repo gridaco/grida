@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { welcome_message } from "./welcome-message";
+import { workflowMessageContext } from "./workflow-message-context";
+import { slidesTemplateMessageContext } from "./slides-message-context";
 
 function memoryStorage() {
   const entries = new Map<string, string>();
@@ -28,9 +30,11 @@ describe("welcome_message", () => {
       profileId: PROFILE,
     });
     expect(welcome_message.peek("workspace-b", storage)).toBeNull();
-    expect(welcome_message.take("workspace-a", storage)).toBe("Make a poster");
+    expect(welcome_message.takeMessage("workspace-a", storage)?.text).toBe(
+      "Make a poster"
+    );
     // A second taker, or the same chat after a reload, gets nothing.
-    expect(welcome_message.take("workspace-a", storage)).toBeNull();
+    expect(welcome_message.takeMessage("workspace-a", storage)).toBeNull();
     expect(welcome_message.peek("workspace-a", storage)).toBeNull();
   });
 
@@ -43,6 +47,7 @@ describe("welcome_message", () => {
       effort: "high" as const,
       operatingRegime: "plan" as const,
       goal: false,
+      preparedSessionId: "abf7864b-6bd5-4d77-9159-7d17ddbed879",
       attachment: { kind: "file" as const, file },
     };
     expect(welcome_message.stash("settings", message, storage)).toBe(true);
@@ -109,13 +114,82 @@ describe("welcome_message", () => {
       operatingRegime: "unknown",
     }),
     JSON.stringify({ text: "Ask", profileId: null, goal: "yes" }),
+    JSON.stringify({
+      text: "Ask",
+      profileId: null,
+      preparedSessionId: "not-a-session",
+    }),
     JSON.stringify({ text: "Ask", profileId: null, attachment: { token: 4 } }),
+    JSON.stringify({
+      text: "Ask",
+      profileId: null,
+      messageContext: { modelText: "Malformed", displayParts: [null] },
+    }),
+    JSON.stringify({
+      text: "",
+      profileId: null,
+      messageContext: workflowMessageContext([]),
+    }),
   ])("reads and removes a malformed entry as none (%s)", (raw) => {
     const storage = memoryStorage();
     storage.entries.set("grida.welcome.message.v1.workspace-a", raw);
     expect(welcome_message.peek("workspace-a", storage)).toBeNull();
-    expect(welcome_message.take("workspace-a", storage)).toBeNull();
+    expect(welcome_message.takeMessage("workspace-a", storage)).toBeNull();
     expect(storage.entries.size).toBe(0);
+  });
+
+  it.each([
+    "Use the prompt from 1.\nMatch the layout from 2.",
+    "<grida-desktop-context>My own markup</grida-desktop-context>",
+    "",
+  ])(
+    "stashes the complete workflow context beside authored text (%j)",
+    (text) => {
+      const storage = memoryStorage();
+      const messageContext = workflowMessageContext([
+        {
+          number: 1,
+          title: "Pet",
+          showcaseUrl: "https://grida.co/fx/workflows/pet",
+          sourceUrl: "https://github.com/gridaco/fx/tree/main/examples/pet",
+          templateId: "pet",
+        },
+        {
+          number: 2,
+          title: "Nine-slice UI kit",
+          showcaseUrl: "https://grida.co/fx/workflows/ui-kit",
+          sourceUrl: "https://github.com/gridaco/fx/tree/main/examples/ui-kit",
+        },
+      ]);
+      const message = { text, profileId: PROFILE, messageContext };
+
+      expect(welcome_message.stash("workflow", message, storage)).toBe(true);
+      expect(welcome_message.peek("workflow", storage)).toEqual(message);
+      expect(welcome_message.takeMessage("workflow", storage)).toEqual(message);
+      expect(welcome_message.takeMessage("workflow", storage)).toBeNull();
+      expect(messageContext.modelText).toContain(
+        '<reference number="1" title="Pet"'
+      );
+      expect(messageContext.modelText).toContain(
+        '<reference number="2" title="Nine-slice UI kit"'
+      );
+    }
+  );
+
+  it("restores a template-only request with an empty authored message", () => {
+    const storage = memoryStorage();
+    const message = {
+      text: "",
+      profileId: null,
+      messageContext: slidesTemplateMessageContext({
+        title: "Startup Pitch",
+        slides: 12,
+        path: "startup-pitch 2.canvas",
+      }),
+    };
+    expect(welcome_message.stash("slides", message, storage)).toBe(true);
+    expect(welcome_message.takeMessage("slides", storage)).toEqual(message);
+    expect(welcome_message.takeMessage("slides", storage)).toBeNull();
   });
 
   describe("compose", () => {
@@ -124,26 +198,6 @@ describe("welcome_message", () => {
         "Make a poster"
       );
       expect(welcome_message.compose({ text: "   " })).toBeNull();
-    });
-
-    it("names the template copy the chat should edit", () => {
-      const template = {
-        title: "Startup Pitch",
-        slides: 12,
-        path: "startup-pitch 2.canvas",
-      };
-      expect(
-        welcome_message.compose({
-          text: "A pitch for a bakery",
-          template,
-          references: [{ title: "Ignored", url: "https://example.test/a" }],
-        })
-      ).toBe(
-        'A pitch for a bakery\n\nTemplate: "Startup Pitch" (12 slides), copied to `startup-pitch 2.canvas`. Edit that deck and keep its visual system.'
-      );
-      expect(welcome_message.compose({ text: "", template })).toMatch(
-        /^Adapt the "Startup Pitch" slides template\.\n\nTemplate:/
-      );
     });
 
     it("lists references after the ask", () => {

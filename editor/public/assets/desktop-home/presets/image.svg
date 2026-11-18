@@ -1,17 +1,85 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" preserveAspectRatio="xMidYMid slice">
+<svg xmlns="http://www.w3.org/2000/svg" id="still" viewBox="0 0 320 180">
+  <title>Three prints fanned out with a botanical cyanotype in front</title>
   <defs>
-    <linearGradient id="ap-art-image" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#3f3b5e" />
-      <stop offset="1" stop-color="#6c6690" />
+    <radialGradient id="backdrop" cx="46%" cy="38%" r="75%">
+      <stop stop-color="#2c2c30" />
+      <stop offset="1" stop-color="#111113" />
+    </radialGradient>
+    <rect id="paper" x="101" y="27" width="118" height="126" rx="2" fill="#f8f5e9" stroke="#232b42" stroke-opacity=".1" />
+    <clipPath id="print"><rect x="108" y="34" width="104" height="104" /></clipPath>
+    <linearGradient id="blue" x2=".8" y2="1">
+      <stop stop-color="#4761ce" />
+      <stop offset="1" stop-color="#172c76" />
     </linearGradient>
-    <clipPath id="ap-art-image-clip">
-      <rect x="94" y="48" width="132" height="84" rx="14" />
-    </clipPath>
+    <path id="leaf" d="M0 0C-8-1-15-6-19-16-9-14-2-8 0 0Z" />
+    <g id="frond">
+      <path d="M0 1Q2-34 0-69" fill="none" stroke="currentColor" stroke-width="1.4" />
+      <use href="#leaf" y="-9" />
+      <use href="#leaf" transform="translate(1 -16) scale(-.98 .98)" />
+      <use href="#leaf" transform="translate(1 -24) scale(.9)" />
+      <use href="#leaf" transform="translate(1 -31) scale(-.8 .8)" />
+      <use href="#leaf" transform="translate(1 -38) scale(.72)" />
+      <use href="#leaf" transform="translate(1 -45) scale(-.59 .63)" />
+      <use href="#leaf" transform="translate(1 -51) scale(.5)" />
+      <use href="#leaf" transform="translate(.6 -57) scale(-.37 .43)" />
+      <path d="M0-63Q-4-70 0-77q4 8 0 14Z" />
+    </g>
   </defs>
-  <rect width="320" height="180" fill="url(#ap-art-image)" />
-  <rect x="94" y="48" width="132" height="84" rx="14" fill="#f3f0ea" />
-  <g clip-path="url(#ap-art-image-clip)">
-    <circle cx="126" cy="76" r="12" fill="#d6b183" />
-    <path d="M94 132 L138 96 L166 116 L200 88 L226 132 Z" fill="#ada6c6" />
+  <style>
+    .landscape {
+      --stacked: translate(-5px, 2px) rotate(-4deg);
+      --overshoot: translate(-33px, 1px) rotate(-20deg);
+      --open: translate(-27px, 4px) rotate(-16deg);
+    }
+    .cyanotype {
+      --stacked: translate(4px, 2px) rotate(3deg);
+      --overshoot: translate(31px, -2px) rotate(17deg);
+      --open: translate(24px, 2px) rotate(13deg);
+      --delay: 80ms;
+    }
+    .print {
+      transform-origin: 160px 150px;
+      transform: var(--open);
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      #still:not(:target) .print {
+        animation: fan 4.8s cubic-bezier(.22, .78, .24, 1) var(--delay, 0ms) infinite both;
+      }
+    }
+    @keyframes fan {
+      0%, 3% { transform: var(--stacked); }
+      8% { transform: var(--overshoot); }
+      12%, 81% { transform: var(--open); }
+      88%, 100% { transform: var(--stacked); }
+    }
+  </style>
+  <rect width="320" height="180" fill="url(#backdrop)" />
+  <g class="print landscape">
+    <use href="#paper" />
+    <g clip-path="url(#print)">
+      <rect x="108" y="34" width="104" height="104" fill="#efaa92" />
+      <circle cx="132" cy="64" r="12" fill="#fff1ce" />
+      <path d="M108 112q26-50 55-36t49-15v77H108Z" fill="#ca735e" />
+      <path d="M108 119q34-13 62-11t42-15v45H108Z" fill="#924e49" />
+    </g>
+  </g>
+  <g transform="translate(-2 -6) rotate(-2 160 150)">
+    <use href="#paper" />
+    <g clip-path="url(#print)">
+      <rect x="108" y="34" width="104" height="104" fill="#eabc55" />
+      <path d="M99 126c66-2 60-83 32-73-25 9-3 70 70 34" fill="none" stroke="#916133" stroke-width="11" />
+      <path d="M99 122c66-2 60-83 32-73-25 9-3 70 70 34" fill="none" stroke="#ffedb8" stroke-width="11" />
+    </g>
+  </g>
+  <g class="print cyanotype">
+    <use href="#paper" />
+    <g clip-path="url(#print)">
+      <rect x="108" y="34" width="104" height="104" fill="url(#blue)" />
+      <g opacity=".88" color="#e4f0eb" fill="currentColor">
+        <use href="#frond" transform="translate(154 145) rotate(-30) scale(1.06)" />
+        <use href="#frond" transform="translate(154 145) rotate(10) scale(1.36)" />
+        <use href="#frond" transform="translate(155 144) rotate(46) scale(.87)" />
+      </g>
+    </g>
   </g>
 </svg>

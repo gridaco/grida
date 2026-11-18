@@ -17,6 +17,12 @@ export type BrowserAutomationResult = Readonly<{
   image?: { mimeType: "image/jpeg"; base64: string };
 }>;
 
+export type ObservedWorkbenchDocument = Readonly<{
+  id: string;
+  value: unknown;
+  current(): boolean;
+}>;
+
 type Host = Pick<
   DesktopBrowserHost,
   "openAutomationPage" | "resolveAutomationPage" | "revokeAutomation"
@@ -34,6 +40,65 @@ export class BrowserAutomation {
   #inputReady: Promise<unknown> = Promise.resolve();
 
   constructor(readonly host: Host) {}
+
+  /** Internal Main observation using the same debugger and document owner as tools. */
+  async observeWorkbenchDocument(
+    page: BrowserAutomationPage,
+    url: string,
+    functionText: string,
+    signal: AbortSignal
+  ): Promise<ObservedWorkbenchDocument | null> {
+    if (page.target.kind !== "workbench") return null;
+    try {
+      const contents = page.contents();
+      if (!contents) return null;
+      const request = new Request(
+        () => {
+          if (
+            !page.current() ||
+            page.contents() !== contents ||
+            contents.isDestroyed() ||
+            contents.getURL() !== url
+          )
+            fail("stale_document");
+        },
+        signal,
+        1500
+      );
+      request.guard();
+      const guest = this.#guest(contents, false);
+      await guest.attach(request);
+      const document = await this.#document(guest, request);
+      if (document.frame.url !== url) return null;
+      const value = await this.#evaluate(
+        guest,
+        request,
+        document,
+        functionText,
+        null,
+        750
+      );
+      const current = () => {
+        try {
+          if (
+            signal.aborted ||
+            !page.current() ||
+            page.contents() !== contents ||
+            contents.isDestroyed() ||
+            contents.getURL() !== url
+          )
+            return false;
+          guest.assertDocument(document);
+          return true;
+        } catch {
+          return false;
+        }
+      };
+      return current() ? { id: document.id, value, current } : null;
+    } catch {
+      return null;
+    }
+  }
 
   closeScope(scopeId: string): void {
     const state = this.#scopes.get(scopeId);
@@ -270,36 +335,51 @@ export class BrowserAutomation {
           request.dispatch();
           request.markAutomation(page);
           try {
-            const arg = JSON.stringify(JSON.stringify(operation.arg));
-            const script = `(async () => {
-            const value = await (${operation.functionText}\n)(JSON.parse(${arg}));
-            const json = JSON.stringify(value);
-            if (typeof json !== "string") return { serialized: false };
-            if (json.length > 65536) return { oversized: true };
-            return { json };
-          })()`;
-            const reply = await guest.evaluate<{
-              json?: string;
-              oversized?: boolean;
-            }>(request, document.frame, script, operation.timeoutMs);
-            if (reply.exceptionDetails) fail("evaluation_failed");
-            const result = reply.result.value;
-            if (
-              result?.oversized ||
-              (result?.json !== undefined &&
-                Buffer.byteLength(result.json) > 65536)
-            )
-              fail("output_limit");
-            if (result?.json === undefined) fail("result_not_serializable");
-            guest.assertDocument(document);
+            const value = await this.#evaluate(
+              guest,
+              request,
+              document,
+              operation.functionText,
+              operation.arg,
+              operation.timeoutMs
+            );
             return {
-              data: { documentId: document.id, value: JSON.parse(result.json) },
+              data: { documentId: document.id, value },
             };
           } finally {
             request.releaseAutomation();
           }
         });
     }
+  }
+
+  async #evaluate(
+    guest: Guest,
+    request: Request,
+    document: Guest.Document,
+    functionText: string,
+    arg: unknown,
+    timeoutMs: number
+  ): Promise<unknown> {
+    const input = JSON.stringify(JSON.stringify(arg));
+    const script = `(async () => {
+      const value = await (${functionText}\n)(JSON.parse(${input}));
+      const json = JSON.stringify(value);
+      if (typeof json !== "string") return { serialized: false };
+      if (json.length > 65536) return { oversized: true };
+      return { json };
+    })()`;
+    const reply = await guest.evaluate<{
+      json?: string;
+      oversized?: boolean;
+    }>(request, document.frame, script, timeoutMs);
+    if (reply.exceptionDetails) fail("evaluation_failed");
+    const result = reply.result.value;
+    if (result?.oversized) fail("output_limit");
+    if (typeof result?.json !== "string") fail("result_not_serializable");
+    if (Buffer.byteLength(result.json) > 65536) fail("output_limit");
+    guest.assertDocument(document);
+    return JSON.parse(result.json) as unknown;
   }
 
   #scope(scope: BrowserAutomationScope): ScopeState {

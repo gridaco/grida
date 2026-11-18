@@ -71,6 +71,7 @@ import type {
   WorkspaceReadFileResult,
   WorkspaceWriteFileResult,
 } from "@grida/desktop-bridge";
+import { WorkspaceHistory } from "./workspace-history";
 import {
   DESKTOP_BRIDGE_PROTOCOL,
   DESKTOP_HOST_APP_IDS,
@@ -842,22 +843,65 @@ export namespace app {
 
 /* ────────────────────────── nav namespace ────────────────── */
 
-/**
- * Imperative wrappers around `bridge.window.navigation.{back,forward}`.
- * Kept in a namespace so the TitleBar's button handlers don't reach
- * into `getDesktopBridge()` directly — same convention as the other
- * namespaces in this file.
- *
- * Reactive state (used by the buttons' disabled flag) comes from the
- * `useNavigationState()` hook in `bridge-react.ts`; the hook owns the
- * subscription bookkeeping so callers don't have to.
- */
+/** Window navigation, with exact same-document steps for the workbench. */
 export namespace nav {
-  export async function back(): Promise<void> {
-    await bridgeOrThrow().window.navigation.back();
+  export type Scope = "window" | "workspace";
+
+  export function observe(
+    scope: Scope,
+    onChange: (state: NavigationState) => void
+  ): (() => void) | undefined {
+    const native = getDesktopBridge()?.window.navigation;
+    if (!native) return;
+    const history = scope === "workspace" ? window.navigation : undefined;
+    let latest: NavigationState | undefined;
+    let observing = true;
+    const publish = () => {
+      if (!observing || !latest) return;
+      onChange(
+        history
+          ? WorkspaceHistory.project(history, window.location.origin, latest)
+          : latest
+      );
+    };
+    const unsubscribe = native.subscribe((state) => {
+      latest = state;
+      publish();
+    });
+    history?.addEventListener("currententrychange", publish);
+    void native
+      .state()
+      .then((state) => {
+        latest ??= state;
+        publish();
+      })
+      .catch(() => {});
+    return () => {
+      observing = false;
+      unsubscribe();
+      history?.removeEventListener("currententrychange", publish);
+    };
   }
-  export async function forward(): Promise<void> {
-    await bridgeOrThrow().window.navigation.forward();
+
+  export async function go(
+    direction: "back" | "forward",
+    scope: Scope
+  ): Promise<void> {
+    const native = bridgeOrThrow().window.navigation;
+    const history = scope === "workspace" ? window.navigation : undefined;
+    const target =
+      history &&
+      WorkspaceHistory.target(
+        history,
+        window.location.origin,
+        direction === "back" ? -1 : 1
+      );
+    if (history && target) {
+      const { committed, finished } = history.traverseTo(target.key);
+      await Promise.all([committed, finished]).catch(() => {});
+      return;
+    }
+    await native[direction]();
   }
 }
 

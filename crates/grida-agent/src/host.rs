@@ -10,6 +10,7 @@ pub(crate) mod compaction;
 mod completion_checks;
 mod delegation;
 pub(crate) mod deletion;
+pub(crate) mod editor_observation;
 mod file_references;
 mod goals;
 mod history;
@@ -24,6 +25,7 @@ pub(crate) mod library;
 mod lifecycle;
 mod lifecycle_hooks;
 pub(crate) mod live;
+pub(crate) mod message_context;
 pub(crate) mod model_change;
 mod permissions;
 mod questions;
@@ -47,6 +49,7 @@ pub(crate) use catalog::is_archived;
 pub use compaction::{CompactRequest, CompactionReport, CompactionStatus};
 pub use goals::{GoalAction, GoalControl, GoalInspection, GoalRequest, GoalView};
 pub(crate) use history::RevisionTarget;
+pub(crate) use history::TranscriptInputFacts;
 pub use history::{ConversationDerivation, HistoryPage, HistoryQuery};
 pub(crate) use image_tools::{CropArtifact, CropArtifacts};
 #[cfg(any(target_os = "macos", target_os = "linux"))]
@@ -107,10 +110,12 @@ use agent_kit_sessions::{
 };
 use agent_kit_store_sqlite::turn_links::TurnLinkCursor;
 use agent_kit_store_sqlite::{OperationPairReceipt, SqliteStore};
+pub use editor_observation::EditorObservation;
 use grida_agent_master::configuration::SettingChange;
 use grida_agent_master::effort::Policy as EffortPolicy;
 use grida_agent_master::hooks::CompletionChecks;
 use grida_agent_master::{Master, MasterAuthority, MasterConfig, MasterOutcome, OperatingRegime};
+pub use message_context::MessageContext;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::num::NonZeroU64;
@@ -341,6 +346,12 @@ impl Drop for WorkerLifetime {
 pub enum PromptPart {
     Text {
         text: String,
+    },
+    EditorObservation {
+        observation: EditorObservation,
+    },
+    MessageContext {
+        context: MessageContext,
     },
     ResourceLink {
         name: String,
@@ -2555,7 +2566,12 @@ impl Host {
         let guidance = if child_work {
             None
         } else {
-            skills::capture_guidance(self.guidance_scope(session)?, &parts).await?
+            skills::capture_guidance(
+                self.guidance_scope(session)?,
+                &parts,
+                self.optional_bundled_skills(),
+            )
+            .await?
         };
         // A turn with workspace tools lists the skills it may read and follow
         // on its own. Funded Goal work keeps its reviewed tool scope.
@@ -2566,7 +2582,13 @@ impl Host {
         {
             None
         } else {
-            Some(skills::capture_listing(self.guidance_scope(session)?).await?)
+            Some(
+                skills::capture_listing(
+                    self.guidance_scope(session)?,
+                    self.optional_bundled_skills(),
+                )
+                .await?,
+            )
         };
         let parts = if parts.iter().any(|part| {
             matches!(
@@ -3381,10 +3403,7 @@ impl Host {
         if editor_endpoint.is_some()
             && (!policy.operating_regime.is_act()
                 || !self.supports_editor_tools()
-                || !request
-                    .parts
-                    .iter()
-                    .all(|part| matches!(part, PromptPart::Text { .. })))
+                || !request.parts.iter().all(editor_observation::is_editor_text))
         {
             return Err(problem(
                 ErrorKind::Unsupported,
@@ -4342,6 +4361,8 @@ fn validate_prompt_record(parts: &[PromptPart]) -> Result<()> {
     if parts.is_empty() || parts.len() > MAX_PROMPT_PARTS {
         return Err(problem(ErrorKind::InvalidInput, "invalid_prompt_parts"));
     }
+    editor_observation::validate_parts(parts)?;
+    message_context::validate_parts(parts)?;
     let metadata: Vec<_> = parts
         .iter()
         .filter(|part| {
@@ -4361,13 +4382,33 @@ fn validate_prompt_record(parts: &[PromptPart]) -> Result<()> {
     Ok(())
 }
 
+fn prompt_message_id(id: &ChangeId) -> Result<MessageId> {
+    MessageId::new(format!(
+        "{}/{:x}",
+        grida_agent_master::conversation_seed::AUTHORED_INPUT_PREFIX,
+        uuid::Uuid::from_bytes(
+            Fingerprint::of(id)?.bytes()[..16]
+                .try_into()
+                .expect("fingerprint prefix"),
+        )
+    ))
+}
+
 fn prompt_input(id: &ChangeId, parts: &[PromptPart]) -> Result<Vec<Message>> {
     validate_prompt_record(parts)?;
     let content = parts
         .iter()
+        .filter(|part| {
+            !matches!(
+                part,
+                PromptPart::EditorObservation { .. } | PromptPart::MessageContext { .. }
+            )
+        })
         .map(|part| {
             Ok(match part {
                 PromptPart::Text { text } => Content::Text(text.clone()),
+                PromptPart::EditorObservation { .. } => unreachable!("separate observation"),
+                PromptPart::MessageContext { .. } => unreachable!("separate context contribution"),
                 reference @ PromptPart::ResourceLink { .. } => {
                     // A reference is context supplied by the user. It is neither
                     // imported nor granted filesystem or network authority here.
@@ -4399,24 +4440,30 @@ fn prompt_input(id: &ChangeId, parts: &[PromptPart]) -> Result<Vec<Message>> {
             })
         })
         .collect::<Result<Vec<_>>>()?;
-    Ok(vec![Message {
-        id: MessageId::new(format!(
-            "input/{:x}",
-            uuid::Uuid::from_bytes(
-                Fingerprint::of(id)?.bytes()[..16]
-                    .try_into()
-                    .expect("fingerprint prefix"),
-            )
-        ))?,
+    let supplied_context = message_context::context(parts);
+    let mut messages = vec![Message {
+        id: prompt_message_id(id)?,
         role: Role::User,
         phase: None,
         content,
         provenance: Provenance {
-            source: "native-client".into(),
+            source: supplied_context
+                .map_or("native-client", |_| message_context::SUPPLIED_SOURCE)
+                .into(),
             kind: ProvenanceKind::Supplied,
             fingerprint: None,
         },
-    }])
+    }];
+    if let Some(context) = supplied_context {
+        messages.push(context.model_message(&messages[0].id)?);
+    }
+    if let Some(observation) = parts.iter().find_map(|part| match part {
+        PromptPart::EditorObservation { observation } => Some(observation),
+        _ => None,
+    }) {
+        messages.push(observation.message(id)?);
+    }
+    Ok(messages)
 }
 
 fn session_configuration(view: &SessionView) -> Result<SessionConfiguration> {

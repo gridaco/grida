@@ -19,6 +19,16 @@ export namespace LibraryStorage {
     "image/avif": "avif",
   };
 
+  function supabaseBaseUrl(): string | undefined {
+    const origin = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (origin)
+      return `${origin.replace(/\/$/, "")}/storage/v1/object/public/library`;
+  }
+
+  function isLoopback(url: URL): boolean {
+    return ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname);
+  }
+
   export function extension(mimetype: string): string | null {
     return extensions[mimetype] ?? null;
   }
@@ -42,17 +52,17 @@ export namespace LibraryStorage {
 
   export function baseUrl(): string {
     if (provider() === "supabase") {
-      const origin = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      if (!origin) throw new Error("Missing Supabase URL for Library storage");
-      return `${origin.replace(/\/$/, "")}/storage/v1/object/public/library`;
+      const base = supabaseBaseUrl();
+      if (!base) throw new Error("Missing Supabase URL for Library storage");
+      return base;
     }
     const configured =
       process.env.NEXT_PUBLIC_GRIDA_LIBRARY_ASSET_ORIGIN ??
       "https://library.grida.co";
     const url = new URL(configured);
-    const local = ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname);
     if (
-      (url.protocol !== "https:" && !(local && url.protocol === "http:")) ||
+      (url.protocol !== "https:" &&
+        !(isLoopback(url) && url.protocol === "http:")) ||
       url.username ||
       url.password ||
       url.search ||
@@ -74,6 +84,40 @@ export namespace LibraryStorage {
         ? key(asset.sha256 ?? "", asset.mimetype)
         : asset.path.split("/").map(encodeURIComponent).join("/");
     return `${baseUrl()}/${path}`;
+  }
+
+  /** Public byte URLs that can be rendered from a saved Library reference. */
+  export function isPublicAssetUrl(value: string): boolean {
+    try {
+      const url = new URL(value);
+      if (
+        (url.protocol !== "https:" &&
+          !(isLoopback(url) && url.protocol === "http:")) ||
+        url.username ||
+        url.password ||
+        /[?#\\]/.test(value) ||
+        /%(?:2f|5c)/i.test(url.pathname)
+      )
+        return false;
+
+      const supabase = supabaseBaseUrl();
+      if (supabase) {
+        const base = new URL(supabase);
+        const prefix = `${base.pathname}/`;
+        if (
+          url.origin === base.origin &&
+          url.pathname.startsWith(prefix) &&
+          url.pathname.length > prefix.length
+        )
+          return true;
+      }
+
+      if (provider() !== "tigris" || url.origin !== origin()) return false;
+      const match = /^\/[a-f0-9]{64}\.([a-z]+)$/.exec(url.pathname);
+      return !!match && Object.values(extensions).includes(match[1]);
+    } catch {
+      return false;
+    }
   }
 
   export function download(asset: Asset): string {

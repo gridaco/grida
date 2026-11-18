@@ -893,7 +893,7 @@ authority with accepted input and worker assignments; inspection, replay and
 reopening do not change it. Saved Full access is unavailable when the current
 trusted launch does not authorize it.
 
-Desktop presents an in-app confirmation bound to the attached chat before
+Desktop presents an in-app confirmation bound to the exact chat before
 enabling Full access. Clients must feature-detect the capability; older hosts
 retain their restricted contract. Permission selection is independent of
 model/effort defaults and starts no provider call.
@@ -1086,8 +1086,8 @@ An identified Submit or Enqueue then carries `editorEndpointId`, the opaque
 UUID of the Desktop editor endpoint that owns the workspace view, and may set
 `editorPresentation: true` when the open capability is negotiated. The input
 retains that binding, including while it waits in the queue, and the turn's
-editor tools target only that endpoint. Both operations apply the same
-checks: Act, text-only prompt, and the negotiated capabilities.
+editor tools target only that endpoint. Both operations require Act, a text
+prompt with optional editor context, and the negotiated capabilities.
 
 | Direction      | Method                               | Parameters and result                                                                                                                                                                   |
 | -------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1120,6 +1120,13 @@ An Act text submission or queued input may carry `editorSvgTargetId` with its
 workspace SVG selection. The input retains the original capture on retry.
 Check-ins have no SVG target.
 
+In bounded transcript replay, the exact local user text message may carry
+`svgTextSelection: true` in `_meta["co.grida/session/transcript-window"]`.
+This indicates that the accepted input included that binding, even if the
+selection has since changed or the editor closed. It reveals no target ID,
+path, or text and carries no authority. Ordinary messages and inherited
+history omit the field. Older hosts can omit it for any message.
+
 The reverse `_co.grida/editor/svg-selected-text` request carries the exact
 `sessionId`, `endpointId`, `targetId`, `callId`, and `expiresAtMs`, with a
 `read` or `replace` operation. Replacement requires the opaque revision from
@@ -1127,6 +1134,52 @@ read and at most 4 KiB of valid SVG text. A verified response echoes the four
 identities and carries `result`. Applied and unchanged replacement results
 report `saved: false`. Unavailable or stale targets supply a domain failure.
 Malformed, lost, or uncorrelated replies leave the tool outcome uncertain.
+
+The private supervisor and agent can negotiate
+`co.grida/session/editor-context` version 1. Submit and Enqueue may then
+include `editorContext` with a `kind`, `surface`, `sampledAt` in epoch
+milliseconds, and an object `payload` validated by the supervisor. The two
+identifiers use lowercase ASCII letters, digits and hyphens with a leading
+letter and a 64-byte limit. The observation has an 8 KiB encoded limit and
+bounded JSON nesting. It accompanies nonblank user text and carries no tool
+authority. A context part does not extend an editor or browser lease.
+
+The host retains the observation with the input and labels it as observed
+data for inference. Identified retries compare the original observation and
+sample time. Queue text edits retain them and require the edited text to
+remain nonblank. Transcript and queue projections name the observation
+without reproducing its payload as user prose. Omit the field if the agent
+does not negotiate it.
+
+### Supplemental message context
+
+On private supervising stdio, negotiate `co.grida/session/message-context`
+version 1. Submit, Enqueue, and Goal Start accept the optional named
+`messageContext` field alongside the ACP prompt. It contains nonblank
+`modelText` and an ordered `displayParts` array of up to sixteen entries.
+Each entry has a `kind` of up to 64 lowercase ASCII letters, digits, dots or
+hyphens starting with a letter, an integer `version` from 1 to 65535, and a JSON
+object `data` with nesting bounded to eight levels. The encoded context is
+limited to 16 KiB. The host leaves each presentation payload opaque.
+
+The model receives the supplemental text as a separate observed user-role
+record. The authored input retains its identity and supplied provenance.
+Lifecycle `before_input` checks run once for the accepted authored message.
+The supplemental record grants no tool authority. When no authored text or ordinary
+resource is provided, at least one display part is required. A context-only
+submit uses an empty ACP `prompt` array. Exact retries compare the accepted
+context, and queue text edits retain it.
+
+For negotiated clients, `input` and `queued-message` return `displayParts`
+outside their ACP `prompt` blocks. In bounded replay the first user text
+chunk of its exact accepted local message carries `displayParts` in
+`_meta["co.grida/session/transcript-window"]`. A display-only user message
+has one empty text chunk. The user text contains authored content, and the
+supplemental model text stays out of the transcript. Derived chat history
+carries the portable inference material and authored prose, with display
+metadata scoped to the original accepted message. A fork through the authored
+message retains its associated observations, including when the authored input
+contains only display parts.
 
 The private Desktop supervisor can negotiate `co.grida/media/generate-image`
 version 1 for a captured saved BYOK image route. Ordinary Act work can offer

@@ -30,6 +30,7 @@ import {
   Suspense,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -37,6 +38,7 @@ import {
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { XIcon } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@app/ui/lib/utils";
 import {
   getDesktopBridge,
@@ -45,9 +47,12 @@ import {
   type Workspace,
 } from "@/lib/desktop/bridge";
 import { welcome_message } from "@/lib/desktop/welcome-message";
+import { imagesMessageContext } from "@/lib/desktop/images-message-context";
+import { workflowMessageContext } from "@/lib/desktop/workflow-message-context";
 import { dotcanvas } from "dotcanvas";
 import { TitleBar } from "@/scaffolds/desktop/chrome/title-bar";
 import { AgentComposer } from "@/scaffolds/desktop/shared/agent-composer";
+import { AgentPermissionConfirmation } from "@/scaffolds/desktop/shared/agent-permission-confirmation";
 import { HomeComposer } from "@/scaffolds/desktop/home/home-composer";
 import { NativeAttachmentCard } from "@/scaffolds/desktop/workbench/native-attachment-card";
 import { useWorkspaceFileMentions } from "@/scaffolds/desktop/shared/use-workspace-file-mentions";
@@ -64,6 +69,14 @@ import {
 import { workspaceWorkbenchHref } from "@/scaffolds/desktop/workbench/workspace-workbench-url";
 import { resolveLibraryExplorerPage } from "@/scaffolds/desktop/shared/design-search";
 import { SlidesTemplateGallery } from "@/scaffolds/desktop/home/slides-template-gallery";
+import {
+  WorkflowGallery,
+  WorkflowReferenceTray,
+} from "@/scaffolds/desktop/home/workflow-gallery";
+import {
+  workflowShowcaseUrl,
+  type WorkflowShowcase,
+} from "@/scaffolds/desktop/home/workflow-showcases";
 // `import type` is erased at build — it does NOT pull the loader (and its
 // fflate/dotcanvas deps) into the home chunk; the gallery's dynamic `import()`
 // stays the sole code-split boundary. The home only holds the picked template
@@ -112,27 +125,47 @@ function DesktopWelcomeRoute() {
         openFolder: workspacesNs.openFolder,
         readdir: workspacesNs.readdir,
       })
+      .catch((err) => {
+        if (!cancelled) {
+          console.warn("[welcome] couldn't restore last workspace:", err);
+        }
+        return null;
+      })
       .then((target) => {
         if (cancelled) return;
         if (target) {
           router.replace(last_workspace.href(target));
           return;
         }
+        // The startup directive is spent. Back and reload should stay on Home.
+        const url = new URL(window.location.href);
+        url.searchParams.delete("startup");
+        window.history.replaceState(null, "", url);
         setChecking(false);
-      })
-      .catch((err) => {
-        console.warn("[welcome] couldn't restore last workspace:", err);
-        if (!cancelled) setChecking(false);
       });
     return () => {
       cancelled = true;
     };
   }, [router, shouldRestore]);
 
+  function selectPreset(next: ApplicationPresetId) {
+    const url = new URL(window.location.href);
+    if (ApplicationPreset.fromParam(url.searchParams.get("preset")) === next) {
+      return;
+    }
+    if (next === ApplicationPreset.DEFAULT) url.searchParams.delete("preset");
+    else url.searchParams.set("preset", next);
+    window.history.pushState(null, "", url);
+  }
+
   return checking ? (
     <StartupRestoreScreen />
   ) : (
-    <WelcomeSurface initialWorkspaceId={onboardingWorkspaceId} />
+    <WelcomeSurface
+      initialWorkspaceId={onboardingWorkspaceId}
+      preset={ApplicationPreset.fromParam(params.get("preset"))}
+      onPresetChange={selectPreset}
+    />
   );
 }
 
@@ -149,8 +182,12 @@ function StartupRestoreScreen() {
 
 function WelcomeSurface({
   initialWorkspaceId,
+  preset,
+  onPresetChange,
 }: {
   initialWorkspaceId: string | null;
+  preset: ApplicationPresetId;
+  onPresetChange: (preset: ApplicationPresetId) => void;
 }) {
   const router = useRouter();
   const bridge = useDesktopBridge();
@@ -162,21 +199,38 @@ function WelcomeSurface({
   );
   useEffect(() => {
     void composer.restore();
+    return composer.resetPermissionMode;
   }, [composer]);
+  useEffect(() => {
+    if (staged.permissionError) toast.error(staged.permissionError);
+  }, [staged.permissionError]);
   const filePicker = useRef<HTMLInputElement>(null);
   const imagePicker = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLDivElement>(null);
+  const galleryMotionRef = useRef<HTMLDivElement>(null);
   // The home's single page-scroll container — everything (composer, gallery)
   // scrolls together inside it; the gallery virtualizes against it.
   const scrollRef = useRef<HTMLDivElement>(null);
   const libraryRef = useRef<LibraryExplorerViewHandle>(null);
   const [openingFolder, setBusy] = useState(false);
-  const busy = openingFolder || staged.busy;
-  const [error, setError] = useState<string | null>(null);
-  // Presets supply explicit user intent and select the surrounding gallery.
-  const [preset, setPreset] = useState<ApplicationPresetId>(
-    ApplicationPreset.DEFAULT
-  );
+  const busy = openingFolder || staged.busy || staged.permissionBusy;
+  const {
+    prepareWelcomeFullAccess,
+    answerWelcomeFullAccess,
+    startWelcomeFullAccess,
+  } = bridge?.nativeChat ?? {};
+  const fullAccess =
+    prepareWelcomeFullAccess &&
+    answerWelcomeFullAccess &&
+    startWelcomeFullAccess
+      ? {
+          prepare: prepareWelcomeFullAccess,
+          answer: answerWelcomeFullAccess,
+          start: startWelcomeFullAccess,
+        }
+      : undefined;
+  const showWorkflows = preset === "workflows";
+  const showImages = preset === "image";
   const presetSpec = ApplicationPreset.byId(preset);
   const PresetIcon = presetSpec.icon;
   // Recent-projects quick switcher (⌃R, VS Code's "Open Recent"). Keeps the
@@ -185,6 +239,10 @@ function WelcomeSurface({
   // Null targets the managed default workspace; an explicit choice is honored
   // for text, references and templates alike.
   const [target, setTarget] = useState<Workspace | null>(null);
+  useEffect(
+    () => composer.resetPermissionMode(),
+    [composer, preset, target?.id]
+  );
   const composerDraft = useMemo(
     () => composer.draftFor(target?.id ?? "default"),
     [composer, target?.id]
@@ -219,6 +277,18 @@ function WelcomeSurface({
     () => new Set(pickedRefs.map((p) => p.id)),
     [pickedRefs]
   );
+  const [workflowSelection, setWorkflowSelection] = useState<
+    readonly WorkflowShowcase[]
+  >([]);
+  const workflowPicks = useMemo(
+    () =>
+      workflowSelection.map((showcase, index) => ({
+        showcase,
+        number: index + 1,
+      })),
+    [workflowSelection]
+  );
+  const selectedWorkflows = showWorkflows ? workflowPicks : undefined;
   // The slides template the user picked from the gallery — single-select (you
   // start from ONE template, like choosing a Keynote theme). Null = none. It's
   // an attachment-style reference, NOT an instant start: the composer send seeds
@@ -242,6 +312,24 @@ function WelcomeSurface({
   const [docked, setDocked] = useState(false);
   const [heroHeight, setHeroHeight] = useState<number>();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+
+  const previousPreset = useRef(preset);
+  useLayoutEffect(() => {
+    if (previousPreset.current === preset) return;
+    previousPreset.current = preset;
+    scrollRef.current?.scrollTo({ top: 0, behavior: "instant" });
+    setDocked(false);
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const animation = galleryMotionRef.current?.animate(
+      [
+        { opacity: 0.35, transform: "translateX(12px)" },
+        { opacity: 1, transform: "translateX(0)" },
+      ],
+      { duration: 220, easing: "ease-out", fill: "backwards" }
+    );
+    return () => animation?.cancel();
+  }, [preset]);
 
   const refreshWorkspaces = useCallback(async () => {
     const bridge = getDesktopBridge();
@@ -288,17 +376,19 @@ function WelcomeSurface({
 
   // Track the composer's natural (in-flow) height so the spacer can reserve it
   // when the composer detaches to float — otherwise the flow collapses and the
-  // gallery jumps up by the composer's height at the dock moment. Measurements
-  // are frozen WHILE docked: the floating card has its own padding/border, and
-  // adopting its height would skew the spacer. When the composer re-enters the
-  // flow its size changes, so the observer fires again and re-measures.
+  // gallery jumps up by the composer's height at the dock moment. Freeze the
+  // in-flow spacer while docked, and keep measuring the floating composer so
+  // the Workflows gallery can scroll clear of it as the draft grows.
   const dockedRef = useRef(docked);
   dockedRef.current = docked;
   useEffect(() => {
     const el = composerRef.current;
     if (!el) return;
+    const scroller = scrollRef.current;
     const measure = () => {
-      if (!dockedRef.current) setHeroHeight(el.offsetHeight);
+      const height = el.offsetHeight;
+      if (!dockedRef.current) setHeroHeight(height);
+      scroller?.style.setProperty("--welcome-composer-height", `${height}px`);
     };
     const ro = new ResizeObserver(measure);
     ro.observe(el);
@@ -400,47 +490,78 @@ function WelcomeSurface({
   const start = useCallback(
     async (text: string) => {
       const template = pickedTemplate;
-      if (
-        (text.trim() ||
-          template ||
-          pickedRefs.length ||
-          composer.read().attachment) &&
-        !getDesktopBridge()?.nativeChat
-      ) {
-        setError("Chat isn't available in this version of Grida Desktop.");
-        throw new Error("Chat unavailable");
+      const references =
+        template || showWorkflows || showImages ? [] : pickedRefs;
+      const workflowReferences = selectedWorkflows?.map(
+        ({ number, showcase }) => ({
+          number,
+          title: showcase.title,
+          showcaseUrl: workflowShowcaseUrl(showcase.slug),
+          sourceUrl: `https://github.com/gridaco/fx/tree/main/examples/${showcase.sourceFolder}`,
+          templateId: showcase.templateId,
+          posterUrl: showcase.preview.image,
+        })
+      );
+      const messageContext = showWorkflows
+        ? workflowMessageContext(workflowReferences ?? [])
+        : showImages
+          ? imagesMessageContext(pickedRefs)
+          : undefined;
+      const hasRequest =
+        text.trim() ||
+        template ||
+        references.length ||
+        messageContext?.displayParts.length ||
+        composer.read().attachment;
+      if (hasRequest) {
+        const chat = getDesktopBridge()?.nativeChat;
+        if (!chat)
+          throw new Error(
+            "Chat isn't available in this version of Grida Desktop."
+          );
+        if ((template || messageContext) && !chat.submitMessage)
+          throw new Error(
+            "Update Grida Desktop to send this request. Your draft is still here."
+          );
       }
-      setError(null);
-      try {
-        await composer.submit(
-          {
-            text,
-            prompt: ApplicationPreset.prompt(preset, text),
-            profileId,
-            target,
-            references: template ? [] : pickedRefs,
-            ...(template && {
-              copyTemplate: async (workspaceId: string) => ({
+      await composer.submit(
+        {
+          text,
+          prompt: ApplicationPreset.prompt(preset, text),
+          profileId,
+          target,
+          references,
+          messageContext,
+          ...(template && {
+            template: {
+              name: template.name,
+              copy: async (workspaceId: string) => ({
                 title: template.title,
                 slides: template.pages.length,
                 path: await WorkspaceCanvasCreation.copy(workspaceId, template),
               }),
-            }),
-          },
-          {
-            defaultWorkspace: workspacesNs.getDefault,
-            stash: welcome_message.stash,
-            open: (workspace) => router.push(workspaceWorkbenchHref(workspace)),
-          }
-        );
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Couldn't start a session."
-        );
-        throw err;
-      }
+            },
+          }),
+        },
+        {
+          defaultWorkspace: workspacesNs.getDefault,
+          stash: welcome_message.stash,
+          open: (workspace) => router.push(workspaceWorkbenchHref(workspace)),
+        }
+      );
     },
-    [pickedTemplate, pickedRefs, target, profileId, router, composer, preset]
+    [
+      pickedTemplate,
+      pickedRefs,
+      selectedWorkflows,
+      showWorkflows,
+      showImages,
+      target,
+      profileId,
+      router,
+      composer,
+      preset,
+    ]
   );
 
   // A Library card's Add action toggles it in the composer's tray (multi-select)
@@ -451,6 +572,14 @@ function WelcomeSurface({
       cur.some((p) => p.id === pin.id)
         ? cur.filter((p) => p.id !== pin.id)
         : [...cur, pin]
+    );
+  }, []);
+
+  const toggleWorkflowReference = useCallback((showcase: WorkflowShowcase) => {
+    setWorkflowSelection((current) =>
+      current.some((pick) => pick.slug === showcase.slug)
+        ? current.filter((pick) => pick.slug !== showcase.slug)
+        : [...current, showcase]
     );
   }, []);
 
@@ -466,18 +595,17 @@ function WelcomeSurface({
   const onOpen = useCallback(async () => {
     const bridge = getDesktopBridge();
     if (!bridge) {
-      setError("Desktop bridge not available.");
+      toast.error("Desktop bridge not available.");
       return;
     }
     try {
       setBusy(true);
-      setError(null);
       const ws = await workspacesNs.chooseFolder();
       if (!ws) return;
       await refreshWorkspaces();
       setTarget(ws); // aim the composer at the just-opened project
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't open folder.");
+      toast.error(err instanceof Error ? err.message : "Couldn't open folder.");
     } finally {
       setBusy(false);
     }
@@ -500,18 +628,30 @@ function WelcomeSurface({
       // writing while browsing.
       className="flex h-svh w-full flex-col bg-background"
     >
+      <AgentPermissionConfirmation
+        review={staged.permissionReview}
+        onAnswer={composer.answerPermissionReview}
+      />
       {/* Bare drag region — Settings moved to the rail footer below. */}
       <TitleBar />
 
-      {/* Home-scoped icon rail + the shared home surface. The rail lives BELOW
-          the title bar (so it never collides with the macOS traffic lights) and
-          only mutates the active preset — it is not app-wide chrome. */}
       <div className="flex min-h-0 flex-1">
-        <PresetRail value={preset} onChange={setPreset} />
+        <PresetRail value={preset} onChange={onPresetChange} />
 
         {/* One page-scroll container — composer hero then gallery scroll
             together (no nested scroll); the gallery virtualizes against this. */}
-        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+        <div
+          ref={scrollRef}
+          className="min-h-0 flex-1 overflow-y-auto"
+          style={
+            showWorkflows && docked
+              ? {
+                  scrollPaddingBottom:
+                    "calc(var(--welcome-composer-height, 7rem) + 1rem)",
+                }
+              : undefined
+          }
+        >
           {/* Top-left workspace picker — where a start lands (the managed
               ~/Documents/Grida Projects root by default, shown as "Default workspace")
               or which existing project to aim at. Borderless + friendly;
@@ -524,7 +664,19 @@ function WelcomeSurface({
               onOpenFolder={onOpen}
             />
           </div>
-          <div className="mx-auto flex w-full max-w-5xl flex-col gap-16 px-6 pb-10">
+          <div
+            className="mx-auto flex w-full max-w-5xl flex-col gap-16 px-6 pb-10"
+            // Reserve room before docking so the end of the scroll range
+            // already clears the composer on the scroll that docks it.
+            style={
+              showWorkflows
+                ? {
+                    paddingBottom:
+                      "calc(var(--welcome-composer-height, 7rem) + 2.5rem)",
+                  }
+                : undefined
+            }
+          >
             {/* Composer hero — a generous top offset drops the input to roughly
               mid-screen, but the space below stays tight so the gallery sits
               close beneath it (not an even top/bottom split) and peeks in to
@@ -596,7 +748,7 @@ function WelcomeSurface({
                   composer's own send. When docked the row floats above the input
                   in the same stack — same design language, lifted by shadow, not
                   boxed in a container. */}
-                  {pickedRefs.length > 0 && (
+                  {!showWorkflows && pickedRefs.length > 0 && (
                     <div className="flex gap-2 overflow-x-auto pb-0.5">
                       {pickedRefs.map((p) => (
                         <div
@@ -631,12 +783,42 @@ function WelcomeSurface({
                       ))}
                     </div>
                   )}
+                  {selectedWorkflows && selectedWorkflows.length > 0 && (
+                    <WorkflowReferenceTray
+                      picks={selectedWorkflows}
+                      disabled={busy}
+                      onToggle={toggleWorkflowReference}
+                    />
+                  )}
                   <AgentComposer
+                    access={{
+                      mode: staged.permissionMode,
+                      available: !!fullAccess,
+                      staged: true,
+                      busy,
+                      onChange: (mode) => {
+                        composer.selectPermissionMode(
+                          mode,
+                          {
+                            workspace: target ?? defaultWorkspace,
+                            defaultWorkspace: workspacesNs.getDefault,
+                          },
+                          fullAccess
+                        );
+                      },
+                    }}
                     draft={composerDraft}
                     submissionScope={composerDraft.key}
                     catalog={catalog}
                     className={cn("@container", docked && "shadow-xl")}
                     onSubmit={start}
+                    onSubmitError={(error) =>
+                      toast.error(
+                        error instanceof Error
+                          ? error.message
+                          : "Couldn't start a session."
+                      )
+                    }
                     awaitSubmission
                     submitting={staged.busy}
                     canSubmit={!busy}
@@ -644,11 +826,14 @@ function WelcomeSurface({
                     onStop={NOOP}
                     allowEmptySubmit
                     emptySubmitLabel={
-                      pickedTemplate ||
-                      pickedRefs.length > 0 ||
-                      staged.attachment
-                        ? "Start"
-                        : "Open workspace"
+                      selectedWorkflows?.length ||
+                      (showImages && pickedRefs.length > 0)
+                        ? "Send"
+                        : pickedTemplate ||
+                            (!showWorkflows && pickedRefs.length > 0) ||
+                            staged.attachment
+                          ? "Start"
+                          : "Open workspace"
                     }
                     autofocus
                     onAttachmentTransfer={transferAttachment}
@@ -688,16 +873,20 @@ function WelcomeSurface({
                         disabled: busy || staged.goal,
                         onSelect: () => imagePicker.current?.click(),
                       },
-                      library: {
-                        disabled: busy || staged.goal,
-                        onSelect: () => {
-                          galleryRef.current?.scrollIntoView({
-                            behavior: "smooth",
-                            block: "start",
-                          });
-                          galleryRef.current?.focus({ preventScroll: true });
-                        },
-                      },
+                      library: showWorkflows
+                        ? undefined
+                        : {
+                            disabled: busy || staged.goal,
+                            onSelect: () => {
+                              galleryRef.current?.scrollIntoView({
+                                behavior: "smooth",
+                                block: "start",
+                              });
+                              galleryRef.current?.focus({
+                                preventScroll: true,
+                              });
+                            },
+                          },
                       plan: {
                         offered: !!bridge?.nativeChat?.submitInRegime,
                         active: staged.plan,
@@ -731,7 +920,7 @@ function WelcomeSurface({
                         : []),
                     ]}
                     intents={
-                      presetSpec.art
+                      preset !== ApplicationPreset.DEFAULT
                         ? [
                             {
                               id: preset,
@@ -739,7 +928,7 @@ function WelcomeSurface({
                               icon: <PresetIcon />,
                               disabled: busy,
                               onRemove: () =>
-                                setPreset(ApplicationPreset.DEFAULT),
+                                onPresetChange(ApplicationPreset.DEFAULT),
                             },
                           ]
                         : []
@@ -796,51 +985,40 @@ function WelcomeSurface({
                       {staged.notice}
                     </p>
                   )}
-                  {/* Kept inside the composer so a submit error is visible even when
-                  the composer is floating (docked). */}
-                  {error && (
-                    <p
-                      role="alert"
-                      className="px-1 text-center text-xs text-destructive"
-                      onClick={() => setError(null)}
-                    >
-                      {error}
-                    </p>
-                  )}
                 </div>
               </div>
             </div>
 
-            {/* Gallery — preset-aware. The library corpus (image/video pins)
-              fits general/image/video, so those share the reference gallery.
-              Slides swaps in the bundled starter templates instead — real
-              `.canvas` decks served from /templates/slides/ (the
-              `public/slides-templates` publishing unit; loaded lazily by the
-              shared slides-template loader). Filtering the library corpus PER
-              preset (image vs video) is a separate later seam. Both are part
-              of the single page scroll (the reference gallery virtualizes
-              against it). The "Ideas" label is universal — it heads whichever
-              gallery renders. */}
-            <div ref={galleryRef} tabIndex={-1}>
-              <h2 className="mb-3 text-sm font-medium text-muted-foreground">
-                Start from an idea
-              </h2>
-              {preset === "slides" ? (
-                <SlidesTemplateGallery
-                  onPickTemplate={togglePickTemplate}
-                  selectedName={pickedTemplate?.name ?? null}
+            <div ref={galleryMotionRef}>
+              {showWorkflows ? (
+                <WorkflowGallery
+                  picks={workflowPicks}
                   disabled={busy}
+                  onToggle={toggleWorkflowReference}
                 />
               ) : (
-                <LibraryExplorerView
-                  ref={libraryRef}
-                  initialSource={WELCOME_LIBRARY_SOURCE}
-                  loadPage={resolveLibraryExplorerPage}
-                  onToggle={togglePick}
-                  selectedIds={selectedRefIds}
-                  disabled={busy}
-                  scrollContainerRef={scrollRef}
-                />
+                <div ref={galleryRef} tabIndex={-1}>
+                  <h2 className="mb-3 text-sm font-medium text-muted-foreground">
+                    Start from an idea
+                  </h2>
+                  {preset === "slides" ? (
+                    <SlidesTemplateGallery
+                      onPickTemplate={togglePickTemplate}
+                      selectedName={pickedTemplate?.name ?? null}
+                      disabled={busy}
+                    />
+                  ) : (
+                    <LibraryExplorerView
+                      ref={libraryRef}
+                      initialSource={WELCOME_LIBRARY_SOURCE}
+                      loadPage={resolveLibraryExplorerPage}
+                      onToggle={togglePick}
+                      selectedIds={selectedRefIds}
+                      disabled={busy}
+                      scrollContainerRef={scrollRef}
+                    />
+                  )}
+                </div>
               )}
             </div>
           </div>

@@ -34,6 +34,7 @@ struct Start {
     input_id: ChangeId,
     prompt: Vec<ContentBlock>,
     selected_image: Option<crate::host::SelectedImage>,
+    message_context: Option<MessageContext>,
     goal: GoalRequest,
     operating_regime: Option<crate::OperatingRegime>,
     effort: Option<crate::EffortPreset>,
@@ -106,7 +107,7 @@ pub(super) fn handlers(
                     if request.allow_wakeups && !wakeups::available(&start.1) {
                         return Err(unavailable("wakeup_capability_required"));
                     }
-                    let parts = identified_prompt(
+                    let mut parts = identified_prompt(
                         request.prompt,
                         image_intake,
                         false,
@@ -115,6 +116,7 @@ pub(super) fn handlers(
                         &start.1,
                         false,
                     )?;
+                    append_message_context(&mut parts, request.message_context, &start.1)?;
                     let mut goal = request.goal;
                     if goal.named_child.is_some() {
                         require(&start.1, NAMED_CHILD, None)?;

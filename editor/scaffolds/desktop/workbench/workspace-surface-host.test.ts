@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { WorkspaceFsEntry } from "@grida/desktop-bridge";
+import type { DesktopFxViewer, WorkspaceFsEntry } from "@grida/desktop-bridge";
 import { WorkspaceArtifact } from "@/lib/desktop/workspace-artifact";
 import { EditorGroup } from "./editor-group";
 import { WorkbenchTab } from "./workbench-tab";
@@ -16,6 +16,65 @@ function createHost(entries: WorkspaceFsEntry[]) {
     host: new WorkspaceSurfaceHost(readdir, group),
   };
 }
+
+describe("WorkspaceSurfaceHost.openFxFile", () => {
+  const request = { pageId: "fx-browser", reference: {} };
+  const artifact: DesktopFxViewer.Artifact = {
+    kind: "artifact",
+    name: "generated.png",
+    mimeType: "image/png",
+    digest: "d".repeat(64),
+    base64: "YQ==",
+  };
+
+  it("reuses the ordinary file tab for a source and delegates an immutable artifact without a file tab", async () => {
+    const { host, group } = createHost([
+      { kind: "file", name: "render.py", rel_path: "render.py" },
+    ]);
+    const present = vi.fn<(artifact: DesktopFxViewer.Artifact) => boolean>(
+      () => true
+    );
+    await expect(
+      host.openFxFile(
+        request,
+        async () => ({
+          kind: "ready",
+          file: {
+            kind: "source",
+            relativePath: "render.py",
+            sourceMatch: "changed",
+          },
+        }),
+        present
+      )
+    ).resolves.toBe("opened");
+    expect(group.getSnapshot().active).toBe(file("render.py"));
+    expect(present).not.toHaveBeenCalled();
+    await expect(
+      host.openFxFile(
+        request,
+        async () => ({ kind: "ready", file: artifact }),
+        present
+      )
+    ).resolves.toBe("opened");
+    expect(group.getSnapshot().tabs).toEqual([file("render.py")]);
+    expect(present).toHaveBeenCalledExactlyOnceWith(artifact);
+  });
+
+  it("leaves newer tab state alone when the native result arrives later", async () => {
+    const { host, group } = createHost([]);
+    const pending = Promise.withResolvers<DesktopFxViewer.FileResult>();
+    const present = vi.fn<(artifact: DesktopFxViewer.Artifact) => boolean>(
+      () => true
+    );
+    const opening = host.openFxFile(request, () => pending.promise, present);
+    group.open(file("other.py"));
+    pending.resolve({ kind: "ready", file: artifact });
+    await expect(opening).resolves.toBe("stale");
+    expect(group.getSnapshot().active).toBe(file("other.py"));
+    expect(present).not.toHaveBeenCalled();
+  });
+});
 
 describe("WorkspaceSurfaceHost.open", () => {
   it("opens a live file using the editor group's relative id", async () => {

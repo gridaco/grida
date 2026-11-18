@@ -3,7 +3,9 @@
 use crate::hooks::{CheckMode, CheckStatus};
 use agent_kit_core::authority::GrantSelection;
 use agent_kit_core::history::HistoryRecord;
-use agent_kit_core::messages::{Message, OutcomeStatus, ResultContent, Role, ToolArguments};
+use agent_kit_core::messages::{
+    Message, OutcomeStatus, ProvenanceKind, ResultContent, Role, ToolArguments,
+};
 use agent_kit_core::tools::{InventorySnapshot, Invocation, ToolOutcome};
 use agent_kit_core::turn::{ControlRevision, OperationInput, OperationOutcome, TurnOutcome};
 use agent_kit_core::{
@@ -196,7 +198,7 @@ impl HookOccurrence {
         }
         let valid = match &self.moment {
             HookMoment::SessionStart {control_revision} => *control_revision == view.state.controls().revision,
-            HookMoment::BeforeInput {message} => message.role == Role::User && view.state.history().records().iter().any(|record| matches!(record, HistoryRecord::Message(existing) if existing == message)),
+            HookMoment::BeforeInput {message} => is_input_boundary(message) && view.state.history().records().iter().any(|record| matches!(record, HistoryRecord::Message(existing) if existing == message)),
             HookMoment::BeforeTool {operation,invocation} => view.operation(operation).is_some_and(|target| target.outcome().is_none() && target.attempts.is_empty() && matches!(&target.record.input,OperationInput::Tool(expected) if expected == invocation)),
             HookMoment::AfterTool {operation,invocation,outcome} => view.operation(operation).is_some_and(|target| matches!(&target.record.input,OperationInput::Tool(expected) if expected == invocation) && matches!(target.outcome(),Some(OperationOutcome::Tool(expected)) if expected == outcome)),
             HookMoment::BeforeCompletion {proposal} => proposal.is_recorded_in(view),
@@ -206,6 +208,10 @@ impl HookOccurrence {
         }
         Ok(())
     }
+}
+
+pub(super) fn is_input_boundary(message: &Message) -> bool {
+    message.role == Role::User && message.provenance.kind != ProvenanceKind::Observed
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

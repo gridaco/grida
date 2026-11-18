@@ -1,5 +1,6 @@
 // GRIDA-SEC-008 — ChatGPT operations are registered through guarded IPC only.
 import {
+  app,
   BrowserWindow,
   dialog,
   ipcMain,
@@ -10,10 +11,14 @@ import {
 import path from "node:path";
 import { DesktopBrowserHost } from "./browser-host";
 import { DesktopBrowserTools } from "./desktop-browser-tools";
+import { BundledPrograms } from "./bundled-programs";
+import { FxViewer } from "./fx-viewer";
+import { FxWorkspaceFiles } from "./fx-workspace-files";
+import { NativeDesktopProfile } from "./native-desktop-profile";
 import type { BrowserHistory } from "./browser-history";
 import type { BrowserDownloads } from "./browser-downloads";
 import { URL } from "node:url";
-import type { RecentStore } from "@grida/daemon/server";
+import { ProtectedRoots, type RecentStore } from "@grida/daemon/server";
 import {
   IPC_CHANNELS,
   type ConfirmOptions,
@@ -65,6 +70,7 @@ import {
   NativeChatIpc,
   type ActiveNativeChat,
   type NativeChatNestedDeckOwner,
+  type NativeWelcomeWorkspace,
 } from "./native-chat-ipc";
 import type { NativeDocumentFiles } from "./native-document-files";
 import type { WorkspaceMediaGrant } from "./workspace-media-registry";
@@ -102,7 +108,13 @@ type RegisterIpcHandlersOptions = {
     profileId?: string
   ) => ActiveNativeChat | null;
   /** Present when this main process has selected native chat mode. */
-  ensure_native_chat?: (workspaceId: string) => Promise<void>;
+  ensure_native_chat?: (
+    workspaceId: string,
+    requireCurrent?: () => void
+  ) => Promise<void>;
+  resolve_welcome_chat_workspace?: (
+    workspaceId: string
+  ) => Promise<NativeWelcomeWorkspace>;
   native_chat_disabled?: boolean;
   native_chat_selections?: NativeChatSelections;
   forget_native_workspace?: (workspaceId: string) => Promise<void>;
@@ -157,7 +169,49 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     workspaceExists: async (id) =>
       !!(await servicesSidecarClient.findWorkspace(id)),
   });
-  const browserTools = new DesktopBrowserTools(browserHost);
+  let fxProgram: ReturnType<typeof BundledPrograms.resolve> | undefined;
+  let fxProtected: ProtectedRoots | undefined;
+  const fxViewer = new FxViewer(
+    async (workspaceId) => {
+      const workspace = await servicesSidecarClient.findWorkspace(workspaceId);
+      if (workspace?.id !== workspaceId) return undefined;
+      fxProtected ??= NativeDesktopProfile.selected()
+        ? NativeDesktopProfile.protectedRoots(app)
+        : new ProtectedRoots(
+            NativeDesktopProfile.ordinaryChatProtectedPaths(app)
+          );
+      return fxProtected.overlaps(workspace.root)
+        ? undefined
+        : FxViewer.projectDirectory(workspace.root);
+    },
+    async (args, signal) => {
+      fxProgram ??= BundledPrograms.resolve(
+        NativeDesktopProfile.resourcesPath(app),
+        "grida-fx"
+      ).catch(() => {
+        fxProgram = undefined;
+        return undefined;
+      });
+      const program = await fxProgram;
+      return program && !signal.aborted
+        ? FxViewer.run(program.path, args, signal)
+        : null;
+    }
+  );
+  const browserTools = new DesktopBrowserTools(browserHost, fxViewer);
+  const fxFiles = new FxWorkspaceFiles(browserTools, {
+    list: servicesSidecarClient.readWorkspaceDirectory,
+    bytes: async (workspaceId, relativePath, signal) => {
+      const result = await servicesSidecarClient.readWorkspaceFile(
+        workspaceId,
+        relativePath,
+        "bytes",
+        signal
+      );
+      if (!("base64" in result)) throw new Error("workspace_file_unavailable");
+      return result;
+    },
+  });
   options.on_browser_tools?.(browserTools);
   const nativeChat = new NativeChatIpc(
     EDITOR_ORIGIN,
@@ -254,7 +308,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       },
     },
     options.native_chat_selections,
-    browserTools
+    browserTools,
+    options.resolve_welcome_chat_workspace
   );
   const externalAgent = new NativeExternalRunIpc(
     EDITOR_ORIGIN,
@@ -425,6 +480,12 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   guarded(IPC_CHANNELS.BROWSER_OPEN_EXTERNAL, (event, request: unknown) =>
     browserHost.openExternal(event, request)
   );
+  guarded(IPC_CHANNELS.BROWSER_PREPARE_FX_FILE, (event, request: unknown) =>
+    fxFiles.prepare(event.sender, request)
+  );
+  guarded(IPC_CHANNELS.BROWSER_RESOLVE_FX_PREVIEW, (event, entry: unknown) =>
+    browserTools.resolveFxPreview(event.sender, entry)
+  );
   guarded(
     IPC_CHANNELS.BROWSER_CLEAR_BROWSING_DATA,
     (event, ...args: unknown[]) => browserHost.clearBrowsingData(event, ...args)
@@ -513,6 +574,30 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     if (args.length) throw new Error("native_chat_profiles_invalid");
     return nativeChat.welcomeProfiles(event);
   });
+  guarded(
+    IPC_CHANNELS.WELCOME_CHAT_PREPARE_FULL_ACCESS,
+    (event, ...args: unknown[]) => {
+      if (args.length !== 1)
+        throw new Error("native_chat_permission_mode_invalid");
+      return nativeChat.prepareWelcomeFullAccess(event, args[0]);
+    }
+  );
+  guarded(
+    IPC_CHANNELS.WELCOME_CHAT_ANSWER_FULL_ACCESS,
+    (event, ...args: unknown[]) => {
+      if (args.length !== 2)
+        throw new Error("native_chat_permission_mode_invalid");
+      return nativeChat.answerWelcomeFullAccess(event, args[0], args[1]);
+    }
+  );
+  guarded(
+    IPC_CHANNELS.WELCOME_CHAT_START_FULL_ACCESS,
+    (event, ...args: unknown[]) => {
+      if (args.length !== 2)
+        throw new Error("native_chat_permission_mode_invalid");
+      return nativeChat.startWelcomeFullAccess(event, args[0], args[1]);
+    }
+  );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_SELECT_PROFILE,
     (event, selection: unknown) => nativeChat.selectProfile(event, selection)
@@ -688,6 +773,14 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     (event, attachmentId: string, snapshot: unknown, revision?: unknown) =>
       nativeChat.publishEditorSurfaces(event, attachmentId, snapshot, revision)
   );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_CAPTURE_EDITOR_CONTEXT, (event) =>
+    nativeChat.captureEditorContext(event)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_SUBMIT_MESSAGE,
+    (event, attachmentId: string, input: unknown) =>
+      nativeChat.submitMessage(event, attachmentId, input)
+  );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_SUBMIT,
     (
@@ -698,7 +791,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       regime?: unknown,
       effort?: unknown,
       svgTargetId?: unknown,
-      selectionRevision?: unknown
+      selectionRevision?: unknown,
+      editorContextId?: unknown
     ) =>
       nativeChat.submit(
         event,
@@ -708,7 +802,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         regime,
         effort,
         svgTargetId,
-        selectionRevision
+        selectionRevision,
+        editorContextId
       )
   );
   guarded(
@@ -726,7 +821,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       regime?: unknown,
       effort?: unknown,
       svgTargetId?: unknown,
-      selectionRevision?: unknown
+      selectionRevision?: unknown,
+      editorContextId?: unknown
     ) =>
       nativeChat.enqueue(
         event,
@@ -736,7 +832,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         regime,
         effort,
         svgTargetId,
-        selectionRevision
+        selectionRevision,
+        editorContextId
       )
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_EFFORT, (event) =>
@@ -771,7 +868,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       text: string,
       regime?: unknown,
       effort?: unknown,
-      selectionRevision?: unknown
+      selectionRevision?: unknown,
+      editorContextId?: unknown
     ) =>
       nativeChat.submitWithLibrarySelection(
         event,
@@ -780,7 +878,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         text,
         regime,
         effort,
-        selectionRevision
+        selectionRevision,
+        editorContextId
       )
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_FILE, (event) =>
@@ -1556,14 +1655,12 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
 
   guarded(IPC_CHANNELS.WINDOW_NAVIGATION_BACK, (event) => {
     const history = event.sender.navigationHistory;
-    // Second check here is robust against a stale UI (e.g. a click in
-    // flight when the history just collapsed).
-    if (history.canGoBack()) history.goBack();
+    if (desktopNavigationTarget(history, -1)) history.goToOffset(-1);
   });
 
   guarded(IPC_CHANNELS.WINDOW_NAVIGATION_FORWARD, (event) => {
     const history = event.sender.navigationHistory;
-    if (history.canGoForward()) history.goForward();
+    if (desktopNavigationTarget(history, 1)) history.goToOffset(1);
   });
 
   guarded(
@@ -1689,17 +1786,28 @@ function parsePreferredApps(raw: readonly unknown[]): HostAppId[] {
   return ids;
 }
 
-/**
- * Compute the current `{canGoBack, canGoForward}` for a webContents.
- * Exported so `attachNavigationEvents` (called from `window.ts` at
- * window-creation time) can publish initial state immediately rather
- * than waiting for the first `did-navigate*` to fire.
- */
+/** Resolve the exact history step that this Desktop window can take. */
+function desktopNavigationTarget(
+  history: WebContents["navigationHistory"],
+  offset: -1 | 1
+): string | null {
+  // Chromium's goBack/goForward may skip intervening entries. Use the same
+  // exact offset for the snapshot and the action, and recheck it on invoke.
+  if (!history.canGoToOffset(offset)) return null;
+  const url = history.getEntryAtIndex(history.getActiveIndex() + offset)?.url;
+  return url && ipc_sender.isAllowed(url, EDITOR_ORIGIN) ? url : null;
+}
+
 export function computeNavigationState(wc: WebContents): NavigationState {
   const history = wc.navigationHistory;
+  const back = desktopNavigationTarget(history, -1);
+  const forward = desktopNavigationTarget(history, 1);
+  const home = `${EDITOR_ORIGIN}/desktop/welcome`;
   return {
-    can_go_back: history.canGoBack(),
-    can_go_forward: history.canGoForward(),
+    can_go_back: back !== null,
+    can_go_forward: forward !== null,
+    ...(back === home && { back_destination: "home" }),
+    ...(forward === home && { forward_destination: "home" }),
   };
 }
 
@@ -1733,7 +1841,9 @@ export function attachNavigationEvents(window: BrowserWindow): void {
       last &&
       lastUrl === url &&
       last.can_go_back === next.can_go_back &&
-      last.can_go_forward === next.can_go_forward
+      last.can_go_forward === next.can_go_forward &&
+      last.back_destination === next.back_destination &&
+      last.forward_destination === next.forward_destination
     ) {
       return;
     }

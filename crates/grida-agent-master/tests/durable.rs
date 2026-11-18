@@ -2415,6 +2415,63 @@ fn private_grant(name: &str) -> GrantSelection {
 }
 
 #[tokio::test]
+async fn before_input_hooks_check_the_authored_message_once_with_observed_context() {
+    let fixture = Fixture::new(Script::Answer);
+    let store = fixture.store();
+    let handler = AllowingHandler::new("before_input_hook");
+    let hook = lifecycle_hooks::LifecycleHook {
+        id: BindingId::new("review-input").unwrap(),
+        source: "trusted-user".into(),
+        revision: agent_kit_core::Fingerprint::of(&("review-input", "reviewed")).unwrap(),
+        event: lifecycle_hooks::HookEvent::BeforeInput,
+        tool: None,
+        mode: CheckMode::Required,
+        handler: handler.definition().id.clone(),
+    };
+    let mut inventory = Inventory::new();
+    inventory.insert(handler.clone()).unwrap();
+    let mut messages = input();
+    for (id, source) in [
+        ("message-context/input", "message-context"),
+        ("editor-context/input", "editor-context"),
+    ] {
+        let mut observed = message(id, Role::User, Content::Text(source.into()));
+        observed.provenance.source = source.into();
+        observed.provenance.kind = ProvenanceKind::Observed;
+        messages.push(observed);
+    }
+    let claim = fixture.claim(&store).await;
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    let MasterOutcome::Settled(receipt) = fixture
+        .master(3, "Answer")
+        .with_lifecycle_hooks(
+            lifecycle_hooks::LifecycleHooks::new(vec![hook.clone()]).unwrap(),
+            inventory
+                .snapshot(std::slice::from_ref(&hook.handler))
+                .unwrap(),
+            BTreeMap::from([(hook.id.clone(), fixture.grants())]),
+        )
+        .run(opened.turn, messages.clone())
+        .await
+        .unwrap()
+    else {
+        panic!("expected a settled turn")
+    };
+    assert_eq!(receipt.outcome.status, OutcomeStatus::Succeeded);
+    assert_eq!(handler.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        fixture.provider.requests.lock().unwrap()[0]
+            .messages
+            .iter()
+            .filter(|message| message.role == Role::User)
+            .cloned()
+            .collect::<Vec<_>>(),
+        messages,
+    );
+    store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
+}
+
+#[tokio::test]
 async fn after_tool_hooks_observe_model_tools_but_not_private_checks() {
     let fixture = Fixture::new(Script::ToolThenAnswer);
     let store = fixture.store();

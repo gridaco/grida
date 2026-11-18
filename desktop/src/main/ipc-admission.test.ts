@@ -77,7 +77,7 @@ describe("ipc_admission", () => {
           !nativeChat.includes(channel) &&
           !nativeExternal.includes(channel) &&
           channel !== workspacePublish &&
-          channel !== IPC_CHANNELS.WELCOME_CHAT_PROFILES &&
+          !channel.startsWith("grida:welcome:chat-") &&
           !(documentFiles as readonly IpcChannel[]).includes(channel)
       )
     );
@@ -136,6 +136,28 @@ describe("ipc_admission", () => {
     expect(allowedFor("onboarding", "/desktop/onboarding")).not.toContain(
       channel
     );
+  });
+
+  it("allows FX preview and file operations only in the main workbench", () => {
+    for (const channel of [
+      IPC_CHANNELS.BROWSER_PREPARE_FX_FILE,
+      IPC_CHANNELS.BROWSER_RESOLVE_FX_PREVIEW,
+    ]) {
+      expect(allowedFor("main", "/desktop/workspace")).toContain(channel);
+      for (const route of [
+        "/desktop/file",
+        "/desktop/settings",
+        "/desktop/tools",
+        "/desktop/welcome",
+      ])
+        expect(allowedFor("main", route)).not.toContain(channel);
+      expect(allowedFor("sign-in", "/desktop/auth/sign-in")).not.toContain(
+        channel
+      );
+      expect(allowedFor("onboarding", "/desktop/onboarding")).not.toContain(
+        channel
+      );
+    }
   });
 
   it("admits document I/O only from the main standalone file route", () => {
@@ -242,8 +264,12 @@ describe("ipc_admission", () => {
     }
   });
 
-  it("admits Welcome connection choices only on the exact Welcome route", () => {
-    const channel = IPC_CHANNELS.WELCOME_CHAT_PROFILES;
+  it.each([
+    IPC_CHANNELS.WELCOME_CHAT_PROFILES,
+    IPC_CHANNELS.WELCOME_CHAT_PREPARE_FULL_ACCESS,
+    IPC_CHANNELS.WELCOME_CHAT_ANSWER_FULL_ACCESS,
+    IPC_CHANNELS.WELCOME_CHAT_START_FULL_ACCESS,
+  ])("admits %s only on the exact Welcome route", (channel) => {
     expect(allowedFor("main", "/desktop/welcome")).toContain(channel);
     for (const route of [
       "/desktop/welcome/extra",

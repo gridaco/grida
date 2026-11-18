@@ -424,7 +424,9 @@ describe("durable chat selection controller", () => {
   it("honors an explicit Welcome default-model choice while inheriting the last effort", async () => {
     const f = fixture(),
       controller = f.make();
-    expect(await controller.startChat(null, () => "Hello")).toBeNull();
+    expect(
+      await controller.startChat(null, () => ({ text: "Hello" }))
+    ).toBeNull();
     expect(f.defaults()).toEqual({
       profileId: null,
       modelId: "default-model",
@@ -457,7 +459,9 @@ describe("durable chat selection controller", () => {
         return update(...args);
       }
     );
-    const take = vi.fn<() => string>(() => "Plan a poster");
+    const take = vi.fn<() => { text: string }>(() => ({
+      text: "Plan a poster",
+    }));
     const started = controller.startChat(f.b, take, {
       effort: "low",
       operatingRegime: "plan",
@@ -726,7 +730,9 @@ describe("selection activation lineage", () => {
       }
       return read(target);
     };
-    const take = vi.fn<() => string | null>(() => "Welcome message");
+    const take = vi.fn<() => { text: string }>(() => ({
+      text: "Welcome message",
+    }));
     const startup = controller.startChat(f.b, take);
     await vi.waitFor(() => expect(draft).toBeDefined());
     await controller.select("chat-a");
@@ -1057,6 +1063,160 @@ describe("per-chat permission selection controller", () => {
     controller.answerPermissionModeReview(accepted);
     await changing;
   }
+
+  it("sends Home's first message through the prepared session's saved route and grant", async () => {
+    const f = permissions();
+    f.modes.set("chat-b", { revision: 1, mode: "full_access" });
+    const controller = f.make();
+    const take = vi.fn<() => { text: string } | null>(() => null);
+    take.mockReturnValueOnce({ text: "First Home message" });
+    try {
+      const composer = {
+        preparedSessionId: "chat-b",
+        operatingRegime: "plan" as const,
+      };
+      expect(await controller.startChat(f.b, take, composer)).toBeNull();
+      expect(await controller.startChat(f.b, take, composer)).toBeNull();
+      expect(f.bridge.selectProfile).toHaveBeenCalledWith({
+        kind: "saved",
+        id: f.b,
+      });
+      expect(f.bridge.load).toHaveBeenCalledWith("chat-b");
+      expect(f.bridge.submitInRegime).toHaveBeenCalledExactlyOnceWith(
+        "submit",
+        "chat-b",
+        expect.any(String),
+        "First Home message",
+        "plan",
+        "high",
+        undefined,
+        2
+      );
+      expect(f.bridge.updateSelection).not.toHaveBeenCalled();
+      expect(f.bridge.reviewPermissionMode).not.toHaveBeenCalled();
+      expect(f.bridge.setPermissionMode).not.toHaveBeenCalled();
+      expect(f.bridge.createFromDraft).not.toHaveBeenCalled();
+      expect(controller.read().selected).toBe("chat-b");
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("sends context with the identity of the prepared Full access chat", async () => {
+    const f = permissions();
+    f.modes.set("chat-b", { revision: 1, mode: "full_access" });
+    const controller = f.make();
+    const messageContext = {
+      modelText: "Use the attached example as context.",
+      displayParts: [
+        { kind: "example.reference", version: 1, data: { title: "Sample" } },
+      ],
+    };
+    const submitMessage = vi.fn<
+      NonNullable<DesktopNativeChat["submitMessage"]>
+    >(async (attachment, input) =>
+      f.bridge.submit(attachment, input.inputId, input.text)
+    );
+    f.bridge.submitMessage = submitMessage;
+    try {
+      await controller.startChat(f.b, () => ({ text: "", messageContext }), {
+        preparedSessionId: "chat-b",
+        messageContext,
+      });
+      expect(submitMessage).toHaveBeenCalledExactlyOnceWith(
+        "chat-b",
+        expect.objectContaining({
+          action: "submit",
+          text: "",
+          selectionRevision: 2,
+          messageContext,
+        })
+      );
+      expect(f.bridge.setPermissionMode).not.toHaveBeenCalled();
+      expect(controller.read().draftMessageContext).toBeNull();
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it.each(["restricted", "busy", "wrong attachment", "wrong profile"] as const)(
+    "keeps the message as a draft when the prepared session is %s",
+    async (reason) => {
+      const f = permissions();
+      if (reason !== "restricted")
+        f.modes.set("chat-b", { revision: 1, mode: "full_access" });
+      if (reason === "wrong attachment")
+        vi.mocked(f.bridge.load).mockResolvedValueOnce({
+          sessionId: "chat-a",
+          attachmentId: "chat-a",
+        });
+      if (reason === "busy") {
+        const observe = f.bridge.observe;
+        f.bridge.observe = async (id) => {
+          const state = await observe(id);
+          return { ...state, snapshot: { ...state.snapshot, queuedInputs: 1 } };
+        };
+      }
+      const controller = f.make();
+      const take = vi.fn<() => { text: string }>(() => ({
+        text: "Keep this message",
+      }));
+      try {
+        expect(
+          await controller.startChat(
+            reason === "wrong profile" ? f.a : f.b,
+            take,
+            {
+              preparedSessionId: "chat-b",
+            }
+          )
+        ).toBe("Keep this message");
+        expect(take).toHaveBeenCalledOnce();
+        expect(f.bridge.submit).not.toHaveBeenCalled();
+        expect(f.bridge.submitInRegime).not.toHaveBeenCalled();
+        expect(f.bridge.reviewPermissionMode).not.toHaveBeenCalled();
+        expect(f.bridge.setPermissionMode).not.toHaveBeenCalled();
+        expect(f.bridge.createFromDraft).not.toHaveBeenCalled();
+        expect(controller.read().selected).toBe("chat-b");
+        expect(controller.read().error).toContain("Full access");
+      } finally {
+        controller.disconnect();
+      }
+    }
+  );
+
+  it("ignores an old prepared handoff when the selected chat changes", async () => {
+    const f = permissions();
+    f.modes.set("chat-b", { revision: 1, mode: "full_access" });
+    const controller = f.make();
+    const pending = Promise.withResolvers<void>();
+    const check = vi.mocked(f.bridge.permissionMode!);
+    const read = check.getMockImplementation()!;
+    check.mockImplementationOnce(async (id) => {
+      await pending.promise;
+      return read(id);
+    });
+    const take = vi.fn<() => { text: string }>(() => ({
+      text: "Keep waiting",
+    }));
+    try {
+      const start = controller.startChat(f.b, take, {
+        preparedSessionId: "chat-b",
+      });
+      await vi.waitFor(() => expect(check).toHaveBeenCalledOnce());
+      expect(controller.canSubmit).toBe(false);
+      const switched = controller.select("chat-a");
+      pending.resolve();
+      await switched;
+      expect(await start).toBeNull();
+      expect(take).not.toHaveBeenCalled();
+      expect(f.bridge.submitInRegime).not.toHaveBeenCalled();
+      expect(controller.read().selected).toBe("chat-a");
+    } finally {
+      pending.resolve();
+      controller.disconnect();
+    }
+  });
 
   it("opens an exact blank chat without inference before choosing Full access and keeps new chats restricted", async () => {
     const f = permissions();

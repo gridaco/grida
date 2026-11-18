@@ -5,18 +5,23 @@ import { DesktopBrowserTools } from "./desktop-browser-tools";
 import type { DesktopBrowserHost } from "./browser-host";
 import { NativeEditorSurfaceEndpoints } from "./native-editor-surfaces";
 import type { DesktopBrowserToolLease } from "./desktop-browser-tools";
+import type { ObservedWorkbenchDocument } from "./browser-automation";
+import { FxViewer } from "./fx-viewer";
 
 vi.mock("electron", () => ({ BrowserWindow: { fromWebContents: () => null } }));
 const operations = vi.hoisted(() => ({
   invoke: vi.fn<DesktopBrowserToolLease["invoke"]>(),
   closeScope: vi.fn<(id: string) => void>(),
   registerOpen: vi.fn<() => { kind: "navigation"; navigationId: string }>(),
+  observeWorkbenchDocument:
+    vi.fn<() => Promise<ObservedWorkbenchDocument | null>>(),
 }));
 vi.mock("./browser-automation", () => ({
   BrowserAutomation: class {
     invoke = operations.invoke;
     closeScope = operations.closeScope;
     registerOpen = operations.registerOpen;
+    observeWorkbenchDocument = operations.observeWorkbenchDocument;
   },
 }));
 
@@ -121,6 +126,119 @@ it("projects the current workbench and binds requests to their exact publication
   expect(operations.invoke).not.toHaveBeenCalled();
   lease.close();
   expect(operations.closeScope).toHaveBeenCalledWith(expect.any(String));
+});
+
+it("discards the selected FX sample when selection leaves and returns to the same tab", async () => {
+  const project = "a".repeat(64);
+  const entry = "b".repeat(64);
+  const base = "http://127.0.0.1:8787/";
+  const url = `${base}p/${project}/runs/${entry}/`;
+  const pending = Promise.withResolvers<ObservedWorkbenchDocument>();
+  const observing = Promise.withResolvers<void>();
+  operations.observeWorkbenchDocument.mockImplementationOnce(() => {
+    observing.resolve();
+    return pending.promise;
+  });
+  const host = {
+    resolveAutomationPage: vi.fn<
+      () => { snapshot: () => { url: string }; visible: () => boolean }
+    >(() => ({
+      snapshot: () => ({ url }),
+      visible: () => true,
+    })),
+  };
+  const viewer = new FxViewer(
+    async () => ({ root: "/workspace", identity: "preserved" }),
+    async () => ({
+      kind: "fx-service-status-v1",
+      protocol_version: 1,
+      state: "running",
+      project_id: project,
+      instance_id: "c".repeat(64),
+      url: base,
+    })
+  );
+  const tools = new DesktopBrowserTools(
+    host as unknown as DesktopBrowserHost,
+    viewer
+  );
+  const { event } = workbench();
+  tools.publish(event, snapshot, pageId);
+  const sample = tools.captureEditorObservation(event.sender, signal);
+  await observing.promise;
+  tools.publish(event, snapshot, null);
+  tools.publish(event, snapshot, pageId);
+  pending.resolve({
+    id: "fx-doc",
+    current: () => true,
+    value: {
+      subject: {
+        kind: "run",
+        reference: {
+          kind: "service_entry",
+          project_id: project,
+          entry_kind: "run",
+          entry_id: entry,
+        },
+      },
+      scope_id: null,
+      selection: null,
+      sampled_at: 12,
+    },
+  });
+  await expect(sample).resolves.toBeNull();
+  expect(host.resolveAutomationPage).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({ sender: event.sender, frame: event.senderFrame }),
+    { kind: "workbench", tabId: pageId }
+  );
+});
+
+it("reads FX preview readiness from the captured workspace lease and drops a reply after it retires", async () => {
+  const project = "a".repeat(64);
+  const entry = {
+    kind: "service_entry",
+    project_id: project,
+    entry_kind: "plan",
+    entry_id: "b".repeat(64),
+  };
+  const workspaceId = "5bd8f11d11d7effe";
+  const pending = Promise.withResolvers<unknown>();
+  const status = Promise.withResolvers<void>();
+  let live = true;
+  const root = vi.fn<ConstructorParameters<typeof FxViewer>[0]>(async () => ({
+    root: "/workspace",
+    identity: "selected",
+  }));
+  const viewer = new FxViewer(root, async () => {
+    status.resolve();
+    return pending.promise;
+  });
+  const browser = {
+    automationWorkspace: vi.fn<DesktopBrowserHost["automationWorkspace"]>(
+      () => ({ workspaceId, current: () => live })
+    ),
+  };
+  const tools = new DesktopBrowserTools(
+    browser as unknown as DesktopBrowserHost,
+    viewer
+  );
+  const { event } = workbench();
+  const resolving = tools.resolveFxPreview(event.sender, entry);
+  await status.promise;
+  live = false;
+  pending.resolve({
+    kind: "fx-service-status-v1",
+    protocol_version: 1,
+    project_id: project,
+    state: "running",
+    instance_id: "c".repeat(64),
+    url: "http://127.0.0.1:8888/",
+  });
+  await expect(resolving).resolves.toEqual({ state: "unavailable" });
+  expect(browser.automationWorkspace).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({ sender: event.sender, frame: event.senderFrame })
+  );
+  expect(root).toHaveBeenCalledWith(workspaceId);
 });
 
 it("pins the native browser capability and closes the lease with its endpoint", async () => {

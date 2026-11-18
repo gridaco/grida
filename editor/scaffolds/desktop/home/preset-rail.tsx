@@ -22,9 +22,8 @@ import {
 } from "./application-preset";
 
 /**
- * `PresetRail` — the home-scoped, icon-only sidebar. The preset controls mutate
- * the shared Welcome surface; routed destinations remain visibly separated so
- * they cannot be mistaken for another workspace/application preset.
+ * The home-scoped, icon-only sidebar. Its tabs share the Welcome surface.
+ * The rail also links to Tools and Settings.
  */
 export function PresetRail({
   value,
@@ -35,9 +34,6 @@ export function PresetRail({
   onChange: (id: ApplicationPresetId) => void;
   className?: string;
 }) {
-  // Neutral `general` (Home) has no artwork — a plain label tooltip, like
-  // Settings. The marketable presets (which carry `art`) get the tutorial-style
-  // hover card: 16:9 artwork + name + a one-liner that advertises the mode.
   const renderItem = (p: ApplicationPresetSpec) => {
     const Icon = p.icon;
     const active = p.id === value;
@@ -81,25 +77,39 @@ export function PresetRail({
           side="right"
           align="start"
           sideOffset={10}
-          className="w-64 overflow-hidden p-0"
+          className="relative aspect-8/5 w-64 overflow-hidden p-0"
         >
-          {/* 16:9 artwork — a swappable static asset (gif/image later). */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={p.art}
-            alt=""
-            className="aspect-video w-full object-cover"
-          />
-          <div className="p-2.5">
+          <picture>
+            {p.reducedMotionArt && (
+              <source
+                media="(prefers-reduced-motion: reduce)"
+                srcSet={p.reducedMotionArt}
+              />
+            )}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={p.art}
+              alt=""
+              className="absolute inset-0 size-full object-cover"
+            />
+          </picture>
+          <div
+            className={cn(
+              "absolute inset-x-0 bottom-0 bg-linear-to-t via-45% to-transparent px-3 pt-4 pb-2.5",
+              p.artTone === "light"
+                ? "from-white/35 via-white/15 text-neutral-900 text-shadow-[0_1px_2px_rgb(255_255_255_/_0.5)]"
+                : "from-black/35 via-black/15 text-white text-shadow-[0_1px_3px_rgb(0_0_0_/_0.8)]"
+            )}
+          >
             <div className="flex items-center gap-1.5">
               <div className="text-xs font-semibold">{p.label}</div>
               {soon && (
-                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                <span className="rounded-full bg-current/15 px-1.5 text-[10px] leading-4 font-medium">
                   Coming soon
                 </span>
               )}
             </div>
-            <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+            <p className="mt-0.5 text-[11px] leading-4 opacity-90">
               {p.description}
             </p>
           </div>
@@ -108,9 +118,10 @@ export function PresetRail({
     );
   };
 
-  // Split the rail: the neutral Home base, a divider, then the marketable modes.
-  const homeItems = ApplicationPreset.list.filter((p) => !p.art);
-  const presetItems = ApplicationPreset.list.filter((p) => p.art);
+  const homeItem = ApplicationPreset.byId(ApplicationPreset.DEFAULT);
+  const presetItems = ApplicationPreset.list.filter(
+    (p) => p.id !== homeItem.id
+  );
 
   return (
     <TooltipProvider>
@@ -122,7 +133,7 @@ export function PresetRail({
           className
         )}
       >
-        {homeItems.map(renderItem)}
+        {renderItem(homeItem)}
         {/* Divider — sets the neutral Home apart from the marketable modes. */}
         <div className="my-1 h-px w-6 bg-border" aria-hidden />
         {presetItems.map(renderItem)}

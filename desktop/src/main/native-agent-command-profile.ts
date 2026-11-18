@@ -9,6 +9,7 @@ import {
   pinExecutable,
   requirePrivateDirectory,
 } from "./native-agent-hooks";
+import { NativeCommandRuntime } from "./native-command-runtime";
 
 type Pin = Readonly<{ path: string; sha256: number[] }>;
 
@@ -21,6 +22,7 @@ export type NativeCommandProfile = Readonly<{
   diskRead: true;
   environment: Readonly<Record<string, string>>;
   hooksOnly?: true;
+  bundledSkills?: readonly string[];
 }>;
 
 const MAX_ENVIRONMENT_BYTES = 24 * 1024;
@@ -51,18 +53,40 @@ export namespace NativeCommandProfiles {
   export async function launch(
     resources: string,
     workspace: string,
-    hooks?: NativeHookLaunchProfile
+    hooks?: NativeHookLaunchProfile,
+    protectedPaths: readonly string[] = []
   ): Promise<NativeCommandProfile | undefined> {
     if (process.platform !== "darwin" && process.platform !== "linux")
       return undefined;
-    const environment = await programEnvironment();
+    const [shell, tools] = await Promise.all([
+      programEnvironment(),
+      NativeCommandRuntime.prepare(resources, workspace, protectedPaths),
+    ]);
+    const environment = !tools.programDirectory
+      ? shell
+      : bounded({
+          ...shell,
+          PATH: [tools.programDirectory, shell.PATH]
+            .filter(Boolean)
+            .join(path.delimiter),
+        });
+    const runtimeTools = tools.programDirectory
+      ? {
+          paths: [tools.programDirectory],
+          skills: { bundledSkills: ["desktop-fx"] },
+        }
+      : { paths: [], skills: {} };
     if (hooks) {
       const { hooksOnly: _hooksOnly, ...command } = hooks.command;
-      return { ...command, diskRead: true, environment };
+      return {
+        ...command,
+        helper: tools.helper,
+        runtimePaths: [...command.runtimePaths, ...runtimeTools.paths],
+        ...runtimeTools.skills,
+        diskRead: true,
+        environment,
+      };
     }
-    const helper = await pinExecutable(
-      path.join(resources, "native-agent", "agent-kit-sandbox-helper")
-    );
     const runtime =
       process.platform === "darwin"
         ? ["/usr/bin", "/bin", "/usr/lib", "/System/Library"]
@@ -90,11 +114,12 @@ export namespace NativeCommandProfiles {
     });
     await requirePrivateDirectory(temporaryParent);
     return {
-      helper,
+      helper: tools.helper,
       ...(process.platform === "linux"
         ? { bubblewrap: await pinExecutable("/usr/bin/bwrap") }
         : {}),
-      runtimePaths,
+      runtimePaths: [...runtimePaths, ...runtimeTools.paths],
+      ...runtimeTools.skills,
       temporaryParent,
       diskRead: true,
       environment,

@@ -369,10 +369,15 @@ it("revalidates Settings admission after the native trust dialog", async () => {
 
 it("publishes completed route changes even when navigation-history flags remain identical", () => {
   let url = "https://fixture.invalid/desktop/workspace?id=eac20941e6a410aa";
+  let previousUrl = "https://fixture.invalid/desktop/workspace?id=previous";
   const contents = Object.assign(new EventEmitter(), {
     getURL: () => url,
     isDestroyed: () => false,
-    navigationHistory: { canGoBack: () => true, canGoForward: () => false },
+    navigationHistory: {
+      canGoToOffset: (offset: number) => offset === -1,
+      getActiveIndex: () => 1,
+      getEntryAtIndex: () => ({ url: previousUrl }),
+    },
     send: vi.fn<(channel: string, state: unknown) => void>(),
   });
   attachNavigationEvents({
@@ -383,6 +388,9 @@ it("publishes completed route changes even when navigation-history flags remain 
   contents.emit("did-navigate-in-page", {}, url, true);
   contents.emit("did-navigate-in-page", {}, url, true);
   url = "https://fixture.invalid/desktop/workspace?id=eac20941e6a410aa";
+  contents.emit("did-navigate-in-page", {}, url, true);
+  previousUrl = "https://fixture.invalid/desktop/welcome";
+  contents.emit("did-navigate-in-page", {}, url, true);
   contents.emit("did-navigate-in-page", {}, url, true);
   expect(contents.send.mock.calls).toEqual([
     [
@@ -397,5 +405,64 @@ it("publishes completed route changes even when navigation-history flags remain 
       IPC_CHANNELS.WINDOW_NAVIGATION_CHANGED,
       { can_go_back: true, can_go_forward: false },
     ],
+    [
+      IPC_CHANNELS.WINDOW_NAVIGATION_CHANGED,
+      { can_go_back: true, can_go_forward: false, back_destination: "home" },
+    ],
   ]);
+});
+
+it("describes and traverses the same adjacent Desktop history entries", () => {
+  const f = setup();
+  const home = "https://fixture.invalid/desktop/welcome";
+  const entries = [
+    "https://fixture.invalid/desktop/settings",
+    home,
+    f.mainFrame.url,
+    home,
+    "https://fixture.invalid/desktop/tools",
+  ];
+  let active = 2;
+  const goToOffset = vi.fn<(offset: number) => void>((offset) => {
+    active += offset;
+  });
+  Object.assign(f.event.sender, {
+    navigationHistory: {
+      canGoToOffset: (offset: number) => entries[active + offset] !== undefined,
+      getActiveIndex: () => active,
+      getEntryAtIndex: (index: number) => ({ url: entries[index] }),
+      goToOffset,
+    },
+  });
+
+  expect(f.hook(IPC_CHANNELS.WINDOW_NAVIGATION_STATE)).toEqual({
+    can_go_back: true,
+    can_go_forward: true,
+    back_destination: "home",
+    forward_destination: "home",
+  });
+  f.hook(IPC_CHANNELS.WINDOW_NAVIGATION_BACK);
+  expect(entries[active]).toBe(home);
+  f.hook(IPC_CHANNELS.WINDOW_NAVIGATION_FORWARD);
+  f.hook(IPC_CHANNELS.WINDOW_NAVIGATION_FORWARD);
+  expect(entries[active]).toBe(home);
+  expect(goToOffset.mock.calls).toEqual([[-1], [1], [1]]);
+
+  active = 2;
+  entries[1] = `${home}?startup=restore-last-workspace`;
+  entries[3] = `${home}#section`;
+  expect(f.hook(IPC_CHANNELS.WINDOW_NAVIGATION_STATE)).toEqual({
+    can_go_back: true,
+    can_go_forward: true,
+  });
+
+  entries[1] = "https://different.invalid/desktop/welcome";
+  entries[3] = "https://fixture.invalid/account";
+  expect(f.hook(IPC_CHANNELS.WINDOW_NAVIGATION_STATE)).toEqual({
+    can_go_back: false,
+    can_go_forward: false,
+  });
+  f.hook(IPC_CHANNELS.WINDOW_NAVIGATION_BACK);
+  f.hook(IPC_CHANNELS.WINDOW_NAVIGATION_FORWARD);
+  expect(goToOffset).toHaveBeenCalledTimes(3);
 });

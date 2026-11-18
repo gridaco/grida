@@ -10,6 +10,7 @@ export namespace DesktopConversationFixtures {
   export type Scenario =
     | "text"
     | "attachments"
+    | "svg-selection"
     | "activity"
     | "streaming"
     | "empty";
@@ -81,6 +82,23 @@ export namespace DesktopConversationFixtures {
           role: "user",
           text: "This older image no longer has a preview.",
           attachments: [missingImage],
+        },
+      ],
+    },
+    {
+      id: "svg-selection",
+      label: "SVG text selection",
+      messages: [
+        {
+          messageId: "svg-selection-request",
+          role: "user",
+          text: "What does the selected text say?",
+          svgTextSelection: true,
+        },
+        {
+          messageId: "svg-selection-answer",
+          role: "assistant",
+          text: "The selected text says “Quiet tide.”",
         },
       ],
     },

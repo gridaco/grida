@@ -26,6 +26,10 @@ messages.map((m, i) => (
   filename stays in accessible and download metadata. Videos, ordinary files
   and folders keep individual named cards. A folder carries no access grant or
   invented content size. Missing image previews keep a named fallback.
+- **Workflow references** → numbered links to the selected public showcases,
+  presented above the user bubble with their thumbnails when available.
+- **Image references** → clickable thumbnails for selected public Library
+  assets, presented above the user bubble.
 - **Reasoning** parts → not rendered. Chain-of-thought tokens are internal
   transport/session data, not transcript content. While reasoning is the only
   streamed content, the existing compact `Thinking` indicator remains visible.

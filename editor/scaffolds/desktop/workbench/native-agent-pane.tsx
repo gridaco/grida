@@ -30,11 +30,13 @@ import {
   QuestionPrompt,
   workspace_links,
 } from "@/kits/agent-chat";
+import { MessageContextParts } from "@/kits/agent-chat/message-context-parts";
 import {
   NativeChatController,
   type NativeChatEditorSurfaces,
   type NativeChatView,
   type NativeChatInitialComposer,
+  type NativeChatFirstInput,
 } from "@/lib/agent-chat/native-chat-controller";
 import { subscribeToNativeNotificationFocus } from "@/lib/desktop/agent-focus-session";
 import {
@@ -73,6 +75,7 @@ const NO_COMMANDS: ComposerCatalog["commands"] = [];
 const MAX_DRAFT_BYTES = 512 * 1024;
 const readNoActivity = () => null;
 const subscribeNoActivity = () => () => {};
+const readNoSvgSelection = () => false;
 const APPROVAL_ACTION = {
   read_file: "Read file",
   list_files: "List folder",
@@ -91,18 +94,20 @@ const COMPOSER_DRAFTS = new ComposerDrafts();
 
 /**
  * A first message chosen before the workspace opened, with its connection.
- * `take` hands the text over once (see `welcome-message.ts`); `waiting`
+ * `take` hands the request over once (see `welcome-message.ts`); `waiting`
  * tells whether it is still there to take.
  */
 export type NativeFirstMessage = Readonly<{
   profileId: string | null;
   composer?: NativeChatInitialComposer;
   waiting: () => boolean;
-  take: () => string | null;
+  take: () => NativeChatFirstInput | null;
 }>;
 
 type NativeChatPresentation = {
   subagentPlacement?: SubagentPlacement;
+  /** Registered project folder to open from the access confirmation. */
+  projectFolderId?: string;
   /** Lends the selected main chat's existing controller to its workspace. */
   onProcessesChange?: (
     processes: NativeBackgroundProcessController | null
@@ -113,6 +118,7 @@ export function NativeAgentPaneGate({
   bridge,
   selectionKey,
   workspaceId,
+  projectFolderId,
   initialSession,
   editorSurfaces,
   sideChatPlacement,
@@ -152,7 +158,13 @@ export function NativeAgentPaneGate({
       bridge,
       (readiness, recommendedProfileId) =>
         setSelection({ bridge, attempt, readiness, recommendedProfileId }),
-      remembered ? { kind: message ? "new" : "saved", id: remembered } : null,
+      remembered
+        ? {
+            kind:
+              message && !message.composer?.preparedSessionId ? "new" : "saved",
+            id: remembered,
+          }
+        : null,
       message
         ? undefined
         : {
@@ -182,11 +194,17 @@ export function NativeAgentPaneGate({
     !!bridge.selectProfile;
   const unavailable =
     !starting && readiness !== "native-ready" && !connectionRequired;
-  // Chat cannot open here, so the message is dropped with a notice instead
-  // of waiting to be sent whenever this workspace opens again.
+  // A prepared chat has a durable destination. Keep its first message for
+  // retry if the bridge itself is temporarily unavailable.
+  const retainedWaiting =
+    !!(
+      firstMessage?.composer?.preparedSessionId ||
+      firstMessage?.composer?.messageContext
+    ) && firstMessage.waiting();
   useEffect(() => {
-    if (unavailable && firstMessage?.take()) setMessageDropped(true);
-  }, [unavailable, firstMessage]);
+    if (unavailable && !retainedWaiting && firstMessage?.take())
+      setMessageDropped(true);
+  }, [unavailable, retainedWaiting, firstMessage]);
   if (unavailable)
     return (
       <div className="flex flex-col gap-2 px-3 py-2 text-xs">
@@ -196,6 +214,8 @@ export function NativeAgentPaneGate({
             : (nativeChatConnectionNote[readiness] ??
               "Native chat is unavailable.")}
           {messageDropped && " Your message from Welcome wasn't sent."}
+          {retainedWaiting &&
+            " Your message from Home is still waiting to send."}
         </span>
         <Button
           type="button"
@@ -220,6 +240,7 @@ export function NativeAgentPaneGate({
       }
       selectionKey={selectionKey}
       workspaceId={workspaceId}
+      projectFolderId={projectFolderId}
       initialSession={initialSession}
       startupProfileId={
         readiness === "native-ready"
@@ -260,6 +281,7 @@ export function NativeAgentPane({
   connectionNote,
   selectionKey,
   workspaceId,
+  projectFolderId,
   initialSession,
   startupProfileId,
   editorSurfaces,
@@ -372,6 +394,7 @@ export function NativeAgentPane({
       controller={controller}
       bridge={bridge}
       workspaceId={workspaceId}
+      projectFolderId={projectFolderId}
       editorSurfaces={editorSurfaces}
       connectionRequired={connectionRequired}
       connectionNote={connectionNote}
@@ -448,6 +471,7 @@ function NativeChatPane({
   controller,
   bridge,
   workspaceId,
+  projectFolderId = workspaceId,
   editorSurfaces,
   connectionRequired = false,
   connectionNote,
@@ -460,6 +484,7 @@ function NativeChatPane({
   controller: NativeChatController;
   bridge: DesktopNativeChat;
   workspaceId?: string;
+  projectFolderId?: string;
   editorSurfaces?: NativeChatEditorSurfaces;
   /** No connection can run yet; the composer's model picker starts the chat. */
   connectionRequired?: boolean;
@@ -486,6 +511,11 @@ function NativeChatPane({
     controller.subscribe,
     controller.read,
     controller.read
+  );
+  const svgTextSelected = useSyncExternalStore(
+    controller.subscribeToComposerSvgText,
+    controller.readComposerSvgText,
+    readNoSvgSelection
   );
   const subagentActivity = useSyncExternalStore(
     state.subagents?.subscribe ?? subscribeNoActivity,
@@ -612,10 +642,10 @@ function NativeChatPane({
         actions={
           message.role === "user"
             ? {
-                // Only plain-text requests can be edited; a request with an
-                // attachment or one that started a goal cannot be resubmitted.
+                // Inline revision is for plain-text requests.
                 ...(editHistory &&
                   !message.attachments?.length &&
+                  !message.displayParts?.length &&
                   !goalStart && {
                     onEdit: (messageId: string) =>
                       void controller.prepareRevision(messageId),
@@ -660,7 +690,12 @@ function NativeChatPane({
       onTransfer={transferAttachment}
     >
       <AgentPermissionConfirmation
-        review={state.permissionModeReview}
+        review={
+          state.permissionModeReview && {
+            workspaceName: state.permissionModeReview.workspaceName,
+            workspaceId: projectFolderId,
+          }
+        }
         onAnswer={(confirmed) =>
           controller.answerPermissionModeReview(confirmed)
         }
@@ -1011,19 +1046,55 @@ function NativeChatPane({
               run: () => controller.runComposerCommand(id),
             }))}
             attachments={
-              state.attachmentDraft &&
-              !state.attachmentReading && (
-                <NativeAttachmentCard
-                  name={state.attachmentDraft.name}
-                  size={state.attachmentDraft.size}
-                  png={state.attachmentDraft.kind === "png"}
-                  preview={attachmentPreview}
-                  mimeType={state.attachmentDraft.mimeType}
-                  video={state.attachmentDraft.preview}
-                  onRemove={() => controller.removeAttachment(state.scope)}
-                />
+              (state.draftMessageContext ||
+                (state.attachmentDraft && !state.attachmentReading)) && (
+                <>
+                  {state.draftMessageContext && (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {state.draftMessageContext.displayParts.length ? (
+                        <MessageContextParts
+                          parts={state.draftMessageContext.displayParts}
+                        />
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          Message context
+                        </span>
+                      )}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-xs"
+                        aria-label="Remove message context"
+                        disabled={!controller.canRemoveMessageContext}
+                        onClick={() =>
+                          controller.removeMessageContext(state.scope)
+                        }
+                      >
+                        <XIcon className="size-3.5" />
+                      </Button>
+                    </div>
+                  )}
+                  {state.attachmentDraft && !state.attachmentReading && (
+                    <NativeAttachmentCard
+                      name={state.attachmentDraft.name}
+                      size={state.attachmentDraft.size}
+                      png={state.attachmentDraft.kind === "png"}
+                      preview={attachmentPreview}
+                      mimeType={state.attachmentDraft.mimeType}
+                      video={state.attachmentDraft.preview}
+                      onRemove={() => controller.removeAttachment(state.scope)}
+                    />
+                  )}
+                </>
               )
             }
+            allowEmptySubmit={
+              !state.goalIntent &&
+              !!state.draftMessageContext &&
+              (!!state.draftMessageContext.displayParts.length ||
+                !!state.attachmentDraft)
+            }
+            selectionContext={svgTextSelected ? "svg-text" : undefined}
             onAttachmentTransfer={transferAttachment}
             awaitSubmission
             canSubmit={

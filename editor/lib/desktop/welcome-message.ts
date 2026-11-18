@@ -12,14 +12,18 @@
  * navigation and a reload, and stays with this window. Entries are keyed by
  * workspace so two windows opening different workspaces do not cross.
  *
- * Delivery is at most once: the chat {@link welcome_message.take | takes} the
+ * Delivery is at most once: the chat {@link welcome_message.takeMessage | takes} the
  * entry immediately before it sends, so a reload after that point cannot send
  * it again, and an entry that is still waiting survives a slow startup or a
  * reload before the send. A chat that cannot send it takes it too and says so
  * (see test/desktop-welcome-first-message.md).
  */
 
-import type { NativeChatInitialComposer } from "@/lib/agent-chat/native-chat-controller";
+import { parseNativeChatMessageContext } from "@grida/desktop-bridge";
+import type {
+  NativeChatInitialComposer,
+  NativeChatFirstInput,
+} from "@/lib/agent-chat/native-chat-controller";
 
 const attachments = new Map<
   string,
@@ -28,6 +32,7 @@ const attachments = new Map<
 
 const KEY_PREFIX = "grida.welcome.message.v1.";
 const PROFILE_ID = /^[a-f0-9]{64}$/;
+const SESSION_ID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const attachmentTokens = new Map<string, string>();
 
 function key(workspaceId: string): string {
@@ -35,15 +40,14 @@ function key(workspaceId: string): string {
 }
 
 /** What the Welcome composer hands to the workspace's native chat. */
-export type WelcomeMessage = Readonly<{
-  /** The first message, already including any references or template. */
-  text: string;
-  /**
-   * The connection chosen on Welcome, as a new choice for the workspace.
-   * `null` keeps the workspace's default connection.
-   */
-  profileId: string | null;
-}> &
+export type WelcomeMessage = NativeChatFirstInput &
+  Readonly<{
+    /**
+     * The connection chosen on Welcome, as a new choice for the workspace.
+     * `null` keeps the workspace's default connection.
+     */
+    profileId: string | null;
+  }> &
   NativeChatInitialComposer;
 
 /** A slides template already copied into the workspace as its own deck. */
@@ -59,23 +63,16 @@ export type WelcomeReference = Readonly<{ title: string; url: string }>;
 export namespace welcome_message {
   /**
    * The first message for the person's text and selected context, or `null`
-   * when there is nothing to send. A template takes precedence over
-   * references, which only accompany a fresh start.
+   * when there is nothing to send.
    */
   export function compose({
     text,
-    template,
     references = [],
   }: {
     text: string;
-    template?: WelcomeTemplate | null;
     references?: readonly WelcomeReference[];
   }): string | null {
     const ask = text.trim();
-    if (template) {
-      const lead = ask || `Adapt the "${template.title}" slides template.`;
-      return `${lead}\n\nTemplate: "${template.title}" (${template.slides} slides), copied to \`${template.path}\`. Edit that deck and keep its visual system.`;
-    }
     if (references.length > 0) {
       const lead = ask || "Use these visual references as the starting point.";
       const list = references
@@ -137,20 +134,6 @@ export namespace welcome_message {
     }
   }
 
-  /**
-   * Consume the message's text once. Every caller after the first, and every
-   * caller after a reload, gets `null`. A malformed entry is removed and
-   * reads as none.
-   */
-  export function take(
-    workspaceId: string,
-    storage:
-      | Pick<Storage, "getItem" | "removeItem">
-      | undefined = sessionStorageOrUndefined()
-  ): string | null {
-    return takeMessage(workspaceId, storage)?.text ?? null;
-  }
-
   /** Consume the complete request, retaining original File custody in this window. */
   export function takeMessage(
     workspaceId: string,
@@ -182,8 +165,15 @@ function parse(raw: string | null): WelcomeMessage | null {
   if (raw === null) return null;
   const value = JSON.parse(raw) as unknown;
   if (typeof value !== "object" || value === null) return null;
-  const { text, profileId } = value as Record<string, unknown>;
-  if (typeof text !== "string" || !text.trim()) return null;
+  const {
+    text,
+    profileId,
+    messageContext: rawContext,
+  } = value as Record<string, unknown>;
+  const messageContext =
+    rawContext === undefined ? null : parseNativeChatMessageContext(rawContext);
+  if (typeof text !== "string" || (rawContext !== undefined && !messageContext))
+    return null;
   if (
     profileId !== null &&
     (typeof profileId !== "string" || !PROFILE_ID.test(profileId))
@@ -193,6 +183,7 @@ function parse(raw: string | null): WelcomeMessage | null {
     effort,
     operatingRegime,
     goal,
+    preparedSessionId,
     attachment,
     missingAttachment: missing,
   } = value as Record<string, unknown>;
@@ -210,6 +201,12 @@ function parse(raw: string | null): WelcomeMessage | null {
   )
     return null;
   if (goal !== undefined && typeof goal !== "boolean") return null;
+  if (
+    preparedSessionId !== undefined &&
+    (typeof preparedSessionId !== "string" ||
+      !SESSION_ID.test(preparedSessionId))
+  )
+    return null;
   let resource: NativeChatInitialComposer["attachment"];
   let missingAttachment: NativeChatInitialComposer["missingAttachment"];
   if (missing !== undefined) {
@@ -231,14 +228,23 @@ function parse(raw: string | null): WelcomeMessage | null {
     resource = attachments.get(token);
     if (!resource) missingAttachment = { kind, name };
   }
+  if (
+    !text.trim() &&
+    !messageContext?.displayParts.length &&
+    !resource &&
+    !missingAttachment
+  )
+    return null;
   return {
     text,
+    ...(messageContext && { messageContext }),
     profileId,
     ...(effort !== undefined && {
       effort: effort as NativeChatInitialComposer["effort"],
     }),
     ...(operatingRegime !== undefined && { operatingRegime }),
     ...(goal !== undefined && { goal }),
+    ...(preparedSessionId !== undefined && { preparedSessionId }),
     ...(resource && { attachment: resource }),
     ...(missingAttachment && { missingAttachment }),
   };

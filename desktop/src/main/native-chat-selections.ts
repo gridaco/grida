@@ -85,6 +85,7 @@ type Draft = {
   selection: Selection;
   operationId?: string;
   promotion?: { sessionId: string; requestId: string; firstInputId: string };
+  welcome?: true;
 };
 type Intent = {
   workspaceId: string;
@@ -112,6 +113,7 @@ type State = {
 /** Durable UI intent; native sessions remain the owner of saved-chat settings. */
 export class NativeChatSelections {
   private queue: Promise<void> = Promise.resolve();
+  private readonly creatingWelcome = new Set<string>();
   private unsynced = false;
   private confirmedDefaults: Selection | null;
   private constructor(
@@ -333,6 +335,58 @@ export class NativeChatSelections {
   }
 
   /** Persist stable creation and first-input identities before creating a session. */
+  prepareNewChat(
+    workspaceId: string,
+    draftId: string,
+    choice: { profileId: string | null; effort: NativeChatEffort },
+    check: () => void
+  ) {
+    return this.exclusive(async () => {
+      check();
+      workspace(workspaceId);
+      identity(draftId);
+      profile(choice.profileId);
+      const chosenEffort =
+        choice.effort === "standard" ? "medium" : choice.effort;
+      effort(chosenEffort);
+      await this.recoverPending();
+      await this.recoverWelcomeCreations();
+      this.requireReceiptCapacity();
+      if (this.state.drafts[draftId]) throw invalid();
+      if (
+        Object.keys(this.state.drafts).length -
+          (this.state.completed?.length ?? 0) >=
+        MAX_DRAFTS
+      )
+        throw new Error("native_chat_draft_limit");
+      const selected = {
+        ...(await this.options.choice(workspaceId, choice.profileId)),
+        effort: chosenEffort,
+      };
+      selection(selected);
+      if (selected.connectionId !== choice.profileId) throw invalid();
+      const promotion = chatCreation(draftId);
+      check();
+      await this.save({
+        ...this.state,
+        defaults: selected,
+        drafts: {
+          ...this.state.drafts,
+          [draftId]: {
+            workspaceId,
+            revision: 1,
+            selection: selected,
+            promotion,
+            welcome: true,
+          },
+        },
+      });
+      this.creatingWelcome.add(draftId);
+      return { ...promotion, selection: selected };
+    });
+  }
+
+  /** Persist stable creation and first-input identities before creating a session. */
   prepareCreation(
     workspaceId: string,
     draftId: string,
@@ -348,7 +402,8 @@ export class NativeChatSelections {
       workspace(workspaceId);
       identity(draftId);
       const draft = this.state.drafts[draftId];
-      if (!draft || draft.workspaceId !== workspaceId) throw invalid();
+      if (!draft || draft.workspaceId !== workspaceId || draft.welcome)
+        throw invalid();
       if (!draft.promotion) {
         await this.recoverPending();
         this.requireReceiptCapacity();
@@ -361,11 +416,7 @@ export class NativeChatSelections {
           current.model !== draft.selection.model
         )
           throw new Error("native_chat_selection_unavailable");
-        const promotion = {
-          sessionId: creationIdentity(draftId, "session"),
-          requestId: creationIdentity(draftId, "request"),
-          firstInputId: creationIdentity(draftId, "input"),
-        };
+        const promotion = chatCreation(draftId);
         check();
         await this.save({
           ...this.state,
@@ -383,42 +434,60 @@ export class NativeChatSelections {
     return this.exclusive(async () => {
       workspace(workspaceId);
       identity(draftId);
-      const draft = this.state.drafts[draftId];
-      if (!draft || draft.workspaceId !== workspaceId || !draft.promotion)
-        throw invalid();
-      // Keep the stable receipt for a lost response. A subsequent blank chat
-      // gets a fresh identity rather than reusing the promoted draft.
-      const current = { ...this.state.current };
-      if (current[workspaceId] === draftId) delete current[workspaceId];
-      const completed = this.state.completed ?? [];
-      if (!completed.includes(draftId)) {
-        const next = [...completed, draftId];
-        const drafts = { ...this.state.drafts };
-        for (const evicted of next.splice(
-          0,
-          Math.max(0, next.length - MAX_COMPLETED)
-        ))
-          delete drafts[evicted];
-        await this.save({
-          ...this.state,
-          current,
-          drafts,
-          completed: next,
-          acknowledgments: addAcknowledgment(this.state.acknowledgments, {
-            workspaceId,
-            sessionId: draft.promotion.sessionId,
-            operationId: draft.promotion.requestId,
-          }),
-        });
-      }
+      await this.completeCreation(workspaceId, draftId);
       await this.acknowledge();
-    });
+    }).finally(() => this.creatingWelcome.delete(draftId));
   }
 
   /** Safe at startup or before another explicit mutation; never starts a model. */
   recover(): Promise<void> {
     return this.exclusive(async () => {
       await this.recoverPending();
+      await this.recoverWelcomeCreations();
+    });
+  }
+
+  private async recoverWelcomeCreations(): Promise<void> {
+    const abandoned = Object.entries(this.state.drafts).filter(
+      ([id, draft]) =>
+        draft.welcome &&
+        !this.creatingWelcome.has(id) &&
+        !this.state.completed?.includes(id)
+    );
+    // A Welcome review cannot survive its owner. Release abandoned draft slots
+    // and settle the original receipts, without creating or granting a session.
+    for (const [id, draft] of abandoned)
+      await this.completeCreation(draft.workspaceId, id);
+    if (abandoned.length) await this.acknowledge();
+  }
+
+  private async completeCreation(workspaceId: string, draftId: string) {
+    const draft = this.state.drafts[draftId];
+    if (!draft || draft.workspaceId !== workspaceId || !draft.promotion)
+      throw invalid();
+    const completed = this.state.completed ?? [];
+    if (completed.includes(draftId)) return;
+    // Keep the stable receipt for a lost response. A subsequent blank chat
+    // gets a fresh identity rather than reusing the promoted draft.
+    const current = { ...this.state.current };
+    if (current[workspaceId] === draftId) delete current[workspaceId];
+    const next = [...completed, draftId];
+    const drafts = { ...this.state.drafts };
+    for (const evicted of next.splice(
+      0,
+      Math.max(0, next.length - MAX_COMPLETED)
+    ))
+      delete drafts[evicted];
+    await this.save({
+      ...this.state,
+      current,
+      drafts,
+      completed: next,
+      acknowledgments: addAcknowledgment(this.state.acknowledgments, {
+        workspaceId,
+        sessionId: draft.promotion.sessionId,
+        operationId: draft.promotion.requestId,
+      }),
     });
   }
 
@@ -763,9 +832,14 @@ function parseState(value: unknown): State {
     keys(
       draft,
       ["workspaceId", "revision", "selection"],
-      ["operationId", "promotion"]
+      ["operationId", "promotion", "welcome"]
     );
     if (draft.revision === 0) throw invalid();
+    if (
+      draft.welcome !== undefined &&
+      (draft.welcome !== true || !draft.promotion)
+    )
+      throw invalid();
     if (draft.operationId !== undefined) identity(draft.operationId);
     if (draft.promotion !== undefined) {
       const promotion = record(draft.promotion);
@@ -826,6 +900,13 @@ function creationIdentity(
   bytes[8] = (bytes[8]! & 0x3f) | 0x80;
   const hex = bytes.toString("hex");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+function chatCreation(draftId: string) {
+  return {
+    sessionId: creationIdentity(draftId, "session"),
+    requestId: creationIdentity(draftId, "request"),
+    firstInputId: creationIdentity(draftId, "input"),
+  };
 }
 function addAcknowledgment(
   items: State["acknowledgments"],

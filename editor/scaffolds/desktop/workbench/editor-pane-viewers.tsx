@@ -31,6 +31,7 @@ import {
 } from "react";
 import { AlertCircleIcon } from "lucide-react";
 import { Streamdown } from "streamdown";
+import type { DesktopFxViewer } from "@grida/desktop-bridge";
 import { type BundledLanguage, codeToHtml } from "shiki";
 import { cn } from "@app/ui/lib/utils";
 import { ZoomableImage } from "@/components/zoomable-image";
@@ -249,6 +250,20 @@ function StreamedImage({ src, relPath }: { src: string; relPath: string }) {
   const [errored, onError] = useMediaLoadError(src);
   if (errored) return <ErrorState message="Couldn't load this file." />;
   return <ZoomableImage src={src} alt={relPath} onError={onError} />;
+}
+
+/** The bytes were verified in Main. There is no live path to load or edit. */
+export function FxArtifactImage({
+  artifact,
+}: {
+  artifact: DesktopFxViewer.Artifact;
+}) {
+  return (
+    <StreamedImage
+      relPath={artifact.name}
+      src={`data:${artifact.mimeType};base64,${artifact.base64}`}
+    />
+  );
 }
 
 function Base64ImageViewer({

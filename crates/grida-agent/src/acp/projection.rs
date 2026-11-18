@@ -2,6 +2,7 @@
 
 use super::transport::Delivery;
 use super::unavailable;
+use crate::host::{TranscriptInputFacts, message_context};
 use agent_client_protocol::v1::ConnectionTo;
 use agent_client_protocol::v1::schema::{
     ContentBlock, ContentChunk, ResourceLink, SessionId, SessionNotification, SessionUpdate,
@@ -162,6 +163,8 @@ impl Projection {
         delivery: &Delivery,
         records: Vec<ReplayRecord>,
         turns: &[ReplayTurn],
+        input_facts: &TranscriptInputFacts,
+        message_context: bool,
     ) -> Result<()> {
         let request_id = self.replay_id.clone();
         let facts: BTreeMap<_, _> = turns.iter().map(|turn| (&turn.id, turn)).collect();
@@ -193,7 +196,9 @@ impl Projection {
             ));
         }
         for (turn, message) in messages {
-            if !matches!(message.role, Role::User | Role::Assistant) {
+            if !matches!(message.role, Role::User | Role::Assistant)
+                || message_context::is_supplemental(&message)
+            {
                 continue;
             }
             let mut meta = json!({"requestId": request_id});
@@ -208,13 +213,27 @@ impl Projection {
                 });
             }
             let text: String = visible_parts(&message).collect();
+            let mut text_meta = meta.clone();
+            if message.role == Role::User
+                && turn.is_some()
+                && input_facts.svg_text_selections.contains(&message.id)
+            {
+                text_meta["svgTextSelection"] = json!(true);
+            }
+            if message_context
+                && message.role == Role::User
+                && let Some(parts) = input_facts.display_parts.get(&message.id)
+            {
+                text_meta["displayParts"] = json!(parts);
+            }
+            let text_metadata = self.metadata(Some((TRANSCRIPT_WINDOW, text_meta)), &meta);
             self.chunk_with(
                 connection,
                 delivery,
                 message.role,
                 &message.id,
                 &text,
-                &meta,
+                text_metadata,
             )
             .await?;
             self.attachments(connection, delivery, &message, Some(&meta))
@@ -315,7 +334,9 @@ impl Projection {
         delivery: &Delivery,
         message: Message,
     ) -> Result<()> {
-        if !matches!(message.role, Role::User | Role::Assistant) {
+        if !matches!(message.role, Role::User | Role::Assistant)
+            || message_context::is_supplemental(&message)
+        {
             return Ok(());
         }
         let text: String = visible_parts(&message).collect();
@@ -396,7 +417,9 @@ impl Projection {
         if message.role != Role::User {
             return Ok(());
         }
-        for link in attachment_links(message) {
+        let observation =
+            crate::host::editor_observation::is_observation(message).then(editor_context_link);
+        for link in observation.into_iter().chain(attachment_links(message)) {
             let chunk =
                 ContentChunk::new(ContentBlock::ResourceLink(link)).message_id(message.id.as_str());
             let mut notification = SessionNotification::new(
@@ -425,9 +448,12 @@ impl Projection {
         role: Role,
         id: &MessageId,
         mut text: &str,
-        meta: &Value,
+        mut metadata: serde_json::Map<String, Value>,
     ) -> Result<()> {
-        while !text.is_empty() {
+        let mut has_display_parts = metadata
+            .get(TRANSCRIPT_WINDOW)
+            .is_some_and(|facts| facts.get("displayParts").is_some());
+        while !text.is_empty() || has_display_parts {
             let end = text.floor_char_boundary(MAX_CHUNK_BYTES.min(text.len()));
             let (part, remaining) = text.split_at(end);
             let chunk = ContentChunk::new(part.to_owned().into()).message_id(id.as_str());
@@ -436,9 +462,15 @@ impl Projection {
                 Role::Assistant => SessionUpdate::AgentMessageChunk(chunk),
                 _ => return Ok(()),
             };
-            let notification = SessionNotification::new(self.session.clone(), update)
-                .meta(self.metadata(Some((TRANSCRIPT_WINDOW, meta.clone())), meta));
+            let notification =
+                SessionNotification::new(self.session.clone(), update).meta(metadata.clone());
             delivery.send(connection, notification).await?;
+            if has_display_parts {
+                if let Some(Value::Object(facts)) = metadata.get_mut(TRANSCRIPT_WINDOW) {
+                    facts.remove("displayParts");
+                }
+                has_display_parts = false;
+            }
             text = remaining;
         }
         Ok(())
@@ -516,6 +548,7 @@ pub(super) fn visible_record_bytes(record: &HistoryRecord) -> usize {
     visible_parts(message).map(|part| part.len()).sum::<usize>()
         + activity * ACTIVITY_RECORD_BYTES
         + attachments
+        + usize::from(message_context::has_context(message)) * message_context::MAX_BYTES
 }
 
 /// Recorded outcome and wall-clock interval for a replayed turn.
@@ -694,8 +727,10 @@ fn shorten(text: &str, maximum: usize) -> (String, bool) {
 /// A message's readable text. A person's attachments are not text; they are
 /// presented as links (`attachment_links`).
 fn visible_parts(message: &Message) -> impl Iterator<Item = Cow<'_, str>> {
-    message.content.iter().filter_map(|content| {
-        if !matches!(message.role, Role::User | Role::Assistant) {
+    let hidden = crate::host::editor_observation::is_observation(message)
+        || message_context::is_supplemental(message);
+    message.content.iter().filter_map(move |content| {
+        if hidden || !matches!(message.role, Role::User | Role::Assistant) {
             return None;
         }
         match content {
@@ -708,6 +743,10 @@ fn visible_parts(message: &Message) -> impl Iterator<Item = Cow<'_, str>> {
 /// URI scheme naming an attachment the host retains for a chat. Clients
 /// cannot resolve it; it identifies the attachment within the transcript.
 pub(crate) const RETAINED_ATTACHMENT_URI: &str = "urn:grida:retained-attachment:";
+
+pub(super) fn editor_context_link() -> ResourceLink {
+    ResourceLink::new("Editor context", "urn:grida:editor-context")
+}
 
 fn attachment_links(message: &Message) -> impl Iterator<Item = ResourceLink> + '_ {
     message.content.iter().filter_map(move |content| {

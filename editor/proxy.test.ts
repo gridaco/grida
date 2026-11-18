@@ -17,6 +17,8 @@ import { buildDesktopCsp } from "./lib/desktop/csp";
  */
 describe("desktop CSP (GRIDA-SEC-004)", () => {
   const csp = buildDesktopCsp("test-nonce");
+  const fxShowcase = "https://fx-cdn.grida.co/showcase/";
+  const baseImgSrc = `img-src 'self' data: blob: grida-workspace: ${fxShowcase}`;
 
   const directive = (name: string): string => {
     const found = csp
@@ -69,6 +71,16 @@ describe("desktop CSP (GRIDA-SEC-004)", () => {
     }
   });
 
+  it("scopes the public FX showcase to image and video loads", () => {
+    for (const entry of csp.split(";")) {
+      const [name, ...sources] = entry.trim().split(" ");
+      const allowed = name === "img-src" || name === "media-src";
+      expect(
+        sources.filter((source) => source.includes("fx-cdn.grida.co"))
+      ).toEqual(allowed ? [fxShowcase] : []);
+    }
+  });
+
   // The first-party Grida Library's selected storage origin IS allowed in
   // img-src: reference pins are kept as URLs and rendered directly. It is one
   // first-party origin, image-only — distinct from generation-provider CDNs.
@@ -105,7 +117,7 @@ describe("desktop CSP (GRIDA-SEC-004)", () => {
         "https://evil.example.com; script-src 'unsafe-inline'",
       ]);
       expect(directiveOf(src, "img-src")).toBe(
-        "img-src 'self' data: blob: grida-workspace: https://library.grida.co"
+        `${baseImgSrc} https://library.grida.co`
       );
       expect(src).not.toContain("evil.example.com");
     });
@@ -117,9 +129,7 @@ describe("desktop CSP (GRIDA-SEC-004)", () => {
     });
 
     it("omits the library origin when env is unset (no widening on empty)", () => {
-      expect(directiveOf(buildDesktopCsp("n", ""), "img-src")).toBe(
-        "img-src 'self' data: blob: grida-workspace:"
-      );
+      expect(directiveOf(buildDesktopCsp("n", ""), "img-src")).toBe(baseImgSrc);
     });
 
     it("reduces the override to a bare origin (path/query stripped)", () => {
@@ -138,9 +148,7 @@ describe("desktop CSP (GRIDA-SEC-004)", () => {
       // it can neither add a second source nor inject a `; script-src …` clause.
       const evil = "https://evil.example.com; script-src 'unsafe-inline'";
       const src = buildDesktopCsp("n", evil);
-      expect(directiveOf(src, "img-src")).toBe(
-        "img-src 'self' data: blob: grida-workspace:"
-      );
+      expect(directiveOf(src, "img-src")).toBe(baseImgSrc);
       // and no injected directive (host OR the smuggled clause) leaked in
       expect(src).not.toContain("evil.example.com");
       expect(src).not.toContain("script-src 'unsafe-inline'");

@@ -65,6 +65,17 @@ export function DesktopComposerDemo() {
     setGoal(true);
   };
   const [scenario, setScenario] = useState<conversations.Scenario>("text");
+  const [svgTextSelected, setSvgTextSelected] = useState(true);
+  const selectionContext =
+    !home &&
+    scenario === "svg-selection" &&
+    svgTextSelected &&
+    !plan &&
+    !goal &&
+    !image &&
+    !fileAttachment
+      ? "svg-text"
+      : undefined;
   const [messages, setMessages] = useState<readonly NativeChatMessage[]>(
     () => conversations.get("text").messages
   );
@@ -90,7 +101,10 @@ export function DesktopComposerDemo() {
           (message) => message.messageId === messageId
         );
         if (index < 0) return current;
-        return [...current.slice(0, index), { ...current[index], text }];
+        return [
+          ...current.slice(0, index),
+          { ...current[index], text, svgTextSelection: undefined },
+        ];
       });
       setEdit(null);
     } catch (error) {
@@ -114,6 +128,7 @@ export function DesktopComposerDemo() {
     submission.reset();
     queue.reset();
     setScenario("text");
+    setSvgTextSelected(true);
     setMessages(conversations.get("text").messages);
     setEdit(null);
   };
@@ -144,6 +159,7 @@ export function DesktopComposerDemo() {
           messageId: crypto.randomUUID(),
           role: "user",
           text,
+          ...(selectionContext && { svgTextSelection: true }),
           ...(image
             ? { attachments: [fixtures.image] }
             : fileAttachment
@@ -219,6 +235,10 @@ export function DesktopComposerDemo() {
                 setScenario(next);
                 setEdit(null);
                 setMessages(conversations.get(next).messages);
+                if (next === "svg-selection") {
+                  setSvgTextSelected(true);
+                  queue.setRunning(false);
+                }
               }}
             >
               {conversations.scenarios.map((example) => (
@@ -228,6 +248,16 @@ export function DesktopComposerDemo() {
               ))}
             </select>
           </label>
+          {!home && scenario === "svg-selection" && (
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={svgTextSelected}
+                onChange={(event) => setSvgTextSelected(event.target.checked)}
+              />
+              SVG text selected
+            </label>
+          )}
           <label className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -375,6 +405,7 @@ export function DesktopComposerDemo() {
           )}
           <AgentComposer
             key={generation}
+            selectionContext={selectionContext}
             editing={
               queueView.queueDraft
                 ? {

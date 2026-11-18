@@ -292,6 +292,15 @@ Installer makers require a freshly verified package. The distribution and
 unsigned verification jobs each build and run the executable on their target.
 Linux binaries use the builder's GNU runtime.
 
+On macOS and GNU Linux, the Desktop development and package entrypoints also
+stage the exact `@grida/fx` platform executable and its license from the
+Desktop lockfile into `resources/bundled-programs`. The verifier checks the
+target binary and runs `grida-fx --version` on the matching platform. Install
+the target FX package at build time for cross-target packaging. Electron Main
+uses the installed resource for its own lookups and exposes a verified
+read-only command copy through the agent command environment. Coordinate FX
+version changes with the CLI using the [maintainer guidance for externals](../.agents/skills/externals/SKILL.md).
+
 The main-process chat client creates or loads a session in its selected
 workspace and sends identified text input over ACP. It reads retained input
 receipts and turn snapshots separately from execution. Pause and Stop return

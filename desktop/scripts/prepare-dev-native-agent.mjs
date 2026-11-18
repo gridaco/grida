@@ -5,6 +5,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { stageNativeAgent } from "./native-agent-package.mjs";
 
+import { stageBundledPrograms } from "./bundled-programs.mjs";
+
 const desktop = fileURLToPath(new URL("../", import.meta.url));
 const workspace = fileURLToPath(new URL("../../", import.meta.url));
 // Native Windows chat is unavailable until the host has ACL-aware private state.
@@ -60,6 +62,11 @@ if (process.platform !== "win32") {
       force: true,
     });
     stageNativeAgent(resources, artifacts, process.platform, process.arch);
+    fs.rmSync(path.join(resources, "bundled-programs"), {
+      recursive: true,
+      force: true,
+    });
+    stageBundledPrograms(resources, process.platform, process.arch);
   } finally {
     fs.rmSync(artifacts, { recursive: true, force: true });
   }

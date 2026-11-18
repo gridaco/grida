@@ -48,6 +48,7 @@ import type {
   NativeChatSnapshot,
   NativeChatTurnSummary,
   NativeChatUpdate,
+  NativeEditorObservation,
   NativeHookInfo,
   NativeHookInspection,
 } from "@grida/desktop-bridge";
@@ -84,6 +85,38 @@ const MAX_UPDATE_BYTES = 8 * 1024;
 const MAX_DELIVERY_BYTES = 1024 * 1024;
 const MAX_DELIVERY_CHUNKS = 4096;
 const TOKEN = /^[a-f0-9-]{36}$/;
+const PERMISSION_REVIEW_TTL_MS = 5 * 60_000;
+const WELCOME_PERMISSION_UNVERIFIED = new Set([
+  "native_agent_request_timeout",
+  "native_agent_disconnected",
+  "native_agent_input_failed",
+  "native_agent_output_failed",
+  "native_agent_invalid_response",
+  "native_chat_permission_mode_invalid_response",
+  "sqlite_commit_unconfirmed",
+  "store_task_interrupted",
+  "control_worker_interrupted",
+]);
+
+export type NativeWelcomeWorkspace = Readonly<{
+  workspaceId: string;
+  workspaceName: string;
+  directoryIdentity: WorkspaceDirectoryIdentity;
+}>;
+
+type WelcomePermissionReview = {
+  id: string;
+  phase: "pending" | "confirmed" | "starting";
+  workspace?: NativeWelcomeWorkspace;
+  grant?: {
+    sessionId: string;
+    profileId: string | null;
+    effort: NativeChatEffort | undefined;
+  };
+  check(): void;
+  stopExpiry(): void;
+  release(): void;
+};
 
 export type ActiveNativeChat = Readonly<{
   workspaceId: string;
@@ -171,6 +204,8 @@ export type ActiveNativeChat = Readonly<{
         | "listBackgroundProcesses"
         | "stopBackgroundProcesses"
         | "registerEditorSurfaces"
+        | "acceptsEditorContext"
+        | "submitMessage"
         | "inspectHooks"
         | "reviewHook"
         | "installHook"
@@ -235,6 +270,14 @@ type Owner = {
   active: ActiveNativeChat;
   attachments: Map<string, Attachment>;
   retired: Set<string>;
+  editorContexts: Map<
+    string,
+    {
+      observation: NativeEditorObservation;
+      inputId?: string;
+      session?: NativeChatSession;
+    }
+  >;
   subscriptions: Map<string, Subscription>;
   pending: number;
   listing: boolean;
@@ -346,6 +389,10 @@ export class NativeChatIpc {
   >();
   private readonly selectingProfile = new WeakSet<WebContents>();
   private readonly selectingPermissionMode = new WeakSet<Owner>();
+  private readonly welcomePermissionReviews = new WeakMap<
+    WebContents,
+    WelcomePermissionReview
+  >();
   private readonly svgTextReplies = new NativeEditorSvgTextReplies();
   /** Per window, the sessions it showed for each chat host. */
   private readonly shownSessions = new Map<
@@ -362,7 +409,7 @@ export class NativeChatIpc {
     ) => ActiveNativeChat | null,
     private readonly startup?: {
       admits(sender: WebContents): boolean;
-      ensure(workspaceId: string): Promise<void>;
+      ensure(workspaceId: string, requireCurrent?: () => void): Promise<void>;
     },
     private readonly confirmDeletion?: (
       sender: WebContents,
@@ -389,7 +436,10 @@ export class NativeChatIpc {
       ): Promise<boolean>;
     },
     private readonly selections?: NativeChatSelections,
-    private readonly browserTools?: DesktopBrowserTools
+    private readonly browserTools?: DesktopBrowserTools,
+    private readonly resolveWelcomeWorkspace?: (
+      workspaceId: string
+    ) => Promise<NativeWelcomeWorkspace>
   ) {}
 
   async documentRequest<T>(
@@ -950,6 +1000,259 @@ export class NativeChatIpc {
       : undefined;
   }
 
+  /** A Welcome frame may reserve a review, never attach or submit to a workspace. */
+  async prepareWelcomeFullAccess(
+    { sender, senderFrame: frame }: IpcMainInvokeEvent,
+    workspaceId: unknown
+  ): Promise<NativeChatPermissionReview> {
+    const href = frame?.url;
+    if (
+      !frame ||
+      !href ||
+      ipc_sender.pathname(href) !== "/desktop/welcome" ||
+      !this.frameCurrent(sender, frame, href)
+    )
+      throw new Error("native_chat_scope_changed");
+    if (
+      this.disabled ||
+      !this.startup ||
+      !this.selections ||
+      !this.resolveWelcomeWorkspace
+    )
+      throw new Error("native_chat_permission_mode_unavailable");
+    if (!validWelcomeWorkspaceId(workspaceId))
+      throw new Error("native_chat_permission_mode_invalid");
+    const existing = this.welcomePermissionReviews.get(sender);
+    if (existing?.phase === "starting")
+      throw new Error("native_chat_permission_mode_busy");
+    existing?.release();
+    const expiresAt = Date.now() + PERMISSION_REVIEW_TTL_MS;
+    const review: WelcomePermissionReview = {
+      id: randomUUID(),
+      phase: "pending",
+      check: () => {
+        if (
+          this.welcomePermissionReviews.get(sender) !== review ||
+          (review.phase === "pending" && Date.now() >= expiresAt) ||
+          !this.frameCurrent(sender, frame, href)
+        )
+          throw new Error("native_chat_permission_mode_review_changed");
+      },
+      stopExpiry: () => clearTimeout(timer),
+      release: () => {
+        if (this.welcomePermissionReviews.get(sender) === review)
+          this.welcomePermissionReviews.delete(sender);
+        review.stopExpiry();
+        stopWatching();
+      },
+    };
+    const stopWatching = ipc_sender.watchNavigation(sender, review.release);
+    const timer = setTimeout(review.release, PERMISSION_REVIEW_TTL_MS);
+    timer.unref();
+    this.welcomePermissionReviews.set(sender, review);
+    try {
+      const workspace = await this.resolveWelcomeWorkspace(workspaceId);
+      review.check();
+      if (workspace.workspaceId !== workspaceId)
+        throw new Error("native_chat_scope_changed");
+      review.workspace = workspace;
+      return {
+        reviewId: review.id,
+        chatTitle: "New chat",
+        workspaceName: workspace.workspaceName,
+      };
+    } catch (error) {
+      review.release();
+      throw error;
+    }
+  }
+
+  /** Confirm or revoke the reservation without starting a worker. */
+  async answerWelcomeFullAccess(
+    event: IpcMainInvokeEvent,
+    reviewId: unknown,
+    confirmed: unknown
+  ): Promise<void> {
+    if (typeof confirmed !== "boolean")
+      throw new Error("native_chat_permission_mode_invalid");
+    const { review } = this.welcomePermissionReview(event, reviewId);
+    if (
+      review.phase === "starting" ||
+      (confirmed && review.phase !== "pending")
+    )
+      throw new Error("native_chat_permission_mode_review_changed");
+    if (!confirmed) {
+      review.release();
+      return;
+    }
+    review.phase = "confirmed";
+    review.stopExpiry();
+  }
+
+  private welcomePermissionReview(
+    { sender, senderFrame: frame }: IpcMainInvokeEvent,
+    reviewId: unknown
+  ) {
+    if (!token(reviewId))
+      throw new Error("native_chat_permission_mode_invalid");
+    const review = this.welcomePermissionReviews.get(sender);
+    const workspace = review?.workspace;
+    if (
+      !review ||
+      review.id !== reviewId ||
+      !workspace ||
+      frame !== sender.mainFrame
+    )
+      throw new Error("native_chat_permission_mode_review_changed");
+    review.check();
+    return { review, workspace };
+  }
+
+  /** Create with the current model and apply the approved access before export. */
+  async startWelcomeFullAccess(
+    event: IpcMainInvokeEvent,
+    reviewId: unknown,
+    value: unknown
+  ): Promise<{ sessionId: string; profileId: string | null }> {
+    const { sender } = event;
+    const { review, workspace } = this.welcomePermissionReview(event, reviewId);
+    if (review.phase !== "confirmed")
+      throw new Error("native_chat_permission_mode_review_changed");
+    if (!this.startup || !this.selections || !this.resolveWelcomeWorkspace)
+      throw new Error("native_chat_permission_mode_unavailable");
+    const { workspaceId, profileId, effort } = welcomePermissionChoice(value);
+    const prior = review.grant;
+    if (prior && (profileId !== prior.profileId || effort !== prior.effort))
+      throw new Error("native_chat_permission_mode_review_changed");
+    review.phase = "starting";
+    try {
+      const { directoryIdentity } = workspace;
+      if (workspaceId !== workspace.workspaceId)
+        throw new Error("native_chat_scope_changed");
+      const latest = await this.resolveWelcomeWorkspace(workspaceId);
+      review.check();
+      if (
+        latest.workspaceId !== workspaceId ||
+        !sameDirectory(latest.directoryIdentity, directoryIdentity)
+      )
+        throw new Error("native_chat_scope_changed");
+      if (profileId === null)
+        await this.startup.ensure(workspaceId, review.check);
+      else {
+        if (!this.profilesOwner)
+          throw new Error("native_chat_profiles_unavailable");
+        await this.profilesOwner.select(
+          workspaceId,
+          { kind: "new", id: profileId },
+          review.check
+        );
+      }
+      review.check();
+      const active = this.resolve(sender, workspaceId, profileId ?? undefined);
+      const chat = active?.chat;
+      if (
+        !active ||
+        active.workspaceId !== workspaceId ||
+        active.profileId !== profileId ||
+        !active.directoryIdentity ||
+        !sameDirectory(active.directoryIdentity, directoryIdentity) ||
+        !chat?.createSelected ||
+        !chat.acceptsSelection ||
+        !chat.acceptsPermissionMode ||
+        !chat.permissionMode ||
+        !chat.setPermissionMode
+      )
+        throw new Error("native_chat_permission_mode_unavailable");
+      const check = () => {
+        review.check();
+        if (
+          !sameActive(
+            active,
+            this.resolve(sender, workspaceId, profileId ?? undefined)
+          )
+        )
+          throw new Error("native_chat_scope_changed");
+      };
+      let session: NativeChatSession;
+      if (prior) {
+        session = await chat.load(prior.sessionId);
+        check();
+        if (session.id !== prior.sessionId)
+          throw new Error("native_chat_permission_mode_invalid_response");
+      } else {
+        const creation = await this.selections.prepareNewChat(
+          workspaceId,
+          review.id,
+          {
+            profileId,
+            effort:
+              effort ?? this.selections.readDefaults()?.effort ?? "medium",
+          },
+          check
+        );
+        try {
+          check();
+          session = await chat.createSelected(creation);
+        } finally {
+          // Finalize the creation receipt even if its native reply was lost.
+          await this.selections.finishCreation(workspaceId, review.id);
+        }
+        check();
+        if (session.id !== creation.sessionId)
+          throw new Error("native_chat_permission_mode_invalid_response");
+        const state = await chat.permissionMode(session);
+        check();
+        if (
+          state.sessionId !== session.id ||
+          state.revision !== 0 ||
+          state.mode !== "restricted" ||
+          !state.available.includes("full_access")
+        )
+          throw new Error("native_chat_permission_mode_unavailable");
+        review.grant = { sessionId: session.id, profileId, effort };
+      }
+      // A current review authorizes exactly one revision-0 grant. Native can
+      // replay its receipt using the same session and operation identities.
+      const updated = await chat.setPermissionMode(
+        session,
+        0,
+        review.id,
+        "full_access"
+      );
+      check();
+      if (
+        updated.sessionId !== session.id ||
+        updated.revision !== 1 ||
+        updated.mode !== "full_access"
+      )
+        throw new Error("native_chat_permission_mode_invalid_response");
+      if (prior) {
+        const current = await chat.permissionMode(session);
+        check();
+        if (
+          current.sessionId !== session.id ||
+          current.revision !== updated.revision ||
+          current.mode !== updated.mode
+        )
+          throw new Error("native_chat_permission_mode_review_changed");
+      }
+      return { sessionId: session.id, profileId };
+    } catch (error) {
+      if (
+        review.grant &&
+        error instanceof Error &&
+        WELCOME_PERMISSION_UNVERIFIED.has(error.message)
+      ) {
+        review.check();
+        review.phase = "confirmed";
+        throw new Error("native_chat_permission_mode_unverified");
+      }
+      throw error;
+    } finally {
+      if (review.phase === "starting") review.release();
+    }
+  }
+
   async selectProfile(
     { sender, senderFrame: frame }: IpcMainInvokeEvent,
     selection: unknown
@@ -1063,7 +1366,7 @@ export class NativeChatIpc {
       reviewId: randomUUID(),
       requestId,
       revision: expectedRevision as number,
-      expiresAt: Date.now() + 5 * 60_000,
+      expiresAt: Date.now() + PERMISSION_REVIEW_TTL_MS,
     };
     attachment.permissionReview = review;
     return {
@@ -1919,6 +2222,62 @@ export class NativeChatIpc {
     this.svgTextReplies.respond(attachment.id, callId, value);
   }
 
+  async captureEditorContext(
+    event: IpcMainInvokeEvent
+  ): Promise<string | null> {
+    if (
+      ipc_sender.pathname(event.senderFrame?.url) !== "/desktop/workspace" ||
+      !this.scope(event.sender, event.senderFrame)?.chat.acceptsEditorContext
+    )
+      return null;
+    const owner = this.owner(event);
+    const observation = await this.browserTools?.captureEditorObservation(
+      owner.sender
+    );
+    this.revalidate(owner);
+    if (!observation) return null;
+    const encoded = JSON.stringify(observation);
+    const identifier = /^[a-z][a-z0-9-]{0,63}$/;
+    if (
+      Buffer.byteLength(encoded) > MAX_UPDATE_BYTES ||
+      !identifier.test(observation.kind) ||
+      !identifier.test(observation.surface) ||
+      !Number.isSafeInteger(observation.sampledAt) ||
+      observation.sampledAt < 1 ||
+      !record(observation.payload)
+    )
+      throw new Error("native_chat_editor_context_invalid");
+    const id = randomUUID();
+    if (owner.editorContexts.size >= MAX_ATTACHMENTS) {
+      const oldest = owner.editorContexts.keys().next().value;
+      if (oldest) owner.editorContexts.delete(oldest);
+    }
+    owner.editorContexts.set(id, {
+      observation: JSON.parse(encoded) as NativeEditorObservation,
+    });
+    return id;
+  }
+
+  private editorContext(
+    owner: Owner,
+    attachment: Attachment,
+    inputId: string,
+    id: unknown
+  ): NativeEditorObservation | undefined {
+    if (id === undefined) return undefined;
+    const capture = token(id) ? owner.editorContexts.get(id) : undefined;
+    if (
+      !capture ||
+      !owner.active.chat.acceptsEditorContext ||
+      (capture.inputId !== undefined && capture.inputId !== inputId) ||
+      (capture.session !== undefined && capture.session !== attachment.session)
+    )
+      throw new Error("native_chat_editor_context_unavailable");
+    capture.inputId = inputId;
+    capture.session = attachment.session;
+    return capture.observation;
+  }
+
   async submit(
     event: IpcMainInvokeEvent,
     attachmentId: string,
@@ -1927,7 +2286,8 @@ export class NativeChatIpc {
     regime?: unknown,
     effort?: unknown,
     svgTargetId?: unknown,
-    selectionRevision?: unknown
+    selectionRevision?: unknown,
+    editorContextId?: unknown
   ) {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const prior = await this.selectionAdmission(
@@ -1953,7 +2313,44 @@ export class NativeChatIpc {
       inputId,
       text,
       mode,
-      ...submitSelections(surfaces, selected, selectionRevision)
+      ...submitSelections(
+        surfaces,
+        selected,
+        selectionRevision,
+        this.editorContext(owner, attachment, inputId, editorContextId)
+      )
+    );
+    this.revalidate(owner, attachment);
+    return result;
+  }
+
+  async submitMessage(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    input: unknown
+  ): Promise<NativeChatAcceptance> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const data = record(input);
+    if (typeof data?.inputId !== "string")
+      throw new Error("native_chat_message_context_invalid");
+    const { chat } = owner.active;
+    if (!chat.submitMessage)
+      throw new Error("native_chat_message_context_unavailable");
+    // Apply the same route and provider choice checks as other submits. A
+    // captured retry still reaches the host to verify its accepted context.
+    await this.selectionAdmission(
+      owner,
+      attachment,
+      data.inputId,
+      data.selectionRevision
+    );
+    this.revalidate(owner, attachment);
+    const result = await chat.submitMessage(
+      attachment.session,
+      input,
+      data.operatingRegime === "act"
+        ? attachment.editorSurfaces?.selection()
+        : undefined
     );
     this.revalidate(owner, attachment);
     return result;
@@ -1967,7 +2364,8 @@ export class NativeChatIpc {
     regime?: unknown,
     effort?: unknown,
     svgTargetId?: unknown,
-    selectionRevision?: unknown
+    selectionRevision?: unknown,
+    editorContextId?: unknown
   ) {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const prior = await this.selectionAdmission(
@@ -1993,7 +2391,12 @@ export class NativeChatIpc {
       inputId,
       text,
       mode,
-      ...submitSelections(surfaces, selected, selectionRevision)
+      ...submitSelections(
+        surfaces,
+        selected,
+        selectionRevision,
+        this.editorContext(owner, attachment, inputId, editorContextId)
+      )
     );
     this.revalidate(owner, attachment);
     return result;
@@ -2011,7 +2414,8 @@ export class NativeChatIpc {
     text: string,
     regime?: unknown,
     effort?: unknown,
-    selectionRevision?: unknown
+    selectionRevision?: unknown,
+    editorContextId?: unknown
   ): Promise<NativeChatAcceptance> {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const prior = await this.selectionAdmission(
@@ -2032,7 +2436,12 @@ export class NativeChatIpc {
       inputId,
       text,
       mode,
-      ...submitSelections(surfaces, agentEffort(effort), selectionRevision)
+      ...submitSelections(
+        surfaces,
+        agentEffort(effort),
+        selectionRevision,
+        this.editorContext(owner, attachment, inputId, editorContextId)
+      )
     );
     this.revalidate(owner, attachment);
     return result;
@@ -3161,6 +3570,7 @@ export class NativeChatIpc {
       active,
       attachments: new Map(),
       retired: new Set(),
+      editorContexts: new Map(),
       subscriptions: new Map(),
       pending: 0,
       listing: false,
@@ -3513,6 +3923,30 @@ function chatProfileSelection(value: unknown): NativeChatProfileSelection {
   throw new Error("native_chat_profile_selection_invalid");
 }
 
+function validWelcomeWorkspaceId(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(value);
+}
+
+function welcomePermissionChoice(value: unknown): {
+  workspaceId: string;
+  profileId: string | null;
+  effort: NativeChatEffort | undefined;
+} {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new Error("native_chat_permission_mode_invalid");
+  const { workspaceId, profileId, effort } = value as Record<string, unknown>;
+  if (
+    Object.keys(value).some(
+      (key) => !["workspaceId", "profileId", "effort"].includes(key)
+    ) ||
+    !validWelcomeWorkspaceId(workspaceId) ||
+    (Object.hasOwn(value, "effort") && effort === undefined) ||
+    (profileId !== null && !NativeChatProfiles.validId(profileId))
+  )
+    throw new Error("native_chat_permission_mode_invalid");
+  return { workspaceId, profileId, effort: agentEffort(effort) };
+}
+
 function selectionTarget(value: unknown): NativeChatSelections.Target {
   if (
     !value ||
@@ -3657,12 +4091,21 @@ function agentEffort(value: unknown): NativeChatEffort | undefined {
 function submitSelections(
   surfaces: NativeEditorSurfaceSelection | undefined,
   effort: NativeChatEffort | undefined,
-  selectionRevision?: unknown
+  selectionRevision?: unknown,
+  editorContext?: NativeEditorObservation
 ): [
   surfaces?: NativeEditorSurfaceSelection,
   effort?: NativeChatEffort,
   selectionRevision?: number,
+  editorContext?: NativeEditorObservation,
 ] {
+  if (editorContext)
+    return [
+      surfaces,
+      effort,
+      selectionRevision as number | undefined,
+      editorContext,
+    ];
   if (selectionRevision !== undefined)
     return [surfaces, effort, selectionRevision as number];
   if (effort) return [surfaces, effort];

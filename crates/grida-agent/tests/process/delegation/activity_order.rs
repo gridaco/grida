@@ -118,15 +118,17 @@ fn text_order(frames: &[Value], text: &str) -> u64 {
         })
         .unwrap_or_else(|| panic!("missing ordered text {text}: {frames:?}"))
 }
-async fn wait_finished(client: &mut Client, session: &str, name: &str) -> Value {
+async fn wait_ordered_finish(client: &mut Client, session: &str, name: &str) -> Value {
     timeout(WAIT, async {
         loop {
             let page = client.activity(session).await;
-            if page["events"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .any(|e| e["name"] == name && e["kind"] == "finished")
+            // Settlement can be visible before the publisher records its order.
+            if page["orderComplete"] == true
+                && page["events"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|e| e["name"] == name && e["kind"] == "finished")
             {
                 return page;
             }
@@ -134,7 +136,7 @@ async fn wait_finished(client: &mut Client, session: &str, name: &str) -> Value 
         }
     })
     .await
-    .unwrap()
+    .unwrap_or_else(|_| panic!("missing ordered completion for {name}"))
 }
 
 async fn scenario(detached: bool) {
@@ -228,11 +230,11 @@ async fn scenario(detached: bool) {
         2
     );
     release_b.send(()).unwrap();
-    let _ = wait_finished(&mut client, &session, "Second unit").await;
+    wait_ordered_finish(&mut client, &session, "Second unit").await;
     release_middle.send(()).unwrap();
     timeout(WAIT, later_ready).await.unwrap().unwrap();
     release_a.send(()).unwrap();
-    let completed = wait_finished(&mut client, &session, "First unit").await;
+    let completed = wait_ordered_finish(&mut client, &session, "First unit").await;
     release_later.send(()).unwrap();
     if let Some(prompt) = prompt {
         assert!(client.response(prompt).await.get("error").is_none());
@@ -269,7 +271,6 @@ async fn scenario(detached: bool) {
             .as_u64()
             .unwrap()
     };
-    assert_eq!(completed["orderComplete"], true);
     assert!(
         text_order(&client.frames, "Before first worker.") < event_order("First unit", "started")
     );

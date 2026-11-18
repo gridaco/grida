@@ -55,8 +55,11 @@ import type { DesktopHooks, DesktopNativeChat } from "./native-chat";
 import type { DesktopNativeExternalAgent } from "./native-external-agent";
 import type { NativeEditorSurfaceSnapshot } from "./native-editor-surfaces";
 import type { DesktopBrowser } from "./browser";
+import type { DesktopFxViewer } from "./fx-viewer";
 export { DesktopBrowser } from "./browser";
+export type { DesktopFxViewer } from "./fx-viewer";
 export type * from "./native-chat";
+export * from "./native-chat-message-context";
 export type * from "./native-external-agent";
 export type * from "./native-subagents";
 export { NativeEditorSurfaces } from "./native-editor-surfaces";
@@ -145,6 +148,10 @@ export type SaveDialogOptions = {
 export type NavigationState = {
   can_go_back: boolean;
   can_go_forward: boolean;
+  /** Present when the previous Desktop history entry is the plain Home route. */
+  back_destination?: "home";
+  /** Present when the next Desktop history entry is the plain Home route. */
+  forward_destination?: "home";
 };
 
 export const DESKTOP_HOST_APP_IDS = [
@@ -343,6 +350,14 @@ export type DesktopBridge = {
         handler: (request: { path: string; expiresAtMs: number }) => void
       ): () => void;
     };
+    /** User-authorized workbench intent. A viewer event alone grants no native file access. */
+    prepareFxFile?: (
+      request: DesktopFxViewer.FileRequest
+    ) => Promise<DesktopFxViewer.FileResult>;
+    /** Resolve a portable preview reference in this workbench's registered workspace. */
+    resolveFxPreview?: (
+      entry: DesktopFxViewer.Entry
+    ) => Promise<DesktopFxViewer.Preview>;
     /** Open the exact directory selected in a native folder picker. */
     choose?: () => Promise<Workspace | null>;
     open: (rootPath: string) => Promise<Workspace>;

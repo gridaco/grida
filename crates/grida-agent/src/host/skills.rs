@@ -41,13 +41,23 @@ impl Host {
         Ok(None)
     }
 
+    pub(super) fn optional_bundled_skills(&self) -> Vec<String> {
+        self.permissions
+            .as_ref()
+            .map(|profile| profile.bundled_skills().to_vec())
+            .unwrap_or_default()
+    }
+
     pub async fn skill_catalog(&self, session: SessionId) -> Result<Vec<SkillDescription>> {
         self.owned_control(move |host| async move {
             let view = host.store.inspect(session).await?;
             let root = host.guidance_scope(&view)?;
-            tokio::task::spawn_blocking(move || crate::skills::catalog(root.as_ref()))
-                .await
-                .map_err(|_| problem(ErrorKind::Unavailable, "skill_discovery_interrupted"))?
+            let optional = host.optional_bundled_skills();
+            tokio::task::spawn_blocking(move || {
+                crate::skills::catalog_with(root.as_ref(), &optional)
+            })
+            .await
+            .map_err(|_| problem(ErrorKind::Unavailable, "skill_discovery_interrupted"))?
         })
         .await
     }
@@ -55,15 +65,19 @@ impl Host {
 
 pub(super) async fn capture_listing(
     root: Option<ProjectRoot>,
+    optional: Vec<String>,
 ) -> Result<crate::skills::SkillListing> {
-    tokio::task::spawn_blocking(move || crate::skills::SkillListing::capture(root.as_ref()))
-        .await
-        .map_err(|_| problem(ErrorKind::Unavailable, "skill_discovery_interrupted"))?
+    tokio::task::spawn_blocking(move || {
+        crate::skills::SkillListing::capture_with(root.as_ref(), &optional)
+    })
+    .await
+    .map_err(|_| problem(ErrorKind::Unavailable, "skill_discovery_interrupted"))?
 }
 
 pub(super) async fn capture_guidance(
     root: Option<ProjectRoot>,
     parts: &[PromptPart],
+    optional: Vec<String>,
 ) -> Result<Option<CapturedGuidance>> {
     let selected = parts
         .iter()
@@ -72,7 +86,9 @@ pub(super) async fn capture_guidance(
             _ => None,
         })
         .collect();
-    tokio::task::spawn_blocking(move || crate::skills::capture(root.as_ref(), selected))
-        .await
-        .map_err(|_| problem(ErrorKind::Unavailable, "skill_capture_interrupted"))?
+    tokio::task::spawn_blocking(move || {
+        crate::skills::capture_with(root.as_ref(), selected, &optional)
+    })
+    .await
+    .map_err(|_| problem(ErrorKind::Unavailable, "skill_capture_interrupted"))?
 }

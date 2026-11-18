@@ -2,16 +2,19 @@
 import { AuthStore, SecretsStore } from "@grida/daemon/server";
 import { AGENT_DEFAULT_TIER, TIER_MODEL_IDS } from "@grida/ai/catalogue";
 import { createHash } from "node:crypto";
+import { EventEmitter } from "node:events";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { beforeEach, expect, it, vi } from "vitest";
-import type { App } from "electron";
+import type { App, IpcMainInvokeEvent, WebContents } from "electron";
 import { CHATGPT_RESPONSES_URL } from "../chatgpt-configuration";
 import { DesktopAccountSession } from "./account-session";
 import type { NativeChatLifecycle } from "./native-agent-chat";
 import { NativeAgentProcess } from "./native-agent-process";
 import { NativeGatewayConnection } from "./native-gateway-connection";
+import { NativeChatIpc } from "./native-chat-ipc";
+import { NativeChatSelections } from "./native-chat-selections";
 import { NativeProviderSelection } from "./native-provider-selection";
 import { NativeWorkspaceCatalog } from "./native-workspace-catalog";
 import type { NativeProviderNetwork } from "./native-provider-egress";
@@ -431,6 +434,156 @@ it.runIf(Boolean(resources) && process.platform === "darwin")(
     }
   },
   // Starts and replaces native workers; slower under a full suite.
+  20_000
+);
+
+it.runIf(Boolean(resources) && process.platform === "darwin")(
+  "confirms a new ordinary workspace chat on Welcome and opens its exact retained permission",
+  async () => {
+    const base = await fs.mkdtemp(
+      path.join(
+        await fs.realpath(os.tmpdir()),
+        "grida-welcome-native-permission-"
+      )
+    );
+    const root = path.join(base, "project");
+    const source = {
+      userDataPath: path.join(base, "agent"),
+      desktopUserDataPath: path.join(base, "desktop"),
+      providerHome: path.join(base, "providers"),
+      mediaRoot: path.join(base, "media"),
+    };
+    const workspace = {
+      id: "welcome-native",
+      root,
+      name: "Project",
+      opened_at: Date.now(),
+      pinned: false,
+    };
+    const origin = "https://editor.example.test";
+    const frame = { url: `${origin}/desktop/welcome` };
+    const contents = Object.assign(new EventEmitter(), {
+      mainFrame: frame,
+      isDestroyed: () => false,
+      isLoadingMainFrame: () => false,
+    });
+    const sender = contents as unknown as WebContents;
+    const event = {
+      sender,
+      senderFrame: frame,
+    } as unknown as IpcMainInvokeEvent;
+    const network = {
+      prepare: vi.fn<NativeProviderNetwork["prepare"]>(() => null),
+    };
+    let owner: import("./native-desktop-agent").NativeDesktopAgent | undefined;
+    try {
+      await Promise.all(
+        [root, ...Object.values(source)].map((directory) =>
+          fs.mkdir(directory, { recursive: true, mode: 0o700 })
+        )
+      );
+      sidecar.selectNativeChat.mockReturnValue(source);
+      sidecar.nativeAgentSubscriptionSettings.mockResolvedValue({
+        userDataPath: source.userDataPath,
+        network,
+      });
+      sidecar.nativeAgentGatewayConnection.mockImplementation((account) =>
+        NativeGatewayConnection.open({ origin, account, network })
+      );
+      sidecar.findWorkspace.mockResolvedValue(workspace);
+      const { NativeDesktopAgent } = await import("./native-desktop-agent");
+      const agent = await NativeDesktopAgent.prepareOrdinary(
+        new DesktopAccountSession({
+          base_url: origin,
+          fetch: async () =>
+            Response.json({
+              token: "fixture.gg.key",
+              account_subject: "fixture-user",
+              expires_at: new Date(Date.now() + 120_000).toISOString(),
+              organization: { id: 1 },
+            }),
+        }),
+        resources!,
+        [source.userDataPath],
+        { openExternal: async () => {} }
+      );
+      owner = agent;
+      const selections = await NativeChatSelections.open({
+        userDataPath: source.desktopUserDataPath,
+        choice: agent.selectionChoice.bind(agent),
+        query: agent.selectionRequest.bind(agent),
+      });
+      const ipc = new NativeChatIpc(
+        origin,
+        (_sender, id, profile) => agent.currentForWindow(id, profile),
+        { admits: () => true, ensure: agent.ensure.bind(agent) },
+        undefined,
+        undefined,
+        {
+          list: agent.profiles.bind(agent),
+          select: agent.selectProfile.bind(agent),
+        },
+        undefined,
+        false,
+        undefined,
+        undefined,
+        undefined,
+        selections,
+        undefined,
+        agent.welcomeWorkspace.bind(agent)
+      );
+      const choice = {
+        workspaceId: workspace.id,
+        profileId: null,
+        effort: "high",
+      };
+      const canceled = await ipc.prepareWelcomeFullAccess(event, workspace.id);
+      expect(canceled.workspaceName).toBe("project");
+      await expect(
+        ipc.answerWelcomeFullAccess(event, canceled.reviewId, false)
+      ).resolves.toBeUndefined();
+      expect(agent.current(workspace.id)).toBeNull();
+      const review = await ipc.prepareWelcomeFullAccess(event, workspace.id);
+      await ipc.answerWelcomeFullAccess(event, review.reviewId, true);
+      expect(agent.current(workspace.id)).toBeNull();
+      const confirmed = await ipc.startWelcomeFullAccess(
+        event,
+        review.reviewId,
+        choice
+      );
+      expect(confirmed?.profileId).toBeNull();
+      expect(agent.current(workspace.id)?.directoryIdentity).toEqual(
+        (await agent.welcomeWorkspace(workspace.id)).directoryIdentity
+      );
+      frame.url = `${origin}/desktop/workspace?id=${workspace.id}`;
+      contents.emit("did-navigate-in-page", {}, frame.url, true);
+      const { attachmentId, sessionId } = await ipc.load(
+        event,
+        confirmed!.sessionId
+      );
+      expect(sessionId).toBe(confirmed!.sessionId);
+      expect(await ipc.permissionMode(event, attachmentId)).toEqual({
+        sessionId,
+        revision: 1,
+        mode: "full_access",
+        available: ["restricted", "full_access"],
+      });
+      expect(await ipc.transcript(event, attachmentId)).toEqual([]);
+      expect((await ipc.selection(event, { sessionId })).selection).toEqual({
+        profileId: null,
+        modelId: TIER_MODEL_IDS[AGENT_DEFAULT_TIER],
+        effort: "high",
+      });
+      const another = await ipc.create(event);
+      expect((await ipc.permissionMode(event, another.attachmentId)).mode).toBe(
+        "restricted"
+      );
+      expect(network.prepare).not.toHaveBeenCalled();
+    } finally {
+      await owner?.close();
+      await fs.rm(base, { recursive: true, force: true });
+    }
+  },
   20_000
 );
 

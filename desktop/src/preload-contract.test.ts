@@ -176,12 +176,15 @@ describe("Desktop preload agent seam", () => {
     );
   });
 
-  it("preserves effort and SVG slots when forwarding the selection revision", () => {
+  it("preserves effort, SVG and selection slots when forwarding editor context", () => {
     const submission = preloadSource.match(
       /submitInRegime:\s*\(([^)]*)\)\s*=>\s*nativeChatInvoke\(([\s\S]*?)\),/
     );
     expect(submission?.[1]).toMatch(
-      /\beffort,\s*editorSvgTargetId,\s*selectionRevision\s*$/
+      /\beffort,\s*editorSvgTargetId,\s*selectionRevision,\s*editorContextId\s*$/
+    );
+    expect(submission?.[2]).toMatch(
+      /editorContextId !== undefined\s*\?\s*\[effort, editorSvgTargetId, selectionRevision, editorContextId\]/
     );
     expect(submission?.[2]).toMatch(
       /selectionRevision !== undefined\s*\?\s*\[effort, editorSvgTargetId, selectionRevision\]/
@@ -195,9 +198,11 @@ describe("Desktop preload agent seam", () => {
     const submission = preloadSource.match(
       /submitWithLibrarySelection:\s*\(([^)]*)\)\s*=>\s*nativeChatInvoke\(([\s\S]*?)\),/
     );
-    expect(submission?.[1]).toMatch(/effort,\s*selectionRevision\s*$/);
+    expect(submission?.[1]).toMatch(
+      /effort,\s*selectionRevision,\s*editorContextId\s*$/
+    );
     expect(submission?.[2]).toMatch(
-      /IPC_CHANNELS\.NATIVE_CHAT_SUBMIT_LIBRARY_SELECTION,\s*attachmentId,\s*inputId,\s*text,\s*operatingRegime,\s*effort,\s*\.\.\.\(selectionRevision === undefined \? \[\] : \[selectionRevision\]\)/
+      /IPC_CHANNELS\.NATIVE_CHAT_SUBMIT_LIBRARY_SELECTION,\s*attachmentId,\s*inputId,\s*text,\s*operatingRegime,\s*effort,\s*\.\.\.\(editorContextId !== undefined\s*\?\s*\[selectionRevision, editorContextId\]\s*:\s*selectionRevision === undefined\s*\?\s*\[\]\s*:\s*\[selectionRevision\]\)/
     );
   });
 

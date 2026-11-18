@@ -5,6 +5,10 @@ import type {
 } from "./native-editor-surfaces";
 import type { NativeEditorSvgText } from "./native-editor-svg-text";
 import type { NativeSubagentClient } from "./native-subagents";
+import type {
+  NativeChatDisplayPart,
+  NativeChatMessageContext,
+} from "./native-chat-message-context";
 
 export type NativeChatAttachment = Readonly<{
   attachmentId: string;
@@ -19,6 +23,33 @@ export type NativeChatDraftAttachment = NativeChatAttachment &
   }>;
 
 export type NativeChatOperatingRegime = "act" | "plan";
+
+/** Submit authored text and passive context to an attached native chat. */
+export type NativeChatMessageInput = Readonly<{
+  action?: "submit" | "enqueue";
+  inputId: string;
+  text: string;
+  operatingRegime: NativeChatOperatingRegime;
+  effort?: NativeChatEffort;
+  selectionRevision?: number;
+  messageContext: NativeChatMessageContext;
+}>;
+
+type EditorObservationValue =
+  | null
+  | boolean
+  | number
+  | string
+  | readonly EditorObservationValue[]
+  | { readonly [key: string]: EditorObservationValue | undefined };
+
+/** Bounded data observed by a Desktop-owned editor, without any tool authority. */
+export type NativeEditorObservation = Readonly<{
+  kind: string;
+  surface: string;
+  sampledAt: number;
+  payload: Readonly<Record<string, EditorObservationValue | undefined>>;
+}>;
 /** Full access deliberately removes command filesystem and network confinement. */
 export type NativeChatPermissionMode = "restricted" | "full_access";
 export type NativeChatPermissionReview = Readonly<{
@@ -159,6 +190,7 @@ export type NativeChatImageInput = Readonly<{
   operatingRegime: NativeChatOperatingRegime;
   effort?: NativeChatEffort;
   selectionRevision?: number;
+  messageContext?: NativeChatMessageContext;
 }>;
 
 /**
@@ -175,6 +207,7 @@ export type NativeChatSelectedImageInput = Readonly<{
   operatingRegime: NativeChatOperatingRegime;
   effort?: NativeChatEffort;
   selectionRevision?: number;
+  messageContext?: NativeChatMessageContext;
 }>;
 
 export type NativeChatFileInput = Readonly<{
@@ -186,6 +219,7 @@ export type NativeChatFileInput = Readonly<{
   operatingRegime: NativeChatOperatingRegime;
   effort?: NativeChatEffort;
   selectionRevision?: number;
+  messageContext?: NativeChatMessageContext;
 }>;
 
 /**
@@ -215,6 +249,7 @@ export type NativeChatFileReferenceInput = Readonly<{
   operatingRegime: NativeChatOperatingRegime;
   effort?: NativeChatEffort;
   selectionRevision?: number;
+  messageContext?: NativeChatMessageContext;
 }>;
 
 export type NativeChatPage = Readonly<{
@@ -567,6 +602,10 @@ export type NativeChatMessage = Readonly<{
   activity?: readonly NativeChatActivity[];
   /** Files the person attached to this message. Their bytes stay with the host. */
   attachments?: readonly NativeChatMessageAttachment[];
+  /** Passive display parts retained with this accepted message. */
+  displayParts?: readonly NativeChatDisplayPart[];
+  /** This user message carried a live SVG text binding when accepted. */
+  svgTextSelection?: true;
 }>;
 
 /** A file attached to a person's message, named for display. */
@@ -639,6 +678,7 @@ export type NativeChatQueueItem = Readonly<{
   textEditable?: boolean;
   /** Display metadata only; bytes require a current queued-preview read. */
   attachments?: readonly NativeChatMessageAttachment[];
+  displayParts?: readonly NativeChatDisplayPart[];
   goalStart?: NativeChatGoalRequest;
   operatingRegime?: NativeChatOperatingRegime;
   effort?: "ultra";
@@ -653,6 +693,7 @@ export type NativeChatQueuedMessage = Readonly<{
   /** Factual eligibility for the negotiated text-preserving replacement operation. */
   textEditable?: boolean;
   attachments?: readonly NativeChatMessageAttachment[];
+  displayParts?: readonly NativeChatDisplayPart[];
 }>;
 
 export type NativeChatQueuePage = Readonly<{
@@ -707,6 +748,9 @@ export type NativeChatGoalRequest = Readonly<{
   /** Exact USD mills under a negotiated provider-enforced allocation. */
   maxCostMills?: string;
 }>;
+
+export type NativeChatGoalStartInput = NativeChatGoalRequest &
+  Readonly<{ messageContext?: NativeChatMessageContext }>;
 
 export type NativeChatGoalStatus =
   | { status: "active" | "complete" | "exhausted" | "cleared" }
@@ -930,6 +974,21 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
    * workspace opens, with nothing active or saved. Listing starts nothing.
    */
   welcomeProfiles?(): Promise<NativeChatProfileCatalog | null>;
+  /** Review Full access for one reserved new chat. Available only on Welcome. */
+  prepareWelcomeFullAccess?(
+    workspaceId: string
+  ): Promise<NativeChatPermissionReview>;
+  /** Confirm or revoke the reservation in this frame without creating a chat. */
+  answerWelcomeFullAccess?(reviewId: string, confirmed: boolean): Promise<void>;
+  /** Consume one confirmed reservation. Create the chat without sending input. */
+  startWelcomeFullAccess?(
+    reviewId: string,
+    request: Readonly<{
+      workspaceId: string;
+      profileId: string | null;
+      effort?: NativeChatEffort;
+    }>
+  ): Promise<Readonly<{ sessionId: string; profileId: string | null }>>;
   /** Inspect reviewed definitions and retained results without running handlers. */
   inspectHooks?(attachmentId?: string): Promise<NativeHookInspection>;
   /** Main owns file selection and the explicit review of executable authority. */
@@ -1023,6 +1082,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     attachmentId: string,
     invoke: (request: NativeEditorSvgText.Request) => NativeEditorSvgText.Result
   ): () => void;
+  /** Freeze the current workbench observation. Only its opaque ID leaves Main. */
+  captureEditorContext?(): Promise<string | null>;
   submit(
     attachmentId: string,
     inputId: string,
@@ -1041,7 +1102,12 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     operatingRegime: NativeChatOperatingRegime,
     effort?: NativeChatEffort,
     editorSvgTargetId?: string,
-    selectionRevision?: number
+    selectionRevision?: number,
+    editorContextId?: string
+  ): Promise<NativeChatAcceptance>;
+  submitMessage?(
+    attachmentId: string,
+    input: NativeChatMessageInput
   ): Promise<NativeChatAcceptance>;
   acceptsEffort?(): Promise<boolean>;
   acceptsGoalEffort?(): Promise<boolean>;
@@ -1064,7 +1130,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     text: string,
     operatingRegime?: NativeChatOperatingRegime,
     effort?: NativeChatEffort,
-    selectionRevision?: number
+    selectionRevision?: number,
+    editorContextId?: string
   ): Promise<NativeChatAcceptance>;
   acceptsFile?(): Promise<boolean>;
   submitImage?(
@@ -1170,7 +1237,7 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   startGoal?(
     attachmentId: string,
     inputId: string,
-    request: NativeChatGoalRequest
+    request: NativeChatGoalStartInput
   ): Promise<NativeChatAcceptance>;
   controlGoal?(
     attachmentId: string,

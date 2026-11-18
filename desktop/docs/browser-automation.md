@@ -120,3 +120,13 @@ Managed website windows and prompts can require manual intervention. A human
 can use the regular browser controls and DevTools. The automation contract is
 the Grida tool catalog. Supported browser actions and result formats are defined
 by the catalog rather than the private Electron debugger interface.
+
+## FX viewer integration
+
+With the bundled FX 0.10.0, start the FX viewer through the CLI and pass its
+live URL to `surface_open`. Use `browser_snapshot` to identify the current
+document and confirm the viewer's subject before calling its page API through
+`browser_evaluate`.
+
+Catalog-based preview restoration, viewer selection capture on chat submission,
+and opening files from catalog entries are unavailable with this bundle.

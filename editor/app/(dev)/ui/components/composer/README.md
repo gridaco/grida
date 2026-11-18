@@ -35,6 +35,11 @@ Useful scenarios:
   code; image captions and image-only messages; file/folder cards and unavailable
   previews; settled tool activity; partial streaming and an empty conversation.
   Image thumbnails use the real preview/fullscreen components with local bytes.
+- Choose **SVG text selection** to preview the selection indicator in the
+  composer and above a sent message. Use **SVG text selected** to change the
+  simulated selection, or turn on Plan mode or attach a file to check when the
+  composer omits the indicator. A local Send captures the selection state for
+  that message. Changing it afterward leaves the sent indicator in place.
 - Turn **Running turn** off and hover a text user bubble to choose **Edit and
   resubmit**. The production inline message editor replaces that bubble with
   a multiline input and **Cancel** / **Send**; the composer and its unsent draft

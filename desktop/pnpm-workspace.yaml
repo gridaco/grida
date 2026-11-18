@@ -43,3 +43,11 @@ overrides:
   "@grida/ai": "link:../packages/grida-ai"
   "@grida/auth": "link:../packages/grida-auth"
   "@grida/home": "link:../packages/grida-home"
+
+# Exactly the first-party FX artifacts reviewed for the Desktop carrier.
+minimumReleaseAgeExclude:
+  - "@grida/fx-darwin-arm64@0.10.0"
+  - "@grida/fx-darwin-x64@0.10.0"
+  - "@grida/fx-linux-arm64-gnu@0.10.0"
+  - "@grida/fx-linux-x64-gnu@0.10.0"
+  - "@grida/fx@0.10.0"

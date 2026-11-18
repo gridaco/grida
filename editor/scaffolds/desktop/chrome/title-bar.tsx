@@ -97,11 +97,19 @@ function usePlatform(): NodeJS.Platform | string | null {
 export function TitleBar({
   children,
   className,
+  leading,
+  hideNavigationTo,
+  navigationScope = "window",
   reserveRightWindowControls = true,
   navigationDisabled = false,
 }: {
   children?: ReactNode;
   className?: string;
+  /** Optional control before the history buttons. */
+  leading?: ReactNode;
+  /** Hide history arrows to a destination that has its own control here. */
+  hideNavigationTo?: "home";
+  navigationScope?: nav.Scope;
   /**
    * Keep the Windows/Linux window-controls overlay out of this bar's content.
    * Disable only when the bar occupies a left-side region that cannot contain
@@ -144,7 +152,12 @@ export function TitleBar({
       }}
     >
       <div className="flex h-full w-full items-center gap-2 px-3 text-xs text-muted-foreground">
-        <NavButtons disabled={navigationDisabled} />
+        {leading}
+        <NavButtons
+          disabled={navigationDisabled}
+          hideNavigationTo={hideNavigationTo}
+          scope={navigationScope}
+        />
         {children}
       </div>
     </div>
@@ -159,44 +172,61 @@ export function TitleBar({
  * windows (loaded once with `?docId=…` and never navigated) free of
  * dead UI.
  *
- * Once any direction is available, the pair is shown together with
- * the unavailable side disabled — matching the convention from
- * Notion / Spotify / Apple Music desktop. The browser-style "always
- * visible, always disabled" pattern was rejected because Grida's
- * routes are flat and the buttons would be noise on every page that
- * happened to be at the entry point.
+ * The default shows both directions when either is available. A surface
+ * with a dedicated destination control can omit history arrows to that
+ * destination. The group needs at least one usable direction to appear.
  *
  * Each button opts out of the drag region via `.desktop-no-drag` — without it
  * the OS would consume the click as a window-move gesture.
  */
-function NavButtons({ disabled = false }: { disabled?: boolean }) {
-  const state = useNavigationState();
+function NavButtons({
+  disabled = false,
+  hideNavigationTo,
+  scope,
+}: {
+  disabled?: boolean;
+  hideNavigationTo?: "home";
+  scope: nav.Scope;
+}) {
+  const state = useNavigationState(scope);
   if (!state) return null;
-  if (!state.can_go_back && !state.can_go_forward) return null;
+  const showBack =
+    !hideNavigationTo || state.back_destination !== hideNavigationTo;
+  const showForward =
+    !hideNavigationTo || state.forward_destination !== hideNavigationTo;
+  if (
+    !(showBack && state.can_go_back) &&
+    !(showForward && state.can_go_forward)
+  )
+    return null;
   return (
     <div className="desktop-no-drag -ml-1 flex items-center gap-0.5">
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        disabled={disabled || !state.can_go_back}
-        onClick={() => void nav.back()}
-        aria-label="Go back"
-        title="Go back"
-      >
-        <ChevronLeftIcon />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        disabled={disabled || !state.can_go_forward}
-        onClick={() => void nav.forward()}
-        aria-label="Go forward"
-        title="Go forward"
-      >
-        <ChevronRightIcon />
-      </Button>
+      {showBack && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          disabled={disabled || !state.can_go_back}
+          onClick={() => void nav.go("back", scope)}
+          aria-label="Go back"
+          title="Go back"
+        >
+          <ChevronLeftIcon />
+        </Button>
+      )}
+      {showForward && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          disabled={disabled || !state.can_go_forward}
+          onClick={() => void nav.go("forward", scope)}
+          aria-label="Go forward"
+          title="Go forward"
+        >
+          <ChevronRightIcon />
+        </Button>
+      )}
     </div>
   );
 }

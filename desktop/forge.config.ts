@@ -206,6 +206,16 @@ const config: ForgeConfig = {
           stdio: "inherit",
         }
       );
+      execFileSync(
+        process.execPath,
+        [
+          path.join(__dirname, "scripts", "bundled-programs.mjs"),
+          path.dirname(appPath),
+          platform,
+          arch,
+        ],
+        { stdio: "inherit" }
+      );
     },
     // node-pty's npm tarball ships the darwin prebuilt `spawn-helper`
     // with mode 0644 (no exec bit) and never chmods it, so PTY spawn

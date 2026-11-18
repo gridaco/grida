@@ -12,6 +12,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 const SCHEMA: &str = "grida.agent.conversation_seed";
+pub const AUTHORED_INPUT_PREFIX: &str = "input";
+pub const EDITOR_OBSERVATION_SOURCE: &str = "editor-context";
+pub const MESSAGE_CONTEXT_SOURCE: &str = "message-context";
 
 /// The committed source view from which the selection was made.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -168,6 +171,41 @@ pub struct ConversationSeed {
     provenance: SeedProvenance,
 }
 
+struct PrefixEntry {
+    entry: SeedEntry,
+    record: Option<HistoryRecord>,
+    selected: bool,
+}
+
+impl PrefixEntry {
+    fn accompanies(&self, authored: &SeedOrigin) -> bool {
+        let origin = &self.entry.origin;
+        if origin.session != authored.session
+            || origin.view != authored.view
+            || origin.turn != authored.turn
+        {
+            return false;
+        }
+        let Some(HistoryRecord::Message(message)) = &self.record else {
+            return false;
+        };
+        let Some((source, input)) = origin.message.as_str().split_once('/') else {
+            return false;
+        };
+        message.role == Role::User
+            && message.provenance.kind == ProvenanceKind::Observed
+            && message.provenance.source == source
+            && match source {
+                MESSAGE_CONTEXT_SOURCE => input == authored.message.as_str(),
+                EDITOR_OBSERVATION_SOURCE => {
+                    authored.message.as_str().split_once('/')
+                        == Some((AUTHORED_INPUT_PREFIX, input))
+                }
+                _ => false,
+            }
+    }
+}
+
 impl ConversationSeed {
     /// Lower the already ordered source prefix into portable text and lineage.
     /// Local entries supply a turn ID and its observed committed journal position.
@@ -179,57 +217,107 @@ impl ConversationSeed {
     ) -> Result<Self> {
         let mut records = Vec::new();
         let mut entries = Vec::new();
-        if let Some(inherited) = inherited {
+        let anchor = cut.anchor();
+        let inherited = inherited.into_iter().flat_map(move |inherited| {
             let mut inherited_records = inherited.records.into_iter();
-            for entry in inherited.provenance.entries {
+            inherited.provenance.entries.into_iter().map(move |entry| {
                 let record = entry.message.as_ref().map(|_| {
                     inherited_records
                         .next()
                         .expect("seed records match provenance")
                 });
                 let selected = entry.message.as_ref().is_some_and(|message| {
-                    matches!(cut.anchor(), ConversationAnchor::Inherited { message: selected } if selected == message)
+                    matches!(anchor, ConversationAnchor::Inherited { message: selected } if selected == message)
                 });
-                if append_entry(&cut, selected, entry, record, &mut entries, &mut records)? {
-                    return Ok(Self {
-                        records,
-                        provenance: SeedProvenance {
-                            source,
-                            cut,
-                            entries,
-                        },
-                    });
-                }
-            }
-        }
-        for (turn, position, HistoryRecord::Message(message)) in local {
-            let selected = matches!(cut.anchor(), ConversationAnchor::Turn {
+                Ok(PrefixEntry { entry, record, selected })
+            })
+        });
+        let local = local
+            .into_iter()
+            .map(|(turn, position, HistoryRecord::Message(message))| {
+                let selected = matches!(anchor, ConversationAnchor::Turn {
                 turn: selected_turn, message: selected_message,
             } if selected_turn == &turn && selected_message == &message.id);
-            if selected && !matches!(message.role, Role::User | Role::Assistant) {
-                return Err(Error::new(
-                    ErrorKind::InvalidInput,
-                    "history_anchor_not_visible",
-                ));
+                if selected && !matches!(message.role, Role::User | Role::Assistant) {
+                    return Err(Error::new(
+                        ErrorKind::InvalidInput,
+                        "history_anchor_not_visible",
+                    ));
+                }
+                let origin = SeedOrigin {
+                    session: source.session.clone(),
+                    view: source.view,
+                    turn,
+                    position,
+                    message: message.id.clone(),
+                };
+                let (entry, record) = lower_message(origin, message)?;
+                Ok(PrefixEntry {
+                    entry,
+                    record,
+                    selected,
+                })
+            });
+        let mut prefix = inherited.chain(local).peekable();
+        while let Some(candidate) = prefix.next() {
+            let PrefixEntry {
+                entry,
+                record,
+                selected,
+            } = candidate?;
+            if !selected {
+                entries.push(entry);
+                records.extend(record);
+                continue;
             }
-            let origin = SeedOrigin {
-                session: source.session.clone(),
-                view: source.view,
-                turn,
-                position,
-                message: message.id.clone(),
-            };
-            let (entry, record) = lower_message(origin, message)?;
-            if append_entry(&cut, selected, entry, record, &mut entries, &mut records)? {
-                return Ok(Self {
-                    records,
-                    provenance: SeedProvenance {
-                        source,
-                        cut,
-                        entries,
-                    },
-                });
+            match &cut {
+                ConversationCut::BeforeEditableUser(_) => {
+                    if record.is_none() {
+                        return Err(Error::new(
+                            ErrorKind::InvalidInput,
+                            "history_anchor_not_visible",
+                        ));
+                    }
+                    if !entry.editable {
+                        return Err(Error::new(
+                            ErrorKind::InvalidInput,
+                            "history_anchor_not_editable",
+                        ));
+                    }
+                }
+                ConversationCut::Through(_) => {
+                    let authored = entry.origin.clone();
+                    let before = records.len();
+                    entries.push(entry);
+                    records.extend(record);
+                    // The host records the accepted message and its context together.
+                    // Keep the attached observations even when the authored input has
+                    // no portable text of its own.
+                    while let Some(companion) = prefix.next_if(|candidate| {
+                        candidate
+                            .as_ref()
+                            .is_ok_and(|part| part.accompanies(&authored))
+                    }) {
+                        let companion = companion?;
+                        entries.push(companion.entry);
+                        records.extend(companion.record);
+                    }
+                    if records.len() == before {
+                        return Err(Error::new(
+                            ErrorKind::InvalidInput,
+                            "history_anchor_not_visible",
+                        ));
+                    }
+                }
             }
+            return Ok(Self {
+                records,
+                provenance: SeedProvenance {
+                    source,
+                    cut,
+                    entries,
+                },
+            });
         }
         Err(Error::new(
             ErrorKind::InvalidInput,
@@ -288,38 +376,9 @@ impl ConversationSeed {
     }
 }
 
-fn append_entry(
-    cut: &ConversationCut,
-    selected: bool,
-    entry: SeedEntry,
-    record: Option<HistoryRecord>,
-    entries: &mut Vec<SeedEntry>,
-    records: &mut Vec<HistoryRecord>,
-) -> Result<bool> {
-    if selected {
-        if record.is_none() {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                "history_anchor_not_visible",
-            ));
-        }
-        if matches!(cut, ConversationCut::BeforeEditableUser(_)) {
-            if !entry.editable {
-                return Err(Error::new(
-                    ErrorKind::InvalidInput,
-                    "history_anchor_not_editable",
-                ));
-            }
-            return Ok(true);
-        }
-    }
-    entries.push(entry);
-    records.extend(record);
-    Ok(selected)
-}
-
 pub fn is_editable_user(message: &Message) -> bool {
     message.role == Role::User
+        && message.provenance.kind != ProvenanceKind::Observed
         && message.provenance.source != questions::ANSWER_SOURCE
         && message
             .content
@@ -348,10 +407,16 @@ fn lower_message(
             },
             phase: message.phase,
             content,
-            provenance: Provenance {
-                source: "retained_history".into(),
-                kind: ProvenanceKind::Transformed,
-                fingerprint: Some(fingerprint),
+            provenance: if role == Role::User && message.provenance.kind == ProvenanceKind::Observed
+            {
+                // Host observations remain attributed as data, including in derived chats.
+                message.provenance
+            } else {
+                Provenance {
+                    source: "retained_history".into(),
+                    kind: ProvenanceKind::Transformed,
+                    fingerprint: Some(fingerprint),
+                }
             },
         })
     };

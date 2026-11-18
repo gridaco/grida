@@ -522,7 +522,10 @@ fn session_members(session: i32) -> Option<Vec<i32>> {
                     members.push(pid);
                 }
             }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            // Procfs may lose the task after the stat file was opened.
+            Err(error)
+                if error.kind() == std::io::ErrorKind::NotFound
+                    || error.raw_os_error() == Some(libc::ESRCH) => {}
             Err(_) => return None,
         }
     }

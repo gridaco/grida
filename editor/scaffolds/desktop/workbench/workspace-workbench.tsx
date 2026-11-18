@@ -43,12 +43,20 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { useRouter } from "next/navigation";
+import { HouseIcon } from "lucide-react";
 import { usePanelRef } from "react-resizable-panels";
+import { Button } from "@app/ui/components/button";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@app/ui/components/resizable";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@app/ui/components/tooltip";
 import {
   DESKTOP_WINDOW_CONTROLS_RIGHT_INSET,
   TitleBar,
@@ -155,6 +163,7 @@ export function WorkspaceWorkbench({
   workspace: Workspace;
   initialActiveRelPath?: string;
 }) {
+  const router = useRouter();
   // The editor group (VSCode's tab model) owns all tab state + rules — open
   // order, the active-tab-on-close neighbor rule, and reopen-closed history —
   // as a plain, unit-tested class. React is a
@@ -243,6 +252,18 @@ export function WorkspaceWorkbench({
   // Once restoration settles, an actually-empty editor group owns the faux tab.
   // (see test/desktop-workbench-start-tab.md)
   const showStart = restoreSettled && openTabs.length === 0;
+  const [dirtyPaths, setDirtyPaths] = useState<ReadonlySet<string>>(
+    () => new Set()
+  );
+  const onTabDirtyChange = useCallback((relPath: string, dirty: boolean) => {
+    setDirtyPaths((prev) => {
+      if (prev.has(relPath) === dirty) return prev;
+      const next = new Set(prev);
+      if (dirty) next.add(relPath);
+      else next.delete(relPath);
+      return next;
+    });
+  }, []);
   const [treeRefreshKey, setTreeRefreshKey] = useState(0);
   // File tree pane visibility. It starts hidden so the primary agent + editor
   // surfaces get the full workspace; ⌘B / Ctrl+B toggles it. The main title
@@ -306,7 +327,14 @@ export function WorkspaceWorkbench({
       // A trashed file closes its own tab; a trashed folder closes its whole
       // subtree. The group focuses the nearest surviving tab and (being a trash,
       // not a close) never records them for reopen.
-      group.closeMatching(WorkbenchTab.trashed(relPath, isDirectory));
+      const matches = WorkbenchTab.trashed(relPath, isDirectory);
+      group.closeMatching(matches);
+      setDirtyPaths(
+        (paths) =>
+          new Set(
+            [...paths].filter((path) => !matches(WorkbenchTab.file(path)))
+          )
+      );
       bumpTreeRefresh();
     },
     [group, bumpTreeRefresh]
@@ -436,12 +464,27 @@ export function WorkspaceWorkbench({
     async (tab: string): Promise<boolean> => {
       const target = WorkbenchTab.parse(tab);
       if (target.kind === "browser") return browsers.close(target.id);
+      if (target.kind === "file" && dirtyPaths.has(target.relPath)) {
+        const name = target.relPath.split("/").pop() ?? target.relPath;
+        if (!window.confirm(`"${name}" has unsaved changes. Close anyway?`))
+          return false;
+        onTabDirtyChange(target.relPath, false);
+      }
       group.close(tab);
       return true;
     },
-    [group, browsers]
+    [group, browsers, dirtyPaths, onTabDirtyChange]
   );
   const reopenClosedTab = useCallback(() => group.reopenClosed(), [group]);
+
+  function goHome() {
+    if (
+      dirtyPaths.size > 0 &&
+      !window.confirm("Leave workspace? Unsaved file changes will be lost.")
+    )
+      return;
+    router.push("/desktop/welcome");
+  }
 
   return (
     <WorkspaceChangesProvider workspaceId={workspace.id}>
@@ -464,6 +507,25 @@ export function WorkspaceWorkbench({
               <TitleBar
                 className="border-b-0"
                 reserveRightWindowControls={false}
+                hideNavigationTo="home"
+                navigationScope="workspace"
+                leading={
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="desktop-no-drag"
+                        aria-label="Home"
+                        onClick={goHome}
+                      >
+                        <HouseIcon className="size-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">Home</TooltipContent>
+                  </Tooltip>
+                }
               >
                 {/* The menu owns name truncation; keep this wrapper unclipped so
                     its external keyboard-focus ring can paint in full. */}
@@ -517,6 +579,8 @@ export function WorkspaceWorkbench({
                         browsers={browsers}
                         openTabs={openTabs}
                         activeTab={activeTab}
+                        dirtyPaths={dirtyPaths}
+                        onTabDirtyChange={onTabDirtyChange}
                         onSelectTab={activateTab}
                         onCloseTab={closeTab}
                         onReopenClosedTab={reopenClosedTab}

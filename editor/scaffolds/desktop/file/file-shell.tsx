@@ -140,6 +140,9 @@ export function DesktopFileShell({
                   selectionKey={
                     mode === "deck" && !basePath ? workspaceId : undefined
                   }
+                  projectFolderId={
+                    mode === "deck" && !basePath ? workspaceId : undefined
+                  }
                   initialSession={null}
                   editorSurfaces={
                     mode === "doc" || nativeChat.deckSvgText

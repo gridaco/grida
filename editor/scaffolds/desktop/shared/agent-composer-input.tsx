@@ -38,6 +38,7 @@ import {
 import type { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
 import { ComposerDraftBinding } from "@/lib/agent-chat/composer-draft-binding";
 import { AgentComposerEditSession } from "./agent-composer-edit-session";
+import { EditorSelectionIndicator } from "@/kits/agent-chat/editor-selection-indicator";
 import { Button } from "@app/ui/components/button";
 import { cn } from "@app/ui/lib/utils";
 import {
@@ -94,6 +95,8 @@ export type AgentComposerInputProps = {
    * `allowEmptySubmit` is set.
    */
   onSubmit: (text: string) => void | Promise<void>;
+  /** Override the inline notice when an awaited send fails. */
+  onSubmitError?: (error: unknown) => void;
   isStreaming: boolean;
   /**
    * The session's busy signal. A busy submit keeps the draft until the host
@@ -140,6 +143,8 @@ export type AgentComposerInputProps = {
   emptySubmitLabel?: string;
   /** Attachments the host stages itself, shown above the editor. */
   attachments?: ReactNode;
+  /** A live editor selection eligible to go with the next message. */
+  selectionContext?: "svg-text";
   /** Footer content at the start of the toolbar. */
   toolbarStart?: ReactNode;
   /** Footer content right-aligned before the submit/stop button. */
@@ -187,6 +192,7 @@ function AgentComposerInner({
   editing,
   commandActions,
   onSubmit,
+  onSubmitError,
   isStreaming,
   busy,
   submitting = false,
@@ -203,6 +209,7 @@ function AgentComposerInner({
   allowEmptySubmit = false,
   emptySubmitLabel,
   attachments,
+  selectionContext,
   toolbarStart,
   toolbarEnd,
   className,
@@ -452,13 +459,15 @@ function AgentComposerInner({
             composer.clear();
           notify(null);
         }
-      } catch {
+      } catch (error) {
         if (queueSubmitGuard.owns(lease, submissionScopeRef.current)) {
-          notify(
-            awaitSubmission
-              ? "Couldn't confirm the send — your draft is still here."
-              : "Couldn't queue the message — your draft is still here."
-          );
+          if (onSubmitError) onSubmitError(error);
+          else
+            notify(
+              awaitSubmission
+                ? "Couldn't confirm the send — your draft is still here."
+                : "Couldn't queue the message — your draft is still here."
+            );
         }
       } finally {
         if (sentDraft) binding.settle(sentDraft.key);
@@ -498,9 +507,12 @@ function AgentComposerInner({
           {editing.label}
         </div>
       )}
-      {!editing && attachments && (
+      {!editing && (attachments || selectionContext) && (
         <div className="flex flex-wrap items-center gap-1.5 px-3 pt-2">
           {attachments}
+          {selectionContext && (
+            <EditorSelectionIndicator kind={selectionContext} />
+          )}
         </div>
       )}
       <ComposerContent

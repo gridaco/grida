@@ -21,6 +21,8 @@ const DESKTOP_CSP_SCRIPT_TAIL = IS_DEV
 
 const DESKTOP_CSP_PREFIX = `default-src 'self'; script-src 'self' 'nonce-`;
 
+const FX_SHOWCASE_MEDIA_SOURCE = "https://fx-cdn.grida.co/showcase/";
+
 //   connect-src allows:
 //   - 'self'              — grida.co (prod) / localhost:3000 (dev)
 //   - http://127.0.0.1:*  — the services sidecar
@@ -74,7 +76,7 @@ function imgSrcDirective(
   // the main process serves it by proxying to the sidecar's
   // `/workspaces/file` route (Range-capable, no 1 MiB base64 cap). It's a local
   // privileged origin, NOT an external host.
-  const base = "img-src 'self' data: blob: grida-workspace:";
+  const base = `img-src 'self' data: blob: grida-workspace: ${FX_SHOWCASE_MEDIA_SOURCE}`;
   const origins = Array.from(
     new Set(
       (typeof libraryImgOrigins === "string"
@@ -111,11 +113,9 @@ export function buildDesktopCsp(
     // separate change.
     `style-src 'self' 'unsafe-inline'; ` +
     `${imgSrcDirective(libraryImgOrigins)}; ` +
-    // media-src for BYOK video: clips are downloaded by the sidecar and
-    // handed to the renderer as base64 `data:`/`blob:` — never streamed from an
-    // external origin (no provider hosts added). `grida-workspace:`
-    // additionally streams local workspace media.
-    `media-src 'self' data: blob: grida-workspace:; ` +
+    // The sidecar downloads BYOK video. The renderer plays those bytes from
+    // `data:`/`blob:` alongside local workspace media and public FX showcase clips.
+    `media-src 'self' data: blob: grida-workspace: ${FX_SHOWCASE_MEDIA_SOURCE}; ` +
     `font-src 'self' data:; ` +
     DESKTOP_CSP_CONNECT_SRC +
     `frame-ancestors 'none'; ` +

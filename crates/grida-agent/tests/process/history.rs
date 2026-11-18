@@ -268,6 +268,204 @@ async fn transcript_windows_require_opt_in_and_keep_standard_replay() {
     observer.close().await;
 }
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[tokio::test]
+async fn transcript_marks_only_the_exact_input_that_captured_svg_text() {
+    use super::approvals::Stdio as PrivateStdio;
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+
+    const WINDOW: &str = "co.grida/session/transcript-window";
+    const SVG_TEXT: &str = "co.grida/session/editor-svg-text";
+    const ENDPOINT: &str = "6f9619ff-8b86-4011-b42d-00c04fc964ff";
+    const TARGET: &str = "5f9619ff-8b86-4011-b42d-00c04fc964ff";
+    const PROMPT: &str = "Inspect the selected material.";
+
+    async fn replay(client: &mut PrivateStdio, workspace: &Path, session: &Value) -> Vec<bool> {
+        let id = client
+            .send(
+                "session/load",
+                json!({"sessionId": session, "cwd": workspace, "mcpServers": [],
+                    "_meta":{WINDOW:{"kind":"read","requestId":"selection-page"}}}),
+            )
+            .await;
+        let mut selections = Vec::new();
+        loop {
+            let frame = client.read_frame().await;
+            if frame["id"] == id {
+                assert!(frame["result"].is_object(), "{frame}");
+                return selections;
+            }
+            assert!(!frame.to_string().contains(ENDPOINT));
+            assert!(!frame.to_string().contains(TARGET));
+            let params = &frame["params"];
+            let update = &params["update"];
+            let attribution = &params["_meta"][WINDOW];
+            if update["sessionUpdate"] == "user_message_chunk" {
+                assert_eq!(update["content"], json!({"type":"text","text":PROMPT}));
+                assert_eq!(attribution["requestId"], "selection-page");
+                let selected = attribution.get("svgTextSelection");
+                assert!(selected.is_none() || selected == Some(&json!(true)));
+                assert!(attribution["turnId"].is_string(), "{frame}");
+                selections.push(selected.is_some());
+            } else {
+                assert!(attribution.get("svgTextSelection").is_none(), "{frame}");
+            }
+        }
+    }
+
+    let temporary = TempDir::new().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    let workspace = root.join("project");
+    std::fs::create_dir(&workspace).unwrap();
+    let launch = || {
+        PrivateStdio::from_child(
+            executable()
+                .args(["serve", "--stdio", "--supervised-provider", "--state-dir"])
+                .arg(root.join("state"))
+                .args(["--endpoint", "http://127.0.0.1:1/v1", "--model", "fixture"])
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .unwrap(),
+        )
+    };
+    let offer = |svg| {
+        let mut capabilities = extension_initialize();
+        let meta = capabilities["clientCapabilities"]["_meta"]
+            .as_object_mut()
+            .unwrap();
+        for name in ["co.grida/provider/egress", WINDOW] {
+            meta.insert(name.into(), 1.into());
+        }
+        if svg {
+            for name in ["co.grida/session/editor-surfaces", SVG_TEXT] {
+                meta.insert(name.into(), 1.into());
+            }
+        }
+        capabilities
+    };
+    let mut client = launch();
+    let ready = client.request("initialize", offer(true)).await;
+    assert_eq!(
+        ready["result"]["agentCapabilities"]["_meta"][SVG_TEXT], 1,
+        "{ready}"
+    );
+    let created = client
+        .request("session/new", json!({"cwd": workspace,"mcpServers":[]}))
+        .await;
+    let session = &created["result"]["sessionId"];
+    let submission = client
+        .send(
+            "_co.grida/session/submit",
+            json!({"sessionId":session,
+        "inputId":"plain-input","prompt":[{"type":"text","text":PROMPT}]}),
+        )
+        .await;
+
+    let mut open = None;
+    let mut accepted = false;
+    while open.is_none() || !accepted {
+        let frame = client.read_frame().await;
+        if frame["id"] == submission {
+            assert_eq!(frame["result"]["disposition"], "claimed", "{frame}");
+            accepted = true;
+        }
+        if frame["method"] == "_co.grida/provider/exchange" && frame["params"]["action"] == "open" {
+            open = Some(frame);
+        }
+    }
+
+    let queued = client
+        .request(
+            "_co.grida/session/enqueue",
+            json!({"sessionId":session,
+        "inputId":"svg-input","prompt":[{"type":"text","text":PROMPT}],
+        "operatingRegime":"act","editorEndpointId":ENDPOINT,"editorSvgTargetId":TARGET}),
+        )
+        .await;
+    assert_eq!(queued["result"]["disposition"], "queued", "{queued}");
+    assert_eq!(replay(&mut client, &workspace, session).await, [false]);
+
+    let mut frame = open.unwrap();
+    for has_selection in [false, true] {
+        assert_eq!(frame["method"], "_co.grida/provider/exchange");
+        assert_eq!(frame["params"]["action"], "open");
+        let body = STANDARD
+            .decode(frame["params"]["initial"].as_str().unwrap())
+            .unwrap();
+        let body = std::str::from_utf8(&body).unwrap();
+        assert_eq!(body.contains("svg_read_selected_text"), has_selection);
+        assert!(!body.contains(TARGET));
+        assert!(!body.contains("svgTextSelection"));
+        if has_selection {
+            assert_eq!(
+                replay(&mut client, &workspace, session).await,
+                [false, true]
+            );
+        }
+        client
+            .respond(&frame["id"], json!({"status":"accepted"}))
+            .await;
+        let mut chunk = Some(STANDARD.encode(fixture_body(
+            Reply::Finished("Observed the request."),
+            ProviderProtocol::OpenAiCompatible,
+        )));
+        loop {
+            frame = client.read_frame().await;
+            if has_selection && frame["method"] == "_co.grida/provider/cancel" {
+                break;
+            }
+            if frame["method"] != "_co.grida/provider/exchange" {
+                continue;
+            }
+            let result = match frame["params"]["action"].as_str() {
+                Some("open") if !has_selection => break,
+                Some("dispatch") => json!({"status":"ready","httpStatus":200}),
+                Some("read") => match chunk.take() {
+                    Some(data) => json!({"status":"chunk","data":data}),
+                    None => json!({"status":"end"}),
+                },
+                _ => panic!("unexpected provider exchange: {frame}"),
+            };
+            client.respond(&frame["id"], result).await;
+        }
+    }
+    timeout(WAIT, async {
+        loop {
+            let snapshot = client
+                .request("_co.grida/session/snapshot", json!({"sessionId":session}))
+                .await;
+            if snapshot["result"]["current"].is_null()
+                && snapshot["result"]["latest"]["status"] == "succeeded"
+            {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    client.close().await;
+
+    let mut reopened = launch();
+    let ready = reopened.request("initialize", offer(false)).await;
+    assert!(ready["result"].is_object(), "{ready}");
+    let attached = reopened
+        .request(
+            "session/load",
+            json!({"sessionId":session,
+        "cwd":workspace,"mcpServers":[],"_meta":{WINDOW:{"kind":"attach"}}}),
+        )
+        .await;
+    assert!(attached["result"].is_object(), "{attached}");
+    assert_eq!(
+        replay(&mut reopened, &workspace, session).await,
+        [false, true]
+    );
+    reopened.close().await;
+}
+
 async fn after_owner_release(
     socket: &mut SharedSocket,
     id: u64,

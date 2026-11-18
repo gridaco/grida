@@ -1343,17 +1343,124 @@ it("keeps the captured SVG target when the same submission reply is lost", async
       truncated: false,
     }),
     subscribeToEditorSurfaces: () => () => {},
-    svgText: { capture, invoke: () => ({ kind: "unavailable" }) },
+    svgText: {
+      hasSelection: () => true,
+      subscribe: () => () => {},
+      capture,
+      invoke: () => ({ kind: "unavailable" }),
+    },
   });
   try {
     await controller.select("workbench");
+    expect(controller.readComposerSvgText()).toBe(true);
+    expect(capture).not.toHaveBeenCalled();
+    controller.selectOperatingRegime("plan");
+    expect(controller.readComposerSvgText()).toBe(false);
+    controller.selectOperatingRegime("act");
     await expect(controller.submit("Read this SVG selection.")).rejects.toThrow(
       "fixture lost reply"
     );
+    expect(controller.readComposerSvgText()).toBe(false);
     await controller.submit("Read this SVG selection.");
     expect(send.mock.calls[0]?.at(-1)).toBe(target);
     expect(send.mock.calls[1]).toEqual(send.mock.calls[0]);
     expect(capture).toHaveBeenCalledTimes(1);
+  } finally {
+    controller.disconnect();
+  }
+});
+
+it("retries the explicitly supplied editor context without sampling a new one", async () => {
+  const { bridge } = fixture();
+  const id = crypto.randomUUID();
+  bridge.captureEditorContext = vi.fn<
+    NonNullable<DesktopNativeChat["captureEditorContext"]>
+  >(async () => id);
+  const send = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(
+    async (_action, sessionId, inputId) => ({
+      sessionId,
+      inputId,
+      disposition: "claimed",
+      inputPosition: 1,
+      turnId: "turn-workbench",
+    })
+  );
+  send.mockRejectedValueOnce(new Error("fixture lost reply"));
+  bridge.submitInRegime = send;
+  const controller = new NativeChatController(bridge);
+  try {
+    await controller.select("workbench");
+    await expect(
+      controller.submit("Read this selection.", undefined, id)
+    ).rejects.toThrow("fixture lost reply");
+    await controller.submit("Read this selection.");
+    expect(send.mock.calls[0]?.at(-1)).toBe(id);
+    expect(send.mock.calls[1]).toEqual(send.mock.calls[0]);
+    expect(bridge.captureEditorContext).not.toHaveBeenCalled();
+  } finally {
+    controller.disconnect();
+  }
+});
+
+it("asks for reselection when the host confirms an expired capture was never accepted", async () => {
+  const { bridge, controller } = fixture();
+  bridge.captureEditorContext = async () => null;
+  bridge.submitInRegime = vi
+    .fn<NonNullable<DesktopNativeChat["submitInRegime"]>>()
+    .mockRejectedValueOnce(new Error("native_chat_editor_context_unavailable"));
+  try {
+    await controller.select("workbench");
+    await expect(
+      controller.submit("Read this selection.", undefined, crypto.randomUUID())
+    ).rejects.toThrow("native_chat_editor_context_reselect");
+    expect(controller.read().error).toBe(
+      "Select the editor item again to send this draft."
+    );
+  } finally {
+    controller.disconnect();
+  }
+});
+
+it("sends ordinary text but does not strip a pending observation on an older preload", async () => {
+  const { bridge, controller } = fixture();
+  const send = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(
+    async (_action, sessionId, inputId) => ({
+      sessionId,
+      inputId,
+      disposition: "claimed",
+      inputPosition: 1,
+      turnId: "turn-workbench",
+    })
+  );
+  bridge.submitInRegime = send;
+  const drafts = durableDrafts();
+  await drafts.writePending("workspace:workbench", {
+    text: "Read this selection.",
+    inputId: "pending-observation",
+    mode: "submit",
+    operatingRegime: "act",
+    allowLibrarySelection: false,
+    editorContextId: crypto.randomUUID(),
+  });
+  controller.keepDrafts(drafts, "workspace");
+  try {
+    await controller.select("workbench");
+    await expect(controller.submit("Read this selection.")).rejects.toThrow(
+      "native_chat_editor_context_reselect"
+    );
+    expect(controller.read().error).toBe(
+      "Select the editor item again to send this draft."
+    );
+    expect(send).not.toHaveBeenCalled();
+    await controller.submit("Send ordinary text.");
+    expect(send).toHaveBeenCalledExactlyOnceWith(
+      "submit",
+      "workbench",
+      expect.any(String),
+      "Send ordinary text.",
+      "act"
+    );
+    expect(send.mock.calls[0][2]).not.toBe("pending-observation");
   } finally {
     controller.disconnect();
   }
@@ -1385,7 +1492,12 @@ it("queues an Act follow-up with the captured SVG target", async () => {
       truncated: false,
     }),
     subscribeToEditorSurfaces: () => () => {},
-    svgText: { capture: () => target, invoke: () => ({ kind: "unavailable" }) },
+    svgText: {
+      hasSelection: () => true,
+      subscribe: () => () => {},
+      capture: () => target,
+      invoke: () => ({ kind: "unavailable" }),
+    },
   });
   try {
     await controller.select("workbench");
@@ -6673,8 +6785,8 @@ describe("a first message chosen before the chat opened", () => {
   const PROFILE = "9".repeat(64);
 
   function firstMessage(text = "Make a launch poster") {
-    let waiting: string | null = text;
-    const take = vi.fn<() => string | null>(() => {
+    let waiting: { text: string } | null = { text };
+    const take = vi.fn<() => { text: string } | null>(() => {
       const taken = waiting;
       waiting = null;
       return taken;
@@ -6699,6 +6811,144 @@ describe("a first message chosen before the chat opened", () => {
     f.bridge.selectProfile = choose;
     return { ...f, create, submit, choose };
   }
+
+  const messageContext = {
+    modelText: "<desktop-context>Use the selected example.</desktop-context>",
+    displayParts: [
+      { kind: "test.references", version: 1, data: { title: "Sample" } },
+    ],
+  };
+
+  it("sends a context-only first message through the ordinary chat", async () => {
+    const { controller, bridge, submit } = sending();
+    const submitMessage = vi.fn<
+      NonNullable<DesktopNativeChat["submitMessage"]>
+    >((attachment, request) =>
+      submit(attachment, request.inputId, request.text)
+    );
+    bridge.submitMessage = submitMessage;
+    try {
+      expect(
+        await controller.startChat(null, () => ({ text: "", messageContext }))
+      ).toBeNull();
+      expect(submitMessage).toHaveBeenCalledExactlyOnceWith(
+        "first",
+        expect.objectContaining({
+          action: "submit",
+          text: "",
+          messageContext,
+        })
+      );
+      expect(controller.read().draftMessageContext).toBeNull();
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("keeps the authored text and context together when the host refuses it", async () => {
+    const { controller, bridge, submit } = sending();
+    const drafts = durableDrafts();
+    controller.keepDrafts(drafts, "workspace");
+    const text = "Literal <reference> text";
+    try {
+      expect(
+        await controller.startChat(null, () => ({ text, messageContext }))
+      ).toBe(text);
+      expect(submit).not.toHaveBeenCalled();
+      expect(controller.read().error).toContain("Update Grida Desktop");
+      expect(controller.read().draftMessageContext).toEqual(messageContext);
+      expect(drafts.readMessageContext(controller.draftKey()!)).toEqual(
+        messageContext
+      );
+      const submitMessage = vi.fn<
+        NonNullable<DesktopNativeChat["submitMessage"]>
+      >((attachment, request) =>
+        submit(attachment, request.inputId, request.text)
+      );
+      bridge.submitMessage = submitMessage;
+      await controller.submit(text);
+      expect(submitMessage).toHaveBeenCalledExactlyOnceWith(
+        "first",
+        expect.objectContaining({ text, messageContext })
+      );
+      expect(drafts.readMessageContext(controller.draftKey()!)).toBeNull();
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("sends an edited contextual draft with its literal slash prefix", async () => {
+    const { controller, bridge, submit } = sending();
+    const submitMessage = vi
+      .fn<NonNullable<DesktopNativeChat["submitMessage"]>>(
+        (attachment, request) =>
+          submit(attachment, request.inputId, request.text)
+      )
+      .mockRejectedValueOnce(new Error("fixture lost reply"));
+    bridge.submitMessage = submitMessage;
+    const receipt = vi.spyOn(bridge, "inputReceipt");
+    const text = "Check the layout";
+    try {
+      expect(
+        await controller.startChat(null, () => ({ text, messageContext }))
+      ).toBe(text);
+      const [first] = submitMessage.mock.calls;
+      receipt.mockResolvedValue({
+        sessionId: "first",
+        inputId: first[1].inputId,
+        disposition: "claimed",
+        inputPosition: 1,
+        turnId: "turn-first",
+      });
+      await controller.submit(`/plan ${text}`);
+      expect(receipt).toHaveBeenCalledOnce();
+      expect(submitMessage).toHaveBeenCalledTimes(2);
+      expect(submitMessage.mock.calls[1][1]).toMatchObject({
+        text: `/plan ${text}`,
+        operatingRegime: "act",
+        messageContext,
+      });
+      expect(submitMessage.mock.calls[1][1].inputId).not.toBe(first[1].inputId);
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("keeps the context of an unconfirmed goal available for retry", async () => {
+    const { controller, bridge } = sending();
+    bridge.submitMessage =
+      vi.fn<NonNullable<DesktopNativeChat["submitMessage"]>>();
+    bridge.goal = async () => ({ observationId: null, goal: null });
+    const start = vi
+      .fn<NonNullable<DesktopNativeChat["startGoal"]>>(
+        async (sessionId, inputId) => ({
+          sessionId,
+          inputId,
+          disposition: "queued",
+          inputPosition: 1,
+          turnId: null,
+        })
+      )
+      .mockRejectedValueOnce(new Error("native_chat_goal_start_unverified"));
+    bridge.startGoal = start;
+    const text = "Check the layout";
+    try {
+      expect(
+        await controller.startChat(null, () => ({ text, messageContext }), {
+          goal: true,
+        })
+      ).toBe(text);
+      expect(controller.canRemoveMessageContext).toBe(false);
+      controller.removeMessageContext(controller.read().scope);
+      expect(controller.read().draftMessageContext).toEqual(messageContext);
+      await controller.submit(text);
+      expect(start).toHaveBeenCalledTimes(2);
+      expect(start.mock.calls[1]).toEqual(start.mock.calls[0]);
+      expect(controller.read().draftMessageContext).toBeNull();
+    } finally {
+      controller.disconnect();
+    }
+  });
 
   it("opens a new chat on the chosen connection and sends the message once", async () => {
     const { bridge, create, submit, choose } = sending();
@@ -7430,7 +7680,9 @@ describe("recommended model connections", () => {
     bridge.selectProfile = vi.fn<
       NonNullable<DesktopNativeChat["selectProfile"]>
     >(async () => {});
-    const take = vi.fn<() => string>(() => "Use this connection");
+    const take = vi.fn<() => { text: string }>(() => ({
+      text: "Use this connection",
+    }));
     try {
       await controller.startChat(selection.read().profileId, take);
       expect(bridge.selectProfile).toHaveBeenCalledExactlyOnceWith({
@@ -7476,7 +7728,9 @@ describe("recommended model connections", () => {
     bridge.selectProfile = async () => {
       throw new Error("native_chat_profile_unavailable");
     };
-    const take = vi.fn<() => string>(() => "Keep the subscription draft");
+    const take = vi.fn<() => { text: string }>(() => ({
+      text: "Keep the subscription draft",
+    }));
     try {
       expect(await controller.startChat(selection.read().profileId, take)).toBe(
         "Keep the subscription draft"

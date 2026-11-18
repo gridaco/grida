@@ -1,12 +1,43 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" preserveAspectRatio="xMidYMid slice">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180">
+  <title>Three film frames of a solar eclipse</title>
   <defs>
-    <linearGradient id="ap-art-video" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#6d4f4a" />
-      <stop offset="1" stop-color="#a67c6d" />
+    <pattern id="sprockets" width="16" height="6" patternUnits="userSpaceOnUse">
+      <rect x="4" y="1" width="7" height="4" rx="1" fill="#968e85" />
+    </pattern>
+    <clipPath id="disc"><circle r="23" /></clipPath>
+    <linearGradient id="sun" x2="0" y2="1">
+      <stop stop-color="#ffde8a" />
+      <stop offset="1" stop-color="#ed8051" />
     </linearGradient>
+    <g id="frame">
+      <rect x="-48" y="-32" width="96" height="64" rx="2" fill="#362f2e" />
+      <circle r="23" fill="url(#sun)" />
+    </g>
   </defs>
-  <rect width="320" height="180" fill="url(#ap-art-video)" />
-  <circle cx="160" cy="90" r="40" fill="#f3f0ea" fill-opacity="0.16" />
-  <circle cx="160" cy="90" r="30" fill="#f3f0ea" />
-  <path d="M152 76 L178 90 L152 104 Z" fill="#6d4f4a" />
+  <style>
+    @media (prefers-reduced-motion: no-preference) {
+      #still:not(:target) .moon { animation: transit 6s ease-in-out infinite; }
+    }
+    @keyframes transit {
+      0%, 95%, 100% { transform: translateX(0); }
+      45%, 55% { transform: translateX(7px); }
+    }
+  </style>
+  <rect width="320" height="180" fill="#514943" />
+  <g id="still" transform="rotate(-6 160 90)">
+    <rect x="-16" y="42" width="352" height="96" fill="#181717" />
+    <path d="M-16 48h352v6H-16zm0 78h352v6H-16z" fill="url(#sprockets)" />
+    <g transform="translate(58 90)">
+      <use href="#frame" />
+      <g clip-path="url(#disc)"><circle class="moon" cx="-16" cy="-1" r="21" fill="#362f2e" /></g>
+    </g>
+    <g transform="translate(160 90)">
+      <use href="#frame" />
+      <g clip-path="url(#disc)"><circle class="moon" cx="-3" cy="-1" r="21" fill="#362f2e" /></g>
+    </g>
+    <g transform="translate(262 90)">
+      <use href="#frame" />
+      <g clip-path="url(#disc)"><circle class="moon" cx="11" cy="-1" r="21" fill="#362f2e" /></g>
+    </g>
+  </g>
 </svg>

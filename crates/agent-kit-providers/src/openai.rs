@@ -460,6 +460,9 @@ fn lower_tool_images(
 }
 
 fn lower_message(message: &Message, tools_supported: bool, output: &mut Vec<Value>) -> Result<()> {
+    if message.role == Role::User && message.content.is_empty() {
+        return Ok(());
+    }
     let mut text = String::new();
     let mut calls = Vec::new();
     for part in &message.content {

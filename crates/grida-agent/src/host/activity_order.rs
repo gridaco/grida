@@ -641,14 +641,18 @@ fn retained_public_facts(state: &agent_kit_core::turn::TurnState) -> Vec<String>
 }
 
 fn public_facts(message: &Message) -> Vec<String> {
-    if !matches!(message.role, Role::User | Role::Assistant) {
+    if !matches!(message.role, Role::User | Role::Assistant)
+        || super::message_context::is_supplemental(message)
+    {
         return Vec::new();
     }
     let mut facts = Vec::new();
-    if message.content.iter().any(|part| {
-        matches!(part, Content::Text(text) if !text.is_empty())
-            || (message.role == Role::User && matches!(part, Content::Media(_)))
-    }) {
+    if super::message_context::has_context(message)
+        || message.content.iter().any(|part| {
+            matches!(part, Content::Text(text) if !text.is_empty())
+                || (message.role == Role::User && matches!(part, Content::Media(_)))
+        })
+    {
         facts.push(format!("message/{}", message.id));
     }
     if message.role == Role::Assistant {
@@ -662,13 +666,17 @@ fn public_facts(message: &Message) -> Vec<String> {
 }
 
 fn record_public(state: &State, binding: &agent_kit_core::turn::TurnBinding, message: &Message) {
-    if !matches!(message.role, Role::User | Role::Assistant) {
+    if !matches!(message.role, Role::User | Role::Assistant)
+        || super::message_context::is_supplemental(message)
+    {
         return;
     }
-    if message.content.iter().any(|part| {
-        matches!(part, Content::Text(text) if !text.is_empty())
-            || (message.role == Role::User && matches!(part, Content::Media(_)))
-    }) {
+    if super::message_context::has_context(message)
+        || message.content.iter().any(|part| {
+            matches!(part, Content::Text(text) if !text.is_empty())
+                || (message.role == Role::User && matches!(part, Content::Media(_)))
+        })
+    {
         state.record_message(&binding.session, &binding.turn, &message.id);
     }
     if message.role == Role::Assistant {
