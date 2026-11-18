@@ -785,48 +785,71 @@ it("offers recovery for an unpaused saved queue only when Main advertises it", a
   }
 });
 
-it("prepends earlier pages to one transcript and ignores a page from a previous chat", async () => {
-  const { bridge, controller } = fixture();
-  const page = (
-    text: string,
-    older: string | null
-  ): NativeChatTranscriptPage => ({
-    view: 1,
-    messages: [{ messageId: text, role: "assistant", text }],
-    older,
-  });
-  const delayed = Promise.withResolvers<NativeChatTranscriptPage>();
-  const read = vi.fn<NonNullable<DesktopNativeChat["transcriptPage"]>>();
-  read.mockResolvedValueOnce(page("latest-a", "older-a"));
-  read.mockResolvedValueOnce(page("earlier-a", "oldest-a"));
-  read.mockReturnValueOnce(delayed.promise);
-  read.mockResolvedValueOnce(page("latest-b", null));
-  bridge.transcriptPage = read;
-  await controller.select("chat-a");
-  expect(controller.read()).toMatchObject({
-    messages: [{ text: "latest-a" }],
-    canReadEarlier: true,
-  });
-  await controller.loadEarlierMessages();
-  expect(read).toHaveBeenNthCalledWith(2, "chat-a", "older-a");
-  // The older page joins above the latest messages; nothing is swapped out.
-  expect(controller.read()).toMatchObject({
-    messages: [{ text: "earlier-a" }, { text: "latest-a" }],
-    canReadEarlier: true,
-  });
-  const waiting = controller.loadEarlierMessages();
-  await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(3));
-  expect(read).toHaveBeenNthCalledWith(3, "chat-a", "oldest-a");
-  await controller.select("chat-b");
-  delayed.resolve(page("late-a", "other-a"));
-  await waiting;
-  expect(controller.read()).toMatchObject({
-    messages: [{ text: "latest-b" }],
-    canReadEarlier: false,
-    readingEarlier: false,
-  });
-  controller.disconnect();
-});
+it.each(["switch chats", "replace the attachment"] as const)(
+  "ignores a pending earlier page when we %s",
+  async (transition) => {
+    const { bridge, controller } = fixture();
+    const page = (
+      text: string,
+      older: string | null
+    ): NativeChatTranscriptPage => ({
+      view: 1,
+      messages: [{ messageId: text, role: "assistant", text }],
+      older,
+    });
+    const delayed = Promise.withResolvers<NativeChatTranscriptPage>();
+    const read = vi.fn<NonNullable<DesktopNativeChat["transcriptPage"]>>();
+    read.mockResolvedValueOnce(page("latest-a", "older-a"));
+    read.mockResolvedValueOnce(page("earlier-a", "oldest-a"));
+    read.mockReturnValueOnce(delayed.promise);
+    read.mockResolvedValueOnce(page("latest-b", null));
+    bridge.transcriptPage = read;
+    await controller.select("chat-a");
+    expect(controller.read()).toMatchObject({
+      messages: [{ text: "latest-a" }],
+      canReadEarlier: true,
+    });
+    await controller.loadEarlierMessages();
+    expect(read).toHaveBeenNthCalledWith(2, "chat-a", "older-a");
+    // The older page joins above the latest messages; nothing is swapped out.
+    expect(controller.read()).toMatchObject({
+      messages: [{ text: "earlier-a" }, { text: "latest-a" }],
+      canReadEarlier: true,
+    });
+    const waiting = controller.loadEarlierMessages();
+    await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(3));
+    expect(read).toHaveBeenNthCalledWith(3, "chat-a", "oldest-a");
+    if (transition === "switch chats") await controller.select("chat-b");
+    else {
+      vi.spyOn(bridge, "observe").mockRejectedValueOnce(
+        new Error("native_chat_attachment_unavailable")
+      );
+      vi.spyOn(bridge, "load").mockResolvedValueOnce({
+        attachmentId: "replacement-a",
+        sessionId: "chat-a",
+      });
+      controller.checkObservation();
+    }
+    await vi.waitFor(() => {
+      expect(read).toHaveBeenNthCalledWith(
+        4,
+        transition === "switch chats" ? "chat-b" : "replacement-a"
+      );
+      expect(controller.read().connectionRecovery).toBeNull();
+    });
+    delayed.resolve(page("late-a", "other-a"));
+    await waiting;
+    expect(controller.read()).toMatchObject({
+      messages:
+        transition === "switch chats"
+          ? [{ text: "latest-b" }]
+          : [{ text: "earlier-a" }, { text: "latest-b" }],
+      canReadEarlier: transition === "replace the attachment",
+      readingEarlier: false,
+    });
+    controller.disconnect();
+  }
+);
 
 it("streams turn activity live and adopts recorded turns from each page", async () => {
   const { bridge, controller, running, updates } = fixture();
@@ -2428,6 +2451,68 @@ it("retains failed and empty main-composer edit text without reporting a save", 
   expect(controller.read().queueDraft?.text).toBe("  \n");
   expect(edit).toHaveBeenCalledOnce();
   controller.disconnect();
+});
+
+it("keeps a queued edit through host replacement and requires a fresh save basis", async () => {
+  const { bridge, controller, edit } = queuedEditFixture();
+  const observe = bridge.observe.bind(bridge);
+  let retired = false;
+  bridge.load = async (sessionId) => ({
+    sessionId,
+    attachmentId: retired ? "replacement-attachment" : sessionId,
+  });
+  bridge.observe = async (attachmentId) => {
+    if (retired && attachmentId === "chat-a")
+      throw new Error("native_chat_attachment_unavailable");
+    const observed = await observe("chat-a");
+    return {
+      ...observed,
+      observationId:
+        attachmentId === "chat-a"
+          ? observed.observationId
+          : "replacement-observation",
+    };
+  };
+  edit.mockRejectedValueOnce(new Error("transport_closed"));
+
+  try {
+    await controller.select("chat-a");
+    await vi.waitFor(() => expect(controller.queueCurrent).toBe(true));
+    await controller.editQueuedText("queued");
+    await expect(
+      controller.saveQueueDraft("Keep my revised text")
+    ).resolves.toBe(false);
+    retired = true;
+    controller.checkObservation();
+    await vi.waitFor(() => {
+      expect(controller.read().connectionRecovery).toBeNull();
+      expect(controller.read().observation?.observationId).toBe(
+        "replacement-observation"
+      );
+      expect(controller.queueCurrent).toBe(true);
+    });
+
+    expect(controller.read().queueDraft).toEqual({
+      inputId: "queued",
+      text: "Keep my revised text",
+    });
+    expect(edit).toHaveBeenCalledTimes(1);
+    await expect(controller.saveQueueDraft()).resolves.toBe(true);
+    expect(edit).toHaveBeenLastCalledWith(
+      "replacement-attachment",
+      expect.objectContaining({
+        action: "replace",
+        inputId: "queued",
+        text: "Keep my revised text",
+        observationId: "replacement-observation",
+      })
+    );
+    expect(edit.mock.calls[1][1].requestId).not.toBe(
+      edit.mock.calls[0][1].requestId
+    );
+  } finally {
+    controller.disconnect();
+  }
 });
 
 it("replays an unconfirmed edit receipt after the original queued input was replaced", async () => {
@@ -6507,6 +6592,135 @@ describe("Native workspace chat controller", () => {
     }
   });
 
+  it("replays a turn committed before the replacement subscription registers", async () => {
+    const { controller, bridge, updates, transcripts } = fixture();
+    const subscribeOnHost = bridge.subscribe.bind(bridge);
+    const subscribe = vi.spyOn(bridge, "subscribe");
+    const submit = vi.spyOn(bridge, "submit");
+    const registration = Promise.withResolvers<void>();
+    const committed = message("a", "A turn finished in another pane");
+    try {
+      // The idle snapshot does not schedule a follow-up poll.
+      await controller.select("a");
+      const retired = updates.get("a")!;
+      subscribe.mockImplementationOnce(async (id, listener) => {
+        await registration.promise;
+        return subscribeOnHost(id, listener);
+      });
+      retired({ kind: "closed", reason: "delivery_limit" });
+      await vi.waitFor(() => expect(subscribe).toHaveBeenCalledTimes(2));
+      // Main subscribes to future updates. A turn committed in this window
+      // cannot send an update to either the retired or the pending listener.
+      transcripts.set("a", [committed]);
+      registration.resolve();
+
+      await vi.waitFor(() =>
+        expect(controller.read().connectionRecovery).toBeNull()
+      );
+      expect(controller.read().messages).toEqual([committed]);
+      expect(submit).not.toHaveBeenCalled();
+    } finally {
+      registration.resolve();
+      controller.disconnect();
+    }
+  });
+
+  it("removes a delayed renewal after switching chats and ignores its callbacks", async () => {
+    const { controller, bridge, updates, transcripts } = fixture();
+    const subscribe = vi.spyOn(bridge, "subscribe");
+    const unsubscribe = vi.spyOn(bridge, "unsubscribe");
+    const registration = Promise.withResolvers<string>();
+    const committed = message("b", "Current chat history");
+    transcripts.set("b", [committed]);
+    try {
+      await controller.select("a");
+      subscribe.mockReturnValueOnce(registration.promise);
+      updates.get("a")!({ kind: "closed", reason: "delivery_limit" });
+      await vi.waitFor(() => expect(subscribe).toHaveBeenCalledTimes(2));
+      const late = subscribe.mock.calls[1]![1];
+
+      await controller.select("b");
+      registration.resolve("renewed-a");
+      late(text("a", "Late output from the retired chat", 0));
+      late({ kind: "closed", reason: "session_deleted" });
+
+      await vi.waitFor(() =>
+        expect(unsubscribe).toHaveBeenCalledWith("renewed-a")
+      );
+      expect(controller.read().connectionRecovery).toBeNull();
+      expect(controller.read().selected).toBe("b");
+      expect(controller.read().messages).toEqual([committed]);
+    } finally {
+      registration.resolve("renewed-a");
+      controller.disconnect();
+    }
+  });
+
+  it("restores a saved retry and attachment before replacing a failed startup attachment", async () => {
+    const { controller, bridge } = fixture();
+    const drafts = durableDrafts();
+    const draftReady = Promise.withResolvers<void>();
+    const readPending = drafts.readPending.bind(drafts);
+    const status = vi.spyOn(bridge, "status");
+    const send = vi.spyOn(bridge, "submit");
+    const prompt = "Inspect this attachment.";
+    await drafts.writePending("workspace:a", {
+      inputId: "retained-input",
+      text: prompt,
+      mode: "submit",
+      allowLibrarySelection: false,
+      attachment: {
+        kind: "file",
+        name: "draft.txt",
+        bytes: new Uint8Array([1, 2, 3]).buffer,
+      },
+    });
+    const restore = vi
+      .spyOn(drafts, "readPending")
+      .mockImplementationOnce(async (key) => {
+        await draftReady.promise;
+        return readPending(key);
+      });
+    vi.spyOn(bridge, "observe").mockRejectedValueOnce(
+      new Error("native_chat_attachment_unavailable")
+    );
+    const receipt = vi.spyOn(bridge, "inputReceipt").mockResolvedValueOnce({
+      sessionId: "a",
+      inputId: "retained-input",
+      disposition: "claimed",
+      inputPosition: 1,
+      turnId: "turn-a",
+    });
+    controller.keepDrafts(drafts, "workspace");
+
+    try {
+      const opening = controller.select("a");
+      await vi.waitFor(() =>
+        expect(restore).toHaveBeenCalledWith("workspace:a")
+      );
+      expect(controller.read().connectionRecovery).toBe("reconnecting");
+      expect(status).not.toHaveBeenCalled();
+      expect(controller.canSubmit).toBe(false);
+
+      draftReady.resolve();
+      await opening;
+      await vi.waitFor(() =>
+        expect(controller.read().connectionRecovery).toBeNull()
+      );
+      expect(status).toHaveBeenCalledExactlyOnceWith(true);
+      expect(controller.read().attachmentDraft).toMatchObject({
+        kind: "file",
+        name: "draft.txt",
+      });
+      await controller.submit(prompt);
+      expect(receipt).toHaveBeenCalledExactlyOnceWith("a", "retained-input");
+      expect(send).not.toHaveBeenCalled();
+    } finally {
+      draftReady.resolve();
+      controller.disconnect();
+    }
+  });
+
   it("reattaches the same chat after host loss and resolves a pending send by its original receipt", async () => {
     const { controller, bridge, updates, transcripts } = fixture();
     const observe = bridge.observe;
@@ -6622,6 +6836,58 @@ describe("Native workspace chat controller", () => {
       expect(submit.mock.calls).toHaveLength(2);
       expect(submit.mock.calls[0]).toEqual(submit.mock.calls[1]);
       expect(controller.read().selected).toBe("new");
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("reattaches an idle chat when retrying an unconfirmed send finds its attachment retired", async () => {
+    const { controller, bridge } = fixture();
+    const submit = vi
+      .spyOn(bridge, "submit")
+      .mockRejectedValueOnce(new Error("lost_reply"));
+    const receipt = vi.spyOn(bridge, "inputReceipt");
+    const status = vi.spyOn(bridge, "status");
+    const load = vi.spyOn(bridge, "load");
+    const prompt = "Keep this draft until its send is confirmed.";
+    try {
+      await controller.select("a");
+      await expect(controller.submit(prompt)).rejects.toThrow("lost_reply");
+      const inputId = submit.mock.calls[0]![1];
+      expect(receipt).toHaveBeenCalledExactlyOnceWith("a", inputId);
+
+      // The idle pane stays focused as its host exits. The person's retry
+      // is the first operation that can detect the retired attachment.
+      load.mockResolvedValueOnce({
+        attachmentId: "a-reconnected",
+        sessionId: "a",
+      });
+      receipt.mockRejectedValueOnce(new Error("native_chat_scope_changed"));
+      await expect(controller.submit(prompt)).rejects.toThrow(
+        "native_chat_scope_changed"
+      );
+      await vi.waitFor(() => {
+        expect(status).toHaveBeenCalledExactlyOnceWith(true);
+        expect(load.mock.calls).toEqual([["a"], ["a"]]);
+        expect(controller.read().connectionRecovery).toBeNull();
+      });
+      expect(receipt.mock.calls).toEqual([
+        ["a", inputId],
+        ["a", inputId],
+      ]);
+      expect(submit).toHaveBeenCalledTimes(1);
+
+      receipt.mockResolvedValueOnce({
+        sessionId: "a",
+        inputId,
+        disposition: "claimed",
+        inputPosition: 1,
+        turnId: "turn-a",
+      });
+      await controller.submit(prompt);
+      expect(controller.read().selected).toBe("a");
+      expect(receipt).toHaveBeenLastCalledWith("a-reconnected", inputId);
+      expect(submit).toHaveBeenCalledTimes(1);
     } finally {
       controller.disconnect();
     }

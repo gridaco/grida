@@ -558,7 +558,7 @@ function NativeChatPane({
   const interrupted = turn?.disposition === "interrupted";
   const running =
     turn?.disposition === "running" && !turn.paused && !turn.cancelled;
-  const canResume = controller.hasPausedTurn;
+  const canResume = !!turn && controller.hasPausedTurn;
   const goalTurn =
     !!turn && state.goal?.goal?.reservation?.turnId === turn.turnId;
   // A paused turn resumes from the composer; a Goal's own pause resumes from
@@ -632,6 +632,7 @@ function NativeChatPane({
       draft={state.revisionDraft}
       submitting={state.revisionSubmitting}
       effortAvailable={state.effortAvailable}
+      disconnected={!!state.connectionRecovery}
       onChange={(text) => controller.changeRevisionText(text)}
       onCancel={() => controller.cancelRevision()}
       onSubmit={() => void controller.submitRevision()}
@@ -845,16 +846,20 @@ function NativeChatPane({
             className="flex items-center gap-2 px-3 pt-2 text-xs"
           >
             <span className="flex-1">
-              This chat is disconnected. Saved messages are still visible.
+              {controller.canReconnect
+                ? "This chat is disconnected. Saved messages are still visible."
+                : "This side chat has ended."}
             </span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              onClick={() => void controller.repair()}
-            >
-              Reconnect
-            </Button>
+            {controller.canReconnect && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                onClick={() => void controller.repair()}
+              >
+                Reconnect
+              </Button>
+            )}
           </div>
         )}
         {interrupted && (
@@ -1086,10 +1091,13 @@ function NativeChatPane({
             editing={
               state.queueDraft
                 ? {
-                    id: `${state.scope}:${state.queueDraft.inputId}`,
+                    id: `${state.selected}:${state.queueDraft.inputId}`,
                     text: state.queueDraft.text,
                     label: "Editing queued message",
-                    busy: state.acting,
+                    busy:
+                      state.acting ||
+                      state.queueLoading ||
+                      !!state.connectionRecovery,
                     allowEmpty: state.queueDraft.allowEmpty,
                     onSave: (text) => controller.saveQueueDraft(text),
                     onCancel: () => controller.closeQueueDraft(),

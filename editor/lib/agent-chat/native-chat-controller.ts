@@ -202,7 +202,12 @@ export type NativeChatView = Readonly<{
   commandRunning: NativeChatCommand | null;
   commandNotice: string | null;
   commandFork: string | null;
-  revisionDraft: (NativeChatRevisionTarget & { unverified: boolean }) | null;
+  revisionDraft:
+    | (NativeChatRevisionTarget & {
+        unverified: boolean;
+        reviewExpired?: true;
+      })
+    | null;
   revisionSubmitting: boolean;
   catalogDraft: Readonly<{
     text: string;
@@ -1747,12 +1752,11 @@ export class NativeChatController {
       firstInputId: previous.firstInputId,
       selectedAttachment: previous.selectedAttachment,
       messageContext: previous.messageContext,
+      // Durable identities survive an attachment. Observation and review IDs
+      // belong to the retired attachment.
       pending: previous.pending,
       pendingGoalStart: previous.pendingGoalStart,
-      pendingGoalControl: previous.pendingGoalControl,
       pendingCommand: previous.pendingCommand,
-      pendingRevision: previous.pendingRevision,
-      pendingQueueChange: previous.pendingQueueChange,
       startsWithMessage: previous.startsWithMessage,
       submission: previous.submission,
       draftReady: previous.draftRestored ? Promise.resolve() : undefined,
@@ -1762,6 +1766,7 @@ export class NativeChatController {
     };
     this.scope = next;
     this.queueRelease(previous);
+    const revision = this.view.revisionDraft;
     this.update({
       scope: next.id,
       progressRevision: next.progressRevision,
@@ -1777,7 +1782,11 @@ export class NativeChatController {
       librarySelectionError: null,
       queue: null,
       queueLoading: false,
-      queueDraft: null,
+      readingEarlier: false,
+      earlierError: null,
+      ...(revision && {
+        revisionDraft: { ...revision, reviewExpired: true },
+      }),
       steering: false,
       pausing: null,
       sideChats: [],
@@ -3230,7 +3239,11 @@ export class NativeChatController {
    * to a fixed session, whose connection offers side chats.
    */
   get canOpenSideChat(): boolean {
-    return this.offersSideChat && !this.view.profileBusy;
+    return (
+      this.offersSideChat &&
+      !this.view.profileBusy &&
+      !this.view.connectionRecovery
+    );
   }
 
   /** Whether this attached chat's connection can ever open a side chat. */
@@ -3442,6 +3455,7 @@ export class NativeChatController {
     return (
       !!scope &&
       !this.view.loading &&
+      !this.view.connectionRecovery &&
       !this.view.acting &&
       (!scope.attachment || this.view.goalReady) &&
       this.goalStartRefusal === null
@@ -3478,6 +3492,7 @@ export class NativeChatController {
     if (
       !this.bridge.controlGoal ||
       !this.view.goalReady ||
+      this.view.connectionRecovery ||
       this.view.acting ||
       !goal
     )
@@ -3957,6 +3972,15 @@ export class NativeChatController {
     this.update({ submitting: true });
     try {
       await this.submitInScope(text, scopeId, editorContextId);
+    } catch (error) {
+      const current = this.scope;
+      if (
+        current?.submission === submission &&
+        (current.attachment || current.requested) &&
+        retiredChatAttachment(error)
+      )
+        this.requestObservationRecovery(current, error);
+      throw error;
     } finally {
       // Route activation can replace this scope during the same send. A real
       // chat switch starts without this token and must keep its own feedback.
@@ -4484,6 +4508,7 @@ export class NativeChatController {
     if (
       !scope ||
       !attachment ||
+      this.view.connectionRecovery ||
       !this.bridge.runCommand ||
       !this.commandChoices.includes(command)
     ) {
@@ -4607,6 +4632,7 @@ export class NativeChatController {
       goal !== "active" &&
       goal !== "blocked" &&
       !this.view.loading &&
+      !this.view.connectionRecovery &&
       !this.view.repairing &&
       !this.view.acting &&
       !this.view.commandRunning &&
@@ -4707,12 +4733,20 @@ export class NativeChatController {
 
   changeRevisionText(text: string): void {
     const draft = this.view.revisionDraft;
-    if (draft && !draft.unverified && !this.view.revisionSubmitting)
+    if (
+      draft &&
+      (!draft.unverified || draft.reviewExpired) &&
+      !this.view.revisionSubmitting
+    )
       this.update({ revisionDraft: { ...draft, text }, error: null });
   }
 
   cancelRevision(): void {
-    if (!this.view.revisionDraft?.unverified && !this.view.revisionSubmitting)
+    const draft = this.view.revisionDraft;
+    if (
+      (!draft?.unverified || draft.reviewExpired) &&
+      !this.view.revisionSubmitting
+    )
       this.update({ revisionDraft: null, error: null });
   }
 
@@ -4724,8 +4758,10 @@ export class NativeChatController {
       !scope ||
       !attachment ||
       !draft ||
+      draft.reviewExpired ||
       !draft.text.trim() ||
       !this.bridge.revise ||
+      this.view.connectionRecovery ||
       this.view.revisionSubmitting
     )
       return;
@@ -5416,7 +5452,7 @@ export class NativeChatController {
    */
   async resumeTurn(): Promise<void> {
     const scope = this.scope;
-    if (!scope) return;
+    if (!scope || this.view.connectionRecovery) return;
     for (let attempt = 0; attempt < 100 && this.owns(scope); attempt++) {
       const turn = scope.observation?.snapshot.current;
       if (!turn || turn.cancelled) break;
@@ -5471,7 +5507,7 @@ export class NativeChatController {
     if (!scope || (!scope.attachment && !scope.requested && !this.fixed))
       return;
     if (scope.recovery || scope.retiredAttachment) {
-      if (!this.recoveryBlocked()) {
+      if (!this.recoveryBlocked(scope)) {
         if (!scope.recovery) this.update({ error: null });
         await this.reconnectObservation(scope);
       }
@@ -5497,8 +5533,14 @@ export class NativeChatController {
     if (scope?.attachment && !scope.recovery) void this.refresh(scope);
   }
 
-  private recoveryBlocked(): boolean {
+  /** A retired side chat cannot outlive the attachment that created it. */
+  get canReconnect(): boolean {
+    return !this.fixed || !this.scope?.retiredAttachment;
+  }
+
+  private recoveryBlocked(scope: Scope): boolean {
     return (
+      (!!scope.draftReady && !scope.draftRestored) ||
       this.view.loading ||
       this.view.acting ||
       this.view.submitting ||
@@ -5523,11 +5565,14 @@ export class NativeChatController {
     this.update({ connectionRecovery: "reconnecting" });
     try {
       if (scope.attachment && !scope.retiredAttachment) {
-        scope.replay = true;
+        await this.renewSubscription(scope);
         await scope.refreshing;
-        await this.refresh(scope);
         if (!this.owns(scope)) return;
-        if (!scope.observationUnavailable) await this.renewSubscription(scope);
+        // Replay after subscribing so work committed during the handoff is visible.
+        if (!scope.retiredAttachment) {
+          scope.replay = true;
+          await this.refresh(scope);
+        }
       }
       if (!this.owns(scope)) return;
       if (scope.retiredAttachment || !scope.attachment) {
@@ -6939,9 +6984,9 @@ export class NativeChatController {
     if (focus && wasBlocked && !this.focusBlocked())
       queueMicrotask(() => void this.applyFocus(focus));
     const scope = this.scope;
-    if (scope?.recovery === "queued" && !this.recoveryBlocked())
+    if (scope?.recovery === "queued" && !this.recoveryBlocked(scope))
       queueMicrotask(() => {
-        if (scope.recovery === "queued" && !this.recoveryBlocked())
+        if (scope.recovery === "queued" && !this.recoveryBlocked(scope))
           void this.reconnectObservation(scope);
       });
   }
@@ -6959,7 +7004,11 @@ export class NativeChatController {
   private forgetDeletedChat(scope: Scope): void {
     if (this.fixed) {
       // Deleting the chat that opened it discarded this one.
-      if (this.owns(scope)) this.update({ error: "This side chat has ended." });
+      if (this.owns(scope)) {
+        scope.retiredAttachment = true;
+        scope.recovery = "exhausted";
+        this.update({ connectionRecovery: "disconnected" });
+      }
       return;
     }
     const session = scope.attachment?.sessionId ?? scope.requested;

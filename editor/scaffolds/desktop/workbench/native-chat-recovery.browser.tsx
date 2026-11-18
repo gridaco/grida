@@ -174,7 +174,27 @@ async function setup() {
       previousOffset: null,
       nextOffset: null,
     }),
-    editQueue: vi.fn<NonNullable<DesktopNativeChat["editQueue"]>>(),
+    queuedText: async (_, __, inputId) => {
+      const text = waiting.find((item) => item.inputId === inputId)?.preview;
+      if (typeof text !== "string") throw new Error("fixture_input_missing");
+      return text;
+    },
+    editQueue: vi.fn<NonNullable<DesktopNativeChat["editQueue"]>>(
+      async (_, change) => {
+        if (change.action !== "replace" || !admissionPaused)
+          throw new Error("fixture_expected_held_queue_edit");
+        const index = waiting.findIndex(
+          (item) => item.inputId === change.inputId
+        );
+        if (index === -1) throw new Error("fixture_input_missing");
+        waiting[index] = { ...waiting[index], preview: change.text };
+        return {
+          sessionId: chat,
+          requestId: change.requestId,
+          sessionRevision: ++revision,
+        };
+      }
+    ),
     subscribe: async (attachment, receive) => {
       subscribers.set(attachment, receive);
       return attachment;
@@ -223,7 +243,7 @@ async function setup() {
   const loseHost = () => {
     hostAvailable = false;
     for (const attachment of subscribers.keys()) retired.add(attachment);
-    publish({ kind: "closed", reason: "delivery_limit" });
+    subscribers.clear();
   };
   await mount();
   return {
@@ -323,7 +343,10 @@ it("reconnects the mounted chat after the host returns and keeps its saved histo
   await expect.element(saved).toBeVisible();
   await writeDraft("Keep the margins.");
 
-  await act(async () => f.loseHost());
+  await act(async () => {
+    f.loseHost();
+    window.dispatchEvent(new Event("focus"));
+  });
   const reconnect = page.getByRole("button", {
     name: "Reconnect",
     exact: true,
@@ -401,4 +424,67 @@ it("offers an explicit way to end interrupted work while keeping its queue held"
     "enqueue",
   ]);
   expect(f.bridge.editQueue).not.toHaveBeenCalled();
+});
+
+it("keeps typed queue edits through reconnect and saves them only when asked", async () => {
+  const f = await setup();
+  const original = "Check the spacing.";
+  const edited = `${original} Keep the margins.`;
+  const draft = "Later, summarize the changes.";
+  await send("Compare the layouts.");
+  await send(original);
+  await act(async () => f.interrupt());
+  const end = page.getByRole("button", { name: "End interrupted turn" });
+  await expect.element(end).toBeVisible();
+  await act(async () => end.click());
+  const queuePaused = page.getByText("Queue paused because you interrupted");
+  await expect.element(queuePaused).toBeVisible();
+  await writeDraft(draft);
+
+  const more = page.getByRole("button", { name: "More queue actions" });
+  const edit = page.getByRole("menuitem", { name: "Edit", exact: true });
+  await act(async () => more.click());
+  await expect.element(edit).toBeEnabled();
+  await act(async () => edit.click());
+  await expect.poll(() => composer()?.textContent).toBe(original);
+  await act(async () => {
+    composer()!.focus();
+    await userEvent.keyboard("{End} Keep the margins.");
+  });
+  await expect.poll(() => composer()?.textContent).toBe(edited);
+
+  await act(async () => {
+    f.loseHost();
+    window.dispatchEvent(new Event("focus"));
+  });
+  const save = page.getByRole("button", { name: "Save changes" });
+  const reconnect = page.getByRole("button", {
+    name: "Reconnect",
+    exact: true,
+  });
+  await expect.element(reconnect).toBeVisible();
+  await expect.element(save).toBeDisabled();
+  await expect.element(page.getByText(edited, { exact: true })).toBeVisible();
+  f.restoreHost();
+  await act(async () => reconnect.click());
+  await expect.element(reconnect).not.toBeInTheDocument();
+  await expect.element(save).toBeEnabled();
+  await expect.poll(() => composer()?.textContent).toBe(edited);
+  await expect.element(queuePaused).toBeVisible();
+  expect(f.bridge.editQueue).not.toHaveBeenCalled();
+  expect(f.submit).toHaveBeenCalledTimes(2);
+
+  await act(async () => save.click());
+  await expect.element(save).not.toBeInTheDocument();
+  await expect.element(page.getByText(edited, { exact: true })).toBeVisible();
+  await expect.poll(() => composer()?.textContent).toBe(draft);
+  expect(f.bridge.editQueue).toHaveBeenCalledExactlyOnceWith(
+    (await f.load.mock.results[1].value).attachmentId,
+    expect.objectContaining({
+      action: "replace",
+      inputId: f.submit.mock.calls[1][2],
+      text: edited,
+    })
+  );
+  expect(f.submit).toHaveBeenCalledTimes(2);
 });
