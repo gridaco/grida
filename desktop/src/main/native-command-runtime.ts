@@ -1,5 +1,5 @@
 // GRIDA-SEC-004 — project immutable command resources outside protected app data.
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { constants, rmSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -13,6 +13,8 @@ import {
 type Pin = Awaited<ReturnType<typeof pinExecutable>>;
 
 export namespace NativeCommandRuntime {
+  // Reuse pinned copies during this launch and own their cleanup exclusively.
+  const ownerId = randomUUID();
   const projections = new Map<string, Promise<void>>();
   const cleanup = new Set<string>();
   let registeredCleanup = false;
@@ -49,7 +51,7 @@ export namespace NativeCommandRuntime {
       .digest("hex");
     const directory = path.join(
       await commandTemporaryRoot(),
-      `grida-command-runtime-${binRevision}`
+      `grida-command-runtime-${ownerId}-${binRevision}`
     );
     const canonicalWorkspace = await fs.realpath(workspace);
     if (
@@ -97,24 +99,13 @@ export namespace NativeCommandRuntime {
         await fs.chmod(destination, 0o500);
         await verifyCopy(staging, file);
       }
-      try {
-        await fs.rename(staging, directory);
-      } catch (error) {
-        if (
-          !["EEXIST", "ENOTEMPTY"].includes(
-            (error as NodeJS.ErrnoException).code ?? ""
-          )
-        )
-          throw error;
-      }
-      await requirePrivateDirectory(directory);
       if (
-        (await fs.readdir(directory)).sort().join("\n") !==
+        (await fs.readdir(staging)).sort().join("\n") !==
         files
           .map(
             (file) =>
               path
-                .relative(directory, inProjection(directory, file))
+                .relative(staging, inProjection(staging, file))
                 .split(path.sep)[0]
           )
           .sort()
@@ -122,12 +113,12 @@ export namespace NativeCommandRuntime {
       )
         throw new Error("native_command_runtime_inventory_invalid");
       if (files.some((file) => path.basename(file.path) === "grida-fx")) {
-        const bin = path.join(directory, "bin");
+        const bin = path.join(staging, "bin");
         await requirePrivateDirectory(bin);
         if ((await fs.readdir(bin)).join("\n") !== "grida-fx")
           throw new Error("native_command_runtime_inventory_invalid");
       }
-      for (const file of files) await verifyCopy(directory, file);
+      await fs.rename(staging, directory);
       cleanup.add(directory);
       if (!registeredCleanup) {
         registeredCleanup = true;
@@ -136,7 +127,7 @@ export namespace NativeCommandRuntime {
             try {
               rmSync(location, { recursive: true, force: true });
             } catch {
-              // A later launch can validate and reuse an abandoned projection.
+              // An abandoned projection has no owner in a subsequent launch.
             }
           }
         });
