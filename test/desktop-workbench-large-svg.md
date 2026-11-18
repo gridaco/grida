@@ -4,12 +4,15 @@ title: Large SVGs with embedded images open, present, and save
 module: desktop
 area: workbench
 tags: [workspace, canvas, svg, thumbnail, presentation]
-status: untested
+status: verified
 severity: high
 date: 2026-11-19
 updated: 2026-11-19
 automatable: false
-covered_by: []
+covered_by:
+  - desktop/src/main/native-document-files.test.ts
+  - desktop/src/main/native-workspace-reads.test.ts
+  - packages/grida-daemon/src/http/routes/workspaces.read-svg-document.test.ts
 ---
 
 ## Behavior
