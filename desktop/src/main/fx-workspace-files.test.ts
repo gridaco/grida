@@ -15,6 +15,14 @@ const png = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+yZSoAAAAASUVORK5CYII=",
   "base64"
 );
+const gif = Buffer.from(
+  "R0lGODlhAQABAIAAAExpcUCAwCH5BAUAAAAALAAAAAABAAEAAAICTAEAOw==",
+  "base64"
+);
+const webp = Buffer.from(
+  "UklGRh4AAABXRUJQVlA4TBEAAAAvAAAAAAdQwAIVuP+BiOh/AAA=",
+  "base64"
+);
 
 function recordedImage(bytes: Buffer): FxResolvedFile {
   return {
@@ -101,6 +109,24 @@ describe("FxWorkspaceFiles.prepare", () => {
       setup(recordedImage(html), html).files.prepare(sender, requested)
     ).resolves.toEqual({ kind: "unavailable" });
   });
+
+  it.each([
+    { signature: "GIF", bytes: gif, offset: 0, mimeType: "image/gif" },
+    { signature: "RIFF", bytes: webp, offset: 0, mimeType: "image/webp" },
+    { signature: "WEBP", bytes: webp, offset: 8, mimeType: "image/webp" },
+  ])(
+    "compares the $signature signature without masking high bits",
+    async ({ bytes, offset, mimeType }) => {
+      await expect(
+        setup(recordedImage(bytes), bytes).files.prepare(sender, requested)
+      ).resolves.toMatchObject({ kind: "ready", file: { mimeType } });
+      const altered = Buffer.from(bytes);
+      altered[offset] |= 0x80;
+      await expect(
+        setup(recordedImage(altered), altered).files.prepare(sender, requested)
+      ).resolves.toEqual({ kind: "unavailable" });
+    }
+  );
 
   it("publishes no bytes after the initiating document is no longer current", async () => {
     const { files, read, retire } = setup(recordedImage(png));

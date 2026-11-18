@@ -188,7 +188,10 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       fxProgram ??= BundledPrograms.resolve(
         NativeDesktopProfile.resourcesPath(app),
         "grida-fx"
-      ).catch(() => undefined);
+      ).catch(() => {
+        fxProgram = undefined;
+        return undefined;
+      });
       const program = await fxProgram;
       return program && !signal.aborted
         ? FxViewer.run(program.path, args, signal)

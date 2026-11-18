@@ -6,6 +6,7 @@ import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import { parseArgs } from "node:util";
+import { resolveBundledProgramSource } from "./bundled-programs.mjs";
 import { buildNativeAgentArtifacts } from "./native-agent-package.mjs";
 
 const require = createRequire(import.meta.url);
@@ -55,6 +56,8 @@ function runForge(args, artifacts) {
 function buildDesktop(command, args) {
   const invocation = forgeInvocation(command, args);
   if (!invocation.target) return runForge(invocation.args);
+  const { platform, arch } = invocation.target;
+  resolveBundledProgramSource(platform, arch);
   const override = process.env.GRIDA_DESKTOP_NATIVE_ARTIFACTS;
   if (override) {
     assert(
@@ -67,11 +70,7 @@ function buildDesktop(command, args) {
     path.join(os.tmpdir(), "grida-desktop-agent-")
   );
   try {
-    buildNativeAgentArtifacts(
-      artifacts,
-      invocation.target.platform,
-      invocation.target.arch
-    );
+    buildNativeAgentArtifacts(artifacts, platform, arch);
     runForge(invocation.args, artifacts);
   } finally {
     fs.rmSync(artifacts, { recursive: true, force: true });

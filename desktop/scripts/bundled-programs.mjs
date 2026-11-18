@@ -31,8 +31,7 @@ function fxVersion() {
   return version;
 }
 
-/** Copy only the target package's reviewed native executable and license. */
-export function stageBundledPrograms(resources, platform, arch) {
+export function resolveBundledProgramSource(platform, arch) {
   const name = fxPackage(platform, arch);
   if (!name) return;
   const version = fxVersion();
@@ -44,10 +43,15 @@ export function stageBundledPrograms(resources, platform, arch) {
     "Installed FX SDK differs from Desktop pin"
   );
   assert.equal(carrier.optionalDependencies?.[name], version);
-  const platformPath = createRequire(carrierPath).resolve(
-    `${name}/package.json`
-  );
-  const source = path.dirname(platformPath);
+  let platformPath;
+  try {
+    platformPath = createRequire(carrierPath).resolve(`${name}/package.json`);
+  } catch (error) {
+    if (error?.code !== "MODULE_NOT_FOUND") throw error;
+    throw new Error(
+      `Install ${name}@${version} in Desktop's build dependencies before packaging ${platform}-${arch}.`
+    );
+  }
   const manifest = require(platformPath);
   assert.equal(manifest.name, name);
   assert.equal(
@@ -55,6 +59,14 @@ export function stageBundledPrograms(resources, platform, arch) {
     version,
     "Installed FX binary differs from Desktop pin"
   );
+  return { source: path.dirname(platformPath), version };
+}
+
+/** Copy only the target package's reviewed native executable and license. */
+export function stageBundledPrograms(resources, platform, arch) {
+  const target = resolveBundledProgramSource(platform, arch);
+  if (!target) return;
+  const { source, version } = target;
   const bytes = readExecutable(
     path.join(source, "bin", "grida-fx"),
     platform,
