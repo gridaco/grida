@@ -123,10 +123,15 @@ by the catalog rather than the private Electron debugger interface.
 
 ## FX viewer integration
 
-With the bundled FX 0.10.0, start the FX viewer through the CLI and pass its
-live URL to `surface_open`. Use `browser_snapshot` to identify the current
-document and confirm the viewer's subject before calling its page API through
-`browser_evaluate`.
+For an authored workflow, use `grida-fx plan <workflow> --register --json` or
+`grida-fx inspect <run> --register --json` to get the viewer route for a
+specific plan or saved run. Registration works while the viewer is stopped.
+For a running viewer, resolve the route against the URL from
+`grida-fx status --project-root <project-dir> --json` for the same project.
+Pass that URL to `surface_open`. Use `browser_snapshot` to identify the
+current document and confirm the viewer's subject before calling its page
+API through `browser_evaluate`.
 
-Catalog-based preview restoration, viewer selection capture on chat submission,
-and opening files from catalog entries are unavailable with this bundle.
+For one-shot `call image.generate` results, present the saved PNG directly.
+FX 0.11.0 can register the run but its viewer rejects the inline workflow graph.
+The PNG and the record returned by `grida-fx inspect` remain usable.

@@ -1,6 +1,6 @@
 ---
 title: Grida FX in the Grida CLI
-description: Plan, price and run Grida FX workflows with grida fx, the generative asset pipeline engine that ships with the Grida CLI.
+description: Plan, run and inspect asset workflows with the Grida FX engine bundled in the Grida CLI.
 keywords: [grida, cli, fx, workflow, generative assets, pipeline]
 sidebar_label: FX
 sidebar_position: 7
@@ -10,9 +10,10 @@ format: md
 
 # Grida FX in the Grida CLI
 
-`grida fx` runs [Grida FX](https://grida.co/fx): write a workflow file, and FX
-plans it, prices it before anything is spent, caches every paid call by its
-request, and records the run.
+`grida fx` plans and runs reusable asset workflows. FX reuses cached results
+and records each run for inspection.
+
+## Run a workflow
 
 ```sh
 grida fx --help
@@ -26,6 +27,19 @@ their options and their help: `grida fx <command> --help` describes each one.
 The [FX guide](https://github.com/gridaco/fx/tree/main/docs/guide) covers
 workflow files, nodes, costs, caching and runs.
 
+## Generate one image
+
+For a single PNG, you can call `image.generate` directly. This example
+previews a request using the project's configured image route.
+
+```sh
+grida fx call image.generate --prompt 'A red kite above a foggy hill' --dry-run
+```
+
+To generate, replace `--dry-run` with `--live`. Metered routes use
+`--max-usd` or the project budget. See `grida fx call image.generate --help`
+for route and output options.
+
 ## Platforms
 
 FX runs on macOS and on Linux with glibc 2.28 or later. On Windows, use WSL 2;
@@ -35,10 +49,9 @@ are unaffected.
 
 ## Provider keys
 
-FX reads provider keys from the environment, or from a `.env` file in the FX
-project. `grida fx doctor` reports which keys each workflow needs and which it
-found, never their values. Reading the keys that
-[`grida ai providers`](./providers.md) stores is planned.
+FX checks the environment, then the project's `.env`. On macOS and Linux,
+eligible providers can also use a key saved with `grida ai providers configure`.
+Use `grida fx doctor` to check your setup. [Configure provider keys](./providers.md)
 
 ## FX on its own
 
