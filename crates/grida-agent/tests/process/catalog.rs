@@ -3,12 +3,14 @@ use super::lifecycle::{
 };
 use super::*;
 
-async fn catalog_client(url: &str) -> SharedSocket {
+pub(super) async fn catalog_client(url: &str) -> SharedSocket {
     let mut socket = connect_shared(url, Some(SERVER_TOKEN), None, None)
         .await
         .unwrap();
     let mut offered = extension_initialize();
     offered["clientCapabilities"]["_meta"]["co.grida/session/catalog-query"] = 1.into();
+    offered["clientCapabilities"]["_meta"]["co.grida/session/organize"] = 1.into();
+    offered["clientCapabilities"]["_meta"]["co.grida/session/read-state"] = 1.into();
     let init = ws_rpc(&mut socket, 1, "initialize", offered).await;
     assert_eq!(
         init["result"]["agentCapabilities"]["_meta"]["co.grida/session/catalog-query"],
@@ -39,6 +41,82 @@ fn ids(result: &Value) -> Vec<&str> {
         .iter()
         .map(|row| row["sessionId"].as_str().unwrap())
         .collect()
+}
+
+#[tokio::test]
+async fn only_the_displayed_reply_can_clear_shared_unread_state() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint = Endpoint::start(vec![Reply::Finished("One"), Reply::Finished("Two")]).await;
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut writer = catalog_client(&url).await;
+    let mut observer = catalog_client(&url).await;
+    let chat = new_session(&mut writer, 2, workspace.path()).await;
+    let query = json!({"cwd":workspace.path()});
+    let prompt = json!({"sessionId":chat,"prompt":[{"type":"text","text":"Answer."}]});
+    let mut versions = Vec::new();
+    for n in 0..2 {
+        let result = ws_rpc(&mut writer, 3 + n, "session/prompt", prompt.clone()).await;
+        assert_eq!(result["result"]["stopReason"], "end_turn", "{result}");
+        endpoint.request().await;
+        let list = ws_rpc(&mut observer, 2 + n, "session/list", query.clone()).await;
+        let meta = &list["result"]["sessions"][0]["_meta"];
+        let read = &meta["co.grida/readState"];
+        assert_eq!(read["unread"], true);
+        assert!(read["replyId"].is_string());
+        versions.push((read.clone(), meta["co.grida/lastMessageAtMs"].clone()));
+    }
+    let (a, _) = &versions[0];
+    let (b, recent) = &versions[1];
+    assert_ne!(a["replyId"], b["replyId"]);
+    let method = "_co.grida/session/read-state";
+    let ack = |state: &Value| {
+        json!({"cwd":workspace.path(),"sessionId":chat,
+        "action":"acknowledge","revision":state["revision"],"replyId":state["replyId"]})
+    };
+    let stale = ws_rpc(&mut observer, 4, method, ack(a)).await;
+    assert_eq!(stale["result"], *b);
+    let seen = ws_rpc(&mut observer, 5, method, ack(b)).await;
+    assert_eq!(seen["result"]["unread"], false, "{seen}");
+    let manual = ws_rpc(
+        &mut writer,
+        5,
+        method,
+        json!({
+            "cwd":workspace.path(),"sessionId":chat,"action":"markUnread",
+        }),
+    )
+    .await;
+    assert_eq!(manual["result"]["unread"], true, "{manual}");
+    let attached = ws_rpc(
+        &mut writer,
+        6,
+        "_co.grida/session/catalog-entry",
+        json!({"sessionId":chat}),
+    )
+    .await;
+    assert_eq!(attached["result"]["readState"], manual["result"]);
+    let duplicate = ws_rpc(&mut observer, 6, method, ack(b)).await;
+    assert_eq!(duplicate["result"], manual["result"]);
+    let foreign = TempDir::new().unwrap();
+    let mut wrong = ack(&manual["result"]);
+    wrong["cwd"] = json!(foreign.path());
+    let rejected = ws_rpc(&mut observer, 7, method, wrong).await;
+    assert!(rejected.get("error").is_some(), "{rejected}");
+    let page = ws_rpc(&mut observer, 8, "session/list", query).await;
+    assert_eq!(
+        page["result"]["sessions"][0]["_meta"]["co.grida/readState"],
+        manual["result"]
+    );
+    assert_eq!(
+        page["result"]["sessions"][0]["_meta"]["co.grida/lastMessageAtMs"],
+        *recent
+    );
+    drop(observer);
+    drop(writer);
+    terminate_shared_server(host).await;
+    endpoint.done().await;
 }
 
 #[tokio::test]
@@ -257,8 +335,12 @@ async fn standard_acp_catalog_discovers_saved_workspace_sessions_without_loading
         .collect::<Vec<_>>();
     assert_eq!(ids(page), expected);
     let expected_cwd = a.path().canonicalize().unwrap();
+    let empty_metadata = json!({"co.grida/readState": {"unread":false,"revision":0,"replyId":null}, "co.grida/running":false, "co.grida/inputNeeded":false});
     assert!(page["sessions"].as_array().unwrap().iter().all(|row| {
-        row["cwd"] == json!(expected_cwd) && row.as_object().is_some_and(|keys| keys.len() == 2)
+        row == &json!({
+            "sessionId": row["sessionId"], "cwd": expected_cwd,
+            "_meta": empty_metadata,
+        })
     }));
     assert!(!first.to_string().contains("PRIVATE_TRANSCRIPT_MARKER"));
     let cursor = page["nextCursor"].as_str().unwrap();
@@ -290,7 +372,7 @@ async fn standard_acp_catalog_discovers_saved_workspace_sessions_without_loading
         [a_sessions[1].as_str(), a_sessions[0].as_str()]
     );
     assert!(second["result"]["nextCursor"].is_null());
-    assert!(second["result"]["sessions"][0].get("_meta").is_none());
+    assert_eq!(second["result"]["sessions"][0]["_meta"], empty_metadata);
     assert!(
         second["result"]["sessions"][1]["_meta"]["co.grida/lastActivityAtMs"]
             .as_u64()
@@ -338,7 +420,7 @@ async fn standard_acp_catalog_discovers_saved_workspace_sessions_without_loading
     let fork = fork["result"]["sessionId"].as_str().unwrap();
     let with_fork = ws_rpc(&mut client, 13, "session/list", json!({"cwd":a.path()})).await;
     assert_eq!(ids(&with_fork["result"])[0], fork);
-    assert!(with_fork["result"]["sessions"][0].get("_meta").is_none());
+    assert_eq!(with_fork["result"]["sessions"][0]["_meta"], empty_metadata);
     terminate_shared_server(child).await;
 }
 

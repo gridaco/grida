@@ -36,6 +36,26 @@ The client protocol stays outside the neutral component vocabulary. Provider
 streams, internal history, and durable journals may have different shapes.
 The adapter performs an authorized projection of their meaning.
 
+## A catalog shared by several clients
+
+The native host owns the facts that clients must agree on after reopening a
+chat: message order, work in progress, requests for input, and the reply the
+user has read. A client owns its project groups, badges, and the judgment that
+a reply was visible in a focused conversation. Acknowledging the displayed
+revision lets a newer reply stay unread even when another client is slow.
+
+ACP supplies paginated session discovery. A negotiated Grida subscription can
+wake a client when its authorized catalog changes. After a disconnect the
+client reads the catalog again. This supports a sidebar across many workspaces
+without opening each conversation or giving the observer permission to run an
+agent in those workspaces. [Session listing](https://agentclientprotocol.com/protocol/v1/session-list).
+
+Keep standard exchanges when they express the promised behavior. Use a named
+extension when Grida offers a stronger guarantee, as with durable input
+acceptance. Reconsider a separate first-party protocol if compatibility starts
+to require independent implementations of the same behavior or prevents the
+host from honoring a product guarantee.
+
 ## Custom presentation
 
 Standard messages carry streamed text and thoughts, media and resource content,

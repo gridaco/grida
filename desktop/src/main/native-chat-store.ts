@@ -44,6 +44,10 @@ export class NativeChatStore {
     readonly hooksHome: string
   ) {}
 
+  get catalogRegistryDirectory() {
+    return this.stateDirectory;
+  }
+
   /** Main-owned identity receipts for selected standalone documents. */
   get documentIdentitiesDirectory(): string {
     return path.join(this.stateDirectory, "document-identities");

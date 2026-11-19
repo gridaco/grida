@@ -21,6 +21,7 @@ import { MediaTransport } from "@grida/ai-host/media-transport";
 import { FileReferenceRequest } from "./bridge/file-reference-request";
 import { SelectedImageRequest } from "./bridge/selected-image-request";
 import { NativeChatInvoke } from "./bridge/native-chat-invoke";
+import { catalogWorkspaceId } from "./bridge/chat-catalog-route";
 import {
   DesktopBrowser,
   NativeEditorSurfaces,
@@ -128,6 +129,34 @@ function forgetNativeChatAttachment(attachmentId: string): void {
   nativeSvgTextHandlers.delete(attachmentId);
   for (const [id, subscriber] of nativeChatHandlers) {
     if (subscriber.attachmentId === attachmentId) nativeChatHandlers.delete(id);
+  }
+}
+
+async function observeChatCatalog(
+  scope: { workspaceId?: string },
+  onChanged: () => void
+) {
+  const token = crypto.randomUUID();
+  const notify = (_event: Electron.IpcRendererEvent, id: unknown) => {
+    if (id === token) onChanged();
+  };
+  ipcRenderer.on(IPC_CHANNELS.CHAT_CATALOG_CHANGED, notify);
+  try {
+    if (
+      await ipcRenderer.invoke(IPC_CHANNELS.CHAT_CATALOG_OBSERVE, token, scope)
+    ) {
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.CHAT_CATALOG_CHANGED, notify);
+        void ipcRenderer
+          .invoke(IPC_CHANNELS.CHAT_CATALOG_UNOBSERVE, token)
+          .catch(() => {});
+      };
+    }
+    ipcRenderer.removeListener(IPC_CHANNELS.CHAT_CATALOG_CHANGED, notify);
+    return null;
+  } catch (error) {
+    ipcRenderer.removeListener(IPC_CHANNELS.CHAT_CATALOG_CHANGED, notify);
+    throw error;
   }
 }
 
@@ -660,6 +689,18 @@ const bridge: DesktopBridge = {
       selectProfile: (selection) =>
         nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_SELECT_PROFILE, selection),
     }),
+    observeCatalog: (onChanged) => {
+      const workspaceId = catalogWorkspaceId(location);
+      return workspaceId
+        ? observeChatCatalog({ workspaceId }, onChanged)
+        : Promise.resolve(null);
+    },
+    canSetReadState: () => catalogWorkspaceId(location) !== null,
+    setReadState: async (id, change) => {
+      if (!catalogWorkspaceId(location))
+        throw new Error("chat_catalog_unavailable");
+      await nativeChatInvoke(IPC_CHANNELS.CHAT_CATALOG_READ, id, change);
+    },
     listArchived: (cursor) =>
       nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_LIST_ARCHIVED, cursor),
     catalogEntry: (attachmentId) =>
@@ -1157,6 +1198,7 @@ const bridge: DesktopBridge = {
   },
 
   chatCatalog: {
+    observe: observeChatCatalog,
     list: (query) => ipcRenderer.invoke(IPC_CHANNELS.CHAT_CATALOG_LIST, query),
   },
 

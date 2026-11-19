@@ -24,6 +24,7 @@ import {
   useState,
   useSyncExternalStore,
   type ReactNode,
+  type Ref,
 } from "react";
 import { getToolName, isFileUIPart, isTextUIPart, type FileUIPart } from "ai";
 import { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
@@ -148,6 +149,7 @@ export type ChatMessageActions = {
 };
 
 export function ChatMessageView({
+  ref,
   message,
   isStreaming,
   actions,
@@ -155,6 +157,7 @@ export function ChatMessageView({
   loadAttachmentPreview,
   loadToolImage,
 }: {
+  ref?: Ref<HTMLDivElement>;
   message: ChatMessage;
   isStreaming?: boolean;
   /** Per-turn affordances under a message. User bubbles show copy without them. */
@@ -205,7 +208,7 @@ export function ChatMessageView({
         (part as { type: string }).type in chat_vocabulary.CONTEXT_MARKERS
     );
     return (
-      <Message from="user">
+      <Message from="user" ref={ref}>
         {svgTextSelection && !edit && (
           <EditorSelectionIndicator kind="svg-text" className="self-end" />
         )}
@@ -298,7 +301,7 @@ export function ChatMessageView({
     .map((part) => part.text)
     .join("\n\n");
   return (
-    <Message from="assistant" className="w-full max-w-none">
+    <Message from="assistant" ref={ref} className="w-full max-w-none">
       <MessageContent className={`w-full max-w-full ${CHAT_TEXT}`}>
         {groups.map((group) => {
           if (group.type === "text") {

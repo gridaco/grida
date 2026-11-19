@@ -972,7 +972,7 @@ fn a_database_this_store_did_not_create_is_refused_unchanged() {
     assert_eq!(
         refused(
             "unknown-version.sqlite",
-            "PRAGMA application_id=1196572999; PRAGMA user_version=3;",
+            "PRAGMA application_id=1196572999; PRAGMA user_version=2147483647;",
         ),
         (0, 1196572999)
     );

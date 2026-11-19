@@ -74,7 +74,7 @@ describe("ipc_admission", () => {
           !channel.startsWith("grida:provider:endpoint:") &&
           !channel.startsWith("grida:hooks:") &&
           !channel.startsWith("grida:archives:") &&
-          channel !== IPC_CHANNELS.CHAT_CATALOG_LIST &&
+          !channel.startsWith("grida:chat-catalog:") &&
           !nativeChat.includes(channel) &&
           !nativeExternal.includes(channel) &&
           channel !== workspacePublish &&

@@ -79,8 +79,8 @@ import type { NativeExternalRuns } from "./native-external-runs";
 import { takeNativeNotificationFocus } from "./agent-notifications";
 import { NativeArchiveIpc } from "./native-archive-ipc";
 import { confirmChatDeletion } from "./chat-deletion-dialog";
-import { listDesktopChats } from "./chat-catalog-ipc";
-import type { NativeChatCatalog } from "./native-chat-catalog";
+import { listDesktopChats, DesktopChatCatalogIpc } from "./chat-catalog-ipc";
+import type { DesktopChatCatalog } from "./native-desktop-chat-catalog";
 import type { NativeArchives } from "./native-archives";
 import type { NativeChatSelections } from "./native-chat-selections";
 
@@ -102,7 +102,7 @@ type RegisterIpcHandlersOptions = {
   resolve_ipc_role: (window: BrowserWindow) => DesktopIpcRole | null;
   open_settings: () => void;
   archives?: NativeArchives;
-  chat_catalog?: NativeChatCatalog;
+  chat_catalog?: DesktopChatCatalog;
   open_restored_chat?: (workspaceId: string, sessionId: string) => boolean;
   global_hooks?: NativeAgentHooks;
   recent_files?: Pick<RecentStore, "list" | "touch" | "pin" | "forget">;
@@ -489,6 +489,22 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     (sender) => admittedWindow(sender) !== null,
     options.open_restored_chat
   );
+  const catalogIpc = new DesktopChatCatalogIpc(
+    options.chat_catalog,
+    (sender) => admittedWindow(sender) !== null
+  );
+  guarded(
+    IPC_CHANNELS.CHAT_CATALOG_OBSERVE,
+    (event, token: unknown, scope: unknown) =>
+      catalogIpc.observe(event, token, scope)
+  );
+  guarded(IPC_CHANNELS.CHAT_CATALOG_UNOBSERVE, (event, token: unknown) =>
+    catalogIpc.unobserve(event, token)
+  );
+  guarded(
+    IPC_CHANNELS.CHAT_CATALOG_READ,
+    (event, id: unknown, change: unknown) => catalogIpc.read(event, id, change)
+  );
   guarded(IPC_CHANNELS.CHAT_CATALOG_LIST, (event, query: unknown) =>
     listDesktopChats(
       event,
@@ -574,8 +590,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     (event, preferred?: unknown) =>
       nativeChat.startWorkspaceChat(event, preferred)
   );
-  guarded(IPC_CHANNELS.NATIVE_CHAT_LIST, (event, cursor?: string | null) =>
-    nativeChat.list(event, cursor)
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_LIST,
+    async (event, cursor?: string | null) =>
+      (await catalogIpc.pickerPage(event, cursor)) ??
+      nativeChat.list(event, cursor)
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_PROFILES, (event) =>
     nativeChat.profiles(event)

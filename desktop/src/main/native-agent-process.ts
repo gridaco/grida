@@ -284,6 +284,12 @@ export class NativeAgentProcess {
     });
   }
 
+  private onCatalogChanged?: (params: unknown) => void;
+
+  get terminated() {
+    return this.exited;
+  }
+
   get connected(): boolean {
     return this.ready && !this.failure && !this.shutdown;
   }
@@ -469,6 +475,57 @@ export class NativeAgentProcess {
       throw new Error("native_agent_installation_unavailable");
     }
     return executable;
+  }
+
+  /** Metadata-only ACP host. Its client has no provider route or editor capabilities. */
+  static async startCatalog(
+    resourcesPath: string,
+    registry: string,
+    onChanged: (params: unknown) => void
+  ): Promise<NativeAgentProcess | null> {
+    const child = spawn(
+      this.executable(resourcesPath),
+      ["serve-catalog", "--stdio", "--catalog-registry", registry],
+      {
+        cwd: path.dirname(registry),
+        env: {},
+        shell: false,
+        windowsHide: true,
+        stdio: "pipe",
+      }
+    );
+    const owner = new NativeAgentProcess(child);
+    owner.onCatalogChanged = onChanged;
+    try {
+      const capabilities = {
+        [CATALOG_QUERY]: 1,
+        "co.grida/catalog/watch": 1,
+        "co.grida/session/read-state": 1,
+      };
+      const reply = object(
+        await owner.request(
+          "initialize",
+          { protocolVersion: 1, clientCapabilities: { _meta: capabilities } },
+          START_TIMEOUT_MS
+        )
+      );
+      const advertised = object(object(reply?.agentCapabilities)?._meta);
+      if (
+        reply?.protocolVersion !== 1 ||
+        advertised?.["co.grida/catalog/watch"] !== 1 ||
+        advertised?.[CATALOG_QUERY] !== 1
+      ) {
+        await owner.close();
+        return null;
+      }
+      owner.ready = true;
+      return owner;
+    } catch (error) {
+      await owner.close();
+      // clap reports an unknown subcommand on binaries predating this capability.
+      if ((await owner.exited).code === 2) return null;
+      throw error;
+    }
   }
 
   static async start(options: NativeAgentLaunch): Promise<NativeAgentProcess> {
@@ -1374,6 +1431,8 @@ export class NativeAgentProcess {
         if (typeof id === "string" || typeof id === "number")
           this.providerRoutes?.cancelImage(id);
         this.imagePlacement?.cancel(id);
+      } else if (message.method === "_co.grida/catalog/changed") {
+        this.onCatalogChanged?.(message.params);
       } else if (message.method === "session/update") {
         try {
           this.onSessionUpdate?.(message.params);

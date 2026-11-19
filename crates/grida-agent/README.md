@@ -596,6 +596,16 @@ Process tests launch the built executable with a loopback streaming provider.
 Run them with `cargo test -p grida-agent --locked` in an environment that
 permits a local listener.
 
+## Observe chat catalogs
+
+A terminal client can launch a native catalog over private stdio using
+`grida-agent serve-catalog --stdio --catalog-registry <private-manifest>`.
+The service also accepts independent clients over authenticated loopback
+WebSocket. It reads registered native stores, including stores that already
+have an execution owner. Clients can list, subscribe, acknowledge a displayed
+reply, or mark it unread. The [catalog binding](./docs/rust-client-protocol.md#live-cross-workspace-catalog)
+describes registry admission, startup, ordering, and reconnect.
+
 ## Shared local service
 
 ```sh

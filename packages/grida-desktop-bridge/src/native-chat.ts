@@ -252,9 +252,22 @@ export type NativeChatFileReferenceInput = Readonly<{
   messageContext?: NativeChatMessageContext;
 }>;
 
+export type NativeChatReadState = Readonly<{
+  unread: boolean;
+  revision: number;
+  replyId: string | null;
+}>;
+
+export type NativeChatReadChange =
+  | Readonly<{ kind: "acknowledge"; revision: number; replyId: string | null }>
+  | Readonly<{ kind: "markUnread" }>;
+
 export type NativeChatPage = Readonly<{
   sessionIds: readonly string[];
+  readStates?: readonly (NativeChatReadState & { sessionId: string })[];
   titles?: readonly Readonly<{ sessionId: string; title: string }>[];
+  /** Message recency on capable catalog hosts, including empty when all rows predate tracking. */
+  lastMessage?: readonly Readonly<{ sessionId: string; atMs: number }>[];
   /** Latest local turn's settlement or start time; absent on older hosts. */
   lastActivity?: readonly Readonly<{ sessionId: string; atMs: number }>[];
   /** Listed chats running when the page was read. Older hosts omit this field. */
@@ -304,6 +317,7 @@ export type NativeChatProfileSelection =
   | Readonly<{ kind: "new" | "saved"; id: string }>;
 
 export type NativeChatCatalogEntry = Readonly<{
+  readState?: NativeChatReadState;
   sessionId: string;
   revision: number;
   title: string | null;
@@ -1064,6 +1078,10 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
       effort: NativeChatEffort;
     }>
   ): Promise<NativeChatSelectionState>;
+  observeCatalog?(onChanged: () => void): Promise<(() => void) | null>;
+  /** Whether the current Desktop page can update a catalog row's read state. */
+  canSetReadState?(): boolean;
+  setReadState?(sessionId: string, change: NativeChatReadChange): Promise<void>;
   listArchived?(cursor?: string | null): Promise<NativeChatPage>;
   catalogEntry?(attachmentId: string): Promise<NativeChatCatalogEntry>;
   organize?(

@@ -115,6 +115,9 @@ const TEST_CREDENTIAL: &str = "fixture-only-bearer-token";
 #[cfg(unix)]
 #[path = "process/catalog.rs"]
 mod catalog;
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[path = "process/live_catalog.rs"]
+mod live_catalog;
 
 struct Endpoint {
     url: String,

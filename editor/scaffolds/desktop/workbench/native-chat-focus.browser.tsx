@@ -67,6 +67,9 @@ async function setup(
     titles: [...entries.values()].flatMap(({ sessionId, title }) =>
       title === null ? [] : [{ sessionId, title }]
     ),
+    readStates: [...entries.values()].flatMap(({ sessionId, readState }) =>
+      readState ? [{ sessionId, ...readState }] : []
+    ),
     runningSessionIds: [...running].filter(
       (id) => entries.get(id)?.archived === archived
     ),
@@ -217,6 +220,197 @@ async function click(name: string) {
     page.getByRole("button", { name, exact: true }).click()
   );
 }
+
+it("shows an unread reply in another chat, acknowledges it on display, and preserves a manual mark until revisited", async () => {
+  let invalidate!: () => void;
+  const change = vi.fn<NonNullable<DesktopNativeChat["setReadState"]>>();
+  const f = await setup(
+    {
+      observeCatalog: async (notify) => {
+        invalidate = notify;
+        return () => {};
+      },
+      setReadState: change,
+      transcript: async (id) => [
+        {
+          messageId: `answer-${id}`,
+          role: "assistant",
+          phase: "answer",
+          text: `Final reply for ${id}`,
+        },
+      ],
+    },
+    { waitForHistory: false }
+  );
+  const set = (id: string, unread: boolean, revision: number) => {
+    const chat = f.entries.get(id)!;
+    f.entries.set(id, {
+      ...chat,
+      readState: { replyId: `answer-${id}`, unread, revision },
+    });
+    invalidate();
+  };
+  change.mockImplementation(async (id, action) => {
+    const seen = f.entries.get(id)!.readState!;
+    if (action.kind === "markUnread") set(id, true, seen.revision + 1);
+    else if (action.revision === seen.revision)
+      set(id, false, seen.revision + 1);
+  });
+  const interrupted = Promise.withResolvers<void>();
+  change.mockImplementationOnce(() => interrupted.promise);
+  const otherPane = document.createElement("button");
+  document.body.append(otherPane);
+  await act(async () => {
+    otherPane.focus();
+    set(f.first, true, 2);
+    set(f.second, true, 5);
+  });
+  await click("Open chat list");
+  await expect
+    .element(
+      page
+        .getByRole("option", { name: /First chat/ })
+        .getByRole("img", { name: "Unread" })
+    )
+    .toBeVisible();
+  const secondRow = page.getByRole("option", { name: /Second chat/ });
+  await expect
+    .element(secondRow.getByRole("img", { name: "Unread" }))
+    .toBeVisible();
+  expect(change).not.toHaveBeenCalled();
+  await act(async () => secondRow.click());
+  await expect
+    .element(page.getByText(`Final reply for ${f.second}`))
+    .toBeVisible();
+  await expect
+    .poll(() => change.mock.calls)
+    .toEqual([
+      [
+        f.second,
+        { kind: "acknowledge", revision: 5, replyId: `answer-${f.second}` },
+      ],
+    ]);
+
+  // The catalog reconnects while the display acknowledgement is still in
+  // flight. Retry the same displayed revision without a focus or scroll event.
+  await act(async () => {
+    invalidate();
+    interrupted.reject(new Error("catalog disconnected"));
+  });
+  await expect
+    .poll(() => change.mock.calls)
+    .toEqual([
+      [
+        f.second,
+        { kind: "acknowledge", revision: 5, replyId: `answer-${f.second}` },
+      ],
+      [
+        f.second,
+        { kind: "acknowledge", revision: 5, replyId: `answer-${f.second}` },
+      ],
+    ]);
+
+  await click("Chat options");
+  await act(async () =>
+    page.getByRole("menuitem", { name: "Mark unread" }).click()
+  );
+  await expect
+    .poll(() => change.mock.lastCall)
+    .toEqual([f.second, { kind: "markUnread" }]);
+  await expect
+    .element(page.getByRole("menu", { name: "Chat options" }))
+    .not.toBeInTheDocument();
+  await click("Open chat list");
+  await expect
+    .element(secondRow.getByRole("img", { name: "Unread" }))
+    .toBeVisible();
+  await act(async () =>
+    page.getByRole("option", { name: /First chat/ }).click()
+  );
+  await expect
+    .poll(() => change.mock.lastCall)
+    .toEqual([
+      f.first,
+      { kind: "acknowledge", revision: 2, replyId: `answer-${f.first}` },
+    ]);
+  await click("Open chat list");
+  await expect
+    .element(secondRow.getByRole("img", { name: "Unread" }))
+    .toBeVisible();
+  expect(change).toHaveBeenCalledTimes(4);
+  await act(async () => secondRow.click());
+  await expect
+    .poll(() => change.mock.lastCall)
+    .toEqual([
+      f.second,
+      { kind: "acknowledge", revision: 7, replyId: `answer-${f.second}` },
+    ]);
+});
+
+it.each(["file window", "archived chat"] as const)(
+  "withholds read actions and receipts (%s)",
+  async (surface) => {
+    const receipt = vi.fn<NonNullable<DesktopNativeChat["setReadState"]>>();
+    const readState = { unread: true, revision: 1, replyId: null };
+    const f = await setup({
+      canSetReadState: () => surface !== "file window",
+      setReadState: receipt,
+      catalogEntry: async (sessionId) => ({
+        sessionId,
+        revision: 1,
+        title: "Saved chat",
+        archived: surface === "archived chat",
+        readState,
+      }),
+    });
+    await expect
+      .element(page.getByTitle("Saved chat", { exact: true }))
+      .toBeVisible();
+    await act(async () => {
+      f.composer.focus();
+      await new Promise(requestAnimationFrame);
+    });
+    await click("Chat options");
+    await expect
+      .element(page.getByRole("menuitem", { name: "Rename" }))
+      .toBeVisible();
+    await expect
+      .element(page.getByRole("menuitem", { name: "Mark unread" }))
+      .not.toBeInTheDocument();
+    expect(receipt).not.toHaveBeenCalled();
+  }
+);
+
+it("clears a manual unread mark on an empty chat only after its retained history is displayed", async () => {
+  const history = Promise.withResolvers<readonly NativeChatMessage[]>();
+  const change = vi
+    .fn<NonNullable<DesktopNativeChat["setReadState"]>>()
+    .mockResolvedValue();
+  const f = await setup(
+    {
+      transcript: () => history.promise,
+      catalogEntry: async (id) => ({
+        sessionId: id,
+        revision: 1,
+        title: "Marked chat",
+        archived: false,
+        readState: { unread: true, revision: 6, replyId: null },
+      }),
+      setReadState: change,
+    },
+    { waitForHistory: false }
+  );
+  await expect.element(page.getByText("Marked chat")).toBeVisible();
+  await act(async () => {
+    f.composer.focus();
+    await new Promise(requestAnimationFrame);
+  });
+  expect(change).not.toHaveBeenCalled();
+  await act(async () => history.resolve([]));
+  await expect
+    .poll(() => change.mock.calls)
+    .toEqual([[f.first, { kind: "acknowledge", revision: 6, replyId: null }]]);
+});
 
 it("keeps a plain Welcome message available through workspace startup retries", async () => {
   const f = await setup();

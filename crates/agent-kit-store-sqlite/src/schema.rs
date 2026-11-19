@@ -6,8 +6,8 @@ use agent_kit_core::ErrorKind;
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
 
 /// The SQLite application identity of this store's databases.
-const APPLICATION_ID: i64 = 0x4752_4147;
-const VERSION: i64 = 2;
+pub(crate) const APPLICATION_ID: i64 = 0x4752_4147;
+pub(crate) const VERSION: i64 = 3;
 
 /// Encoded values are JSON. Digests and identities the store compares in SQL
 /// are raw 32-byte blobs. No CHECK enumerates an open vocabulary such as
@@ -181,6 +181,14 @@ CREATE INDEX conversations_group_created ON sessions(conversation_group, bucket,
     WHERE conversation_group IS NOT NULL;
 ";
 
+// Old conversations begin read. Only newly published final replies establish
+// a reply identity; upgrading never scans turn history or manufactures unread mail.
+const READ_STATE_SCHEMA: &str = "
+ALTER TABLE sessions ADD COLUMN reply_id TEXT;
+ALTER TABLE sessions ADD COLUMN read_revision INTEGER NOT NULL DEFAULT 0 CHECK (read_revision >= 0);
+ALTER TABLE sessions ADD COLUMN unread INTEGER NOT NULL DEFAULT 0 CHECK (unread IN (0,1));
+";
+
 /// The owner projections a store opens with. A database keeps the profile it
 /// was created with.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -202,7 +210,7 @@ pub(crate) fn prepare(
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .map_err(database_error)?;
     match (application_id, version) {
-        (APPLICATION_ID, VERSION) => {
+        (APPLICATION_ID, VERSION | 2) => {
             require_profile(connection, profile)?;
             let enabled: bool = connection
                 .query_row(
@@ -213,6 +221,24 @@ pub(crate) fn prepare(
                 .map_err(database_error)?;
             if enabled != conversations.is_some() {
                 return Err(error(ErrorKind::Unsupported, "store_profile_mismatch"));
+            }
+            if version == 2 {
+                let tx = connection
+                    .transaction_with_behavior(TransactionBehavior::Immediate)
+                    .map_err(database_error)?;
+                let reference = Connection::open_in_memory().map_err(database_error)?;
+                reference.execute_batch(SCHEMA_V1).map_err(database_error)?;
+                reference
+                    .execute_batch(CONVERSATION_SCHEMA)
+                    .map_err(database_error)?;
+                if definitions(&tx)? != definitions(&reference)? {
+                    return Err(unsupported());
+                }
+                tx.execute_batch(READ_STATE_SCHEMA)
+                    .map_err(database_error)?;
+                tx.pragma_update(None, "user_version", VERSION)
+                    .map_err(database_error)?;
+                tx.commit().map_err(commit_error)?;
             }
             Ok(())
         }
@@ -241,6 +267,9 @@ fn install(connection: &mut Connection, profile: Profile, conversations: bool) -
         .map_err(database_error)?;
     transaction
         .execute_batch(CONVERSATION_SCHEMA)
+        .map_err(database_error)?;
+    transaction
+        .execute_batch(READ_STATE_SCHEMA)
         .map_err(database_error)?;
     transaction
         .execute(
@@ -275,6 +304,9 @@ fn upgrade(
     require_profile(&transaction, profile)?;
     transaction
         .execute_batch(CONVERSATION_SCHEMA)
+        .map_err(database_error)?;
+    transaction
+        .execute_batch(READ_STATE_SCHEMA)
         .map_err(database_error)?;
     if let Some(project) = conversations {
         // Version 1 retained immutable session configuration but no message
@@ -368,6 +400,48 @@ mod tests {
     use agent_kit_core::{ChangeId, Envelope, Fingerprint, SchemaId, SessionId};
     use agent_kit_sessions::{SessionStore, Submission};
 
+    #[test]
+    fn version_two_upgrades_read_positions_without_changing_existing_recency() {
+        let mut db = Connection::open_in_memory().unwrap();
+        db.execute_batch(SCHEMA_V1).unwrap();
+        db.execute_batch(CONVERSATION_SCHEMA).unwrap();
+        db.pragma_update(None, "application_id", APPLICATION_ID)
+            .unwrap();
+        db.pragma_update(None, "user_version", 2).unwrap();
+        db.execute(
+            "INSERT INTO store_profile(singleton,catalog,turn_links,conversations)
+            VALUES(1,1,0,1)",
+            [],
+        )
+        .unwrap();
+        db.execute("INSERT INTO sessions(id,configuration,revision,paused,next_input,conversation_group,last_message_ms)
+            VALUES('old',X'00',0,0,0,'workspace',42)", []).unwrap();
+        let project = ConversationProjection {
+            group: |_| panic!("existing groups must not be recomputed"),
+            input: |_| false,
+            message: |_| false,
+            final_reply: |_| None,
+            revised_reply: |_, _| Ok(None),
+        };
+        prepare(
+            &mut db,
+            Profile {
+                catalog: true,
+                turn_links: false,
+            },
+            Some(project),
+        )
+        .unwrap();
+        let state: (bool, i64, Option<String>, i64) = db
+            .query_row(
+                "SELECT unread,read_revision,reply_id,last_message_ms FROM sessions WHERE id='old'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .unwrap();
+        assert_eq!(state, (false, 0, None, 42));
+    }
+
     #[tokio::test]
     async fn legacy_catalog_upgrades_once_and_dates_only_new_messages() {
         use crate::catalog::ConversationOrder;
@@ -378,7 +452,11 @@ mod tests {
             std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))
                 .unwrap();
         }
-        let path = directory.path().join("legacy.sqlite");
+        let path = directory
+            .path()
+            .canonicalize()
+            .unwrap()
+            .join("legacy.sqlite");
         drop(crate::open_private_file(&path).unwrap());
         let db = Connection::open(&path).unwrap();
         db.execute_batch(SCHEMA_V1).unwrap();
@@ -402,18 +480,16 @@ mod tests {
                 params![name,encode(&config).unwrap(),scope(&config).unwrap().bytes().as_slice()]).unwrap();
         }
         drop(db);
-        let open = || {
-            SqliteStore::open_with_conversations(
-                &path,
-                scope,
-                Some(|_, _| Ok(TurnLinkDecision::Unrelated)),
-                ConversationProjection {
-                    group: |config| (config.bytes() == b"public").then(|| "public".to_owned()),
-                    input: |_| true,
-                    message: |_| false,
-                },
-            )
+        let links: Option<crate::turn_links::TurnLinkProjection> =
+            Some(|_, _| Ok(TurnLinkDecision::Unrelated));
+        let conversations = ConversationProjection {
+            group: |config| (config.bytes() == b"public").then(|| "public".to_owned()),
+            input: |_| true,
+            message: |_| false,
+            final_reply: |_| None,
+            revised_reply: |_, _| Ok(None),
         };
+        let open = || SqliteStore::open_with_conversations(&path, scope, links, conversations);
         let version = || {
             Connection::open(&path)
                 .unwrap()
@@ -431,9 +507,43 @@ mod tests {
         assert_eq!(open().err().unwrap().code, "store_schema_unsupported");
         assert_eq!(version(), 1);
         db.execute("DROP TABLE unrecognized", []).unwrap();
-        drop(db);
 
-        let store = open().unwrap();
+        // Stall a real migration after it acquired the legacy writer lock,
+        // then start the execution host while that lock is still occupied.
+        db.execute_batch("BEGIN IMMEDIATE").unwrap();
+        let store = std::thread::scope(|threads| {
+            use crate::catalog_reader::CatalogReader;
+            use std::{
+                sync::mpsc,
+                thread,
+                time::{Duration, Instant},
+            };
+            let reader = threads.spawn(|| {
+                CatalogReader::open_with_conversations(&path, false, scope, links, conversations)
+                    .unwrap()
+                    .is_some()
+            });
+            let deadline = Instant::now() + Duration::from_secs(3);
+            while std::fs::metadata(crate::lock_path(&path)).unwrap().len() == 0 {
+                assert!(
+                    Instant::now() < deadline,
+                    "catalog never acquired the migration lock"
+                );
+                thread::sleep(Duration::from_millis(2));
+            }
+            let (tx, rx) = mpsc::channel();
+            threads.spawn(move || tx.send(open()).unwrap());
+            assert!(matches!(
+                rx.recv_timeout(Duration::from_millis(100)),
+                Err(mpsc::RecvTimeoutError::Timeout)
+            ));
+            db.execute_batch("ROLLBACK").unwrap();
+            assert!(reader.join().unwrap());
+            rx.recv().unwrap().unwrap()
+        });
+        drop(db);
+        // Only startup waits; a second actual execution owner still fails.
+        assert_eq!(open().err().unwrap().code, "store_already_owned");
         assert_eq!(version(), VERSION);
         let list = |store: &SqliteStore| {
             let store = store.clone();

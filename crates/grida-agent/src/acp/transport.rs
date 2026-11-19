@@ -48,7 +48,10 @@ impl Delivery {
                     });
             }
             TransportFrame::Single(RawJsonRpcMessage::Notification(notification))
-                if &*notification.method == "session/update" =>
+                if matches!(
+                    &*notification.method,
+                    "session/update" | "_co.grida/catalog/changed"
+                ) =>
             {
                 self.updates.add_permits(1);
             }

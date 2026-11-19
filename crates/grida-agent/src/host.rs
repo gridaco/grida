@@ -46,8 +46,8 @@ mod titles;
 pub(crate) mod tool_images;
 mod wakeups;
 pub use access::{PermissionModeReceipt, PermissionModeSnapshot, PermissionModeUpdate};
-pub(crate) use catalog::CatalogListing;
 pub(crate) use catalog::is_archived;
+pub(crate) use catalog::{CatalogListing, ListedSession};
 pub use catalog::{CatalogOrder, SessionCatalog, needs_user_input};
 pub use compaction::{CompactRequest, CompactionReport, CompactionStatus};
 pub use goals::{GoalAction, GoalControl, GoalInspection, GoalRequest, GoalView};
@@ -139,6 +139,21 @@ pub const DATABASE_FILE: &str = "agent.sqlite";
 pub fn open_store(database: &Path) -> Result<SqliteStore> {
     SqliteStore::open_with_conversations(
         database,
+        catalog::configuration_scope,
+        Some(subagents::turn_link),
+        catalog::CONVERSATIONS,
+    )
+}
+
+/// Open the same projected database for catalog observation. Closed legacy
+/// stores upgrade with the writer's profile under the store's startup lock.
+pub(crate) fn open_catalog(
+    database: &Path,
+    writable: bool,
+) -> Result<Option<agent_kit_store_sqlite::catalog_reader::CatalogReader>> {
+    agent_kit_store_sqlite::catalog_reader::CatalogReader::open_with_conversations(
+        database,
+        writable,
         catalog::configuration_scope,
         Some(subagents::turn_link),
         catalog::CONVERSATIONS,

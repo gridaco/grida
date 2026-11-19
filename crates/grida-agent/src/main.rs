@@ -294,6 +294,13 @@ fn command() -> Command {
                 .arg(Arg::new("operation").long("operation").value_parser(["inspect", "update", "receipt", "ack"]).default_value("inspect"))
                 .arg(Arg::new("request-json").long("request-json")),
         )
+        .subcommand(Command::new("serve-catalog")
+            .about("Serve a provider-independent ACP catalog of authorized native workspaces")
+            .arg(Arg::new("catalog-registry").long("catalog-registry").value_parser(value_parser!(PathBuf)).required(true))
+            .arg(Arg::new("stdio").long("stdio").action(ArgAction::SetTrue))
+            .arg(Arg::new("listen").long("listen").requires("server-token-env"))
+            .arg(Arg::new("server-token-env").long("server-token-env").requires("listen"))
+            .group(ArgGroup::new("transport").args(["stdio","listen"]).required(true)))
         .subcommand(
             Command::new("chat-catalog")
                 .about("List saved chats in an existing native store without attaching to them")
@@ -518,6 +525,27 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     if name == "workspace-file" {
         return grida_agent::workspace_file::serve_stdio().map(|()| 0);
+    }
+    if name == "serve-catalog" {
+        let catalog = acp::catalog_service::Catalog::open(
+            args.get_one::<PathBuf>("catalog-registry")
+                .expect("required registry")
+                .clone(),
+        )?;
+        let listener = args
+            .get_one::<String>("listen")
+            .map(|address| {
+                acp::ListenOptions::from_environment(
+                    address,
+                    args.get_one::<String>("server-token-env")
+                        .expect("required bearer"),
+                )
+            })
+            .transpose()?;
+        return tokio::select! {
+            result=acp::catalog_service::serve(catalog,listener)=>result.map(|()|0),
+            result=process::shutdown_signal()=>result.map(|()|130),
+        };
     }
     if name == "serve-mcp" || name == "serve-editor-mcp" {
         let options = mcp::ListenOptions::from_environment(

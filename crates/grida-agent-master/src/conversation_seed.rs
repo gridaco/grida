@@ -109,6 +109,17 @@ pub struct SeedOmissions {
 }
 
 impl SeedProvenance {
+    /// The visible ID of a source-view message after this history cut.
+    pub fn retained_message_id(&self, previous: &str) -> Option<&MessageId> {
+        self.entries.iter().find_map(|entry| {
+            entry.message.as_ref().filter(|id| {
+                id.as_str() == previous
+                    || (entry.origin.session == self.source.session
+                        && entry.origin.message.as_str() == previous)
+            })
+        })
+    }
+
     /// Interpret the product provenance retained beside a seed's records.
     pub fn decode(envelope: &Envelope) -> Result<Self> {
         decode(SCHEMA, envelope)

@@ -7,7 +7,7 @@ const PAGE_SIZE: usize = 32;
 const MAX_LABEL_BYTES: usize = 256;
 const TURN_ACTIVITY: &str = "SELECT active_turn, last_message_ms,
     (SELECT COALESCE(settled_ms,started_ms) FROM turns
-     WHERE session=?1 ORDER BY ordinal DESC LIMIT 1)
+     WHERE session=?1 ORDER BY ordinal DESC LIMIT 1), unread, read_revision, reply_id
     FROM sessions WHERE id=?1";
 
 /// Return a stable scope for an immutable configuration this owner recognizes.
@@ -21,6 +21,90 @@ pub struct ConversationProjection {
     pub group: fn(&Envelope) -> Option<String>,
     pub input: fn(&Submission) -> bool,
     pub message: fn(&Message) -> bool,
+    /// Select the last user-visible reply from a newly settled turn.
+    pub final_reply: fn(&TurnState) -> Option<agent_kit_core::MessageId>,
+    /// Locate the same reply in a replacement view, whose seed may re-key messages.
+    pub revised_reply: fn(&history::HistorySeed, &str) -> Result<Option<agent_kit_core::MessageId>>,
+}
+
+/// Last projected reply and the revision a client must have displayed to
+/// acknowledge it. Independent from both recency and title/placement revisions.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConversationReadState {
+    pub unread: bool,
+    pub revision: u64,
+    pub reply_id: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "action", rename_all = "camelCase", deny_unknown_fields)]
+pub enum ReadStateUpdate {
+    Acknowledge {
+        revision: u64,
+        #[serde(rename = "replyId", deserialize_with = "Deserialize::deserialize")]
+        reply_id: Option<agent_kit_core::MessageId>,
+    },
+    MarkUnread,
+}
+
+fn read_state(row: &rusqlite::Row<'_>, start: usize) -> rusqlite::Result<ConversationReadState> {
+    let revision: i64 = row.get(start + 1)?;
+    Ok(ConversationReadState {
+        unread: row.get(start)?,
+        revision: u64::try_from(revision)
+            .map_err(|_| rusqlite::Error::IntegralValueOutOfRange(start + 1, revision))?,
+        reply_id: row.get(start + 2)?,
+    })
+}
+
+/// This operation changes only catalog read metadata. It can also be called
+/// by an independently authorized catalog connection to an active store.
+pub(crate) fn update_conversation_read(
+    connection: &mut Connection,
+    group: &str,
+    bucket: u8,
+    session: &SessionId,
+    update: &ReadStateUpdate,
+    admit: impl FnOnce() -> Result<()>,
+) -> Result<(ConversationReadState, bool)> {
+    let tx = connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(database_error)?;
+    admit()?;
+    let mut current = tx
+        .query_row(
+            "SELECT unread,read_revision,reply_id FROM sessions
+         WHERE conversation_group=?1 AND id=?2 AND bucket=?3",
+            params![group, session.as_str(), bucket],
+            |row| read_state(row, 0),
+        )
+        .optional()
+        .map_err(database_error)?
+        .ok_or_else(|| error(ErrorKind::InvalidInput, "session_catalog_scope_mismatch"))?;
+    let unread = match update {
+        ReadStateUpdate::Acknowledge { revision, reply_id } => {
+            if !current.unread
+                || *revision != current.revision
+                || reply_id.as_ref().map(|id| id.as_str()) != current.reply_id.as_deref()
+            {
+                return Ok((current, false));
+            }
+            false
+        }
+        // Even when already unread, this intent supersedes earlier displays.
+        ReadStateUpdate::MarkUnread => true,
+    };
+    current = tx
+        .query_row(
+            "UPDATE sessions SET unread=?1,read_revision=read_revision+1 WHERE id=?2
+         RETURNING unread,read_revision,reply_id",
+            params![unread, session.as_str()],
+            |row| read_state(row, 0),
+        )
+        .map_err(database_error)?;
+    tx.commit().map_err(commit_error)?;
+    Ok((current, true))
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -71,6 +155,7 @@ pub enum InitialLabel {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CatalogRecord {
     pub entry: CatalogEntry,
+    pub read_state: ConversationReadState,
     /// Most recent projected conversational admission or publication. Absent
     /// when no message timestamp was recorded (including version 1 data).
     pub last_message_ms: Option<u64>,
@@ -93,6 +178,25 @@ pub struct CatalogPage<T = CatalogEntry> {
 }
 
 impl SqliteStore {
+    /// Acknowledge a displayed reply or deliberately mark a public chat unread.
+    pub async fn update_read_state(
+        &self,
+        group: String,
+        bucket: u8,
+        session: SessionId,
+        update: ReadStateUpdate,
+    ) -> Result<ConversationReadState> {
+        execute(Arc::clone(&self.inner), move |inner, connection| {
+            let (state, changed) =
+                update_conversation_read(connection, &group, bucket, &session, &update, || Ok(()))?;
+            if changed && let Some(marker) = &inner.catalog_marker {
+                marker.changed();
+            }
+            Ok(state)
+        })
+        .await
+    }
+
     /// List discoverable conversations. Both group filtering and ordering
     /// precede pagination. Reading a page never loads conversation history.
     pub async fn list_conversations(
@@ -115,38 +219,15 @@ impl SqliteStore {
                     "conversation_catalog_unavailable",
                 ));
             }
-            let sql = conversation_page_query(order, group.is_some());
-            let (boundary, id) = after.as_ref().map_or((i64::MIN, ""), |anchor| {
-                (-anchor.value, anchor.session.as_str())
-            });
-            let mut query = connection.prepare_cached(&sql).map_err(database_error)?;
-            let mut rows = query
-                .query(params![bucket, group, boundary, id, limit as i64 + 1])
-                .map_err(database_error)?;
-            let mut entries = Vec::with_capacity(limit);
-            let mut next_after = None;
-            while let Some(row) = rows.next().map_err(database_error)? {
-                if entries.len() == limit {
-                    next_after = entries
-                        .last()
-                        .map(|row: &ConversationRow| row.anchor.clone());
-                    break;
-                }
-                let entry = decode_entry(read_entry(row))?;
-                let anchor = ConversationAnchor {
-                    value: -row.get::<_, i64>(5).map_err(database_error)?,
-                    session: entry.session.clone(),
-                };
-                entries.push(ConversationRow {
-                    group: row.get(4).map_err(database_error)?,
-                    record: read_record(inner, connection, entry)?,
-                    anchor,
-                });
-            }
-            Ok(ConversationPage {
-                entries,
-                next_after,
-            })
+            conversation_page(
+                connection,
+                group.as_deref(),
+                bucket,
+                order,
+                (after.as_ref(), false),
+                limit,
+                |entry| read_record(inner, connection, entry),
+            )
         })
         .await
     }
@@ -491,11 +572,56 @@ type StoredEntry = (String, u8, Option<String>, i64);
 
 /// Ascending tuples let SQLite seek directly to (time, id), including
 /// within a large timestamp tie. Only fixed SQL fragments vary.
-fn conversation_page_query(order: ConversationOrder, grouped: bool) -> String {
+pub(crate) fn conversation_page(
+    connection: &Connection,
+    group: Option<&str>,
+    bucket: u8,
+    order: ConversationOrder,
+    boundary: (Option<&ConversationAnchor>, bool),
+    limit: usize,
+    mut record: impl FnMut(CatalogEntry) -> Result<CatalogRecord>,
+) -> Result<ConversationPage> {
+    let (after, inclusive) = boundary;
+    let sql = conversation_page_query(order, group.is_some(), inclusive);
+    let (boundary, id) = after.as_ref().map_or((i64::MIN, ""), |anchor| {
+        (-anchor.value, anchor.session.as_str())
+    });
+    let mut query = connection.prepare_cached(&sql).map_err(database_error)?;
+    let mut rows = query
+        .query(params![bucket, group, boundary, id, limit as i64 + 1])
+        .map_err(database_error)?;
+    let mut entries = Vec::with_capacity(limit);
+    let mut next_after = None;
+    while let Some(row) = rows.next().map_err(database_error)? {
+        if entries.len() == limit {
+            next_after = entries
+                .last()
+                .map(|row: &ConversationRow| row.anchor.clone());
+            break;
+        }
+        let entry = decode_entry(read_entry(row))?;
+        let anchor = ConversationAnchor {
+            value: -row.get::<_, i64>(5).map_err(database_error)?,
+            session: entry.session.clone(),
+        };
+        entries.push(ConversationRow {
+            group: row.get(4).map_err(database_error)?,
+            record: record(entry)?,
+            anchor,
+        });
+    }
+    Ok(ConversationPage {
+        entries,
+        next_after,
+    })
+}
+
+fn conversation_page_query(order: ConversationOrder, grouped: bool, inclusive: bool) -> String {
     let rank = match order {
         ConversationOrder::Created => "creation_rank",
         ConversationOrder::Recent => "message_rank",
     };
+    let comparator = if inclusive { ">=" } else { ">" };
     let scope = if grouped {
         "conversation_group = ?2"
     } else {
@@ -503,7 +629,7 @@ fn conversation_page_query(order: ConversationOrder, grouped: bool) -> String {
     };
     format!(
         "SELECT id, bucket, label, catalog_revision, conversation_group, {rank}
-         FROM sessions WHERE bucket=?1 AND {scope} AND ({rank}, id) > (?3, ?4)
+         FROM sessions WHERE bucket=?1 AND {scope} AND ({rank}, id) {comparator} (?3, ?4)
          ORDER BY {rank}, id LIMIT ?5"
     )
 }
@@ -562,18 +688,34 @@ fn read_record(
     connection: &Connection,
     entry: CatalogEntry,
 ) -> Result<CatalogRecord> {
-    let (current, last_message, activity): (Option<String>, Option<i64>, Option<i64>) = connection
+    record_with_view(connection, entry, |session, turn| {
+        view_turn(inner, connection, session, turn)
+    })
+}
+
+pub(crate) fn record_with_view(
+    connection: &Connection,
+    entry: CatalogEntry,
+    view: impl FnOnce(&SessionId, &TurnId) -> Result<TurnView>,
+) -> Result<CatalogRecord> {
+    let (current, last_message, activity, read_state) = connection
         .prepare_cached(TURN_ACTIVITY)
         .map_err(database_error)?
         .query_row([entry.session.as_str()], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+            Ok((
+                row.get::<_, Option<String>>(0)?,
+                row.get::<_, Option<i64>>(1)?,
+                row.get::<_, Option<i64>>(2)?,
+                read_state(row, 3)?,
+            ))
         })
         .map_err(database_error)?;
     let current = current
-        .map(|id| view_turn(inner, connection, &entry.session, &TurnId::new(id)?))
+        .map(|id| view(&entry.session, &TurnId::new(id)?))
         .transpose()?;
     Ok(CatalogRecord {
         entry,
+        read_state,
         last_message_ms: last_message.map(unsigned).transpose()?,
         latest_turn_activity_ms: activity.map(unsigned).transpose()?,
         current_turn_disposition: current.as_ref().map(|turn| turn.disposition),
@@ -589,6 +731,44 @@ mod tests {
     use super::*;
 
     #[test]
+    fn read_state_admission_runs_under_the_write_lock_before_any_mutation() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("catalog.sqlite");
+        let mut db = Connection::open(&path).unwrap();
+        schema::install_for_test(&mut db);
+        db.execute("INSERT INTO sessions(id, configuration, revision, paused, next_input, conversation_group)
+                    VALUES('chat', X'00', 0, 0, 0, 'project')", []).unwrap();
+        let other = Connection::open(&path).unwrap();
+        other.busy_timeout(std::time::Duration::ZERO).unwrap();
+        let result = update_conversation_read(
+            &mut db,
+            "project",
+            0,
+            &SessionId::new("chat").unwrap(),
+            &ReadStateUpdate::MarkUnread,
+            || {
+                assert_eq!(
+                    other
+                        .execute_batch("BEGIN IMMEDIATE")
+                        .unwrap_err()
+                        .sqlite_error_code(),
+                    Some(rusqlite::ErrorCode::DatabaseBusy)
+                );
+                Err(error(ErrorKind::Unavailable, "grant_withdrawn"))
+            },
+        );
+        assert_eq!(result.unwrap_err().code, "grant_withdrawn");
+        let stored = other
+            .query_row(
+                "SELECT unread,read_revision,reply_id FROM sessions WHERE id='chat'",
+                [],
+                |row| read_state(row, 0),
+            )
+            .unwrap();
+        assert_eq!(stored, ConversationReadState::default());
+    }
+
+    #[test]
     fn conversation_pages_seek_the_ordering_tuple_in_the_index() {
         let mut db = Connection::open_in_memory().unwrap();
         schema::install_for_test(&mut db);
@@ -596,7 +776,7 @@ mod tests {
             for grouped in [true, false] {
                 let query = format!(
                     "EXPLAIN QUERY PLAN {}",
-                    conversation_page_query(order, grouped)
+                    conversation_page_query(order, grouped, false)
                 );
                 let plan = db
                     .prepare(&query)

@@ -5912,6 +5912,17 @@ it("retains catalog activity by chat and drops it when a later page omits the me
   expect(controller.read().runningSessionIds).toEqual(["chat-a"]);
   expect(controller.read().inputNeededSessionIds).toEqual(["chat-b"]);
   expect(controller.read().sessions).toEqual(["chat-a", "chat-b"]);
+  // On a message-ordered page, later non-message turn activity cannot promote
+  // a chat into a newer date group, including an undated pre-upgrade chat.
+  bridge.list = async () => ({
+    sessionIds: ["chat-a", "chat-b"],
+    lastActivity: [{ sessionId: "chat-b", atMs }],
+    lastMessage: [{ sessionId: "chat-a", atMs: atMs - 1 }],
+    nextCursor: null,
+  });
+  await controller.listChats();
+  expect(controller.chatLastActivityAtMs("chat-a")).toBe(atMs - 1);
+  expect(controller.chatLastActivityAtMs("chat-b")).toBeUndefined();
   bridge.list = async () => ({ sessionIds: ["chat-c"], nextCursor: null });
   await controller.listChats("v1/chat-b");
   expect(controller.chatLastActivityAtMs("chat-b")).toBeUndefined();
@@ -5919,6 +5930,98 @@ it("retains catalog activity by chat and drops it when a later page omits the me
   expect(controller.read().runningSessionIds).toBeUndefined();
   expect(controller.read().inputNeededSessionIds).toBeUndefined();
   controller.disconnect();
+});
+
+it("refreshes a live picker after registration and a racing burst without idle polling", async () => {
+  const { bridge, controller } = fixture();
+  const page = (replyId: string, unread: boolean): NativeChatPage => ({
+    sessionIds: ["switched-away"],
+    nextCursor: null,
+    readStates: [
+      { sessionId: "switched-away", revision: unread ? 1 : 2, replyId, unread },
+    ],
+  });
+  bridge.setReadState = vi.fn<NonNullable<DesktopNativeChat["setReadState"]>>();
+  const list = vi.fn<DesktopNativeChat["list"]>(async () => page("a", false));
+  bridge.list = list;
+  const subscribed = Promise.withResolvers<(() => void) | null>();
+  let changed!: () => void;
+  bridge.observeCatalog = (notify) => {
+    changed = notify;
+    return subscribed.promise;
+  };
+  controller.connect(null);
+  await controller.listChats();
+  list.mockClear();
+  const close = controller.observeChatList(() => true);
+  const snapshot = Promise.withResolvers<NativeChatPage>();
+  list.mockReturnValueOnce(snapshot.promise);
+  const release = vi.fn<() => void>();
+  subscribed.resolve(release);
+  await vi.waitFor(() => expect(list).toHaveBeenCalledTimes(1));
+  for (let i = 0; i < 20; ++i) changed();
+  list.mockResolvedValueOnce(page("b", true));
+  snapshot.resolve(page("a", false));
+  await vi.waitFor(() =>
+    expect(controller.chatReadState("switched-away")?.replyId).toBe("b")
+  );
+  expect(list).toHaveBeenCalledTimes(2);
+  expect(controller.chatReadState("switched-away")?.unread).toBe(true);
+
+  vi.useFakeTimers();
+  try {
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(list).toHaveBeenCalledTimes(2);
+    close();
+    expect(release).toHaveBeenCalledOnce();
+    changed();
+    expect(list).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.useRealTimers();
+    controller.disconnect();
+  }
+});
+
+it("recovers a failed catalog registration and resnapshots before going idle", async () => {
+  const { bridge, controller } = fixture();
+  const release = vi.fn<() => void>();
+  const observe = vi.fn<NonNullable<DesktopNativeChat["observeCatalog"]>>();
+  observe.mockRejectedValueOnce(new Error("host starting"));
+  observe.mockResolvedValue(release);
+  bridge.observeCatalog = observe;
+  const list = vi.fn<DesktopNativeChat["list"]>(async () => ({
+    sessionIds: [],
+    runningSessionIds: [],
+    nextCursor: null,
+  }));
+  bridge.list = list;
+  controller.connect(null);
+  await controller.listChats();
+  list.mockClear();
+  vi.useFakeTimers();
+  const close = controller.observeChatList(() => true);
+  try {
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(observe).toHaveBeenCalledTimes(2);
+    expect(list).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(list).toHaveBeenCalledTimes(1);
+  } finally {
+    close();
+    vi.useRealTimers();
+    controller.disconnect();
+  }
+});
+
+it("releases a late catalog subscription after leaving the workspace", async () => {
+  const { bridge, controller } = fixture();
+  const subscribed = Promise.withResolvers<(() => void) | null>();
+  bridge.observeCatalog = () => subscribed.promise;
+  const close = controller.observeChatList(() => true);
+  close();
+  const release = vi.fn<() => void>();
+  subscribed.resolve(release);
+  await vi.waitFor(() => expect(release).toHaveBeenCalledOnce());
 });
 
 it("serializes picker refreshes with page navigation and retires observation when closed", async () => {
@@ -6015,10 +6118,18 @@ it("serializes picker refreshes with page navigation and retires observation whe
 
 it("uses catalog membership, retains an exact rename draft on conflict, and ignores a retired mutation reply", async () => {
   const { bridge, running, transcripts } = fixture();
+  const readState = { unread: true, replyId: "latest-reply", revision: 5 };
+  bridge.setReadState = vi.fn<NonNullable<DesktopNativeChat["setReadState"]>>();
   const entries = new Map<string, NativeChatCatalogEntry>([
     [
       "chat-a",
-      { sessionId: "chat-a", revision: 1, title: "First", archived: false },
+      {
+        sessionId: "chat-a",
+        revision: 1,
+        title: "First",
+        archived: false,
+        readState,
+      },
     ],
     [
       "chat-b",
@@ -6046,7 +6157,7 @@ it("uses catalog membership, retains an exact rename draft on conflict, and igno
       if (change.revision !== current.revision)
         throw new Error("session_catalog_revision_changed");
       const next = { ...change, sessionId, revision: current.revision + 1 };
-      entries.set(sessionId, next);
+      entries.set(sessionId, { ...current, ...next });
       return next;
     }
   );
@@ -6083,6 +6194,7 @@ it("uses catalog membership, retains an exact rename draft on conflict, and igno
   });
   await controller.saveTitle();
   expect(controller.chatTitle("chat-a")).toBe("My rename");
+  expect(controller.chatReadState("chat-a")).toEqual(readState);
   expect(organize).toHaveBeenLastCalledWith("chat-a", {
     revision: 2,
     title: "My rename",

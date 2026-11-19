@@ -65,9 +65,12 @@ tokio-tungstenite = { version = "=0.30.0", default-features = false, features = 
 ] }
 uuid = { version = "1", features = ["v4", "serde"] }
 zeroize = "1"
+notify = { version = "8", default-features = false, features = [
+  "macos_fsevent",
+] }
 
 [target.'cfg(unix)'.dependencies]
-rustix = { version = "1", features = ["fs", "process"] }
+rustix = { version = "1", features = ["fs", "process", "event"] }
 
 [dev-dependencies]
 rusqlite = { version = "0.40", features = ["bundled"] }

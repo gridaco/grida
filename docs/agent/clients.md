@@ -290,7 +290,7 @@ list the visible chats across their store when you omit `cwd`. Older Grida
 hosts require the workspace. Choose a chat and call `session/load` to open
 its transcript. [ACP session listing](https://agentclientprotocol.com/protocol/v1/session-list)
 
-The default order is newest created. To show recent conversations, negotiate
+On an execution host the default order is newest created. To show recent conversations, negotiate
 `co.grida/session/catalog-query` version 1 and pass
 `"_meta": {"co.grida/catalogOrder": "messageActivity"}`. A new message can
 bring an old chat to the first page. Viewing or renaming a chat preserves its
@@ -299,7 +299,30 @@ same filter and order, or start a fresh first page to see new activity. A chat
 with no recorded message time follows dated chats, including a chat whose
 messages all predate message timestamping.
 
-Supporting hosts include independent page-level metadata arrays
+To watch several stores, launch `grida-agent serve-catalog --stdio --catalog-registry <file>`
+with a private registry of the workspaces the client may see. The catalog
+defaults to message activity order. Negotiate `co.grida/catalog/watch` version 1
+and send `_co.grida/catalog/subscribe` with `{}` or a single `cwd`. Once it
+succeeds, list the first page. List again on `_co.grida/catalog/changed`,
+and resubscribe before listing after a disconnect. This works with Desktop
+closed and requires no model credentials. The native reference describes
+registry permissions and the WebSocket option.
+[Live cross-workspace catalog](https://github.com/gridaco/grida/blob/main/crates/grida-agent/docs/rust-client-protocol.md#live-cross-workspace-catalog)
+
+On a compatible host, a catalog row's `_meta["co.grida/readState"]` tells
+whether the latest reply is unread. To acknowledge a displayed reply,
+negotiate `co.grida/session/read-state` version 1 and send
+`_co.grida/session/read-state` with its workspace `cwd`, `sessionId`,
+`action: "acknowledge"`, and the exact `revision` and `replyId` you
+displayed. The response is the current read state. Use `action: "markUnread"`
+with the same workspace and chat to mark it unread again. Other clients see
+the same state after reopening. Either action keeps the chat's place in
+Recents.
+
+For a cross-workspace list, identify each row by its `cwd` and `sessionId`.
+Read its `co.grida/running` and `co.grida/inputNeeded` flags from the row's
+`_meta`. On pages with unique session IDs, supporting hosts also provide
+the independent page-level arrays
 `co.grida/runningSessionIds` and `co.grida/inputNeededSessionIds` in
 `_meta`. A chat can appear in both when an optional question is open during
 work. Refresh the visible page to observe changes. An attached side chat

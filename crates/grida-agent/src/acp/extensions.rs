@@ -1,7 +1,7 @@
 //! Versioned product operations layered over standard ACP.
 
 pub(super) mod approvals;
-mod catalog;
+pub(super) mod catalog;
 pub(super) mod compaction;
 mod deletion;
 pub(super) mod gateway_billing;
@@ -193,7 +193,12 @@ fn capability_keys(
         .chain(input_images::chunks_capability(reviewer))
         .chain(input_images::queued_capability(reviewer))
         .chain(tool_images::capability(reviewer))
-        .chain([catalog::ORGANIZE, catalog::ARCHIVE_CATALOG, CATALOG_QUERY])
+        .chain([
+            catalog::ORGANIZE,
+            catalog::ARCHIVE_CATALOG,
+            CATALOG_QUERY,
+            catalog::READ_STATE,
+        ])
         .chain(delete_chat.then_some(deletion::DELETE))
         .chain(delete_chat.then_some(deletion::PREVIEW))
         .chain(goals::CAPABILITIES)

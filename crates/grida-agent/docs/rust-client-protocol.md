@@ -65,13 +65,16 @@ returns the same page as the live query. Add `--cwd <absolute-workspace>`
 to filter it or `--cursor <token>` to continue. The default order is
 `created`. The command requires an existing native store.
 
-On supporting hosts the `session/list` response includes
+Each `session/list` row reports boolean `_meta["co.grida/running"]` and
+`_meta["co.grida/inputNeeded"]` values. Global clients use the pair of workspace
+and session ID to identify a row. Two stores can contain the same session ID.
+On pages with unique IDs, the `session/list` response also includes
 `_meta["co.grida/runningSessionIds"]`. This array contains only IDs on the
 returned page whose current turn has the `running` disposition at observation
 time. A running turn is unsettled, unsuspended and has a live writer lease.
 Queued input alone, a paused turn and an interrupted turn do not qualify.
 An empty array means no chat on the page was running.
-An absent field means the host did not report running status. A client can
+If both the row flag and the array are absent, running status is unknown. A client can
 refresh the visible page using its original cursor without loading any session.
 
 `_meta["co.grida/inputNeededSessionIds"]` independently lists page IDs with a
@@ -85,6 +88,85 @@ snapshot's `current.disposition` and optional `current.inputNeeded` to
 include its own side sessions in a parent indicator. The native
 `grida-agent inspect` command includes the same answerable-wait fact in
 `input_needed` for a persisted chat.
+
+### Live cross-workspace catalog
+
+A trusted launcher can expose a catalog independently of an execution worker.
+Start `grida-agent serve-catalog --stdio --catalog-registry <file>` for a
+private ACP connection. Use `--listen ws://127.0.0.1:<port>/acp` and
+`--server-token-env <name>` in place of `--stdio` for authenticated loopback
+connections. This endpoint serves catalog operations and needs no provider.
+A terminal client with its own admitted registry can start a catalog while
+Desktop is closed. Desktop does not install a background discovery service.
+
+The launcher atomically replaces a private JSON file containing
+`{"workspaces":[{"cwd":"/project","stateDir":"/private/project-state"}]}`.
+Each entry identifies one canonical workspace and its native store. The
+registry admits up to 256 distinct workspace/store pairs. On Unix the user
+must own the registry and its containing directory with owner-only permissions.
+An admitted workspace whose store does not exist yet contributes no rows. An
+inaccessible store fails the query. Listing across workspaces grants no
+filesystem access to a chat.
+
+On first access to an older store, the regular store writer performs the
+schema upgrade. Close an older process that still owns that store before
+retrying the query.
+
+- Offer `co.grida/catalog/watch` version 1 during initialization. Once the
+  host advertises support, send `_co.grida/catalog/subscribe` with `{}` for
+  all authorized workspaces or `{"cwd":"/project"}` for one. The successful
+  `{}` response establishes the subscription before the first list. A new
+  subscription replaces this connection’s previous scope.
+- Listen for `_co.grida/catalog/changed`. Its optional `cwds` array identifies
+  affected authorized workspaces. An omitted array requests a full refresh.
+  Notifications are coalesced invalidations. Keep a dirty flag during a list
+  and repeat the read if another invalidation arrived. On reconnect, subscribe
+  before listing the first page. Explicit `_co.grida/catalog/unsubscribe`
+  takes `{}`. Disconnecting releases observation and leaves execution alone.
+- Read standard `session/list`. The cross-workspace catalog defaults to message
+  activity order. Negotiating `co.grida/session/catalog-query` allows
+  `_meta["co.grida/catalogLimit"]` from 1 to 32 and the existing order selector.
+  Creation ordinals belong to individual stores, so explicit `created` order
+  requires `cwd`. Send opaque continuations with the same scope, limit, and
+  order. Refresh the first page after registry changes, service restart, or
+  `invalid_session_cursor`. Removal from the registry revokes both listing
+  and read-state mutations. The host rechecks the workspace and its store after
+  obtaining the write transaction. A request still waiting for that transaction
+  when its workspace is removed leaves the read position unchanged.
+- The host reads the public index and current turn heads in committed SQLite
+  snapshots. A store-owned live turn lease is visible across processes and
+  released by the OS if its owner dies. Filesystem and owner-exit notifications
+  wake subscribers even when another process is the writer. No transcript
+  attachment or per-chat execution worker is required.
+
+### Shared reply read state
+
+A public catalog row carries `_meta["co.grida/readState"]`, with `unread`,
+`revision`, and `replyId`. For an attached chat, the existing `catalog-entry`
+request returns the same object in `readState` even when the row falls outside
+the current catalog page. The reply ID matches the retained transcript's
+`messageId`. When a turn first settles with a user-visible final answer, the
+host records its last final reply and advances the read revision in that
+transaction. Progress, streamed text, and new user submissions leave this
+position alone. Existing chats start read when the store upgrades, with
+`replyId: null` until the next final reply.
+
+Revising history preserves the read state of a reply retained in the new
+transcript and uses its new message ID. Removing the tracked reply clears its
+read position. A change of reply ID invalidates outstanding acknowledgements.
+
+Negotiate `co.grida/session/read-state` version 1. The request
+`_co.grida/session/read-state` takes an absolute workspace `cwd`, a public
+active `sessionId`, and one of these actions. It returns the current read state.
+
+| Action        | Additional fields                                               | Result                                                                                                             |
+| ------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `acknowledge` | `revision`, `replyId` (string or null) from the displayed state | Clears unread when both match. A stale or repeated acknowledgement returns the existing state.                     |
+| `markUnread`  |                                                                 | Advances the revision, including when the reply was already unread. Older acknowledgements cannot clear this mark. |
+
+Both actions retain the chat's message time and its position in Recents.
+Catalog reads and session attachment leave unread state alone. Clients
+acknowledge only after displaying the reply in a focused conversation.
 
 Negotiate `co.grida/session/initial-title` version 1 to suggest a provisional
 catalog title on submission. Standard `session/prompt` takes the optional
@@ -114,8 +196,10 @@ generation finishes between the client's read and its rename request.
 revision. Send a null title to clear it. On a revision conflict, read the
 current entry before asking the user to reapply the edit. Archiving and
 restoring preserve chat identity and leave execution controls unchanged.
-Mutation receipts omit activity; read the entry or list again for that optional
-observation. Activity is never accepted as a catalog mutation input.
+Mutation receipts omit activity and read state. Clients retain their last
+observed values until the next catalog read. Use the read-state operation to
+acknowledge a reply or mark a chat unread. Organize accepts only placement and
+title changes.
 
 Settings clients can negotiate `co.grida/settings/archive-catalog` version 1.
 `_co.grida/settings/archive-catalog` takes an absolute workspace `cwd` and an

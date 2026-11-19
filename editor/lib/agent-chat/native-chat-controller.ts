@@ -405,6 +405,12 @@ type Scope = {
   pendingCommand?: { command: NativeChatCommand; requestId: string };
   pendingRevision?: NativeChatRevisionInput;
   replay: boolean;
+  historyLoaded?: true;
+  readReceipt?: {
+    replyId: string | null;
+    revision: number;
+    delivery?: Promise<void>;
+  };
   draftReady?: Promise<void>;
   draftRestored?: true;
   pendingRestoreFailed?: true;
@@ -587,6 +593,7 @@ export class NativeChatController {
   private catalogRequest?: object;
   private catalog: NativeChatPage | null = null;
   private listing?: Promise<NativeChatPage>;
+  private catalogNavigation?: Promise<void>;
   private recents: readonly string[] = [];
   private profileId: string | null = null;
   private profileRead?: { connection: object; done: Promise<void> };
@@ -641,6 +648,11 @@ export class NativeChatController {
     if (this.scope.selection)
       return this.scope.selection.selection ? "settled" : "unavailable";
     return this.view.loading ? "loading" : "failed";
+  }
+
+  /** True only after this attachment has successfully read retained history. */
+  get hasOpenedHistory(): boolean {
+    return this.scope?.historyLoaded === true;
   }
 
   get presentedAttachmentId(): string | undefined {
@@ -1534,34 +1546,109 @@ export class NativeChatController {
     cursor: string | null = null,
     archived = this.view.catalogArchived
   ): Promise<void> {
-    return this.readChatPage(cursor, archived);
+    const navigation = this.readChatPage(cursor, archived);
+    this.catalogNavigation = navigation;
+    void navigation.finally(() => {
+      if (this.catalogNavigation === navigation)
+        this.catalogNavigation = undefined;
+    });
+    return navigation;
   }
 
-  /** Refresh the visible picker page. A missing projection identifies an older host. */
-  observeChatList(isVisible: () => boolean): () => void {
+  /** One workspace observer serves the selected chat and the open picker. */
+  observeChatList(pickerVisible: () => boolean): () => void {
     const observer = new AbortController();
-    const timer = setInterval(() => {
-      if (
-        isVisible() &&
-        !this.view.catalogLoading &&
-        !this.view.catalogError &&
-        !this.listing &&
-        !this.view.catalogArchived &&
-        (this.catalog?.runningSessionIds !== undefined ||
-          this.catalog?.inputNeededSessionIds !== undefined)
-      )
-        void this.readChatPage(this.view.catalogCursor, false, observer.signal);
-    }, CHAT_LIST_REFRESH_MS);
+    let stop: (() => void) | null = null;
+    let timer: ReturnType<typeof setInterval> | undefined;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    let retryDelay = 500;
+    let refreshing = false;
+    let dirty = false;
+    const refresh = async () => {
+      dirty = true;
+      if (refreshing) return;
+      refreshing = true;
+      try {
+        while (dirty && !observer.signal.aborted) {
+          // A picker navigation owns the cursor until its page is installed.
+          while (this.catalogNavigation) await this.catalogNavigation;
+          if (observer.signal.aborted) return;
+          dirty = false;
+          if (pickerVisible()) {
+            await this.readChatPage(
+              this.view.catalogCursor,
+              this.view.catalogArchived,
+              observer.signal,
+              true
+            );
+          }
+          const scope = this.scope;
+          if (
+            scope &&
+            (!pickerVisible() ||
+              !this.catalog?.readStates?.some(
+                (row) => row.sessionId === scope.attachment?.sessionId
+              ))
+          )
+            await this.readCatalogEntry(scope, true);
+          if (scope?.readReceipt) await this.deliverReadReceipt(scope);
+        }
+      } finally {
+        refreshing = false;
+      }
+    };
+    const fallback = () => {
+      if (observer.signal.aborted) return;
+      timer = setInterval(() => {
+        if (
+          pickerVisible() &&
+          !this.view.catalogLoading &&
+          !this.view.catalogError &&
+          !this.listing &&
+          !this.view.catalogArchived &&
+          (this.catalog?.runningSessionIds !== undefined ||
+            this.catalog?.inputNeededSessionIds !== undefined)
+        )
+          void this.readChatPage(
+            this.view.catalogCursor,
+            false,
+            observer.signal
+          );
+      }, CHAT_LIST_REFRESH_MS);
+    };
+    const observe = this.bridge.observeCatalog;
+    const register = async () => {
+      if (!observe) return fallback();
+      try {
+        const release = await observe.call(this.bridge, () => void refresh());
+        if (observer.signal.aborted) return release?.();
+        if (!release) return fallback();
+        stop = release;
+        // Snapshot after registration also covers events during the handshake.
+        void refresh();
+      } catch {
+        // An unavailable host can recover. Only an explicit unsupported result
+        // selects the older host's polling behavior.
+        if (!observer.signal.aborted) {
+          retry = setTimeout(() => void register(), retryDelay);
+          retryDelay = Math.min(5000, retryDelay * 2);
+        }
+      }
+    };
+    void register();
     return () => {
-      clearInterval(timer);
       observer.abort();
+      clearTimeout(retry);
+      clearInterval(timer);
+      stop?.();
     };
   }
 
   private async readChatPage(
     cursor: string | null,
     archived: boolean,
-    observer?: AbortSignal
+    observer?: AbortSignal,
+    recoverCursor = false
   ): Promise<void> {
     const connection = this.catalogConnection;
     const list = archived ? this.bridge.listArchived : this.bridge.list;
@@ -1599,6 +1686,7 @@ export class NativeChatController {
       if (!owns()) return;
       this.catalog = page;
       this.update({
+        catalogError: null,
         sessions: this.sessionChoices(),
         runningSessionIds: page.runningSessionIds,
         inputNeededSessionIds: page.inputNeededSessionIds,
@@ -1624,7 +1712,14 @@ export class NativeChatController {
         const invalidPage =
           cursor !== null &&
           error instanceof Error &&
-          error.message === "invalid_session_cursor";
+          [
+            "invalid_session_cursor",
+            "native_chat_catalog_cursor_invalid",
+          ].includes(error.message);
+        if (invalidPage && recoverCursor) {
+          await this.readChatPage(null, archived, observer, false);
+          return;
+        }
         this.update({
           runningSessionIds: undefined,
           inputNeededSessionIds: undefined,
@@ -3153,10 +3248,102 @@ export class NativeChatController {
     return title ?? NEW_CHAT_TITLE;
   }
 
+  /** Read receipts belong to active workspace chats, including when opened off-page. */
+  chatReadState(sessionId: string) {
+    if (
+      this.fixed ||
+      !this.bridge.setReadState ||
+      this.bridge.canSetReadState?.() === false
+    )
+      return;
+    const selected = this.view.catalogEntry;
+    const entry = selected?.sessionId === sessionId ? selected : undefined;
+    if (entry?.archived) return;
+    const listed = this.view.catalogArchived
+      ? undefined
+      : this.catalog?.readStates?.find((row) => row.sessionId === sessionId);
+    const opened = entry?.readState;
+    return opened && (!listed || opened.revision >= listed.revision)
+      ? opened
+      : listed;
+  }
+
+  async markChatUnread(sessionId: string): Promise<void> {
+    const scope = this.scope;
+    const connection = this.catalogConnection;
+    if (
+      !connection ||
+      !this.chatReadState(sessionId) ||
+      !this.bridge.setReadState
+    )
+      return;
+    try {
+      await this.bridge.setReadState(sessionId, { kind: "markUnread" });
+    } catch {
+      if (connection !== this.catalogConnection) return;
+      if (
+        scope &&
+        this.owns(scope) &&
+        scope.attachment?.sessionId === sessionId
+      )
+        this.update({ catalogEntryError: "Couldn't mark this chat unread." });
+      else this.update({ catalogError: "Couldn't mark this chat unread." });
+    }
+  }
+
+  /** The host checks the displayed read revision atomically with acknowledgement. */
+  acknowledgeReply(
+    sessionId: string,
+    replyId: string | null,
+    revision: number
+  ): Promise<void> {
+    const scope = this.scope;
+    if (!scope || scope.attachment?.sessionId !== sessionId)
+      return Promise.resolve();
+    if (
+      scope.readReceipt?.revision !== revision ||
+      scope.readReceipt.replyId !== replyId
+    )
+      scope.readReceipt = { replyId, revision };
+    return this.deliverReadReceipt(scope);
+  }
+
+  private async deliverReadReceipt(scope: Scope) {
+    const receipt = scope.readReceipt;
+    const sessionId = scope.attachment?.sessionId;
+    const send = this.bridge.setReadState;
+    if (!receipt || !sessionId || !send) return;
+    // A reconnect may refresh the catalog before the write on the old
+    // connection has rejected. Serialize the two attempts.
+    receipt.delivery = (receipt.delivery ?? Promise.resolve()).then(
+      async () => {
+        if (!this.owns(scope) || scope.readReceipt !== receipt) return;
+        const state = this.chatReadState(sessionId);
+        if (
+          state?.unread &&
+          state.revision === receipt.revision &&
+          state.replyId === receipt.replyId
+        ) {
+          try {
+            await send.call(this.bridge, sessionId, {
+              kind: "acknowledge",
+              replyId: receipt.replyId,
+              revision: receipt.revision,
+            });
+          } catch {
+            // Retain the displayed revision for the next catalog refresh.
+            return;
+          }
+        }
+        if (scope.readReceipt === receipt) scope.readReceipt = undefined;
+      }
+    );
+    await receipt.delivery;
+  }
+
   chatLastActivityAtMs(sessionId: string): number | undefined {
-    return this.catalog?.lastActivity?.find(
-      (entry) => entry.sessionId === sessionId
-    )?.atMs;
+    const activity = this.catalog?.lastMessage ?? this.catalog?.lastActivity;
+    return activity?.find((entry) => entry.sessionId === sessionId)?.atMs;
   }
 
   beginRename(): void {
@@ -6643,6 +6830,14 @@ export class NativeChatController {
   ): NativeChatCatalogEntry {
     const current = this.view.catalogEntry;
     if (current && current.revision > entry.revision) return current;
+    // Organize returns a placement receipt without a read observation.
+    if (
+      current?.sessionId === entry.sessionId &&
+      current.readState &&
+      (!entry.readState ||
+        current.readState.revision > entry.readState.revision)
+    )
+      entry = { ...entry, readState: current.readState };
     const page = this.catalog;
     if (page && entry.archived !== this.view.catalogArchived)
       this.catalog = {
@@ -6815,6 +7010,7 @@ export class NativeChatController {
           turns: page.turns,
         };
         scope.durable = messages;
+        scope.historyLoaded = true;
         const committed = new Set(messages.map((message) => message.messageId));
         const current = next.snapshot.current?.turnId;
         const latest = next.snapshot.latest?.turnId;

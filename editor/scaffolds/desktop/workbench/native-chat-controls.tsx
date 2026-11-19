@@ -20,6 +20,7 @@ import {
   RotateCcwIcon,
   EllipsisVerticalIcon,
   ListIcon,
+  MailIcon,
   PencilIcon,
   PlusIcon,
   SparklesIcon,
@@ -53,6 +54,12 @@ import {
   CommandItem,
 } from "@app/ui/components/command";
 import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@app/ui/components/context-menu";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -77,6 +84,7 @@ export function NativeChatHeader({
   onChatSelected?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const pickerOpen = useRef(false);
   const [chatQuery, setChatQuery] = useState("");
   const selecting = useRef(false);
   const renaming = useRef(false);
@@ -85,8 +93,18 @@ export function NativeChatHeader({
     ? controller.chatTitle(state.selected)
     : NEW_CHAT_TITLE;
   useEffect(() => {
-    if (open) return controller.observeChatList(() => !document.hidden);
-  }, [controller, open]);
+    if (disabled) return;
+    const visible = () => pickerOpen.current && !document.hidden;
+    const release = controller.observeChatList(visible);
+    const restore = () => {
+      if (visible()) void controller.listChats(controller.read().catalogCursor);
+    };
+    document.addEventListener("visibilitychange", restore);
+    return () => {
+      document.removeEventListener("visibilitychange", restore);
+      release();
+    };
+  }, [controller, disabled]);
 
   async function archiveChat() {
     const profileId = state.profiles?.active ?? undefined;
@@ -131,6 +149,7 @@ export function NativeChatHeader({
       <Popover
         open={open}
         onOpenChange={(next) => {
+          pickerOpen.current = next;
           setOpen(next);
           if (next) {
             selecting.current = false;
@@ -195,25 +214,53 @@ export function NativeChatHeader({
                   value={heading || "search-results"}
                   heading={heading || undefined}
                 >
-                  {ids.map((id) => (
-                    <CommandItem
-                      key={id}
-                      value={id}
-                      disabled={state.profileBusy}
-                      aria-current={state.selected === id ? "true" : undefined}
-                      className="aria-[current=true]:bg-accent"
-                      onSelect={() => {
-                        selecting.current = true;
-                        void controller.select(id);
-                        setOpen(false);
-                      }}
-                    >
-                      <span className="min-w-0 flex-1 truncate">
-                        {controller.chatTitle(id)}
-                      </span>
-                      <ChatActivityIndicators {...chatActivity(state, id)} />
-                    </CommandItem>
-                  ))}
+                  {ids.map((id) => {
+                    const readState = controller.chatReadState(id);
+                    const row = (
+                      <CommandItem
+                        key={id}
+                        value={id}
+                        disabled={state.profileBusy}
+                        aria-current={
+                          state.selected === id ? "true" : undefined
+                        }
+                        className="aria-[current=true]:bg-accent"
+                        onSelect={() => {
+                          selecting.current = true;
+                          void controller.select(id);
+                          pickerOpen.current = false;
+                          setOpen(false);
+                        }}
+                      >
+                        <span className="min-w-0 flex-1 truncate">
+                          {controller.chatTitle(id)}
+                        </span>
+                        {readState?.unread && (
+                          <span
+                            role="img"
+                            aria-label="Unread"
+                            className="size-2 shrink-0 rounded-full bg-primary"
+                          />
+                        )}
+                        <ChatActivityIndicators {...chatActivity(state, id)} />
+                      </CommandItem>
+                    );
+                    return readState ? (
+                      <ContextMenu key={id}>
+                        <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
+                        <ContextMenuContent>
+                          <ContextMenuItem
+                            onSelect={() => void controller.markChatUnread(id)}
+                          >
+                            <MailIcon aria-hidden />
+                            Mark unread
+                          </ContextMenuItem>
+                        </ContextMenuContent>
+                      </ContextMenu>
+                    ) : (
+                      row
+                    );
+                  })}
                 </CommandGroup>
               ))}
             </CommandList>
@@ -329,6 +376,16 @@ export function NativeChatHeader({
                   <PencilIcon aria-hidden />
                   Rename
                 </DropdownMenuItem>
+                {state.selected && controller.chatReadState(state.selected) && (
+                  <DropdownMenuItem
+                    onSelect={() =>
+                      void controller.markChatUnread(state.selected!)
+                    }
+                  >
+                    <MailIcon aria-hidden />
+                    Mark unread
+                  </DropdownMenuItem>
+                )}
                 {!state.catalogEntry.archived && (
                   <DropdownMenuItem
                     disabled={state.catalogChanging}

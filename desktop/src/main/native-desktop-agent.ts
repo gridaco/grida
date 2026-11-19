@@ -272,6 +272,20 @@ export class NativeDesktopAgent {
     );
   }
 
+  get catalogRegistryDirectory() {
+    return this.store.catalogRegistryDirectory;
+  }
+
+  catalogLocation(id: string) {
+    return this.withWorkspace(id, async (workspace, check) => {
+      const stateDir = await this.store.workspaceDirectory(id, workspace.root);
+      check();
+      return { id, cwd: workspace.root, stateDir };
+    });
+  }
+
+  onCatalogReset?: (shutdown: boolean) => Promise<void>;
+
   get catalogGeneration(): number {
     return this.accountGeneration;
   }
@@ -1129,6 +1143,7 @@ export class NativeDesktopAgent {
 
   private transition<T>(action: () => Promise<T>): Promise<T> {
     this.accountGeneration += 1;
+    const catalogClosed = this.onCatalogReset?.(this.closed);
     this.gatewayScopes.clear();
     this.transitions += 1;
     const owners = this.owners;
@@ -1151,7 +1166,8 @@ export class NativeDesktopAgent {
     });
     this.accountDrain = result.then(() => {});
     void this.accountDrain.catch(() => {});
-    return result;
+    // A catalog read may itself be waiting for the workspace transition.
+    return Promise.all([result, catalogClosed]).then(([value]) => value);
   }
 
   private newOwners(): NativeWorkspaceAgents {

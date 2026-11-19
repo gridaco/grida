@@ -14,31 +14,143 @@ use agent_kit_store_sqlite::{
 };
 use support::{change, payload, private_directory, submission};
 
+fn conversation_store(filename: &std::path::Path) -> SqliteStore {
+    use agent_kit_core::history::HistoryRecord;
+    use agent_kit_core::messages::Role;
+    use agent_kit_store_sqlite::catalog::ConversationProjection;
+    SqliteStore::open_with_conversations(
+        filename,
+        project,
+        None,
+        ConversationProjection {
+            group: |env| {
+                matches!(env.bytes(), b"a" | b"b")
+                    .then(|| String::from_utf8(env.bytes().to_vec()).unwrap())
+            },
+            input: |input| input.payload.bytes() == b"message",
+            message: |message| message.role == Role::Assistant,
+            final_reply: |turn| {
+                turn.history()
+                    .records()
+                    .last()
+                    .map(|HistoryRecord::Message(message)| message.id.clone())
+            },
+            revised_reply: |_, _| Ok(None),
+        },
+    )
+    .unwrap()
+}
+
+#[tokio::test]
+async fn catalog_wakes_on_public_activity_and_skips_private_turns_and_checkpoints() {
+    use agent_kit_core::turn::{ResponseContract, WaitRecord};
+    use agent_kit_core::{SchemaId, WaitId};
+    use agent_kit_store_sqlite::catalog_reader::{CHANGE_FILE, LEASE_PREFIX};
+    use std::time::{Duration, UNIX_EPOCH};
+
+    let directory = private_directory();
+    let store = conversation_store(&directory.path().join("sessions.sqlite"));
+    let marker = std::fs::OpenOptions::new()
+        .write(true)
+        .open(directory.path().join(CHANGE_FILE))
+        .unwrap();
+    let baseline = UNIX_EPOCH + Duration::from_secs(1_600_000_000);
+    let reset = || marker.set_modified(baseline).unwrap();
+    let changed = || marker.metadata().unwrap().modified().unwrap() != baseline;
+    let lease_count = || {
+        std::fs::read_dir(directory.path())
+            .unwrap()
+            .filter(|entry| {
+                entry
+                    .as_ref()
+                    .unwrap()
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(LEASE_PREFIX)
+            })
+            .count()
+    };
+
+    for (name, public) in [("private", false), ("a", true)] {
+        reset();
+        let session = create(name, name);
+        let id = session.id.clone();
+        store.create(session).await.unwrap();
+        assert_eq!(changed(), public);
+        reset();
+        store
+            .submit(id.clone(), submission("input", "message"))
+            .await
+            .unwrap();
+        assert_eq!(changed(), public);
+        reset();
+        let request = ClaimRequest {
+            id: change("claim"),
+            session: id.clone(),
+            expected_revision: store.inspect(id).await.unwrap().revision,
+            selection: TurnSelection::New {
+                turn: support::turn(),
+                inputs: vec![change("input")],
+            },
+        };
+        let ClaimOutcome::Acquired(claim) = store.claim(request).await.unwrap() else {
+            panic!("expected a new owner")
+        };
+        assert_eq!(changed(), public);
+        assert_eq!(lease_count(), usize::from(public));
+        reset();
+        support::commit(
+            &claim,
+            "checkpoint",
+            vec![JournalAction::SetCheckpoint(payload("progress"))],
+        )
+        .await;
+        assert!(!changed());
+        let wait = WaitId::new("question").unwrap();
+        support::commit(
+            &claim,
+            "question",
+            vec![JournalAction::OpenWait(WaitRecord {
+                id: wait.clone(),
+                request: payload("choose"),
+                response: ResponseContract {
+                    schema: SchemaId::new("test.text").unwrap(),
+                    version: 1,
+                },
+                answer: None,
+                withdrawn: false,
+            })],
+        )
+        .await;
+        assert_eq!(changed(), public);
+        reset();
+        support::commit(&claim, "withdraw", vec![JournalAction::WithdrawWait(wait)]).await;
+        assert_eq!(changed(), public);
+        reset();
+        support::commit(
+            &claim,
+            "settle",
+            vec![JournalAction::Settle(TurnOutcome {
+                status: OutcomeStatus::Succeeded,
+                account: None,
+                evidence: vec![],
+            })],
+        )
+        .await;
+        assert_eq!(changed(), public);
+    }
+}
+
 #[tokio::test]
 async fn conversation_pages_seek_past_a_moved_anchor_and_date_only_new_messages() {
     use agent_kit_core::MessageId;
     use agent_kit_core::history::HistoryRecord;
     use agent_kit_core::messages::{Content, Message, Provenance, ProvenanceKind, Role};
-    use agent_kit_store_sqlite::catalog::{ConversationOrder::Recent, ConversationProjection};
+    use agent_kit_store_sqlite::catalog::ConversationOrder::Recent;
 
     let directory = private_directory();
     let filename = directory.path().join("sessions.sqlite");
-    let open = || {
-        SqliteStore::open_with_conversations(
-            &filename,
-            project,
-            None,
-            ConversationProjection {
-                group: |env| {
-                    matches!(env.bytes(), b"a" | b"b")
-                        .then(|| String::from_utf8(env.bytes().to_vec()).unwrap())
-                },
-                input: |input| input.payload.bytes() == b"message",
-                message: |message| message.role == Role::Assistant,
-            },
-        )
-        .unwrap()
-    };
+    let open = || conversation_store(&filename);
     let store = open();
     let a = create("first", "a").id;
     let b = create("second", "b").id;
@@ -145,6 +257,54 @@ async fn conversation_pages_seek_past_a_moved_anchor_and_date_only_new_messages(
     assert_eq!(page.entries[0].group, "b");
     assert_eq!(page.entries[0].record.entry.session, b);
     assert!(page.entries[0].record.last_message_ms.unwrap() > 7);
+    // Publishing an intermediate message has not yet committed a final answer.
+    assert!(!page.entries[0].record.read_state.unread);
+    support::commit(
+        &claim,
+        "settle",
+        vec![JournalAction::Settle(TurnOutcome {
+            status: OutcomeStatus::Succeeded,
+            account: None,
+            evidence: vec![],
+        })],
+    )
+    .await;
+    let settled = store.catalog_record(b.clone()).await.unwrap();
+    assert!(settled.read_state.unread);
+    assert_eq!(settled.read_state.reply_id.as_deref(), Some("reply"));
+    use agent_kit_store_sqlite::catalog::ReadStateUpdate;
+    let acknowledge = ReadStateUpdate::Acknowledge {
+        revision: settled.read_state.revision,
+        reply_id: Some(MessageId::new("reply").unwrap()),
+    };
+    let seen = store
+        .update_read_state("b".into(), 0, b.clone(), acknowledge.clone())
+        .await
+        .unwrap();
+    assert!(!seen.unread);
+    let marked = store
+        .update_read_state("b".into(), 0, b.clone(), ReadStateUpdate::MarkUnread)
+        .await
+        .unwrap();
+    assert!(marked.unread);
+    assert_eq!(
+        store
+            .update_read_state("b".into(), 0, b.clone(), acknowledge)
+            .await
+            .unwrap(),
+        marked
+    );
+    assert!(
+        store
+            .update_read_state("a".into(), 0, b.clone(), ReadStateUpdate::MarkUnread)
+            .await
+            .is_err()
+    );
+    drop(claim);
+    drop(store);
+    let reopened = open().catalog_record(b).await.unwrap();
+    assert_eq!(reopened.read_state, marked);
+    assert_eq!(reopened.last_message_ms, settled.last_message_ms);
 }
 
 fn project(config: &Envelope) -> Option<Fingerprint> {
