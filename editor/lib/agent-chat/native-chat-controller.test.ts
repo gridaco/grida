@@ -6118,10 +6118,18 @@ it("serializes picker refreshes with page navigation and retires observation whe
 
 it("uses catalog membership, retains an exact rename draft on conflict, and ignores a retired mutation reply", async () => {
   const { bridge, running, transcripts } = fixture();
+  const readState = { unread: true, replyId: "latest-reply", revision: 5 };
+  bridge.setReadState = vi.fn<NonNullable<DesktopNativeChat["setReadState"]>>();
   const entries = new Map<string, NativeChatCatalogEntry>([
     [
       "chat-a",
-      { sessionId: "chat-a", revision: 1, title: "First", archived: false },
+      {
+        sessionId: "chat-a",
+        revision: 1,
+        title: "First",
+        archived: false,
+        readState,
+      },
     ],
     [
       "chat-b",
@@ -6149,7 +6157,7 @@ it("uses catalog membership, retains an exact rename draft on conflict, and igno
       if (change.revision !== current.revision)
         throw new Error("session_catalog_revision_changed");
       const next = { ...change, sessionId, revision: current.revision + 1 };
-      entries.set(sessionId, next);
+      entries.set(sessionId, { ...current, ...next });
       return next;
     }
   );
@@ -6186,6 +6194,7 @@ it("uses catalog membership, retains an exact rename draft on conflict, and igno
   });
   await controller.saveTitle();
   expect(controller.chatTitle("chat-a")).toBe("My rename");
+  expect(controller.chatReadState("chat-a")).toEqual(readState);
   expect(organize).toHaveBeenLastCalledWith("chat-a", {
     revision: 2,
     title: "My rename",

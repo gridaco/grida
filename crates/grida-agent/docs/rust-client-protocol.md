@@ -196,8 +196,10 @@ generation finishes between the client's read and its rename request.
 revision. Send a null title to clear it. On a revision conflict, read the
 current entry before asking the user to reapply the edit. Archiving and
 restoring preserve chat identity and leave execution controls unchanged.
-Mutation receipts omit activity; read the entry or list again for that optional
-observation. Activity is never accepted as a catalog mutation input.
+Mutation receipts omit activity and read state. Clients retain their last
+observed values until the next catalog read. Use the read-state operation to
+acknowledge a reply or mark a chat unread. Organize accepts only placement and
+title changes.
 
 Settings clients can negotiate `co.grida/settings/archive-catalog` version 1.
 `_co.grida/settings/archive-catalog` takes an absolute workspace `cwd` and an

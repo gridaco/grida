@@ -1473,11 +1473,16 @@ it.runIf(Boolean(packaged))(
       const first = await client.list();
       expect(first.sessionIds).toEqual(saved.slice(0, 32));
       expect(first.nextCursor).toEqual(expect.any(String));
+      const emptyReadState = { unread: false, revision: 0, replyId: null };
       await expect(client.list(first.nextCursor)).resolves.toEqual({
         sessionIds: saved.slice(32),
         nextCursor: null,
         runningSessionIds: [],
         inputNeededSessionIds: [],
+        readStates: saved.slice(32).map((sessionId) => ({
+          sessionId,
+          ...emptyReadState,
+        })),
       });
       await expect(
         client.list({ cwd: otherWorkspace } as unknown as string)
@@ -1523,12 +1528,16 @@ it.runIf(Boolean(packaged))(
         sessionIds: [selected.id],
         nextCursor: null,
         titles: [{ sessionId: selected.id, title: renamed.title }],
+        readStates: [{ sessionId: selected.id, ...emptyReadState }],
       });
 
       await client.close();
       client = await NativeAgentChat.start(launch);
       const reopened = await client.load(selected.id);
-      expect(await client.catalogEntry(reopened)).toEqual(archived);
+      expect(await client.catalogEntry(reopened)).toEqual({
+        ...archived,
+        readState: emptyReadState,
+      });
       expect((await client.observe(reopened)).current).toBeNull();
       const restored = await client.organize(reopened, {
         revision: archived.revision,
@@ -1556,6 +1565,7 @@ it.runIf(Boolean(packaged))(
         nextCursor: null,
         runningSessionIds: [],
         inputNeededSessionIds: [],
+        readStates: [{ sessionId: other.id, ...emptyReadState }],
       });
     } finally {
       await client?.close();

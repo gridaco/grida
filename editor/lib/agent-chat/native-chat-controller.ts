@@ -6830,10 +6830,12 @@ export class NativeChatController {
   ): NativeChatCatalogEntry {
     const current = this.view.catalogEntry;
     if (current && current.revision > entry.revision) return current;
+    // Organize returns a placement receipt without a read observation.
     if (
-      current?.readState &&
-      entry.readState &&
-      current.readState.revision > entry.readState.revision
+      current?.sessionId === entry.sessionId &&
+      current.readState &&
+      (!entry.readState ||
+        current.readState.revision > entry.readState.revision)
     )
       entry = { ...entry, readState: current.readState };
     const page = this.catalog;
