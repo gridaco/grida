@@ -22,7 +22,6 @@ import { DesktopQueueFixture } from "./desktop-queue-fixture";
 import { DesktopSubmissionFixture } from "./desktop-submission-fixture";
 import { DesktopConversation } from "./desktop-conversation";
 import { DesktopConversationFixtures as conversations } from "./desktop-conversation-fixtures";
-import { DesktopChatTabs } from "./desktop-chat-tabs";
 
 /** The production composer and preview surfaces, backed by local fixture state. */
 export function DesktopComposerDemo() {
@@ -435,6 +434,7 @@ export function DesktopComposerDemo() {
                     label: "Pause",
                     icon: <SquareIcon className="size-3.5" />,
                     onClick: () => queue.setRunning(false),
+                    confirmWithEscape: true,
                   }
                 : undefined
             }
@@ -556,7 +556,6 @@ export function DesktopComposerDemo() {
             }}
           />
         </ComposerDropArea>
-        <DesktopChatTabs key={generation} messages={messages} />
       </main>
     </TooltipProvider>
   );

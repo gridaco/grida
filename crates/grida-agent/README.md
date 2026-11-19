@@ -34,6 +34,44 @@ feature's current behavior, intended outcome, caveats, and availability.
 - [Native sandbox](docs/rust-sandbox.md) — native command confinement, its
   launch contract, and platform boundaries.
 
+## Review the effective prompt
+
+Run `grida-agent bake-prompt` to print the merged system text for a sample
+turn. Compare `--mode act` and `--mode plan`, `--role main` and
+`--role side`, or add `--no-questions`. Add `--json` to inspect each system
+message in order alongside the exact tools and schemas offered to that sample.
+The command uses a temporary native session with a fixed text model and an
+offline transport. It needs no credentials or model subscription.
+
+```sh
+target/debug/grida-agent bake-prompt --mode act --json
+target/debug/grida-agent bake-prompt --mode plan --role side
+target/debug/grida-agent bake-prompt --effort ultra --json
+```
+
+An optional `--cwd DIRECTORY` includes that directory’s project guidance in
+request preparation. Project and user messages have their own roles and are
+excluded from this system-instruction view. To inspect a specific permission
+posture, use `--permission-profile FILE` with a reviewed launch profile that
+has no executable hooks. Side chats use standard effort. As in a headless
+run, Ultra enables independent review and offers general-purpose delegation
+when eligible. Add `--subagents` to offer general delegation at standard effort.
+
+For an actual past turn on a stopped host, use
+`grida-agent inspect --state-dir DIRECTORY SESSION_ID --prompt-turn TURN_ID`.
+The result lists each recorded inference by operation ID with its original
+request fingerprint, model, message count, and attempt count. The IDs are
+in lexical order. Add
+`--operation OPERATION_ID` to read the selected call's system messages
+and tool declarations, including role, capability, and runtime additions.
+These system messages can contain private workspace or hook context. The
+fingerprint covers the complete prepared request. A new preview uses today's build.
+
+The [product prompt assets](../grida-agent-master/src/prompts) own shared
+wording, mode guidance and role instructions. The host selects them from the
+accepted configuration. Tool descriptions stay beside their schemas. The
+[title task](src/prompts/title.md) has separate user-role instructions.
+
 ## Run locally
 
 Build with `cargo build -p grida-agent --locked`. Use an absolute workspace
@@ -300,8 +338,10 @@ cleanup and uncertain outcomes keep their original attempt identity.
 | 6    | Verified suspension for a question or approval       |
 | 130  | Stopped run or process signal                        |
 
-`inspect` reads the latest and current persisted turn state without provider
-configuration. Use it after the process that owns the state directory exits.
+`run --initial-title TITLE` suggests a catalog title for the first accepted
+message. `inspect` reports the saved catalog `title` (null for an untitled
+chat) alongside the latest and current persisted turn state. Use it after the
+process that owns the state directory exits. It needs no provider configuration.
 
 ### Check a command before it runs
 
@@ -509,9 +549,11 @@ text context and confer no file or network access. Session loading replays
 committed text before its reply and leaves work ownership with the host.
 The prompt response follows the last delivered update and verified outcome.
 
-List supplies an absolute workspace `cwd` and returns up to 32 saved session
-identities in newest-created order. Follow `nextCursor` with the same workspace.
-Listing leaves chats detached and reads no transcripts.
+List returns up to 32 public saved chats in newest-created order. Supply an
+absolute `cwd` for one workspace or omit it for the visible store. Clients
+can negotiate message-activity ordering to discover recently active chats.
+The cursor continues the same scope and order. Listing reads catalog metadata
+without attaching to chats. [Catalog protocol](docs/rust-client-protocol.md#baseline-and-ownership)
 
 On macOS and Linux, negotiate `co.grida/session/delete` version 1 on private
 stdio to delete an eligible idle saved chat. A fresh request binds the
@@ -593,6 +635,8 @@ with an underscore.
 | Capability                                        | Behavior                                                                            |
 | ------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | `co.grida/session/submit`                         | Accept an identified prompt for an idle session.                                    |
+| `co.grida/session/initial-title`                  | Suggest a provisional catalog title when the first message is accepted.             |
+| `co.grida/session/catalog-query`                  | List visible public chats across workspaces or order a page by message activity.    |
 | `co.grida/session/snapshot`                       | Read revisions, ordered queue settings, and turn summaries.                         |
 | `co.grida/session/enqueue`, `input`               | Accept waiting work or read an accepted input and its settings.                     |
 | `co.grida/session/replace`, `withdraw`, `reorder` | Edit waiting work with revision checks and retained receipts.                       |
@@ -833,8 +877,8 @@ withholds command and mutation tools.
 
 The supervisor negotiates `co.grida/session/permission-mode` version 1 on
 private stdio. Inspection and update create no model work. A mode change is
-durable per chat, requires its current revision and an exact request identity,
-and is refused while work, queue entries or running processes remain.
+durable per chat and requires its current revision and an exact request identity.
+It applies to inputs accepted after the change, including while a turn runs.
 Accepted work and child assignments retain the captured mode through recovery;
 a launcher lacking Full access authority cannot resume a Full access capture.
 See the [client protocol](./docs/rust-client-protocol.md#per-chat-permission-mode).
@@ -863,6 +907,8 @@ polls: 5000 to 300000) and `max_output_tokens`. A pipe process accepts only
 `"\u0003"`, delivered as an interrupt; a terminal process receives the
 characters. A call's wait ends two seconds before its operation deadline. It
 needs no approval of its own and reaches only the calling chat's processes.
+Reading or writing an unconfined process requires a turn with captured Full access.
+The supervisor can list and stop it after a change to Default.
 The response text is:
 
 ```text

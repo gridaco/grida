@@ -125,14 +125,14 @@ content reads the session. This keeps the channel volatile and the approval
 state durable, and it means a forged or replayed fact can never _answer_
 anything.
 
-### Facts the channel does not carry
+### Question asked
 
-A turn starting is not an attention moment and is not part of this vocabulary.
-A pending **question** — the agent asking the person something whose answer
-shapes the work — is likewise not projected as an attention fact; the turn
-waits in an inspectable state, and a consumer that wants to surface it reads
-the session. A host that later adds a question-waiting fact extends the
-vocabulary and its notification table together.
+Registering a pending question publishes the session, turn, and wait identity.
+This applies to required and optional questions, including while the agent is
+doing independent work. The consumer reads the question from the authorized
+pending wait and the chat title from its owner. If the question has expired or
+was already answered, the consumer can discard the fact. Deduplicate delivery
+by session, turn and wait. A session start alone has no attention meaning.
 
 ## Semantics
 
@@ -200,12 +200,19 @@ eye.
 
 | Fact                      | Notify?                                                          |
 | ------------------------- | ---------------------------------------------------------------- |
+| Question asked            | Yes, while the question remains open outside the focused chat.   |
 | Approval required         | Yes — highest value; the agent is stalled on the user.           |
 | Turn settled, `succeeded` | Yes — "done, come look."                                         |
 | Turn settled, `failed`    | Yes — the turn ended in failure; the user must decide what next. |
 | Turn settled, `uncertain` | Yes — the outcome needs review before any work is repeated.      |
 | Turn settled, `cancelled` | Never — the user did this themselves.                            |
 | Outcome or fact not known | Never — version skew stays silent rather than notifying wrongly. |
+
+For a successful turn, the notification uses the chat title and a short
+excerpt from that turn’s saved final response. Each has its own fallback.
+An unavailable title uses the product name, and an unavailable excerpt uses
+a completion message. The person’s system notification settings govern
+where previews appear.
 
 ### Focus gating
 
@@ -222,7 +229,10 @@ The gate:
   it is not.
 
 Focus gating belongs to the consumer. Authorized attention facts can
-arrive for a chat whose view is closed.
+arrive for a chat whose view is closed. For a question in a known workspace
+chat, Desktop checks whether a focused window is actually displaying that
+chat. A different chat or a hidden side tab in the same window still gets a
+notification. A discarded side chat has no destination and stays silent.
 
 ### Click-to-attend
 
@@ -232,7 +242,8 @@ where the host supports addressing a session within a surface —
 select that session. The resolution key is the session's workspace
 binding; an unbound session falls back to the host's default
 surface. A notification that cannot deep-link still MUST focus the
-application.
+application. Temporary side chats are private to their owning frame. A click
+can focus that specific live side tab only while its attachment is valid.
 
 ## The seam under a foreign backend
 
@@ -304,6 +315,9 @@ A conforming implementation MUST hold all of these:
   explicit outcome, after that outcome is committed.
 - An approval wait publishes an approval-required fact naming the turn and
   the wait, before that turn settles.
+- A new question publishes the identity of its committed wait even while
+  independent work runs. Resuming a worker with that wait already open
+  does not register it again.
 - The channel is volatile and observe-only: no replay, no
   durability, no consumer can affect a turn through it.
 - The projected stream is authenticated and limited to sessions the

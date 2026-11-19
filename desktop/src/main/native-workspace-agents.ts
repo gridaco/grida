@@ -62,6 +62,7 @@ export class NativeWorkspaceAgents {
     }
   >();
   private readonly recoveries = new Set<string>();
+  private readonly catalogReads = new Map<string, Promise<void>>();
   private readonly workspaceGenerations = new Map<string, number>();
   private closed: Promise<void> | undefined;
 
@@ -91,6 +92,43 @@ export class NativeWorkspaceAgents {
       }
     }
     return null;
+  }
+
+  /** A closed-store reader briefly owns the writer lock. A workspace startup
+   * waits for it; an already-starting worker supplies its live catalog instead. */
+  async readCatalog<T>(
+    id: string,
+    read: (active: ActiveNativeChat | null) => Promise<T>
+  ): Promise<T> {
+    if (this.stopping.signal.aborted) throw closing();
+    const transition = this.transitions.get(id);
+    if (transition) {
+      if (!transition.result || this.recoveries.has(id)) throw closing();
+      return read(await transition.result);
+    }
+    const current = this.catalogOwner(id);
+    if (current) return read(current);
+    if (
+      [...this.slots.values()].some(
+        (slot) => slot.workspace.id === id && !slot.owner?.active.chat.hasExited
+      )
+    )
+      throw closing();
+    const previous = this.catalogReads.get(id);
+    const result = (previous ?? Promise.resolve()).then(() => {
+      if (this.stopping.signal.aborted) throw closing();
+      return read(null);
+    });
+    const done = result.then(
+      () => {},
+      () => {}
+    );
+    this.catalogReads.set(id, done);
+    try {
+      return await result;
+    } finally {
+      if (this.catalogReads.get(id) === done) this.catalogReads.delete(id);
+    }
   }
 
   gatewayScope(workspaceId: string, profileId?: string): string | undefined {
@@ -140,6 +178,14 @@ export class NativeWorkspaceAgents {
   ): Promise<ActiveNativeChat> {
     if (!("root" in workspace) || workspace.nestedDeck)
       return this.openOwned(workspace, profile, admit);
+    if (this.catalogReads.has(workspace.id)) {
+      const generation = this.workspaceGenerations.get(workspace.id);
+      while (this.catalogReads.has(workspace.id))
+        await this.catalogReads.get(workspace.id);
+      if (generation !== this.workspaceGenerations.get(workspace.id))
+        throw closing();
+      (profile?.admit ?? admit)?.();
+    }
     const existing = this.transitions.get(workspace.id);
     if (existing) {
       if (!sameProject(existing.workspace, workspace, false))
@@ -379,7 +425,9 @@ export class NativeWorkspaceAgents {
 
   close(): Promise<void> {
     if (this.closed) return this.closed;
-    this.closed = Promise.resolve().then(() => this.drain(this.slots));
+    this.closed = Promise.all(this.catalogReads.values()).then(() =>
+      this.drain(this.slots)
+    );
     this.stopping.abort();
     return this.closed;
   }
@@ -389,13 +437,16 @@ export class NativeWorkspaceAgents {
       workspaceId,
       (this.workspaceGenerations.get(workspaceId) ?? 0) + 1
     );
-    return this.drain(
+    const retired = this.drain(
       [...this.slots].filter(
         ([, slot]) =>
           "root" in slot.workspace &&
           (slot.workspace.nestedDeck?.parentWorkspaceId ??
             slot.workspace.id) === workspaceId
       )
+    );
+    return Promise.all([retired, this.catalogReads.get(workspaceId)]).then(
+      () => {}
     );
   }
 
@@ -489,7 +540,12 @@ export class NativeWorkspaceAgents {
     if ("root" in workspace) {
       if (workspace.nestedDeck) await workspace.nestedDeck.requireCurrent();
       workspace.requireDirectoryCurrent?.();
-      const options = { ...launch, cwd: workspace.root };
+      const options = {
+        ...launch,
+        cwd: workspace.root,
+        ...(launch.lookupProviderRoute &&
+          profile && { inputRouteConnectionId: profile.id }),
+      };
       return profile
         ? this.store.startWorkspace(workspace.id, options, profile.id)
         : this.store.startWorkspace(workspace.id, options);

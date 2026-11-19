@@ -51,6 +51,16 @@ impl Worker {
     }
 
     async fn open_scoped(state: &Path, home: &Path, endpoint: &str, scope: char) -> Self {
+        Self::launch(state, home, endpoint, scope, false).await
+    }
+
+    async fn launch(
+        state: &Path,
+        home: &Path,
+        endpoint: &str,
+        scope: char,
+        chat_titles: bool,
+    ) -> Self {
         let mut command = executable();
         command
             .args([
@@ -61,6 +71,9 @@ impl Worker {
                 "--state-dir",
             ])
             .arg(state);
+        if chat_titles {
+            command.arg("--chat-titles");
+        }
         if endpoint == GATEWAY {
             command.args(["--supervised-gateway-scope", &scope.to_string().repeat(64)]);
         } else {
@@ -90,6 +103,8 @@ impl Worker {
         for capability in [
             "provider/egress",
             "session/effort",
+            "session/initial-title",
+            "session/organize",
             "goal/start",
             "goal/inspect",
             "goal/control",
@@ -507,7 +522,7 @@ async fn failed_spending_publication_keeps_accepted_input_fail_closed_on_retry()
     let state = directory.join("state");
     let workspace = directory.join("workspace");
     std::fs::create_dir(&workspace).unwrap();
-    let mut worker = Worker::open(&state, &directory, GATEWAY).await;
+    let mut worker = Worker::launch(&state, &directory, GATEWAY, 'a', true).await;
     let created = worker
         .request("session/new", json!({"cwd":workspace,"mcpServers":[]}))
         .await;
@@ -515,7 +530,7 @@ async fn failed_spending_publication_keeps_accepted_input_fail_closed_on_retry()
     worker.parent = session.clone();
     let start = json!({
         "sessionId":session,"inputId":"funded-goal","effort":"ultra","operatingRegime":"act",
-        "prompt":[{"type":"text","text":"Review the export."}],"maxCostMills":"7",
+        "prompt":[{"type":"text","text":"Review the export."}],"maxCostMills":"7","initialTitle":"Export review",
         "goal":{"objective":{"description":"Review the export","criteria":["Export reviewed"]},
             "allowance":{"work_turns":1,"inference_steps":7},"automatic":false},
     });
@@ -532,6 +547,14 @@ async fn failed_spending_publication_keeps_accepted_input_fail_closed_on_retry()
             .contains("goal_spending_publication_unconfirmed"),
         "{rejected}"
     );
+    let entry = worker
+        .request(
+            "_co.grida/session/catalog-entry",
+            json!({"sessionId":session}),
+        )
+        .await;
+    assert_eq!(entry["title"], "Export review");
+    assert!(entry.get("titleGenerationPending").is_none(), "{entry}");
     let captured = worker
         .request(
             "_co.grida/session/input",

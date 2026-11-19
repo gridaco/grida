@@ -592,6 +592,8 @@ const bridge: DesktopBridge = {
       ? { document: true as const }
       : nativeWorkspaceChatOnly && { documentUnavailable: true as const }),
     status: (start) => nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_STATUS, start),
+    startWorkspaceChat: (preferred) =>
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_START_WORKSPACE, preferred),
     takeNotificationFocus: async () => {
       if (location.pathname !== "/desktop/workspace") return null;
       const href = location.href;
@@ -637,6 +639,7 @@ const bridge: DesktopBridge = {
       profiles: () => nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_PROFILES),
       welcomeProfiles: () =>
         nativeChatInvoke(IPC_CHANNELS.WELCOME_CHAT_PROFILES),
+      welcomeFullAccessAcrossPresets: true as const,
       prepareWelcomeFullAccess: (workspaceId) =>
         nativeChatInvoke(
           IPC_CHANNELS.WELCOME_CHAT_PREPARE_FULL_ACCESS,
@@ -663,6 +666,8 @@ const bridge: DesktopBridge = {
       nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_CATALOG_ENTRY, attachmentId),
     organize: (attachmentId, change) =>
       nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ORGANIZE, attachmentId, change),
+    undoArchive: (receipt) =>
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_UNDO_ARCHIVE, receipt),
     deleteSavedChat: (attachmentId, observationId, catalogRevision) =>
       nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_DELETE,
@@ -867,6 +872,12 @@ const bridge: DesktopBridge = {
       ),
     observe: (attachmentId) =>
       nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_OBSERVE, attachmentId),
+    setPresented: (attachmentId, visible) =>
+      nativeChatInvoke(
+        IPC_CHANNELS.NATIVE_CHAT_SET_PRESENTED,
+        attachmentId,
+        visible
+      ),
     acceptsEffort: () =>
       nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_EFFORT),
     acceptsGoalEffort: () =>
@@ -884,7 +895,8 @@ const bridge: DesktopBridge = {
         attachmentId,
         ...(processIds === undefined ? [] : [[...processIds]])
       ),
-    acceptsPng: () => nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PNG),
+    acceptsPng: (attachmentId) =>
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PNG, attachmentId),
     acceptsLibrarySelection: () =>
       nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_LIBRARY_SELECTION),
     submitWithLibrarySelection: (
@@ -920,8 +932,11 @@ const bridge: DesktopBridge = {
         attachmentId,
         input
       ),
-    acceptsSelectedImage: () =>
-      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_SELECTED_IMAGE),
+    acceptsSelectedImage: (attachmentId) =>
+      nativeChatInvoke(
+        IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_SELECTED_IMAGE,
+        attachmentId
+      ),
     submitSelectedImage: async (attachmentId, input) =>
       nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_SUBMIT_SELECTED_IMAGE,
@@ -1137,6 +1152,12 @@ const bridge: DesktopBridge = {
       ipcRenderer.invoke(IPC_CHANNELS.ARCHIVES_LIST, cursor ?? null),
     unarchive: (id, revision) =>
       ipcRenderer.invoke(IPC_CHANNELS.ARCHIVES_UNARCHIVE, id, revision),
+    openRestored: (id) =>
+      ipcRenderer.invoke(IPC_CHANNELS.ARCHIVES_OPEN_RESTORED, id),
+  },
+
+  chatCatalog: {
+    list: (query) => ipcRenderer.invoke(IPC_CHANNELS.CHAT_CATALOG_LIST, query),
   },
 
   account: {

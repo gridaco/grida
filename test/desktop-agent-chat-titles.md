@@ -29,7 +29,7 @@ with the current title selected. A title the person sets is never replaced.
 2. Send a first request. Within a few seconds, confirm a short title types in
    over **New chat**, in the request's language. With reduced motion turned on
    in system settings, confirm it appears without the typing effect.
-3. Choose **Chat options → Rename chat**. Confirm the title becomes an outlined
+3. Choose **Chat options → Rename**. Confirm the title becomes an outlined
    field with the whole title selected. Type a new title and press Enter.
 4. Double-click the title. Confirm the same outlined, selected field. Press
    Escape and confirm the title is unchanged.

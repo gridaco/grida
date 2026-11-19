@@ -343,7 +343,59 @@ describe("durable chat selection controller", () => {
     controller.disconnect();
   });
 
-  it("keeps the saved future choice when accepted work blocks activation", async () => {
+  it("queues the new model revision while observing the same running turn", async () => {
+    const f = fixture();
+    const catalog = await f.bridge.profiles!();
+    f.bridge.profiles = async () => ({ ...catalog!, inputRoutes: true });
+    const observe = f.bridge.observe;
+    f.bridge.observe = async (id) => {
+      const value = await observe(id);
+      return {
+        ...value,
+        snapshot: {
+          ...value.snapshot,
+          current: {
+            turnId: "running-on-a",
+            epoch: 1,
+            journalPosition: 1,
+            historyPosition: 1,
+            controlRevision: 1,
+            paused: false,
+            cancelled: false,
+            disposition: "running",
+            status: null,
+          },
+        },
+      };
+    };
+    const controller = f.make();
+    try {
+      controller.connect("chat-a");
+      await ready(controller);
+      const scope = controller.read().scope;
+      await controller.selectProfile({ kind: "new", id: f.b });
+      await controller.submit("Next task");
+      expect(f.bridge.submitInRegime).toHaveBeenCalledExactlyOnceWith(
+        "enqueue",
+        "chat-a",
+        expect.any(String),
+        "Next task",
+        "act",
+        "low",
+        undefined,
+        2
+      );
+      expect(controller.read().scope).toBe(scope);
+      expect(controller.read().observation?.snapshot.current?.turnId).toBe(
+        "running-on-a"
+      );
+      expect(f.bridge.selectProfile).not.toHaveBeenCalled();
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("keeps the saved future choice when an older host blocks activation", async () => {
     const f = fixture(),
       controller = f.make();
     controller.connect("chat-a");
@@ -360,6 +412,31 @@ describe("durable chat selection controller", () => {
     expect(f.bridge.submitInRegime).not.toHaveBeenCalled();
     expect(controller.read().error).toContain("running chat turns");
     controller.disconnect();
+  });
+
+  it("resends the same draft on another connection after a confirmed admission refusal", async () => {
+    const f = fixture();
+    const catalog = (await f.bridge.profiles!())!;
+    f.bridge.profiles = async () => ({ ...catalog, inputRoutes: true });
+    const send = vi.mocked(f.bridge.submitInRegime!);
+    send.mockRejectedValueOnce(new Error("chat_selection_route_unavailable"));
+    const controller = f.make();
+    try {
+      controller.connect("chat-a");
+      await ready(controller);
+      await controller.selectProfile({ kind: "new", id: f.b });
+      await expect(controller.submit("Try this")).rejects.toThrow(
+        "route_unavailable"
+      );
+      expect(controller.read().error).toContain("choose another connection");
+      await controller.selectProfile({ kind: "new", id: f.a });
+      await controller.submit("Try this");
+      const [refused, accepted] = send.mock.calls;
+      expect([refused[7], accepted[7]]).toEqual([2, 3]);
+      expect(accepted[2]).not.toBe(refused[2]);
+    } finally {
+      controller.disconnect();
+    }
   });
 
   it("drops a delayed old-chat restore after another chat opens", async () => {
@@ -491,15 +568,33 @@ describe("durable chat selection controller", () => {
     }
   });
 
-  it.each([false, true])(
-    "validates Goal funding and Ultra on the activated saved route (supported: %s)",
-    async (supported) => {
+  it.each([
+    { inputRoutes: false, supported: false },
+    { inputRoutes: false, supported: true },
+    { inputRoutes: true, supported: false },
+    { inputRoutes: true, supported: true },
+  ])(
+    "validates Goal funding on the selected connection (inputRoutes: $inputRoutes, funded: $supported)",
+    async ({ inputRoutes, supported }) => {
       const f = fixture();
+      if (inputRoutes) {
+        const catalog = (await f.bridge.profiles!())!;
+        f.bridge.profiles = async () => ({
+          ...catalog,
+          inputRoutes: true,
+          choices: catalog.choices.map((choice) => ({
+            ...choice,
+            ...((choice.id === f.b ? supported : !supported) && {
+              goalSpending: true as const,
+            }),
+          })),
+        });
+      }
       const observe = f.bridge.observe;
       f.bridge.observe = async (id) => {
         const observation = await observe(id);
         const selected = (await f.bridge.profiles!())!.active === f.b;
-        const available = selected ? supported : !supported;
+        const available = inputRoutes || (selected ? supported : !supported);
         return {
           ...observation,
           snapshot: {
@@ -514,7 +609,7 @@ describe("durable chat selection controller", () => {
       f.bridge.goal = async () => ({ observationId: null, goal: null });
       f.bridge.acceptsGoalEffort = async () => {
         const selected = (await f.bridge.profiles!())!.active === f.b;
-        return selected ? supported : !supported;
+        return inputRoutes || (selected ? supported : !supported);
       };
       f.bridge.startGoal = vi.fn<NonNullable<DesktopNativeChat["startGoal"]>>(
         async (sessionId, inputId) => ({
@@ -543,15 +638,16 @@ describe("durable chat selection controller", () => {
             maxCostMills: "1000",
           })
         ).toBe(supported);
-        expect(f.bridge.selectProfile).toHaveBeenCalledExactlyOnceWith({
-          kind: "new",
-          id: f.b,
-        });
+        expect(vi.mocked(f.bridge.selectProfile!).mock.calls).toEqual(
+          inputRoutes ? [] : [[{ kind: "new", id: f.b }]]
+        );
         expect(f.bridge.startGoal).toHaveBeenCalledTimes(Number(supported));
-        expect(controller.read().goalEffortAvailable).toBe(supported);
+        expect(controller.read().goalEffortAvailable).toBe(
+          inputRoutes || supported
+        );
         expect(
           !!controller.read().observation?.snapshot.goalSpendingAvailable
-        ).toBe(supported);
+        ).toBe(inputRoutes || supported);
         const fundingRefusal = expect.stringContaining(
           "supports enforced goal spending"
         );
@@ -1293,7 +1389,7 @@ describe("per-chat permission selection controller", () => {
       await choose(controller);
       expect(controller.read().permissionMode?.mode).toBe("restricted");
       expect(controller.read().permissionModeError).toMatch(
-        /accepted work and background processes/
+        /couldn't change access/
       );
     } finally {
       controller.disconnect();

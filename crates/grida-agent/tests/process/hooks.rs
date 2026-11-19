@@ -1189,15 +1189,14 @@ async fn restart_preserves_the_selected_check_and_stop_works_without_the_handler
     let state = directory.path().join("state");
     let workspace = TempDir::new().unwrap();
     let mut endpoint = Endpoint::start(vec![
-        Reply::Question("question_async"),
-        Reply::Finished(" "),
+        Reply::Question("question"),
         Reply::Finished(" "),
         Reply::Question("question"),
     ])
     .await;
     let mut host = server(&state, &endpoint.url, true).await;
     let session = start(&mut host, workspace.path()).await;
-    for _ in 0..2 {
+    {
         let request = endpoint.request().await;
         assert!(
             request["tools"]

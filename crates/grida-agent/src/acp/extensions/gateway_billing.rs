@@ -25,6 +25,8 @@ struct Status {
 #[request(method = "_co.grida/gateway/read-job-billing", response = GatewayBillingRead)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ReadJob {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    route_id: Option<uuid::Uuid>,
     request_id: String,
 }
 
@@ -47,6 +49,10 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                     if has_child {
                         require(&sessions, CHILD_CAPABILITY, Some(&request.session_id))?;
                     }
+                    let Ok(host) = host.for_turn(&request.session_id, &request.turn_id).await
+                    else {
+                        return Ok(GatewayBillingRead::Unavailable);
+                    };
                     let request_id = host
                         .gateway_billing_request_id(
                             request.session_id.clone(),
@@ -65,7 +71,10 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                     };
                     let reply = tokio::time::timeout(LOOKUP_TIMEOUT, async {
                         client
-                            .send_request(ReadJob { request_id })
+                            .send_request(ReadJob {
+                                request_id,
+                                route_id: host.supervised_route_id(),
+                            })
                             .block_task()
                             .await
                     })

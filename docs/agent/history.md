@@ -27,12 +27,29 @@ blank draft; the chat is created when you send its first message. Selecting a
 chat opens its transcript and saved work. Review any pending question or
 interruption before continuing. [Guide and interrupt work](./controls.md)
 
-On compatible Desktop builds, the chat list and **Settings → Archived chats**
-show the date of the latest turn's activity. This is its finish time, or its
-start time while unfinished, including stopped or failed work. Hover the date
-for the full local date and time. Renaming, archiving and reopening a chat do
-not change it. Chats without a recorded turn and older Desktop builds show no
-date.
+When you reopen a workspace while its chat connection is still starting,
+Desktop waits for startup to finish. The chat list can use a connection that
+is already running for that workspace. If the workspace has no running chat
+connection and all its providers are unavailable, its saved chats stay on disk.
+You can browse them again after a connection starts.
+
+On compatible Desktop builds, a spinner in the chat header or beside a chat
+in the list means a turn is running. **Input needed** means there is a question,
+permission request, or Library selection you can answer. Both can appear
+together while the agent continues other work. An open side chat contributes
+to its parent's indicators in the window that opened it. Its tab shows its own
+status. The list refreshes while open, including for saved chats you switched
+away from. Each indicator clears when its corresponding work or request ends.
+
+The chat picker groups chats under **Today**, **Yesterday**, **Earlier**, and
+**Undated** by the local date of their latest turn activity. Searching shows a
+single list ranked by match. **Settings → Archived chats** shows the date on
+each row. Hover that date to see the full local date and time.
+
+Activity uses the turn's finish time, or its start time while unfinished,
+including stopped or failed work. Renaming, archiving and reopening leave this
+time as recorded. Chats without a recorded activity time appear under
+**Undated** in the picker.
 
 Long chats open at the latest messages. Scroll up to read earlier messages:
 they load above as you go, without moving what you are reading. Reading
@@ -45,19 +62,29 @@ image support keeps the file card. An unavailable retained image shows an
 unavailable notice.
 [Inspect attachments](./results.md#inspect-an-attachment)
 
-A new chat gets a short title from its first request while the agent starts
-working. To change it, double-click the title, or open **Chat options** (the
-three-dot menu) and choose **Rename chat**. Type the new title and press
-Enter, or click elsewhere; Escape keeps the old one. A title you set is never
-replaced.
+An empty draft shows **New chat**. If your first message contains text, its
+opening words appear in the header and workspace chat picker as soon as the
+host accepts it. The agent can replace this excerpt with a generated title.
+If generation fails, the excerpt stays, including when you reopen the chat.
+A rejected send leaves the draft untitled.
 
-**Archive chat** moves a chat out of the active list and lets any ongoing
+To choose your own title, double-click the title or open **Chat options** and
+choose **Rename**. Press Enter or click elsewhere to save, or press Escape
+to cancel. Your saved title takes precedence even if the agent is still
+generating one.
+
+**Archive** moves a chat out of the active list and lets any ongoing
 work continue. After confirmation, Desktop opens a new-chat draft and shows
-**Chat archived**. Open **Settings → Archived chats** to find archived chats across
-your workspaces, then choose **Unarchive** to return one to its workspace's
-active list. Restoring a chat does not open it or resume its work, and does not
-require a working model connection. The chat picker shows active chats only.
-When **Delete chat** is available, it
+**Chat archived**. Choose **View** to open that chat. On compatible builds,
+choose **Undo** to return it to the active list. Undo also reopens the chat
+if you're still on the empty draft that archiving opened.
+
+Open **Settings → Archived chats** to find archived chats across your
+workspaces. **Unarchive** returns a chat to its workspace's active list and
+leaves Settings open. Restoring works without a model connection. On compatible
+builds, choose **View** on the **Chat unarchived** toast to open the restored
+chat in its workspace. The chat picker shows active chats only.
+When **Permanently delete** is available, it
 removes the chat's private data and its named subagents. Saved project files
 and independent forks stay in place. A chat with running, paused, queued or
 uncertain work, or an unfinished goal, cannot be deleted; Desktop explains why

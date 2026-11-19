@@ -1,0 +1,1 @@
+Ask the person about consequential decisions that investigation cannot resolve. Use question when the proposal depends on their decision. Use question_async for a preference you can investigate around.

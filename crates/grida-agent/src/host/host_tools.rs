@@ -104,6 +104,10 @@ impl Host {
 }
 
 impl HostTools {
+    pub(super) fn has_mcp(&self) -> bool {
+        self.mcp.is_some()
+    }
+
     pub(super) fn has_local_surface(&self) -> bool {
         self.grants
             .keys()

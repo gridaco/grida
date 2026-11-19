@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { last_workspace } from "./last-workspace";
+import { WindowContentState } from "./window-content-state";
 
 class MemoryStorage {
   private readonly values = new Map<string, string>();
@@ -11,13 +11,27 @@ class MemoryStorage {
   setItem(key: string, value: string): void {
     this.values.set(key, value);
   }
-
-  removeItem(key: string): void {
-    this.values.delete(key);
-  }
 }
 
-describe("last_workspace", () => {
+describe("WindowContentState", () => {
+  it("records Home after a workspace and restores it without workspace reads", async () => {
+    const storage = new MemoryStorage();
+    WindowContentState.remember(storage, {
+      surface: "workbench",
+      workspace_id: "workspace-a",
+    });
+    WindowContentState.remember(storage, { surface: "home" });
+    const list = vi.fn<() => Promise<[]>>(async () => []);
+
+    await expect(
+      WindowContentState.resolve(storage, {
+        list,
+        openFolder: async (root) => ({ id: "workspace-a", root }),
+        readdir: async () => [],
+      })
+    ).resolves.toEqual({ surface: "home" });
+    expect(list).not.toHaveBeenCalled();
+  });
   it("round-trips a workbench target and builds its route", () => {
     const storage = new MemoryStorage();
     const target = {
@@ -25,10 +39,10 @@ describe("last_workspace", () => {
       workspace_id: "workspace-a",
     } as const;
 
-    last_workspace.remember(storage, target);
+    WindowContentState.remember(storage, target);
 
-    expect(last_workspace.read(storage)).toEqual(target);
-    expect(last_workspace.href(target)).toBe(
+    expect(WindowContentState.read(storage)).toEqual(target);
+    expect(WindowContentState.href(target)).toBe(
       "/desktop/workspace?id=workspace-a"
     );
   });
@@ -41,10 +55,10 @@ describe("last_workspace", () => {
       active_path: "decks/Launch.canvas",
     } as const;
 
-    last_workspace.remember(storage, target);
+    WindowContentState.remember(storage, target);
 
-    expect(last_workspace.read(storage)).toEqual(target);
-    expect(last_workspace.href(target)).toBe(
+    expect(WindowContentState.read(storage)).toEqual(target);
+    expect(WindowContentState.href(target)).toBe(
       "/desktop/workspace?id=workspace-a&path=decks%2FLaunch.canvas"
     );
   });
@@ -61,12 +75,7 @@ describe("last_workspace", () => {
       })
     );
 
-    expect(last_workspace.read(storage)).toEqual({
-      surface: "workbench",
-      workspace_id: "workspace-a",
-    });
-    expect(JSON.parse(storage.getItem("grida.lastWorkspace")!)).toEqual({
-      version: 1,
+    expect(WindowContentState.read(storage)).toEqual({
       surface: "workbench",
       workspace_id: "workspace-a",
     });
@@ -80,10 +89,10 @@ describe("last_workspace", () => {
       base_path: "decks/Launch.canvas",
     } as const;
 
-    last_workspace.remember(storage, target);
+    WindowContentState.remember(storage, target);
 
-    expect(last_workspace.read(storage)).toEqual(target);
-    expect(last_workspace.href(target)).toBe(
+    expect(WindowContentState.read(storage)).toEqual(target);
+    expect(WindowContentState.href(target)).toBe(
       "/desktop/file?id=workspace-a&path=decks%2FLaunch.canvas"
     );
   });
@@ -100,13 +109,12 @@ describe("last_workspace", () => {
       })
     );
 
-    expect(last_workspace.read(storage)).toBeNull();
-    expect(storage.getItem("grida.lastWorkspace")).toBeNull();
+    expect(WindowContentState.read(storage)).toBeNull();
   });
 
   it("validates and re-opens the saved workspace before restoring", async () => {
     const storage = new MemoryStorage();
-    last_workspace.remember(storage, {
+    WindowContentState.remember(storage, {
       surface: "workbench",
       workspace_id: "workspace-a",
     });
@@ -115,7 +123,7 @@ describe("last_workspace", () => {
     >(async (root) => ({ id: "workspace-a", root }));
 
     await expect(
-      last_workspace.resolve(storage, {
+      WindowContentState.resolve(storage, {
         list: async () => [{ id: "workspace-a", root: "/projects/a" }],
         openFolder,
         readdir: async () => [],
@@ -127,17 +135,20 @@ describe("last_workspace", () => {
     expect(openFolder).toHaveBeenCalledWith("/projects/a");
   });
 
-  it("restores a live workbench artifact after validating its parent", async () => {
+  it("restores a legacy workbench artifact after validating its parent", async () => {
     const storage = new MemoryStorage();
     const target = {
       surface: "workbench",
       workspace_id: "workspace-a",
       active_path: "decks/Launch.canvas",
     } as const;
-    last_workspace.remember(storage, target);
+    storage.setItem(
+      "grida.lastWorkspace",
+      JSON.stringify({ version: 1, ...target })
+    );
 
     await expect(
-      last_workspace.resolve(storage, {
+      WindowContentState.resolve(storage, {
         list: async () => [{ id: "workspace-a", root: "/projects/a" }],
         openFolder: async (root) => ({ id: "workspace-a", root }),
         readdir: async (workspaceId, relPath) => {
@@ -155,46 +166,45 @@ describe("last_workspace", () => {
     ).resolves.toEqual(target);
   });
 
-  it("falls back to the workspace when its saved artifact is missing", async () => {
+  it("falls back to the workspace without overwriting Home saved during restore", async () => {
     const storage = new MemoryStorage();
-    last_workspace.remember(storage, {
+    WindowContentState.remember(storage, {
       surface: "workbench",
       workspace_id: "workspace-a",
       active_path: "removed.svg",
     });
 
     await expect(
-      last_workspace.resolve(storage, {
+      WindowContentState.resolve(storage, {
         list: async () => [{ id: "workspace-a", root: "/projects/a" }],
         openFolder: async (root) => ({ id: "workspace-a", root }),
-        readdir: async () => [],
+        readdir: async () => {
+          WindowContentState.remember(storage, { surface: "home" });
+          return [];
+        },
       })
     ).resolves.toEqual({
       surface: "workbench",
       workspace_id: "workspace-a",
     });
-    expect(last_workspace.read(storage)).toEqual({
-      surface: "workbench",
-      workspace_id: "workspace-a",
-    });
+    expect(WindowContentState.read(storage)).toEqual({ surface: "home" });
   });
 
-  it("forgets a workspace id that is no longer registered", async () => {
+  it("skips a workspace id that is no longer registered", async () => {
     const storage = new MemoryStorage();
-    last_workspace.remember(storage, {
+    WindowContentState.remember(storage, {
       surface: "workbench",
       workspace_id: "workspace-a",
     });
 
     await expect(
-      last_workspace.resolve(storage, {
+      WindowContentState.resolve(storage, {
         list: async () => [],
         openFolder:
           vi.fn<(root: string) => Promise<{ id: string; root: string }>>(),
         readdir: async () => [],
       })
     ).resolves.toBeNull();
-    expect(last_workspace.read(storage)).toBeNull();
   });
 
   it("keeps the target when its registered path is temporarily unavailable", async () => {
@@ -203,10 +213,10 @@ describe("last_workspace", () => {
       surface: "workbench",
       workspace_id: "workspace-a",
     } as const;
-    last_workspace.remember(storage, target);
+    WindowContentState.remember(storage, target);
 
     await expect(
-      last_workspace.resolve(storage, {
+      WindowContentState.resolve(storage, {
         list: async () => [{ id: "workspace-a", root: "/offline/a" }],
         openFolder: async () => {
           throw new Error("ENOENT");
@@ -214,7 +224,7 @@ describe("last_workspace", () => {
         readdir: async () => [],
       })
     ).rejects.toThrow("ENOENT");
-    expect(last_workspace.read(storage)).toEqual(target);
+    expect(WindowContentState.read(storage)).toEqual(target);
   });
 
   it("validates a saved canvas directory before restoring it", async () => {
@@ -224,10 +234,10 @@ describe("last_workspace", () => {
       workspace_id: "workspace-a",
       base_path: "decks/Launch.canvas",
     } as const;
-    last_workspace.remember(storage, target);
+    WindowContentState.remember(storage, target);
 
     await expect(
-      last_workspace.resolve(storage, {
+      WindowContentState.resolve(storage, {
         list: async () => [{ id: "workspace-a", root: "/projects/a" }],
         openFolder: async (root) => ({ id: "workspace-a", root }),
         readdir: async (workspaceId, relPath) => {
@@ -239,16 +249,16 @@ describe("last_workspace", () => {
     ).resolves.toEqual(target);
   });
 
-  it("forgets a saved canvas directory that no longer exists", async () => {
+  it("skips a saved canvas directory that no longer exists", async () => {
     const storage = new MemoryStorage();
-    last_workspace.remember(storage, {
+    WindowContentState.remember(storage, {
       surface: "canvas",
       workspace_id: "workspace-a",
       base_path: "decks/Removed.canvas",
     });
 
     await expect(
-      last_workspace.resolve(storage, {
+      WindowContentState.resolve(storage, {
         list: async () => [{ id: "workspace-a", root: "/projects/a" }],
         openFolder: async (root) => ({ id: "workspace-a", root }),
         readdir: async () => {
@@ -259,6 +269,5 @@ describe("last_workspace", () => {
         },
       })
     ).resolves.toBeNull();
-    expect(last_workspace.read(storage)).toBeNull();
   });
 });

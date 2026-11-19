@@ -7,7 +7,13 @@ async fn catalog_client(url: &str) -> SharedSocket {
     let mut socket = connect_shared(url, Some(SERVER_TOKEN), None, None)
         .await
         .unwrap();
-    let init = ws_rpc(&mut socket, 1, "initialize", extension_initialize()).await;
+    let mut offered = extension_initialize();
+    offered["clientCapabilities"]["_meta"]["co.grida/session/catalog-query"] = 1.into();
+    let init = ws_rpc(&mut socket, 1, "initialize", offered).await;
+    assert_eq!(
+        init["result"]["agentCapabilities"]["_meta"]["co.grida/session/catalog-query"],
+        1
+    );
     assert_eq!(
         init["result"]["agentCapabilities"]["sessionCapabilities"]["list"],
         json!({})
@@ -36,6 +42,85 @@ fn ids(result: &Value) -> Vec<&str> {
 }
 
 #[tokio::test]
+async fn workspace_catalog_reports_open_user_input_during_work_and_clears_it_at_completion() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let workspace = TempDir::new().unwrap();
+    let foreign = TempDir::new().unwrap();
+    let (release, held) = tokio::sync::oneshot::channel();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Question("question_async"),
+        Reply::Release("Independent work is finished.", held),
+    ])
+    .await;
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut writer = super::questions::question_socket(&url, true).await;
+    let mut observer = catalog_client(&url).await;
+    let chat = new_session(&mut writer, 2, workspace.path()).await;
+    let started = ws_rpc(
+        &mut writer,
+        3,
+        "_co.grida/session/submit",
+        prompt_request(&chat, "catalog-question", "Prepare the document."),
+    )
+    .await;
+    assert!(started["result"]["turnId"].is_string(), "{started}");
+    endpoint.request().await;
+    endpoint.request().await;
+    let page = ws_rpc(
+        &mut observer,
+        2,
+        "session/list",
+        json!({"cwd":workspace.path()}),
+    )
+    .await;
+    assert_eq!(
+        page["result"]["_meta"]["co.grida/runningSessionIds"],
+        json!([&chat])
+    );
+    assert_eq!(
+        page["result"]["_meta"]["co.grida/inputNeededSessionIds"],
+        json!([&chat])
+    );
+    assert!(!page.to_string().contains("Which edition?"));
+    let other = ws_rpc(
+        &mut observer,
+        3,
+        "session/list",
+        json!({"cwd":foreign.path()}),
+    )
+    .await;
+    assert_eq!(
+        other["result"]["_meta"]["co.grida/inputNeededSessionIds"],
+        json!([])
+    );
+    release.send(()).unwrap();
+    wait_for_snapshot(&mut writer, &chat, |snapshot| {
+        snapshot["latest"]["status"] == "succeeded"
+    })
+    .await;
+    let page = ws_rpc(
+        &mut observer,
+        4,
+        "session/list",
+        json!({"cwd":workspace.path()}),
+    )
+    .await;
+    assert_eq!(
+        page["result"]["_meta"]["co.grida/runningSessionIds"],
+        json!([])
+    );
+    assert_eq!(
+        page["result"]["_meta"]["co.grida/inputNeededSessionIds"],
+        json!([])
+    );
+    drop(writer);
+    drop(observer);
+    terminate_shared_server(host).await;
+    endpoint.done().await;
+}
+
+#[tokio::test]
 async fn standard_acp_catalog_discovers_saved_workspace_sessions_without_loading_them() {
     let temporary = TempDir::new().unwrap();
     let state = temporary.path().join("agent-state");
@@ -43,7 +128,8 @@ async fn standard_acp_catalog_discovers_saved_workspace_sessions_without_loading
     let b = TempDir::new().unwrap();
     let alias = temporary.path().join("workspace-alias");
     std::os::unix::fs::symlink(a.path(), &alias).unwrap();
-    let mut endpoint = Endpoint::start(vec![Reply::Finished("Retained answer")]).await;
+    let (release, held) = tokio::sync::oneshot::channel();
+    let mut endpoint = Endpoint::start(vec![Reply::Release("Retained answer", held)]).await;
     let (child, url) = shared_server(&state, &endpoint.url).await;
     let mut client = catalog_client(&url).await;
     let mut a_sessions = Vec::new();
@@ -54,24 +140,112 @@ async fn standard_acp_catalog_discovers_saved_workspace_sessions_without_loading
     let prompt = ws_rpc(
         &mut client,
         37,
-        "session/prompt",
-        json!({
-            "sessionId":a_sessions[0],"prompt":[{"type":"text","text":"PRIVATE_TRANSCRIPT_MARKER"}],
-        }),
+        "_co.grida/session/submit",
+        prompt_request(&a_sessions[0], "work", "PRIVATE_TRANSCRIPT_MARKER"),
     )
     .await;
-    assert_eq!(prompt["result"]["stopReason"], "end_turn");
+    assert!(prompt["result"]["turnId"].is_string(), "{prompt}");
     endpoint.request().await;
-    let before = session_snapshot(&mut client, &a_sessions[0]).await;
+    let mut observer = catalog_client(&url).await;
+    let first = ws_rpc(&mut observer, 2, "session/list", json!({"cwd":a.path()})).await;
+    assert_eq!(
+        first["result"]["_meta"]["co.grida/runningSessionIds"],
+        json!([])
+    );
+    let tail = json!({"cwd":a.path(),"cursor":first["result"]["nextCursor"].as_str().unwrap()});
+    let running = ws_rpc(&mut observer, 3, "session/list", tail.clone()).await;
+    assert_eq!(
+        running["result"]["_meta"]["co.grida/runningSessionIds"],
+        json!([a_sessions[0]])
+    );
+    assert!(!running.to_string().contains("PRIVATE_TRANSCRIPT_MARKER"));
+    let recent_request = json!({"_meta":{"co.grida/catalogOrder":"messageActivity"}});
+    let recent = ws_rpc(&mut observer, 50, "session/list", recent_request.clone()).await;
+    assert_eq!(ids(&recent["result"])[0], a_sessions[0]);
+    assert_eq!(
+        recent["result"]["sessions"][0]["cwd"],
+        json!(a.path().canonicalize().unwrap())
+    );
+    let admitted_at = recent["result"]["sessions"][0]["_meta"]["co.grida/lastMessageAtMs"]
+        .as_u64()
+        .unwrap();
+    let mut filtered = recent_request.clone();
+    filtered["cwd"] = json!(b.path());
+    let only_b = ws_rpc(&mut observer, 51, "session/list", filtered.clone()).await;
+    assert_eq!(ids(&only_b["result"]), [b_id.as_str()]);
+    filtered["cursor"] = recent["result"]["nextCursor"].clone();
+    let cross_scope = ws_rpc(&mut observer, 52, "session/list", filtered).await;
+    assert_eq!(cross_scope["error"]["data"], "invalid_session_cursor");
+    let wrong_order = ws_rpc(
+        &mut observer,
+        53,
+        "session/list",
+        json!({"cursor":recent["result"]["nextCursor"]}),
+    )
+    .await;
+    assert_eq!(wrong_order["error"]["data"], "invalid_session_cursor");
+    let foreign = ws_rpc(&mut observer, 4, "session/list", json!({"cwd":b.path()})).await;
+    assert_eq!(
+        foreign["result"]["_meta"]["co.grida/runningSessionIds"],
+        json!([])
+    );
+    let unattached = ws_rpc(
+        &mut observer,
+        5,
+        "_co.grida/session/snapshot",
+        json!({"sessionId":a_sessions[0]}),
+    )
+    .await;
+    assert_eq!(unattached["error"]["data"], "session_setup_required");
+    release.send(()).unwrap();
+    let before = wait_for_snapshot(&mut client, &a_sessions[0], |view| {
+        view["latest"]["status"] == "succeeded" && view["current"].is_null()
+    })
+    .await;
+    let settled = ws_rpc(&mut observer, 6, "session/list", tail).await;
+    assert_eq!(
+        settled["result"]["_meta"]["co.grida/runningSessionIds"],
+        json!([])
+    );
+    let final_recent = ws_rpc(&mut observer, 54, "session/list", recent_request.clone()).await;
+    let reply_at = final_recent["result"]["sessions"][0]["_meta"]["co.grida/lastMessageAtMs"]
+        .as_u64()
+        .unwrap();
+    assert!(reply_at > admitted_at);
+    drop(observer);
     terminate_shared_server(child).await;
     let endpoint_url = endpoint.url.clone();
     endpoint.done().await;
 
+    let absent = temporary.path().join("unopened-store");
+    let missing = executable()
+        .args(["chat-catalog", "--state-dir"])
+        .arg(&absent)
+        .output()
+        .await
+        .unwrap();
+    assert!(!missing.status.success());
+    assert!(!absent.exists(), "discovery created a new store");
+    let cold = executable()
+        .args(["chat-catalog", "--state-dir"])
+        .arg(&state)
+        .args(["--order", "message-activity"])
+        .output()
+        .await
+        .unwrap();
+    assert!(
+        cold.status.success(),
+        "{}",
+        String::from_utf8_lossy(&cold.stderr)
+    );
+    assert_eq!(records(&cold.stdout)[0], final_recent["result"]);
+
     let (child, url) = shared_server(&state, &endpoint_url).await;
     let mut client = catalog_client(&url).await;
     let unscoped = ws_rpc(&mut client, 2, "session/list", json!({})).await;
-    assert_eq!(unscoped["error"]["code"], -32602);
-    assert_eq!(unscoped["error"]["data"], "session_list_workspace_required");
+    assert_eq!(ids(&unscoped["result"])[0], b_id);
+    let reopened = ws_rpc(&mut client, 51, "session/list", recent_request).await;
+    assert_eq!(reopened["result"], final_recent["result"]);
     let relative = ws_rpc(&mut client, 3, "session/list", json!({"cwd":"workspace"})).await;
     assert_eq!(relative["error"]["code"], -32602);
     let first = ws_rpc(&mut client, 4, "session/list", json!({"cwd":alias})).await;
@@ -168,12 +342,46 @@ async fn standard_acp_catalog_discovers_saved_workspace_sessions_without_loading
     terminate_shared_server(child).await;
 }
 
+#[tokio::test]
+async fn pinned_workspace_catalog_does_not_expose_other_saved_chats() {
+    let fixture = super::approvals::Fixture::new(false);
+    let endpoint = "http://127.0.0.1:1/v1";
+    let (host, url) = shared_server(&fixture.state, endpoint).await;
+    let mut client = catalog_client(&url).await;
+    let own = new_session(&mut client, 2, &fixture.primary).await;
+    new_session(&mut client, 3, &fixture.extra).await;
+    drop(client);
+    terminate_shared_server(host).await;
+
+    let (host, url) = shared_server_with_profile(
+        &fixture.state,
+        endpoint,
+        "catalog-fixture",
+        Some(&fixture.profile),
+    )
+    .await;
+    let mut client = catalog_client(&url).await;
+    let implicit = ws_rpc(
+        &mut client,
+        2,
+        "session/list",
+        json!({"_meta":{"co.grida/catalogOrder":"messageActivity"}}),
+    )
+    .await;
+    assert_eq!(ids(&implicit["result"]), [own.as_str()]);
+    let foreign = ws_rpc(&mut client, 3, "session/list", json!({"cwd":fixture.extra})).await;
+    assert_eq!(foreign["error"]["data"], "session_catalog_scope_mismatch");
+    drop(client);
+    terminate_shared_server(host).await;
+}
+
 async fn organizer(url: &str) -> SharedSocket {
     let mut socket = connect_shared(url, Some(SERVER_TOKEN), None, None)
         .await
         .unwrap();
     let mut request = extension_initialize();
     request["clientCapabilities"]["_meta"]["co.grida/session/organize"] = 1.into();
+    request["clientCapabilities"]["_meta"]["co.grida/session/initial-title"] = 1.into();
     request["clientCapabilities"]["_meta"]["co.grida/settings/archive-catalog"] = 1.into();
     let init = ws_rpc(&mut socket, 1, "initialize", request).await;
     assert_eq!(
@@ -341,6 +549,9 @@ async fn archived_chat_keeps_its_turn_and_reopens_with_the_same_title() {
     .await;
     assert_eq!(ids(&list["result"]), [session.as_str()]);
     assert_eq!(list["result"]["sessions"][0]["title"], "Reusable work");
+    let message_time = list["result"]["sessions"][0]["_meta"]["co.grida/lastMessageAtMs"]
+        .as_u64()
+        .unwrap();
     assert_eq!(
         list["result"]["sessions"][0]["_meta"]["co.grida/lastActivityAtMs"],
         settled_at
@@ -389,6 +600,10 @@ async fn archived_chat_keeps_its_turn_and_reopens_with_the_same_title() {
     assert_eq!(ids(&active["result"]), [session.as_str()]);
     assert_eq!(active["result"]["sessions"][0]["title"], "Reusable work");
     assert_eq!(
+        active["result"]["sessions"][0]["_meta"]["co.grida/lastMessageAtMs"],
+        message_time
+    );
+    assert_eq!(
         active["result"]["sessions"][0]["_meta"]["co.grida/lastActivityAtMs"],
         settled_at
     );
@@ -400,16 +615,7 @@ async fn archived_chat_keeps_its_turn_and_reopens_with_the_same_title() {
     terminate_shared_server(second).await;
 }
 
-#[tokio::test]
-async fn a_first_request_titles_an_untitled_chat_without_overriding_a_rename() {
-    let temporary = TempDir::new().unwrap();
-    let state = temporary.path().join("agent-state");
-    let workspace = TempDir::new().unwrap();
-    let mut endpoint = Endpoint::start(vec![
-        Reply::Finished("Here is a plan."),
-        Reply::Finished("Done."),
-    ])
-    .await;
+async fn title_server(state: &Path, endpoint: &Endpoint) -> (Child, String) {
     let mut command = executable();
     command
         .args([
@@ -422,8 +628,21 @@ async fn a_first_request_titles_an_untitled_chat_without_overriding_a_rename() {
         ])
         .env("GRIDA_AGENT_FIXTURE_SERVER_TOKEN", SERVER_TOKEN)
         .env("GRIDA_AGENT_PROCESS_TEST_KEY", TEST_CREDENTIAL);
-    configured(&mut command, &state, &endpoint.url);
-    let (child, url) = spawn_shared_server(command).await;
+    configured(&mut command, state, &endpoint.url);
+    spawn_shared_server(command).await
+}
+
+#[tokio::test]
+async fn a_first_request_titles_an_untitled_chat_without_overriding_a_rename() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Finished("Here is a plan."),
+        Reply::Finished("Done."),
+    ])
+    .await;
+    let (child, url) = title_server(&state, &endpoint).await;
     let mut client = organizer(&url).await;
     let session = new_session(&mut client, 2, workspace.path()).await;
     let prompt = |id: u64, text: &str| {
@@ -492,6 +711,206 @@ async fn a_first_request_titles_an_untitled_chat_without_overriding_a_rename() {
     assert_eq!(after["result"]["title"], "Spring launch");
     endpoint.done().await;
     terminate_shared_server(child).await;
+}
+
+#[tokio::test]
+async fn first_accepted_title_survives_retries_and_either_order_of_rename_and_generation() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint =
+        Endpoint::start(vec![Reply::Finished("Done."), Reply::Finished("Done.")]).await;
+    let (child, url) = title_server(&state, &endpoint).await;
+    let mut client = organizer(&url).await;
+    let mut observer = catalog_client(&url).await;
+    for rename_first in [true, false] {
+        let (release, held) = tokio::sync::oneshot::channel();
+        assert!(
+            endpoint
+                .title_replies
+                .send(Reply::After(held, Box::new(Reply::Finished(FIXTURE_TITLE))))
+                .is_ok()
+        );
+        let session = new_session(&mut client, 2, workspace.path()).await;
+        let read = json!({"sessionId":session});
+        let rejected = ws_rpc(
+            &mut client,
+            3,
+            "_co.grida/session/submit",
+            json!({
+                "sessionId": session,
+                "inputId": "first",
+                "prompt": [],
+                "initialTitle": "Rejected title"
+            }),
+        )
+        .await;
+        assert_eq!(
+            rejected["error"]["data"], "invalid_prompt_parts",
+            "{rejected}"
+        );
+        let empty = ws_rpc(
+            &mut client,
+            4,
+            "_co.grida/session/catalog-entry",
+            read.clone(),
+        )
+        .await;
+        assert_eq!(empty["result"]["revision"], 0, "{empty}");
+        assert!(empty["result"]["title"].is_null());
+
+        let mut first = prompt_request(
+            &session,
+            "first",
+            "Plan a spring launch with the design team",
+        );
+        first["initialTitle"] = json!("Launch planning");
+        let accepted = ws_rpc(&mut client, 5, "_co.grida/session/submit", first.clone()).await;
+        assert!(accepted["result"]["turnId"].is_string(), "{accepted}");
+        assert!(
+            !endpoint
+                .request()
+                .await
+                .to_string()
+                .contains("Launch planning")
+        );
+        endpoint.title_request().await;
+        let provisional = ws_rpc(&mut client, 6, "_co.grida/session/catalog-entry", read).await;
+        assert_eq!(
+            provisional["result"]["title"], "Launch planning",
+            "{provisional}"
+        );
+        assert_eq!(provisional["result"]["titleGenerationPending"], true);
+        let listed = ws_rpc(
+            &mut observer,
+            7,
+            "session/list",
+            json!({"cwd":workspace.path()}),
+        )
+        .await;
+        assert_eq!(listed["result"]["sessions"][0]["sessionId"], session);
+        assert_eq!(listed["result"]["sessions"][0]["title"], "Launch planning");
+
+        let rename = json!({"sessionId":session,"revision":provisional["result"]["revision"],
+            "title":"My launch plan","archived":false});
+        if rename_first {
+            let renamed =
+                ws_rpc(&mut client, 8, "_co.grida/session/organize", rename.clone()).await;
+            assert_eq!(renamed["result"]["title"], "My launch plan", "{renamed}");
+        }
+        release.send(()).unwrap();
+        if !rename_first {
+            let generated = wait_for_title_worker(&mut client, &session).await;
+            assert_eq!(generated["title"], FIXTURE_TITLE, "{generated}");
+            let renamed = ws_rpc(&mut client, 9, "_co.grida/session/organize", rename).await;
+            assert_eq!(renamed["result"]["title"], "My launch plan", "{renamed}");
+        }
+        let retry = ws_rpc(&mut client, 10, "_co.grida/session/submit", first).await;
+        assert_eq!(
+            retry["result"]["turnId"], accepted["result"]["turnId"],
+            "{retry}"
+        );
+        let settled = wait_for_title_worker(&mut client, &session).await;
+        assert_eq!(settled["title"], "My launch plan");
+    }
+    terminate_shared_server(child).await;
+    endpoint.done().await;
+}
+
+async fn wait_for_title_worker(client: &mut SharedSocket, session: &str) -> Value {
+    timeout(WAIT, async {
+        loop {
+            let entry = ws_rpc(
+                client,
+                20,
+                "_co.grida/session/catalog-entry",
+                json!({"sessionId":session}),
+            )
+            .await;
+            let entry = entry.get("result").unwrap_or_else(|| panic!("{entry}"));
+            if entry.get("titleGenerationPending").is_none() {
+                break entry.clone();
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("the background title request settled")
+}
+
+#[tokio::test]
+async fn failed_generation_keeps_the_standard_prompt_title_after_restart() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Finished("Done."),
+        Reply::Finished("Done again."),
+    ])
+    .await;
+    let (release, held) = tokio::sync::oneshot::channel();
+    let failure = Reply::RawHttp(
+        "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".into(),
+    );
+    assert!(
+        endpoint
+            .title_replies
+            .send(Reply::After(held, Box::new(failure)))
+            .is_ok()
+    );
+    let (child, url) = title_server(&state, &endpoint).await;
+    let mut client = organizer(&url).await;
+    let session = new_session(&mut client, 2, workspace.path()).await;
+    let first = ws_rpc(
+        &mut client,
+        3,
+        "session/prompt",
+        json!({"sessionId":session,"prompt":[{"type":"text","text":"Compare the drafts"}],
+            "_meta":{"co.grida/initialTitle":"Draft comparison"}}),
+    )
+    .await;
+    assert_eq!(first["result"]["stopReason"], "end_turn", "{first}");
+    endpoint.request().await;
+    endpoint.title_request().await;
+    release.send(()).unwrap();
+    let retained = wait_for_title_worker(&mut client, &session).await;
+    assert_eq!(retained["title"], "Draft comparison");
+    let mut later = prompt_request(&session, "later", "Now summarize the differences");
+    later["initialTitle"] = json!("Later message");
+    let reply = ws_rpc(&mut client, 4, "_co.grida/session/submit", later).await;
+    assert!(reply["result"]["turnId"].is_string(), "{reply}");
+    endpoint.request().await;
+    wait_for_snapshot(&mut client, &session, |view| {
+        view["latest"]["turnId"] == reply["result"]["turnId"] && view["current"].is_null()
+    })
+    .await;
+    terminate_shared_server(child).await;
+    let inspected = executable()
+        .args(["inspect", "--state-dir"])
+        .arg(&state)
+        .arg(&session)
+        .output()
+        .await
+        .unwrap();
+    assert!(
+        inspected.status.success(),
+        "{}",
+        String::from_utf8_lossy(&inspected.stderr)
+    );
+    assert_eq!(records(&inspected.stdout)[0]["title"], "Draft comparison");
+    let (child, url) = title_server(&state, &endpoint).await;
+    let mut observer = catalog_client(&url).await;
+    let listed = ws_rpc(
+        &mut observer,
+        2,
+        "session/list",
+        json!({"cwd":workspace.path()}),
+    )
+    .await;
+    assert_eq!(ids(&listed["result"]), [session.as_str()]);
+    assert_eq!(listed["result"]["sessions"][0]["title"], "Draft comparison");
+    terminate_shared_server(child).await;
+    endpoint.done().await;
 }
 
 #[tokio::test]

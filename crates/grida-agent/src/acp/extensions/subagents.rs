@@ -299,7 +299,7 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
     let steer = (host.clone(), sessions.clone());
     let resume_queue = (host.clone(), sessions.clone());
     RequestRoutes::default()
-        .on_receive_request(
+        .on_supervised_request(
             async move |request: Create, responder, _| {
                 let result = async {
                     require(&create.1, CREATE, Some(&request.parent_session_id))?;
@@ -320,7 +320,7 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
             },
             on_receive_request!(),
         )
-        .on_receive_request(
+        .on_supervised_request(
             async move |request: Assign, responder, _| {
                 let result = async {
                     require(&assign.1, ASSIGN, Some(&request.parent_session_id))?;
@@ -343,7 +343,7 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
             },
             on_receive_request!(),
         )
-        .on_receive_request(
+        .on_supervised_request(
             async move |request: SendMessage, responder, _| {
                 let result = async {
                     require(&message.1, SEND_MESSAGE, Some(&request.parent_session_id))?;
@@ -448,7 +448,7 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
             },
             on_receive_request!(),
         )
-        .on_receive_request(
+        .on_supervised_request(
             async move |request: ResumeChild, responder, _| {
                 let result = async {
                     require(&resume.1, RESUME, Some(&request.task.parent_session_id))?;
@@ -474,7 +474,7 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
             },
             on_receive_request!(),
         )
-        .on_receive_request(
+        .on_supervised_request(
             async move |request: SteerChild, responder, _| {
                 let result = async {
                     require(&steer.1, STEER, Some(&request.task.parent_session_id))?;
@@ -497,7 +497,7 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
             },
             on_receive_request!(),
         )
-        .on_receive_request(
+        .on_supervised_request(
             async move |ResumeQueue(queue): ResumeQueue, responder, _| {
                 let result = async {
                     require(

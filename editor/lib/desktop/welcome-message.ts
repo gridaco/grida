@@ -14,8 +14,8 @@
  *
  * Delivery is at most once: the chat {@link welcome_message.takeMessage | takes} the
  * entry immediately before it sends, so a reload after that point cannot send
- * it again, and an entry that is still waiting survives a slow startup or a
- * reload before the send. A chat that cannot send it takes it too and says so
+ * it again. A waiting entry survives startup failures, retries and reloads.
+ * A connected chat that refuses the first input returns it to its composer
  * (see test/desktop-welcome-first-message.md).
  */
 

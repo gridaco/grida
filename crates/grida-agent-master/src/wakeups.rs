@@ -181,7 +181,7 @@ pub fn prepare_delivery(
             && state
                 .waits()
                 .values()
-                .all(|other| other.id == *wait || !other.is_pending()),
+                .all(|other| other.id == *wait || !crate::questions::blocks_progress(other)),
     }))
 }
 

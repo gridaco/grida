@@ -48,6 +48,7 @@ async fn run_in(
                 effort,
                 "--mode",
                 mode,
+                "--questions",
                 "--prompt",
                 PARENT,
                 "--compatible-output-limit-field",
@@ -150,6 +151,8 @@ async fn built_ultra_delegates_and_collects_in_plan_and_act() {
         let initial = endpoint.request().await;
         assert!(offers(&initial, "delegate_review"));
         assert!(offers(&initial, "collect_review"));
+        assert!(offers(&initial, "question_async"));
+        assert!(initial["messages"].to_string().contains("question_async"));
         assert!(
             initial["messages"]
                 .to_string()
@@ -170,6 +173,7 @@ async fn built_ultra_delegates_and_collects_in_plan_and_act() {
         assert!(child_messages.contains(ASSIGNMENT));
         assert!(!child_messages.contains(PARENT));
         assert!(!child_messages.contains("Ultra effort is active"));
+        assert!(!child_messages.contains("question_async"));
         assert_eq!(child_messages.contains("Plan is active."), mode == "plan");
         assert_eq!(child["max_tokens"], 1024);
         let collected = endpoint.request().await;

@@ -106,7 +106,8 @@ export function AgentPermissionConfirmation({
           Includes credentials your account can read.
         </p>
         <p className="text-xs text-muted-foreground">
-          This chat only. New chats use Default.
+          Applies to new messages in this chat. Other chats keep their own
+          access.
         </p>
         <AlertDialogFooter>
           <AlertDialogCancel size="sm" onClick={() => onAnswer(false)}>

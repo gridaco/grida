@@ -2,7 +2,7 @@
 // GRIDA-GG: provider — invocation-owned chat authority with scoped renewal.
 
 use crate::error::{Error, Result};
-use crate::{AgentAction, AgentCommand, ExternalAgentCommand, account, host, http};
+use crate::{AgentAction, AgentCommand, AgentRunArgs, ExternalAgentCommand, account, host, http};
 use agent_kit_core::inference::RequestControl;
 use agent_kit_core::{BoxFuture, Error as CoreError, ErrorKind, Result as CoreResult};
 use agent_kit_providers::{
@@ -78,16 +78,18 @@ pub async fn dispatch(command: AgentCommand) -> Result<u8> {
     let signal = process::shutdown_signal();
     tokio::pin!(signal);
     let run = match command.action {
-        AgentAction::Run {
-            cwd,
-            session,
-            prompt,
-            input_png,
-            input_file,
-            skills,
-            questions,
-            deadline_ms,
-        } => {
+        AgentAction::Run(args) => {
+            let AgentRunArgs {
+                cwd,
+                session,
+                prompt,
+                initial_title,
+                input_png,
+                input_file,
+                skills,
+                questions,
+                deadline_ms,
+            } = *args;
             let cwd = cwd
                 .canonicalize()
                 .ok()
@@ -124,6 +126,7 @@ pub async fn dispatch(command: AgentCommand) -> Result<u8> {
                     timeout: Duration::from_millis(deadline_ms),
                 },
                 input_file,
+                initial_title,
             ))
         }
         AgentAction::ServeStdio => None,
@@ -172,8 +175,8 @@ pub async fn dispatch(command: AgentCommand) -> Result<u8> {
         )
         .map_err(failure)?,
     );
-    if let Some((run, input_file)) = run {
-        process::run_with_file(&host, run, input_file, signal)
+    if let Some((run, input_file, initial_title)) = run {
+        process::run_with_input(&host, run, input_file, initial_title, signal)
             .await
             .map_err(failure)
     } else {

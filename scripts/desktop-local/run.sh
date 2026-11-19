@@ -38,12 +38,15 @@ fi
 editor_pid=""
 cleanup() {
   if [ -n "$editor_pid" ] && kill -0 "$editor_pid" 2>/dev/null; then
-    step "Stopping the editor dev server"
+    step "Stopping the editor dev server" 2>/dev/null || true
     kill "$editor_pid" 2>/dev/null || true
     wait "$editor_pid" 2>/dev/null || true
   fi
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 if curl -fsS -o /dev/null --max-time 2 "$editor_url/desktop/auth/me" 2>/dev/null ||
    curl -fsS -o /dev/null --max-time 2 "$editor_url" 2>/dev/null; then
@@ -68,4 +71,5 @@ else
 fi
 
 step "Starting Grida Desktop (builds linked packages and the native agent first)"
-pnpm --dir desktop dev
+# Forge reads stdin for its restart shortcut. Keep terminal output for colors.
+pnpm --dir desktop dev </dev/null

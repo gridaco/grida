@@ -14,7 +14,21 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type ReactNode,
 } from "react";
+import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+} from "@dnd-kit/core";
+import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
+import {
+  SortableContext,
+  horizontalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   Loader2Icon,
   PanelBottomIcon,
@@ -52,6 +66,7 @@ import { useWorkspaceChanges } from "./workspace-changes";
 import { WorkspaceFileIcon } from "./workspace-file-icon";
 import { WorkspaceTabThumbnail } from "./workspace-tab-thumbnail";
 import { WorkbenchTab } from "./workbench-tab";
+import { PanelTabContent } from "./workbench-panel-content";
 import { WorkbenchPanelTab } from "./workbench-panel-tab";
 import type { WorkbenchPanel, WorkbenchPanels } from "./workbench-panels";
 import type { WorkspaceSvgText } from "./workspace-svg-text";
@@ -64,6 +79,7 @@ import {
 } from "./workspace-workbench-keybindings";
 
 const START_PANEL_ID = "quick-start";
+const TAB_MOVE_SHORTCUTS = "Alt+Shift+ArrowLeft Alt+Shift+ArrowRight";
 
 export type EditorPaneProps = {
   workspace: Workspace;
@@ -77,6 +93,7 @@ export type EditorPaneProps = {
   dirtyPaths: ReadonlySet<string>;
   onTabDirtyChange: (relPath: string, dirty: boolean) => void;
   onSelectTab: (tab: string) => void;
+  onMoveTab: (tab: string, target: string) => void;
   onCloseTab: (tab: string) => void | Promise<boolean>;
   onReopenClosedTab: () => void;
   /** Show the workspace-local faux Start tab while the real group is empty. */
@@ -108,6 +125,7 @@ export function EditorPane({
   dirtyPaths,
   onTabDirtyChange,
   onSelectTab,
+  onMoveTab,
   onCloseTab,
   onReopenClosedTab,
   showStart,
@@ -297,6 +315,7 @@ export function EditorPane({
         activeTab={activeTab}
         dirtyPaths={dirtyPaths}
         onSelect={onSelectTab}
+        onMove={onMoveTab}
         onClose={onCloseTab}
         onCloseOthers={handleCloseOthers}
         showStart={showStart}
@@ -400,7 +419,7 @@ function StartTabContent({
   );
 }
 
-function EditorTitleBar({
+export function EditorTitleBar({
   workspace,
   tabs,
   panels,
@@ -410,10 +429,11 @@ function EditorTitleBar({
   activeTab,
   dirtyPaths,
   onSelect,
+  onMove,
   onClose,
   onCloseOthers,
   showStart,
-  treeVisible,
+  treeVisible = false,
   onToggleTree,
   utilitiesVisible,
   onToggleUtilities,
@@ -428,11 +448,12 @@ function EditorTitleBar({
   activeTab: string | null;
   dirtyPaths: ReadonlySet<string>;
   onSelect: (tab: string) => void;
+  onMove: (tab: string, target: string) => void;
   onClose: (tab: string) => void;
   onCloseOthers: (keep: string) => Promise<void>;
   showStart: boolean;
-  treeVisible: boolean;
-  onToggleTree: () => void;
+  treeVisible?: boolean;
+  onToggleTree?: () => void;
   utilitiesVisible: boolean;
   onToggleUtilities?: () => void;
   onFileTrashed?: (relPath: string) => void;
@@ -447,6 +468,14 @@ function EditorTitleBar({
   const [previewController] = useState(() => new TabPreviewController());
   const [thumbnailCache] = useState(() => new WorkspaceTabThumbnail.Cache());
   const [previewRevision, setPreviewRevision] = useState(0);
+  const pointerSensor = useSensor(PointerSensor, {
+    activationConstraint: { distance: { x: 5 } },
+    onActivation: ({ event }) => {
+      // Capture on the original hit element so a plain click keeps its target.
+      if (event instanceof PointerEvent && event.target instanceof Element)
+        event.target.setPointerCapture(event.pointerId);
+    },
+  });
 
   useEffect(() => {
     // Files have semantic thumbnails; a panel may supply informational content.
@@ -521,72 +550,104 @@ function EditorTitleBar({
           : DESKTOP_WINDOW_CONTROLS_RIGHT_INSET,
       }}
     >
-      <div
-        ref={railRef}
-        role="tablist"
-        aria-label="Open editors"
-        className="desktop-native-drag-scroll-viewport scroll-fade-x scroll-fade-3 no-scrollbar flex h-full min-w-0 flex-initial items-center gap-1 overflow-x-auto overscroll-x-contain pl-1.5 pr-2 scroll-pl-1.5 scroll-pr-2"
-        onPointerLeave={(event) =>
-          previewController.railLeave(event.pointerType)
-        }
+      <DndContext
+        sensors={[pointerSensor]}
+        collisionDetection={closestCenter}
+        modifiers={[restrictToHorizontalAxis]}
+        autoScroll={{ canScroll: (element) => element === railRef.current }}
+        onDragStart={() => previewController.dismiss()}
+        onDragEnd={({ active, over }) => {
+          if (over) onMove(String(active.id), String(over.id));
+        }}
       >
-        {showStart && <StartTabItem />}
-        {tabs.map((tab) => {
-          const target = WorkbenchTab.parse(tab);
-          return target.kind === "file" ? (
-            <TabItem
-              key={tab}
-              workspace={workspace}
-              tabKey={tab}
-              relPath={target.relPath}
-              active={tab === activeTab}
-              dirty={dirtyPaths.has(target.relPath)}
-              onSelect={() => onSelect(tab)}
-              onClose={() => onClose(tab)}
-              onTrashed={
-                onFileTrashed ? () => onFileTrashed(target.relPath) : undefined
-              }
-              previewController={previewController}
-            />
-          ) : target.kind === "browser" ? (
-            <BrowserTabItem
-              key={tab}
-              tabKey={tab}
-              onCloseOthers={() => {
-                previewController.dismiss();
-                void onCloseOthers(tab);
-              }}
-              entry={browserEntries.get(target.id)}
-              previewController={previewController}
-              active={tab === activeTab}
-              onSelect={() => {
-                previewController.dismiss();
-                onSelect(tab);
-              }}
-              onClose={() => {
-                previewController.dismiss();
-                onClose(tab);
-              }}
-            />
-          ) : (
-            <PanelTabItem
-              key={tab}
-              tabKey={tab}
-              panel={panels.get(target.id)}
-              previewController={previewController}
-              active={tab === activeTab}
-              onSelect={() => {
-                previewController.dismiss();
-                onSelect(tab);
-              }}
-              onClose={() => {
-                previewController.dismiss();
-                onClose(tab);
-              }}
-            />
-          );
-        })}
-      </div>
+        <div
+          ref={railRef}
+          role="tablist"
+          aria-label="Open editors"
+          className="desktop-native-drag-scroll-viewport scroll-fade-x scroll-fade-3 no-scrollbar flex h-full min-w-0 flex-initial items-center overflow-x-auto overscroll-x-contain pl-1.5 pr-2 scroll-pl-1.5 scroll-pr-2"
+          onPointerLeave={(event) =>
+            previewController.railLeave(event.pointerType)
+          }
+        >
+          {/* Translated tabs must not extend the rail's scroll range. */}
+          <div
+            role="presentation"
+            className="flex h-full shrink-0 items-center gap-1 overflow-clip"
+          >
+            {showStart && <StartTabItem />}
+            <SortableContext
+              items={[...tabs]}
+              strategy={horizontalListSortingStrategy}
+            >
+              {tabs.map((tab) => {
+                const target = WorkbenchTab.parse(tab);
+                const item =
+                  target.kind === "file" ? (
+                    <TabItem
+                      workspace={workspace}
+                      tabKey={tab}
+                      relPath={target.relPath}
+                      active={tab === activeTab}
+                      dirty={dirtyPaths.has(target.relPath)}
+                      onSelect={() => onSelect(tab)}
+                      onClose={() => onClose(tab)}
+                      onTrashed={
+                        onFileTrashed
+                          ? () => onFileTrashed(target.relPath)
+                          : undefined
+                      }
+                      previewController={previewController}
+                    />
+                  ) : target.kind === "browser" ? (
+                    <BrowserTabItem
+                      tabKey={tab}
+                      onCloseOthers={() => {
+                        previewController.dismiss();
+                        void onCloseOthers(tab);
+                      }}
+                      entry={browserEntries.get(target.id)}
+                      previewController={previewController}
+                      active={tab === activeTab}
+                      onSelect={() => {
+                        previewController.dismiss();
+                        onSelect(tab);
+                      }}
+                      onClose={() => {
+                        previewController.dismiss();
+                        onClose(tab);
+                      }}
+                    />
+                  ) : (
+                    <PanelTabItem
+                      tabKey={tab}
+                      panel={panels.get(target.id)}
+                      previewController={previewController}
+                      active={tab === activeTab}
+                      onSelect={() => {
+                        previewController.dismiss();
+                        onSelect(tab);
+                      }}
+                      onClose={() => {
+                        previewController.dismiss();
+                        onClose(tab);
+                      }}
+                    />
+                  );
+                return (
+                  <SortableEditorTab
+                    key={tab}
+                    id={tab}
+                    disabled={tabs.length < 2}
+                    onMove={onMove}
+                  >
+                    {item}
+                  </SortableEditorTab>
+                );
+              })}
+            </SortableContext>
+          </div>
+        </div>
+      </DndContext>
       {!onlyQuickStart && (
         <TooltipProvider>
           <Tooltip>
@@ -675,13 +736,87 @@ function EditorTitleBar({
           />
         </Toggle>
       )}
-      {!treeVisible && (
+      {onToggleTree && !treeVisible && (
         <WorkspaceExplorerToggleButton
           open={false}
           onToggle={onToggleTree}
           className="mr-3"
         />
       )}
+    </div>
+  );
+}
+
+function SortableEditorTab({
+  id,
+  disabled,
+  onMove,
+  children,
+}: {
+  id: string;
+  disabled: boolean;
+  onMove: (tab: string, target: string) => void;
+  children: ReactNode;
+}) {
+  const {
+    setNodeRef,
+    listeners,
+    items,
+    index,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id, disabled });
+
+  // Keep the native no-drag geometry in place while the tab itself moves.
+  return (
+    <div
+      ref={setNodeRef}
+      role="presentation"
+      data-tab-native-drag-region-target={id}
+      className={cn(
+        "relative shrink-0",
+        !disabled && "touch-pan-y",
+        isDragging && "z-10"
+      )}
+      onPointerDown={(event) => {
+        const target = event.target;
+        if (
+          target instanceof Element &&
+          event.currentTarget.contains(target) &&
+          !target.closest("button")
+        ) {
+          listeners?.onPointerDown?.(event);
+        }
+      }}
+      onKeyDown={(event) => {
+        if (
+          event.defaultPrevented ||
+          !event.altKey ||
+          !event.shiftKey ||
+          event.metaKey ||
+          event.ctrlKey ||
+          !(event.target instanceof Element) ||
+          event.target.getAttribute("role") !== "tab" ||
+          (event.key !== "ArrowLeft" && event.key !== "ArrowRight")
+        )
+          return;
+
+        const target = items[index + (event.key === "ArrowLeft" ? -1 : 1)];
+        if (typeof target !== "string") return;
+        event.preventDefault();
+        onMove(id, target);
+      }}
+    >
+      <div
+        className={cn(
+          "motion-reduce:transition-none!",
+          isDragging && "rounded-md bg-background shadow-sm"
+        )}
+        style={{ transform: CSS.Translate.toString(transform), transition }}
+      >
+        {children}
+      </div>
     </div>
   );
 }
@@ -767,7 +902,7 @@ function TabItem({
       role="tab"
       tabIndex={0}
       aria-selected={active}
-      data-tab-native-drag-region-target={tabKey}
+      aria-keyshortcuts={TAB_MOVE_SHORTCUTS}
       onPointerEnter={(event) =>
         previewController.pointerEnter(
           { tabKey, anchor: event.currentTarget },
@@ -847,30 +982,6 @@ function TabItem({
   );
 }
 
-/** A panel's content, kept mounted while another tab is in front. */
-function PanelTabContent({
-  panel,
-  active,
-}: {
-  panel: WorkbenchPanel | undefined;
-  active: boolean;
-}) {
-  return (
-    <div
-      // A panel fills the editor region as a column, so content that sizes
-      // itself with flex (a chat pane and its composer) gets a definite
-      // height instead of growing past the region.
-      className={cn(
-        "absolute inset-0 flex min-h-0 flex-col overflow-hidden",
-        !active && "invisible pointer-events-none"
-      )}
-      aria-hidden={!active}
-    >
-      {panel?.content}
-    </div>
-  );
-}
-
 /** A panel's strip tab, with its owner's optional informational preview. */
 function PanelTabItem({
   tabKey,
@@ -903,7 +1014,7 @@ function PanelTabItem({
       active={active}
       onSelect={onSelect}
       onClose={onClose}
-      data-tab-native-drag-region-target={tabKey}
+      aria-keyshortcuts={TAB_MOVE_SHORTCUTS}
       onPointerEnter={(event) => {
         if (panel?.preview)
           previewController.pointerEnter(
@@ -965,7 +1076,7 @@ function BrowserTabItem({
       <ContextMenuTrigger asChild>
         <WorkbenchPanelTab
           ref={ref}
-          data-tab-native-drag-region-target={tabKey}
+          aria-keyshortcuts={TAB_MOVE_SHORTCUTS}
           title={title || "Browser"}
           icon={
             entry?.page?.loading ? (

@@ -83,7 +83,8 @@ Feature status: [`docs/agent/features.md`](../../../docs/agent/features.md).
 - **Desktop chat state** lives under Electron `userData/native-chat/`
   (`workspaces/<key>/`, `documents/<key>/runtime/`), one SQLite
   `agent.sqlite` per state directory with one owning process. The store opens
-  only an empty database or one it created; there are no schema upgrades. The earlier
+  only an empty database or its own recognized schema and profile. See the
+  [SQLite opening and upgrade rules](../../../crates/agent-kit-store-sqlite/README.md#schema-and-opening). The earlier
   TypeScript `sessions.db` and its session scratch stay in place, denied to
   the retained sidecar; never reopen them.
 - **Retained sidecar perimeter** (GRIDA-SEC-004): Main owns the loopback

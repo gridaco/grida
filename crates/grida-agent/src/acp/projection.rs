@@ -212,8 +212,15 @@ impl Projection {
                     _ => "progress",
                 });
             }
-            let text: String = visible_parts(&message).collect();
             let mut text_meta = meta.clone();
+            let text: String =
+                if let Some(reply) = grida_agent_master::questions::visible_reply(&message) {
+                    text_meta["questionReply"] =
+                        json!({ "waitId": reply.question_item_id, "question": reply.question });
+                    reply.answer
+                } else {
+                    visible_parts(&message).collect()
+                };
             if message.role == Role::User
                 && turn.is_some()
                 && input_facts.svg_text_selections.contains(&message.id)
@@ -339,7 +346,9 @@ impl Projection {
         {
             return Ok(());
         }
-        let text: String = visible_parts(&message).collect();
+        let text: String = grida_agent_master::questions::visible_reply(&message)
+            .map(|reply| reply.answer)
+            .unwrap_or_else(|| visible_parts(&message).collect());
         let suffix = if let Some(prefix) = self.streamed_text.remove(&message.id) {
             text.strip_prefix(&prefix)
                 .ok_or_else(|| unavailable("session_message_projection_conflict"))?

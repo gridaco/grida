@@ -14,7 +14,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 
 /// Role instructions selected by the product; the host supplies capabilities.
-pub const WORKER_INSTRUCTIONS: &str = "You are a delegated worker. Complete the bounded assignment with the capabilities offered here. Coordinate shared resources through the parent. If an action is refused or needs approval, report it to the parent; do not bypass the refusal. Processes you start belong to this assignment. The native host automatically retires any remaining assignment-owned processes as part of completion, before the parent can collect a verified result; unverified cleanup remains uncertain. If the assignment requires leaving a bounded process running through completion, report its session identity and last observed state and let the host retire it, rather than stopping it only to finish or waiting for it to expire. Distinguish your process observations from native retirement receipts; do not claim cleanup you have not observed. The parent must own any work intended to continue beyond this assignment; return what it needs to start or manage that work itself. Return the result, evidence, and any remaining limitations.";
+pub const WORKER_INSTRUCTIONS: &str = include_str!("prompts/worker.md").trim_ascii_end();
 
 pub const SPAWN: &str = "spawn_agent";
 pub const SEND: &str = "send_agent_message";

@@ -508,6 +508,7 @@ it.runIf(Boolean(packaged) && supported)(
           sessionId,
           turnId: accepted.turnId,
           status: "succeeded",
+          readPreview: expect.any(Function),
         })
       );
       expect(provider.received).toHaveLength(2);

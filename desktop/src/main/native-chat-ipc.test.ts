@@ -6,6 +6,8 @@ import os from "node:os";
 import path from "node:path";
 import type { IpcMainInvokeEvent, WebContents } from "electron";
 import type {
+  DesktopNativeChat,
+  NativeChatReadiness,
   NativeChatSnapshot,
   NativeChatProfileSelection,
   NativeChatStreamUpdate,
@@ -19,11 +21,15 @@ import {
   type NativeWelcomeWorkspace,
 } from "./native-chat-ipc";
 import { NativeChatSelections } from "./native-chat-selections";
-import type { NativeChatSession } from "./native-agent-chat";
+import type { NativeAgentChat, NativeChatSession } from "./native-agent-chat";
+import { NativeWorkspaceAgents } from "./native-workspace-agents";
 import type { NativeSavedChatDeletionPreview } from "./native-agent-deletion";
 import { NativeEditorSurfaceEndpoints } from "./native-editor-surfaces";
 import { NativeDocumentIdentityBusy } from "./native-document-files";
-import { DesktopAccountSession } from "./account-session";
+import {
+  DesktopAccountSession,
+  DesktopGatewayGrantUnavailable,
+} from "./account-session";
 import type { NativeNestedDeckGrant } from "./native-workspace-catalog";
 
 const ORIGIN = "https://fixture.invalid";
@@ -147,22 +153,62 @@ it("reports desired-binding image eligibility without borrowing another active m
     selections
   );
   Object.defineProperties(chat, {
+    acceptsPng: { value: true, configurable: true },
     acceptsSelectedImage: { value: true, configurable: true },
     supportsSelectedImage: { value: true },
+    acceptsInputRoutes: { value: true },
   });
+  const session = await ipc.load(first.event, "saved");
+  chat.inputReceipt = vi.fn<typeof chat.inputReceipt>(async () => {
+    throw new Error("input_unavailable");
+  });
+  const submit = (chat.submitSelectedImage =
+    vi.fn<NonNullable<typeof chat.submitSelectedImage>>());
+  const send = () =>
+    ipc.submitSelectedImage(first.event, session.attachmentId, {
+      inputId: "image",
+      selectionRevision: state.revision,
+    });
   await ipc.selection(first.event, { sessionId: "saved" });
+  expect(await ipc.acceptsPng(first.event, session.attachmentId)).toBe(false);
   expect(await ipc.acceptsSelectedImage(first.event)).toBe(false);
+  await expect(send()).rejects.toThrow("image_input_unavailable");
+  expect(submit).not.toHaveBeenCalled();
   state = {
     ...state,
     revision: 2,
     selection: { ...state.selection, profileId: image, modelId: "image-model" },
   };
-  Object.defineProperty(chat, "acceptsSelectedImage", { value: false });
+  Object.defineProperties(chat, {
+    acceptsPng: { value: false },
+    acceptsSelectedImage: { value: false },
+  });
   await ipc.selection(first.event, { sessionId: "saved" });
+  expect(await ipc.acceptsPng(first.event, session.attachmentId)).toBe(true);
   expect(await ipc.acceptsSelectedImage(first.event)).toBe(true);
+  await send();
+  expect(submit).toHaveBeenCalledTimes(1);
+  const openSide = chat.openSideChat.bind(chat);
+  vi.spyOn(chat, "openSideChat").mockImplementation(async (parent) => {
+    const opened = await openSide(parent);
+    return {
+      ...opened,
+      session: { ...opened.session, sideImageInput: true },
+    };
+  });
+  const side = await ipc.openSideChat(first.event, session.attachmentId);
   state = { ...state, available: false };
   await ipc.selection(first.event, { sessionId: "saved" });
+  expect(await ipc.acceptsPng(first.event, session.attachmentId)).toBe(false);
   expect(await ipc.acceptsSelectedImage(first.event)).toBe(false);
+  expect(await ipc.acceptsPng(first.event, side.attachmentId)).toBe(true);
+  expect(await ipc.acceptsSelectedImage(first.event, side.attachmentId)).toBe(
+    true
+  );
+  await ipc.submitSelectedImage(first.event, side.attachmentId, {
+    inputId: "side-image",
+  });
+  expect(submit).toHaveBeenCalledTimes(2);
   expect(select).not.toHaveBeenCalled();
 });
 
@@ -1495,7 +1541,10 @@ describe("native chat IPC", () => {
     await expect(inDeck(() => ipc.status(first.event, true))).resolves.toBe(
       "native-ready"
     );
-    expect(ensure).toHaveBeenCalledExactlyOnceWith(workspaceId);
+    expect(ensure).toHaveBeenCalledExactlyOnceWith(
+      workspaceId,
+      expect.any(Function)
+    );
     const opened = await inDeck(() => ipc.create(first.event));
     const subscription = randomUUID();
     await inDeck(() =>
@@ -1628,12 +1677,13 @@ describe("native chat IPC", () => {
     };
     const pending = Promise.withResolvers<void>();
     let delay = false;
+    let connected = true;
     const ipc = new NativeChatIpc(
       ORIGIN,
-      (_sender, workspaceId, profile) => ({
-        workspaceId,
-        chat: profile === id ? alternate : chat,
-      }),
+      (_sender, workspaceId, profile) =>
+        connected
+          ? { workspaceId, chat: profile === id ? alternate : chat }
+          : null,
       undefined,
       undefined,
       undefined,
@@ -1665,6 +1715,10 @@ describe("native chat IPC", () => {
     ).resolves.toMatchObject({
       snapshot: { sessionId: other.sessionId },
     });
+    // The frame still remembers its route after the workspace worker exits.
+    connected = false;
+    expect((await ipc.profiles(first.event))?.active).toBeNull();
+    connected = true;
     await expect(
       ipc.selectProfile(first.event, {
         kind: "saved",
@@ -1975,6 +2029,55 @@ describe("native chat IPC", () => {
     first.contents.emit("did-start-navigation", { isMainFrame: true });
     late.resolve({ ...current, ...change });
     await expect(pending).rejects.toThrow("native_chat_attachment_unavailable");
+  });
+
+  it("undoes the confirmed archive from the same frame after detaching its chat", async () => {
+    const { ipc, first, second, chat } = setup();
+    const opened = await ipc.load(first.event, "archived-chat");
+    await ipc.load(second.event, "unrelated-chat");
+    const unarchive = vi.fn<NonNullable<typeof chat.unarchiveCatalog>>();
+    chat.unarchiveCatalog = unarchive;
+    const load = vi.spyOn(chat, "load");
+    vi.spyOn(chat, "organize").mockResolvedValue({
+      sessionId: opened.sessionId,
+      title: null,
+      archived: true,
+      revision: 1,
+    });
+    const result = await ipc.organize(first.event, opened.attachmentId, {
+      revision: 0,
+      title: null,
+      archived: true,
+    });
+    expect(result.archiveUndo).toBeDefined();
+    ipc.detach(first.event, opened.attachmentId);
+    await expect(
+      ipc.undoArchive(second.event, result.archiveUndo)
+    ).rejects.toThrow("native_chat_archive_undo_unavailable");
+    await ipc.undoArchive(first.event, result.archiveUndo);
+    expect(load).not.toHaveBeenCalled();
+    expect(unarchive).toHaveBeenCalledExactlyOnceWith(opened.sessionId, 1);
+    await expect(
+      ipc.undoArchive(first.event, result.archiveUndo)
+    ).rejects.toThrow("native_chat_archive_undo_unavailable");
+  });
+
+  it("issues no Undo for archive requests based on a different catalog revision", async () => {
+    const { ipc, first, chat } = setup();
+    const opened = await ipc.create(first.event);
+    chat.unarchiveCatalog = vi.fn<NonNullable<typeof chat.unarchiveCatalog>>();
+    vi.spyOn(chat, "organize").mockResolvedValue({
+      sessionId: opened.sessionId,
+      title: null,
+      archived: true,
+      revision: 2,
+    });
+    const result = await ipc.organize(first.event, opened.attachmentId, {
+      revision: 1,
+      title: null,
+      archived: true,
+    });
+    expect(result.archiveUndo).toBeUndefined();
   });
 
   it("reads only the current attached terminal basis and drops a superseded reply", async () => {
@@ -2656,7 +2759,10 @@ describe("native chat IPC", () => {
     const status = ipc.status(first.event, true);
     const shared = ipc.status(first.event, true);
     await vi.waitFor(() =>
-      expect(ensure).toHaveBeenCalledExactlyOnceWith(WORKSPACE)
+      expect(ensure).toHaveBeenCalledExactlyOnceWith(
+        WORKSPACE,
+        expect.any(Function)
+      )
     );
     scopes.set(first.sender, { workspaceId: WORKSPACE, chat });
     started.resolve();
@@ -2694,6 +2800,8 @@ describe("native chat IPC", () => {
 
   it.each([
     ["native_provider_byok_key_missing", "native-provider-key-required"],
+    ["native_chat_profile_unavailable", "native-provider-model-unavailable"],
+    ["native_chat_profile_changed", "native-provider-model-unavailable"],
     ["native_provider_model_unavailable", "native-provider-model-unavailable"],
     ["native_hooks_review_required", "native-hooks-review-required"],
     [
@@ -2767,6 +2875,10 @@ describe("native chat IPC", () => {
       saved: [],
       active: null,
     });
+    select.mockRejectedValueOnce(new Error("native_hooks_review_required"));
+    await expect(
+      ipc.startWorkspaceChat(first.event, { kind: "saved", id })
+    ).resolves.toEqual({ readiness: "native-hooks-review-required" });
     await ipc.selectProfile(first.event, { kind: "saved", id });
     await expect(ipc.status(first.event, true)).resolves.toBe("native-ready");
     await expect(ipc.profiles(first.event)).resolves.toMatchObject({
@@ -2775,8 +2887,8 @@ describe("native chat IPC", () => {
     await expect(ipc.create(first.event)).resolves.toMatchObject({
       sessionId: expect.any(String),
     });
-    expect(ensure).toHaveBeenCalledTimes(1);
-    expect(select).toHaveBeenCalledTimes(1);
+    expect(ensure).toHaveBeenCalledTimes(2);
+    expect(select).toHaveBeenCalledTimes(2);
   });
 
   it("continues with a saved provider key when the default Gateway cannot start", async () => {
@@ -2864,6 +2976,212 @@ describe("native chat IPC", () => {
     await expect(old).rejects.toThrow("native_chat_scope_changed");
     await expect(ipc.status(first.event)).resolves.toBe("native-ready");
   });
+
+  it("waits for a warm workspace replacement before reporting the surviving owner ready in another window", async () => {
+    const { first, second, scopes, chat } = setup();
+    const survivingProfile = "a".repeat(64);
+    scopes.set(second.sender, {
+      workspaceId: WORKSPACE,
+      chat,
+      profileId: survivingProfile,
+    });
+    const replacing = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const ensure = vi.fn<() => Promise<void>>();
+    const ipc = new NativeChatIpc(
+      ORIGIN,
+      (sender, _, profile) => (profile ? null : (scopes.get(sender) ?? null)),
+      { admits: () => true, ensure },
+      undefined,
+      undefined,
+      {
+        list: async () => ({ choices: [], saved: [] }),
+        select: async (_, __, check) => {
+          replacing.resolve();
+          await release.promise;
+          check();
+        },
+      }
+    );
+    const saved = await ipc.load(second.event, "existing");
+    const replacement = ipc
+      .selectProfile(first.event, { kind: "new", id: "f".repeat(64) })
+      .catch((error: unknown) => error);
+    await replacing.promise;
+    try {
+      expect(await ipc.status(second.event)).toBe("native-starting");
+      const ready = vi.fn<() => void>();
+      const opening = ipc.startWorkspaceChat(second.event).then((result) => {
+        ready();
+        return result;
+      });
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(ready).not.toHaveBeenCalled();
+      first.contents.emit("did-start-navigation", { isMainFrame: true });
+      release.resolve();
+      expect(await replacement).toMatchObject({
+        message: "native_chat_scope_changed",
+      });
+      await expect(opening).resolves.toEqual({
+        readiness: "native-ready",
+        selectedProfileId: survivingProfile,
+      });
+      expect(
+        (await ipc.observe(second.event, saved.attachmentId)).snapshot.sessionId
+      ).toBe("existing");
+      expect(ensure).not.toHaveBeenCalled();
+    } finally {
+      release.resolve();
+    }
+  });
+
+  it.each(["current", "legacy"] as const)(
+    "opens the returning workspace with the %s bridge and sends Welcome once while the old fallback drains",
+    async (version) => {
+      // The hosted renderer ships as a separate TypeScript project.
+      const renderer = path.resolve(
+        import.meta.dirname,
+        "../../../editor/lib/agent-chat/native-chat-controller.ts"
+      );
+      const { NativeChatController } = await import(renderer);
+      const { first, chat } = setup();
+      const { event } = first;
+      const workspace = { id: WORKSPACE, root: "/project" };
+      const fallback = "a".repeat(64);
+      const preferred = "b".repeat(64);
+      const fallbackStarted = Promise.withResolvers<void>();
+      const finishFallback = Promise.withResolvers<void>();
+      const committed: string[] = [];
+      const worker = Object.assign(chat, {
+        connected: true,
+        close: async () => {},
+      }) as NativeAgentChat;
+      const owners = new NativeWorkspaceAgents(
+        {
+          startWorkspace: async (_, __, id) => {
+            if (id === fallback) {
+              fallbackStarted.resolve();
+              await finishFallback.promise;
+            }
+            return { chat: worker, stateDirectory: "/state" };
+          },
+        },
+        async () => {
+          throw new DesktopGatewayGrantUnavailable();
+        }
+      );
+      const ipc = new NativeChatIpc(
+        ORIGIN,
+        (_, id, profile) => owners.current(id, profile),
+        {
+          admits: () => true,
+          ensure: async (_, check) => {
+            await owners.open(workspace, undefined, check);
+          },
+        },
+        undefined,
+        undefined,
+        {
+          list: async () => ({ choices: [], saved: [] }),
+          fallback: async () => fallback,
+          select: async (_, selection, check) => {
+            if (selection.kind === "default")
+              throw new Error("expected a profile");
+            const { id } = selection;
+            await owners.open(workspace, {
+              id,
+              prepare: async () => ({
+                launch: {
+                  resourcesPath: "/resources",
+                  provider: "openai-compatible",
+                  endpoint: "http://127.0.0.1/v1",
+                  model: "fixture",
+                },
+              }),
+              admit: check,
+              commit: async () => {
+                committed.push(id);
+              },
+            });
+          },
+        }
+      );
+      const old = ipc.status(event, true).catch((error: unknown) => error);
+      await fallbackStarted.promise;
+      first.contents.emit("did-start-navigation", { isMainFrame: true });
+      const submit = vi.spyOn(chat, "submit");
+      vi.spyOn(chat, "list").mockResolvedValue({
+        sessionIds: ["existing"],
+        nextCursor: null,
+      });
+      const preferredRequested = Promise.withResolvers<void>();
+      const bridge: DesktopNativeChat = {
+        status: (start) => ipc.status(event, start),
+        ...(version === "current" && {
+          startWorkspaceChat: (selection?: NativeChatProfileSelection) => {
+            preferredRequested.resolve();
+            return ipc.startWorkspaceChat(event, selection);
+          },
+        }),
+        profiles: () => ipc.profiles(event),
+        selectProfile: (selection) => {
+          preferredRequested.resolve();
+          return ipc.selectProfile(event, selection);
+        },
+        list: (cursor) => ipc.list(event, cursor),
+        create: () => ipc.create(event),
+        load: (id) => ipc.load(event, id),
+        detach: async (id) => ipc.detach(event, id),
+        submit: (...args) => ipc.submit(event, ...args),
+        inputReceipt: (id, input) => ipc.inputReceipt(event, id, input),
+        observe: (id) => ipc.observe(event, id),
+        transcript: (id) => ipc.transcript(event, id),
+        control: (id, input) => ipc.control(event, id, input),
+        subscribe: async (id) => {
+          const subscription = randomUUID();
+          ipc.subscribe(event, id, subscription);
+          return subscription;
+        },
+        unsubscribe: async (id) => ipc.unsubscribe(event, id),
+        takeNotificationFocus: async () => null,
+      };
+      const readiness = Promise.withResolvers<NativeChatReadiness | null>();
+      const stop = NativeChatController.watchReadiness(
+        bridge,
+        (value: NativeChatReadiness | null) => {
+          if (value !== "native-starting") readiness.resolve(value);
+        },
+        { kind: "new", id: preferred }
+      );
+      const controller = new NativeChatController(bridge);
+      try {
+        await preferredRequested.promise;
+        // Run both visits' pending startup microtasks before releasing the old worker.
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        finishFallback.resolve();
+        expect(await old).toMatchObject({
+          message: "native_chat_scope_changed",
+        });
+        expect(await readiness.promise).toBe("native-ready");
+        expect(committed).toEqual([preferred]);
+        await expect(bridge.list()).resolves.toMatchObject({
+          sessionIds: ["existing"],
+        });
+        const take = vi.fn<() => { text: string }>(() => ({
+          text: "From Welcome",
+        }));
+        await expect(controller.startChat(preferred, take)).resolves.toBeNull();
+        expect(take).toHaveBeenCalledTimes(1);
+        expect(submit).toHaveBeenCalledTimes(1);
+        expect(submit.mock.calls[0][2]).toBe("From Welcome");
+      } finally {
+        finishFallback.resolve();
+        stop();
+        controller.disconnect();
+        await owners.close();
+      }
+    }
+  );
 
   it("lists without attaching and drops replies after the admitted frame changes", async () => {
     const { ipc, first, chat, scopes } = setup();
@@ -3265,6 +3583,73 @@ describe("Welcome Full access review", () => {
     await f.ipc.answerWelcomeFullAccess(f.event, review.reviewId, true);
     return review;
   }
+
+  function navigateWelcome(
+    f: Awaited<ReturnType<typeof welcomePermissionSetup>>,
+    url: string,
+    isSameDocument: boolean
+  ) {
+    f.contents.emit("did-start-navigation", {
+      isMainFrame: true,
+      isSameDocument,
+      url,
+    });
+    f.frame.url = url;
+    if (isSameDocument) f.contents.emit("did-navigate-in-page", {}, url, true);
+    else f.contents.emit("did-navigate", {}, url);
+  }
+
+  it("uses the original approved reservation across Welcome preset navigation", async () => {
+    const f = await welcomePermissionSetup();
+    try {
+      f.frame.url = `${WELCOME_URL}?onboardingWorkspace=${WORKSPACE}`;
+      const originalUrl = f.frame.url;
+      const review = await confirmedReview(f);
+      navigateWelcome(f, `${originalUrl}&preset=workflows`, true);
+      navigateWelcome(f, `${originalUrl}&preset=slides`, true);
+      navigateWelcome(f, originalUrl, true);
+      navigateWelcome(f, `${originalUrl}&preset=workflows`, true);
+      expect(f.create).not.toHaveBeenCalled();
+
+      const started = await f.ipc.startWelcomeFullAccess(
+        f.event,
+        review.reviewId,
+        CHOICE
+      );
+      expect(f.setPermission).toHaveBeenCalledExactlyOnceWith(
+        { id: started.sessionId },
+        0,
+        review.reviewId,
+        "full_access"
+      );
+      expect(f.submit).not.toHaveBeenCalled();
+    } finally {
+      fs.rmSync(f.directory, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    [`${WELCOME_URL}?preset=workflows`, false],
+    [`${WELCOME_URL}?preset=workflows&onboardingWorkspace=other`, true],
+    [`${WELCOME_URL}?preset=workflows#changed`, true],
+    [`${WELCOME_URL}?preset=workflows&preset=slides`, true],
+    [WORKSPACE_URL, true],
+  ])(
+    "revokes the Welcome reservation on navigation to %s (same document: %s)",
+    async (url, isSameDocument) => {
+      const f = await welcomePermissionSetup();
+      try {
+        const review = await confirmedReview(f);
+        navigateWelcome(f, url, isSameDocument);
+        await expect(
+          f.ipc.startWelcomeFullAccess(f.event, review.reviewId, CHOICE)
+        ).rejects.toThrow("native_chat_permission_mode_review_changed");
+        expect(f.create).not.toHaveBeenCalled();
+      } finally {
+        fs.rmSync(f.directory, { recursive: true, force: true });
+      }
+    }
+  );
 
   it("approves without creating a chat and starts once with the model and effort supplied at send time", async () => {
     const f = await welcomePermissionSetup();
@@ -3817,41 +4202,47 @@ describe("saved selection IPC", () => {
     expect(submit).not.toHaveBeenCalled();
   });
 
-  it("forwards a validated fresh selection revision in its own argument slot", async () => {
-    const selections = owner(
-      vi.fn<NativeChatSelections["read"]>(async () => state("session-0"))
-    );
-    const f = setup(undefined, undefined, undefined, undefined, selections);
-    f.scopes.set(f.first.sender, {
-      workspaceId: WORKSPACE,
-      chat: f.chat,
-      profileId: profile,
-    });
-    f.chat.inputReceipt = vi.fn<typeof f.chat.inputReceipt>(async () => {
-      throw new Error("input_unavailable");
-    });
-    const attachment = await f.ipc.create(f.first.event);
-    const submit = vi.spyOn(f.chat, "submit");
-    await f.ipc.submit(
-      f.first.event,
-      attachment.attachmentId,
-      "fresh",
-      "Hello",
-      "act",
-      "high",
-      undefined,
-      2
-    );
-    expect(submit).toHaveBeenCalledExactlyOnceWith(
-      expect.objectContaining({ id: attachment.sessionId }),
-      "fresh",
-      "Hello",
-      "act",
-      undefined,
-      "high",
-      2
-    );
-  });
+  it.each([false, true])(
+    "forwards a validated fresh selection revision (per-input routes: %s)",
+    async (inputRoutes) => {
+      const selections = owner(
+        vi.fn<NativeChatSelections["read"]>(async () => state("session-0"))
+      );
+      const f = setup(undefined, undefined, undefined, undefined, selections);
+      f.scopes.set(f.first.sender, {
+        workspaceId: WORKSPACE,
+        chat: f.chat,
+        profileId: inputRoutes ? "b".repeat(64) : profile,
+      });
+      Object.defineProperty(f.chat, "acceptsInputRoutes", {
+        value: inputRoutes,
+      });
+      f.chat.inputReceipt = vi.fn<typeof f.chat.inputReceipt>(async () => {
+        throw new Error("input_unavailable");
+      });
+      const attachment = await f.ipc.create(f.first.event);
+      const submit = vi.spyOn(f.chat, "submit");
+      await f.ipc.submit(
+        f.first.event,
+        attachment.attachmentId,
+        "fresh",
+        "Hello",
+        "act",
+        "high",
+        undefined,
+        2
+      );
+      expect(submit).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ id: attachment.sessionId }),
+        "fresh",
+        "Hello",
+        "act",
+        undefined,
+        "high",
+        2
+      );
+    }
+  );
 });
 
 it("uses the verified fixed route's image capability for a default-profile subscription", async () => {

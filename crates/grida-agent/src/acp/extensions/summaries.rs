@@ -239,7 +239,7 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
     let summary_host = host.clone();
     let summary_sessions = sessions.clone();
     RequestRoutes::default()
-        .on_receive_request(
+        .on_supervised_request(
             async move |request: SummaryRequest, responder, _| {
                 let result = async {
                     require(&summary_sessions, SUMMARY, Some(&request.session_id))?;

@@ -1,15 +1,11 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { expect, it, vi } from "vitest";
-import type { SettingsArchives } from "@/lib/desktop/settings-archives";
+import { expect, it } from "vitest";
+import { SettingsArchives } from "@/lib/desktop/settings-archives";
 import { ArchivedChatsSettings } from "./archived-chats-settings";
 
-vi.mock("@/lib/desktop/settings-archives", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@/lib/desktop/settings-archives")>();
-  class Controller extends actual.SettingsArchives.Controller {
-    readonly read = (): SettingsArchives.State => ({
-      supported: true,
-      loading: false,
+it("shows activity dates without inventing archive dates or changing row order", async () => {
+  const controller = new SettingsArchives.Controller(() => ({
+    list: async () => ({
       entries: [
         {
           id: "first-chat",
@@ -26,16 +22,13 @@ vi.mock("@/lib/desktop/settings-archives", async (importOriginal) => {
         },
       ],
       nextCursor: null,
-      restoring: null,
-      unavailableWorkspaces: [],
-      error: null,
-    });
-  }
-  return { SettingsArchives: { ...actual.SettingsArchives, Controller } };
-});
-
-it("shows activity dates without inventing archive dates or changing row order", () => {
-  const html = renderToStaticMarkup(<ArchivedChatsSettings />);
+    }),
+    unarchive: async () => {},
+  }));
+  await controller.refresh();
+  const html = renderToStaticMarkup(
+    <ArchivedChatsSettings controller={controller} />
+  );
   expect(html.match(/<time\b/g)).toHaveLength(1);
   expect(html).toContain('dateTime="2026-11-17T03:04:00.000Z"');
   expect(html).toContain('title="Last activity: ');

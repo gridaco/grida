@@ -7,12 +7,13 @@ tags: [chat, composer, draft, reliability]
 status: untested
 severity: critical
 date: 2026-11-12
-updated: 2026-11-17
+updated: 2026-11-19
 automatable: partial
 covered_by:
   [
     editor/lib/agent-chat/composer-drafts.test.ts,
     editor/lib/agent-chat/native-chat-controller.test.ts,
+    editor/scaffolds/desktop/workbench/native-chat-recovery.browser.tsx,
   ]
 ---
 
@@ -36,8 +37,9 @@ the agent accepted, clears it. A failed send keeps it. See the
 4. Reload the window (or quit and reopen Desktop) and reopen the chat. The
    draft is still there.
 5. Delete all the text, reload: the composer is empty.
-6. Type again and send. Once the message appears in the chat, the composer is
-   empty and stays empty after a reload.
+6. Send from an idle chat, then send a follow-up while the turn runs. On
+   confirmation of each send, the matching draft clears even if the transcript
+   is still loading. Reload and confirm the composer stays empty.
 7. In an idle chat with an empty queue and no unresolved Goal, prepare another
    unsent composer draft. Hover over an earlier plain-text user message and
    choose **Edit and resubmit**. Confirm that message becomes an editor in its

@@ -438,8 +438,7 @@ impl SqliteStore {
             )?;
             require_basis(&history.basis, &request.expected_history)?;
             let seed = make_seed(history)?;
-            let receipt =
-                insert_session(&transaction, &request.create, inner.catalog, Some(&seed))?;
+            let receipt = insert_session(&transaction, &request.create, inner, Some(&seed))?;
             save_request(
                 &transaction,
                 destination,

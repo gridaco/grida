@@ -138,6 +138,9 @@ pub(super) async fn forward(
                         LifecycleFact::ApprovalRequired(wait) => {
                             json!({"kind": "approval_required", "turnId": update.turn, "waitId": wait})
                         }
+                        LifecycleFact::QuestionAsked(wait) => {
+                            json!({"kind": "question_asked", "turnId": update.turn, "waitId": wait})
+                        }
                     };
                     send(
                         &connection,

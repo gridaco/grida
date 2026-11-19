@@ -35,6 +35,7 @@ fn capabilities() -> Value {
         LIVE,
         "co.grida/session/compact",
         "co.grida/session/organize",
+        "co.grida/session/initial-title",
         "co.grida/session/delete",
         "co.grida/session/delete-preview",
         "co.grida/session/effort",
@@ -280,6 +281,9 @@ async fn a_side_chat_forks_committed_context_and_runs_as_an_ordinary_temporary_c
         .map(|entry| entry["sessionId"].as_str().unwrap())
         .collect();
     assert_eq!(ids, [parent.as_str()]);
+    let all = ok(client.request("session/list", json!({})).await);
+    assert_eq!(all["sessions"].as_array().unwrap().len(), 1, "{all}");
+    assert_eq!(all["sessions"][0]["sessionId"], parent);
 
     // An ordinary identified submission streams live text on this connection.
     let sent = client
@@ -955,21 +959,26 @@ async fn a_side_chat_is_titled_like_a_chat_and_stays_out_of_the_catalog() {
     endpoint.title_request().await;
     let (side, _) = open(&mut client, &parent).await;
 
-    // The first side message is titled by the same chat titler.
-    ok(client
-        .request(
-            SUBMIT,
-            prompt_request(&side, "first", "Which banner sizes do we need?"),
-        )
-        .await);
+    let (release, held) = tokio::sync::oneshot::channel();
+    endpoint
+        .title_replies
+        .send(Reply::After(held, Box::new(Reply::Finished(FIXTURE_TITLE))))
+        .unwrap();
+    let mut first = prompt_request(&side, "first", "Which banner sizes do we need?");
+    first["initialTitle"] = json!("Banner sizes");
+    ok(client.request(SUBMIT, first).await);
     endpoint.request().await;
     let title = endpoint.title_request().await;
     assert!(title.to_string().contains("Which banner sizes"), "{title}");
     assert!(!title.to_string().contains("spring launch"), "{title}");
+    let view = snapshot(&mut client, &side).await;
+    assert_eq!(view["side"]["title"], "Banner sizes", "{view}");
+    assert_eq!(view["side"]["titleGenerationPending"], true, "{view}");
+    release.send(()).unwrap();
     let titled = timeout(WAIT, async {
         loop {
             let view = snapshot(&mut client, &side).await;
-            if !view["side"]["title"].is_null() {
+            if view["side"]["titleGenerationPending"].is_null() {
                 return view;
             }
             tokio::time::sleep(Duration::from_millis(20)).await;

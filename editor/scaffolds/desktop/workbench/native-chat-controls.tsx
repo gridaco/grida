@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
+import { defaultFilter } from "cmdk";
+import { startOfToday, subDays } from "date-fns";
 import { toast } from "sonner";
 import { app, useDesktopBridge } from "@/lib/desktop/bridge";
 import type {
@@ -10,6 +12,7 @@ import type {
   NativeChatProfileSelection,
 } from "@grida/desktop-bridge";
 import {
+  ArchiveIcon,
   CheckIcon,
   ChevronDownIcon,
   ChevronLeftIcon,
@@ -17,9 +20,11 @@ import {
   RotateCcwIcon,
   EllipsisVerticalIcon,
   ListIcon,
+  PencilIcon,
   PlusIcon,
   SparklesIcon,
   SettingsIcon,
+  Trash2Icon,
 } from "lucide-react";
 import {
   OpenRouterLogo,
@@ -29,9 +34,11 @@ import {
   OpenAILogo,
 } from "@grida/react-icons/logos";
 import { Button } from "@app/ui/components/button";
+import { chatActivity } from "@/lib/agent-chat/native-chat-activity";
+import { ChatActivityIndicators } from "./chat-activity-indicators";
 import { cn } from "@app/ui/lib/utils";
 import { NativeEffortSlider } from "./native-effort-slider";
-import { ChatActivityDate } from "../shared/chat-activity-date";
+import { ComposerControlSkeleton } from "../shared/composer-control-skeleton";
 import {
   Popover,
   PopoverContent,
@@ -61,19 +68,61 @@ import {
 export function NativeChatHeader({
   controller,
   state,
+  disabled = false,
   onChatSelected,
 }: {
   controller: NativeChatController;
   state: NativeChatView;
+  disabled?: boolean;
   onChatSelected?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [chatQuery, setChatQuery] = useState("");
   const selecting = useRef(false);
   const renaming = useRef(false);
   const titleInput = useRef<HTMLInputElement>(null);
   const title = state.selected
     ? controller.chatTitle(state.selected)
     : NEW_CHAT_TITLE;
+  useEffect(() => {
+    if (open) return controller.observeChatList(() => !document.hidden);
+  }, [controller, open]);
+
+  async function archiveChat() {
+    const profileId = state.profiles?.active ?? undefined;
+    const archived = await controller.setChatArchived(true);
+    if (!archived) return;
+    const view = {
+      label: "View",
+      onClick: () => void controller.focusChat(archived.sessionId, profileId),
+    };
+    const { undo } = archived;
+    toast("Chat archived", {
+      icon: <ArchiveIcon aria-hidden className="size-4" />,
+      ...(undo
+        ? {
+            cancel: view,
+            actionButtonStyle: { marginInlineStart: 0 },
+            action: {
+              label: "Undo",
+              onClick: () => {
+                void undo().catch(() => {
+                  toast.error("Couldn't undo archiving this chat.");
+                });
+              },
+            },
+          }
+        : { action: view }),
+    });
+  }
+
+  async function deleteChat() {
+    if (await controller.deleteSavedChat()) {
+      toast("Chat deleted", {
+        icon: <Trash2Icon aria-hidden className="size-4" />,
+      });
+    }
+  }
   return (
     <header
       data-testid="native-chat-header"
@@ -85,6 +134,7 @@ export function NativeChatHeader({
           setOpen(next);
           if (next) {
             selecting.current = false;
+            setChatQuery("");
             void controller.listChats(null, false);
           }
         }}
@@ -94,6 +144,7 @@ export function NativeChatHeader({
             type="button"
             variant="ghost"
             size="icon-xs"
+            disabled={disabled}
             aria-label="Open chat list"
             title="Open chat list"
           >
@@ -113,36 +164,58 @@ export function NativeChatHeader({
             selecting.current = false;
           }}
         >
-          <Command>
-            <CommandInput placeholder="Search chats…" />
+          <Command
+            label="Search chats"
+            defaultValue={
+              !state.profileBusy &&
+              state.selected &&
+              state.sessions.includes(state.selected)
+                ? state.selected
+                : undefined
+            }
+            filter={(id, query) =>
+              defaultFilter(`${controller.chatTitle(id)} ${id}`, query)
+            }
+          >
+            <CommandInput
+              placeholder="Search chats…"
+              value={chatQuery}
+              onValueChange={setChatQuery}
+            />
             <CommandList className="max-h-72">
               <CommandEmpty>
                 {state.catalogLoading ? "Loading chats…" : "No chats found."}
               </CommandEmpty>
-              <CommandGroup heading="Chats">
-                {state.sessions.map((id) => (
-                  <CommandItem
-                    key={id}
-                    value={`${controller.chatTitle(id)} ${id}`}
-                    disabled={state.profileBusy}
-                    onSelect={() => {
-                      selecting.current = true;
-                      void controller.select(id);
-                      setOpen(false);
-                    }}
-                  >
-                    <span className="min-w-0 flex-1 truncate">
-                      {controller.chatTitle(id)}
-                    </span>
-                    <ChatActivityDate
-                      atMs={controller.chatLastActivityAtMs(id)}
-                    />
-                    {state.selected === id && (
-                      <CheckIcon className="size-3.5" />
-                    )}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
+              {(chatQuery
+                ? [["", state.sessions] as const]
+                : chatsByDate(state.sessions, controller)
+              ).map(([heading, ids]) => (
+                <CommandGroup
+                  key={heading}
+                  value={heading || "search-results"}
+                  heading={heading || undefined}
+                >
+                  {ids.map((id) => (
+                    <CommandItem
+                      key={id}
+                      value={id}
+                      disabled={state.profileBusy}
+                      aria-current={state.selected === id ? "true" : undefined}
+                      className="aria-[current=true]:bg-accent"
+                      onSelect={() => {
+                        selecting.current = true;
+                        void controller.select(id);
+                        setOpen(false);
+                      }}
+                    >
+                      <span className="min-w-0 flex-1 truncate">
+                        {controller.chatTitle(id)}
+                      </span>
+                      <ChatActivityIndicators {...chatActivity(state, id)} />
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              ))}
             </CommandList>
           </Command>
           {state.catalogError && (
@@ -205,11 +278,12 @@ export function NativeChatHeader({
           {state.catalogEntry?.archived && " · Archived"}
         </span>
       )}
+      <ChatActivityIndicators {...chatActivity(state)} running={false} />
       <Button
         type="button"
         variant="ghost"
         size="icon-xs"
-        disabled={state.profileBusy}
+        disabled={disabled || state.profileBusy}
         aria-label="New chat"
         title="New chat"
         onClick={() => void controller.select(null)}
@@ -252,27 +326,25 @@ export function NativeChatHeader({
                     controller.beginRename();
                   }}
                 >
-                  Rename chat
+                  <PencilIcon aria-hidden />
+                  Rename
                 </DropdownMenuItem>
                 {!state.catalogEntry.archived && (
                   <DropdownMenuItem
                     disabled={state.catalogChanging}
-                    onSelect={() => {
-                      void controller.setChatArchived(true).then((archived) => {
-                        if (archived) toast("Chat archived");
-                      });
-                    }}
+                    onSelect={() => void archiveChat()}
                   >
-                    Archive chat
+                    <ArchiveIcon aria-hidden />
+                    Archive
                   </DropdownMenuItem>
                 )}
                 {state.catalogEntry.deletionAvailable && (
                   <DropdownMenuItem
-                    className="text-destructive focus:text-destructive"
                     disabled={!controller.canDeleteSavedChat}
-                    onSelect={() => void controller.deleteSavedChat()}
+                    onSelect={() => void deleteChat()}
                   >
-                    Delete chat
+                    <Trash2Icon aria-hidden />
+                    Permanently delete
                   </DropdownMenuItem>
                 )}
               </>
@@ -292,6 +364,25 @@ export function NativeChatHeader({
       )}
     </header>
   );
+}
+
+function chatsByDate(ids: readonly string[], controller: NativeChatController) {
+  const today = startOfToday().getTime();
+  const yesterday = subDays(today, 1).getTime();
+  const groups: Record<string, string[]> = {
+    Today: [],
+    Yesterday: [],
+    Earlier: [],
+    Undated: [],
+  };
+  for (const id of ids) {
+    const atMs = controller.chatLastActivityAtMs(id);
+    if (atMs === undefined) groups.Undated.push(id);
+    else if (atMs >= today) groups.Today.push(id);
+    else if (atMs >= yesterday) groups.Yesterday.push(id);
+    else groups.Earlier.push(id);
+  }
+  return Object.entries(groups).filter(([, ids]) => ids.length > 0);
 }
 
 /** Effort stops from least to most, as shown on the slider. */
@@ -316,6 +407,8 @@ export function NativeModelPicker({
   onSelect,
   onRefresh,
   refreshError,
+  loading,
+  initialError,
   effort,
   onEffort,
   ultraAvailable,
@@ -333,6 +426,10 @@ export function NativeModelPicker({
   onRefresh: () => void;
   /** Last catalogue reload failed; existing choices remain usable. */
   refreshError?: string | null;
+  /** Initial catalogue or saved selection is still being read. */
+  loading?: boolean;
+  /** A first read failed before the picker had a resolved selection. */
+  initialError?: string | null;
   effort?: NativeChatEffort;
   onEffort?: (effort: NativeChatEffort) => void;
   /** Negotiated harness support; absent until the installed host is checked. */
@@ -372,13 +469,12 @@ export function NativeModelPicker({
     profiles?.choices.find((p) => p.id === profiles.active);
   const label =
     selected?.model ??
-    (!onSelect
+    (!defaultUnavailable &&
+    (profiles?.active === null || (!profiles && !onSelect))
       ? "Default model"
-      : !profiles
+      : !profiles || !onSelect
         ? "Model"
-        : profiles.active === null && !defaultUnavailable
-          ? "Default model"
-          : "Choose model");
+        : "Choose model");
   // One list of models. A previously used connection keeps its saved identity.
   const models = [
     ...(profiles?.choices ?? []).map((p) => ({
@@ -424,6 +520,23 @@ export function NativeModelPicker({
   // (see test/desktop-agent-chat-model-refresh.md)
   const showModels = !!onSelect && (!onEffort || view === "models");
   const editingEffort = open && !showModels && !!onEffort;
+  if (initialError)
+    return (
+      <Button
+        type="button"
+        size="xs"
+        variant="ghost"
+        aria-label="Retry loading models"
+        title={initialError}
+        className="w-32 min-w-16 shrink rounded-xl text-muted-foreground"
+        disabled={busy}
+        onClick={onRefresh}
+      >
+        <RotateCcwIcon className="size-3.5" />
+        Retry
+      </Button>
+    );
+  if (loading) return <ComposerControlSkeleton kind="model" />;
   return (
     <Popover
       open={open}
@@ -525,9 +638,9 @@ export function NativeModelPicker({
                           <ConnectionIcon connection={selected.connection} />
                         )}
                         <span className="truncate">
-                          {selected
-                            ? label
-                            : "This chat uses the default model"}
+                          {label === "Default model"
+                            ? "This chat uses the default model"
+                            : label}
                         </span>
                       </span>
                     )}

@@ -62,15 +62,22 @@ marker. Older hosts can omit both markers. The bridge publishes destination
 markers and availability without exposing history URLs, titles or page state.
 
 `nativeChat` is an optional Desktop namespace. Check `status()` in the
-current workspace. If it reports `native-starting`, call `status(true)` to
-start the workspace chat. Known setup failures are fixed readiness values.
+current workspace. If it reports `native-starting`, call the optional
+`startWorkspaceChat(preferred?)` with the saved or newly chosen connection.
+Main coordinates concurrent visits and provider fallback. The result contains
+`readiness` and, when applicable, the actual `selectedProfileId`. File windows
+and older Desktop builds use `status(true)`. Known setup failures are fixed
+readiness values.
 `native-gateway-unavailable` means scoped Gateway access could not be acquired;
 it does not identify a worker or storage failure. `profiles()` remains available
 before startup succeeds. An explicit `selectProfile()` can open a saved or
 configured connection, with no implicit fallback or default retry.
-The optional catalogue flag `modelChanges` advertises guarded replacement of
-the workspace worker. A renderer must withhold existing-chat model changes
-when this flag is absent. Selection validates the destination before closing
+The optional catalogue flag `inputRoutes` means the live workspace host can
+accept inputs on different saved connections. After saving the chat selection,
+submit or enqueue with its revision on the existing attachment. An accepted
+input keeps its own connection across subsequent model calls and queue waits.
+For hosts that require changing the workspace worker, the optional catalogue
+flag `modelChanges` advertises guarded replacement. Replacement validates the destination before closing
 the previous connection, checks all chats for captured work, and saves a new
 profile only after launch succeeds. A refusal keeps the previous worker;
 `native_chat_model_change_failed_restored` requires loading the previous chat
@@ -81,7 +88,10 @@ workspace opens. It starts nothing; the opened workspace selects the choice
 as a new connection.
 When all three optional Welcome Full access methods exist, the app can
 prepare an expiring review for one new chat in the selected registered
-workspace. Answer it in the same Welcome frame. Confirmed reservations
+workspace. Answer it in the same Welcome frame. With
+`welcomeFullAccessAcrossPresets`, the review survives same-document Welcome
+navigation that changes only the `preset` query parameter. An omitted flag
+means navigation revokes the review. Confirmed reservations
 survive the review timeout and can be revoked before use. Answering creates no
 chat. Start consumes the confirmation once, applies Full access to the
 returned chat with the requested model and effort, and sends no input. Open
@@ -117,6 +127,27 @@ the model that vocabulary in the appropriate skill. Workflows is the first
 consumer. The native host treats the display schema as opaque and supplies
 model context at the request's existing authority.
 
+`window.grida.chatCatalog?.list({ workspaceId?, limit?, cursor? })` discovers
+unarchived chats for Home and the workbench. Omit the workspace to list across
+the registered workspaces. The default and maximum page size is 32. Entries carry
+workspace and chat IDs, the title, the last recorded message time and independent
+running and input-needed flags. Newest messages appear first, and undated chats
+follow. Continue with the returned opaque cursor and the same workspace filter.
+Request the first page again to observe new activity. The method reads metadata
+from live and closed stores and opens no chat. A registered workspace with no
+saved chats contributes zero rows. If a participating store cannot be read,
+the global query reports an error so clients can distinguish it from an empty
+catalog. Older native builds omit the
+namespace. The workspace picker's existing `nativeChat.list` retains creation order.
+
+For unarchived workspace chats, `list(cursor)` can return `runningSessionIds`
+and `inputNeededSessionIds` alongside `sessionIds`. Each independent array
+contains only IDs on the page. An empty array means no chat had that status
+when read. Older hosts can omit either field. Refresh the same cursor to
+observe a change without attaching to a chat. An attached turn can also carry
+`inputNeeded`. Only the frame holding a side chat combines its activity with
+the parent's indicators.
+
 Chat listings may carry optional `lastActivity` entries pairing a session ID
 with `atMs`; organization entries and Settings archive rows use
 `lastActivityAtMs`. These are nonnegative integer Unix milliseconds within
@@ -124,6 +155,16 @@ JavaScript's Date range. They describe the latest local turn's first settlement
 time, or start time while unfinished, rather than exact message or archive
 time. A chat without local turns or an older host omits the value. Listing
 order and cursors are unchanged; dates grant no attachment or control authority.
+
+`organize` can return an opaque `archiveUndo` receipt after archiving a
+workspace chat. Pass it to `undoArchive` in the same workspace frame to restore
+the exact archived chat without attaching or switching chats. Receipts expire
+and can be used once. Older bridges omit the receipt and method.
+
+After `archives.unarchive` succeeds, `archives.openRestored` can use the same
+opaque archive row ID to open the restored chat from that Settings document.
+This optional action is separate from the metadata-only unarchive. It accepts
+no workspace or session ID and its handle expires after use or timeout.
 
 Compatible native hosts supply optional `activityOrder` on exposed messages,
 individual tool calls and child lifecycle events. Positive safe-integer
@@ -301,6 +342,11 @@ After the workbench chat connects, `takeNotificationFocus()` consumes its
 latest pending notification click once. The result identifies the saved chat
 and, when applicable, its model connection. A missing or stale click returns
 `null`. The focus push wakes the same read.
+
+Workspace panes can report whether their attachment is visible with
+`setPresented(attachmentId, visible)`. A background question can trigger
+a notification while a different tab is in view. A side-chat click includes
+`side: true` and can be taken only by the frame still owning that side.
 
 ## Native browser
 

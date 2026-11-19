@@ -27,6 +27,11 @@ default project folder, or the project chosen at the top left, and sends your
 message as the first message of a new chat there. Your message is sent once:
 reloading the window does not send it again.
 
+If the connection cannot start, the workspace keeps your Welcome message.
+Choose **Retry** to send it once the original connection is ready. If you
+choose a different model, the message appears in the composer so you can
+review it and press **Send**.
+
 The model picker on Welcome lists **Default**, models from a connected
 **ChatGPT Subscription**, and models available through your saved provider
 keys and endpoints. New chats use your last explicitly chosen model and

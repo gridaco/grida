@@ -277,6 +277,7 @@ impl PlaceImage {
         let client = self
             .owner
             .connection
+            .0
             .lock()
             .unwrap()
             .as_ref()

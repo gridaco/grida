@@ -11,7 +11,9 @@ mod websocket;
 
 pub use websocket::{ListenOptions, serve_websocket};
 
-use crate::host::{AcceptedRun, Host, PromptPart, PromptRequest, RunResult, SessionCatalog};
+use crate::host::{
+    AcceptedRun, CatalogListing, CatalogOrder, Host, PromptPart, PromptRequest, RunResult,
+};
 use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::v1::schema::{
     AgentCapabilities, CancelNotification, ContentBlock, EmbeddedResourceResource, Implementation,
@@ -82,11 +84,10 @@ async fn serve(
     let (sdk, wire) = Channel::duplex();
     let (incoming, outgoing) = wire.into_parts();
     let editor_surfaces = host.editor_surfaces.clone();
-    let desktop_image_generation = host.desktop_image_generation.clone();
     let read = async {
         let result = transport::read(input, outgoing, delivery.clone()).await;
         editor_surfaces.detach();
-        if let Some(generation) = &desktop_image_generation {
+        if let Some(generation) = host.image_connection() {
             generation.detach();
         }
         if let Some(provider) = &provider {
@@ -107,7 +108,7 @@ async fn serve(
         transport::write(output, incoming, delivery.clone()),
     );
     editor_surfaces.detach();
-    if let Some(generation) = &desktop_image_generation {
+    if let Some(generation) = host.image_connection() {
         generation.detach();
     }
     if let Some(provider) = &provider {
@@ -216,8 +217,9 @@ async fn serve_connection(
                 let goal_effort = initialized_host.goal_sponsorship_available();
                 let mut advertised =
                     extensions::advertised(reviewer, subagents, deletion, effort, goal_effort, files);
-                let library_selection = reviewer && initialized_host.accepts_library_selection();
-                let spending = reviewer && initialized_host.supports_goal_spending();
+                let routed = reviewer && provider.is_some() && offered(crate::supervised_provider::ROUTES);
+                let library_selection = reviewer && (routed || initialized_host.accepts_library_selection());
+                let spending = reviewer && (routed || initialized_host.supports_goal_spending());
                 let spending_negotiated = spending && offered(extensions::GOAL_SPENDING);
                 if spending {
                     advertised.insert(extensions::GOAL_SPENDING.into(), 1.into());
@@ -241,9 +243,16 @@ async fn serve_connection(
                         return responder.respond_with_error(host_error(error));
                     }
                     advertised.insert(capability.into(), 1.into());
+                    let routes = crate::supervised_provider::ROUTES;
+                    if routed {
+                        if let Err(error) = initialized_host.attach_routes(provider.clone()) {
+                            return responder.respond_with_error(host_error(error));
+                        }
+                        advertised.insert(routes.into(), 1.into());
+                    }
                     let billing = extensions::gateway_billing::CAPABILITY;
                     if reviewer
-                        && initialized_host.supports_gateway_billing_status()
+                        && (routed || initialized_host.supports_gateway_billing_status())
                         && offered(billing)
                     {
                         advertised.insert(billing.into(), 1.into());
@@ -254,7 +263,7 @@ async fn serve_connection(
                     }
                     let capability = crate::host::image_generation::CAPABILITY;
                     if reviewer
-                        && let Some(generation) = &initialized_host.desktop_image_generation
+                        && let Some(generation) = initialized_host.image_connection()
                         && offered(capability)
                     {
                         let reference = crate::host::image_generation::REFERENCE_CAPABILITY;
@@ -262,10 +271,10 @@ async fn serve_connection(
                         let placement = crate::host::image_generation::PLACE_CAPABILITY;
                         let place = offered(placement);
                         let attachment = crate::host::image_generation::ATTACHMENT_CAPABILITY;
-                        let attachments = initialized_host.supports_attachment_reference()
+                        let attachments = (routed || initialized_host.supports_attachment_reference())
                             && offered(attachment);
                         let workspace_reference = crate::host::image_generation::WORKSPACE_CAPABILITY;
-                        let workspace_references = initialized_host.supports_workspace_image_reference()
+                        let workspace_references = (routed || initialized_host.supports_workspace_image_reference())
                             && offered(workspace_reference);
                         generation.attach(connection.clone(), references, place, attachments, workspace_references);
                         advertised.insert(capability.into(), 1.into());
@@ -394,15 +403,9 @@ async fn serve_connection(
                     if !list_sessions.lock().unwrap().initialized {
                         return Err(unavailable("initialize_required"));
                     }
-                    let cwd = request.cwd.ok_or_else(|| {
-                        Error::invalid_params().data("session_list_workspace_required")
-                    })?;
-                    let after = request.cursor.as_deref().map(catalog_anchor).transpose()?;
-                    let catalog = list_host
-                        .list_sessions(cwd, false, after)
-                        .await
-                        .map_err(host_error)?;
-                    catalog_response(catalog)
+                    let order = extensions::catalog_order(&list_sessions, &request)?;
+                    list_chats(&list_host, request.cwd, order, request.cursor.as_deref())
+                        .await.map_err(host_error)
                 }
                 .await;
                 responder.respond_with_result(result)
@@ -568,16 +571,21 @@ async fn serve_connection(
                     // ACP JSON-RPC IDs correlate requests on one connection. A
                     // distinct host-generated ID identifies each durable input.
                     let id = ChangeId::new(uuid::Uuid::new_v4().to_string()).map_err(host_error)?;
+                    let initial_title = extensions::prompt_initial_title(
+                        &prompt_sessions,
+                        request.meta.as_ref(),
+                    )?;
+                    let prompt = PromptRequest {
+                        id,
+                        session,
+                        parts,
+                        questions: false,
+                        operating_regime: None,
+                        effort: None,
+                        reasoning: Default::default(),
+                    };
                     prompt_host
-                        .start_prompt(PromptRequest {
-                            id,
-                            session,
-                            parts,
-                            questions: false,
-                            operating_regime: None,
-                            effort: None,
-                            reasoning: Default::default(),
-                        })
+                        .start_prompt_with_initial_title(prompt, initial_title)
                         .await
                         .map_err(host_error)
                 }
@@ -861,47 +869,102 @@ fn host_error(error: agent_kit_core::Error) -> Error {
     wire_error.data(error.code)
 }
 
-fn catalog_anchor(cursor: &str) -> Result<SessionId> {
-    cursor
-        .strip_prefix("v1/")
-        .and_then(|id| SessionId::new(id).ok())
-        .ok_or_else(|| Error::invalid_params().data("invalid_session_cursor"))
+/// The native CLI and ACP project the same host-owned public catalog page.
+pub async fn list_chats(
+    host: &Host,
+    cwd: Option<std::path::PathBuf>,
+    order: CatalogOrder,
+    cursor: Option<&str>,
+) -> agent_kit_core::Result<ListSessionsResponse> {
+    let page = host.discover_chats(cwd, order, cursor).await?;
+    catalog_response(page, true)
 }
 
-fn catalog_response(mut catalog: SessionCatalog) -> Result<ListSessionsResponse> {
-    let cwd_bytes = serde_json::to_vec(&catalog.cwd)
-        .map_err(|_| unavailable("session_catalog_projection_failed"))?
-        .len();
-    // Each standard record repeats the workspace path. Leave frame room for
-    // the maximum escaped ID, keys, cursor, and the JSON-RPC envelope.
-    let page_limit = (transport::MAX_FRAME_BYTES / 2) / (cwd_bytes + 3072);
-    if page_limit == 0 {
-        return Err(Error::invalid_params().data("session_catalog_workspace_too_large"));
+fn catalog_response(
+    mut catalog: CatalogListing,
+    include_activity: bool,
+) -> agent_kit_core::Result<ListSessionsResponse> {
+    // Reserve room for titles, cursor and activity arrays, including when
+    // different rows in an all-workspaces page have different path lengths.
+    let mut bytes = 0;
+    let mut count = 0;
+    for row in &catalog.entries {
+        bytes += serde_json::to_vec(&row.cwd)
+            .map_err(|_| {
+                agent_kit_core::Error::new(
+                    ErrorKind::InvalidState,
+                    "session_catalog_projection_failed",
+                )
+            })?
+            .len()
+            + 4096;
+        if bytes > transport::MAX_FRAME_BYTES / 2 {
+            break;
+        }
+        count += 1;
     }
-    if catalog.entries.len() > page_limit {
-        catalog.entries.truncate(page_limit);
-        catalog.next_after = catalog
+    if count == 0 && !catalog.entries.is_empty() {
+        return Err(agent_kit_core::Error::new(
+            ErrorKind::InvalidInput,
+            "session_catalog_workspace_too_large",
+        ));
+    }
+    if count < catalog.entries.len() {
+        catalog.entries.truncate(count);
+        catalog.has_more = true;
+    }
+    let cursor = catalog
+        .has_more
+        .then(|| catalog.entries.last().map(|row| row.cursor.clone()))
+        .flatten();
+    let meta = include_activity.then(|| {
+        let ids = catalog
             .entries
-            .last()
-            .map(|record| record.entry.session.clone());
-    }
+            .iter()
+            .map(|row| &row.record)
+            .filter(|record| {
+                record.current_turn_disposition
+                    == Some(agent_kit_sessions::TurnDisposition::Running)
+            })
+            .map(|record| serde_json::Value::from(record.entry.session.as_str()))
+            .collect();
+        let input = catalog
+            .entries
+            .iter()
+            .map(|row| &row.record)
+            .filter(|record| crate::host::needs_user_input(&record.pending_request_schemas))
+            .map(|record| serde_json::Value::from(record.entry.session.as_str()))
+            .collect();
+        serde_json::Map::from_iter([
+            (
+                "co.grida/runningSessionIds".to_owned(),
+                serde_json::Value::Array(ids),
+            ),
+            (
+                "co.grida/inputNeededSessionIds".to_owned(),
+                serde_json::Value::Array(input),
+            ),
+        ])
+    });
     Ok(ListSessionsResponse::new(
         catalog
             .entries
             .into_iter()
-            .map(|record| {
-                let meta = record.latest_turn_activity_ms.map(|timestamp| {
-                    serde_json::Map::from_iter([(
-                        "co.grida/lastActivityAtMs".to_owned(),
-                        timestamp.into(),
-                    )])
-                });
-                let entry = record.entry;
-                SessionInfo::new(entry.session.as_str().to_owned(), catalog.cwd.clone())
+            .map(|row| {
+                let mut meta = serde_json::Map::new();
+                if let Some(value) = row.record.latest_turn_activity_ms {
+                    meta.insert("co.grida/lastActivityAtMs".into(), value.into());
+                }
+                if let Some(value) = row.record.last_message_ms {
+                    meta.insert("co.grida/lastMessageAtMs".into(), value.into());
+                }
+                let entry = row.record.entry;
+                SessionInfo::new(entry.session.as_str().to_owned(), row.cwd)
                     .title(entry.label)
-                    .meta(meta)
+                    .meta((!meta.is_empty()).then_some(meta))
             })
             .collect(),
     )
-    .next_cursor(catalog.next_after.map(|id| format!("v1/{}", id.as_str()))))
+    .next_cursor(cursor)
+    .meta(meta))
 }

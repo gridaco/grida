@@ -91,27 +91,66 @@ it("refreshes the active chat picker so chats restored in Settings appear", () =
   expect(html).not.toContain("Lifecycle checks");
 });
 
-it("shows known activity beside its chat without reordering or dating unknown chats", () => {
+it("groups the list by local activity date and keeps chat activity indicators", () => {
   const controller = new NativeChatController({} as DesktopNativeChat);
   vi.spyOn(controller, "chatTitle").mockImplementation((id) => id);
-  vi.spyOn(controller, "chatLastActivityAtMs").mockImplementation((id) =>
-    id === "earlier-chat" ? Date.parse("2026-11-17T03:04:00.000Z") : undefined
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const dates: Record<string, number> = {
+    "running-chat": today.getTime(),
+    "input-chat": yesterday.getTime(),
+    "earlier-chat": 0,
+  };
+  vi.spyOn(controller, "chatLastActivityAtMs").mockImplementation(
+    (id) => dates[id]
   );
   const html = renderToStaticMarkup(
     <NativeChatHeader
       controller={controller}
       state={{
         ...controller.read(),
-        sessions: ["earlier-chat", "undated-chat"],
+        selected: "running-chat",
+        sessions: [
+          "earlier-chat",
+          "undated-chat",
+          "running-chat",
+          "input-chat",
+        ],
+        runningSessionIds: ["running-chat"],
+        inputNeededSessionIds: ["input-chat"],
+        observation: {
+          observationId: "running-observation",
+          snapshot: {
+            sessionId: "running-chat",
+            sessionRevision: 0,
+            queuedInputs: 0,
+            admissionPaused: false,
+            current: {
+              turnId: "running-turn",
+              epoch: 0,
+              journalPosition: 0,
+              historyPosition: 0,
+              controlRevision: 0,
+              paused: false,
+              cancelled: false,
+              disposition: "running",
+              inputNeeded: true,
+              status: null,
+            },
+            latest: null,
+          },
+        },
       }}
     />
   );
-  expect(html.match(/<time\b/g)).toHaveLength(1);
-  expect(html).toContain('dateTime="2026-11-17T03:04:00.000Z"');
-  expect(html).toContain('title="Last activity: ');
-  expect(html.indexOf("earlier-chat")).toBeLessThan(
-    html.indexOf("undated-chat")
+  expect(html).not.toMatch(/<time\b/);
+  expect(html).toMatch(
+    />Today<.*>running-chat<.*>Yesterday<.*>input-chat<.*>Earlier<.*>earlier-chat<.*>Undated<.*>undated-chat</
   );
+  expect(html.match(/aria-label="Running"/g)).toHaveLength(1);
+  expect(html.match(/>Input needed</g)).toHaveLength(2);
+  expect(html.match(/aria-current="true"/g)).toHaveLength(1);
 });
 
 describe("chat options availability", () => {

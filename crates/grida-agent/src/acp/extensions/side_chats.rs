@@ -48,7 +48,7 @@ pub(super) fn handlers(
 ) -> RequestRoutes {
     let open = (host.clone(), sessions.clone(), scope.clone());
     RequestRoutes::default()
-        .on_receive_request(
+        .on_supervised_request(
             async move |request: Open, responder, _| {
                 let _observation = match Observation::begin(&open.1, Some(&request.session_id)) {
                     Ok(guard) => guard,

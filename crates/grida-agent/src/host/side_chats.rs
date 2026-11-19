@@ -105,6 +105,8 @@ impl Refusal {
 pub(crate) struct SideChatView {
     pub side_chat_id: SessionId,
     pub parent_session_id: SessionId,
+    /// Whether the side chat's inherited execution accepts image inputs.
+    pub image_input: bool,
     /// The parent's committed history the side chat was forked from.
     pub source_context: HistoryBasis,
     /// The parent's model context had been compacted. The side chat still
@@ -122,9 +124,11 @@ pub(crate) struct SideSnapshot {
     parent_session_id: SessionId,
     temporary: bool,
     unavailable: [Refusal; 8],
-    /// The title generated from the side chat's first message, once written.
+    /// The side chat's current title, including an accepted provisional label.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     title: Option<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    title_generation_pending: bool,
 }
 
 impl Host {
@@ -133,19 +137,27 @@ impl Host {
         let Some(side) = session_configuration(view)?.side else {
             return Ok(None);
         };
-        let title = self.store.catalog_entry(view.session.clone()).await?.label;
+        let (entry, title_generation_pending) = self
+            .read_with_title_state(
+                &view.session,
+                self.store.catalog_entry(view.session.clone()),
+            )
+            .await?;
         Ok(Some(SideSnapshot {
             parent_session_id: side.parent,
             temporary: true,
             unavailable: Refusal::ALL,
-            title,
+            title: entry.label,
+            title_generation_pending,
         }))
     }
 
     /// The parent of a side session, or `None` for any other session.
     pub(crate) async fn side_parent(&self, session: &SessionId) -> Result<Option<SessionId>> {
-        let view = self.store.inspect(session.clone()).await?;
-        Ok(session_configuration(&view)?.side.map(|side| side.parent))
+        let configuration = self.store.configuration(session.clone()).await?;
+        Ok(decode_session_configuration(&configuration)?
+            .side
+            .map(|side| side.parent))
     }
 
     /// Refuse `refusal` for a side session. Other sessions, and sessions that
@@ -165,6 +177,7 @@ impl Host {
     /// under the parent's execution.
     async fn open_side_chat(&self, parent: SessionId) -> Result<SideChatView> {
         self.owned_control(move |host| async move {
+            let (host, revision) = host.for_derived_session(&parent).await?;
             // Deleting the parent holds this admission from its idle check
             // until its data is gone, then discards the side chats it can
             // list. Opening under the same admission either completes first,
@@ -181,7 +194,10 @@ impl Host {
             }
             let execution = host.execution()?;
             let source = host.store.inspect(parent.clone()).await?;
-            host.check_execution(&source).await?;
+            if let Some(revision) = revision {
+                host.selection_at_revision(&source, revision)?;
+            }
+            host.check_new_submission(&source).await?;
             let configuration = session_configuration(&source)?;
             if configuration.side.is_some() {
                 return Err(Refusal::SideChat.error());
@@ -197,6 +213,7 @@ impl Host {
                     SESSION_SCHEMA,
                     SESSION_VERSION,
                     &SessionConfiguration {
+                        inherited_route: host.selected_route.clone(),
                         cwd: canonical_workspace(&configuration.cwd)?,
                         execution: execution.configuration,
                         owner: execution.owner,
@@ -264,6 +281,7 @@ impl Host {
             Ok(SideChatView {
                 side_chat_id: side,
                 parent_session_id: parent,
+                image_input: host.accepts_images(),
                 source_context: basis,
                 compacted,
                 omissions,

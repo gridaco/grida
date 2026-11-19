@@ -10,6 +10,10 @@ import {
   type NativeAgentChatLaunch,
 } from "./native-agent-chat";
 import { NativeAgentProcess } from "./native-agent-process";
+import {
+  NativeChatCatalog,
+  readClosedChatCatalog,
+} from "./native-chat-catalog";
 
 const packaged = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
 
@@ -200,11 +204,19 @@ it("projects bounded catalog activity metadata and accepts older hosts without i
     for (const archived of [false, true]) {
       request.mockResolvedValueOnce({
         sessions: [dated, { sessionId: "older", cwd: test.cwd }],
+        _meta: {
+          "co.grida/runningSessionIds": ["dated"],
+          "co.grida/inputNeededSessionIds": ["older", "dated"],
+        },
       });
       await expect(client.list(null, archived)).resolves.toEqual({
         sessionIds: ["dated", "older"],
         nextCursor: null,
         lastActivity: [{ sessionId: "dated", atMs }],
+        ...(!archived && {
+          runningSessionIds: ["dated"],
+          inputNeededSessionIds: ["older", "dated"],
+        }),
       });
       expect(request).toHaveBeenLastCalledWith(
         archived ? "_co.grida/session/list-archived" : "session/list",
@@ -218,6 +230,31 @@ it("projects bounded catalog activity metadata and accepts older hosts without i
       sessionIds: ["older"],
       nextCursor: null,
     });
+    request.mockResolvedValueOnce({
+      sessions: [],
+      _meta: { "co.grida/runningSessionIds": [] },
+    });
+    await expect(client.list()).resolves.toMatchObject({
+      runningSessionIds: [],
+    });
+    for (const key of [
+      "co.grida/runningSessionIds",
+      "co.grida/inputNeededSessionIds",
+    ])
+      for (const invalid of [
+        null,
+        "dated",
+        ["outside-page"],
+        ["dated", "dated"],
+      ]) {
+        request.mockResolvedValueOnce({
+          sessions: [dated, { sessionId: "older", cwd: test.cwd }],
+          _meta: { [key]: invalid },
+        });
+        await expect(client.list()).rejects.toThrow(
+          "native_chat_invalid_protocol_value"
+        );
+      }
     for (const invalid of [null, -1, 1.5, "today", 8_640_000_000_000_001]) {
       request.mockResolvedValueOnce({
         sessions: [
@@ -243,6 +280,16 @@ it("projects bounded catalog activity metadata and accepts older hosts without i
     });
     request.mockResolvedValueOnce(entry);
     await expect(client.catalogEntry(session)).resolves.toEqual(entry);
+    request.mockResolvedValueOnce({
+      ...entry,
+      title: "First line",
+      titleGenerationPending: true,
+    });
+    await expect(client.catalogEntry(session)).resolves.toEqual({
+      ...entry,
+      title: "First line",
+      titleGenerationPending: true,
+    });
     request.mockResolvedValueOnce({ ...entry, lastActivityAtMs: -1 });
     await expect(client.catalogEntry(session)).rejects.toThrow(
       "native_chat_invalid_protocol_value"
@@ -261,7 +308,14 @@ it("opens a saved queue passively and resumes idle queued work on an exact obser
     sessionId,
     sessionRevision: 8,
     queuedInputs: 1,
-    queue: [{ inputId: "saved-input", inputPosition: 1, settings: {} }],
+    queue: [
+      {
+        inputId: "saved-input",
+        inputPosition: 1,
+        settings: {},
+        preview: "Waiting message",
+      },
+    ],
     admissionPaused: false,
     current: null,
     latest: null,
@@ -272,6 +326,7 @@ it("opens a saved queue passively and resumes idle queued work on an exact obser
     >();
   const start = vi.spyOn(NativeAgentProcess, "start").mockResolvedValueOnce({
     request,
+    acceptsQueuedMessages: true,
     close: async () => {},
   } as unknown as NativeAgentProcess);
   let client: NativeAgentChat | undefined;
@@ -325,6 +380,12 @@ it("opens a saved queue passively and resumes idle queued work on an exact obser
     request.mockResolvedValueOnce(saved);
     const observed = await client.observe(session);
     expect(observed.idleQueueResumeAvailable).toBe(true);
+    expect(observed.queuePreview).toEqual({
+      items: [{ inputId: "saved-input", preview: "Waiting message" }],
+      offset: 0,
+      previousOffset: null,
+      nextOffset: null,
+    });
     expect(request.mock.calls.map(([method]) => method)).toEqual([
       "session/load",
       "_co.grida/session/snapshot",
@@ -353,6 +414,32 @@ it("opens a saved queue passively and resumes idle queued work on an exact obser
     ];
     expect(request.mock.calls[4]).toEqual(call);
     expect(request.mock.calls[6]).toEqual(call);
+
+    // Identical durable state can also occur between two live workers.
+    request.mockResolvedValueOnce({
+      ...saved,
+      idleQueueResumeAvailable: false,
+    });
+    const advancing = await client.observe(session);
+    expect(advancing).not.toHaveProperty("idleQueueResumeAvailable");
+    await expect(client.editQueue(session, advancing, change)).rejects.toThrow(
+      "native_chat_queue_not_paused"
+    );
+    request.mockResolvedValueOnce({ ...saved, idleQueueResumeAvailable: true });
+    expect((await client.observe(session)).idleQueueResumeAvailable).toBe(true);
+
+    const unavailable = new Error("queued_input_image_unavailable");
+    request.mockRejectedValueOnce(unavailable).mockResolvedValueOnce(saved);
+    await expect(client.queue(session, observed, 0)).rejects.toBe(unavailable);
+    request.mockRejectedValueOnce(unavailable).mockResolvedValueOnce({
+      ...saved,
+      sessionRevision: 9,
+      queue: [],
+      queuedInputs: 0,
+    });
+    await expect(client.queue(session, observed, 0)).rejects.toThrow(
+      "native_chat_queue_changed"
+    );
   } finally {
     await client?.close();
     start.mockRestore();
@@ -950,6 +1037,7 @@ it.runIf(Boolean(packaged))(
         { timeout: 3000 }
       );
       expect(requests).toEqual(["/v1/responses"]);
+      expect((await client.list()).runningSessionIds).toEqual([]);
     } finally {
       await client?.close();
       if (provider.listening) {
@@ -1018,6 +1106,9 @@ it.runIf(Boolean(packaged))(
 
       await client.close();
       client = await NativeAgentChat.start(launch);
+      expect((await client.list()).titles).toEqual([
+        { sessionId: session.id, title: original },
+      ]);
       const reopened = await client.load(session.id);
       expect(reopened.id).toBe(session.id);
       const snapshot = await client.observe(reopened);
@@ -1257,6 +1348,102 @@ it.runIf(Boolean(packaged))(
 );
 
 it.runIf(Boolean(packaged))(
+  "finds an old chat with a new reply across live and closed workspace stores",
+  async () => {
+    const a = fixture();
+    const b = fixture();
+    const projectA = { id: "000000000000000a", root: a.cwd };
+    const projectB = { id: "000000000000000b", root: b.cwd };
+    const provider = await scriptedProvider([
+      finishReply("First."),
+      finishReply("Latest."),
+    ]);
+    const launch = (test: ReturnType<typeof fixture>) =>
+      NativeAgentChat.start({
+        resourcesPath: packaged!,
+        stateDirectory: test.stateDirectory,
+        cwd: test.cwd,
+        provider: "openai-compatible",
+        model: "fixture",
+        endpoint: provider.endpoint,
+      });
+    let active: NativeAgentChat | undefined;
+    let other: NativeAgentChat | undefined;
+    const openCatalog = () =>
+      new NativeChatCatalog({
+        workspaces: async () => [projectB, projectA],
+        resolve: async (id) => (id === projectA.id ? projectA : projectB),
+        read: (workspace, cursor) =>
+          active && workspace.id === projectA.id
+            ? active.messageActivityCatalog(cursor)
+            : readClosedChatCatalog(
+                packaged!,
+                workspace.id === projectA.id
+                  ? a.stateDirectory
+                  : b.stateDirectory,
+                workspace.root,
+                cursor
+              ),
+      });
+    try {
+      active = await launch(a);
+      const original = await active.create();
+      for (let i = 0; i < 32; i++) await active.create();
+      expect((await active.list()).sessionIds).not.toContain(original.id);
+      other = await launch(b);
+      const otherChat = await other.create();
+      await other.submit(otherChat, "other-message", "First message.");
+      await vi.waitFor(async () =>
+        expect((await other!.observe(otherChat)).latest?.status).toBe(
+          "succeeded"
+        )
+      );
+      await other.close();
+      other = undefined;
+      await active.submit(original, "new-reply", "Resume this chat.");
+      await vi.waitFor(async () =>
+        expect((await active!.observe(original)).latest?.status).toBe(
+          "succeeded"
+        )
+      );
+      const catalog = openCatalog();
+      const first = await catalog.list({ limit: 1 });
+      expect(first.entries).toEqual([
+        expect.objectContaining({
+          sessionId: original.id,
+          workspaceId: projectA.id,
+          lastMessageAtMs: expect.any(Number),
+        }),
+      ]);
+      expect(
+        (await catalog.list({ cursor: first.nextCursor, limit: 1 })).entries[0]
+          .sessionId
+      ).toBe(otherChat.id);
+      expect(
+        (await catalog.list({ workspaceId: projectA.id, limit: 1 })).entries
+      ).toEqual(first.entries);
+      expect(
+        (await catalog.list({ workspaceId: projectB.id })).entries.map(
+          (chat) => chat.sessionId
+        )
+      ).toEqual([otherChat.id]);
+      await active.close();
+      active = undefined;
+      expect((await openCatalog().list({ limit: 1 })).entries).toEqual(
+        first.entries
+      );
+      expect(provider.requests).toHaveLength(2);
+    } finally {
+      await Promise.all([active?.close(), other?.close()]);
+      await provider.close();
+      a.close();
+      b.close();
+    }
+  },
+  30_000
+);
+
+it.runIf(Boolean(packaged))(
   "lists detached workspace pages and restores a renamed archive after restart",
   async () => {
     const test = fixture();
@@ -1289,6 +1476,8 @@ it.runIf(Boolean(packaged))(
       await expect(client.list(first.nextCursor)).resolves.toEqual({
         sessionIds: saved.slice(32),
         nextCursor: null,
+        runningSessionIds: [],
+        inputNeededSessionIds: [],
       });
       await expect(
         client.list({ cwd: otherWorkspace } as unknown as string)
@@ -1365,6 +1554,8 @@ it.runIf(Boolean(packaged))(
       await expect(client.list()).resolves.toEqual({
         sessionIds: [other.id],
         nextCursor: null,
+        runningSessionIds: [],
+        inputNeededSessionIds: [],
       });
     } finally {
       await client?.close();
@@ -1467,6 +1658,7 @@ it.runIf(Boolean(packaged))(
       await expect(client.turnSummary(session, running)).rejects.toThrow(
         "native_chat_turn_summary_unavailable"
       );
+      expect((await client.list()).runningSessionIds).toEqual([session.id]);
       const entry = await client.catalogEntry(session);
       await client.organize(session, {
         revision: entry.revision,
@@ -1474,6 +1666,7 @@ it.runIf(Boolean(packaged))(
         archived: true,
       });
       expect((await client.observe(session)).current).toEqual(running.current);
+      expect((await client.list()).runningSessionIds).toEqual([]);
       const pause = await client.pause(session, running, "pause-fixture");
       expect(await client.pause(session, running, "pause-fixture")).toEqual(
         pause

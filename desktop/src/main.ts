@@ -10,6 +10,7 @@ import create_menu, {
   rebuild_application_menu,
 } from "./menu";
 import { createDesktopArchives } from "./main/native-desktop-archives";
+import { createDesktopChatCatalog } from "./main/native-desktop-chat-catalog";
 import { open_document_window } from "./window";
 import { DEEP_LINK_SCHEME, EDITOR_BASE_URL } from "./env";
 import {
@@ -33,7 +34,8 @@ import {
   registerWorkspaceMediaScheme,
   handleWorkspaceMediaProtocol,
 } from "./main/workspace-media-protocol";
-import { notifyNativeChat } from "./main/agent-notifications";
+import { focusNativeChat, notifyNativeChat } from "./main/agent-notifications";
+import type { NativeChatIpc } from "./main/native-chat-ipc";
 import type { NativeChatLifecycle } from "./main/native-agent-chat";
 import { NativeCommandProfiles } from "./main/native-agent-command-profile";
 import { protocol_router } from "./main/protocol-router";
@@ -665,13 +667,26 @@ app.on("ready", async () => {
     fetch: async (url, init) =>
       (await session.defaultSession.fetch(url, init)) as Response,
   });
+  let chatIpc: NativeChatIpc | undefined;
   const onNativeLifecycle = (
     workspaceId: string,
     event: NativeChatLifecycle,
     current: () => boolean,
     profileId?: string
   ) =>
-    notifyNativeChat(workspaceId, event, windowAdmission, current, profileId);
+    notifyNativeChat(
+      workspaceId,
+      event,
+      {
+        ...windowAdmission,
+        questionPresentation: (sender, session) =>
+          chatIpc?.questionPresentation(sender, session),
+      },
+      current,
+      profileId
+    ).catch(() =>
+      console.warn("[agent-notifications] Could not deliver notification")
+    );
   let workspaceCatalog: NativeWorkspaceCatalog | undefined;
   if (nativeProfile) {
     try {
@@ -900,6 +915,9 @@ app.on("ready", async () => {
     console.warn("[grida] browser history is unavailable");
   }
   browserHost = registerIpcHandlers({
+    on_native_chat: (chat) => {
+      chatIpc = chat;
+    },
     browser_history: browserHistory,
     on_browser_tools: (tools) => {
       browserTools = tools;
@@ -914,6 +932,12 @@ app.on("ready", async () => {
       native,
       NativeDesktopProfile.resourcesPath(app)
     ),
+    chat_catalog: createDesktopChatCatalog(
+      native,
+      NativeDesktopProfile.resourcesPath(app)
+    ),
+    open_restored_chat: (workspaceId, sessionId) =>
+      focusNativeChat(workspaceId, { sessionId }, windowAdmission),
     global_hooks: native?.globalHooks,
     recent_files: recentFiles,
     native_chat_disabled: !native,

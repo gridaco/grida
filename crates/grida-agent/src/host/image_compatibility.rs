@@ -61,7 +61,7 @@ async fn legacy_serialized_input_selects_original_profile_and_does_not_gain_imag
         parts: vec![PromptPart::Text {
             text: "Accepted without a model call.".into(),
         }],
-        questions: false,
+        questions: true,
         operating_regime: None,
         effort: None,
         reasoning: None,
@@ -84,6 +84,7 @@ async fn legacy_serialized_input_selects_original_profile_and_does_not_gain_imag
         )
         .unwrap();
     assert!(new.subscription_image_input && new.image_tool_results);
+    assert!(new.config.instructions.contains("question_async"));
     assert_eq!(new.image_view, crate::file_tools::ImageView::Raster);
     assert!(
         execution
@@ -99,6 +100,8 @@ async fn legacy_serialized_input_selects_original_profile_and_does_not_gain_imag
         .remove("subscription_image_input");
     old.as_object_mut().unwrap().remove("image_tool_results");
     old.as_object_mut().unwrap().remove("image_view");
+    old.as_object_mut().unwrap().remove("initial_instructions");
+    old.as_object_mut().unwrap().remove("question_instructions");
     let old = Submission {
         id: input.id.clone(),
         payload: encode(INPUT_SCHEMA, INPUT_VERSION, &old).unwrap(),
@@ -115,6 +118,13 @@ async fn legacy_serialized_input_selects_original_profile_and_does_not_gain_imag
         )
         .unwrap();
     assert!(!original.subscription_image_input && !original.image_tool_results);
+    assert!(
+        original
+            .config
+            .instructions
+            .starts_with(LEGACY_CORE_INSTRUCTIONS.trim())
+    );
+    assert!(!original.config.instructions.contains("question_async"));
     assert_eq!(original.image_view, crate::file_tools::ImageView::LegacyPng);
     let provider = execution
         .subscription_provider_for_capture(original.subscription_image_input)

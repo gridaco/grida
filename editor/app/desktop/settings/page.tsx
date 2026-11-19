@@ -28,6 +28,7 @@ import {
   TabsContent,
 } from "@app/ui/components/tabs";
 import { SettingsNavigation } from "@/lib/desktop/settings-navigation";
+import { SettingsArchives } from "@/lib/desktop/settings-archives";
 import { SettingsOllama } from "@/lib/desktop/settings-ollama";
 import {
   Collapsible,
@@ -63,6 +64,7 @@ import {
 } from "@grida/react-icons/logos";
 import {
   DesktopBridgeMissingError,
+  getDesktopBridge,
   OLLAMA_ENDPOINT_PRESET,
   account,
   audio,
@@ -116,6 +118,10 @@ export default function DesktopSettingsPage() {
     SettingsNavigation.getServerSnapshot
   );
   const [providerKeysRevision, setProviderKeysRevision] = useState(0);
+  // Keep the archive request alive while its tab mounts or unmounts.
+  const [archives] = useState(
+    () => new SettingsArchives.Controller(() => getDesktopBridge()?.archives)
+  );
   const onProviderKeyChanged = () => {
     setProviderKeysRevision((revision) => revision + 1);
   };
@@ -200,7 +206,7 @@ export default function DesktopSettingsPage() {
             <HooksSettings />
           </TabsContent>
           <TabsContent value="archived-chats" className="m-0">
-            <ArchivedChatsSettings />
+            <ArchivedChatsSettings controller={archives} />
           </TabsContent>
           <TabsContent value="about" className="m-0">
             <AboutSection />

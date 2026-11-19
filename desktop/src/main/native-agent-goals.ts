@@ -10,6 +10,7 @@ import type {
   NativeChatGoalUsage,
 } from "@grida/desktop-bridge";
 import { parseNativeChatMessageContext } from "@grida/desktop-bridge";
+import { NativeChatTitle } from "./native-chat-title";
 
 const OBJECTIVE_LIMIT = 8192;
 const CRITERION_LIMIT = 1024;
@@ -195,6 +196,7 @@ export class NativeAgentGoals {
       namedChild: boolean;
       spending?: boolean;
       messageContext?: boolean;
+      initialTitle?: boolean;
     }
   ): Promise<unknown> {
     const {
@@ -223,9 +225,13 @@ export class NativeAgentGoals {
     )
       throw new Error("native_chat_goal_named_child_unavailable");
     const regime = operatingRegime ?? (namedChildId ? "act" : undefined);
+    const initialTitle = capabilities.initialTitle
+      ? NativeChatTitle.excerpt(objective)
+      : undefined;
     return this.request("_co.grida/goal/start", {
       sessionId,
       inputId,
+      ...(initialTitle && { initialTitle }),
       ...(selectionRevision !== undefined && {
         _meta: { "co.grida/selectionRevision": selectionRevision },
       }),

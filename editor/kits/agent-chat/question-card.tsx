@@ -1,10 +1,8 @@
 /**
  * `@/kits/agent-chat` — the locked `question` (ask-user) tool's UI.
  *
- * Mental model: the agent **asks**. The host surface pins
- * {@link QuestionPrompt} above its composer while the run is paused on the
- * human; the transcript only shows a passive record of what was asked and
- * answered ({@link AnsweredQuestionSummary}).
+ * A surface pins {@link QuestionPrompt} above its composer. An optional
+ * question can return to a compact transcript action while work continues.
  *
  * This file is a THIN VIEW. All form logic — per-question selections, write-ins,
  * per-question skip, the wizard step, answer-building, and validation — lives in
@@ -15,8 +13,10 @@
 
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { getToolName } from "ai";
+import { MessageCircleQuestionIcon, XIcon } from "lucide-react";
 import { cn } from "@app/ui/lib/utils";
 import { Button } from "@app/ui/components/button";
 import { Checkbox } from "@app/ui/components/checkbox";
@@ -32,14 +32,9 @@ import {
 
 export type { QuestionAnswerOutput };
 
-// The locked tool name is the native agent's vocabulary, matched by literal
-// like `tool-display.ts` matches `skill`. The wire shape is
-// `tool-<name>` (AI SDK UI parts).
-const QUESTION_TOOL_NAME = "question";
-
-/** True iff this tool part is the locked `question` tool. */
 export function isQuestionEntry(entry: ToolCallEntry): boolean {
-  return getToolName(entry) === QUESTION_TOOL_NAME;
+  const name = getToolName(entry);
+  return name === "question" || name === "question_async";
 }
 
 function inputOf(entry: ToolCallEntry): unknown {
@@ -62,21 +57,35 @@ function optionDescriptionClassName(selected: boolean) {
 export function QuestionPrompt({
   input,
   onSubmit,
-  disabled,
+  submitDisabled,
+  dismissal,
 }: {
   input: unknown;
   onSubmit: (survey: QuestionSurvey) => void | Promise<boolean>;
-  disabled?: boolean;
+  /** A refreshed review may be needed to submit while the draft stays editable. */
+  submitDisabled?: boolean;
+  /** Optional questions can move back into the transcript until their host expires them. */
+  dismissal?: { transcript: Element | null; initiallyClosed?: boolean };
 }) {
   // Stable prefix for `aria-labelledby` ids tying each write-in to its question
   // text (the form gives screen readers no other accessible name).
   const labelId = useId();
   const [survey, setSurvey] = useState(() => QuestionSurvey.from(input));
   const [submitted, setSubmitted] = useState(false);
+  const [closed, setClosed] = useState(dismissal?.initiallyClosed ?? false);
+  const form = useRef<HTMLDivElement>(null);
+  const reopen = useRef<HTMLButtonElement>(null);
+  const restoreFocus = useRef(false);
+  useLayoutEffect(() => {
+    if (restoreFocus.current) {
+      (closed ? reopen.current : form.current)?.focus();
+      restoreFocus.current = false;
+    }
+  }, [closed]);
 
   if (survey.count === 0) return null;
 
-  const busy = disabled || submitted;
+  const busy = submitDisabled || submitted;
   const qi = survey.multiStep ? survey.step : 0;
   const q = survey.questions[qi];
   if (!q) return null;
@@ -84,6 +93,38 @@ export function QuestionPrompt({
   const hasOptions = (q.options?.length ?? 0) > 0;
   const writeIn = survey.writeInFor(qi);
   const writeInSelected = survey.isCustomSelected(qi);
+  const hasNext = survey.multiStep && !survey.isLast;
+  const canAdvance =
+    !busy && (hasNext ? survey.currentAnswered : survey.canSubmit);
+  const changeClosed = (next: boolean) => {
+    restoreFocus.current = true;
+    setClosed(next);
+  };
+
+  if (closed && dismissal) {
+    const action = (
+      <div className="flex flex-col items-start gap-1.5">
+        <p id={questionId} className="text-sm whitespace-pre-wrap">
+          {q.question}
+        </p>
+        <Button
+          ref={reopen}
+          type="button"
+          variant="outline"
+          size="sm"
+          aria-describedby={questionId}
+          className="rounded-full"
+          onClick={() => changeClosed(false)}
+        >
+          <MessageCircleQuestionIcon />
+          Answer question
+        </Button>
+      </div>
+    );
+    return dismissal.transcript
+      ? createPortal(action, dismissal.transcript)
+      : action;
+  }
 
   const finalize = (s: QuestionSurvey) => {
     if (busy) return;
@@ -97,17 +138,51 @@ export function QuestionPrompt({
         () => setSubmitted(false)
       );
   };
-  // Skip is PER QUESTION: skip the current one (its answer becomes empty) and
-  // advance, or finalize if it's the last/only question.
+  // Dismissing keeps the draft. A required question submits an explicit skip.
   const onSkip = () => {
+    if (dismissal) return changeClosed(true);
     if (busy) return;
     const skipped = survey.skipCurrent();
-    if (survey.multiStep && !survey.isLast) setSurvey(skipped.next());
+    if (hasNext) setSurvey(skipped.next());
     else finalize(skipped);
+  };
+  const advance = () => {
+    if (!canAdvance) return;
+    if (hasNext) setSurvey(survey.next());
+    else finalize(survey);
   };
 
   return (
-    <div className="flex flex-col gap-4 rounded-lg border bg-background p-3 shadow-lg shadow-black/10">
+    <div
+      ref={form}
+      tabIndex={-1}
+      role="group"
+      aria-labelledby={questionId}
+      className="flex flex-col gap-4 rounded-lg border bg-background p-3 shadow-lg shadow-black/10 outline-none"
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && dismissal && !submitted) {
+          event.stopPropagation();
+          changeClosed(true);
+        }
+      }}
+    >
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <MessageCircleQuestionIcon className="size-4" />
+        Question
+        {dismissal && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            className="ms-auto"
+            aria-label="Close question"
+            disabled={submitted}
+            onClick={() => changeClosed(true)}
+          >
+            <XIcon />
+          </Button>
+        )}
+      </div>
       <div className="flex flex-col gap-2">
         {(q.header || survey.multiStep) && (
           <div className="flex items-center justify-between gap-2">
@@ -130,13 +205,16 @@ export function QuestionPrompt({
             aria-labelledby={questionId}
             value={survey.pickedFor(qi)[0] ?? ""}
             onValueChange={(label) => setSurvey(survey.togglePick(qi, label))}
-            disabled={busy}
+            disabled={submitted}
             className="gap-1.5"
           >
             {q.options!.map((opt, oi) => {
               const selected = survey.pickedFor(qi)[0] === opt.label;
               return (
-                <Label key={oi} className={optionCardClassName(selected, busy)}>
+                <Label
+                  key={oi}
+                  className={optionCardClassName(selected, submitted)}
+                >
                   <RadioGroupItem value={opt.label} className="mt-0.5" />
                   <span className="flex flex-col">
                     <span>{opt.label}</span>
@@ -161,13 +239,16 @@ export function QuestionPrompt({
             {q.options!.map((opt, oi) => {
               const selected = survey.pickedFor(qi).includes(opt.label);
               return (
-                <Label key={oi} className={optionCardClassName(selected, busy)}>
+                <Label
+                  key={oi}
+                  className={optionCardClassName(selected, submitted)}
+                >
                   <Checkbox
                     checked={selected}
                     onCheckedChange={() =>
                       setSurvey(survey.togglePick(qi, opt.label))
                     }
-                    disabled={busy}
+                    disabled={submitted}
                     className="mt-0.5"
                   />
                   <span className="flex flex-col">
@@ -184,7 +265,7 @@ export function QuestionPrompt({
           </div>
         )}
 
-        <div className={optionCardClassName(writeInSelected, busy)}>
+        <div className={optionCardClassName(writeInSelected, submitted)}>
           <Checkbox
             checked={writeInSelected}
             onCheckedChange={(checked) =>
@@ -194,17 +275,31 @@ export function QuestionPrompt({
                   : current.clearCustom(qi)
               )
             }
-            disabled={busy}
+            disabled={submitted}
             className="mt-0.5"
           />
           <Textarea
             aria-labelledby={questionId}
             value={writeIn}
-            onFocus={() => setSurvey((current) => current.selectCustom(qi))}
+            onFocus={() => {
+              if (!submitted) setSurvey((current) => current.selectCustom(qi));
+            }}
             onChange={(e) =>
               setSurvey((current) => current.setWriteIn(qi, e.target.value))
             }
-            disabled={busy}
+            onKeyDown={(event) => {
+              if (
+                event.key !== "Enter" ||
+                event.shiftKey ||
+                event.nativeEvent.isComposing ||
+                event.keyCode === 229
+              )
+                return;
+              event.preventDefault();
+              event.stopPropagation();
+              if (!event.repeat) advance();
+            }}
+            readOnly={submitted}
             rows={2}
             placeholder={
               hasOptions ? "Or write your own answer…" : "Type your answer…"
@@ -232,29 +327,18 @@ export function QuestionPrompt({
           variant="ghost"
           size="xs"
           onClick={onSkip}
-          disabled={busy}
+          disabled={dismissal ? submitted : busy}
         >
           Skip
         </Button>
-        {survey.multiStep && !survey.isLast ? (
-          <Button
-            type="button"
-            size="xs"
-            onClick={() => setSurvey(survey.next())}
-            disabled={!survey.currentAnswered || busy}
-          >
-            Next
-          </Button>
-        ) : (
-          <Button
-            type="button"
-            size="xs"
-            onClick={() => finalize(survey)}
-            disabled={!survey.canSubmit || busy}
-          >
-            Submit
-          </Button>
-        )}
+        <Button
+          type="button"
+          size="xs"
+          onClick={advance}
+          disabled={!canAdvance}
+        >
+          {hasNext ? "Next" : "Submit"}
+        </Button>
       </div>
     </div>
   );

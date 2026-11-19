@@ -21,6 +21,7 @@ import { getServicesSidecarInfo } from "./main/services-sidecar-supervisor";
 import { servicesSidecarClient } from "./main/services-sidecar-client";
 import type { NativeWorkspaceCatalog } from "./main/native-workspace-catalog";
 import { focusWindowByUrl } from "./main/window-focus";
+import { openAboutWindow } from "./main/about-window";
 import { IPC_CHANNELS } from "./bridge/contract";
 
 export type DesktopWindowAdmission = {
@@ -565,7 +566,7 @@ export function create_default_menu(
     template.unshift({
       label: appName,
       submenu: [
-        { role: "about", label: "About " + appName },
+        { label: "About " + appName, click: () => void openAboutWindow(app) },
         { type: "separator" },
         {
           label: "Settings…",

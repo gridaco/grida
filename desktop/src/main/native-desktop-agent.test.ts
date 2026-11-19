@@ -1003,6 +1003,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       expect(await agent.welcomeProfiles()).toEqual({
         modelChanges: true,
         defaultContextWindow: expect.any(Number),
+        defaultGoalSpending: true,
         choices,
       });
       const [{ id: newId }, { id: countedId }] = choices;
@@ -1283,12 +1284,14 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
           connection: "Grida",
           model: model.label,
           contextWindow: 8192,
+          goalSpending: true,
           ultra: true,
         },
       ]);
       expect(await agent.profiles(workspace.id)).toEqual({
         modelChanges: true,
         defaultContextWindow: expect.any(Number),
+        defaultGoalSpending: true,
         choices,
         saved: [],
       });
@@ -2076,6 +2079,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       expect(await desktop.profiles(workspace.id)).toEqual({
         modelChanges: true,
         defaultContextWindow: expect.any(Number),
+        defaultGoalSpending: true,
         choices: [],
         saved: [],
       });

@@ -22,6 +22,7 @@ import type {
   NativeEditorSurfaceSnapshot,
 } from "@grida/desktop-bridge";
 import { NEW_CHAT_TITLE, NativeChatController } from "./native-chat-controller";
+import { chatActivity, type ChatActivity } from "./native-chat-activity";
 import { native_message_parts } from "./native-message-parts";
 import { video_attachment } from "./video-attachment";
 import { image_attachment_preview } from "./image-attachment-preview";
@@ -1736,10 +1737,10 @@ it("keeps a cancelled deletion open and ignores replay after a confirmed retirem
   await controller.select("chat-a");
   await vi.waitFor(() => expect(controller.canDeleteSavedChat).toBe(true));
   const late = updates.get("chat-a")!;
-  await controller.deleteSavedChat();
+  await expect(controller.deleteSavedChat()).resolves.toBe(false);
   expect(controller.read().messages[0]?.text).toBe("Old transcript");
   expect(controller.read().selected).toBe("chat-a");
-  await controller.deleteSavedChat();
+  await expect(controller.deleteSavedChat()).resolves.toBe(true);
   expect(remove.mock.calls).toEqual([
     ["chat-a", "observation-chat-a", 4],
     ["chat-a", "observation-chat-a", 4],
@@ -1920,7 +1921,17 @@ it("queues separately and uses the new review token for the same question", asyn
   bridge.answerQuestion = answer;
   await controller.select("chat-a");
   expect(controller.read().questions[0]?.reviewId).toBe("review-0");
-  await controller.submit("Check the page numbers.");
+  // A lifecycle read taken before acceptance can still be in flight when
+  // the queue receipt arrives. The new review must come from a later read.
+  const prior = await bridge.observe("chat-a");
+  const stale = Promise.withResolvers<NativeChatObservation>();
+  vi.spyOn(bridge, "observe").mockReturnValueOnce(stale.promise);
+  controller.checkObservation();
+  const submitted = controller.submit("Check the page numbers.");
+  await vi.waitFor(() => expect(enqueue).toHaveBeenCalledOnce());
+  stale.resolve(prior);
+  await submitted;
+  expect(controller.read().observation?.snapshot.queuedInputs).toBe(1);
   expect(enqueue).toHaveBeenCalledExactlyOnceWith(
     "chat-a",
     expect.any(String),
@@ -3432,6 +3443,7 @@ function sideFixture() {
   let opened = 0;
   /** Side chats the host has titled, by attachment. */
   const titles = new Map<string, string>();
+  const pendingTitles = new Set<string>();
   const observe = f.bridge.observe.bind(f.bridge);
   f.bridge.observe = async (id) => {
     const observation = await observe(id);
@@ -3446,6 +3458,9 @@ function sideFixture() {
               temporary: true as const,
               unavailable: SIDE_REFUSALS,
               ...(title && { title }),
+              ...(pendingTitles.has(id) && {
+                titleGenerationPending: true as const,
+              }),
             },
           },
         }
@@ -3470,7 +3485,7 @@ function sideFixture() {
   f.bridge.closeSideChat = close;
   f.bridge.commands = async () => ["compact", "fork"];
   f.bridge.runCommand = vi.fn<NonNullable<DesktopNativeChat["runCommand"]>>();
-  return { ...f, open, close, titles };
+  return { ...f, open, close, titles, pendingTitles };
 }
 
 it("opens a side chat at once on /side, and /side alone shows it again", async () => {
@@ -3536,8 +3551,65 @@ it("opens a new side chat for each /side with a question", async () => {
   await first.chat.submit("One more thing.");
   await controller.submit("/side");
   expect(controller.read().sideChats.map(({ focus }) => focus)).toEqual([2, 2]);
+  // A notification names its own session even when another side was used last.
+  await controller.showSideChat("side/side-2");
+  expect(controller.read().sideChats.map(({ focus }) => focus)).toEqual([2, 3]);
+  await controller.showSideChat("side/discarded");
+  expect(controller.read().sideChats.map(({ focus }) => focus)).toEqual([2, 3]);
   expect(open).toHaveBeenCalledTimes(2);
   controller.disconnect();
+});
+
+it("publishes this frame's running side chat and question on its idle parent only", async () => {
+  const { bridge, controller, running } = sideFixture();
+  const observe = bridge.observe.bind(bridge);
+  bridge.observe = async (id) => {
+    const result = await observe(id);
+    const current = result.snapshot.current;
+    return current
+      ? {
+          ...result,
+          snapshot: {
+            ...result.snapshot,
+            current: { ...current, inputNeeded: true },
+          },
+        }
+      : result;
+  };
+  await controller.select("chat-a");
+  await controller.openSideChat();
+  const [side] = controller.read().sideChats;
+  await side.chat.opened();
+  const published = vi.fn<() => ChatActivity>(() =>
+    chatActivity(controller.read(), "chat-a")
+  );
+  const stop = controller.subscribe(published);
+  try {
+    running.add("side-1");
+    side.chat.checkObservation();
+    await vi.waitFor(() =>
+      expect(published).toHaveLastReturnedWith({
+        running: true,
+        inputNeeded: true,
+      })
+    );
+    expect(chatActivity(controller.read(), "chat-b")).toEqual({
+      running: false,
+      inputNeeded: false,
+    });
+    expect(controller.read().sideChats[0]).toBe(side);
+    running.clear();
+    side.chat.checkObservation();
+    await vi.waitFor(() =>
+      expect(published).toHaveLastReturnedWith({
+        running: false,
+        inputNeeded: false,
+      })
+    );
+  } finally {
+    stop();
+    controller.disconnect();
+  }
 });
 
 it("offers in a side chat only what its snapshot does not refuse", async () => {
@@ -3685,6 +3757,33 @@ it("titles a side chat once its snapshot carries the generated title", async () 
   expect(side.chat.canOrganizeChats).toBe(false);
   expect(controller.chatTitle("chat-a")).toBe("New chat");
   controller.disconnect();
+});
+
+it("follows a provisional side title past the final turn snapshot without rereading its transcript", async () => {
+  const { controller, bridge, titles, pendingTitles } = sideFixture();
+  titles.set("side-1", "Which banner sizes?");
+  pendingTitles.add("side-1");
+  vi.useFakeTimers();
+  try {
+    await controller.select("chat-a");
+    await controller.openSideChat();
+    const [side] = controller.read().sideChats;
+    await side.chat.opened();
+    expect(side.chat.sideChatTitle()).toBe("Which banner sizes?");
+    const transcript = vi.spyOn(bridge, "transcript");
+    await vi.advanceTimersByTimeAsync(6_000);
+    titles.set("side-1", "Banner sizes");
+    pendingTitles.clear();
+    await vi.advanceTimersByTimeAsync(6_000);
+    expect(side.chat.sideChatTitle()).toBe("Banner sizes");
+    const observe = vi.spyOn(bridge, "observe");
+    await vi.advanceTimersByTimeAsync(18_000);
+    expect(observe).not.toHaveBeenCalled();
+    expect(transcript).not.toHaveBeenCalled();
+  } finally {
+    controller.disconnect();
+    vi.useRealTimers();
+  }
 });
 
 it("needs an attached chat to open a side chat", async () => {
@@ -5700,6 +5799,8 @@ it.each([
   ["native-provider-key-required", "native-provider-key-required"],
   ["native-gateway-unavailable", "native-gateway-unavailable"],
   ["native-provider-model-unavailable", "native-provider-model-unavailable"],
+  ["native-hooks-review-required", "native-hooks-review-required"],
+  ["native-hooks-configuration-invalid", "native-hooks-configuration-invalid"],
   [
     "native-provider-endpoint-https-required",
     "native-provider-endpoint-https-required",
@@ -5794,11 +5895,13 @@ it("drops a disposed startup reply", async () => {
   expect(publish).toHaveBeenCalledExactlyOnceWith("native-starting");
 });
 
-it("retains catalog activity by chat and drops it when a later page has no timestamp", async () => {
+it("retains catalog activity by chat and drops it when a later page omits the metadata", async () => {
   const { bridge, controller } = fixture();
   const atMs = 1_800_000_000_000;
   bridge.list = vi.fn<DesktopNativeChat["list"]>().mockResolvedValue({
     sessionIds: ["chat-a", "chat-b"],
+    runningSessionIds: ["chat-a"],
+    inputNeededSessionIds: ["chat-b"],
     lastActivity: [{ sessionId: "chat-b", atMs }],
     nextCursor: "v1/chat-b",
   });
@@ -5806,12 +5909,108 @@ it("retains catalog activity by chat and drops it when a later page has no times
   await controller.listChats();
   expect(controller.chatLastActivityAtMs("chat-a")).toBeUndefined();
   expect(controller.chatLastActivityAtMs("chat-b")).toBe(atMs);
+  expect(controller.read().runningSessionIds).toEqual(["chat-a"]);
+  expect(controller.read().inputNeededSessionIds).toEqual(["chat-b"]);
   expect(controller.read().sessions).toEqual(["chat-a", "chat-b"]);
   bridge.list = async () => ({ sessionIds: ["chat-c"], nextCursor: null });
   await controller.listChats("v1/chat-b");
   expect(controller.chatLastActivityAtMs("chat-b")).toBeUndefined();
   expect(controller.chatLastActivityAtMs("chat-c")).toBeUndefined();
+  expect(controller.read().runningSessionIds).toBeUndefined();
+  expect(controller.read().inputNeededSessionIds).toBeUndefined();
   controller.disconnect();
+});
+
+it("serializes picker refreshes with page navigation and retires observation when closed", async () => {
+  const { bridge, controller } = fixture();
+  const recent = {
+    sessionIds: ["a"],
+    runningSessionIds: ["a"],
+    nextCursor: "older",
+  };
+  const older = {
+    sessionIds: ["b"],
+    runningSessionIds: ["b"],
+    nextCursor: null,
+  };
+  const list = vi.fn<DesktopNativeChat["list"]>(async (cursor) =>
+    cursor === "older" ? older : recent
+  );
+  bridge.list = list;
+  controller.connect(null);
+  await controller.listChats();
+  list.mockClear();
+  vi.useFakeTimers();
+  let visible = false;
+  const close = controller.observeChatList(() => visible);
+  try {
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(list).not.toHaveBeenCalled();
+    visible = true;
+    const pending = Promise.withResolvers<NativeChatPage>();
+    list.mockReturnValueOnce(pending.promise);
+    await vi.advanceTimersToNextTimerAsync();
+    const navigate = controller.listChats("older");
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(list).toHaveBeenCalledExactlyOnceWith(null);
+    pending.resolve(recent);
+    await navigate;
+    expect(controller.read().runningSessionIds).toEqual(["b"]);
+
+    list.mockRejectedValueOnce(new Error("disconnected"));
+    await vi.advanceTimersToNextTimerAsync();
+    expect(list).toHaveBeenLastCalledWith("older");
+    expect(controller.read().runningSessionIds).toBeUndefined();
+    list.mockRejectedValueOnce(new Error("invalid_session_cursor"));
+    await vi.advanceTimersToNextTimerAsync();
+    expect(controller.read().catalogError).toContain("Newest chats");
+    list.mockClear();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(list).not.toHaveBeenCalled();
+    // Another client can ask or answer while every chat on the page is idle.
+    // A host may expose just one of the two independent activity projections.
+    list.mockResolvedValueOnce({
+      sessionIds: ["a"],
+      inputNeededSessionIds: [],
+      nextCursor: null,
+    });
+    await controller.listChats();
+    list.mockResolvedValueOnce({
+      sessionIds: ["a"],
+      inputNeededSessionIds: ["a"],
+      nextCursor: null,
+    });
+    await vi.advanceTimersToNextTimerAsync();
+    expect(controller.read().inputNeededSessionIds).toEqual(["a"]);
+    expect(controller.read().runningSessionIds).toBeUndefined();
+    list.mockResolvedValueOnce({
+      ...recent,
+      runningSessionIds: [],
+      inputNeededSessionIds: [],
+    });
+    await vi.advanceTimersToNextTimerAsync();
+    expect(controller.read().inputNeededSessionIds).toEqual([]);
+    const late = Promise.withResolvers<NativeChatPage>();
+    list.mockReturnValueOnce(late.promise);
+    await vi.advanceTimersToNextTimerAsync();
+    close();
+    list.mockClear();
+    late.resolve(recent);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(list).not.toHaveBeenCalled();
+    expect(controller.read().runningSessionIds).toEqual([]);
+    list.mockResolvedValueOnce({ sessionIds: ["a"], nextCursor: null });
+    await controller.listChats();
+    list.mockClear();
+    const stopLegacy = controller.observeChatList(() => true);
+    await vi.advanceTimersByTimeAsync(10_000);
+    stopLegacy();
+    expect(list).not.toHaveBeenCalled();
+  } finally {
+    close();
+    controller.disconnect();
+    vi.useRealTimers();
+  }
 });
 
 it("uses catalog membership, retains an exact rename draft on conflict, and ignores a retired mutation reply", async () => {
@@ -5895,7 +6094,11 @@ it("uses catalog membership, retains an exact rename draft on conflict, and igno
   await vi.waitFor(() =>
     expect(list.mock.results.at(-1)?.value).toBe(stalePage.promise)
   );
-  await expect(controller.setChatArchived(true)).resolves.toBe(true);
+  await expect(controller.setChatArchived(true)).resolves.toMatchObject({
+    sessionId: "chat-a",
+    archived: true,
+    revision: 4,
+  });
   stalePage.resolve({ sessionIds: ["chat-a"], nextCursor: null });
   await refresh;
   expect(controller.read().sessions).not.toContain("chat-a");
@@ -5969,6 +6172,176 @@ it("picks up the title the host writes for an untitled chat as its turn settles"
     entry = { ...entry, revision: 2, title: "Other" };
     expect(controller.read().catalogDraft?.text).toBe("Mine");
   });
+});
+
+function titleCatalog(bridge: DesktopNativeChat, title: string | null) {
+  let entry: NativeChatCatalogEntry = {
+    sessionId: "new",
+    revision: title ? 1 : 0,
+    title,
+    archived: false,
+    ...(title && { titleGenerationPending: true as const }),
+  };
+  const read = vi.fn<NonNullable<DesktopNativeChat["catalogEntry"]>>(
+    async () => entry
+  );
+  bridge.catalogEntry = read;
+  bridge.list = async () => ({
+    sessionIds: ["new"],
+    titles:
+      entry.title === null ? [] : [{ sessionId: "new", title: entry.title }],
+    nextCursor: null,
+  });
+  bridge.listArchived = async () => ({ sessionIds: [], nextCursor: null });
+  const organize = vi.fn<NonNullable<DesktopNativeChat["organize"]>>(
+    async (sessionId, change) => {
+      entry = { ...change, sessionId, revision: entry.revision + 1 };
+      return entry;
+    }
+  );
+  bridge.organize = organize;
+  return {
+    read,
+    organize,
+    update(change: Partial<NativeChatCatalogEntry>) {
+      entry = { ...entry, ...change };
+    },
+  };
+}
+
+it("shows the catalog title on first acceptance, keeps a rejected draft untitled, and reopens it from the picker", async () => {
+  const { bridge, controller } = fixture();
+  const catalog = titleCatalog(bridge, null);
+  const send = vi
+    .spyOn(bridge, "submit")
+    .mockRejectedValueOnce(new Error("session_admission_paused"));
+  const accepted = Promise.withResolvers<void>();
+  send.mockImplementationOnce(async (sessionId, inputId) => {
+    await accepted.promise;
+    catalog.update({
+      revision: 1,
+      title: "Accepted excerpt",
+      titleGenerationPending: true,
+    });
+    return {
+      sessionId,
+      inputId,
+      disposition: "claimed",
+      inputPosition: 0,
+      turnId: "turn-new",
+    };
+  });
+  controller.connect(null);
+  try {
+    expect(controller.read().selected).toBeNull();
+    await expect(controller.submit("A longer first request")).rejects.toThrow(
+      "session_admission_paused"
+    );
+    expect(controller.chatTitle("new")).toBe(NEW_CHAT_TITLE);
+    const retry = controller.submit("A longer first request");
+    await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(2));
+    expect(controller.chatTitle("new")).toBe(NEW_CHAT_TITLE);
+    const stalledHistory =
+      Promise.withResolvers<readonly NativeChatMessage[]>();
+    vi.spyOn(bridge, "transcript").mockReturnValueOnce(stalledHistory.promise);
+    const olderPage = Promise.withResolvers<NativeChatPage>();
+    vi.spyOn(bridge, "list").mockReturnValueOnce(olderPage.promise);
+    const navigation = controller.listChats("older");
+    accepted.resolve();
+    try {
+      await vi.waitFor(() =>
+        expect(controller.chatTitle("new")).toBe("Accepted excerpt")
+      );
+    } finally {
+      stalledHistory.resolve([]);
+      olderPage.resolve({ sessionIds: ["old"], nextCursor: null });
+      await navigation;
+      await retry;
+    }
+    expect(controller.read().catalogCursor).toBe("older");
+    expect(controller.read().sessions).toEqual(["old"]);
+    await controller.listChats();
+    await controller.select(null);
+    expect(controller.read().selected).toBeNull();
+    expect(controller.chatTitle("new")).toBe("Accepted excerpt");
+    await controller.select("new");
+    expect(controller.chatTitle("new")).toBe("Accepted excerpt");
+  } finally {
+    accepted.resolve();
+    controller.disconnect();
+  }
+});
+
+it.each(["Generated title", null])(
+  "follows a reopened chat's pending title without reading history and stops after the titler returns %s",
+  async (generated) => {
+    const { bridge } = fixture();
+    const catalog = titleCatalog(bridge, "First message excerpt");
+    const transcript = vi.spyOn(bridge, "transcript");
+    vi.useFakeTimers();
+    try {
+      await controller_select(bridge, "new", async (controller) => {
+        expect(controller.chatTitle("new")).toBe("First message excerpt");
+        transcript.mockClear();
+        await vi.advanceTimersByTimeAsync(6_000);
+        expect(controller.read().catalogEntry?.titleGenerationPending).toBe(
+          true
+        );
+        catalog.update({
+          titleGenerationPending: undefined,
+          ...(generated && { title: generated, revision: 2 }),
+        });
+        await vi.advanceTimersByTimeAsync(6_000);
+        expect(
+          controller.read().catalogEntry?.titleGenerationPending
+        ).toBeUndefined();
+        expect(controller.chatTitle("new")).toBe(
+          generated ?? "First message excerpt"
+        );
+        catalog.read.mockClear();
+        await vi.advanceTimersByTimeAsync(18_000);
+        expect(catalog.read).not.toHaveBeenCalled();
+        expect(transcript).not.toHaveBeenCalled();
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  }
+);
+
+it("confirms a provisional label as a manual rename while a generated title read is in flight", async () => {
+  const { bridge } = fixture();
+  const title = "First message excerpt";
+  const catalog = titleCatalog(bridge, title);
+  vi.useFakeTimers();
+  try {
+    await controller_select(bridge, "new", async (controller) => {
+      controller.beginRename();
+      const generated = {
+        sessionId: "new",
+        revision: 2,
+        title: "Generated title",
+        archived: false,
+      };
+      catalog.update(generated);
+      const earlier = Promise.withResolvers<NativeChatCatalogEntry>();
+      catalog.read.mockReturnValueOnce(earlier.promise);
+      await vi.advanceTimersByTimeAsync(6_000);
+      await controller.saveTitle();
+      expect(catalog.organize).toHaveBeenCalledExactlyOnceWith("new", {
+        revision: 1,
+        title,
+        archived: false,
+      });
+      earlier.resolve(generated);
+      await vi.advanceTimersByTimeAsync(12_000);
+      expect(controller.chatTitle("new")).toBe(title);
+      expect(controller.read().catalogDraft).toBeNull();
+      expect(controller.read().catalogEntry?.revision).toBe(3);
+    });
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 async function controller_select(
@@ -7846,8 +8219,15 @@ describe("recommended model connections", () => {
     const choose = vi.fn<NonNullable<DesktopNativeChat["selectProfile"]>>(
       async () => {}
     );
+    const open = vi.fn<NonNullable<DesktopNativeChat["startWorkspaceChat"]>>(
+      async () => ({
+        readiness: "native-ready",
+        selectedProfileId: recommended,
+      })
+    );
     bridge.status = status;
     bridge.selectProfile = choose;
+    bridge.startWorkspaceChat = open;
     bridge.profiles = async () => catalog();
     const publish = vi.fn<(state: string | null, profileId?: string) => void>();
     const stop = NativeChatController.watchReadiness(bridge, publish, null, {
@@ -7860,13 +8240,12 @@ describe("recommended model connections", () => {
       await vi.waitFor(() =>
         expect(publish).toHaveBeenLastCalledWith("native-ready", recommended)
       );
-      expect(choose).toHaveBeenCalledExactlyOnceWith({
+      expect(open).toHaveBeenCalledExactlyOnceWith({
         kind: "new",
         id: recommended,
       });
-      expect(choose.mock.invocationCallOrder[0]).toBeLessThan(
-        status.mock.invocationCallOrder[1]!
-      );
+      expect(choose).not.toHaveBeenCalled();
+      expect(status.mock.calls).toEqual([[]]);
       controller.connect(null, recommended);
       await vi.waitFor(() =>
         expect(JSON.parse(stored.get("workspace")!).profileId).toBe(recommended)
@@ -8004,7 +8383,7 @@ describe("recommended model connections", () => {
     }
   );
 
-  it("does not retain a recommendation the host refused", async () => {
+  it("does not retain a recommendation when Main opened a fallback connection", async () => {
     const { bridge } = fixture();
     const status = vi.fn<DesktopNativeChat["status"]>();
     status
@@ -8016,9 +8395,11 @@ describe("recommended model connections", () => {
         ...bridge,
         status,
         profiles: async () => catalog(),
-        selectProfile: async () => {
-          throw new Error("connection changed");
-        },
+        selectProfile: vi.fn<NonNullable<DesktopNativeChat["selectProfile"]>>(),
+        startWorkspaceChat: async () => ({
+          readiness: "native-ready",
+          selectedProfileId: explicit,
+        }),
       },
       publish,
       null,

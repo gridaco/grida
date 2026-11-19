@@ -54,6 +54,8 @@ struct Entry {
     archived: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     last_activity_at_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    title_generation_pending: bool,
 }
 
 impl From<CatalogRecord> for Entry {
@@ -66,6 +68,7 @@ impl From<CatalogRecord> for Entry {
             title: entry.label,
             archived,
             last_activity_at_ms: record.latest_turn_activity_ms,
+            title_generation_pending: false,
         }
     }
 }
@@ -127,11 +130,14 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                     };
                 let result = async {
                     require(&get_sessions, ORGANIZE, Some(&request.session_id))?;
-                    get_host
+                    let (record, title_generation_pending) = get_host
                         .catalog_entry(request.session_id)
                         .await
-                        .map(Entry::from)
-                        .map_err(host_error)
+                        .map_err(host_error)?;
+                    Ok(Entry {
+                        title_generation_pending,
+                        ..record.into()
+                    })
                 }
                 .await;
                 responder.respond_with_result(result)
@@ -174,13 +180,14 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                     let after = request
                         .cursor
                         .as_deref()
-                        .map(super::super::catalog_anchor)
-                        .transpose()?;
+                        .map(crate::host::SessionCatalog::anchor)
+                        .transpose()
+                        .map_err(host_error)?;
                     let catalog = host
                         .list_sessions(request.cwd, true, after)
                         .await
                         .map_err(host_error)?;
-                    super::super::catalog_response(catalog)
+                    super::super::catalog_response(catalog.into(), false).map_err(host_error)
                 }
                 .await;
                 responder.respond_with_result(result)

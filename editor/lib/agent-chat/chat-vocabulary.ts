@@ -24,6 +24,7 @@ export namespace chat_vocabulary {
     files: "data-user_file_attachments",
     svgTextSelection: "data-svg-text-selection",
     messageContext: "data-message-context",
+    questionReply: "data-question-reply",
   } as const;
 
   /** Context part type → the marker name shown on its chip. */

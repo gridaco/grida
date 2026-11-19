@@ -339,6 +339,13 @@ const config: ForgeConfig = {
           target: "preload",
         },
         {
+          // GRIDA-SEC-004 — build the local deletion confirmation and its styles.
+          entry:
+            "../editor/scaffolds/desktop/shared/chat-deletion-renderer.tsx",
+          config: "vite.chat-deletion-dialog.config.ts",
+          target: "preload",
+        },
+        {
           // Services sidecar. Runs in Electron-as-Node and starts the
           // retained media and host services. Forge emits
           // `.vite/build/services-sidecar.js`
@@ -349,9 +356,8 @@ const config: ForgeConfig = {
         },
       ],
       // URL-loaded model — main BrowserWindow `loadURL`s
-      // `${EDITOR_BASE_URL}/desktop/...` directly; no local renderer
-      // bundle is built. The preload (above) is the only renderer-side
-      // code we ship. GRIDA-SEC-004.
+      // `${EDITOR_BASE_URL}/desktop/...` directly. The deletion confirmation
+      // above is a separate, bundled surface. GRIDA-SEC-004.
       renderer: [],
     }),
     // Fuses are used to enable/disable various Electron functionality

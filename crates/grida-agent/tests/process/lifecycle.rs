@@ -48,6 +48,7 @@ async fn queue_edits_keep_receipts_and_only_advance_after_stop_is_released() {
     let snapshot = session_snapshot(&mut socket, session).await;
     assert_eq!(queue_ids(&snapshot), ["a", "b", "c"]);
     assert_eq!(snapshot["queue"][1]["settings"]["model"], "fixture-model");
+    assert!(snapshot["queue"][1].get("preview").is_none());
     let edit = json!({
         "queue":queue_basis(&snapshot, session, "edit-b"),
         "inputId":"b","replacementInputId":"b2",
@@ -120,6 +121,7 @@ async fn queue_edits_keep_receipts_and_only_advance_after_stop_is_released() {
     .await;
     assert_eq!(stopped["latest"]["status"], "cancelled");
     assert_eq!(stopped["admissionPaused"], true);
+    assert_eq!(stopped["idleQueueResumeAvailable"], false);
     assert_eq!(queue_ids(&stopped), ["c", "b2"]);
     assert!(matches!(
         endpoint.requests.try_recv(),
@@ -220,6 +222,7 @@ async fn queue_edits_keep_receipts_and_only_advance_after_stop_is_released() {
     assert!(loaded.get("result").is_some(), "{loaded}");
     let before_retry = session_snapshot(&mut socket, session).await;
     assert_eq!(queue_ids(&before_retry), ["later-input"]);
+    assert_eq!(before_retry["idleQueueResumeAvailable"], true);
     let retried = ws_rpc(
         &mut socket,
         3,
@@ -310,6 +313,17 @@ async fn paused_task_resumes_after_restart_with_retained_input_and_steering() {
     .await;
     assert_eq!(paused["current"]["paused"], true);
     assert_eq!(paused["current"]["turnId"], turn);
+    let catalog = ws_rpc(
+        &mut first,
+        5,
+        "session/list",
+        json!({"cwd":workspace.path()}),
+    )
+    .await;
+    assert_eq!(
+        catalog["result"]["_meta"]["co.grida/runningSessionIds"],
+        json!([])
+    );
     drop(first);
     terminate_shared_server(first_host).await;
 
@@ -838,6 +852,7 @@ async fn freed_provider_slot_wakes_the_queue_in_another_session() {
     let snapshot = session_snapshot(&mut socket, waiting).await;
     assert!(snapshot["current"].is_null());
     assert_eq!(queue_ids(&snapshot), ["ninth"]);
+    assert_eq!(snapshot["idleQueueResumeAvailable"], false);
     assert!(matches!(
         endpoint.requests.try_recv(),
         Err(mpsc::error::TryRecvError::Empty)

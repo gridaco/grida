@@ -52,8 +52,11 @@ composer as an unsent draft.
 
 Send an ordinary follow-up while a turn is running to put it in the queue. For
 example, “When the deck is ready, describe the changes” can run as its own
-turn. Each waiting message keeps the options selected when you sent it; a
-**Plan** or **Ultra** choice is shown on the message, but its model is not.
+turn. It appears above the composer while its details load. After the current
+turn finishes normally, the next waiting message starts automatically when
+there is room to run it. Each waiting message keeps the options you selected
+when you sent it. The row shows a **Plan** or **Ultra** choice. The model
+selection stays in the message's saved settings.
 
 Hover or focus a waiting message to read its full text, including line breaks.
 Every message keeps its queue icon. An attached image also shows a leading
@@ -73,14 +76,26 @@ while keeping the attachment. The attached content, captured settings and queue
 position stay the same. Older runtimes offer editing for plain text only.
 Goals cannot be edited; remove the queued goal and send a new one instead.
 
-If the current turn asks a question, answer it in its card. A separate queued
-message leaves the question open.
+If the current turn asks a question, answer it in its card. In the custom answer
+field, press Enter to submit or Shift+Enter to add a line. You can keep typing
+while other work streams. For an optional question, **Skip** or the close button
+puts the card away. Select **Answer question** in the chat to reopen it while
+that turn is active. The agent can keep working and gives you time to reply
+before proceeding on a stated assumption. The question expires when the turn
+ends. A required question waits for an answer or an explicit **Skip**. A
+separate queued message leaves the question open.
+
+Your answer appears with the original question above it. Open **Worked for …**
+on a finished turn to read that exchange again.
 
 ## Pause, resume, or move on
 
 While the agent works, the composer's main button (■) pauses it at once and
-keeps its place. A reply in progress is cut off; tool work already completed
-is kept. From there:
+keeps its place. With focus in the composer and the square button visible,
+press Escape to show **Esc** on the button. Press it again within two seconds
+to pause. A reply in progress is cut off. Completed tool work is kept.
+
+From there:
 
 - Choose ▶ in the empty composer to resume the same turn where it paused.
   Completed work is kept; a reply that was cut off is written again.
@@ -164,11 +179,18 @@ controls live separately in the workspace's **Processes** tab.
 
 With system notifications turned on, Desktop tells you when a workspace chat
 finishes, fails or ends with an uncertain result while its window is out of
-focus. A turn you stopped does not notify, and neither does a question from
-the agent, so check a backgrounded chat when you expect it to ask something.
+focus. When a turn succeeds, the notification shows the chat title and a short
+excerpt from the final reply. If the chat has no title, it shows **Grida
+Agent**. If the reply has no preview text, it shows **Turn completed**.
+
+When a question arrives in another chat or side tab, the notification shows
+its chat title and question. The system’s notification settings control where
+previews appear. A question in the chat already on screen appears in its card.
+A turn you stopped is silent.
 
 Click the notification to reopen the matching chat on its original model. If
 the model is changing or an attachment is still in the composer, the chat
 opens after that clears. If the original model is unavailable, Desktop says so
 before opening the chat. If the workspace chat is still starting, Desktop
-opens the latest clicked notification once the chat connects.
+opens the latest clicked notification once the chat connects. A side-chat notification
+returns to the tab in the window that opened it, while that side chat is still open.

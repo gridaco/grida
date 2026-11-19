@@ -557,7 +557,11 @@ and returns its receipt immediately. A nonblocking question tool reports that
 registration as its result. The answer later arrives as a correlated control
 and is incorporated into the task at a recorded decision boundary. An
 answer-dependent tool can instead retain a pending invocation until the answer
-is available. Its response contract has the same durable identity.
+is available. Its response contract has the same durable identity. Optional
+questions remain answerable until the turn finishes. The master selects them
+for withdrawal in the settlement commit, so explicit Pause preserves them and
+a reply racing normal completion either contributes to the turn or sees a
+closed question. Required questions continue to hold dependent work.
 
 When there is no useful work to do, the master can intentionally suspend the
 unfinished turn. Runtime records its continuation basis and accounts for active
@@ -655,17 +659,16 @@ stop selects the factual fallback, so publishing the terminal outcome always
 has an available summary. A later rendering of that account is a view of
 settled facts.
 
-### Model selection between turns
+### Model selection for new inputs
 
-A conversation belongs to its workspace, not to a model connection. Each turn
-runs under the route that claimed it. An idle top-level conversation follows the
-person's selection to another route held by the same credential owner. Delegated
-work keeps its parent's route, and an active Goal keeps the route its allowance
-and spending were measured against. A queued request keeps the model and
-authority it was accepted under, so a conversation holding one accepted under
-another route stays on that route until the request runs or the person
-withdraws it. A route held by a different account never continues another
-account's conversation.
+A conversation belongs to its workspace. Each new input captures the selected
+model, its connection and the chat's permission profile at acceptance. The
+person can change either setting while earlier work runs or waits. A turn uses
+its capture throughout execution, including later model calls and recovery.
+Messages already queued keep their original capture. Delegated work keeps its
+parent's route, and an active Goal keeps the route its allowance and spending
+were measured against. Changing accounts carries portable conversation history
+forward. Provider-private continuation remains bound to the original account.
 
 ### Turn activity presentation
 

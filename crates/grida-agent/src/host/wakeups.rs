@@ -370,7 +370,10 @@ impl Host {
                     && state.controls().revision == revision
                     && state.position() == position
                     && state.binding().epoch == epoch
-                    && state.waits().values().all(|wait| !wait.is_pending())
+                    && !state
+                        .waits()
+                        .values()
+                        .any(grida_agent_master::questions::blocks_progress)
                     && state
                         .operations()
                         .get(&scheduled.operation)
@@ -487,7 +490,10 @@ impl Host {
                         Delivery::Paused => TimerStep::Paused,
                         Delivery::Resolve(plan) => TimerStep::Resolve(plan),
                         Delivery::AlreadyResolved
-                            if state.waits().values().all(|wait| !wait.is_pending()) =>
+                            if !state
+                                .waits()
+                                .values()
+                                .any(grida_agent_master::questions::blocks_progress) =>
                         {
                             TimerStep::Wake(state.position())
                         }

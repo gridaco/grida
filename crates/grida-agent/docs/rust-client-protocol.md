@@ -35,18 +35,69 @@ delegates work to an external agent. Choosing this client protocol leaves the
 Grida master in charge of native execution.
 
 The Grida profile advertises `sessionCapabilities.list` for standard v1
-`session/list` with an explicit absolute workspace `cwd`. The host canonicalizes
-that directory and reads the workspace's unarchived chats in newest-created
-order. Pages contain at most 32 `SessionInfo` records with the ID, working
-directory and optional title. When local turn timing is retained, a record also
+`session/list`. An explicit absolute `cwd` selects one canonical workspace.
+Omitting it lists unarchived public chats visible in this host's store.
+An initialized client can detect support for this broader catalog through
+`co.grida/session/catalog-query` version 1. Older hosts require `cwd`.
+The default order is newest created. Pages contain at most 32 `SessionInfo`
+records with the ID, working directory and optional title. When local turn timing is retained, a record also
 has `_meta["co.grida/lastActivityAtMs"]`, an optional Unix-epoch millisecond
 integer. For the local turn with the latest execution ordinal, it is the first
 settlement time, or the start time until settlement. Sessions with no local turns omit
 the field, including forks that only have inherited history. This is recorded
-turn activity, not an exact last-message time; it never changes listing order.
-Treat `nextCursor` as opaque and send it with
-the same workspace.
+turn activity. The host uses a separate timestamp for message ordering.
+Treat `nextCursor` as opaque and send it with the same scope and order.
 Listing leaves attachment, execution, and history unchanged. [ACP session listing](https://agentclientprotocol.com/protocol/v1/session-list)
+
+Clients negotiating `co.grida/session/catalog-query` version 1 can request
+`_meta["co.grida/catalogOrder"] = "messageActivity"`. The host orders eligible
+rows before pagination by the latest recorded conversation message, newest first.
+The row's optional `_meta["co.grida/lastMessageAtMs"]` is in Unix milliseconds.
+An accepted user message or saved assistant reply can promote a chat. Reading,
+renaming and changes in execution status preserve this timestamp. Rows with
+no recorded message time follow dated rows. This includes chats with only
+pre-upgrade history. Equal message times are ordered by ascending session ID.
+The workspace and the two activity indicators remain facts of the same chat
+in every view. Side chats and delegated sessions belong to their own scopes.
+
+For a closed store, `grida-agent chat-catalog --state-dir <dir> --order message-activity`
+returns the same page as the live query. Add `--cwd <absolute-workspace>`
+to filter it or `--cursor <token>` to continue. The default order is
+`created`. The command requires an existing native store.
+
+On supporting hosts the `session/list` response includes
+`_meta["co.grida/runningSessionIds"]`. This array contains only IDs on the
+returned page whose current turn has the `running` disposition at observation
+time. A running turn is unsettled, unsuspended and has a live writer lease.
+Queued input alone, a paused turn and an interrupted turn do not qualify.
+An empty array means no chat on the page was running.
+An absent field means the host did not report running status. A client can
+refresh the visible page using its original cursor without loading any session.
+
+`_meta["co.grida/inputNeededSessionIds"]` independently lists page IDs with a
+current, uncancelled turn holding an open question, approval or Library
+selection. A scheduled wakeup is automatic and contributes no ID. A running
+turn with an open async question appears in both arrays. Empty means observed
+and none, and omission supports older hosts. The source is the committed turn
+head. The page carries no wait IDs or request contents. Private side sessions
+stay outside the workspace catalog. Their owning client can use the attached
+snapshot's `current.disposition` and optional `current.inputNeeded` to
+include its own side sessions in a parent indicator. The native
+`grida-agent inspect` command includes the same answerable-wait fact in
+`input_needed` for a persisted chat.
+
+Negotiate `co.grida/session/initial-title` version 1 to suggest a provisional
+catalog title on submission. Standard `session/prompt` takes the optional
+string in `_meta["co.grida/initialTitle"]`. The private `session/submit`,
+`session/enqueue` and `goal/start` requests take an optional top-level
+`initialTitle`. Omit the extension field when the host did not advertise it.
+A supplied title uses the catalog's rename limits. After trimming it must
+be nonempty, contain no control characters and fit in 256 UTF-8 bytes.
+The host records the title only when it accepts the first input. A rejection
+leaves the title available for a later accepted send. Retries and later
+inputs preserve the current title. The title is catalog metadata and never
+becomes part of the prompt or transcript. Workspace listing and the attached
+catalog entry return the same title.
 
 Negotiate `co.grida/session/organize` version 1 for archived listing and
 catalog changes. `_co.grida/session/list-archived` accepts the standard
@@ -54,11 +105,15 @@ workspace and cursor fields and returns the standard page shape.
 `_co.grida/session/catalog-entry` accepts an attached `sessionId` and
 returns `sessionId`, `title`, `archived`, and `revision`, plus optional
 `lastActivityAtMs` with the same retained-turn meaning as listing metadata.
+The attached read can also return `titleGenerationPending: true` while a
+title worker is active. Clients can reread this entry to observe the result.
+A successful generation can replace a provisional title. Failure leaves it
+in place, including after restart. A manual rename takes precedence even if
+generation finishes between the client's read and its rename request.
 `_co.grida/session/organize` replaces the title and archive state at that
-revision. Send a null title to clear it. An already-matching value succeeds
-without another write. On a revision conflict, read the current entry before
-asking the user to reapply the edit. Archiving and restoring preserve chat
-identity and leave execution controls unchanged.
+revision. Send a null title to clear it. On a revision conflict, read the
+current entry before asking the user to reapply the edit. Archiving and
+restoring preserve chat identity and leave execution controls unchanged.
 Mutation receipts omit activity; read the entry or list again for that optional
 observation. Activity is never accepted as a catalog mutation input.
 
@@ -392,6 +447,21 @@ A queue basis contains `sessionId`, `requestId`, and
 summaries, with `sessionRevision`, `controlRevision`, `historyPosition`,
 `journalPosition`, and turn `epoch` for conditional operations.
 
+Snapshot also reports `idleQueueResumeAvailable`. An open queue with a runnable
+input and no current turn offers explicit recovery when the host has no worker
+or scheduler dispatch handling it. This includes a saved queue left unclaimed
+after the host restarted. Normal turn handoff and queues waiting for a host slot
+report `false`. An explicit admission hold is reported by `admissionPaused`.
+Reading either fact is passive.
+
+Private clients that negotiate waiting-message inspection can display the
+first eight ordered queue rows immediately from that snapshot. Each of those
+rows with user text carries an optional `preview` from the first nonblank
+text block, limited to 2,048 UTF-8 bytes including any ellipsis. Attachments
+and structured display parts remain available through inspection of the
+queued input at the same session revision. Supplemental model context is
+excluded from the preview.
+
 ### Retained tool-result images
 
 Private stdio clients on macOS and Linux can negotiate
@@ -478,6 +548,13 @@ recorded message text at offset zero. Apply it to the identified message
 before appending later chunks. A `resyncRequired` notice has no text and
 asks the client to reload committed history. Observation owns neither work
 admission nor cancellation.
+
+Negotiated private stdio lifecycle updates use
+`_meta["co.grida/session/lifecycle"]`. A `question_asked` fact names the
+`turnId` and `waitId` of a registered question on this attached session. Both
+question styles can raise it. Consumers deduplicate the identity and read the
+current question through the authorized questions operation. An empty or
+expired result needs no attention. Older consumers ignore unknown fact kinds.
 
 | Method suffix after `_co.grida/session/` | Parameters and result                                                                                                                                                                                           |
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -668,11 +745,13 @@ deadline. New inputs capture version 2 with bounded raster preparation and a
 three-second limit. An older serialized invocation therefore does not acquire
 new semantics or fail merely because the current product offers raster tools.
 
-On the private stdio Responses PNG profile or reviewed saved OpenRouter PNG
-profile, negotiate both
+Private stdio clients negotiate both
 `co.grida/session/library-selections` and `co.grida/session/answer-library-selection`
-at version 1. An identified Submit with `allowLibrarySelection: true` can
-offer `design_search` for that input. The tool asks the attached client to
+at version 1. A fixed connection offers these capabilities when it supports
+image tool results. A supervisor with per-input provider routes can negotiate
+them once for the connection. An identified Submit with `allowLibrarySelection: true`
+offers `design_search` on a compatible input route. A text-only route accepts
+the prompt with the tool omitted. The tool asks the attached client to
 present a Library picker, with the recorded initial query. The client owns
 search, refinement, and access to the selected item.
 
@@ -758,8 +837,18 @@ for newly accepted input. Answers use `{ "kind": "text", "text": "..." }`,
 Keep the request identity and all parameters stable when retrying. Accepted
 answers retain a scheduling wake across concurrent worker completion and
 capacity changes. An explicit task pause is independent of answer receipt.
-An embedded `run --questions` returns a verified `input_required` result and
-exit code `6` when it suspends for an answer.
+Hosts advertising `co.grida/session/optional-questions: 1` expire unanswered
+nonblocking questions in the owning turn's settlement commit. Closing or
+skipping an optional card locally lets the person reopen it while the wait is
+pending. Sending `{ "kind": "skipped" }` explicitly resolves a wait.
+A reply accepted before settlement reaches the next model decision as a user
+message wrapped in `<send_user_message_question_reply>` with a JSON array of
+`{questionItemId, question, answer}`. An answer-dependent tool receives its
+answer as the tool result. For either style, the transcript window delivers the
+readable answer in a user text chunk with `questionReply: {waitId, question}`
+in the chunk's window metadata. Quoted markup in ordinary chat stays ordinary
+text. An embedded `run --questions` exits with `input_required` and code `6`
+when an answer is required. An unanswered optional question permits success.
 
 ### Temporary side chats
 
@@ -774,10 +863,10 @@ side chat it opened and close it. The same `requestId` with another parent
 returns `side_chat_request_conflict`. Once its side chat is closed, a
 `requestId` names nothing and opens a new side chat.
 
-| Method suffix | Parameters and result                                                                                                                                                                                                                        |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `open`        | `sessionId` of an attached parent and optional `requestId`. Fork its committed conversation into a temporary session attached here and return `sideChatId`, `parentSessionId`, `sourceContext`, `compacted`, `omissions`, `temporary: true`. |
-| `close`       | `sideChatId` opened on this connection. Cancel its running turn, stop its processes, remove its data and detach it. Returns `{}`.                                                                                                            |
+| Method suffix | Parameters and result                                                                                                                                                                                                                                                                                                |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `open`        | `sessionId` of an attached parent and optional `requestId`. Fork its committed conversation into a temporary session attached here and return `sideChatId`, `parentSessionId`, `sourceContext`, `compacted`, `omissions`, `temporary: true`, and `imageInput` indicating whether its inherited model accepts images. |
+| `close`       | `sideChatId` opened on this connection. Cancel its running turn, stop its processes, remove its data and detach it. Returns `{}`.                                                                                                                                                                                    |
 
 Every session method works on `sideChatId`: `session/prompt`, `session/cancel`,
 `_co.grida/session/submit`, queue edits, steer, stop, pause and resume,
@@ -795,7 +884,7 @@ history page's `seed` still names the parent the side chat was forked from.
 Revision targets are the side chat's own messages; revising one keeps the
 earlier side turns in the transcript, now as inherited anchors with
 `editable: true`, and the parent's history stays hidden. The snapshot carries
-`side: { parentSessionId, temporary: true, unavailable, title? }`, where
+`side: { parentSessionId, temporary: true, unavailable, title?, titleGenerationPending? }`, where
 `unavailable` lists `fork`, `side_chat`, `compaction`, `goals`, `subagents`,
 `delegation`, `wakeups` and `catalog`. The host refuses each with
 `side_chat_fork_unavailable`, `side_chat_nested_unavailable`,
@@ -810,10 +899,10 @@ background too, so the side chat's transcript window leaves out the turn that
 wrote it. Once the side chat has a turn, automatic compaction no longer
 selects it.
 
-A host launched with chat titles titles a side chat from its first message,
-as it titles a chat. `title` appears in the side chat's snapshot once written;
-a client reads it there, since the catalog entry stays refused. The title is
-kept only on the side chat's own record and is discarded with it.
+A side chat exposes the accepted excerpt and any subsequent generated title
+in its own snapshot. While `titleGenerationPending` is true a client can
+reread that snapshot to observe completion. The title is kept on the side
+chat's own record and is discarded with it.
 
 Side chats live in a catalog scope outside every workspace, so listings,
 archive listings and deletion previews never include them. Loading one from a
@@ -887,12 +976,15 @@ the supervisor can select that mode.
   exact pending change until its outcome is confirmed, then acknowledge it;
   the saved mode remains. Outstanding unacknowledged receipts are bounded.
 
-Changes require an idle ordinary parent chat, an empty queue and no running
-command processes. `permission_mode_busy` leaves the choice unchanged. Child
-and side chats cannot select their own broader posture. The host captures
-authority with accepted input and worker assignments; inspection, replay and
-reopening do not change it. Saved Full access is unavailable when the current
-trusted launch does not authorize it.
+The update selects the mode for inputs accepted after it in this ordinary
+parent chat. Running turns, queued inputs and worker assignments keep their
+captured mode through replay and recovery. Child and side chats cannot select
+their own broader posture. A running command retains its launch permissions.
+Only turns with Full access can read or write its terminal when it launched
+unconfined. The supervisor can always list and stop the chat's processes.
+Saved Full access is unavailable when the current trusted launch does not
+authorize it. Earlier implementations can return `permission_mode_busy` when
+work or running processes remain.
 
 Desktop presents an in-app confirmation bound to the exact chat before
 enabling Full access. Clients must feature-detect the capability; older hosts
@@ -1265,8 +1357,9 @@ The worker resolves the dispatch receipt under the captured Gateway scope.
 Main reads the current status through its fixed authenticated jobs route.
 
 The worker then asks the client for that job's settlement with the reverse
-`_co.grida/gateway/read-job-billing` request, carrying only the opaque
-`requestId` of the retained dispatch. The client answers within 15 seconds or
+`_co.grida/gateway/read-job-billing` request. It carries the opaque
+`requestId` of the retained dispatch and, for an alternate supervised
+Gateway connection, the supervisor-local `routeId` for that scope. The client answers within 15 seconds or
 the lookup reports `unavailable`.
 
 A response reports `kind` as `pending`, `unavailable`, or `settled`.
@@ -1490,6 +1583,39 @@ before `dispatch`, or an `unavailable` reply to it, means the request was not
 sent; a lost or invalid reply to `dispatch` or during reading leaves the
 attempt interrupted. Desktop's Gateway
 profile uses the same pipe and attaches its short-lived grant at dispatch.
+
+#### Selecting a provider for each input
+
+The private supervising client may also negotiate `co.grida/provider/routes` version 1.
+One native host then owns the store, turns and queue while different accepted
+inputs can use different provider connections. The agent asks the supervisor
+to resolve the input's saved choice with `_co.grida/provider/resolve`.
+Its parameters are the saved `connectionId` (null selects the configured
+default) and the exact `model`. Only the supervising client supplies an
+endpoint, custody configuration or Gateway/subscription scope.
+
+Every successful response carries the same model and a supervisor-local
+`routeId` UUID. The `kind` determines the remaining fields.
+
+| Kind      | Fields                                                                                                                                                                                                                        |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `launch`  | Reuses the process launch configuration and its existing provider exchange.                                                                                                                                                   |
+| `http`    | `endpoint`, `protocol`, and applicable native provider settings: `maxOutputTokens`, `credentialHome`, `configuredEndpointKey`, `compatibleOutputLimitField`, `llamaCppInputCount`, `reasoning`, and `imageGenerationBinding`. |
+| `gateway` | `endpoint`, `scope`, optional `maxOutputTokens`, and `gatewayBilling` when the supervisor can read billing for this exact scope.                                                                                              |
+| `chatgpt` | `endpoint` and `scope` for the subscription connection.                                                                                                                                                                       |
+
+For alternate routes every provider exchange action and cancellation includes
+the `routeId`. Image generation and Gateway billing reads also include this
+identifier when using an alternate route. The native host checks the selected
+adapter, captured model and credential authority. The supervisor checks the
+registered route before using its credential or executing an optional callback.
+Both sides must support a capability before an input can capture it.
+
+An accepted input retains the durable selection and authority. Queue dispatch,
+resumption and recovery resolve that choice again on the current private pipe.
+Route UUIDs have process lifetime and never enter the journal. A missing or
+changed authorized route leaves the input available for explicit recovery.
+Clients without this extension retain the single-provider launch contract.
 
 ### Configuration operations
 

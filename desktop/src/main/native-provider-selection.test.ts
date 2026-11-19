@@ -828,17 +828,20 @@ it.runIf(sharedCustody).each([...byokProviders, ["local", base]] as const)(
     try {
       await store.set(provider, raw);
       owner.hasKey.mockResolvedValue(true);
-      const profile = custom
-        ? await NativeProviderSelection.configuredEndpoint(
-            provider,
-            undefined,
-            { ...owner, credentialHome: home }
-          )
-        : await NativeProviderSelection.builtInByok(provider, byokModel, {
-            credentialHome: home,
-            hasKey: owner.hasKey,
-            network: () => owner.network(provider, endpoint),
-          });
+      const select = async () =>
+        custom
+          ? await NativeProviderSelection.configuredEndpoint(
+              provider,
+              undefined,
+              { ...owner, credentialHome: home }
+            )
+          : await NativeProviderSelection.builtInByok(provider, byokModel, {
+              credentialHome: home,
+              hasKey: owner.hasKey,
+              network: () => owner.network(provider, endpoint),
+            });
+      const profile = await select();
+      expect(await profile.providerNetwork.isCurrent?.()).toBe(true);
       const route = `${endpoint}/chat/completions`;
       const headers = new Headers({ authorization: "Bearer fixture-key" });
       expect(
@@ -854,6 +857,16 @@ it.runIf(sharedCustody).each([...byokProviders, ["local", base]] as const)(
       expect(await send(Buffer.from("{}"), cancelled.signal)).toBeNull();
       expect(owner.prepare).not.toHaveBeenCalled();
       await store.set(provider, "rotated-key");
+      expect(await profile.providerNetwork.isCurrent?.()).toBe(false);
+      const fresh = await select();
+      expect(await fresh.providerNetwork.isCurrent?.()).toBe(true);
+      expect(fresh.providerNetwork.prepare(route, headers)).toBeNull();
+      expect(
+        fresh.providerNetwork.prepare(
+          route,
+          new Headers({ authorization: "Bearer rotated-key" })
+        )
+      ).toBeTypeOf("function");
       expect(await send(Buffer.from("{}"), signal.signal)).toBeNull();
       expect(owner.prepare).not.toHaveBeenCalled();
       await store.set(provider, raw);

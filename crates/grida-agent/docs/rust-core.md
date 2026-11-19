@@ -1429,9 +1429,9 @@ or retired members fail before the host opens session state or sends provider
 work. Catalogue membership updates do not change owner, route or continuation
 bindings, and do not migrate saved choices to another model.
 
-An idle top-level chat can follow an explicitly selected authorized provider or
-credential connection. Creation configuration records provenance; it does not
-own future inputs. Current turns, queued inputs, delegated sessions and unresolved
+A top-level chat can accept inputs on an explicitly selected authorized
+connection while earlier work uses a different one. The host binds the model,
+principal, scope and permission profile at acceptance. Current turns, queued inputs, delegated sessions and unresolved
 Goals keep their accepted model, principal and scope. Admission and recovery
 validate those accepted identities, including work accepted after a model change.
 A legacy input with no captured model keeps the exact creation-execution
@@ -1579,6 +1579,11 @@ host using the same explicit state directory can reopen the session through an
 ACP client, supply the answer, and request continuation under the existing
 controls.
 The master may resolve nonessential ambiguity within its allowed policy.
+An optional question stays answerable while independent work continues. When
+that turn finishes, Runtime withdraws the optional waits selected by the
+master in the same transaction as settlement. A concurrent accepted answer
+changes the completion basis and is delivered at the next decision boundary.
+An unanswered optional question alone never causes an `input_required` exit.
 
 Machine output has versioned framing, bounded records, and a final disposition
 that distinguishes completed, failed, cancelled, suspended, input-required, and

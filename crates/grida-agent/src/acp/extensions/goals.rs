@@ -32,6 +32,7 @@ struct Start {
     meta: Option<Meta>,
     session_id: SessionId,
     input_id: ChangeId,
+    initial_title: Option<String>,
     prompt: Vec<ContentBlock>,
     selected_image: Option<crate::host::SelectedImage>,
     message_context: Option<MessageContext>,
@@ -100,7 +101,7 @@ pub(super) fn handlers(
     let inspect = (host.clone(), sessions.clone());
     let control = (host.clone(), sessions.clone());
     RequestRoutes::default()
-        .on_receive_request(
+        .on_supervised_request(
             async move |request: Start, responder, _| {
                 let result = async {
                     require(&start.1, START, Some(&request.session_id))?;
@@ -109,7 +110,7 @@ pub(super) fn handlers(
                     }
                     let mut parts = identified_prompt(
                         request.prompt,
-                        image_intake,
+                        image_intake || start.0.has_routes(),
                         false,
                         None,
                         request.selected_image,
@@ -146,6 +147,7 @@ pub(super) fn handlers(
                             request.allow_wakeups,
                             request.max_cost_mills,
                             selection::revision(request.meta.as_ref(), &start.1)?,
+                            initial_title(&start.1, request.initial_title)?,
                         )
                         .await
                         .map(SubmitResponse::from)
@@ -231,7 +233,7 @@ pub(super) fn handlers(
             },
             on_receive_request!(),
         )
-        .on_receive_request(
+        .on_supervised_request(
             async move |request: Recover, responder, _| {
                 let result = async {
                     require(&sessions, RECOVER, Some(&request.session_id))?;

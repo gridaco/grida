@@ -33,7 +33,7 @@ describe("SettingsArchives.Controller", () => {
     const api = native();
     const controller = new SettingsArchives.Controller(() => api);
     await controller.refresh();
-    await controller.unarchive(first.id);
+    await expect(controller.unarchive(first.id)).resolves.toBe(true);
     expect(api.unarchive).toHaveBeenCalledExactlyOnceWith(
       first.id,
       first.revision
@@ -45,7 +45,7 @@ describe("SettingsArchives.Controller", () => {
     api.unarchive.mockRejectedValue(new Error("revision conflict"));
     const controller = new SettingsArchives.Controller(() => api);
     await controller.refresh();
-    await controller.unarchive(first.id);
+    await expect(controller.unarchive(first.id)).resolves.toBe(false);
     expect(controller.read().entries).toEqual([first]);
     expect(controller.read().restoring).toBeNull();
     expect(controller.read().error).toContain("Refresh the list");
@@ -125,7 +125,7 @@ describe("SettingsArchives.Controller", () => {
     await controller.refresh();
     expect(controller.read().unavailableWorkspaces).toEqual([]);
   });
-  it("does not publish a page after cancellation and coalesces focus refresh", async () => {
+  it("keeps the first read in flight while the archive tab resubscribes", async () => {
     let settle!: (value: DesktopArchivedChatPage) => void;
     const api = native();
     api.list.mockReturnValue(
@@ -134,13 +134,27 @@ describe("SettingsArchives.Controller", () => {
       })
     );
     const controller = new SettingsArchives.Controller(() => api);
+    const previousTab = vi.fn<() => void>();
+    const unsubscribe = controller.subscribe(previousTab);
     const pending = controller.refresh();
+    unsubscribe();
+    previousTab.mockClear();
+
+    const currentTab = vi.fn<() => void>();
+    controller.subscribe(currentTab);
     await controller.refresh();
     expect(api.list).toHaveBeenCalledOnce();
-    controller.cancel();
+    expect(controller.read().loading).toBe(true);
+
     settle({ entries: [first], nextCursor: null });
     await pending;
-    expect(controller.read().entries).toEqual([]);
+    expect(previousTab).not.toHaveBeenCalled();
+    expect(currentTab).toHaveBeenCalled();
+    expect(controller.read()).toMatchObject({
+      entries: [first],
+      loading: false,
+      error: null,
+    });
   });
   it("shows an unsupported state on older hosts", async () => {
     const controller = new SettingsArchives.Controller(() => undefined);

@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { expect, it, vi } from "vitest";
 import { NativeAgentChat } from "./native-agent-chat";
+import type { NativeProviderNetwork } from "./native-provider-egress";
 
 const resources = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
 
@@ -59,15 +60,49 @@ it.skipIf(!resources || process.platform === "win32")(
     const address = server.address();
     if (!address || typeof address === "string")
       throw new Error("fixture_bind");
+    const endpoint = `http://127.0.0.1:${address.port}/v1`;
+    const network: NativeProviderNetwork = {
+      prepare: (target, headers) =>
+        target === `${endpoint}/responses`
+          ? (body, signal) =>
+              fetch(target, {
+                method: "POST",
+                headers,
+                body: new Uint8Array(body),
+                signal,
+                redirect: "manual",
+              })
+          : null,
+    };
+    const connectionB = "b".repeat(64);
+    const modelB = "gpt-6.1-terra";
     const start = () =>
       NativeAgentChat.start({
         resourcesPath: resources!,
         stateDirectory: path.join(root, "state"),
         cwd,
         provider: "responses",
-        endpoint: `http://127.0.0.1:${address.port}/v1`,
+        endpoint,
         model: "gpt-6.1-sol",
         reasoning: true,
+        providerNetwork: network,
+        lookupProviderRoute: async (id, model) => {
+          expect(model).toBe(id === null ? "gpt-6.1-sol" : modelB);
+          return {
+            prepare: async () => {
+              expect(id).toBe(connectionB);
+              return {
+                launch: {
+                  provider: "responses",
+                  endpoint,
+                  model,
+                  reasoning: true,
+                  providerNetwork: network,
+                },
+              };
+            },
+          };
+        },
       });
     let chat: NativeAgentChat | undefined;
     const sessionId = randomUUID(),
@@ -76,6 +111,7 @@ it.skipIf(!resources || process.platform === "win32")(
     try {
       chat = await start();
       expect(chat.acceptsSelection).toBe(true);
+      expect(chat.acceptsInputRoutes).toBe(true);
       let session = await chat.createSelected({
         sessionId,
         requestId: createId,
@@ -108,7 +144,7 @@ it.skipIf(!resources || process.platform === "win32")(
       await chat.selectionRequest("update", sessionId, {
         operationId,
         expectedRevision: 1,
-        selection: { connectionId: null, model: "gpt-6.1-sol", effort: "low" },
+        selection: { connectionId: connectionB, model: modelB, effort: "low" },
       });
       await chat.selectionRequest("ack", sessionId, { operationId });
       expect(
@@ -139,7 +175,7 @@ it.skipIf(!resources || process.platform === "win32")(
       session = await chat.load(sessionId);
       expect(await chat.selectionRequest("inspect", sessionId)).toMatchObject({
         revision: 2,
-        selection: { effort: "low" },
+        selection: { connectionId: connectionB, model: modelB, effort: "low" },
       });
       expect(requests).toHaveLength(1);
       await chat.submit(
@@ -154,6 +190,7 @@ it.skipIf(!resources || process.platform === "win32")(
       await vi.waitFor(
         async () => {
           expect(requests).toHaveLength(2);
+          expect(requests[1].model).toBe(modelB);
           expect((await chat!.observe(session)).latest?.status).toBe(
             "succeeded"
           );

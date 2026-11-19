@@ -1,18 +1,14 @@
 /**
- * Last workspace-backed surface the user was looking at.
+ * Last content surface the user focused in Desktop.
  *
- * This is renderer UX state, not workspace-registry truth. The daemon owns
- * which workspaces exist; this module remembers only which registered id a
- * cold launch should try to resume. The welcome bootstrap validates the id
- * against the daemon before navigating, so stale localStorage never grants
- * authority or creates a workspace. Workbench-internal continuity belongs to
- * `WorkspaceViewState`; this record should not grow into a layout snapshot.
+ * The welcome bootstrap validates workspace targets against the daemon before
+ * navigating. Workbench-internal continuity belongs to `WorkspaceViewState`.
  */
 
 import type { WorkspaceFsEntry } from "@grida/desktop-bridge";
 import { WorkspaceArtifact } from "./workspace-artifact";
 
-type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+type StorageLike = Pick<Storage, "getItem" | "setItem">;
 
 type WorkspaceRecord = {
   id: string;
@@ -25,11 +21,12 @@ type WorkspaceResolver = {
   readdir(workspaceId: string, relPath?: string): Promise<WorkspaceFsEntry[]>;
 };
 
+// Keep the existing slot so version 1 workspace targets survive the upgrade.
 const STORAGE_KEY = "grida.lastWorkspace";
-const VERSION = 1;
+const VERSION = 2;
 
-export namespace last_workspace {
-  export type Target =
+export namespace WindowContentState {
+  type WorkspaceTarget =
     | {
         surface: "workbench";
         workspace_id: string;
@@ -44,6 +41,8 @@ export namespace last_workspace {
         workspace_id: string;
         base_path: string;
       };
+
+  export type Target = { surface: "home" } | WorkspaceTarget;
 
   export function remember(storage: StorageLike, target: Target): void {
     try {
@@ -67,12 +66,13 @@ export namespace last_workspace {
 
     try {
       const value = JSON.parse(raw) as Record<string, unknown>;
-      if (value.version !== VERSION || !isWorkspaceId(value.workspace_id)) {
-        forget(storage);
-        return null;
+      if (value.version !== 1 && value.version !== VERSION) return null;
+      if (value.version === VERSION && value.surface === "home") {
+        return { surface: "home" };
       }
+      if (!isWorkspaceId(value.workspace_id)) return null;
       if (value.surface === "workbench") {
-        const target: Target = {
+        const target: WorkspaceTarget = {
           surface: "workbench",
           workspace_id: value.workspace_id,
         };
@@ -81,13 +81,9 @@ export namespace last_workspace {
           typeof value.active_path === "string"
             ? WorkspaceArtifact.normalizeRelativePath(value.active_path)
             : null;
-        if (activePath === null) {
-          // Optional surface state must never invalidate an otherwise valid
-          // workspace. Clean only the unusable artifact path.
-          remember(storage, target);
-          return target;
-        }
-        return { ...target, active_path: activePath };
+        return activePath === null
+          ? target
+          : { ...target, active_path: activePath };
       }
       if (value.surface === "canvas" && isSafeBasePath(value.base_path)) {
         return {
@@ -100,19 +96,10 @@ export namespace last_workspace {
       // Corrupt optional state falls through to the normal welcome surface.
     }
 
-    forget(storage);
     return null;
   }
 
-  export function forget(storage: StorageLike): void {
-    try {
-      storage.removeItem(STORAGE_KEY);
-    } catch {
-      // Optional UX state: best-effort cleanup only.
-    }
-  }
-
-  export function href(target: Target): string {
+  export function href(target: WorkspaceTarget): string {
     const id = encodeURIComponent(target.workspace_id);
     if (target.surface === "workbench") {
       const activePath = target.active_path
@@ -130,48 +117,38 @@ export namespace last_workspace {
    * Resolve saved UX state against daemon truth and re-open the registered
    * root. `openFolder` is intentionally the existing operation: it validates
    * that the directory is still available and refreshes registry recency.
-   * A missing registry id is stale and is forgotten; an unavailable path
-   * throws so the caller can fall back without erasing a temporarily-unmounted
-   * workspace.
+   * Leave persistence to the focused view so an in-flight restore cannot
+   * overwrite a newer window's saved state.
    */
   export async function resolve(
     storage: StorageLike,
     workspaces: WorkspaceResolver
   ): Promise<Target | null> {
     const target = read(storage);
-    if (!target) return null;
+    if (!target || target.surface === "home") return target;
 
     const registered = (await workspaces.list()).find(
       (workspace) => workspace.id === target.workspace_id
     );
-    if (!registered) {
-      forget(storage);
-      return null;
-    }
+    if (!registered) return null;
 
     const reopened = await workspaces.openFolder(registered.root);
-    let relocated: Target = { ...target, workspace_id: reopened.id };
-    let changed = reopened.id !== target.workspace_id;
+    const relocated = { ...target, workspace_id: reopened.id };
     if (relocated.surface === "workbench" && relocated.active_path) {
+      let entry: WorkspaceFsEntry | null = null;
       try {
-        const entry = await WorkspaceArtifact.find(
+        entry = await WorkspaceArtifact.find(
           (relPath) => workspaces.readdir(relocated.workspace_id, relPath),
           relocated.active_path
         );
-        if (!entry || !WorkspaceArtifact.isOpenable(entry)) {
-          relocated = {
-            surface: "workbench",
-            workspace_id: relocated.workspace_id,
-          };
-          changed = true;
-        }
       } catch (error) {
         if (!isMissingEntry(error)) throw error;
-        relocated = {
+      }
+      if (!entry || !WorkspaceArtifact.isOpenable(entry)) {
+        return {
           surface: "workbench",
           workspace_id: relocated.workspace_id,
         };
-        changed = true;
       }
     }
     if (relocated.surface === "canvas") {
@@ -182,12 +159,10 @@ export namespace last_workspace {
         await workspaces.readdir(relocated.workspace_id, relocated.base_path);
       } catch (error) {
         if (!isMissingEntry(error)) throw error;
-        forget(storage);
         return null;
       }
     }
 
-    if (changed) remember(storage, relocated);
     return relocated;
   }
 }

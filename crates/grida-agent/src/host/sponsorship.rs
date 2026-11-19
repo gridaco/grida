@@ -866,6 +866,7 @@ impl Host {
         let driver_state = profile.reserve(&Default::default())?;
         config.subagent = Some(profile);
         config.execution = execution.configuration;
+        config.inherited_route = self.selected_route.clone();
         Ok(SponsoredClaim::Fresh(OperationClaim {
             source,
             create: CreateSession {
@@ -1521,7 +1522,7 @@ fn related_changed() -> Error {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::*;
     use agent_kit_core::inference::InputFormat;
     use agent_kit_core::messages::ToolArguments;
@@ -1695,7 +1696,7 @@ mod tests {
         (owner, source)
     }
 
-    async fn synthetic_reply(listener: &TcpListener) -> serde_json::Value {
+    pub(in crate::host) async fn synthetic_reply(listener: &TcpListener) -> serde_json::Value {
         let (stream, _) = listener.accept().await.unwrap();
         answer_request(stream).await
     }

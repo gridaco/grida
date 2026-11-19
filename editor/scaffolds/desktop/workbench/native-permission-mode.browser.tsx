@@ -171,7 +171,7 @@ async function openReview() {
     )
     .toBe(true);
   await expect
-    .element(page.getByText("What can the agent access?"))
+    .element(page.getByText("Access for new messages"))
     .not.toBeInTheDocument();
 }
 
@@ -337,7 +337,7 @@ it("keeps the picker closed through compact confirmation, cancellation and exact
   await act(async () => userEvent.keyboard("{Enter}"));
   await expect.element(dialog).not.toBeInTheDocument();
   await expect
-    .element(page.getByText("What can the agent access?"))
+    .element(page.getByText("Access for new messages"))
     .not.toBeInTheDocument();
   await expect.poll(() => f.controller.read().permissionModeBusy).toBe(false);
   expect(f.modes.has(CHAT)).toBe(false);
@@ -369,7 +369,7 @@ it("closes the picker immediately before a delayed Full access review and change
   await click("Access: Default");
   await click(/^Full access/);
   await expect
-    .element(page.getByText("What can the agent access?"))
+    .element(page.getByText("Access for new messages"))
     .not.toBeInTheDocument();
   expect(f.setPermissionMode).not.toHaveBeenCalled();
   expect(f.modes.has(CHAT)).toBe(false);
@@ -389,7 +389,7 @@ it("closes the picker when Default is selected and needs no warning confirmation
   await click("Access: Full access");
   await click(/^Default/);
   await expect
-    .element(page.getByText("What can the agent access?"))
+    .element(page.getByText("Access for new messages"))
     .not.toBeInTheDocument();
   await expect.element(page.getByRole("alertdialog")).not.toBeInTheDocument();
   await expect

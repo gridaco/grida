@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { execFile } from "node:child_process";
+import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -26,6 +26,7 @@ export type NativeCommandProfile = Readonly<{
 }>;
 
 const MAX_ENVIRONMENT_BYTES = 24 * 1024;
+const MAX_SHELL_OUTPUT_BYTES = 1024 * 1024;
 const SHELL_TIMEOUT_MS = 4000;
 /** Kept when the full environment is too large for a launch profile. */
 const CORE_VARIABLES = [
@@ -138,19 +139,55 @@ export namespace NativeCommandProfiles {
 
   async function captureShell(): Promise<Record<string, string>> {
     const shell = process.env.SHELL || "/bin/zsh";
-    if (!path.isAbsolute(shell)) throw new Error("shell_invalid");
+    if (process.platform === "win32" || !path.isAbsolute(shell))
+      throw new Error("shell_invalid");
+    const homeDirectory = os.homedir();
+    // Read login configuration once, outside any project and without access
+    // to the launching terminal. Startup scripts may otherwise prompt there.
+    const child = spawn(shell, ["-ilc", "/usr/bin/env -0"], {
+      cwd: homeDirectory,
+      env: { HOME: homeDirectory, USER: os.userInfo().username },
+      detached: true,
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    const chunks: Buffer[] = [];
+    let bytes = 0;
     const output = await new Promise<string>((resolve, reject) => {
-      execFile(
-        shell,
-        ["-ilc", "/usr/bin/env -0"],
-        {
-          timeout: SHELL_TIMEOUT_MS,
-          maxBuffer: 1024 * 1024,
-          encoding: "utf8",
-          env: { HOME: os.homedir(), USER: os.userInfo().username },
-        },
-        (error, stdout) => (error ? reject(error) : resolve(stdout))
-      );
+      const stopGroup = () => {
+        if (child.pid !== undefined) {
+          try {
+            process.kill(-child.pid, "SIGKILL");
+          } catch {
+            // The probe's process group may have already exited.
+          }
+        }
+      };
+      const abandon = () => {
+        // A shell can ignore SIGTERM, and a child it starts can hold stdout
+        // open. Neither may keep workspace startup waiting for a close event.
+        cleanup();
+        stopGroup();
+        child.stdout.destroy();
+        reject(new Error("shell_environment_incomplete"));
+      };
+      const deadline = setTimeout(abandon, SHELL_TIMEOUT_MS);
+      function cleanup() {
+        clearTimeout(deadline);
+        process.off("exit", stopGroup);
+      }
+      process.once("exit", stopGroup);
+      child.stdout.on("data", (chunk: Buffer) => {
+        bytes += chunk.length;
+        if (bytes > MAX_SHELL_OUTPUT_BYTES) abandon();
+        else chunks.push(chunk);
+      });
+      child.stdout.once("error", abandon);
+      child.once("error", reject);
+      child.once("close", (code) => {
+        cleanup();
+        if (code === 0) resolve(Buffer.concat(chunks).toString("utf8"));
+        else reject(new Error("shell_environment_incomplete"));
+      });
     });
     const environment: Record<string, string> = {};
     for (const entry of output.split("\0")) {

@@ -5,7 +5,10 @@ import os from "node:os";
 import path from "node:path";
 import type { IpcMainInvokeEvent, WebContents } from "electron";
 import { expect, it, vi } from "vitest";
-import { NativeAgentChat } from "./native-agent-chat";
+import {
+  NativeAgentChat,
+  type NativeAgentChatLaunch,
+} from "./native-agent-chat";
 import { NativeChatIpc } from "./native-chat-ipc";
 import { NativeGatewayConnection } from "./native-gateway-connection";
 
@@ -88,6 +91,8 @@ it.runIf(Boolean(packaged)).each([false, true])(
     } as unknown as IpcMainInvokeEvent;
     let chat: NativeAgentChat | undefined;
     let gateway: NativeGatewayConnection | undefined;
+    const onLifecycle =
+      vi.fn<NonNullable<NativeAgentChatLaunch["onLifecycle"]>>();
     try {
       if (effortEnabled)
         gateway = await NativeGatewayConnection.open({
@@ -116,6 +121,7 @@ it.runIf(Boolean(packaged)).each([false, true])(
         resourcesPath: packaged!,
         stateDirectory: path.join(root, "state"),
         cwd,
+        onLifecycle,
         ...(gateway
           ? { ...gateway.launch("fixture"), subagents: true }
           : {
@@ -345,6 +351,23 @@ it.runIf(Boolean(packaged)).each([false, true])(
       expect(endpoint.requests[2]).toContain("Gamma next.");
       expect(endpoint.requests[2]).not.toContain("Beta revised.");
       expect(endpoint.requests[3]).toContain("Beta revised.");
+      // Read both previews only after the second queued turn has settled.
+      const completed = await vi.waitFor(() => {
+        const notices = onLifecycle.mock.calls.flatMap(([event]) =>
+          event.kind === "settled" && event.status === "succeeded"
+            ? [event]
+            : []
+        );
+        expect(notices).toHaveLength(2);
+        return notices;
+      });
+      const previews = await Promise.all(
+        completed.map((event) => event.readPreview!())
+      );
+      expect(previews).toEqual([
+        { title: "Initial task.", text: "Fixture reply 3" },
+        { title: "Initial task.", text: "Fixture reply 4" },
+      ]);
       sender.emit("did-start-navigation", { isMainFrame: true });
       await expect(ipc.steer(event, attachmentId, steering)).rejects.toThrow(
         "native_chat_attachment_unavailable"
