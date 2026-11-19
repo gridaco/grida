@@ -43,8 +43,9 @@ export function SlidesTemplatePreviewDialog({
   onOpenChange: (open: boolean) => void;
   onPick: (template: SlidesTemplate) => void;
 }) {
+  const { openingPageIndex } = template;
   const count = template.pages.length;
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useState(openingPageIndex);
   const [thumbApi, setThumbApi] = useState<CarouselApi>();
 
   // Carousel → page: track the snap CLOSEST to the LIVE scroll position on every
@@ -77,10 +78,12 @@ export function SlidesTemplatePreviewDialog({
     };
   }, [thumbApi]);
 
-  // Reopen always starts at the title slide (jump, no animation).
+  // Reopen at the declared opening slide (jump, no animation).
   useEffect(() => {
-    if (open) thumbApi?.scrollTo(0, true);
-  }, [open, thumbApi]);
+    if (!open) return;
+    thumbApi?.scrollTo(openingPageIndex, true);
+    setPage(openingPageIndex);
+  }, [open, openingPageIndex, thumbApi]);
 
   // Explicit navigation defers to embla: `scrollPrev`/`scrollNext` step from
   // embla's OWN target index, which it advances synchronously on each call — so
@@ -94,8 +97,12 @@ export function SlidesTemplatePreviewDialog({
   // `containScroll: false` lets the selected page center even at the ends (the
   // default "trimSnaps" would pin the first/last to the edge instead).
   const carouselOpts = useMemo(
-    () => ({ align: "center" as const, containScroll: false as const }),
-    []
+    () => ({
+      align: "center" as const,
+      containScroll: false as const,
+      startIndex: openingPageIndex,
+    }),
+    [openingPageIndex]
   );
   // Trackpad / mouse-wheel scrolling for the filmstrip (embla has no built-in
   // wheel support). `forceWheelAxis: "x"` maps a vertical mouse wheel onto the

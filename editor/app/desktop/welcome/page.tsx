@@ -719,7 +719,11 @@ function WelcomeSurface({
                       <div className="size-10 shrink-0 overflow-hidden rounded border bg-muted">
                         {/* eslint-disable-next-line @next/next/no-img-element -- blob object URL; next/image can't optimize it */}
                         <img
-                          src={pickedTemplate.pages[0]?.url}
+                          src={
+                            pickedTemplate.pages[
+                              pickedTemplate.openingPageIndex
+                            ]?.url
+                          }
                           alt=""
                           className="size-full object-cover"
                         />

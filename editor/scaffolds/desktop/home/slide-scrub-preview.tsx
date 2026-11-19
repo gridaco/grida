@@ -7,8 +7,8 @@ import { cn } from "@app/ui/lib/utils";
  * `SlideScrubPreview` — a **scrubbable filmstrip**.
  *
  * The interaction (call it *hover-scrubbing* / *pointer scrubbing*): the
- * pointer's HORIZONTAL position within the frame maps to a page index — the
- * left edge is the first page, the right edge is the last. Moving the cursor
+ * pointer's HORIZONTAL position maps to an index in the preview sequence.
+ * The left edge shows the first frame, the right edge the last. Moving the cursor
  * across the frame "scrubs" through the pages like dragging a video playhead,
  * except it's fully manual: nothing auto-advances (it's not a looping gif), so
  * the user controls exactly which page they land on. Same gesture as scrubbing
@@ -16,8 +16,7 @@ import { cn } from "@app/ui/lib/utils";
  *
  * The math: given `n` frames over a frame `w` px wide, each frame owns a `w / n`
  * slice. With a 100px-wide card and 10 pages, crossing 11px shows page 2, 21px
- * page 3, and so on. Pointer-leave resets to the first page — the resting
- * "cover" — so an un-hovered card always shows page one.
+ * page 3, and so on. The first frame is also shown at rest.
  *
  * Presentation-agnostic on purpose: it owns only the active index and the
  * pointer math, and delegates pixels to `renderFrame(index)`. The caller
