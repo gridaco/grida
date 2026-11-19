@@ -579,9 +579,22 @@ export class NativeAgentChat {
       if (atMs !== undefined) lastActivity.push({ sessionId, atMs });
       return sessionId;
     });
+    const listed = new Set(sessionIds);
+    const runningSessionIds =
+      archived || result._meta == null
+        ? undefined
+        : object(result._meta)["co.grida/runningSessionIds"];
+    if (
+      runningSessionIds !== undefined &&
+      (!Array.isArray(runningSessionIds) ||
+        runningSessionIds.length > listed.size ||
+        runningSessionIds.some((id) => !listed.has(id)) ||
+        new Set(runningSessionIds).size !== runningSessionIds.length)
+    )
+      throw invalidResponse();
     const nextCursor = result.nextCursor ?? null;
     if (
-      new Set(sessionIds).size !== sessionIds.length ||
+      listed.size !== sessionIds.length ||
       (nextCursor !== null &&
         (!isCatalogCursor(nextCursor) ||
           nextCursor === cursor ||
@@ -593,6 +606,7 @@ export class NativeAgentChat {
       nextCursor,
       ...(titles.length && { titles }),
       ...(lastActivity.length && { lastActivity }),
+      ...(runningSessionIds !== undefined && { runningSessionIds }),
     };
   }
 

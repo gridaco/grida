@@ -257,6 +257,8 @@ export type NativeChatPage = Readonly<{
   titles?: readonly Readonly<{ sessionId: string; title: string }>[];
   /** Latest local turn's settlement or start time; absent on older hosts. */
   lastActivity?: readonly Readonly<{ sessionId: string; atMs: number }>[];
+  /** Listed chats running when the page was read. Older hosts omit this field. */
+  runningSessionIds?: readonly string[];
   nextCursor: string | null;
 }>;
 

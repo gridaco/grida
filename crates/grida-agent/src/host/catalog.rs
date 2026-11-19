@@ -129,10 +129,11 @@ impl Host {
             })
             .await?;
         // The placement receipt needs no fallible observation after commit.
-        // Current timing is available through the read-only entry and lists.
+        // Read-only observations supply current turn activity.
         Ok(CatalogRecord {
             entry,
             latest_turn_activity_ms: None,
+            current_turn_disposition: None,
         })
     }
 }

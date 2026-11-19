@@ -313,6 +313,17 @@ async fn paused_task_resumes_after_restart_with_retained_input_and_steering() {
     .await;
     assert_eq!(paused["current"]["paused"], true);
     assert_eq!(paused["current"]["turnId"], turn);
+    let catalog = ws_rpc(
+        &mut first,
+        5,
+        "session/list",
+        json!({"cwd":workspace.path()}),
+    )
+    .await;
+    assert_eq!(
+        catalog["result"]["_meta"]["co.grida/runningSessionIds"],
+        json!([])
+    );
     drop(first);
     terminate_shared_server(first_host).await;
 

@@ -4,7 +4,10 @@ mod support;
 use agent_kit_core::messages::OutcomeStatus;
 use agent_kit_core::turn::{JournalAction, JournalChange, TurnOutcome};
 use agent_kit_core::{Envelope, ErrorKind, Fingerprint, SessionId, TurnId};
-use agent_kit_sessions::{ClaimOutcome, ClaimRequest, CreateSession, SessionStore, TurnSelection};
+use agent_kit_sessions::{
+    ClaimOutcome, ClaimRequest, CreateSession, RecoveryRequest, SessionStore, TurnDisposition,
+    TurnSelection,
+};
 use agent_kit_store_sqlite::{SqliteStore, catalog::CatalogPage};
 use support::{change, payload, private_directory, submission};
 
@@ -224,6 +227,7 @@ async fn catalog_records_retain_turn_timing_across_settlement_retries_and_reopen
         .await
         .unwrap();
     assert_eq!(empty.latest_turn_activity_ms, None);
+    assert_eq!(empty.current_turn_disposition, None);
     assert_eq!(store.catalog_record(id.clone()).await.unwrap(), empty);
     for session in [id.clone(), SessionId::new("missing").unwrap()] {
         let error = store
@@ -279,6 +283,10 @@ async fn catalog_records_retain_turn_timing_across_settlement_retries_and_reopen
     assert_eq!(running.entry, empty.entry);
     assert_eq!(running.latest_turn_activity_ms, Some(started));
     assert_eq!(
+        running.current_turn_disposition,
+        Some(TurnDisposition::Running)
+    );
+    assert_eq!(
         store
             .list_catalog_records(scope, 0, None)
             .await
@@ -287,6 +295,29 @@ async fn catalog_records_retain_turn_timing_across_settlement_retries_and_reopen
         [running]
     );
 
+    let binding = claim.lease.binding().clone();
+    drop(claim);
+    assert_eq!(
+        store
+            .list_catalog_records(scope, 0, None)
+            .await
+            .unwrap()
+            .entries[0]
+            .current_turn_disposition,
+        Some(TurnDisposition::Interrupted)
+    );
+    let ClaimOutcome::Acquired(claim) = store
+        .recover(RecoveryRequest {
+            id: change("recover"),
+            session: id.clone(),
+            turn: binding.turn,
+            expected_epoch: binding.epoch,
+        })
+        .await
+        .unwrap()
+    else {
+        panic!("expected a recovery lease")
+    };
     let state = claim.lease.journal().load().await.unwrap();
     let finish = JournalChange::new(
         change("finish"),
@@ -308,6 +339,7 @@ async fn catalog_records_retain_turn_timing_across_settlement_retries_and_reopen
     let finished = store.catalog_record(id.clone()).await.unwrap();
     assert_eq!(finished.entry, empty.entry);
     assert_eq!(finished.latest_turn_activity_ms, Some(settled));
+    assert_eq!(finished.current_turn_disposition, None);
     assert_eq!(claim.lease.journal().commit(finish).await.unwrap(), receipt);
     assert!(matches!(
         store.claim(request).await.unwrap(),

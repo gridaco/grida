@@ -27,6 +27,11 @@ blank draft; the chat is created when you send its first message. Selecting a
 chat opens its transcript and saved work. Review any pending question or
 interruption before continuing. [Guide and interrupt work](./controls.md)
 
+On compatible Desktop builds, a spinner beside a chat means its turn is
+running. You can switch to another chat and reopen the list to check on the
+first one. The list refreshes while open, and the spinner clears when the
+turn pauses or finishes. Older builds show the list without running indicators.
+
 On compatible Desktop builds, the chat list and **Settings → Archived chats**
 show the date of the latest turn's activity. This is its finish time, or its
 start time while unfinished, including stopped or failed work. Hover the date

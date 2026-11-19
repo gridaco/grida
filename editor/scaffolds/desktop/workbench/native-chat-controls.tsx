@@ -29,6 +29,7 @@ import {
   OpenAILogo,
 } from "@grida/react-icons/logos";
 import { Button } from "@app/ui/components/button";
+import { Spinner } from "@app/ui/components/spinner";
 import { cn } from "@app/ui/lib/utils";
 import { NativeEffortSlider } from "./native-effort-slider";
 import { ChatActivityDate } from "../shared/chat-activity-date";
@@ -74,6 +75,9 @@ export function NativeChatHeader({
   const title = state.selected
     ? controller.chatTitle(state.selected)
     : NEW_CHAT_TITLE;
+  useEffect(() => {
+    if (open) return controller.observeChatList(() => !document.hidden);
+  }, [controller, open]);
   return (
     <header
       data-testid="native-chat-header"
@@ -134,6 +138,9 @@ export function NativeChatHeader({
                     <span className="min-w-0 flex-1 truncate">
                       {controller.chatTitle(id)}
                     </span>
+                    {state.runningSessionIds?.includes(id) && (
+                      <Spinner aria-label="Running" className="size-3.5" />
+                    )}
                     <ChatActivityDate
                       atMs={controller.chatLastActivityAtMs(id)}
                     />

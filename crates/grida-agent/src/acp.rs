@@ -409,7 +409,7 @@ async fn serve_connection(
                         .list_sessions(cwd, false, after)
                         .await
                         .map_err(host_error)?;
-                    catalog_response(catalog)
+                    catalog_response(catalog, true)
                 }
                 .await;
                 responder.respond_with_result(result)
@@ -875,13 +875,17 @@ fn catalog_anchor(cursor: &str) -> Result<SessionId> {
         .ok_or_else(|| Error::invalid_params().data("invalid_session_cursor"))
 }
 
-fn catalog_response(mut catalog: SessionCatalog) -> Result<ListSessionsResponse> {
+fn catalog_response(
+    mut catalog: SessionCatalog,
+    include_running: bool,
+) -> Result<ListSessionsResponse> {
     let cwd_bytes = serde_json::to_vec(&catalog.cwd)
         .map_err(|_| unavailable("session_catalog_projection_failed"))?
         .len();
     // Each standard record repeats the workspace path. Leave frame room for
-    // the maximum escaped ID, keys, cursor, and the JSON-RPC envelope.
-    let page_limit = (transport::MAX_FRAME_BYTES / 2) / (cwd_bytes + 3072);
+    // labels, keys, cursor, and the JSON-RPC envelope, plus a second copy of
+    // each running session ID (up to 256 ASCII bytes) in the page metadata.
+    let page_limit = (transport::MAX_FRAME_BYTES / 2) / (cwd_bytes + 3072 + 256);
     if page_limit == 0 {
         return Err(Error::invalid_params().data("session_catalog_workspace_too_large"));
     }
@@ -892,6 +896,21 @@ fn catalog_response(mut catalog: SessionCatalog) -> Result<ListSessionsResponse>
             .last()
             .map(|record| record.entry.session.clone());
     }
+    let meta = include_running.then(|| {
+        let ids = catalog
+            .entries
+            .iter()
+            .filter(|record| {
+                record.current_turn_disposition
+                    == Some(agent_kit_sessions::TurnDisposition::Running)
+            })
+            .map(|record| serde_json::Value::from(record.entry.session.as_str()))
+            .collect();
+        serde_json::Map::from_iter([(
+            "co.grida/runningSessionIds".to_owned(),
+            serde_json::Value::Array(ids),
+        )])
+    });
     Ok(ListSessionsResponse::new(
         catalog
             .entries
@@ -910,5 +929,6 @@ fn catalog_response(mut catalog: SessionCatalog) -> Result<ListSessionsResponse>
             })
             .collect(),
     )
-    .next_cursor(catalog.next_after.map(|id| format!("v1/{}", id.as_str()))))
+    .next_cursor(catalog.next_after.map(|id| format!("v1/{}", id.as_str())))
+    .meta(meta))
 }

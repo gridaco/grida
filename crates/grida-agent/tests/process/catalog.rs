@@ -43,7 +43,8 @@ async fn standard_acp_catalog_discovers_saved_workspace_sessions_without_loading
     let b = TempDir::new().unwrap();
     let alias = temporary.path().join("workspace-alias");
     std::os::unix::fs::symlink(a.path(), &alias).unwrap();
-    let mut endpoint = Endpoint::start(vec![Reply::Finished("Retained answer")]).await;
+    let (release, held) = tokio::sync::oneshot::channel();
+    let mut endpoint = Endpoint::start(vec![Reply::Release("Retained answer", held)]).await;
     let (child, url) = shared_server(&state, &endpoint.url).await;
     let mut client = catalog_client(&url).await;
     let mut a_sessions = Vec::new();
@@ -54,15 +55,49 @@ async fn standard_acp_catalog_discovers_saved_workspace_sessions_without_loading
     let prompt = ws_rpc(
         &mut client,
         37,
-        "session/prompt",
-        json!({
-            "sessionId":a_sessions[0],"prompt":[{"type":"text","text":"PRIVATE_TRANSCRIPT_MARKER"}],
-        }),
+        "_co.grida/session/submit",
+        prompt_request(&a_sessions[0], "work", "PRIVATE_TRANSCRIPT_MARKER"),
     )
     .await;
-    assert_eq!(prompt["result"]["stopReason"], "end_turn");
+    assert!(prompt["result"]["turnId"].is_string(), "{prompt}");
     endpoint.request().await;
-    let before = session_snapshot(&mut client, &a_sessions[0]).await;
+    let mut observer = catalog_client(&url).await;
+    let first = ws_rpc(&mut observer, 2, "session/list", json!({"cwd":a.path()})).await;
+    assert_eq!(
+        first["result"]["_meta"]["co.grida/runningSessionIds"],
+        json!([])
+    );
+    let tail = json!({"cwd":a.path(),"cursor":first["result"]["nextCursor"].as_str().unwrap()});
+    let running = ws_rpc(&mut observer, 3, "session/list", tail.clone()).await;
+    assert_eq!(
+        running["result"]["_meta"]["co.grida/runningSessionIds"],
+        json!([a_sessions[0]])
+    );
+    assert!(!running.to_string().contains("PRIVATE_TRANSCRIPT_MARKER"));
+    let foreign = ws_rpc(&mut observer, 4, "session/list", json!({"cwd":b.path()})).await;
+    assert_eq!(
+        foreign["result"]["_meta"]["co.grida/runningSessionIds"],
+        json!([])
+    );
+    let unattached = ws_rpc(
+        &mut observer,
+        5,
+        "_co.grida/session/snapshot",
+        json!({"sessionId":a_sessions[0]}),
+    )
+    .await;
+    assert_eq!(unattached["error"]["data"], "session_setup_required");
+    release.send(()).unwrap();
+    let before = wait_for_snapshot(&mut client, &a_sessions[0], |view| {
+        view["latest"]["status"] == "succeeded" && view["current"].is_null()
+    })
+    .await;
+    let settled = ws_rpc(&mut observer, 6, "session/list", tail).await;
+    assert_eq!(
+        settled["result"]["_meta"]["co.grida/runningSessionIds"],
+        json!([])
+    );
+    drop(observer);
     terminate_shared_server(child).await;
     let endpoint_url = endpoint.url.clone();
     endpoint.done().await;

@@ -48,6 +48,15 @@ Treat `nextCursor` as opaque and send it with
 the same workspace.
 Listing leaves attachment, execution, and history unchanged. [ACP session listing](https://agentclientprotocol.com/protocol/v1/session-list)
 
+On supporting hosts the `session/list` response includes
+`_meta["co.grida/runningSessionIds"]`. This array contains only IDs on the
+returned page whose current turn has the `running` disposition at observation
+time. A running turn is unsettled, unsuspended and has a live writer lease.
+Queued input alone, a paused turn and an interrupted turn do not qualify.
+An empty array means no chat on the page was running.
+An absent field means the host did not report running status. A client can
+refresh the visible page using its original cursor without loading any session.
+
 Negotiate `co.grida/session/organize` version 1 for archived listing and
 catalog changes. `_co.grida/session/list-archived` accepts the standard
 workspace and cursor fields and returns the standard page shape.

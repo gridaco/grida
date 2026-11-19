@@ -180,7 +180,7 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                         .list_sessions(request.cwd, true, after)
                         .await
                         .map_err(host_error)?;
-                    super::super::catalog_response(catalog)
+                    super::super::catalog_response(catalog, false)
                 }
                 .await;
                 responder.respond_with_result(result)

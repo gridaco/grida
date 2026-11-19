@@ -33,6 +33,7 @@ async function setup() {
   await page.viewport(860, 800);
   const first = crypto.randomUUID();
   const second = crypto.randomUUID();
+  const running = new Set<string>();
   const entries = new Map<string, NativeChatCatalogEntry>([
     [
       first,
@@ -49,6 +50,9 @@ async function setup() {
       .map((entry) => entry.sessionId),
     titles: [...entries.values()].flatMap(({ sessionId, title }) =>
       title === null ? [] : [{ sessionId, title }]
+    ),
+    runningSessionIds: [...running].filter(
+      (id) => entries.get(id)?.archived === archived
     ),
     nextCursor: null,
   });
@@ -144,6 +148,7 @@ async function setup() {
     render,
     first,
     second,
+    running,
   };
 }
 
@@ -174,6 +179,32 @@ async function expectComposerFocus(composer: HTMLElement, text: string) {
   );
   expect(range.toString()).toBe(text);
 }
+
+it("keeps the background chat's running indicator current after switching chats", async () => {
+  const f = await setup();
+  f.running.add(f.first);
+  await selectChat("Second chat");
+  await expect.element(page.getByText("Second saved request")).toBeVisible();
+  const load = vi.spyOn(f.bridge, "load");
+  const transcript = vi.spyOn(f.bridge, "transcript");
+
+  await click("Open chat list");
+  const first = page.getByRole("option", { name: /First chat/ });
+  const second = page.getByRole("option", { name: /Second chat/ });
+  const indicator = (row: typeof first) =>
+    row.getByRole("status", { name: "Running" });
+  await expect.element(indicator(first)).toBeVisible();
+  await expect.element(indicator(second)).not.toBeInTheDocument();
+
+  f.running.clear();
+  await expect
+    .element(indicator(first), { timeout: 5_000 })
+    .not.toBeInTheDocument();
+  await expect.element(first).toBeVisible();
+  await expect.element(second).toBeVisible();
+  expect(load).not.toHaveBeenCalled();
+  expect(transcript).not.toHaveBeenCalled();
+});
 
 describe("Native chat composer focus", () => {
   it("focuses new chats and restored chat drafts at the end without remounting", async () => {

@@ -108,6 +108,7 @@ const PREPARED_MESSAGE_NOT_SENT =
   "Couldn't start the new chat with Full access. Your message is still in the composer.";
 /** A second look for a background chat title after a turn progresses. */
 const TITLE_RECHECK_MS = 6_000;
+const CHAT_LIST_REFRESH_MS = 2_000;
 const MAX_LIVE_BYTES = 1024 * 1024;
 const MAX_ATTACHMENT_BYTES = 256 * 1024;
 const DIRECTORY_MIME_TYPE = "inode/directory";
@@ -180,6 +181,7 @@ export type NativeChatView = Readonly<{
   scope: number;
   selected: string | null;
   sessions: readonly string[];
+  runningSessionIds?: readonly string[];
   catalogCursor: string | null;
   nextCatalogCursor: string | null;
   catalogLoading: boolean;
@@ -543,6 +545,7 @@ const EMPTY: NativeChatView = Object.freeze({
 /** View fields that belong to the workspace, not to the selected chat. */
 const SESSION_INDEPENDENT_FIELDS = [
   "sessions",
+  "runningSessionIds",
   "catalogCursor",
   "nextCatalogCursor",
   "catalogLoading",
@@ -1364,6 +1367,7 @@ export class NativeChatController {
     this.recents = saved.sessions;
     this.update({
       sessions: this.sessionChoices(),
+      runningSessionIds: undefined,
       catalogCursor: null,
       nextCatalogCursor: null,
       catalogLoading: false,
@@ -1410,12 +1414,41 @@ export class NativeChatController {
         subagents: null,
         backgroundProcesses: null,
         submitting: false,
+        runningSessionIds: undefined,
       });
   }
 
-  async listChats(
+  listChats(
     cursor: string | null = null,
     archived = this.view.catalogArchived
+  ): Promise<void> {
+    return this.readChatPage(cursor, archived);
+  }
+
+  /** Refresh the visible picker page. A missing projection identifies an older host. */
+  observeChatList(isVisible: () => boolean): () => void {
+    const observer = new AbortController();
+    const timer = setInterval(() => {
+      if (
+        isVisible() &&
+        !this.view.catalogLoading &&
+        !this.view.catalogError &&
+        !this.listing &&
+        !this.view.catalogArchived &&
+        this.catalog?.runningSessionIds !== undefined
+      )
+        void this.readChatPage(this.view.catalogCursor, false, observer.signal);
+    }, CHAT_LIST_REFRESH_MS);
+    return () => {
+      clearInterval(timer);
+      observer.abort();
+    };
+  }
+
+  private async readChatPage(
+    cursor: string | null,
+    archived: boolean,
+    observer?: AbortSignal
   ): Promise<void> {
     const connection = this.catalogConnection;
     const list = archived ? this.bridge.listArchived : this.bridge.list;
@@ -1423,7 +1456,9 @@ export class NativeChatController {
     const request = {};
     this.catalogRequest = request;
     const owns = () =>
-      this.catalogConnection === connection && this.catalogRequest === request;
+      !observer?.aborted &&
+      this.catalogConnection === connection &&
+      this.catalogRequest === request;
     if (archived !== this.view.catalogArchived) {
       this.catalog = null;
       this.update({
@@ -1433,7 +1468,12 @@ export class NativeChatController {
         nextCatalogCursor: null,
       });
     }
-    this.update({ catalogLoading: true, catalogError: null });
+    if (!observer)
+      this.update({
+        catalogLoading: true,
+        catalogError: null,
+        runningSessionIds: undefined,
+      });
     try {
       // A reconnect can happen before the old page releases the frame's slot.
       await this.listing?.catch(() => {});
@@ -1446,13 +1486,27 @@ export class NativeChatController {
       this.catalog = page;
       this.update({
         sessions: this.sessionChoices(),
+        runningSessionIds: page.runningSessionIds,
         catalogCursor: cursor,
         nextCatalogCursor: page.nextCursor,
       });
-    } catch {
-      if (owns()) this.update({ catalogError: "Couldn't list saved chats." });
+    } catch (error) {
+      if (owns()) {
+        const invalidPage =
+          cursor !== null &&
+          error instanceof Error &&
+          error.message === "invalid_session_cursor";
+        this.update({
+          runningSessionIds: undefined,
+          ...((!observer || invalidPage) && {
+            catalogError: invalidPage
+              ? "This chat page changed. Choose Newest chats to refresh it."
+              : "Couldn't list saved chats.",
+          }),
+        });
+      }
     } finally {
-      if (owns()) this.update({ catalogLoading: false });
+      if (owns() && !observer) this.update({ catalogLoading: false });
     }
   }
 
@@ -1908,6 +1962,7 @@ export class NativeChatController {
           profiles: { ...this.view.profiles, active: this.profileId },
         }),
         sessions: this.sessionChoices(),
+        runningSessionIds: undefined,
         catalogCursor: null,
         nextCatalogCursor: null,
         catalogLoading: false,

@@ -123,6 +123,11 @@ model context at the request's existing authority.
 Chat listings may carry optional `lastActivity` entries pairing a session ID
 with `atMs`; organization entries and Settings archive rows use
 `lastActivityAtMs`. These are nonnegative integer Unix milliseconds within
+For unarchived workspace chats, `list(cursor)` can return `runningSessionIds`
+alongside `sessionIds`. Every running ID belongs to that page. An empty array
+means none of its chats was running when read. Older hosts omit the field.
+Refresh the same cursor to observe a change without attaching to a chat.
+
 JavaScript's Date range. They describe the latest local turn's first settlement
 time, or start time while unfinished, rather than exact message or archive
 time. A chat without local turns or an older host omits the value. Listing

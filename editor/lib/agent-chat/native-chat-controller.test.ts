@@ -5804,11 +5804,12 @@ it("drops a disposed startup reply", async () => {
   expect(publish).toHaveBeenCalledExactlyOnceWith("native-starting");
 });
 
-it("retains catalog activity by chat and drops it when a later page has no timestamp", async () => {
+it("retains catalog activity by chat and drops it when a later page omits the metadata", async () => {
   const { bridge, controller } = fixture();
   const atMs = 1_800_000_000_000;
   bridge.list = vi.fn<DesktopNativeChat["list"]>().mockResolvedValue({
     sessionIds: ["chat-a", "chat-b"],
+    runningSessionIds: ["chat-a"],
     lastActivity: [{ sessionId: "chat-b", atMs }],
     nextCursor: "v1/chat-b",
   });
@@ -5816,12 +5817,78 @@ it("retains catalog activity by chat and drops it when a later page has no times
   await controller.listChats();
   expect(controller.chatLastActivityAtMs("chat-a")).toBeUndefined();
   expect(controller.chatLastActivityAtMs("chat-b")).toBe(atMs);
+  expect(controller.read().runningSessionIds).toEqual(["chat-a"]);
   expect(controller.read().sessions).toEqual(["chat-a", "chat-b"]);
   bridge.list = async () => ({ sessionIds: ["chat-c"], nextCursor: null });
   await controller.listChats("v1/chat-b");
   expect(controller.chatLastActivityAtMs("chat-b")).toBeUndefined();
   expect(controller.chatLastActivityAtMs("chat-c")).toBeUndefined();
+  expect(controller.read().runningSessionIds).toBeUndefined();
   controller.disconnect();
+});
+
+it("serializes picker refreshes with page navigation and retires observation when closed", async () => {
+  const { bridge, controller } = fixture();
+  const recent = {
+    sessionIds: ["a"],
+    runningSessionIds: ["a"],
+    nextCursor: "older",
+  };
+  const older = {
+    sessionIds: ["b"],
+    runningSessionIds: ["b"],
+    nextCursor: null,
+  };
+  const list = vi.fn<DesktopNativeChat["list"]>(async (cursor) =>
+    cursor === "older" ? older : recent
+  );
+  bridge.list = list;
+  controller.connect(null);
+  await controller.listChats();
+  list.mockClear();
+  vi.useFakeTimers();
+  let visible = false;
+  const close = controller.observeChatList(() => visible);
+  try {
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(list).not.toHaveBeenCalled();
+    visible = true;
+    const pending = Promise.withResolvers<NativeChatPage>();
+    list.mockReturnValueOnce(pending.promise);
+    await vi.advanceTimersToNextTimerAsync();
+    const navigate = controller.listChats("older");
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(list).toHaveBeenCalledExactlyOnceWith(null);
+    pending.resolve(recent);
+    await navigate;
+    expect(controller.read().runningSessionIds).toEqual(["b"]);
+
+    list.mockRejectedValueOnce(new Error("disconnected"));
+    await vi.advanceTimersToNextTimerAsync();
+    expect(list).toHaveBeenLastCalledWith("older");
+    expect(controller.read().runningSessionIds).toBeUndefined();
+    list.mockRejectedValueOnce(new Error("invalid_session_cursor"));
+    await vi.advanceTimersToNextTimerAsync();
+    expect(controller.read().catalogError).toContain("Newest chats");
+    list.mockClear();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(list).not.toHaveBeenCalled();
+    list.mockResolvedValueOnce({ ...recent, runningSessionIds: [] });
+    await controller.listChats();
+    const late = Promise.withResolvers<NativeChatPage>();
+    list.mockReturnValueOnce(late.promise);
+    await vi.advanceTimersToNextTimerAsync();
+    close();
+    list.mockClear();
+    late.resolve(recent);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(list).not.toHaveBeenCalled();
+    expect(controller.read().runningSessionIds).toEqual([]);
+  } finally {
+    close();
+    controller.disconnect();
+    vi.useRealTimers();
+  }
 });
 
 it("uses catalog membership, retains an exact rename draft on conflict, and ignores a retired mutation reply", async () => {

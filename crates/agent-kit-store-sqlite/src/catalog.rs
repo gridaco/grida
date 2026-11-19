@@ -4,8 +4,10 @@ use super::*;
 
 const PAGE_SIZE: usize = 32;
 const MAX_LABEL_BYTES: usize = 256;
-const LATEST_TURN_ACTIVITY: &str = "SELECT COALESCE(settled_ms,started_ms) FROM turns
-     WHERE session=?1 ORDER BY ordinal DESC LIMIT 1";
+const TURN_ACTIVITY: &str = "SELECT active_turn,
+    (SELECT COALESCE(settled_ms,started_ms) FROM turns
+     WHERE session=?1 ORDER BY ordinal DESC LIMIT 1)
+    FROM sessions WHERE id=?1";
 
 /// Return a stable scope for an immutable configuration this owner recognizes.
 pub type ScopeProjection = fn(&Envelope) -> Option<Fingerprint>;
@@ -22,7 +24,7 @@ pub struct CatalogEntry {
     pub revision: u64,
 }
 
-/// Catalog metadata with a read-only fact about its latest retained local turn.
+/// Catalog metadata with read-only facts about local turn activity.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CatalogRecord {
     pub entry: CatalogEntry,
@@ -31,6 +33,8 @@ pub struct CatalogRecord {
     /// settlement. Absent when the session has no local turn. This fact never
     /// orders or authorizes work and is not a catalog mutation input.
     pub latest_turn_activity_ms: Option<u64>,
+    /// The current turn's authoritative disposition, absent for an idle or queued-only session.
+    pub current_turn_disposition: Option<TurnDisposition>,
 }
 
 /// One page of a scoped catalog listing in reverse creation order.
@@ -53,16 +57,15 @@ impl SqliteStore {
         .await
     }
 
-    /// Read catalog metadata and the latest retained local turn's timing only
-    /// after verifying its owner-defined scope. Reads no turn snapshots.
+    /// Read catalog metadata and local turn activity after verifying its scope.
     pub async fn scoped_catalog_record(
         &self,
         scope: Fingerprint,
         session: SessionId,
     ) -> Result<CatalogRecord> {
-        execute(Arc::clone(&self.inner), move |_, connection| {
+        execute(Arc::clone(&self.inner), move |inner, connection| {
             let entry = scoped_lookup(connection, scope, &session)?;
-            read_record(connection, entry)
+            read_record(inner, connection, entry)
         })
         .await
     }
@@ -82,20 +85,20 @@ impl SqliteStore {
     }
 
     /// Read the same bounded catalog page with the latest retained local
-    /// turn's timing. Adds one indexed lookup per returned entry without
-    /// reading configurations, queues, turn snapshots, or transcripts.
+    /// turn's timing and the current turn's disposition. Indexed reads visit
+    /// the current turn head when present, without loading queues or transcripts.
     pub async fn list_catalog_records(
         &self,
         scope: Fingerprint,
         bucket: u8,
         after: Option<SessionId>,
     ) -> Result<CatalogPage<CatalogRecord>> {
-        execute(Arc::clone(&self.inner), move |_, connection| {
+        execute(Arc::clone(&self.inner), move |inner, connection| {
             let page = read_page(connection, scope, bucket, after)?;
             let entries = page
                 .entries
                 .into_iter()
-                .map(|entry| read_record(connection, entry))
+                .map(|entry| read_record(inner, connection, entry))
                 .collect::<Result<_>>()?;
             Ok(CatalogPage {
                 entries,
@@ -143,12 +146,12 @@ impl SqliteStore {
         .await
     }
 
-    /// Read catalog metadata and retained local turn timing without a scope
-    /// filter. The owner is responsible for authorizing the session identity.
+    /// Read catalog metadata and local turn activity without a scope filter.
+    /// The owner is responsible for authorizing the session identity.
     pub async fn catalog_record(&self, session: SessionId) -> Result<CatalogRecord> {
-        execute(Arc::clone(&self.inner), move |_, connection| {
+        execute(Arc::clone(&self.inner), move |inner, connection| {
             let entry = lookup(connection, &session)?;
-            read_record(connection, entry)
+            read_record(inner, connection, entry)
         })
         .await
     }
@@ -290,18 +293,25 @@ fn scoped_lookup(
     lookup(connection, session)
 }
 
-fn read_record(connection: &Connection, entry: CatalogEntry) -> Result<CatalogRecord> {
-    let latest_turn_activity_ms = connection
-        .prepare_cached(LATEST_TURN_ACTIVITY)
+fn read_record(
+    inner: &Inner,
+    connection: &Connection,
+    entry: CatalogEntry,
+) -> Result<CatalogRecord> {
+    let (current, activity): (Option<String>, Option<i64>) = connection
+        .prepare_cached(TURN_ACTIVITY)
         .map_err(database_error)?
-        .query_row([entry.session.as_str()], |row| row.get::<_, i64>(0))
-        .optional()
-        .map_err(database_error)?
-        .map(unsigned)
+        .query_row([entry.session.as_str()], |row| {
+            Ok((row.get(0)?, row.get(1)?))
+        })
+        .map_err(database_error)?;
+    let current_turn_disposition = current
+        .map(|id| Ok(view_turn(inner, connection, &entry.session, &TurnId::new(id)?)?.disposition))
         .transpose()?;
     Ok(CatalogRecord {
         entry,
-        latest_turn_activity_ms,
+        latest_turn_activity_ms: activity.map(unsigned).transpose()?,
+        current_turn_disposition,
     })
 }
 
@@ -314,7 +324,7 @@ mod tests {
         let mut connection = Connection::open_in_memory().unwrap();
         schema::install_for_test(&mut connection);
         let mut statement = connection
-            .prepare(&format!("EXPLAIN QUERY PLAN {LATEST_TURN_ACTIVITY}"))
+            .prepare(&format!("EXPLAIN QUERY PLAN {TURN_ACTIVITY}"))
             .unwrap();
         let plan = statement
             .query_map(["session"], |row| row.get::<_, String>(3))
