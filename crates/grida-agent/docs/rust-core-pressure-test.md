@@ -124,6 +124,16 @@ Newly discovered caveats extend this section only when they establish a distinct
 failure or uncovered contract. Each entry retains its cause, owner, evidence,
 and required observation. Related detail belongs beside the owning contract.
 
+Shared read positions require two independent client observations. If a new
+reply arrives after one client displayed an earlier reply, acknowledging the
+earlier reply leaves the new one unread. Acknowledging the new reply can
+clear it. A subsequent manual mark must survive a late
+duplicate of that acknowledgement, a reopened store, and catalog queries.
+Both actions preserve message time. A different workspace cannot mutate
+the chat's read state. The [store catalog regression](../../agent-kit-store-sqlite/tests/catalog.rs)
+exercises settlement and reopening. The [native catalog regression](../tests/process/catalog.rs)
+checks the public wire operations from two clients against a synthetic provider.
+
 ### Discovery audits
 
 Discovery draws on independent sources rather than waiting for a remembered
@@ -948,6 +958,14 @@ following cases constrain that adapter before compatibility can be claimed.
 | A client asks to steer an existing child                         | Require explicitly supported target/control semantics. ACP's current subagent draft alone does not grant that operation.                |
 | A replay follows process loss                                    | Follow the negotiated replay rules and Grida's durable receipts/cursors. Connection-local or optional upstream IDs cannot replace them. |
 | A settings UI changes an advertised session selector             | Apply that session scope. Persistent numeric defaults require the separate validated host-config operation.                             |
+
+The [independent catalog process case](../tests/process/live_catalog.rs)
+uses two workspace writers and two subscribers. It checks that an unseen chat
+can move onto the first page, a filtered observer receives only its workspace,
+and read state is shared without attaching. A held question exercises running
+and input-needed state. Killing its writer checks liveness independently of
+graceful cleanup. Removing a workspace from the registry rechecks access on
+both listing and mutation, including after reconnect.
 
 These cases introduce no new core component. The host adapter owns protocol
 translation, and Desktop owns rendering. They preserve the existing acceptance,

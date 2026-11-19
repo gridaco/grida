@@ -35,6 +35,12 @@ async fn conversation_pages_seek_past_a_moved_anchor_and_date_only_new_messages(
                 },
                 input: |input| input.payload.bytes() == b"message",
                 message: |message| message.role == Role::Assistant,
+                final_reply: |turn| {
+                    turn.history()
+                        .records()
+                        .last()
+                        .map(|HistoryRecord::Message(message)| message.id.clone())
+                },
             },
         )
         .unwrap()
@@ -145,6 +151,54 @@ async fn conversation_pages_seek_past_a_moved_anchor_and_date_only_new_messages(
     assert_eq!(page.entries[0].group, "b");
     assert_eq!(page.entries[0].record.entry.session, b);
     assert!(page.entries[0].record.last_message_ms.unwrap() > 7);
+    // Publishing an intermediate message has not yet committed a final answer.
+    assert!(!page.entries[0].record.read_state.unread);
+    support::commit(
+        &claim,
+        "settle",
+        vec![JournalAction::Settle(TurnOutcome {
+            status: OutcomeStatus::Succeeded,
+            account: None,
+            evidence: vec![],
+        })],
+    )
+    .await;
+    let settled = store.catalog_record(b.clone()).await.unwrap();
+    assert!(settled.read_state.unread);
+    assert_eq!(settled.read_state.reply_id.as_deref(), Some("reply"));
+    use agent_kit_store_sqlite::catalog::ReadStateUpdate;
+    let acknowledge = ReadStateUpdate::Acknowledge {
+        revision: settled.read_state.revision,
+        reply_id: Some(MessageId::new("reply").unwrap()),
+    };
+    let seen = store
+        .update_read_state("b".into(), 0, b.clone(), acknowledge.clone())
+        .await
+        .unwrap();
+    assert!(!seen.unread);
+    let marked = store
+        .update_read_state("b".into(), 0, b.clone(), ReadStateUpdate::MarkUnread)
+        .await
+        .unwrap();
+    assert!(marked.unread);
+    assert_eq!(
+        store
+            .update_read_state("b".into(), 0, b.clone(), acknowledge)
+            .await
+            .unwrap(),
+        marked
+    );
+    assert!(
+        store
+            .update_read_state("a".into(), 0, b.clone(), ReadStateUpdate::MarkUnread)
+            .await
+            .is_err()
+    );
+    drop(claim);
+    drop(store);
+    let reopened = open().catalog_record(b).await.unwrap();
+    assert_eq!(reopened.read_state, marked);
+    assert_eq!(reopened.last_message_ms, settled.last_message_ms);
 }
 
 fn project(config: &Envelope) -> Option<Fingerprint> {

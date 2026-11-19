@@ -131,6 +131,34 @@ function forgetNativeChatAttachment(attachmentId: string): void {
   }
 }
 
+async function observeChatCatalog(
+  scope: { workspaceId?: string },
+  onChanged: () => void
+) {
+  const token = crypto.randomUUID();
+  const notify = (_event: Electron.IpcRendererEvent, id: unknown) => {
+    if (id === token) onChanged();
+  };
+  ipcRenderer.on(IPC_CHANNELS.CHAT_CATALOG_CHANGED, notify);
+  try {
+    if (
+      await ipcRenderer.invoke(IPC_CHANNELS.CHAT_CATALOG_OBSERVE, token, scope)
+    ) {
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.CHAT_CATALOG_CHANGED, notify);
+        void ipcRenderer
+          .invoke(IPC_CHANNELS.CHAT_CATALOG_UNOBSERVE, token)
+          .catch(() => {});
+      };
+    }
+    ipcRenderer.removeListener(IPC_CHANNELS.CHAT_CATALOG_CHANGED, notify);
+    return null;
+  } catch (error) {
+    ipcRenderer.removeListener(IPC_CHANNELS.CHAT_CATALOG_CHANGED, notify);
+    throw error;
+  }
+}
+
 function selectedDocumentRoute(): boolean {
   const params = new URLSearchParams(location.search);
   return (
@@ -660,6 +688,18 @@ const bridge: DesktopBridge = {
       selectProfile: (selection) =>
         nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_SELECT_PROFILE, selection),
     }),
+    ...(location.pathname === "/desktop/workspace" && {
+      observeCatalog: (onChanged: () => void) => {
+        const workspaceId = new URLSearchParams(location.search).get("id");
+        return workspaceId
+          ? observeChatCatalog({ workspaceId }, onChanged)
+          : Promise.resolve(null);
+      },
+      setReadState: (
+        id: string,
+        change: import("@grida/desktop-bridge").NativeChatReadChange
+      ) => nativeChatInvoke(IPC_CHANNELS.CHAT_CATALOG_READ, id, change),
+    }),
     listArchived: (cursor) =>
       nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_LIST_ARCHIVED, cursor),
     catalogEntry: (attachmentId) =>
@@ -1157,6 +1197,7 @@ const bridge: DesktopBridge = {
   },
 
   chatCatalog: {
+    observe: observeChatCatalog,
     list: (query) => ipcRenderer.invoke(IPC_CHANNELS.CHAT_CATALOG_LIST, query),
   },
 

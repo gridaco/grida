@@ -1,14 +1,26 @@
-//! Organize attached conversations independently of their execution.
+//! GRIDA-SEC-004 — negotiated metadata operations admit read positions by
+//! workspace membership and organizer edits by the attached session and revision.
 
 use super::*;
 use crate::acp::observation::Observation;
 use crate::host::is_archived;
 use agent_client_protocol::v1::schema::ListSessionsResponse;
-use agent_kit_store_sqlite::catalog::CatalogRecord;
+use agent_kit_store_sqlite::catalog::{CatalogRecord, ConversationReadState, ReadStateUpdate};
 use std::path::PathBuf;
 
 pub(super) const ORGANIZE: &str = "co.grida/session/organize";
 pub(super) const ARCHIVE_CATALOG: &str = "co.grida/settings/archive-catalog";
+pub(in crate::acp) const READ_STATE: &str = "co.grida/session/read-state";
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
+#[request(method = "_co.grida/session/read-state", response = Value)]
+#[serde(rename_all = "camelCase")]
+pub(in crate::acp) struct SetReadState {
+    pub(in crate::acp) cwd: PathBuf,
+    pub(in crate::acp) session_id: SessionId,
+    #[serde(flatten)]
+    pub(in crate::acp) update: ReadStateUpdate,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
 #[request(method = "_co.grida/settings/archive-catalog", response = Value)]
@@ -56,6 +68,8 @@ struct Entry {
     last_activity_at_ms: Option<u64>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     title_generation_pending: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    read_state: Option<ConversationReadState>,
 }
 
 impl From<CatalogRecord> for Entry {
@@ -69,6 +83,7 @@ impl From<CatalogRecord> for Entry {
             archived,
             last_activity_at_ms: record.latest_turn_activity_ms,
             title_generation_pending: false,
+            read_state: None,
         }
     }
 }
@@ -90,7 +105,25 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
     let get_sessions = sessions.clone();
     let update_host = host.clone();
     let update_sessions = sessions.clone();
+    let read_host = host.clone();
+    let read_sessions = sessions.clone();
     RequestRoutes::default()
+        .on_receive_request(
+            async move |request: SetReadState, responder, _| {
+                let result = async {
+                    require(&read_sessions, READ_STATE, None)?;
+                    let _observation = Observation::begin(&read_sessions, None)?;
+                    let state = read_host
+                        .update_conversation_read(request.cwd, request.session_id, request.update)
+                        .await
+                        .map_err(host_error)?;
+                    serde_json::to_value(state).map_err(|_| Error::internal_error())
+                }
+                .await;
+                responder.respond_with_result(result)
+            },
+            on_receive_request!(),
+        )
         .on_receive_request(
             async move |request: ArchiveCatalog, responder, _| {
                 let result = async {
@@ -136,6 +169,7 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                         .map_err(host_error)?;
                     Ok(Entry {
                         title_generation_pending,
+                        read_state: Some(record.read_state.clone()),
                         ..record.into()
                     })
                 }

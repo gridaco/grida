@@ -105,10 +105,17 @@ export namespace servicesSidecarClient {
    *
    * The native profile captures the exact directory selected by Main.
    */
+  let workspaceMembershipChanged: (() => Promise<void>) | undefined;
+  export function onWorkspaceMembershipChange(listener: () => Promise<void>) {
+    workspaceMembershipChanged = listener;
+  }
+
   export async function openWorkspace(rootPath: string): Promise<Workspace> {
-    return catalog
+    const workspace = catalog
       ? await catalog.openSelected(rootPath)
       : await client().workspaces.open(rootPath);
+    await workspaceMembershipChanged?.();
+    return workspace;
   }
 
   export async function listWorkspaces(): Promise<Workspace[]> {
@@ -122,13 +129,18 @@ export namespace servicesSidecarClient {
   }
 
   export async function reopenWorkspace(root: string): Promise<Workspace> {
-    return catalog ? await catalog.reopen(root) : await openWorkspace(root);
+    if (!catalog) return openWorkspace(root);
+    const workspace = await catalog.reopen(root);
+    await workspaceMembershipChanged?.();
+    return workspace;
   }
 
   export async function createWorkspace(name?: string): Promise<Workspace> {
-    return catalog
+    const workspace = catalog
       ? await catalog.create(name)
       : await client().workspaces.create({ name });
+    await workspaceMembershipChanged?.();
+    return workspace;
   }
 
   export async function pinWorkspace(
@@ -140,8 +152,9 @@ export namespace servicesSidecarClient {
   }
 
   export async function forgetWorkspace(id: string): Promise<void> {
-    if (catalog) return await catalog.forget(id);
-    await client().workspaces.forget(id);
+    if (catalog) await catalog.forget(id);
+    else await client().workspaces.forget(id);
+    await workspaceMembershipChanged?.();
   }
 
   export async function readWorkspaceFile(

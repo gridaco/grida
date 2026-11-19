@@ -94,6 +94,11 @@ it("refreshes the active chat picker so chats restored in Settings appear", () =
 it("groups the list by local activity date and keeps chat activity indicators", () => {
   const controller = new NativeChatController({} as DesktopNativeChat);
   vi.spyOn(controller, "chatTitle").mockImplementation((id) => id);
+  vi.spyOn(controller, "chatReadState").mockImplementation((id) =>
+    id === "input-chat"
+      ? { revision: 3, replyId: "output", unread: true }
+      : undefined
+  );
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
@@ -149,6 +154,7 @@ it("groups the list by local activity date and keeps chat activity indicators", 
     />Today<.*>running-chat<.*>Yesterday<.*>input-chat<.*>Earlier<.*>earlier-chat<.*>Undated<.*>undated-chat</
   );
   expect(html.match(/aria-label="Running"/g)).toHaveLength(1);
+  expect(html.match(/aria-label="Unread"/g)).toHaveLength(1);
   expect(html.match(/>Input needed</g)).toHaveLength(2);
   expect(html.match(/aria-current="true"/g)).toHaveLength(1);
 });

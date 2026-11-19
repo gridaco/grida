@@ -71,7 +71,14 @@ export namespace ipc_admission {
   }): boolean {
     switch (role) {
       case "main":
-        if (channel === IPC_CHANNELS.CHAT_CATALOG_LIST)
+        if (channel === IPC_CHANNELS.CHAT_CATALOG_READ)
+          return pathname === "/desktop/workspace";
+        if (
+          channel === IPC_CHANNELS.CHAT_CATALOG_LIST ||
+          channel === IPC_CHANNELS.CHAT_CATALOG_OBSERVE ||
+          channel === IPC_CHANNELS.CHAT_CATALOG_UNOBSERVE ||
+          channel === IPC_CHANNELS.CHAT_CATALOG_CHANGED
+        )
           return (
             pathname === "/desktop/welcome" || pathname === "/desktop/workspace"
           );

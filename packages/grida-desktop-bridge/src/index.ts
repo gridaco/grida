@@ -52,7 +52,11 @@ import type {
   WorkspaceWriteFileResult,
 } from "@grida/daemon";
 
-import type { DesktopHooks, DesktopNativeChat } from "./native-chat";
+import type {
+  DesktopHooks,
+  DesktopNativeChat,
+  NativeChatReadState,
+} from "./native-chat";
 import type { DesktopNativeExternalAgent } from "./native-external-agent";
 import type { NativeEditorSurfaceSnapshot } from "./native-editor-surfaces";
 import type { DesktopBrowser } from "./browser";
@@ -246,6 +250,8 @@ export type DesktopChatCatalogEntry = Readonly<{
   title: string | null;
   /** Null when no message time was recorded. Undated entries follow dated entries. */
   lastMessageAtMs: number | null;
+  lastActivityAtMs?: number;
+  readState?: NativeChatReadState;
   running: boolean;
   /** Present when the native host reports answerable waits independently of running status. */
   inputNeeded?: boolean;
@@ -284,6 +290,10 @@ export type DesktopBridge = {
   /** Metadata discovery for Home and the workbench. Older hosts omit this capability. */
   chatCatalog?: {
     list(query?: DesktopChatCatalogQuery): Promise<DesktopChatCatalogPage>;
+    observe?(
+      scope: Pick<DesktopChatCatalogQuery, "workspaceId">,
+      onChanged: () => void
+    ): Promise<(() => void) | null>;
   };
   /** Global config.toml hooks. Absent on older native builds. */
   hooks?: DesktopHooks;

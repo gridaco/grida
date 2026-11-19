@@ -1309,19 +1309,32 @@ pixels through this reader, with no additional filesystem or model grant.
   the saved model selector in its local URL fragment. Selecting any target
   still requires ordinary workspace and saved-connection admission. Attention
   events are transient and grant no execution, transcript, or filesystem access.
-- [Native session listing](crates/grida-agent/src/host/catalog.rs) discovers
-  public workspace chats within the host's store. An explicit canonical workspace
-  narrows that scope. The [SQLite catalog](crates/agent-kit-store-sqlite/src/catalog.rs)
-  applies visibility and ordering before pagination. Private side chats and
-  delegated sessions have no public catalog membership. The [Desktop catalog](desktop/src/main/native-desktop-chat-catalog.ts)
-  resolves workspace IDs through the registered workspace owner. Its
-  [IPC adapter](desktop/src/main/chat-catalog-ipc.ts) admits metadata reads from
-  the authenticated Home or workspace main frame, revokes pending reads on navigation,
-  and accepts no renderer-supplied paths. Rows carry identity, title, time and
-  attention flags. Listing creates no attachment or
-  execution authority. [Catalog changes](crates/grida-agent/src/acp/extensions/catalog.rs)
-  require a negotiated capability, an attached chat, and the observed metadata
-  revision. They leave execution, transcripts, and artifacts untouched.
+- **Saved-chat metadata.** [Native session listing](crates/grida-agent/src/host/catalog.rs)
+  and the [dedicated ACP catalog](crates/grida-agent/src/acp/catalog_service.rs)
+  expose public workspace chats. The dedicated host reads workspace and store
+  pairs from its launcher's private manifest. A caller can narrow that membership
+  by workspace. The [SQLite catalog](crates/agent-kit-store-sqlite/src/catalog.rs)
+  checks conversation group and active membership before listing or updating a
+  read position. Private side chats, delegated sessions and archived chats stay
+  outside this view. The [store reader](crates/agent-kit-store-sqlite/src/catalog_reader.rs)
+  opens an existing recognized conversation store. Its only chat mutation is a
+  read-position update. Acknowledgement must match the current revision and
+  reply ID. [Catalog observation](crates/grida-agent/src/acp/catalog_service/observation.rs)
+  rechecks membership before emitting an invalidation. Listing and watching
+  require no transcript, attachment or execution grant.
+- The [Desktop catalog](desktop/src/main/native-desktop-chat-catalog.ts) resolves
+  registered workspace IDs to their admitted roots and private state directories.
+  [Main's catalog connection](desktop/src/main/live-chat-catalog.ts) publishes
+  those pairs and revalidates the workspace roots represented on a page. The
+  [IPC adapter](desktop/src/main/chat-catalog-ipc.ts) admits listing and observation
+  from authenticated Home and workspace main frames. It revokes access on
+  navigation. Renderers receive workspace IDs and bounded chat metadata. A read
+  acknowledgement or manual unread mark derives its workspace from the admitted
+  workspace frame. [Organizer controls](crates/grida-agent/src/acp/extensions/catalog.rs)
+  for renaming or archiving still require an attached chat and its observed
+  organizer revision. [Native process](crates/grida-agent/tests/process/live_catalog.rs),
+  [Main catalog](desktop/src/main/live-chat-catalog.test.ts) and
+  [IPC](desktop/src/main/chat-catalog-ipc.test.ts) tests cover these boundaries.
 - [Saved-chat deletion](crates/grida-agent/src/acp/extensions/deletion.rs)
   requires negotiated private stdio and an attached chat at both observed
   revisions. An exact scope-bound retry can recover the retirement receipt.
@@ -2308,6 +2321,9 @@ Today:
 - [desktop/src/main/desktop-preferences.ts](desktop/src/main/desktop-preferences.ts) — non-secret, versioned native onboarding authority; owns the durable one-time renderer-migration marker, writes are serialized and atomic, future schemas are read-only, and no generic renderer preferences capability exists (pinned by `desktop-preferences.test.ts`).
 - [desktop/src/main/desktop-entry-window.ts](desktop/src/main/desktop-entry-window.ts) — exact entry-window ownership, serialized role transitions, one-time fixed-surface onboarding migration, callback re-probe, role-aware blocked-navigation recovery, auxiliary-window admission, and close-before-sign-out ordering (pinned by `desktop-entry-window.test.ts`).
 - [desktop/src/main/ipc-handlers.ts](desktop/src/main/ipc-handlers.ts) + [desktop/src/main/ipc-admission.ts](desktop/src/main/ipc-admission.ts) — exact sender/role/path/channel validation for the one native account-sign-out transition and narrow sign-in/onboarding IPC capability sets (pinned by `ipc-admission.test.ts`).
+- The [chat catalog IPC adapter](desktop/src/main/chat-catalog-ipc.ts) binds each
+  metadata request and observer to the admitted Home or workspace main frame.
+  Only a workspace frame can update read positions in its own workspace.
 - [desktop/src/window.ts](desktop/src/window.ts) — `will-redirect` guard; `isAllowedNavigation` predicate (pinned by `window.test.ts`).
 
 **What does NOT belong here.** A code exchange in the Electron main
@@ -4123,7 +4139,9 @@ durable or discard unrelated OAuth records.
    changes with its contents, so simultaneous launches with different
    selections cannot substitute one another's scope before startup.
    The [native chat store](desktop/src/main/native-chat-store.ts) refuses a
-   native chat store that overlaps the selected credential home.
+   native chat store that overlaps the selected credential home. The
+   [Desktop catalog](desktop/src/main/native-desktop-chat-catalog.ts) takes
+   its workspace and store pairs from that same protected layout.
 
 8. **Credential continuity stays in private custody.** The native agent can
    persist a bounded, versioned record under its explicit private host directory.

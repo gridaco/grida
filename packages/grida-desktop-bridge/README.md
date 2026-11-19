@@ -137,14 +137,21 @@ Request the first page again to observe new activity. The method reads metadata
 from live and closed stores and opens no chat. A registered workspace with no
 saved chats contributes zero rows. If a participating store cannot be read,
 the global query reports an error so clients can distinguish it from an empty
-catalog. Older native builds omit the
-namespace. The workspace picker's existing `nativeChat.list` retains creation order.
+catalog. Older native builds can omit the namespace.
+
+On supporting hosts, call `chatCatalog.observe({}, onChanged)` before the first
+list. Pass `{ workspaceId }` to observe one workspace. Reread the first page
+when notified, including after reconnection. The returned function releases
+the subscription. A missing method or a `null` result means the client uses
+its existing refresh behavior. Entries can also carry `readState` for the
+latest reply.
 
 For unarchived workspace chats, `list(cursor)` can return `runningSessionIds`
 and `inputNeededSessionIds` alongside `sessionIds`. Each independent array
 contains only IDs on the page. An empty array means no chat had that status
-when read. Older hosts can omit either field. Refresh the same cursor to
-observe a change without attaching to a chat. An attached turn can also carry
+when read. Older hosts can omit either field. On a capable host, the workspace
+picker uses message order and `nativeChat.observeCatalog`. Older hosts retain
+creation order and refresh while the picker is open. An attached turn can also carry
 `inputNeeded`. Only the frame holding a side chat combines its activity with
 the parent's indicators.
 
@@ -154,7 +161,7 @@ with `atMs`; organization entries and Settings archive rows use
 JavaScript's Date range. They describe the latest local turn's first settlement
 time, or start time while unfinished, rather than exact message or archive
 time. A chat without local turns or an older host omits the value. Listing
-order and cursors are unchanged; dates grant no attachment or control authority.
+dates grant no attachment or control authority.
 
 `organize` can return an opaque `archiveUndo` receipt after archiving a
 workspace chat. Pass it to `undoArchive` in the same workspace frame to restore

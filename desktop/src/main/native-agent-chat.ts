@@ -37,6 +37,7 @@ import type {
   NativeChatPermissionMode,
   NativeChatPermissionState,
   NativeChatPage,
+  NativeChatReadState,
   NativeChatQuestion,
   NativeChatQuestionAnswer,
   NativeChatQueueChange,
@@ -591,6 +592,11 @@ export class NativeAgentChat {
       sessionIds: sessions.map((entry) => entry.sessionId),
       ...page,
       ...(titles.length && { titles }),
+      ...(sessions.some((row) => row.readState) && {
+        readStates: sessions.flatMap(({ sessionId, readState }) =>
+          readState ? [{ sessionId, ...readState }] : []
+        ),
+      }),
       ...(lastActivity.length && { lastActivity }),
     };
   }
@@ -3665,7 +3671,7 @@ function revision(value: unknown): number {
 /** Shared projection for the worker and offline catalog command. Both return ACP session/list. */
 export function readNativeSessionList(
   value: unknown,
-  cwd: string,
+  cwd: string | ReadonlySet<string>,
   cursor: string | null,
   archived = false
 ) {
@@ -3677,10 +3683,24 @@ export function readNativeSessionList(
     throw invalidResponse();
   const sessions = result.sessions.map((entry: unknown) => {
     const session = object(entry);
-    if (session.cwd !== cwd) throw invalidResponse();
+    if (
+      typeof session.cwd !== "string" ||
+      (typeof cwd === "string" ? session.cwd !== cwd : !cwd.has(session.cwd))
+    )
+      throw invalidResponse();
     const meta = session._meta == null ? {} : object(session._meta);
     return {
+      cwd: session.cwd,
       sessionId: identity(session.sessionId),
+      readState: catalogReadState(meta["co.grida/readState"]),
+      running:
+        meta["co.grida/running"] === undefined
+          ? undefined
+          : flag(meta["co.grida/running"]),
+      inputNeeded:
+        meta["co.grida/inputNeeded"] === undefined
+          ? undefined
+          : flag(meta["co.grida/inputNeeded"]),
       title: catalogTitle(session.title ?? null),
       lastActivityAtMs: catalogActivityTime(meta["co.grida/lastActivityAtMs"]),
       lastMessageAtMs: catalogActivityTime(
@@ -3700,7 +3720,10 @@ export function readNativeSessionList(
   );
   const nextCursor = result.nextCursor ?? null;
   if (
-    listed.size !== sessions.length ||
+    (typeof cwd === "string"
+      ? listed.size
+      : new Set(sessions.map((row) => JSON.stringify([row.cwd, row.sessionId])))
+          .size) !== sessions.length ||
     (nextCursor !== null &&
       (!isCatalogCursor(nextCursor) ||
         nextCursor === cursor ||
@@ -3712,6 +3735,16 @@ export function readNativeSessionList(
     nextCursor,
     ...(runningSessionIds !== undefined && { runningSessionIds }),
     ...(inputNeededSessionIds !== undefined && { inputNeededSessionIds }),
+  };
+}
+
+function catalogReadState(value: unknown): NativeChatReadState | undefined {
+  if (value === undefined) return undefined;
+  const state = object(value);
+  return {
+    unread: flag(state.unread),
+    revision: revision(state.revision),
+    replyId: state.replyId === null ? null : identity(state.replyId),
   };
 }
 
@@ -3741,6 +3774,9 @@ function catalogEntry(
   return Object.freeze({
     sessionId,
     revision: revision(entry.revision),
+    ...(entry.readState !== undefined && {
+      readState: catalogReadState(entry.readState),
+    }),
     title: catalogTitle(entry.title),
     archived: flag(entry.archived),
     ...(titleGenerationPending(entry.titleGenerationPending) && {

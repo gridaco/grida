@@ -1,5 +1,6 @@
 //! Stable ACP v1 over a supervised, bounded stdio connection.
 
+pub mod catalog_service;
 mod extensions;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 pub mod external;
@@ -917,54 +918,123 @@ fn catalog_response(
         .has_more
         .then(|| catalog.entries.last().map(|row| row.cursor.clone()))
         .flatten();
-    let meta = include_activity.then(|| {
-        let ids = catalog
-            .entries
-            .iter()
-            .map(|row| &row.record)
-            .filter(|record| {
-                record.current_turn_disposition
-                    == Some(agent_kit_sessions::TurnDisposition::Running)
-            })
-            .map(|record| serde_json::Value::from(record.entry.session.as_str()))
-            .collect();
-        let input = catalog
-            .entries
-            .iter()
-            .map(|row| &row.record)
-            .filter(|record| crate::host::needs_user_input(&record.pending_request_schemas))
-            .map(|record| serde_json::Value::from(record.entry.session.as_str()))
-            .collect();
+    let mut sessions = Vec::with_capacity(catalog.entries.len());
+    let mut ids = BTreeSet::new();
+    let mut running = Vec::new();
+    let mut input_needed = Vec::new();
+    for row in catalog.entries {
+        let record = row.record;
+        let entry = record.entry;
+        let id = entry.session.as_str();
+        let mut meta = serde_json::Map::new();
+        if include_activity {
+            let is_running = record.current_turn_disposition
+                == Some(agent_kit_sessions::TurnDisposition::Running);
+            let needs_input = crate::host::needs_user_input(&record.pending_request_schemas);
+            meta.insert("co.grida/running".into(), is_running.into());
+            meta.insert("co.grida/inputNeeded".into(), needs_input.into());
+            if is_running {
+                running.push(serde_json::Value::from(id));
+            }
+            if needs_input {
+                input_needed.push(serde_json::Value::from(id));
+            }
+            ids.insert(entry.session.clone());
+        }
+        meta.insert(
+            "co.grida/readState".into(),
+            serde_json::json!(record.read_state),
+        );
+        if let Some(value) = record.latest_turn_activity_ms {
+            meta.insert("co.grida/lastActivityAtMs".into(), value.into());
+        }
+        if let Some(value) = record.last_message_ms {
+            meta.insert("co.grida/lastMessageAtMs".into(), value.into());
+        }
+        sessions.push(
+            SessionInfo::new(id.to_owned(), row.cwd)
+                .title(entry.label)
+                .meta(meta),
+        );
+    }
+    // Legacy arrays identify a session only by ID. A combined page can contain
+    // independently stored chats with the same ID in different workspaces.
+    let meta = (include_activity && ids.len() == sessions.len()).then(|| {
         serde_json::Map::from_iter([
             (
                 "co.grida/runningSessionIds".to_owned(),
-                serde_json::Value::Array(ids),
+                serde_json::Value::Array(running),
             ),
             (
                 "co.grida/inputNeededSessionIds".to_owned(),
-                serde_json::Value::Array(input),
+                serde_json::Value::Array(input_needed),
             ),
         ])
     });
-    Ok(ListSessionsResponse::new(
-        catalog
-            .entries
-            .into_iter()
+    Ok(ListSessionsResponse::new(sessions)
+        .next_cursor(cursor)
+        .meta(meta))
+}
+
+#[cfg(test)]
+mod catalog_tests {
+    use super::*;
+    use crate::host::ListedSession;
+    use agent_kit_store_sqlite::catalog::{CatalogEntry, CatalogRecord};
+
+    #[test]
+    fn equal_session_ids_in_different_workspaces_keep_their_own_activity() {
+        let row = |cwd: &str, is_running: bool, needs_input: bool| ListedSession {
+            cwd: cwd.into(),
+            record: CatalogRecord {
+                entry: CatalogEntry {
+                    session: SessionId::new("same-id").unwrap(),
+                    bucket: 0,
+                    label: None,
+                    revision: 0,
+                },
+                last_message_ms: None,
+                read_state: Default::default(),
+                latest_turn_activity_ms: None,
+                current_turn_disposition: is_running
+                    .then_some(agent_kit_sessions::TurnDisposition::Running),
+                pending_request_schemas: needs_input
+                    .then(|| {
+                        agent_kit_core::SchemaId::new(grida_agent_master::questions::REQUEST_SCHEMA)
+                            .unwrap()
+                    })
+                    .into_iter()
+                    .collect(),
+            },
+            cursor: cwd.into(),
+        };
+        let page = catalog_response(
+            CatalogListing {
+                entries: vec![row("/first", true, false), row("/second", false, true)],
+                has_more: false,
+            },
+            true,
+        )
+        .unwrap();
+        assert!(
+            page.meta.is_none(),
+            "bare IDs would give both rows the same status"
+        );
+        let activity: Vec<_> = page
+            .sessions
+            .iter()
             .map(|row| {
-                let mut meta = serde_json::Map::new();
-                if let Some(value) = row.record.latest_turn_activity_ms {
-                    meta.insert("co.grida/lastActivityAtMs".into(), value.into());
-                }
-                if let Some(value) = row.record.last_message_ms {
-                    meta.insert("co.grida/lastMessageAtMs".into(), value.into());
-                }
-                let entry = row.record.entry;
-                SessionInfo::new(entry.session.as_str().to_owned(), row.cwd)
-                    .title(entry.label)
-                    .meta((!meta.is_empty()).then_some(meta))
+                let meta = row.meta.as_ref().unwrap();
+                (
+                    row.cwd.to_str().unwrap(),
+                    meta["co.grida/running"].as_bool().unwrap(),
+                    meta["co.grida/inputNeeded"].as_bool().unwrap(),
+                )
             })
-            .collect(),
-    )
-    .next_cursor(cursor)
-    .meta(meta))
+            .collect();
+        assert_eq!(
+            activity,
+            [("/first", true, false), ("/second", false, true)]
+        );
+    }
 }

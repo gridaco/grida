@@ -3,6 +3,7 @@
 use super::*;
 use agent_kit_store_sqlite::catalog::{
     CatalogEntry, CatalogRecord, ConversationAnchor, ConversationOrder, ConversationProjection,
+    ConversationReadState, ReadStateUpdate,
 };
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 
@@ -55,6 +56,29 @@ pub(super) const CONVERSATIONS: ConversationProjection = ConversationProjection 
                         )))
         }
         _ => false,
+    },
+    final_reply: |state| {
+        let messages = state
+            .history()
+            .records()
+            .iter()
+            .map(|HistoryRecord::Message(message)| message);
+        let answers = grida_agent_master::activity::final_answers(
+            messages.clone(),
+            state.outcome().map(|outcome| outcome.status),
+        );
+        messages
+            .rev()
+            .find(|message| {
+                answers.contains(&message.id)
+                    && message.provenance.kind == ProvenanceKind::Generated
+                    && message.content.iter().any(|part| match part {
+                        Content::Text(text) => !text.trim().is_empty(),
+                        Content::Media(_) => true,
+                        _ => false,
+                    })
+            })
+            .map(|message| message.id.clone())
     },
 };
 
@@ -163,6 +187,37 @@ pub struct ArchiveCatalogPage {
 }
 
 impl Host {
+    pub(crate) async fn update_conversation_read(
+        &self,
+        cwd: PathBuf,
+        session: SessionId,
+        update: ReadStateUpdate,
+    ) -> Result<ConversationReadState> {
+        let cwd = tokio::task::spawn_blocking(move || canonical_workspace(&cwd))
+            .await
+            .map_err(|_| problem(ErrorKind::Unavailable, "workspace_unavailable"))??;
+        if self
+            .permissions
+            .as_deref()
+            .map(|p| p.catalog_workspace())
+            .transpose()?
+            .flatten()
+            .is_some_and(|fixed| fixed != cwd)
+        {
+            return Err(problem(
+                ErrorKind::InvalidInput,
+                "session_catalog_scope_mismatch",
+            ));
+        }
+        let group = cwd
+            .into_os_string()
+            .into_string()
+            .map_err(|_| problem(ErrorKind::InvalidInput, "invalid_workspace_path"))?;
+        self.store
+            .update_read_state(group, ACTIVE, session, update)
+            .await
+    }
+
     pub(crate) async fn discover_chats(
         &self,
         cwd: Option<PathBuf>,
@@ -351,6 +406,7 @@ impl Host {
         // Read-only observations supply current turn activity.
         Ok(CatalogRecord {
             entry,
+            read_state: ConversationReadState::default(),
             latest_turn_activity_ms: None,
             last_message_ms: None,
             current_turn_disposition: None,

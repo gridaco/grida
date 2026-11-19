@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -64,6 +65,7 @@ import {
 import { NativeTurnArtifacts } from "./native-turn-summary";
 import { NativeAttachmentCard } from "./native-attachment-card";
 import { NativeEarlierMessages } from "./native-earlier-messages";
+import { NativeDisplayedReply } from "./native-displayed-reply";
 import { NativeTurnActivity } from "./native-turn-activity";
 import { turn_activity } from "@/lib/agent-chat/turn-activity";
 import { native_message_parts } from "@/lib/agent-chat/native-message-parts";
@@ -602,6 +604,7 @@ function NativeChatPane({
   const [libraryScope, setLibraryScope] = useState<number | null>(null);
   const activityOpen = !subagentsInTabs && !!subagentActivity?.open;
   const panelPresented = useContext(PanelIsPresented);
+  const conversationPane = useRef<HTMLDivElement>(null);
   const attachmentId = controller.presentedAttachmentId;
   useEffect(() => {
     if (!attachmentId || !bridge.setPresented) return;
@@ -706,6 +709,24 @@ function NativeChatPane({
       onSubmit={() => void controller.submitRevision()}
     />
   );
+  const readState = state.selected
+    ? controller.chatReadState(state.selected)
+    : undefined;
+  const replyId = readState?.replyId;
+  const sessionId = state.selected;
+  const [drawnReply, setDrawnReply] = useState<{
+    node: HTMLDivElement;
+    replyId: string;
+    sessionId: string;
+  } | null>(null);
+  const bindReply = useCallback(
+    (node: HTMLDivElement | null) => {
+      setDrawnReply(
+        node && replyId && sessionId ? { node, replyId, sessionId } : null
+      );
+    },
+    [replyId, sessionId]
+  );
   const renderMessage = (message: NativeChatMessage) => {
     if (message.messageId === state.revisionDraft?.messageId)
       return revisionEditor;
@@ -717,6 +738,7 @@ function NativeChatPane({
     return (
       <ChatMessageView
         key={message.messageId}
+        ref={replyId === message.messageId ? bindReply : undefined}
         loadAttachmentPreview={controller.readAttachmentPreview}
         loadToolImage={controller.readToolImage}
         actions={
@@ -781,7 +803,11 @@ function NativeChatPane({
           controller.answerPermissionModeReview(confirmed)
         }
       />
-      <div inert={activityOpen} className="flex min-h-0 flex-1 flex-col">
+      <div
+        ref={conversationPane}
+        inert={activityOpen}
+        className="flex min-h-0 flex-1 flex-col"
+      >
         <div className="min-w-0 shrink-0">{header(state)}</div>
         {(state.profileError ||
           state.catalogEntryError ||
@@ -829,6 +855,24 @@ function NativeChatPane({
               className="gap-4 px-[max(0.75rem,calc((100%_-_48rem)/2))] py-4"
               scrollClassName="desktop-native-drag-scroll-viewport scroll-fade-y scroll-fade-4"
             >
+              {sessionId && readState && (
+                <NativeDisplayedReply
+                  controller={controller}
+                  sessionId={sessionId}
+                  readState={readState}
+                  pane={conversationPane}
+                  message={
+                    drawnReply?.sessionId === sessionId &&
+                    drawnReply.replyId === replyId
+                      ? drawnReply.node
+                      : null
+                  }
+                  historyLoaded={controller.hasOpenedHistory}
+                  presented={
+                    panelPresented && !activityOpen && !state.connectionRecovery
+                  }
+                />
+              )}
               <NativeEarlierMessages
                 canLoad={state.canReadEarlier}
                 loading={state.readingEarlier}

@@ -41,15 +41,23 @@ to its parent's indicators in the window that opened it. Its tab shows its own
 status. The list refreshes while open, including for saved chats you switched
 away from. Each indicator clears when its corresponding work or request ends.
 
-The chat picker groups chats under **Today**, **Yesterday**, **Earlier**, and
-**Undated** by the local date of their latest turn activity. Searching shows a
-single list ranked by match. **Settings → Archived chats** shows the date on
-each row. Hover that date to see the full local date and time.
+An unread indicator beside a chat means a final reply is waiting or you
+marked the chat unread yourself. Viewing the reply in a focused conversation
+clears the indicator across connected clients. A reply that arrives while
+you are viewing an earlier one stays unread. Choose **Mark unread** to return
+to the conversation later. This keeps its place in Recents.
 
-Activity uses the turn's finish time, or its start time while unfinished,
-including stopped or failed work. Renaming, archiving and reopening leave this
-time as recorded. Chats without a recorded activity time appear under
-**Undated** in the picker.
+The chat picker groups chats under **Today**, **Yesterday**, **Earlier**, and
+**Undated** by the local date of the latest user message or final agent reply.
+Sending a message or receiving a reply moves the chat up in Recents. Renaming,
+archiving, reopening or changing the read state preserves its position.
+Searching shows a single list ranked by match. Chats without a recorded date
+appear under **Undated**.
+
+Older hosts group chats by the time their latest turn finished, or started
+if it is still running. **Settings → Archived chats** also shows the latest
+turn activity, including stopped or failed work. Hover the date to see the
+full local date and time.
 
 Long chats open at the latest messages. Scroll up to read earlier messages:
 they load above as you go, without moving what you are reading. Reading
