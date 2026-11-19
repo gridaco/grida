@@ -147,7 +147,7 @@ export class NativeChatStore {
   }
 
   /** Existing private store only; catalog inspection must never initialize a chat. */
-  async archiveDirectory(
+  async existingWorkspaceDirectory(
     workspaceId: string,
     root: string
   ): Promise<string | null> {

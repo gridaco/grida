@@ -29,6 +29,7 @@ import {
   type ChatGptOAuthCoordinator,
 } from "./chatgpt-oauth";
 import { NativeChatStore } from "./native-chat-store";
+import type { ActiveNativeChat } from "./native-chat-ipc";
 import type { NativeChatGptHost } from "./native-chatgpt-host";
 import { NativeChatProfiles } from "./native-chat-profiles";
 import type { NativeDesktopProfile } from "./native-desktop-profile";
@@ -271,28 +272,41 @@ export class NativeDesktopAgent {
     );
   }
 
-  archiveOwner(workspaceId: string) {
-    if (
-      this.closed ||
-      this.transitions ||
-      this.workspaceActivity.get(workspaceId)?.retired
-    )
-      return null;
-    const chat = this.owners?.catalogOwner(workspaceId)?.chat;
-    return chat?.archiveCatalog && chat.unarchiveCatalog
-      ? {
-          archiveCatalog: chat.archiveCatalog.bind(chat),
-          unarchiveCatalog: chat.unarchiveCatalog.bind(chat),
-        }
-      : null;
+  get catalogGeneration(): number {
+    return this.accountGeneration;
   }
 
-  archiveDirectory(workspaceId: string, root: string) {
-    return this.store.archiveDirectory(workspaceId, root);
+  /** The live worker or one closed-store command owns a workspace store at a time. */
+  withCatalogStore<T>(
+    workspaceId: string,
+    expectedRoot: string | undefined,
+    use: (
+      chat: ActiveNativeChat["chat"] | null,
+      directory: string | null,
+      root: string
+    ) => Promise<T>
+  ): Promise<T> {
+    return this.withWorkspace(workspaceId, async (workspace, check) => {
+      if (expectedRoot !== undefined && workspace.root !== expectedRoot)
+        throw new Error("native_chat_catalog_workspace_changed");
+      const owners = (this.owners ??= this.newOwners());
+      const result = await owners.readCatalog(workspaceId, async (active) => {
+        const directory = active
+          ? null
+          : await this.store.existingWorkspaceDirectory(
+              workspaceId,
+              workspace.root
+            );
+        check();
+        return use(active?.chat ?? null, directory, workspace.root);
+      });
+      check();
+      return result;
+    });
   }
 
   /** Reuse workspace registration/root admission without preparing a provider. */
-  archiveWorkspace(workspaceId: string): Promise<{ root: string }> {
+  catalogWorkspace(workspaceId: string): Promise<{ root: string }> {
     return this.withWorkspace(
       workspaceId,
       async (workspace, requireCurrent) => {
@@ -612,63 +626,54 @@ export class NativeDesktopAgent {
         throw new Error("native_chat_selection_unsupported");
       return local.selectionRequest(operation, sessionId, body);
     }
-    return this.withWorkspace(workspaceId, async (workspace, check) => {
-      const active = this.owners?.catalogOwner(workspaceId)?.chat;
-      if (active) {
-        if (!active.selectionRequest)
-          throw new Error("native_chat_selection_unsupported");
-        const result = await active.selectionRequest(
-          operation,
+    return this.withCatalogStore(
+      workspaceId,
+      undefined,
+      async (active, directory, root) => {
+        if (active) {
+          if (!active.selectionRequest)
+            throw new Error("native_chat_selection_unsupported");
+          return active.selectionRequest(operation, sessionId, body);
+        }
+        if (!directory) throw new Error("native_chat_selection_unavailable");
+        const args = [
+          "chat-selection",
+          "--state-dir",
+          directory,
+          "--cwd",
+          root,
+          "--session",
           sessionId,
-          body
-        );
-        check();
-        return result;
+          "--operation",
+          operation,
+        ];
+        if (operation !== "inspect")
+          args.push(
+            "--request-json",
+            JSON.stringify({ ...body, cwd: root, sessionId })
+          );
+        try {
+          const { stdout } = await executeSelection(
+            NativeAgentProcess.executable(this.resourcesPath),
+            args,
+            {
+              timeout: 5000,
+              maxBuffer: 1024 * 1024,
+              windowsHide: true,
+              env: { PATH: process.env.PATH ?? "/usr/bin:/bin" },
+            }
+          );
+          return JSON.parse(stdout);
+        } catch (error) {
+          const stderr = (error as { stderr?: unknown }).stderr;
+          const code =
+            typeof stderr === "string"
+              ? /^grida-agent: (selection_[a-z_]{1,80})$/m.exec(stderr)?.[1]
+              : undefined;
+          throw new Error(code ?? "native_chat_selection_unavailable");
+        }
       }
-      const directory = await this.store.archiveDirectory(
-        workspaceId,
-        workspace.root
-      );
-      check();
-      if (!directory) throw new Error("native_chat_selection_unavailable");
-      const args = [
-        "chat-selection",
-        "--state-dir",
-        directory,
-        "--cwd",
-        workspace.root,
-        "--session",
-        sessionId,
-        "--operation",
-        operation,
-      ];
-      if (operation !== "inspect")
-        args.push(
-          "--request-json",
-          JSON.stringify({ ...body, cwd: workspace.root, sessionId })
-        );
-      try {
-        const { stdout } = await executeSelection(
-          NativeAgentProcess.executable(this.resourcesPath),
-          args,
-          {
-            timeout: 5000,
-            maxBuffer: 1024 * 1024,
-            windowsHide: true,
-            env: { PATH: process.env.PATH ?? "/usr/bin:/bin" },
-          }
-        );
-        check();
-        return JSON.parse(stdout);
-      } catch (error) {
-        const stderr = (error as { stderr?: unknown }).stderr;
-        const code =
-          typeof stderr === "string"
-            ? /^grida-agent: (selection_[a-z_]{1,80})$/m.exec(stderr)?.[1]
-            : undefined;
-        throw new Error(code ?? "native_chat_selection_unavailable");
-      }
-    });
+    );
   }
 
   /**

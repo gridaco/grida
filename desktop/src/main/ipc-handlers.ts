@@ -78,6 +78,8 @@ import { NativeExternalRunIpc } from "./native-external-run-ipc";
 import type { NativeExternalRuns } from "./native-external-runs";
 import { takeNativeNotificationFocus } from "./agent-notifications";
 import { NativeArchiveIpc } from "./native-archive-ipc";
+import { listDesktopChats } from "./chat-catalog-ipc";
+import type { NativeChatCatalog } from "./native-chat-catalog";
 import type { NativeArchives } from "./native-archives";
 import type { NativeChatSelections } from "./native-chat-selections";
 
@@ -98,6 +100,7 @@ type RegisterIpcHandlersOptions = {
   resolve_ipc_role: (window: BrowserWindow) => DesktopIpcRole | null;
   open_settings: () => void;
   archives?: NativeArchives;
+  chat_catalog?: NativeChatCatalog;
   global_hooks?: NativeAgentHooks;
   recent_files?: Pick<RecentStore, "list" | "touch" | "pin" | "forget">;
   document_files?: NativeDocumentFiles;
@@ -494,6 +497,14 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   const archives = new NativeArchiveIpc(
     options.archives,
     (sender) => admittedWindow(sender) !== null
+  );
+  guarded(IPC_CHANNELS.CHAT_CATALOG_LIST, (event, query: unknown) =>
+    listDesktopChats(
+      event,
+      query,
+      options.chat_catalog,
+      (sender) => admittedWindow(sender) !== null
+    )
   );
   guarded(IPC_CHANNELS.ARCHIVES_LIST, (event, cursor: unknown) =>
     archives.list(event, cursor)

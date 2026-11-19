@@ -146,6 +146,33 @@ function fixture() {
   };
 }
 
+it("lets a closed-store catalog read finish before opening the worker, then uses its live owner", async () => {
+  const { workspace, owners } = fixture();
+  spawn.mockReturnValueOnce(child(1, { closeOnEof: true }).handle);
+  const release = Promise.withResolvers<void>();
+  const entered = Promise.withResolvers<void>();
+  const inspection = owners.readCatalog(workspace.id, async (active) => {
+    expect(active).toBeNull();
+    entered.resolve();
+    await release.promise;
+  });
+  await entered.promise;
+  const opened = owners.open(workspace);
+  try {
+    expect(spawn).not.toHaveBeenCalled();
+    release.resolve();
+    await inspection;
+    const live = await opened;
+    expect(
+      await owners.readCatalog(workspace.id, async (active) => active)
+    ).toBe(live);
+    expect(spawn).toHaveBeenCalledTimes(1);
+  } finally {
+    release.resolve();
+    await owners.close();
+  }
+});
+
 it("retires the exited worker's callbacks before admitting a replacement", async () => {
   const { workspace, owners, signals } = fixture();
   const exited = child(1, { closeOnEof: true });

@@ -1421,6 +1421,14 @@ async fn named_child_reuses_its_own_context_and_retains_exact_assignment_results
         .await;
     let ids = catalog["result"]["sessions"].as_array().unwrap();
     assert!(ids.iter().all(|session| session["sessionId"] != child));
+    let global = first.request("session/list", json!({})).await;
+    assert!(
+        global["result"]["sessions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|row| row["sessionId"] != child)
+    );
 
     let first_input = assign(
         &parent,

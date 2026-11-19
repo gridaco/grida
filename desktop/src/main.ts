@@ -10,6 +10,7 @@ import create_menu, {
   rebuild_application_menu,
 } from "./menu";
 import { createDesktopArchives } from "./main/native-desktop-archives";
+import { createDesktopChatCatalog } from "./main/native-desktop-chat-catalog";
 import { open_document_window } from "./window";
 import { DEEP_LINK_SCHEME, EDITOR_BASE_URL } from "./env";
 import {
@@ -911,6 +912,10 @@ app.on("ready", async () => {
     resolve_ipc_role: (window) => entryWindow?.ipcRoleFor(window) ?? null,
     open_settings: () => open_or_focus_settings(app, windowAdmission),
     archives: createDesktopArchives(
+      native,
+      NativeDesktopProfile.resourcesPath(app)
+    ),
+    chat_catalog: createDesktopChatCatalog(
       native,
       NativeDesktopProfile.resourcesPath(app)
     ),

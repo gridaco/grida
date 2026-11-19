@@ -35,18 +35,34 @@ delegates work to an external agent. Choosing this client protocol leaves the
 Grida master in charge of native execution.
 
 The Grida profile advertises `sessionCapabilities.list` for standard v1
-`session/list` with an explicit absolute workspace `cwd`. The host canonicalizes
-that directory and reads the workspace's unarchived chats in newest-created
-order. Pages contain at most 32 `SessionInfo` records with the ID, working
-directory and optional title. When local turn timing is retained, a record also
+`session/list`. An explicit absolute `cwd` selects one canonical workspace.
+Omitting it lists unarchived public chats visible in this host's store.
+An initialized client can detect support for this broader catalog through
+`co.grida/session/catalog-query` version 1. Older hosts require `cwd`.
+The default order is newest created. Pages contain at most 32 `SessionInfo`
+records with the ID, working directory and optional title. When local turn timing is retained, a record also
 has `_meta["co.grida/lastActivityAtMs"]`, an optional Unix-epoch millisecond
 integer. For the local turn with the latest execution ordinal, it is the first
 settlement time, or the start time until settlement. Sessions with no local turns omit
 the field, including forks that only have inherited history. This is recorded
-turn activity, not an exact last-message time; it never changes listing order.
-Treat `nextCursor` as opaque and send it with
-the same workspace.
+turn activity. The host uses a separate timestamp for message ordering.
+Treat `nextCursor` as opaque and send it with the same scope and order.
 Listing leaves attachment, execution, and history unchanged. [ACP session listing](https://agentclientprotocol.com/protocol/v1/session-list)
+
+Clients negotiating `co.grida/session/catalog-query` version 1 can request
+`_meta["co.grida/catalogOrder"] = "messageActivity"`. The host orders eligible
+rows before pagination by the latest recorded conversation message, newest first.
+The row's optional `_meta["co.grida/lastMessageAtMs"]` is in Unix milliseconds.
+An accepted user message or saved assistant reply can promote a chat. Reading,
+renaming and changes in execution status preserve this timestamp. Rows with
+no recorded message time follow dated rows. This includes chats with only
+pre-upgrade history. Equal message times are ordered by ascending session ID.
+Side chats and delegated sessions stay outside this catalog.
+
+For a closed store, `grida-agent chat-catalog --state-dir <dir> --order message-activity`
+returns the same page as the live query. Add `--cwd <absolute-workspace>`
+to filter it or `--cursor <token>` to continue. The default order is
+`created`. The command requires an existing native store.
 
 On supporting hosts the `session/list` response includes
 `_meta["co.grida/runningSessionIds"]`. This array contains only IDs on the

@@ -45,8 +45,9 @@ mod titles;
 pub(crate) mod tool_images;
 mod wakeups;
 pub use access::{PermissionModeReceipt, PermissionModeSnapshot, PermissionModeUpdate};
-pub use catalog::SessionCatalog;
+pub(crate) use catalog::CatalogListing;
 pub(crate) use catalog::is_archived;
+pub use catalog::{CatalogOrder, SessionCatalog};
 pub use compaction::{CompactRequest, CompactionReport, CompactionStatus};
 pub use goals::{GoalAction, GoalControl, GoalInspection, GoalRequest, GoalView};
 pub(crate) use history::RevisionTarget;
@@ -135,10 +136,11 @@ pub const DATABASE_FILE: &str = "agent.sqlite";
 /// Open a host's session database with the host's catalog and turn-link
 /// projections. A database created with them refuses any other opener.
 pub fn open_store(database: &Path) -> Result<SqliteStore> {
-    SqliteStore::open_cataloged_with_turn_links(
+    SqliteStore::open_with_conversations(
         database,
         catalog::configuration_scope,
-        subagents::turn_link,
+        Some(subagents::turn_link),
+        catalog::CONVERSATIONS,
     )
 }
 

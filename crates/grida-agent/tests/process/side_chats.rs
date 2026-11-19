@@ -281,6 +281,9 @@ async fn a_side_chat_forks_committed_context_and_runs_as_an_ordinary_temporary_c
         .map(|entry| entry["sessionId"].as_str().unwrap())
         .collect();
     assert_eq!(ids, [parent.as_str()]);
+    let all = ok(client.request("session/list", json!({})).await);
+    assert_eq!(all["sessions"].as_array().unwrap().len(), 1, "{all}");
+    assert_eq!(all["sessions"][0]["sessionId"], parent);
 
     // An ordinary identified submission streams live text on this connection.
     let sent = client

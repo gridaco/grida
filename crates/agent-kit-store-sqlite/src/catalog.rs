@@ -1,16 +1,52 @@
 //! Bounded catalog pages keyed by an opaque scope selected by the owner.
 
 use super::*;
+use agent_kit_core::messages::Message;
 
 const PAGE_SIZE: usize = 32;
 const MAX_LABEL_BYTES: usize = 256;
-const TURN_ACTIVITY: &str = "SELECT active_turn,
+const TURN_ACTIVITY: &str = "SELECT active_turn, last_message_ms,
     (SELECT COALESCE(settled_ms,started_ms) FROM turns
      WHERE session=?1 ORDER BY ordinal DESC LIMIT 1)
     FROM sessions WHERE id=?1";
 
 /// Return a stable scope for an immutable configuration this owner recognizes.
 pub type ScopeProjection = fn(&Envelope) -> Option<Fingerprint>;
+
+/// The owner identifies discoverable conversations, accepted conversational
+/// submissions and newly published messages. An admission and its subsequent
+/// replay into history should be counted by only one of the two predicates.
+#[derive(Clone, Copy)]
+pub struct ConversationProjection {
+    pub group: fn(&Envelope) -> Option<String>,
+    pub input: fn(&Submission) -> bool,
+    pub message: fn(&Message) -> bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ConversationOrder {
+    Created,
+    Recent,
+}
+
+/// The ordering value is captured when the page is read. A subsequent message
+/// or deletion cannot move the boundary when the caller requests the next page.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ConversationAnchor {
+    pub value: i64,
+    pub session: SessionId,
+}
+
+pub struct ConversationRow {
+    pub group: String,
+    pub record: CatalogRecord,
+    pub anchor: ConversationAnchor,
+}
+
+pub struct ConversationPage {
+    pub entries: Vec<ConversationRow>,
+    pub next_after: Option<ConversationAnchor>,
+}
 
 /// A session's owner-defined catalog placement and display label.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -35,6 +71,9 @@ pub enum InitialLabel {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CatalogRecord {
     pub entry: CatalogEntry,
+    /// Most recent projected conversational admission or publication. Absent
+    /// when no message timestamp was recorded (including version 1 data).
+    pub last_message_ms: Option<u64>,
     /// Wall-clock milliseconds since the Unix epoch from the latest turn by
     /// execution ordinal: its first settlement time, or its start time until
     /// settlement. Absent when the session has no local turn. This fact never
@@ -52,6 +91,64 @@ pub struct CatalogPage<T = CatalogEntry> {
 }
 
 impl SqliteStore {
+    /// List discoverable conversations. Both group filtering and ordering
+    /// precede pagination. Reading a page never loads conversation history.
+    pub async fn list_conversations(
+        &self,
+        group: Option<String>,
+        bucket: u8,
+        order: ConversationOrder,
+        after: Option<ConversationAnchor>,
+        limit: usize,
+    ) -> Result<ConversationPage> {
+        if !(1..=PAGE_SIZE).contains(&limit)
+            || after.as_ref().is_some_and(|anchor| anchor.value < -1)
+        {
+            return Err(error(ErrorKind::InvalidInput, "invalid_conversation_page"));
+        }
+        execute(Arc::clone(&self.inner), move |inner, connection| {
+            if inner.conversations.is_none() {
+                return Err(error(
+                    ErrorKind::Unsupported,
+                    "conversation_catalog_unavailable",
+                ));
+            }
+            let sql = conversation_page_query(order, group.is_some());
+            let (boundary, id) = after.as_ref().map_or((i64::MIN, ""), |anchor| {
+                (-anchor.value, anchor.session.as_str())
+            });
+            let mut query = connection.prepare_cached(&sql).map_err(database_error)?;
+            let mut rows = query
+                .query(params![bucket, group, boundary, id, limit as i64 + 1])
+                .map_err(database_error)?;
+            let mut entries = Vec::with_capacity(limit);
+            let mut next_after = None;
+            while let Some(row) = rows.next().map_err(database_error)? {
+                if entries.len() == limit {
+                    next_after = entries
+                        .last()
+                        .map(|row: &ConversationRow| row.anchor.clone());
+                    break;
+                }
+                let entry = decode_entry(read_entry(row))?;
+                let anchor = ConversationAnchor {
+                    value: -row.get::<_, i64>(5).map_err(database_error)?,
+                    session: entry.session.clone(),
+                };
+                entries.push(ConversationRow {
+                    group: row.get(4).map_err(database_error)?,
+                    record: read_record(inner, connection, entry)?,
+                    anchor,
+                });
+            }
+            Ok(ConversationPage {
+                entries,
+                next_after,
+            })
+        })
+        .await
+    }
+
     /// Read presentation metadata only after verifying its owner-defined scope.
     pub async fn scoped_catalog_entry(
         &self,
@@ -390,6 +487,25 @@ fn read_page(
 
 type StoredEntry = (String, u8, Option<String>, i64);
 
+/// Ascending tuples let SQLite seek directly to (time, id), including
+/// within a large timestamp tie. Only fixed SQL fragments vary.
+fn conversation_page_query(order: ConversationOrder, grouped: bool) -> String {
+    let rank = match order {
+        ConversationOrder::Created => "creation_rank",
+        ConversationOrder::Recent => "message_rank",
+    };
+    let scope = if grouped {
+        "conversation_group = ?2"
+    } else {
+        "conversation_group IS NOT NULL"
+    };
+    format!(
+        "SELECT id, bucket, label, catalog_revision, conversation_group, {rank}
+         FROM sessions WHERE bucket=?1 AND {scope} AND ({rank}, id) > (?3, ?4)
+         ORDER BY {rank}, id LIMIT ?5"
+    )
+}
+
 fn read_entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoredEntry> {
     Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
 }
@@ -444,26 +560,57 @@ fn read_record(
     connection: &Connection,
     entry: CatalogEntry,
 ) -> Result<CatalogRecord> {
-    let (current, activity): (Option<String>, Option<i64>) = connection
+    let (current, last_message, activity): (Option<String>, Option<i64>, Option<i64>) = connection
         .prepare_cached(TURN_ACTIVITY)
         .map_err(database_error)?
         .query_row([entry.session.as_str()], |row| {
-            Ok((row.get(0)?, row.get(1)?))
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
         })
         .map_err(database_error)?;
-    let current_turn_disposition = current
-        .map(|id| Ok(view_turn(inner, connection, &entry.session, &TurnId::new(id)?)?.disposition))
+    let current = current
+        .map(|id| view_turn(inner, connection, &entry.session, &TurnId::new(id)?))
         .transpose()?;
     Ok(CatalogRecord {
         entry,
+        last_message_ms: last_message.map(unsigned).transpose()?,
         latest_turn_activity_ms: activity.map(unsigned).transpose()?,
-        current_turn_disposition,
+        current_turn_disposition: current.as_ref().map(|turn| turn.disposition),
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn conversation_pages_seek_the_ordering_tuple_in_the_index() {
+        let mut db = Connection::open_in_memory().unwrap();
+        schema::install_for_test(&mut db);
+        for order in [ConversationOrder::Recent, ConversationOrder::Created] {
+            for grouped in [true, false] {
+                let query = format!(
+                    "EXPLAIN QUERY PLAN {}",
+                    conversation_page_query(order, grouped)
+                );
+                let plan = db
+                    .prepare(&query)
+                    .unwrap()
+                    .query_map(params![0, "group", -100, "session", 33], |r| {
+                        r.get::<_, String>(3)
+                    })
+                    .unwrap()
+                    .collect::<rusqlite::Result<Vec<_>>>()
+                    .unwrap()
+                    .join("\n");
+                assert!(
+                    plan.contains("SEARCH sessions USING INDEX conversations_")
+                        && plan.contains("rank,id)>(?,?)"),
+                    "{plan}"
+                );
+                assert!(!plan.contains("TEMP B-TREE"), "{plan}");
+            }
+        }
+    }
 
     #[test]
     fn latest_turn_timing_uses_the_session_ordinal_index() {

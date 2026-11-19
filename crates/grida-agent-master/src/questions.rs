@@ -25,6 +25,14 @@ use std::collections::BTreeSet;
 const REQUEST_SCHEMA: &str = "grida.agent.question";
 const ANSWER_SCHEMA: &str = "grida.agent.question.answer";
 pub(crate) const ANSWER_SOURCE: &str = "question_response";
+
+/// Whether this saved message is a user contribution accepted by the question owner.
+pub fn is_answer_contribution(message: &Message) -> bool {
+    message.role == Role::User
+        && message.provenance.kind == ProvenanceKind::Supplied
+        && message.provenance.source == ANSWER_SOURCE
+}
+
 const REGISTRATION_SCHEMA: &str = "grida.agent.question.registration";
 const ANSWER_DEPENDENT: &str = "question";
 const NONBLOCKING: &str = "question_async";

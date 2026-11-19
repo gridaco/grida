@@ -120,18 +120,30 @@ the model that vocabulary in the appropriate skill. Workflows is the first
 consumer. The native host treats the display schema as opaque and supplies
 model context at the request's existing authority.
 
+`window.grida.chatCatalog?.list({ workspaceId?, limit?, cursor? })` discovers
+unarchived chats for Home and the workbench. Omit the workspace to list across
+the registered workspaces. The default and maximum page size is 32. Entries carry
+workspace and chat IDs, the title, the last recorded message time and running status. Newest messages appear first, and undated chats
+follow. Continue with the returned opaque cursor and the same workspace filter.
+Request the first page again to observe new activity. The method reads metadata
+from live and closed stores and opens no chat. A registered workspace with no
+saved chats contributes zero rows. If a participating store cannot be read,
+the global query reports an error so clients can distinguish it from an empty
+catalog. Older native builds omit the
+namespace. The workspace picker's existing `nativeChat.list` retains creation order.
+
 Chat listings may carry optional `lastActivity` entries pairing a session ID
 with `atMs`; organization entries and Settings archive rows use
 `lastActivityAtMs`. These are nonnegative integer Unix milliseconds within
-For unarchived workspace chats, `list(cursor)` can return `runningSessionIds`
-alongside `sessionIds`. Every running ID belongs to that page. An empty array
-means none of its chats was running when read. Older hosts omit the field.
-Refresh the same cursor to observe a change without attaching to a chat.
-
 JavaScript's Date range. They describe the latest local turn's first settlement
 time, or start time while unfinished, rather than exact message or archive
 time. A chat without local turns or an older host omits the value. Listing
 order and cursors are unchanged; dates grant no attachment or control authority.
+
+For unarchived workspace chats, `list(cursor)` can return `runningSessionIds`
+alongside `sessionIds`. Every running ID belongs to that page. An empty array
+means none of its chats was running when read. Older hosts omit the field.
+Refresh the same cursor to observe a change without attaching to a chat.
 
 Compatible native hosts supply optional `activityOrder` on exposed messages,
 individual tool calls and child lifecycle events. Positive safe-integer

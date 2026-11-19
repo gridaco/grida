@@ -80,6 +80,7 @@ export const IPC_CHANNELS = {
   WINDOW_SET_REPRESENTED_FILENAME: "grida:window:set-represented-filename",
   WINDOW_CLOSE: "grida:window:close",
   WINDOW_OPEN_SETTINGS: "grida:window:open-settings",
+  CHAT_CATALOG_LIST: "grida:chat-catalog:list",
   ARCHIVES_LIST: "grida:archives:list",
   ARCHIVES_UNARCHIVE: "grida:archives:unarchive",
   GLOBAL_HOOKS_INSPECT: "grida:hooks:inspect",

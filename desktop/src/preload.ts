@@ -1143,6 +1143,10 @@ const bridge: DesktopBridge = {
       ipcRenderer.invoke(IPC_CHANNELS.ARCHIVES_UNARCHIVE, id, revision),
   },
 
+  chatCatalog: {
+    list: (query) => ipcRenderer.invoke(IPC_CHANNELS.CHAT_CATALOG_LIST, query),
+  },
+
   account: {
     sign_out: () => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_SIGN_OUT),
   },

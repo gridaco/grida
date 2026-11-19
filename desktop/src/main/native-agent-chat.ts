@@ -549,66 +549,40 @@ export class NativeAgentChat {
     this.requireOpen();
     if (cursor !== null && !isCatalogCursor(cursor))
       throw new Error("native_chat_cursor_invalid");
-    const result = object(
-      await this.process.request(
-        archived ? "_co.grida/session/list-archived" : "session/list",
-        {
-          cwd: this.cwd,
-          ...(cursor === null ? {} : { cursor }),
-        }
-      )
+    const result = await this.process.request(
+      archived ? "_co.grida/session/list-archived" : "session/list",
+      { cwd: this.cwd, ...(cursor === null ? {} : { cursor }) }
     );
-    if (
-      !Array.isArray(result.sessions) ||
-      result.sessions.length > MAX_CATALOG_SESSIONS
-    )
-      throw invalidResponse();
-    const titles: NonNullable<NativeChatPage["titles"]>[number][] = [];
-    const lastActivity: NonNullable<NativeChatPage["lastActivity"]>[number][] =
-      [];
-    const sessionIds = result.sessions.map((entry: unknown) => {
-      const session = object(entry);
-      if (session.cwd !== this.cwd) throw invalidResponse();
-      const sessionId = identity(session.sessionId);
-      const title = catalogTitle(session.title ?? null);
-      if (title !== null) titles.push({ sessionId, title });
-      const atMs = catalogActivityTime(
-        session._meta == null
-          ? undefined
-          : object(session._meta)["co.grida/lastActivityAtMs"]
-      );
-      if (atMs !== undefined) lastActivity.push({ sessionId, atMs });
-      return sessionId;
-    });
-    const listed = new Set(sessionIds);
-    const runningSessionIds =
-      archived || result._meta == null
-        ? undefined
-        : object(result._meta)["co.grida/runningSessionIds"];
-    if (
-      runningSessionIds !== undefined &&
-      (!Array.isArray(runningSessionIds) ||
-        runningSessionIds.length > listed.size ||
-        runningSessionIds.some((id) => !listed.has(id)) ||
-        new Set(runningSessionIds).size !== runningSessionIds.length)
-    )
-      throw invalidResponse();
-    const nextCursor = result.nextCursor ?? null;
-    if (
-      listed.size !== sessionIds.length ||
-      (nextCursor !== null &&
-        (!isCatalogCursor(nextCursor) ||
-          nextCursor === cursor ||
-          sessionIds.length === 0))
-    )
-      throw invalidResponse();
+    const { sessions, ...page } = readNativeSessionList(
+      result,
+      this.cwd,
+      cursor,
+      archived
+    );
+    const titles = sessions.flatMap(({ sessionId, title }) =>
+      title === null ? [] : [{ sessionId, title }]
+    );
+    const lastActivity = sessions.flatMap(
+      ({ sessionId, lastActivityAtMs: atMs }) =>
+        atMs === undefined ? [] : [{ sessionId, atMs }]
+    );
     return {
-      sessionIds,
-      nextCursor,
+      sessionIds: sessions.map((entry) => entry.sessionId),
+      ...page,
       ...(titles.length && { titles }),
       ...(lastActivity.length && { lastActivity }),
-      ...(runningSessionIds !== undefined && { runningSessionIds }),
     };
+  }
+
+  async messageActivityCatalog(cursor: string | null): Promise<unknown> {
+    this.requireOpen();
+    if (!this.process.acceptsCatalogQuery)
+      throw new Error("native_chat_catalog_query_unavailable");
+    return this.process.request("session/list", {
+      cwd: this.cwd,
+      ...(cursor !== null && { cursor }),
+      _meta: { "co.grida/catalogOrder": "messageActivity" },
+    });
   }
 
   /** Metadata-only Settings calls never attach or restore a chat. */
@@ -3544,6 +3518,59 @@ function revision(value: unknown): number {
   return value;
 }
 
+/** Shared projection for the worker and offline catalog command. Both return ACP session/list. */
+export function readNativeSessionList(
+  value: unknown,
+  cwd: string,
+  cursor: string | null,
+  archived = false
+) {
+  const result = object(value);
+  if (
+    !Array.isArray(result.sessions) ||
+    result.sessions.length > MAX_CATALOG_SESSIONS
+  )
+    throw invalidResponse();
+  const sessions = result.sessions.map((entry: unknown) => {
+    const session = object(entry);
+    if (session.cwd !== cwd) throw invalidResponse();
+    const meta = session._meta == null ? {} : object(session._meta);
+    return {
+      sessionId: identity(session.sessionId),
+      title: catalogTitle(session.title ?? null),
+      lastActivityAtMs: catalogActivityTime(meta["co.grida/lastActivityAtMs"]),
+      lastMessageAtMs: catalogActivityTime(
+        meta["co.grida/lastMessageAtMs"] ?? undefined
+      ),
+    };
+  });
+  const listed = new Set(sessions.map((entry) => entry.sessionId));
+  const meta = archived || result._meta == null ? {} : object(result._meta);
+  const runningSessionIds = catalogIds(
+    meta["co.grida/runningSessionIds"],
+    listed
+  );
+  const inputNeededSessionIds = catalogIds(
+    meta["co.grida/inputNeededSessionIds"],
+    listed
+  );
+  const nextCursor = result.nextCursor ?? null;
+  if (
+    listed.size !== sessions.length ||
+    (nextCursor !== null &&
+      (!isCatalogCursor(nextCursor) ||
+        nextCursor === cursor ||
+        sessions.length === 0))
+  )
+    throw invalidResponse();
+  return {
+    sessions,
+    nextCursor,
+    ...(runningSessionIds !== undefined && { runningSessionIds }),
+    ...(inputNeededSessionIds !== undefined && { inputNeededSessionIds }),
+  };
+}
+
 function catalogTitle(value: unknown): string | null {
   if (value === null) return null;
   if (
@@ -3577,6 +3604,21 @@ function catalogEntry(
     }),
     ...(lastActivityAtMs !== undefined && { lastActivityAtMs }),
   });
+}
+
+function catalogIds(
+  value: unknown,
+  listed: ReadonlySet<string>
+): string[] | undefined {
+  if (value === undefined) return undefined;
+  if (
+    !Array.isArray(value) ||
+    value.length > listed.size ||
+    value.some((id) => !listed.has(id)) ||
+    new Set(value).size !== value.length
+  )
+    throw invalidResponse();
+  return value;
 }
 
 function catalogActivityTime(value: unknown): number | undefined {

@@ -52,6 +52,7 @@ use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
 
 const SUBMIT: &str = "co.grida/session/submit";
+const CATALOG_QUERY: &str = "co.grida/session/catalog-query";
 const INITIAL_TITLE: &str = "co.grida/session/initial-title";
 const FILE_INTAKE: &str = "co.grida/session/selected-file";
 const IMAGE_INTAKE: &str = "co.grida/session/selected-image";
@@ -134,6 +135,26 @@ pub(super) fn prompt_initial_title(
     initial_title(sessions, Some(title.to_owned()))
 }
 
+pub(super) fn catalog_order(
+    connection: &Mutex<ConnectionSessions>,
+    request: &agent_client_protocol::v1::schema::ListSessionsRequest,
+) -> Result<crate::host::CatalogOrder> {
+    use crate::host::CatalogOrder;
+    let Some(order) = request
+        .meta
+        .as_ref()
+        .and_then(|meta| meta.get("co.grida/catalogOrder"))
+    else {
+        return Ok(CatalogOrder::Created);
+    };
+    require(connection, CATALOG_QUERY, None)?;
+    match order.as_str() {
+        Some("created") => Ok(CatalogOrder::Created),
+        Some("messageActivity") => Ok(CatalogOrder::MessageActivity),
+        _ => Err(Error::invalid_params().data("invalid_catalog_order")),
+    }
+}
+
 pub(super) fn negotiated(
     meta: Option<&Meta>,
     reviewer: bool,
@@ -171,7 +192,7 @@ fn capability_keys(
         .chain(input_images::chunks_capability(reviewer))
         .chain(input_images::queued_capability(reviewer))
         .chain(tool_images::capability(reviewer))
-        .chain([catalog::ORGANIZE, catalog::ARCHIVE_CATALOG])
+        .chain([catalog::ORGANIZE, catalog::ARCHIVE_CATALOG, CATALOG_QUERY])
         .chain(delete_chat.then_some(deletion::DELETE))
         .chain(delete_chat.then_some(deletion::PREVIEW))
         .chain(goals::CAPABILITIES)

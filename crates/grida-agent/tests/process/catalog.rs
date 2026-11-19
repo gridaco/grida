@@ -7,7 +7,13 @@ async fn catalog_client(url: &str) -> SharedSocket {
     let mut socket = connect_shared(url, Some(SERVER_TOKEN), None, None)
         .await
         .unwrap();
-    let init = ws_rpc(&mut socket, 1, "initialize", extension_initialize()).await;
+    let mut offered = extension_initialize();
+    offered["clientCapabilities"]["_meta"]["co.grida/session/catalog-query"] = 1.into();
+    let init = ws_rpc(&mut socket, 1, "initialize", offered).await;
+    assert_eq!(
+        init["result"]["agentCapabilities"]["_meta"]["co.grida/session/catalog-query"],
+        1
+    );
     assert_eq!(
         init["result"]["agentCapabilities"]["sessionCapabilities"]["list"],
         json!({})
@@ -74,6 +80,31 @@ async fn standard_acp_catalog_discovers_saved_workspace_sessions_without_loading
         json!([a_sessions[0]])
     );
     assert!(!running.to_string().contains("PRIVATE_TRANSCRIPT_MARKER"));
+    let recent_request = json!({"_meta":{"co.grida/catalogOrder":"messageActivity"}});
+    let recent = ws_rpc(&mut observer, 50, "session/list", recent_request.clone()).await;
+    assert_eq!(ids(&recent["result"])[0], a_sessions[0]);
+    assert_eq!(
+        recent["result"]["sessions"][0]["cwd"],
+        json!(a.path().canonicalize().unwrap())
+    );
+    let admitted_at = recent["result"]["sessions"][0]["_meta"]["co.grida/lastMessageAtMs"]
+        .as_u64()
+        .unwrap();
+    let mut filtered = recent_request.clone();
+    filtered["cwd"] = json!(b.path());
+    let only_b = ws_rpc(&mut observer, 51, "session/list", filtered.clone()).await;
+    assert_eq!(ids(&only_b["result"]), [b_id.as_str()]);
+    filtered["cursor"] = recent["result"]["nextCursor"].clone();
+    let cross_scope = ws_rpc(&mut observer, 52, "session/list", filtered).await;
+    assert_eq!(cross_scope["error"]["data"], "invalid_session_cursor");
+    let wrong_order = ws_rpc(
+        &mut observer,
+        53,
+        "session/list",
+        json!({"cursor":recent["result"]["nextCursor"]}),
+    )
+    .await;
+    assert_eq!(wrong_order["error"]["data"], "invalid_session_cursor");
     let foreign = ws_rpc(&mut observer, 4, "session/list", json!({"cwd":b.path()})).await;
     assert_eq!(
         foreign["result"]["_meta"]["co.grida/runningSessionIds"],
@@ -97,16 +128,45 @@ async fn standard_acp_catalog_discovers_saved_workspace_sessions_without_loading
         settled["result"]["_meta"]["co.grida/runningSessionIds"],
         json!([])
     );
+    let final_recent = ws_rpc(&mut observer, 54, "session/list", recent_request.clone()).await;
+    let reply_at = final_recent["result"]["sessions"][0]["_meta"]["co.grida/lastMessageAtMs"]
+        .as_u64()
+        .unwrap();
+    assert!(reply_at > admitted_at);
     drop(observer);
     terminate_shared_server(child).await;
     let endpoint_url = endpoint.url.clone();
     endpoint.done().await;
 
+    let absent = temporary.path().join("unopened-store");
+    let missing = executable()
+        .args(["chat-catalog", "--state-dir"])
+        .arg(&absent)
+        .output()
+        .await
+        .unwrap();
+    assert!(!missing.status.success());
+    assert!(!absent.exists(), "discovery created a new store");
+    let cold = executable()
+        .args(["chat-catalog", "--state-dir"])
+        .arg(&state)
+        .args(["--order", "message-activity"])
+        .output()
+        .await
+        .unwrap();
+    assert!(
+        cold.status.success(),
+        "{}",
+        String::from_utf8_lossy(&cold.stderr)
+    );
+    assert_eq!(records(&cold.stdout)[0], final_recent["result"]);
+
     let (child, url) = shared_server(&state, &endpoint_url).await;
     let mut client = catalog_client(&url).await;
     let unscoped = ws_rpc(&mut client, 2, "session/list", json!({})).await;
-    assert_eq!(unscoped["error"]["code"], -32602);
-    assert_eq!(unscoped["error"]["data"], "session_list_workspace_required");
+    assert_eq!(ids(&unscoped["result"])[0], b_id);
+    let reopened = ws_rpc(&mut client, 51, "session/list", recent_request).await;
+    assert_eq!(reopened["result"], final_recent["result"]);
     let relative = ws_rpc(&mut client, 3, "session/list", json!({"cwd":"workspace"})).await;
     assert_eq!(relative["error"]["code"], -32602);
     let first = ws_rpc(&mut client, 4, "session/list", json!({"cwd":alias})).await;
@@ -201,6 +261,39 @@ async fn standard_acp_catalog_discovers_saved_workspace_sessions_without_loading
     assert_eq!(ids(&with_fork["result"])[0], fork);
     assert!(with_fork["result"]["sessions"][0].get("_meta").is_none());
     terminate_shared_server(child).await;
+}
+
+#[tokio::test]
+async fn pinned_workspace_catalog_does_not_expose_other_saved_chats() {
+    let fixture = super::approvals::Fixture::new(false);
+    let endpoint = "http://127.0.0.1:1/v1";
+    let (host, url) = shared_server(&fixture.state, endpoint).await;
+    let mut client = catalog_client(&url).await;
+    let own = new_session(&mut client, 2, &fixture.primary).await;
+    new_session(&mut client, 3, &fixture.extra).await;
+    drop(client);
+    terminate_shared_server(host).await;
+
+    let (host, url) = shared_server_with_profile(
+        &fixture.state,
+        endpoint,
+        "catalog-fixture",
+        Some(&fixture.profile),
+    )
+    .await;
+    let mut client = catalog_client(&url).await;
+    let implicit = ws_rpc(
+        &mut client,
+        2,
+        "session/list",
+        json!({"_meta":{"co.grida/catalogOrder":"messageActivity"}}),
+    )
+    .await;
+    assert_eq!(ids(&implicit["result"]), [own.as_str()]);
+    let foreign = ws_rpc(&mut client, 3, "session/list", json!({"cwd":fixture.extra})).await;
+    assert_eq!(foreign["error"]["data"], "session_catalog_scope_mismatch");
+    drop(client);
+    terminate_shared_server(host).await;
 }
 
 async fn organizer(url: &str) -> SharedSocket {
@@ -377,6 +470,9 @@ async fn archived_chat_keeps_its_turn_and_reopens_with_the_same_title() {
     .await;
     assert_eq!(ids(&list["result"]), [session.as_str()]);
     assert_eq!(list["result"]["sessions"][0]["title"], "Reusable work");
+    let message_time = list["result"]["sessions"][0]["_meta"]["co.grida/lastMessageAtMs"]
+        .as_u64()
+        .unwrap();
     assert_eq!(
         list["result"]["sessions"][0]["_meta"]["co.grida/lastActivityAtMs"],
         settled_at
@@ -424,6 +520,10 @@ async fn archived_chat_keeps_its_turn_and_reopens_with_the_same_title() {
     .await;
     assert_eq!(ids(&active["result"]), [session.as_str()]);
     assert_eq!(active["result"]["sessions"][0]["title"], "Reusable work");
+    assert_eq!(
+        active["result"]["sessions"][0]["_meta"]["co.grida/lastMessageAtMs"],
+        message_time
+    );
     assert_eq!(
         active["result"]["sessions"][0]["_meta"]["co.grida/lastActivityAtMs"],
         settled_at

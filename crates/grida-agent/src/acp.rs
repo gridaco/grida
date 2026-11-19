@@ -11,7 +11,9 @@ mod websocket;
 
 pub use websocket::{ListenOptions, serve_websocket};
 
-use crate::host::{AcceptedRun, Host, PromptPart, PromptRequest, RunResult, SessionCatalog};
+use crate::host::{
+    AcceptedRun, CatalogListing, CatalogOrder, Host, PromptPart, PromptRequest, RunResult,
+};
 use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::v1::schema::{
     AgentCapabilities, CancelNotification, ContentBlock, EmbeddedResourceResource, Implementation,
@@ -401,15 +403,9 @@ async fn serve_connection(
                     if !list_sessions.lock().unwrap().initialized {
                         return Err(unavailable("initialize_required"));
                     }
-                    let cwd = request.cwd.ok_or_else(|| {
-                        Error::invalid_params().data("session_list_workspace_required")
-                    })?;
-                    let after = request.cursor.as_deref().map(catalog_anchor).transpose()?;
-                    let catalog = list_host
-                        .list_sessions(cwd, false, after)
-                        .await
-                        .map_err(host_error)?;
-                    catalog_response(catalog, true)
+                    let order = extensions::catalog_order(&list_sessions, &request)?;
+                    list_chats(&list_host, request.cwd, order, request.cursor.as_deref())
+                        .await.map_err(host_error)
                 }
                 .await;
                 responder.respond_with_result(result)
@@ -873,38 +869,59 @@ fn host_error(error: agent_kit_core::Error) -> Error {
     wire_error.data(error.code)
 }
 
-fn catalog_anchor(cursor: &str) -> Result<SessionId> {
-    cursor
-        .strip_prefix("v1/")
-        .and_then(|id| SessionId::new(id).ok())
-        .ok_or_else(|| Error::invalid_params().data("invalid_session_cursor"))
+/// The native CLI and ACP project the same host-owned public catalog page.
+pub async fn list_chats(
+    host: &Host,
+    cwd: Option<std::path::PathBuf>,
+    order: CatalogOrder,
+    cursor: Option<&str>,
+) -> agent_kit_core::Result<ListSessionsResponse> {
+    let page = host.discover_chats(cwd, order, cursor).await?;
+    catalog_response(page, true)
 }
 
 fn catalog_response(
-    mut catalog: SessionCatalog,
-    include_running: bool,
-) -> Result<ListSessionsResponse> {
-    let cwd_bytes = serde_json::to_vec(&catalog.cwd)
-        .map_err(|_| unavailable("session_catalog_projection_failed"))?
-        .len();
-    // Each standard record repeats the workspace path. Leave frame room for
-    // labels, keys, cursor, and the JSON-RPC envelope, plus a second copy of
-    // each running session ID (up to 256 ASCII bytes) in the page metadata.
-    let page_limit = (transport::MAX_FRAME_BYTES / 2) / (cwd_bytes + 3072 + 256);
-    if page_limit == 0 {
-        return Err(Error::invalid_params().data("session_catalog_workspace_too_large"));
+    mut catalog: CatalogListing,
+    include_activity: bool,
+) -> agent_kit_core::Result<ListSessionsResponse> {
+    // Reserve room for titles, cursor and activity arrays, including when
+    // different rows in an all-workspaces page have different path lengths.
+    let mut bytes = 0;
+    let mut count = 0;
+    for row in &catalog.entries {
+        bytes += serde_json::to_vec(&row.cwd)
+            .map_err(|_| {
+                agent_kit_core::Error::new(
+                    ErrorKind::InvalidState,
+                    "session_catalog_projection_failed",
+                )
+            })?
+            .len()
+            + 4096;
+        if bytes > transport::MAX_FRAME_BYTES / 2 {
+            break;
+        }
+        count += 1;
     }
-    if catalog.entries.len() > page_limit {
-        catalog.entries.truncate(page_limit);
-        catalog.next_after = catalog
-            .entries
-            .last()
-            .map(|record| record.entry.session.clone());
+    if count == 0 && !catalog.entries.is_empty() {
+        return Err(agent_kit_core::Error::new(
+            ErrorKind::InvalidInput,
+            "session_catalog_workspace_too_large",
+        ));
     }
-    let meta = include_running.then(|| {
+    if count < catalog.entries.len() {
+        catalog.entries.truncate(count);
+        catalog.has_more = true;
+    }
+    let cursor = catalog
+        .has_more
+        .then(|| catalog.entries.last().map(|row| row.cursor.clone()))
+        .flatten();
+    let meta = include_activity.then(|| {
         let ids = catalog
             .entries
             .iter()
+            .map(|row| &row.record)
             .filter(|record| {
                 record.current_turn_disposition
                     == Some(agent_kit_sessions::TurnDisposition::Running)
@@ -920,20 +937,21 @@ fn catalog_response(
         catalog
             .entries
             .into_iter()
-            .map(|record| {
-                let meta = record.latest_turn_activity_ms.map(|timestamp| {
-                    serde_json::Map::from_iter([(
-                        "co.grida/lastActivityAtMs".to_owned(),
-                        timestamp.into(),
-                    )])
-                });
-                let entry = record.entry;
-                SessionInfo::new(entry.session.as_str().to_owned(), catalog.cwd.clone())
+            .map(|row| {
+                let mut meta = serde_json::Map::new();
+                if let Some(value) = row.record.latest_turn_activity_ms {
+                    meta.insert("co.grida/lastActivityAtMs".into(), value.into());
+                }
+                if let Some(value) = row.record.last_message_ms {
+                    meta.insert("co.grida/lastMessageAtMs".into(), value.into());
+                }
+                let entry = row.record.entry;
+                SessionInfo::new(entry.session.as_str().to_owned(), row.cwd)
                     .title(entry.label)
-                    .meta(meta)
+                    .meta((!meta.is_empty()).then_some(meta))
             })
             .collect(),
     )
-    .next_cursor(catalog.next_after.map(|id| format!("v1/{}", id.as_str())))
+    .next_cursor(cursor)
     .meta(meta))
 }

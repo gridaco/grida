@@ -123,6 +123,7 @@ struct Inner {
     owners: Mutex<BTreeMap<(SessionId, TurnId), Weak<()>>>,
     changed: Notify,
     catalog: Option<catalog::ScopeProjection>,
+    conversations: Option<catalog::ConversationProjection>,
     turn_links: Option<turn_links::TurnLinkProjection>,
     // Drop SQLite before releasing the writer lock.
     _lock: Option<WriterLock>,
@@ -195,7 +196,7 @@ impl SqliteStore {
         connection
             .pragma_update(None, "temp_store", "MEMORY")
             .map_err(database_error)?;
-        Self::initialize(None, connection, None, None)
+        Self::initialize(None, connection, None, None, None)
     }
 
     /// Open a private application database with synchronous WAL commits.
@@ -203,7 +204,7 @@ impl SqliteStore {
     /// The parent directory must exist. One process owns this database while
     /// any store or bound journal handle remains alive.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::open_inner(path.as_ref(), None, None)
+        Self::open_inner(path.as_ref(), None, None, None)
     }
 
     /// Open with a stable, owner-defined scope projection for read-only
@@ -212,7 +213,7 @@ impl SqliteStore {
         path: impl AsRef<Path>,
         project: catalog::ScopeProjection,
     ) -> Result<Self> {
-        Self::open_inner(path.as_ref(), Some(project), None)
+        Self::open_inner(path.as_ref(), Some(project), None, None)
     }
 
     /// Open with owner-defined session scopes and immutable submission links.
@@ -221,13 +222,25 @@ impl SqliteStore {
         catalog: catalog::ScopeProjection,
         project: turn_links::TurnLinkProjection,
     ) -> Result<Self> {
-        Self::open_inner(path.as_ref(), Some(catalog), Some(project))
+        Self::open_inner(path.as_ref(), Some(catalog), Some(project), None)
+    }
+
+    /// Track the owner's public conversation catalog in the same transactions
+    /// that accept submissions and publish history records.
+    pub fn open_with_conversations(
+        path: impl AsRef<Path>,
+        scope: catalog::ScopeProjection,
+        links: Option<turn_links::TurnLinkProjection>,
+        conversations: catalog::ConversationProjection,
+    ) -> Result<Self> {
+        Self::open_inner(path.as_ref(), Some(scope), links, Some(conversations))
     }
 
     fn open_inner(
         path: &Path,
         catalog: Option<catalog::ScopeProjection>,
         turn_links: Option<turn_links::TurnLinkProjection>,
+        conversations: Option<catalog::ConversationProjection>,
     ) -> Result<Self> {
         if path.file_name().is_none() || !path.parent().is_some_and(Path::is_dir) {
             return Err(error(ErrorKind::InvalidInput, "store_directory_missing"));
@@ -247,7 +260,7 @@ impl SqliteStore {
         let database = open_private_file(&path)?;
         drop(database);
         let connection = Connection::open(&path).map_err(database_error)?;
-        Self::initialize(Some(lock), connection, catalog, turn_links)
+        Self::initialize(Some(lock), connection, catalog, turn_links, conversations)
     }
 
     fn initialize(
@@ -256,6 +269,7 @@ impl SqliteStore {
         mut connection: Connection,
         catalog: Option<catalog::ScopeProjection>,
         turn_links: Option<turn_links::TurnLinkProjection>,
+        conversations: Option<catalog::ConversationProjection>,
     ) -> Result<Self> {
         connection
             .busy_timeout(Duration::from_secs(5))
@@ -269,6 +283,7 @@ impl SqliteStore {
                 catalog: catalog.is_some(),
                 turn_links: turn_links.is_some(),
             },
+            conversations,
         )?;
         if lock.is_some() {
             connection
@@ -285,6 +300,7 @@ impl SqliteStore {
                 owners: Mutex::new(BTreeMap::new()),
                 changed: Notify::new(),
                 catalog,
+                conversations,
                 turn_links,
                 _lock: lock,
             }),
@@ -678,12 +694,7 @@ impl SqliteStore {
             }
             let _source_owner = require_operation_owner(inner, &transaction, &source)?;
             if let Some(create) = create {
-                record_creation(
-                    &transaction,
-                    &create,
-                    inner.catalog,
-                    Fingerprint::of(&create)?,
-                )?;
+                record_creation(&transaction, &create, inner, Fingerprint::of(&create)?)?;
             }
             let prepared =
                 prepare_claim(inner, &transaction, claim, Some(driver_state), Some(input))?;
@@ -988,7 +999,7 @@ impl SessionStore for SqliteStore {
             )? {
                 return Ok(receipt);
             }
-            let receipt = record_creation(&transaction, &request, inner.catalog, fingerprint)?;
+            let receipt = record_creation(&transaction, &request, inner, fingerprint)?;
             commit(inner, transaction)?;
             Ok(receipt)
         })
@@ -1159,7 +1170,7 @@ impl TurnJournal for SqliteJournal {
                 .iter()
                 .any(|action| matches!(action, JournalAction::SetDriverState(_)))
                 .then(|| state.driver_state().clone());
-            let receipt = state.apply(change)?;
+            let receipt = apply_turn_change(inner, &transaction, &mut state, change)?;
             save_turn(inner, &transaction, &state)?;
             let previous = before.filter(|snapshot| snapshot != state.driver_state());
             let settled = state.outcome().is_some();
@@ -1301,19 +1312,25 @@ fn execute<T: Send + 'static>(
 fn insert_session(
     transaction: &Transaction<'_>,
     request: &CreateSession,
-    catalog: Option<catalog::ScopeProjection>,
+    inner: &Inner,
     seed: Option<&history::HistorySeed>,
 ) -> Result<SessionCreated> {
     deletion::require_unretired(transaction, &request.id)?;
-    let scope = catalog.and_then(|project| project(&request.configuration));
+    let scope = inner
+        .catalog
+        .and_then(|project| project(&request.configuration));
+    let group = inner
+        .conversations
+        .and_then(|project| (project.group)(&request.configuration));
     let inserted = transaction
         .execute(
-            "INSERT INTO sessions(id,configuration,revision,paused,next_input,scope) VALUES(?1,?2,0,0,0,?3)
+            "INSERT INTO sessions(id,configuration,revision,paused,next_input,scope,conversation_group)
+             VALUES(?1,?2,0,0,0,?3,?4)
          ON CONFLICT(id) DO NOTHING",
             params![
                 request.id.as_str(),
                 encode(&request.configuration)?,
-                scope.as_ref().map(|scope| scope.bytes().as_slice())
+                scope.as_ref().map(|scope| scope.bytes().as_slice()), group
             ],
         )
         .map_err(database_error)?;
@@ -1330,10 +1347,10 @@ fn insert_session(
 fn record_creation(
     transaction: &Transaction<'_>,
     request: &CreateSession,
-    catalog: Option<catalog::ScopeProjection>,
+    inner: &Inner,
     fingerprint: Fingerprint,
 ) -> Result<SessionCreated> {
-    let receipt = insert_session(transaction, request, catalog, None)?;
+    let receipt = insert_session(transaction, request, inner, None)?;
     save_request(
         transaction,
         &request.id,
@@ -1636,7 +1653,7 @@ fn apply_control(
             expected,
             actions,
         )?;
-        let receipt = state.apply(change)?;
+        let receipt = apply_turn_change(inner, transaction, &mut state, change)?;
         session.driver_state = state.driver_state().clone();
         save_turn(inner, transaction, &state)?;
         Some(receipt)
@@ -1726,6 +1743,12 @@ fn insert_input(
         params![session_id.as_str(), input.id.as_str(), sql_number(receipt.position)?,
             payload, Fingerprint::of(input)?.bytes().as_slice(), sql_number(order.unwrap_or(receipt.position))?],
     ).map_err(database_error)?;
+    if inner
+        .conversations
+        .is_some_and(|project| (project.input)(input))
+    {
+        record_message_time(transaction, session_id)?;
+    }
     if let Some(project) = inner.turn_links {
         turn_links::project_input(
             transaction,
@@ -2020,6 +2043,34 @@ fn decode_turn(
 
 fn save_turn(inner: &Inner, transaction: &Transaction<'_>, state: &TurnState) -> Result<()> {
     turn_layout::write(&inner.turns, transaction, state, false)
+}
+
+fn apply_turn_change(
+    inner: &Inner,
+    tx: &Transaction<'_>,
+    state: &mut TurnState,
+    change: JournalChange,
+) -> Result<CommitReceipt> {
+    let previous = state.history().records().len();
+    let receipt = state.apply(change)?;
+    if let Some(project) = inner.conversations
+        && state.history().records()[previous..]
+            .iter()
+            .any(|HistoryRecord::Message(message)| (project.message)(message))
+    {
+        record_message_time(tx, &state.binding().session)?;
+    }
+    Ok(receipt)
+}
+
+fn record_message_time(tx: &Transaction<'_>, session: &SessionId) -> Result<()> {
+    tx.execute(
+        "UPDATE sessions SET last_message_ms=max(coalesce(last_message_ms,0),?2)
+         WHERE id=?1 AND conversation_group IS NOT NULL",
+        params![session.as_str(), now_ms()],
+    )
+    .map_err(database_error)?;
+    Ok(())
 }
 
 /// Refuse a new turn whose identity its session already holds.

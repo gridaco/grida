@@ -71,6 +71,10 @@ export namespace ipc_admission {
   }): boolean {
     switch (role) {
       case "main":
+        if (channel === IPC_CHANNELS.CHAT_CATALOG_LIST)
+          return (
+            pathname === "/desktop/welcome" || pathname === "/desktop/workspace"
+          );
         // GRIDA-SEC-016 — confirmed app-wide clearing grants no page lease.
         if (
           channel === IPC_CHANNELS.BROWSER_CLEAR_BROWSING_DATA ||

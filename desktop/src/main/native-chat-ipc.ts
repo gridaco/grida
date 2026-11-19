@@ -166,6 +166,7 @@ export type ActiveNativeChat = Readonly<{
     Partial<
       Pick<
         NativeAgentChat,
+        | "messageActivityCatalog"
         | "archiveCatalog"
         | "unarchiveCatalog"
         | "acceptsSavedChatDeletion"

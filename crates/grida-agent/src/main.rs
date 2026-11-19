@@ -279,6 +279,14 @@ fn command() -> Command {
                 .arg(Arg::new("request-json").long("request-json")),
         )
         .subcommand(
+            Command::new("chat-catalog")
+                .about("List saved chats in an existing native store without attaching to them")
+                .arg(state_dir())
+                .arg(Arg::new("cwd").long("cwd").value_parser(value_parser!(PathBuf)))
+                .arg(Arg::new("order").long("order").value_parser(["created", "message-activity"]).default_value("created"))
+                .arg(Arg::new("cursor").long("cursor")),
+        )
+        .subcommand(
             Command::new("archive-catalog")
                 .hide(true)
                 .arg(state_dir())
@@ -574,6 +582,23 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
             }
             _ => unreachable!("validated operation"),
         }
+        return Ok(0);
+    }
+    if name == "chat-catalog" {
+        use grida_agent::host::CatalogOrder;
+        let host = Host::open(state_dir, None)?;
+        let order = match args.get_one::<String>("order").map(String::as_str) {
+            Some("message-activity") => CatalogOrder::MessageActivity,
+            _ => CatalogOrder::Created,
+        };
+        let page = acp::list_chats(
+            &host,
+            args.get_one::<PathBuf>("cwd").cloned(),
+            order,
+            args.get_one::<String>("cursor").map(String::as_str),
+        )
+        .await?;
+        process::write_record(&page).await?;
         return Ok(0);
     }
     if name == "archive-catalog" {

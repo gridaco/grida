@@ -511,9 +511,11 @@ text context and confer no file or network access. Session loading replays
 committed text before its reply and leaves work ownership with the host.
 The prompt response follows the last delivered update and verified outcome.
 
-List supplies an absolute workspace `cwd` and returns up to 32 saved session
-identities in newest-created order. Follow `nextCursor` with the same workspace.
-Listing leaves chats detached and reads no transcripts.
+List returns up to 32 public saved chats in newest-created order. Supply an
+absolute `cwd` for one workspace or omit it for the visible store. Clients
+can negotiate message-activity ordering to discover recently active chats.
+The cursor continues the same scope and order. Listing reads catalog metadata
+without attaching to chats. [Catalog protocol](docs/rust-client-protocol.md#baseline-and-ownership)
 
 On macOS and Linux, negotiate `co.grida/session/delete` version 1 on private
 stdio to delete an eligible idle saved chat. A fresh request binds the
@@ -596,6 +598,7 @@ with an underscore.
 | ------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | `co.grida/session/submit`                         | Accept an identified prompt for an idle session.                                    |
 | `co.grida/session/initial-title`                  | Suggest a provisional catalog title when the first message is accepted.             |
+| `co.grida/session/catalog-query`                  | List visible public chats across workspaces or order a page by message activity.    |
 | `co.grida/session/snapshot`                       | Read revisions, ordered queue settings, and turn summaries.                         |
 | `co.grida/session/enqueue`, `input`               | Accept waiting work or read an accepted input and its settings.                     |
 | `co.grida/session/replace`, `withdraw`, `reorder` | Edit waiting work with revision checks and retained receipts.                       |

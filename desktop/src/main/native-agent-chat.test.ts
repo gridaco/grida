@@ -10,6 +10,10 @@ import {
   type NativeAgentChatLaunch,
 } from "./native-agent-chat";
 import { NativeAgentProcess } from "./native-agent-process";
+import {
+  NativeChatCatalog,
+  readClosedChatCatalog,
+} from "./native-chat-catalog";
 
 const packaged = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
 
@@ -1328,6 +1332,102 @@ it.runIf(Boolean(packaged))(
         await closed;
       }
       test.close();
+    }
+  },
+  30_000
+);
+
+it.runIf(Boolean(packaged))(
+  "finds an old chat with a new reply across live and closed workspace stores",
+  async () => {
+    const a = fixture();
+    const b = fixture();
+    const projectA = { id: "000000000000000a", root: a.cwd };
+    const projectB = { id: "000000000000000b", root: b.cwd };
+    const provider = await scriptedProvider([
+      finishReply("First."),
+      finishReply("Latest."),
+    ]);
+    const launch = (test: ReturnType<typeof fixture>) =>
+      NativeAgentChat.start({
+        resourcesPath: packaged!,
+        stateDirectory: test.stateDirectory,
+        cwd: test.cwd,
+        provider: "openai-compatible",
+        model: "fixture",
+        endpoint: provider.endpoint,
+      });
+    let active: NativeAgentChat | undefined;
+    let other: NativeAgentChat | undefined;
+    const openCatalog = () =>
+      new NativeChatCatalog({
+        workspaces: async () => [projectB, projectA],
+        resolve: async (id) => (id === projectA.id ? projectA : projectB),
+        read: (workspace, cursor) =>
+          active && workspace.id === projectA.id
+            ? active.messageActivityCatalog(cursor)
+            : readClosedChatCatalog(
+                packaged!,
+                workspace.id === projectA.id
+                  ? a.stateDirectory
+                  : b.stateDirectory,
+                workspace.root,
+                cursor
+              ),
+      });
+    try {
+      active = await launch(a);
+      const original = await active.create();
+      for (let i = 0; i < 32; i++) await active.create();
+      expect((await active.list()).sessionIds).not.toContain(original.id);
+      other = await launch(b);
+      const otherChat = await other.create();
+      await other.submit(otherChat, "other-message", "First message.");
+      await vi.waitFor(async () =>
+        expect((await other!.observe(otherChat)).latest?.status).toBe(
+          "succeeded"
+        )
+      );
+      await other.close();
+      other = undefined;
+      await active.submit(original, "new-reply", "Resume this chat.");
+      await vi.waitFor(async () =>
+        expect((await active!.observe(original)).latest?.status).toBe(
+          "succeeded"
+        )
+      );
+      const catalog = openCatalog();
+      const first = await catalog.list({ limit: 1 });
+      expect(first.entries).toEqual([
+        expect.objectContaining({
+          sessionId: original.id,
+          workspaceId: projectA.id,
+          lastMessageAtMs: expect.any(Number),
+        }),
+      ]);
+      expect(
+        (await catalog.list({ cursor: first.nextCursor, limit: 1 })).entries[0]
+          .sessionId
+      ).toBe(otherChat.id);
+      expect(
+        (await catalog.list({ workspaceId: projectA.id, limit: 1 })).entries
+      ).toEqual(first.entries);
+      expect(
+        (await catalog.list({ workspaceId: projectB.id })).entries.map(
+          (chat) => chat.sessionId
+        )
+      ).toEqual([otherChat.id]);
+      await active.close();
+      active = undefined;
+      expect((await openCatalog().list({ limit: 1 })).entries).toEqual(
+        first.entries
+      );
+      expect(provider.requests).toHaveLength(2);
+    } finally {
+      await Promise.all([active?.close(), other?.close()]);
+      await provider.close();
+      a.close();
+      b.close();
     }
   },
   30_000

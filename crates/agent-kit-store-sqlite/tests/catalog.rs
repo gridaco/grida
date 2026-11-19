@@ -14,6 +14,139 @@ use agent_kit_store_sqlite::{
 };
 use support::{change, payload, private_directory, submission};
 
+#[tokio::test]
+async fn conversation_pages_seek_past_a_moved_anchor_and_date_only_new_messages() {
+    use agent_kit_core::MessageId;
+    use agent_kit_core::history::HistoryRecord;
+    use agent_kit_core::messages::{Content, Message, Provenance, ProvenanceKind, Role};
+    use agent_kit_store_sqlite::catalog::{ConversationOrder::Recent, ConversationProjection};
+
+    let directory = private_directory();
+    let filename = directory.path().join("sessions.sqlite");
+    let open = || {
+        SqliteStore::open_with_conversations(
+            &filename,
+            project,
+            None,
+            ConversationProjection {
+                group: |env| {
+                    matches!(env.bytes(), b"a" | b"b")
+                        .then(|| String::from_utf8(env.bytes().to_vec()).unwrap())
+                },
+                input: |input| input.payload.bytes() == b"message",
+                message: |message| message.role == Role::Assistant,
+            },
+        )
+        .unwrap()
+    };
+    let store = open();
+    let a = create("first", "a").id;
+    let b = create("second", "b").id;
+    for (id, group) in [
+        ("first", "a"),
+        ("second", "b"),
+        ("empty", "a"),
+        ("private", "private"),
+    ] {
+        store.create(create(id, group)).await.unwrap();
+    }
+    let message = submission("input", "message");
+    for id in [a.clone(), b.clone(), SessionId::new("private").unwrap()] {
+        store.submit(id, message.clone()).await.unwrap();
+    }
+    // Pin an old timestamp tie in the closed fixture instead of sleeping to
+    // arrange clock ticks. All observations and subsequent writes use the store.
+    drop(store);
+    let db = rusqlite::Connection::open(&filename).unwrap();
+    assert_eq!(
+        db.execute(
+            "UPDATE sessions SET last_message_ms=7 WHERE last_message_ms IS NOT NULL",
+            []
+        )
+        .unwrap(),
+        2
+    );
+    drop(db);
+    let store = open();
+    let first = store
+        .list_conversations(None, 0, Recent, None, 1)
+        .await
+        .unwrap();
+    assert_eq!(first.entries[0].record.entry.session, a);
+    let after = first.next_after.unwrap();
+    let claim_request = ClaimRequest {
+        id: change("claim"),
+        session: b.clone(),
+        expected_revision: store.inspect(b.clone()).await.unwrap().revision,
+        selection: TurnSelection::New {
+            turn: TurnId::new("turn").unwrap(),
+            inputs: vec![message.id.clone()],
+        },
+    };
+    let ClaimOutcome::Acquired(claim) = store.claim(claim_request).await.unwrap() else {
+        panic!("expected lease")
+    };
+    let mut renamed = store.catalog_entry(a.clone()).await.unwrap();
+    renamed.label = Some("renamed".into());
+    store.replace_catalog_entry(renamed).await.unwrap();
+    store.submit(a.clone(), message).await.unwrap(); // accepted retry
+    store
+        .submit(a.clone(), submission("internal", "internal"))
+        .await
+        .unwrap();
+    let before = store
+        .list_conversations(None, 0, Recent, None, 32)
+        .await
+        .unwrap()
+        .entries;
+    assert_eq!(
+        before
+            .iter()
+            .map(|r| r.record.last_message_ms)
+            .collect::<Vec<_>>(),
+        [Some(7), Some(7), None]
+    );
+    assert_eq!(
+        before[1].record.current_turn_disposition,
+        Some(TurnDisposition::Running)
+    );
+    store
+        .submit(a.clone(), submission("later", "message"))
+        .await
+        .unwrap();
+    let tail = store
+        .list_conversations(None, 0, Recent, Some(after), 1)
+        .await
+        .unwrap();
+    assert_eq!(tail.entries[0].record.entry.session, b);
+
+    let reply = HistoryRecord::Message(Message {
+        id: MessageId::new("reply").unwrap(),
+        role: Role::Assistant,
+        phase: None,
+        content: vec![Content::Text("reply".into())],
+        provenance: Provenance {
+            source: "fixture".into(),
+            kind: ProvenanceKind::Generated,
+            fingerprint: None,
+        },
+    });
+    support::commit(
+        &claim,
+        "publish",
+        vec![JournalAction::AppendHistory(vec![reply])],
+    )
+    .await;
+    let page = store
+        .list_conversations(Some("b".into()), 0, Recent, None, 32)
+        .await
+        .unwrap();
+    assert_eq!(page.entries.len(), 1);
+    assert_eq!(page.entries[0].group, "b");
+    assert_eq!(page.entries[0].record.entry.session, b);
+    assert!(page.entries[0].record.last_message_ms.unwrap() > 7);
+}
+
 fn project(config: &Envelope) -> Option<Fingerprint> {
     match config.bytes() {
         b"a" | b"b" => Fingerprint::of(&config.bytes()).ok(),

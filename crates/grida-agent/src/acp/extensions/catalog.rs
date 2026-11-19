@@ -180,13 +180,14 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                     let after = request
                         .cursor
                         .as_deref()
-                        .map(super::super::catalog_anchor)
-                        .transpose()?;
+                        .map(crate::host::SessionCatalog::anchor)
+                        .transpose()
+                        .map_err(host_error)?;
                     let catalog = host
                         .list_sessions(request.cwd, true, after)
                         .await
                         .map_err(host_error)?;
-                    super::super::catalog_response(catalog, false)
+                    super::super::catalog_response(catalog.into(), false).map_err(host_error)
                 }
                 .await;
                 responder.respond_with_result(result)

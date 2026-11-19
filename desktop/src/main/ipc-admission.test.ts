@@ -74,6 +74,7 @@ describe("ipc_admission", () => {
           !channel.startsWith("grida:provider:endpoint:") &&
           !channel.startsWith("grida:hooks:") &&
           !channel.startsWith("grida:archives:") &&
+          channel !== IPC_CHANNELS.CHAT_CATALOG_LIST &&
           !nativeChat.includes(channel) &&
           !nativeExternal.includes(channel) &&
           channel !== workspacePublish &&
@@ -303,6 +304,21 @@ describe("ipc_admission", () => {
     expect(allowedFor("sign-in", "/desktop/auth/sign-in")).not.toContain(
       channel
     );
+  });
+
+  it("admits saved chat discovery only in Home and the main workbench", () => {
+    const list = IPC_CHANNELS.CHAT_CATALOG_LIST;
+    expect(allowedFor("main", "/desktop/welcome")).toContain(list);
+    expect(allowedFor("main", "/desktop/workspace")).toContain(list);
+    for (const path of [
+      "/desktop/file",
+      "/desktop/tools",
+      "/desktop/settings",
+      "/desktop/workspace/extra",
+    ])
+      expect(allowedFor("main", path)).not.toContain(list);
+    expect(allowedFor("sign-in", "/desktop/auth/sign-in")).not.toContain(list);
+    expect(allowedFor("onboarding", "/desktop/onboarding")).not.toContain(list);
   });
 
   it("admits nested deck text edits within the file chat scope", () => {

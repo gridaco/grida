@@ -58,6 +58,7 @@ const LIBRARY_SELECTION_CAPABILITIES = {
   "co.grida/session/library-selections": 1,
   "co.grida/session/answer-library-selection": 1,
 } as const;
+const CATALOG_QUERY = "co.grida/session/catalog-query";
 export const TRANSCRIPT_WINDOW = "co.grida/session/transcript-window";
 const MODEL_CHANGE = "co.grida/session/model-change";
 const SUBAGENT_CAPABILITIES = {
@@ -189,6 +190,7 @@ export class NativeAgentProcess {
   private historyRevision = false;
   private transcriptWindow = false;
   private activityOrder = false;
+  private catalogQuery = false;
   private modelChange = false;
   private inputRoutes = false;
   get acceptsInputRoutes() {
@@ -303,6 +305,10 @@ export class NativeAgentProcess {
 
   get acceptsActivityOrder(): boolean {
     return this.connected && this.activityOrder;
+  }
+
+  get acceptsCatalogQuery(): boolean {
+    return this.connected && this.catalogQuery;
   }
 
   get acceptsEditorContext(): boolean {
@@ -680,6 +686,7 @@ export class NativeAgentProcess {
                 [NativeQueuedMessages.replaceTextCapability]: 1,
                 [NativeSelectedImages.capability]: 1,
                 [TRANSCRIPT_WINDOW]: 1,
+                [CATALOG_QUERY]: 1,
                 [NativeActivityOrder.capability]: 1,
                 [MODEL_CHANGE]: 1,
                 ...(providerRoutes && { [NativeProviderRoutes.capability]: 1 }),
@@ -704,6 +711,7 @@ export class NativeAgentProcess {
       const agentCapabilities = object(response.agentCapabilities);
       const advertised = object(agentCapabilities?._meta);
       processOwner.transcriptWindow = advertised?.[TRANSCRIPT_WINDOW] === 1;
+      processOwner.catalogQuery = advertised?.[CATALOG_QUERY] === 1;
       processOwner.activityOrder =
         advertised?.[NativeActivityOrder.capability] === 1;
       processOwner.modelChange = advertised?.[MODEL_CHANGE] === 1;

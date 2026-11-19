@@ -284,10 +284,20 @@ as the command and the arguments from the example above. Start a chat from
 the Agent Panel's new-thread menu; Grida's replies appear in that thread.
 [Zed custom agents](https://zed.dev/docs/ai/external-agents#custom-agents)
 
-Use `session/list` to discover unarchived chats for an absolute workspace `cwd`.
-Follow `nextCursor` with the same workspace to get the next page. The list
-shows chat identities and optional titles in newest-created order. Choose a
-chat and call `session/load` to open its transcript. [ACP session listing](https://agentclientprotocol.com/protocol/v1/session-list)
+Use `session/list` to discover unarchived chats. An absolute `cwd` filters
+to one workspace. Hosts supporting `co.grida/session/catalog-query` can also
+list the visible chats across their store when you omit `cwd`. Older Grida
+hosts require the workspace. Choose a chat and call `session/load` to open
+its transcript. [ACP session listing](https://agentclientprotocol.com/protocol/v1/session-list)
+
+The default order is newest created. To show recent conversations, negotiate
+`co.grida/session/catalog-query` version 1 and pass
+`"_meta": {"co.grida/catalogOrder": "messageActivity"}`. A new message can
+bring an old chat to the first page. Viewing or renaming a chat preserves its
+position. Each row identifies its workspace. Follow `nextCursor` with the
+same filter and order, or start a fresh first page to see new activity. A chat
+with no recorded message time follows dated chats, including a chat whose
+messages all predate message timestamping.
 
 Clients that negotiate `co.grida/session/initial-title` version 1 can send
 the optional `_meta["co.grida/initialTitle"]` string with a first

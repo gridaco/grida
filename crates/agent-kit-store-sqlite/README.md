@@ -11,18 +11,30 @@ transaction. Earlier turns are retained independently.
 
 ## Schema and opening
 
-The database has one schema, declared in `src/schema.rs`, and carries this
-store's SQLite application identity and schema version 1. Opening an empty
-database installs the schema in one transaction. A database with this store's
-identity and version opens as it is. Every other file is refused unchanged
-with `store_schema_unsupported`: a database another program wrote, one without
-this store's identity whatever its version, and a non-empty file at version 0.
-There are no in-place upgrades.
+The database carries this store's SQLite application identity and schema
+version 2. Opening an empty database installs the schema in one transaction.
+Opening a version 1 database verifies the original schema and owner profile,
+then adds the conversation catalog in one transaction. The upgrade recovers
+catalog membership from session configuration. Version 1 did not record
+message timestamps, so those conversations have an unknown message time until
+new activity arrives. Older binaries refuse a version 2 database. Unrecognized
+schemas, other applications’ files, and non-empty files at version 0 are
+refused unchanged.
 
 The database records the owner projections it was created with: whether it
-keeps a catalog and whether it links submissions to source turns. Reopening it
+keeps a catalog, tracks public conversations and links submissions to source turns. Reopening it
 with a different set is refused with `store_profile_mismatch`, so a session is
 never admitted without the catalog placement or link its owner relies on.
+
+The optional public catalog records the owner's group and projected message
+activity in the same transaction as session creation, input acceptance or
+history publication. Its creation and message-time indexes support bounded
+pages within one group and across groups. Recent pages use descending message
+time, then ascending session ID for ties; undated conversations follow the
+dated rows. A cursor retains the observed sort value, so an updated or deleted
+anchor still identifies the same boundary. Refresh the first page to see chats
+that moved ahead of that boundary. Catalog reads require no transcript,
+provider or execution ownership.
 
 Deleting a session inserts its retirement and removes the session row. Its
 turns, parts, messages, submissions, links, receipts, history views and

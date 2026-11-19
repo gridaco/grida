@@ -1298,12 +1298,16 @@ pixels through this reader, with no additional filesystem or model grant.
   the saved model selector in its local URL fragment. Selecting any target
   still requires ordinary workspace and saved-connection admission. Attention
   events are transient and grant no execution, transcript, or filesystem access.
-- [Native session listing](crates/grida-agent/src/host/catalog.rs) uses an
-  explicit canonical workspace on the initialized ACP connection. The
-  [SQLite catalog](crates/agent-kit-store-sqlite/src/catalog.rs) queries that
-  scope before pagination. Responses project IDs, the selected workspace and
-  optional bounded user-entered titles. A cursor carries no global order and
-  must anchor a session in the same scope. Listing creates no attachment or
+- [Native session listing](crates/grida-agent/src/host/catalog.rs) discovers
+  public workspace chats within the host's store. An explicit canonical workspace
+  narrows that scope. The [SQLite catalog](crates/agent-kit-store-sqlite/src/catalog.rs)
+  applies visibility and ordering before pagination. Private side chats and
+  delegated sessions have no public catalog membership. The [Desktop catalog](desktop/src/main/native-desktop-chat-catalog.ts)
+  resolves workspace IDs through the registered workspace owner. Its
+  [IPC adapter](desktop/src/main/chat-catalog-ipc.ts) admits metadata reads from
+  the authenticated Home or workspace main frame, revokes pending reads on navigation,
+  and accepts no renderer-supplied paths. Rows carry identity, title, time and
+  running status. Listing creates no attachment or
   execution authority. [Catalog changes](crates/grida-agent/src/acp/extensions/catalog.rs)
   require a negotiated capability, an attached chat, and the observed metadata
   revision. They leave execution, transcripts, and artifacts untouched.

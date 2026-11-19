@@ -21,8 +21,8 @@ type CatalogPage = {
 type Receipt = { workspace: Workspace; session: string; revision: number };
 type Cursor = { workspaces: Workspace[]; index: number; after: string | null };
 type Active = {
-  archiveCatalog(cursor: string | null): Promise<unknown>;
-  unarchiveCatalog(id: string, revision: number): Promise<void>;
+  archiveCatalog?(cursor: string | null): Promise<unknown>;
+  unarchiveCatalog?(id: string, revision: number): Promise<void>;
 };
 type Request = {
   directory: string;
@@ -34,8 +34,10 @@ type Options = {
   resourcesPath: string;
   workspaces(): Promise<Workspace[]>;
   resolve(id: string): Promise<{ root: string }>;
-  directory(id: string, root: string): Promise<string | null>;
-  active(id: string): Active | null;
+  withStore<T>(
+    workspace: Workspace,
+    use: (active: Active | null, directory: string | null) => Promise<T>
+  ): Promise<T>;
   /** Native command adapter; the owner still resolves all paths and handles. */
   execute?: (request: Request) => Promise<unknown>;
 };
@@ -75,24 +77,26 @@ export class NativeArchives {
         try {
           await this.requireWorkspace(workspace);
           check();
-          const active = this.options.active(workspace.id);
-          if (active) {
-            page = readPage(await active.archiveCatalog(state.after));
-          } else {
-            const directory = await this.options.directory(
-              workspace.id,
-              workspace.root
-            );
-            page = directory
-              ? readPage(
-                  await this.query({
-                    directory,
-                    root: workspace.root,
-                    cursor: state.after,
-                  })
-                )
-              : { entries: [], nextCursor: null };
-          }
+          page = await this.options.withStore(
+            workspace,
+            async (active, directory) => {
+              check();
+              if (active) {
+                if (!active.archiveCatalog)
+                  throw new Error("native_archive_catalog_unavailable");
+                return readPage(await active.archiveCatalog(state.after));
+              }
+              return directory
+                ? readPage(
+                    await this.query({
+                      directory,
+                      root: workspace.root,
+                      cursor: state.after,
+                    })
+                  )
+                : { entries: [], nextCursor: null };
+            }
+          );
         } catch {
           unavailable.push(workspace.name);
           state.index += 1;
@@ -159,30 +163,33 @@ export class NativeArchives {
         throw new Error("native_archive_handle_invalid");
       await this.requireWorkspace(receipt.workspace);
       check();
-      const active = this.options.active(receipt.workspace.id);
-      if (active) {
-        await active.unarchiveCatalog(receipt.session, revision);
-      } else {
-        const directory = await this.options.directory(
-          receipt.workspace.id,
-          receipt.workspace.root
-        );
-        if (!directory) throw new Error("native_archive_store_unavailable");
-        check();
-        const result = await this.query({
-          directory,
-          root: receipt.workspace.root,
-          cursor: null,
-          restore: { session: receipt.session, revision },
-        });
-        if (
-          !result ||
-          typeof result !== "object" ||
-          !("restored" in result) ||
-          result.restored !== true
-        )
-          throw new Error("native_archive_response_invalid");
-      }
+      await this.options.withStore(
+        receipt.workspace,
+        async (active, directory) => {
+          check();
+          if (active) {
+            if (!active.unarchiveCatalog)
+              throw new Error("native_archive_catalog_unavailable");
+            await active.unarchiveCatalog(receipt.session, revision);
+          } else {
+            if (!directory) throw new Error("native_archive_store_unavailable");
+            check();
+            const result = await this.query({
+              directory,
+              root: receipt.workspace.root,
+              cursor: null,
+              restore: { session: receipt.session, revision },
+            });
+            if (
+              !result ||
+              typeof result !== "object" ||
+              !("restored" in result) ||
+              result.restored !== true
+            )
+              throw new Error("native_archive_response_invalid");
+          }
+        }
+      );
       await this.requireWorkspace(receipt.workspace);
       check();
       this.receipts.delete(id);

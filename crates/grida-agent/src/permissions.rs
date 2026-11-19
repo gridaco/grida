@@ -590,6 +590,13 @@ impl PermissionProfile {
             .map(DirectoryBinding::root)
     }
 
+    pub(crate) fn catalog_workspace(&self) -> Result<Option<&Path>> {
+        self.workspace
+            .primary()
+            .map(|_| self.primary_directory())
+            .transpose()
+    }
+
     pub fn matches_primary(&self, cwd: &Path) -> bool {
         self.primary_directory().is_ok_and(|primary| primary == cwd)
     }
