@@ -1,38 +1,17 @@
 ---
 name: desktop-fx
-description: Generate a single image from a text prompt in a Desktop workspace, including when the chat has no image generation tool. Also use Grida FX to build editable workflows from examples, inspect saved runs, and present results.
+description: Work with Grida FX in a Desktop workspace. Adapt workflow examples, plan and run asset workflows, inspect saved runs, and present results.
 ---
 
-Run `grida-fx` in the workspace through the ordinary command tool. Check that
-`command -v grida-fx` resolves in the first directory on `PATH`, then check
-`grida-fx --version`. If the bundled executable is unavailable, tell the user.
-Follow the project's FX instructions and use command-specific `--help` for the installed version.
+Desktop puts the bundled `grida-fx` executable on the command tool's `PATH`.
+The Grida CLI exposes the same engine as `grida fx`. Where the docs say
+`grida fx plan`, run `grida-fx plan` in Desktop with the same arguments.
+Check that `command -v grida-fx` resolves in the first directory on `PATH`,
+then check `grida-fx --version`. If the bundled executable is unavailable, tell the user.
 
-## Generate one image
-
-For a text-to-image request, `call image.generate` produces one PNG and a saved
-run directly. Use the nearest `fx.yaml`'s image route when configured. Outside a
-project, supply a qualified route the user wants. For example, preview an
-image request for the user's signed-in Codex CLI.
-
-```sh
-grida-fx call image.generate --prompt 'A red kite above a foggy hill' --route imagegen@codex --dry-run --json
-```
-
-The preview reports the route, forecast and ceiling. Resolving an unfamiliar
-provider model may need network access. To generate, replace `--dry-run`
-with `--live`. Use the user's Full access selection and
-authorization for the chosen route. A metered route needs an agreed
-`--max-usd` or project budget. Codex and Grok Build routes use the user's
-own signed-in subscriptions. Use `grida-fx doctor` to diagnose setup while
-leaving credential values in their configured sources.
-
-Read `status`, `output` and `run` from the JSON result. On success, give the
-user the PNG directly. The FX 0.11.0 viewer cannot display a one-shot run's
-graph. To deliver a named copy, add `--out` with an unused filename
-in an existing workspace directory on the generation command. To diagnose
-failure, inspect the exact run folder when returned. If only delivery failed,
-use the saved `artifact`. Leave provider retries to FX.
+Follow the project's FX instructions. Start with `grida-fx <command> --help`
+for the installed version. For details beyond the local help, consult the
+[full FX reference for agents](https://grida.co/fx/llms.txt).
 
 ## Work with examples and workflows
 
@@ -45,8 +24,10 @@ For a selected `template-id`, look it up with `grida-fx init --list-templates --
 Install it with `grida-fx add <id> <new-dir> --json` and use the workflow entry
 and optional input preset from the receipt. For a private GitHub template the
 user specified, `add OWNER/REPO@REF --github-auth` uses their authenticated
-GitHub CLI. Downloads and provider calls require Full access. Offline planning
-and saved run inspection work under Default access.
+GitHub CLI. Offline planning and saved run inspection work under Default access.
+Downloads and live provider calls require Full access. Confirm the user's route
+and spending ceiling or subscription use before live generation. Use
+`grida-fx doctor` to check provider setup.
 
 ## Present an authored workflow's plan or saved run
 
@@ -61,3 +42,9 @@ Open the resulting URL with `surface_open`. Use `browser_snapshot` to identify
 the tab and current document, then `browser_evaluate` with that document ID to
 read the viewer's context. Verify the subject and selection before using its
 presentation API or telling the user what appeared.
+
+## Single image
+
+FX can also generate one PNG from text with `grida-fx call image.generate`.
+Use `--dry-run` to preview the request and route. A successful call with
+`--json` reports the PNG in `output` and the saved run in `run`.

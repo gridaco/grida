@@ -16,8 +16,7 @@ npm install -g grida
 grida --help
 ```
 
-`grida fx call image.generate` generates a single PNG from a text prompt.
-You can also use FX to plan, run and inspect reusable asset workflows.
+`grida fx` lets you plan, run and inspect reusable asset workflows.
 [Use FX in the CLI](https://grida.co/docs/cli/fx)
 
 [Read the docs](https://grida.co/docs/cli) for setup, supported platforms,

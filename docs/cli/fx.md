@@ -1,6 +1,6 @@
 ---
 title: Grida FX in the Grida CLI
-description: Generate a single image or plan and run an asset workflow with the Grida FX engine bundled in the Grida CLI.
+description: Plan, run and inspect asset workflows with the Grida FX engine bundled in the Grida CLI.
 keywords: [grida, cli, fx, workflow, generative assets, pipeline]
 sidebar_label: FX
 sidebar_position: 7
@@ -10,24 +10,8 @@ format: md
 
 # Grida FX in the Grida CLI
 
-`grida fx` can generate a single image from text or run a reusable asset
-workflow. FX plans the request, reuses cached results and records each run.
-
-## Generate one image
-
-Preview the prompt and route first. This example selects the Codex route,
-which uses your signed-in Codex CLI for generation. If your FX project already
-sets an image route, you can omit `--route`.
-
-```sh
-grida fx call image.generate --prompt 'A red kite above a foggy hill' --route imagegen@codex --dry-run --json
-```
-
-When you're ready to generate, replace `--dry-run` with `--live`. Add
-`--out kite.png` to deliver a copy to an unused filename. For a dollar-billed
-route, supply `--max-usd` or set the project's budget. The result's `output`
-names the PNG. Use `grida fx inspect <run>` with the returned `run` folder to
-see how it was made.
+`grida fx` plans and runs reusable asset workflows. FX reuses cached results
+and records each run for inspection.
 
 ## Run a workflow
 
@@ -42,6 +26,19 @@ updates FX. `grida fx --version` prints that version. FX owns these commands,
 their options and their help: `grida fx <command> --help` describes each one.
 The [FX guide](https://github.com/gridaco/fx/tree/main/docs/guide) covers
 workflow files, nodes, costs, caching and runs.
+
+## Generate one image
+
+For a single PNG, you can call `image.generate` directly. This example
+previews a request using the project's configured image route.
+
+```sh
+grida fx call image.generate --prompt 'A red kite above a foggy hill' --dry-run
+```
+
+To generate, replace `--dry-run` with `--live`. Metered routes use
+`--max-usd` or the project budget. See `grida fx call image.generate --help`
+for route and output options.
 
 ## Platforms
 
