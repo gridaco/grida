@@ -81,6 +81,8 @@ pub struct CatalogRecord {
     pub latest_turn_activity_ms: Option<u64>,
     /// The current turn's authoritative disposition, absent for an idle or queued-only session.
     pub current_turn_disposition: Option<TurnDisposition>,
+    /// Open request schema identities for the current turn eligible for input.
+    pub pending_request_schemas: BTreeSet<agent_kit_core::SchemaId>,
 }
 
 /// One page of a scoped catalog listing in reverse creation order.
@@ -575,6 +577,10 @@ fn read_record(
         last_message_ms: last_message.map(unsigned).transpose()?,
         latest_turn_activity_ms: activity.map(unsigned).transpose()?,
         current_turn_disposition: current.as_ref().map(|turn| turn.disposition),
+        pending_request_schemas: current
+            .filter(|turn| !turn.controls.cancelled)
+            .map(|turn| turn.pending_request_schemas)
+            .unwrap_or_default(),
     })
 }
 

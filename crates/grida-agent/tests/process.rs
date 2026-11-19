@@ -75,6 +75,9 @@ mod outbound_mcp;
 #[path = "process/processes.rs"]
 mod processes;
 #[cfg(unix)]
+#[path = "process/prompt_preview.rs"]
+mod prompt_preview;
+#[cfg(unix)]
 #[path = "process/questions.rs"]
 mod questions;
 #[path = "process/responses.rs"]

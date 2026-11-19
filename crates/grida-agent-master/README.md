@@ -73,7 +73,10 @@ forward. The original execution records remain available in their source view.
 Turn-bound question tools support immediate registration and answer-dependent
 deferral. Responses can be a suggested choice, free text, or a skip. Their
 schema and reply validation live with the tools. The host chooses which styles
-to offer and how to deliver questions to its clients.
+to offer and how to deliver questions to its clients. An optional question
+expires at settlement. A reply accepted beforehand enters the next model
+decision as a correlated user message. An awaited answer reaches the model
+in its tool result. Both answers have an attributed transcript entry.
 
 Effort policy selects a turn's parent generation allowance within a
 host-supplied total. Standard uses the direct allowance. Ultra requires an

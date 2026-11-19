@@ -24,7 +24,6 @@ export namespace SettingsArchives {
       error: null,
     };
     private listeners = new Set<() => void>();
-    private generation = 0;
     private pending = false;
     constructor(private readonly native: () => Native | undefined) {}
     readonly read = (): State => this.state;
@@ -32,42 +31,35 @@ export namespace SettingsArchives {
       this.listeners.add(listener);
       return () => this.listeners.delete(listener);
     };
-    cancel(): void {
-      this.generation += 1;
-      this.pending = false;
-    }
     readonly refresh = async (): Promise<void> => {
       await this.list(null);
     };
     readonly more = async (): Promise<void> => {
       if (this.state.nextCursor) await this.list(this.state.nextCursor);
     };
-    async unarchive(id: string): Promise<void> {
-      if (this.pending) return;
+    async unarchive(id: string): Promise<boolean> {
+      if (this.pending) return false;
       const api = this.native();
       const entry = this.state.entries.find((entry) => entry.id === id);
-      if (!api || !entry) return;
+      if (!api || !entry) return false;
       this.pending = true;
-      const generation = ++this.generation;
       this.publish({ restoring: id, error: null });
       try {
         await api.unarchive(entry.id, entry.revision);
-        if (generation === this.generation)
-          this.publish({
-            entries: this.state.entries.filter((entry) => entry.id !== id),
-          });
+        this.publish({
+          entries: this.state.entries.filter((entry) => entry.id !== id),
+        });
+        return true;
       } catch (error) {
-        if (generation === this.generation)
-          this.publish({
-            error:
-              unavailableMessage(error) ??
-              "Couldn't unarchive this chat. Refresh the list and try again.",
-          });
+        this.publish({
+          error:
+            unavailableMessage(error) ??
+            "Couldn't unarchive this chat. Refresh the list and try again.",
+        });
+        return false;
       } finally {
-        if (generation === this.generation) {
-          this.pending = false;
-          this.publish({ restoring: null });
-        }
+        this.pending = false;
+        this.publish({ restoring: null });
       }
     }
     private async list(cursor: string | null): Promise<void> {
@@ -78,41 +70,35 @@ export namespace SettingsArchives {
         return;
       }
       this.pending = true;
-      const generation = ++this.generation;
       this.publish({ supported: true, loading: true, error: null });
       try {
         const page = await api.list(cursor);
-        if (generation === this.generation) {
-          const entries = cursor
-            ? [...this.state.entries, ...page.entries]
-            : page.entries;
-          this.publish({
-            entries: Array.from(
-              new Map(entries.map((entry) => [entry.id, entry])).values()
-            ),
-            nextCursor: page.nextCursor,
-            unavailableWorkspaces: cursor
-              ? [
-                  ...new Set([
-                    ...this.state.unavailableWorkspaces,
-                    ...(page.unavailableWorkspaces ?? []),
-                  ]),
-                ]
-              : (page.unavailableWorkspaces ?? []),
-          });
-        }
+        const entries = cursor
+          ? [...this.state.entries, ...page.entries]
+          : page.entries;
+        this.publish({
+          entries: Array.from(
+            new Map(entries.map((entry) => [entry.id, entry])).values()
+          ),
+          nextCursor: page.nextCursor,
+          unavailableWorkspaces: cursor
+            ? [
+                ...new Set([
+                  ...this.state.unavailableWorkspaces,
+                  ...(page.unavailableWorkspaces ?? []),
+                ]),
+              ]
+            : (page.unavailableWorkspaces ?? []),
+        });
       } catch (error) {
-        if (generation === this.generation)
-          this.publish({
-            error:
-              unavailableMessage(error) ??
-              "Couldn't load archived chats. Try refreshing the list.",
-          });
+        this.publish({
+          error:
+            unavailableMessage(error) ??
+            "Couldn't load archived chats. Try refreshing the list.",
+        });
       } finally {
-        if (generation === this.generation) {
-          this.pending = false;
-          this.publish({ loading: false });
-        }
+        this.pending = false;
+        this.publish({ loading: false });
       }
     }
     private publish(patch: Partial<State>): void {

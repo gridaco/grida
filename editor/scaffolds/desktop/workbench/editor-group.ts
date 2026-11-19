@@ -93,6 +93,19 @@ export class EditorGroup {
     this.commit();
   }
 
+  /** Move an open tab to another open tab's index, preserving focus and history. */
+  move(id: string, targetId: string): void {
+    const from = this._tabs.indexOf(id);
+    const to = this._tabs.indexOf(targetId);
+    if (from < 0 || to < 0 || from === to) return;
+
+    const tabs = [...this._tabs];
+    tabs.splice(from, 1);
+    tabs.splice(to, 0, id);
+    this._tabs = tabs;
+    this.commit();
+  }
+
   /**
    * Substitute a fresh key at one open tab's index in one publication. An
    * active source selects its replacement; an inactive source keeps focus.

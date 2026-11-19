@@ -37,5 +37,5 @@ in Settings rather than chat menus.
    System and confirm it follows the operating system. Confirm the preference
    survives reopening Settings and is reflected in other Desktop windows.
 6. Open chat options and the chat picker. Confirm neither offers lifecycle-hook
-   management nor archived-chat browsing/restoration. Archive chat remains an
+   management nor archived-chat browsing/restoration. **Archive** remains an
    action for an active chat.

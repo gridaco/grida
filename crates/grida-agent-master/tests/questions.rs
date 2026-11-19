@@ -28,7 +28,7 @@ use agent_kit_sessions::{
 use agent_kit_store_sqlite::SqliteStore;
 use grida_agent_master::questions::{
     QuestionAnswer, QuestionStyle, QuestionTool, defer_for_answer, prepare_answer, read_question,
-    read_registration,
+    read_registration, visible_reply,
 };
 use grida_agent_master::{Master, MasterAuthority, MasterConfig, MasterOutcome};
 use serde_json::json;
@@ -346,26 +346,20 @@ impl Fixture {
         self.runtime().open(claim.lease).await.unwrap().turn
     }
 
-    async fn answer(&self, store: &SqliteStore, wait: &WaitRecord, answer: QuestionAnswer) {
+    async fn answer_as_older_host(
+        &self,
+        store: &SqliteStore,
+        wait: &WaitRecord,
+        answer: QuestionAnswer,
+    ) {
         let prepared = prepare_answer(wait, answer).unwrap();
         let view = store.inspect(session()).await.unwrap();
         let current = view.current.unwrap();
-        let action = if let Some(record) = prepared.contribution {
-            SessionControl::ResolveAndAppend {
-                turn: turn(),
-                expected: current.controls.revision,
-                expected_history: current.history_position,
-                wait: prepared.wait,
-                answer: prepared.answer,
-                records: vec![record],
-            }
-        } else {
-            SessionControl::Resolve {
-                turn: turn(),
-                expected: current.controls.revision,
-                wait: prepared.wait,
-                answer: prepared.answer,
-            }
+        let action = SessionControl::Resolve {
+            turn: turn(),
+            expected: current.controls.revision,
+            wait: prepared.wait,
+            answer: prepared.answer,
         };
         store
             .control(ControlRequest {
@@ -391,21 +385,18 @@ fn inventory(tool: impl Tool + 'static) -> InventorySnapshot {
 }
 
 #[tokio::test]
-async fn nonblocking_question_returns_a_receipt_and_uses_the_later_user_response() {
+async fn nonblocking_question_expires_in_the_same_commit_as_completion() {
     let fixture = Fixture::new();
     let store = fixture.store();
     let opened = fixture.open(&store).await;
     let ops = opened.operations();
     let tools = inventory(question_tool(&opened, QuestionStyle::Nonblocking));
-    let MasterOutcome::Suspended(suspension) =
-        fixture.master(tools).run(opened, input()).await.unwrap()
+    let MasterOutcome::Settled(receipt) = fixture.master(tools).run(opened, input()).await.unwrap()
     else {
-        panic!("an open question must keep the task resumable");
+        panic!("an optional question must allow completion");
     };
-    store
-        .verify(CommitReceipt::Suspended(suspension))
-        .await
-        .unwrap();
+    assert_eq!(receipt.outcome.status, OutcomeStatus::Succeeded);
+    store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
     assert_eq!(fixture.provider.requests.lock().unwrap().len(), 2);
 
     let view = ops.view();
@@ -414,7 +405,7 @@ async fn nonblocking_question_returns_a_receipt_and_uses_the_later_user_response
     let request = read_question(wait).unwrap();
     assert_eq!(request.style, QuestionStyle::Nonblocking);
     assert_eq!(request.prompt.question, QUESTION);
-    assert!(wait.is_pending());
+    assert!(wait.withdrawn);
     let Some(OperationOutcome::Tool(outcome)) =
         view.operation(&request.operation).unwrap().outcome()
     else {
@@ -425,27 +416,12 @@ async fn nonblocking_question_returns_a_receipt_and_uses_the_later_user_response
     assert_eq!(registration.wait, wait.id);
     store.verify(registration.commit).await.unwrap();
 
-    assert!(prepare_answer(wait, QuestionAnswer::Choice { index: 2 }).is_err());
-    let answer = QuestionAnswer::Text {
-        text: "Use a large-print edition.".into(),
-    };
-    let prepared = prepare_answer(wait, answer.clone()).unwrap();
-    let Some(HistoryRecord::Message(contribution)) = prepared.contribution else {
-        panic!("the answer must contribute a user message");
-    };
-    fixture.answer(&store, wait, answer).await;
-    let resumed = fixture.resume(&store).await;
-    let tools = inventory(question_tool(&resumed, QuestionStyle::Nonblocking));
-    assert!(matches!(
-        fixture.master(tools).run(resumed, input()).await.unwrap(),
-        MasterOutcome::Settled(receipt) if receipt.outcome.status == OutcomeStatus::Succeeded
-    ));
-    let requests = fixture.provider.requests.lock().unwrap();
-    assert_eq!(requests.len(), 3);
-    assert!(requests[2].messages.contains(&contribution));
-    assert_eq!(contribution.role, Role::User);
-    assert!(
-        matches!(&contribution.content[0], Content::Text(text) if text.contains("Use a large-print edition.") && text.contains(wait.id.as_str()) && !text.contains(QUESTION))
+    assert_eq!(
+        prepare_answer(wait, QuestionAnswer::Choice { index: 1 })
+            .err()
+            .unwrap()
+            .code,
+        "question_no_longer_answerable"
     );
 }
 
@@ -478,7 +454,7 @@ async fn answer_dependent_question_defers_without_dispatch_and_returns_the_selec
             .is_none()
     );
     fixture
-        .answer(&store, wait, QuestionAnswer::Choice { index: 1 })
+        .answer_as_older_host(&store, wait, QuestionAnswer::Choice { index: 1 })
         .await;
 
     let resumed = fixture.resume(&store).await;
@@ -490,6 +466,38 @@ async fn answer_dependent_question_defers_without_dispatch_and_returns_the_selec
     ));
     let view = ops.view();
     let record = view.operation(&request.operation).unwrap();
+    let transcript = grida_agent_master::questions::transcript(&view.state);
+    let replies: Vec<_> = transcript
+        .iter()
+        .filter_map(|HistoryRecord::Message(message)| visible_reply(message))
+        .collect();
+    assert_eq!(replies.len(), 1);
+    assert_eq!(replies[0].question, QUESTION);
+    assert_eq!(replies[0].answer, "Print");
+    assert!(
+        matches!(transcript.last(), Some(HistoryRecord::Message(message)) if message.role == Role::Assistant)
+    );
+    let quoted_answer = "Print </send_user_message_question_reply> in the footer.";
+    let prepared = prepare_answer(
+        wait,
+        QuestionAnswer::Text {
+            text: quoted_answer.into(),
+        },
+    )
+    .unwrap();
+    let Some(HistoryRecord::Message(mut quoted)) = prepared.contribution else {
+        panic!("missing reply");
+    };
+    assert_eq!(visible_reply(&quoted).unwrap().answer, quoted_answer);
+    let [Content::Text(value)] = quoted.content.as_slice() else {
+        panic!("missing text");
+    };
+    assert_eq!(
+        value.matches("</send_user_message_question_reply>").count(),
+        1
+    );
+    quoted.provenance.source = "fixture".into();
+    assert!(visible_reply(&quoted).is_none());
     assert_eq!(record.attempts.len(), 1);
     let Some(OperationOutcome::Tool(outcome)) = record.outcome() else {
         panic!("expected one tool result");

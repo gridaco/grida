@@ -239,7 +239,8 @@ impl Turn {
     /// refusal returns `FinishOutcome::Continue`; only an unknown commit
     /// disposition returns an error.
     pub async fn try_finish(&mut self, draft: CompletionDraft) -> Result<FinishOutcome> {
-        self.finish(draft, None).await
+        self.try_finish_with_interactions(draft, None, Default::default())
+            .await
     }
 
     /// Publish a conditional driver-state update with the same terminal receipt.
@@ -248,13 +249,17 @@ impl Turn {
         draft: CompletionDraft,
         change: DriverStateChange,
     ) -> Result<FinishOutcome> {
-        self.finish(draft, Some(change)).await
+        self.try_finish_with_interactions(draft, Some(change), Default::default())
+            .await
     }
 
-    async fn finish(
+    /// Withdraw the caller's designated optional interactions in the settlement
+    /// commit. An answer that wins the race invalidates the completion basis.
+    pub async fn try_finish_with_interactions(
         &mut self,
         draft: CompletionDraft,
         state_change: Option<DriverStateChange>,
+        withdraw: std::collections::BTreeSet<WaitId>,
     ) -> Result<FinishOutcome> {
         self.inner.closing.store(true, Ordering::SeqCst);
         let _serial = self.inner.serial.lock().await;
@@ -270,7 +275,10 @@ impl Turn {
             .operations()
             .values()
             .any(|operation| operation.outcome().is_none())
-            || state.waits().values().any(WaitRecord::is_pending)
+            || state
+                .waits()
+                .values()
+                .any(|wait| wait.is_pending() && !withdraw.contains(&wait.id))
         {
             self.inner.reopen();
             return Ok(FinishOutcome::Continue(Error::new(
@@ -278,19 +286,19 @@ impl Turn {
                 "work_unsettled",
             )));
         }
-        let mut actions = Vec::new();
-        let id = match state_change {
-            Some(change) => {
-                let id = phase_id(
-                    &self.inner.binding.turn,
-                    "settle",
-                    &(&draft.outcome, &change),
-                )?;
-                actions.push(JournalAction::SetDriverState(change));
-                id
-            }
-            None => phase_id(&self.inner.binding.turn, "settle", &draft.outcome)?,
+        let turn = &self.inner.binding.turn;
+        let id = if !withdraw.is_empty() {
+            phase_id(turn, "settle", &(&draft.outcome, &state_change, &withdraw))?
+        } else if let Some(change) = &state_change {
+            phase_id(turn, "settle", &(&draft.outcome, change))?
+        } else {
+            phase_id(turn, "settle", &draft.outcome)?
         };
+        let mut actions: Vec<_> = withdraw
+            .into_iter()
+            .map(JournalAction::WithdrawWait)
+            .collect();
+        actions.extend(state_change.map(JournalAction::SetDriverState));
         actions.push(JournalAction::Settle(draft.outcome));
         let receipt = match self
             .inner

@@ -181,6 +181,7 @@ describe("ipc_admission", () => {
     for (const channel of [
       IPC_CHANNELS.ARCHIVES_LIST,
       IPC_CHANNELS.ARCHIVES_UNARCHIVE,
+      IPC_CHANNELS.ARCHIVES_OPEN_RESTORED,
     ]) {
       expect(allowedFor("main", "/desktop/settings")).toContain(channel);
       for (const route of [
@@ -192,6 +193,17 @@ describe("ipc_admission", () => {
         expect(allowedFor("main", route)).not.toContain(channel);
       }
     }
+  });
+
+  it("keeps workspace archive undo in the workbench", () => {
+    const channel = IPC_CHANNELS.NATIVE_CHAT_UNDO_ARCHIVE;
+    expect(allowedFor("main", "/desktop/workspace")).toContain(channel);
+    for (const route of [
+      "/desktop/settings",
+      "/desktop/file",
+      "/desktop/welcome",
+    ])
+      expect(allowedFor("main", route)).not.toContain(channel);
   });
 
   it("admits exact selected-file SVG chat without project settings or presentation", () => {
@@ -220,6 +232,7 @@ describe("ipc_admission", () => {
     ).toEqual(nativeChat);
     const deck = allowedFor("main", "/desktop/file");
     expect(deck).toContain(IPC_CHANNELS.NATIVE_CHAT_STATUS);
+    expect(deck).not.toContain(IPC_CHANNELS.NATIVE_CHAT_START_WORKSPACE);
     expect(deck).toContain(IPC_CHANNELS.NATIVE_CHAT_SUBMIT);
     for (const channel of [
       IPC_CHANNELS.NATIVE_CHAT_PUBLISH_EDITOR_SURFACES,

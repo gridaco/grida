@@ -18,8 +18,9 @@ Desktop chat in a project uses the **Default** access, shown in the composer.
 The agent reads and edits files in the project and runs commands there in a
 sandbox without asking. For example, ask “Run the tests and fix what fails.”
 
-- Commands start from your login shell's environment, so your usual tools
-  work.
+- Desktop reads your login shell's environment from your home folder so
+  commands can find your usual tools. If shell startup stalls, Desktop uses
+  its own environment and opens chat.
 - Commands can read elsewhere on your computer, except Grida's own data and
   saved credentials. They can write only in the project and the system's
   temporary folder, and they cannot reach the internet.
@@ -64,8 +65,10 @@ Grida does not promise isolation from hostile same-user code.
 
 On Home, choosing **Full access** opens the same confirmation immediately.
 Confirm to select Full access for the new chat in your chosen project. You can
-keep drafting and change the model or effort before sending. Cancel keeps the
-draft and Default access. Changing the project resets access to Default.
+keep drafting and change the model or effort before sending. On supported
+Desktop builds, switching Home presets keeps that approval for the same
+project. Cancel keeps the draft and Default access. Changing the project
+resets access to Default.
 
 Full access needs a compatible native Desktop build. Earlier builds that offer
 the picker can require the chat and its processes to finish before changing access.

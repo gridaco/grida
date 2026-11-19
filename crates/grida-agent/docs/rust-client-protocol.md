@@ -57,7 +57,8 @@ An accepted user message or saved assistant reply can promote a chat. Reading,
 renaming and changes in execution status preserve this timestamp. Rows with
 no recorded message time follow dated rows. This includes chats with only
 pre-upgrade history. Equal message times are ordered by ascending session ID.
-Side chats and delegated sessions stay outside this catalog.
+The workspace and the two activity indicators remain facts of the same chat
+in every view. Side chats and delegated sessions belong to their own scopes.
 
 For a closed store, `grida-agent chat-catalog --state-dir <dir> --order message-activity`
 returns the same page as the live query. Add `--cwd <absolute-workspace>`
@@ -72,6 +73,18 @@ Queued input alone, a paused turn and an interrupted turn do not qualify.
 An empty array means no chat on the page was running.
 An absent field means the host did not report running status. A client can
 refresh the visible page using its original cursor without loading any session.
+
+`_meta["co.grida/inputNeededSessionIds"]` independently lists page IDs with a
+current, uncancelled turn holding an open question, approval or Library
+selection. A scheduled wakeup is automatic and contributes no ID. A running
+turn with an open async question appears in both arrays. Empty means observed
+and none, and omission supports older hosts. The source is the committed turn
+head. The page carries no wait IDs or request contents. Private side sessions
+stay outside the workspace catalog. Their owning client can use the attached
+snapshot's `current.disposition` and optional `current.inputNeeded` to
+include its own side sessions in a parent indicator. The native
+`grida-agent inspect` command includes the same answerable-wait fact in
+`input_needed` for a persisted chat.
 
 Negotiate `co.grida/session/initial-title` version 1 to suggest a provisional
 catalog title on submission. Standard `session/prompt` takes the optional
@@ -536,6 +549,13 @@ before appending later chunks. A `resyncRequired` notice has no text and
 asks the client to reload committed history. Observation owns neither work
 admission nor cancellation.
 
+Negotiated private stdio lifecycle updates use
+`_meta["co.grida/session/lifecycle"]`. A `question_asked` fact names the
+`turnId` and `waitId` of a registered question on this attached session. Both
+question styles can raise it. Consumers deduplicate the identity and read the
+current question through the authorized questions operation. An empty or
+expired result needs no attention. Older consumers ignore unknown fact kinds.
+
 | Method suffix after `_co.grida/session/` | Parameters and result                                                                                                                                                                                           |
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `submit`, `enqueue`                      | `sessionId`, `inputId`, ACP `prompt`. Submit selects idle work. Enqueue accepts waiting work. Both return `inputPosition`, `disposition`, and the `turnId` once selected.                                       |
@@ -817,8 +837,18 @@ for newly accepted input. Answers use `{ "kind": "text", "text": "..." }`,
 Keep the request identity and all parameters stable when retrying. Accepted
 answers retain a scheduling wake across concurrent worker completion and
 capacity changes. An explicit task pause is independent of answer receipt.
-An embedded `run --questions` returns a verified `input_required` result and
-exit code `6` when it suspends for an answer.
+Hosts advertising `co.grida/session/optional-questions: 1` expire unanswered
+nonblocking questions in the owning turn's settlement commit. Closing or
+skipping an optional card locally lets the person reopen it while the wait is
+pending. Sending `{ "kind": "skipped" }` explicitly resolves a wait.
+A reply accepted before settlement reaches the next model decision as a user
+message wrapped in `<send_user_message_question_reply>` with a JSON array of
+`{questionItemId, question, answer}`. An answer-dependent tool receives its
+answer as the tool result. For either style, the transcript window delivers the
+readable answer in a user text chunk with `questionReply: {waitId, question}`
+in the chunk's window metadata. Quoted markup in ordinary chat stays ordinary
+text. An embedded `run --questions` exits with `input_required` and code `6`
+when an answer is required. An unanswered optional question permits success.
 
 ### Temporary side chats
 

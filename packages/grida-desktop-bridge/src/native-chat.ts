@@ -259,6 +259,8 @@ export type NativeChatPage = Readonly<{
   lastActivity?: readonly Readonly<{ sessionId: string; atMs: number }>[];
   /** Listed chats running when the page was read. Older hosts omit this field. */
   runningSessionIds?: readonly string[];
+  /** Listed chats with an unanswered question, approval or Library selection. */
+  inputNeededSessionIds?: readonly string[];
   nextCursor: string | null;
 }>;
 
@@ -279,6 +281,7 @@ export type NativeChatProfileChoice = Readonly<{
 }>;
 
 export type NativeChatProfileCatalog = Readonly<{
+  /** Live named connection. The default connection and a cold workspace both have no named owner. */
   active: string | null;
   /** Last explicitly saved app default, even when its connection is unavailable. */
   newChatDefault?: NativeChatSelection;
@@ -364,6 +367,12 @@ export type NativeChatReadiness =
   | "native-provider-endpoint-approval-required"
   | "native-workspace-capacity";
 
+export type NativeChatStartupResult = Readonly<{
+  readiness: NativeChatReadiness;
+  /** The active worker’s connection when it has a named profile. */
+  selectedProfileId?: string;
+}>;
+
 export type NativeChatTurn = Readonly<{
   turnId: string;
   epoch: number;
@@ -373,6 +382,8 @@ export type NativeChatTurn = Readonly<{
   paused: boolean;
   cancelled: boolean;
   disposition: "running" | "suspended" | "interrupted" | "settled";
+  /** Whether this turn currently has an outstanding request for the person. */
+  inputNeeded?: boolean;
   status: "succeeded" | "failed" | "cancelled" | "uncertain" | null;
 }>;
 
@@ -616,6 +627,8 @@ export type NativeChatMessage = Readonly<{
   displayParts?: readonly NativeChatDisplayPart[];
   /** This user message carried a live SVG text binding when accepted. */
   svgTextSelection?: true;
+  /** A host-attributed question reply. The message text is the person's answer. */
+  questionReply?: Readonly<{ waitId: string; question: string }>;
 }>;
 
 /** A file attached to a person's message, named for display. */
@@ -870,6 +883,8 @@ export type NativeChatQuestion = Readonly<{
   questionId: string;
   reviewId: string;
   style: "answer_dependent" | "nonblocking";
+  /** This optional question can be dismissed until its turn finishes. */
+  expiresWithTurn?: true;
   question: string;
   options: readonly string[];
 }>;
@@ -956,6 +971,8 @@ export type NativeChatUpdate =
 export type NativeChatNotificationFocus = Readonly<{
   sessionId: string;
   profileId?: string;
+  /** A temporary side session in the frame which opened it. */
+  side?: true;
 }>;
 
 /** Available for a native chat in the exact scope selected by Main. */
@@ -975,6 +992,10 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
    * readiness values. Treat an unrecognized value as unavailable.
    */
   status(start?: boolean): Promise<NativeChatReadiness>;
+  /** Open this workspace on its preferred connection. Main coordinates startup and fallback. */
+  startWorkspaceChat?(
+    preferred?: NativeChatProfileSelection
+  ): Promise<NativeChatStartupResult>;
   /** Take the latest notification click for this workbench once, if still current. */
   takeNotificationFocus(): Promise<NativeChatNotificationFocus | null>;
   list(cursor?: string | null): Promise<NativeChatPage>;
@@ -984,6 +1005,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
    * workspace opens, with nothing active or saved. Listing starts nothing.
    */
   welcomeProfiles?(): Promise<NativeChatProfileCatalog | null>;
+  /** The review survives same-document Welcome navigation changing only the preset. */
+  readonly welcomeFullAccessAcrossPresets?: true;
   /** Review Full access for one reserved new chat. Available only on Welcome. */
   prepareWelcomeFullAccess?(
     workspaceId: string
@@ -1046,7 +1069,9 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   organize?(
     attachmentId: string,
     change: NativeChatCatalogChange
-  ): Promise<NativeChatCatalogEntry>;
+  ): Promise<NativeChatCatalogEntry & Readonly<{ archiveUndo?: string }>>;
+  /** Restores a recently archived chat from this workspace without opening it. */
+  undoArchive?(receipt: string): Promise<void>;
   deleteSavedChat?(
     attachmentId: string,
     observationId: string,
@@ -1177,6 +1202,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     inputId: string
   ): Promise<NativeChatAcceptance>;
   observe(attachmentId: string): Promise<NativeChatObservation>;
+  /** Whether this attached chat is actually on screen for notification gating. */
+  setPresented?(attachmentId: string, visible: boolean): Promise<void>;
   turnSummary?(
     attachmentId: string,
     observationId: string,

@@ -39,7 +39,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::time::{Duration, Instant};
 
-const REQUEST: &str = "grida.agent.approval";
+pub(crate) const REQUEST: &str = "grida.agent.approval";
 const ANSWER: &str = "grida.agent.approval.answer";
 const MAX_APPROVAL_BYTES: usize = 128 * 1024;
 const MAX_ACTIONS: usize = 32;

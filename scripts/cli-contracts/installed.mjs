@@ -549,7 +549,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     const readsBefore = billingReads();
     issuedGrant = "synthetic.agent.first";
     const [accepted, finished] = records(
-      await run(task, { stdin: "Remember this fixture." })
+      await run([...task, "--questions"], { stdin: "Remember this fixture." })
     );
     assert.equal(accepted.kind, "accepted");
     assert.equal(finished.kind, "finished");
@@ -557,6 +557,13 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     assert.equal(finished.disposition, "succeeded");
     checkBilling(finished, "settled", "0");
     assert.equal(chatRequests.length, 1);
+    const questionTools = chatRequests[0].tools.map(
+      (tool) => tool.function.name
+    );
+    assert(
+      questionTools.includes("question") &&
+        questionTools.includes("question_async")
+    );
 
     issuedGrant = "synthetic.agent.near-expiry";
     grantLifetimeMs = 20_000;
@@ -567,6 +574,12 @@ export async function proveInstalled({ binary, launcher, workdir }) {
         clientCapabilities: { _meta: { "co.grida/session/snapshot": 1 } },
       });
       assert.equal(initialized.protocolVersion, 1);
+      assert.equal(
+        initialized.agentCapabilities._meta[
+          "co.grida/session/optional-questions"
+        ],
+        1
+      );
       const sessionId = accepted.session_id;
       await service.rpc(2, "session/load", {
         sessionId,
@@ -596,17 +609,25 @@ export async function proveInstalled({ binary, launcher, workdir }) {
             throw new Error("Agent service exited before grant renewal.");
           }),
         ]);
-        let secondAccepted = false;
-        for (let id = 6; id < 26 && !secondAccepted; id++) {
-          const snapshot = await service.rpc(id, "_co.grida/session/snapshot", {
-            sessionId: second.sessionId,
-          });
-          secondAccepted = snapshot.current != null;
+        let activePage;
+        for (let id = 6; id < 26; id++) {
+          activePage = await service.rpc(id, "session/list", { cwd: owned });
+          if (activePage._meta["co.grida/runningSessionIds"].length === 2)
+            break;
         }
-        assert(
-          secondAccepted,
+        assert.deepEqual(
+          new Set(activePage._meta["co.grida/runningSessionIds"]),
+          new Set([sessionId, second.sessionId]),
           "both chats were admitted during the held renewal"
         );
+        assert.deepEqual(
+          activePage._meta["co.grida/inputNeededSessionIds"],
+          []
+        );
+        const snapshot = await service.rpc(26, "_co.grida/session/snapshot", {
+          sessionId: second.sessionId,
+        });
+        assert.equal(snapshot.current.inputNeeded, false);
         assert.equal(
           chatRequests.length,
           1,
@@ -615,6 +636,8 @@ export async function proveInstalled({ binary, launcher, workdir }) {
         renewal.release();
         assert.equal((await service.receive(4)).stopReason, "end_turn");
         assert.equal((await service.receive(5)).stopReason, "end_turn");
+        const idlePage = await service.rpc(27, "session/list", { cwd: owned });
+        assert.deepEqual(idlePage._meta["co.grida/runningSessionIds"], []);
         assert.equal(
           counts.get("/api/v1/auth/gg"),
           minted + 1,

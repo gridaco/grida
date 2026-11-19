@@ -928,10 +928,23 @@ fn catalog_response(
             })
             .map(|record| serde_json::Value::from(record.entry.session.as_str()))
             .collect();
-        serde_json::Map::from_iter([(
-            "co.grida/runningSessionIds".to_owned(),
-            serde_json::Value::Array(ids),
-        )])
+        let input = catalog
+            .entries
+            .iter()
+            .map(|row| &row.record)
+            .filter(|record| crate::host::needs_user_input(&record.pending_request_schemas))
+            .map(|record| serde_json::Value::from(record.entry.session.as_str()))
+            .collect();
+        serde_json::Map::from_iter([
+            (
+                "co.grida/runningSessionIds".to_owned(),
+                serde_json::Value::Array(ids),
+            ),
+            (
+                "co.grida/inputNeededSessionIds".to_owned(),
+                serde_json::Value::Array(input),
+            ),
+        ])
     });
     Ok(ListSessionsResponse::new(
         catalog

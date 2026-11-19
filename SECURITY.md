@@ -554,6 +554,8 @@ Full access, and Desktop Main requires an in-app confirmation for the exact
 chat before selecting it. In a workspace the review is tied to the current
 attachment. On Home, Main validates the registered destination and binds a
 short-lived review to the current Welcome frame and one reserved new chat.
+Same-document Welcome navigation can change its display preset while retaining
+the review. Other navigation and frame teardown revoke it.
 Confirmation marks the reservation approved. Starting the chat consumes that
 approval once and applies Full access. Home receives the session identity
 without an attachment or a send capability. The private,
@@ -1015,8 +1017,11 @@ pixels through this reader, with no additional filesystem or model grant.
   requires an admitted Settings main frame and rechecks it across asynchronous
   work. Listing and unarchiving use metadata-only native catalog operations,
   reuse the existing database owner, or open an existing closed store without
-  a provider. They never attach or resume a session. The core's workspace-scope
-  check excludes side chats and named children, while catalog revision checks
+  a provider. They never attach or resume a session. A separate View request
+  consumes the same Settings frame's short-lived restoration handle and
+  rechecks the registered workspace before routing the resolved chat through
+  Main's existing workspace navigation. The core's workspace-scope check
+  excludes side chats and named children, while catalog revision checks
   prevent stale updates. [Owner tests](desktop/src/main/native-archives.test.ts),
   [IPC tests](desktop/src/main/native-archive-ipc.test.ts), and the
   [native catalog fixture](crates/grida-agent/tests/process/catalog.rs) defend
@@ -1195,12 +1200,14 @@ pixels through this reader, with no additional filesystem or model grant.
   Turn summaries take an attachment-local observation token. Main selects
   the latest observed settled turn and rechecks the frame and turn before
   returning bounded text and validated disposition counts and check statuses.
-  Saved-chat discovery uses the main-owned workspace and a bounded cursor.
+  The workspace picker's saved-chat discovery uses the main-owned workspace and a bounded cursor.
   Active and archived pages return bounded IDs and titles with the next
   cursor after the same frame and workspace recheck. Discovery creates no
   chat attachment. Organization derives its target from the frame's exact
   attachment, forwards the metadata revision, and revalidates the attachment
-  after the native reply.
+  after the native reply. An archive can return a short-lived Undo receipt for
+  its confirmed transition and saved revision. Only the same admitted workspace
+  frame can use it, once, through metadata-only unarchive of that chat.
   The [command adapter](desktop/src/main/native-agent-commands.ts) dispatches
   only negotiated compact and fork controls for the attached chat. Main
   captures the fork basis and anchor together from bounded committed history
@@ -1284,13 +1291,17 @@ pixels through this reader, with no additional filesystem or model grant.
   attachment before serialization and uses the existing bounded ACP delivery
   window. Losing the observer or falling behind cannot cancel a turn.
 - Background attention uses a separate capability on the same private
-  connection. The observer projects only the attached chat, turn, and
-  verified settlement or approval wait. The
+  connection. The observer identifies the attached chat, turn and verified
+  settlement, approval wait or question wait. The
   [Desktop worker owner](desktop/src/main/native-desktop-agent.ts) fences
   delivery and notification clicks by the current account, worker, chat and
   its model connection.
-  [Main](desktop/src/main/agent-notifications.ts) supplies fixed copy and
-  routes clicks to the authorized workspace. An existing workbench can take
+  For a successful turn, [Main](desktop/src/main/agent-notifications.ts) can
+  show the chat title and a bounded excerpt from that turn’s saved final reply.
+  For a question, it can show the chat title and the question from the matching
+  open wait. Approval, failure and uncertain outcomes use fixed copy. System
+  notification settings control where previews appear. Main routes clicks to
+  the authorized workspace. An existing workbench can take
   only its latest pending click from the exact current main frame after it
   connects. Main rechecks the account, source worker, and workspace at take
   and discards pending targets on scope change or renderer teardown. The
@@ -1307,7 +1318,7 @@ pixels through this reader, with no additional filesystem or model grant.
   [IPC adapter](desktop/src/main/chat-catalog-ipc.ts) admits metadata reads from
   the authenticated Home or workspace main frame, revokes pending reads on navigation,
   and accepts no renderer-supplied paths. Rows carry identity, title, time and
-  running status. Listing creates no attachment or
+  attention flags. Listing creates no attachment or
   execution authority. [Catalog changes](crates/grida-agent/src/acp/extensions/catalog.rs)
   require a negotiated capability, an attached chat, and the observed metadata
   revision. They leave execution, transcripts, and artifacts untouched.
@@ -1328,8 +1339,12 @@ pixels through this reader, with no additional filesystem or model grant.
   retires SQLite records and their execution identity. Authored files,
   and independently retained chats have separate custody.
   Desktop selects the chat through its exact frame attachment, checks the
-  observed execution and catalog revisions, and requests Main-owned native
-  confirmation. A lost reply reuses the confirmed request. A matching receipt
+  observed execution and catalog revisions, and requests confirmation in a
+  [Main-owned bundled dialog](desktop/src/main/chat-deletion-dialog.ts).
+  The isolated dialog runs its bundled UI without the application preload.
+  Main intercepts its answer and dismisses it when the requesting frame
+  navigates.
+  A lost reply reuses the confirmed request. A matching receipt
   revokes every attachment for that exact chat owner, including subscriptions
   and any in-flight load that could reinstall the retired attachment.
 - [Native goal controls](crates/grida-agent/src/acp/extensions/goals.rs) require
@@ -2936,10 +2951,12 @@ platform credential store is a separate hardening step.
 
 - `desktop/src/chatgpt-configuration.ts`,
   `desktop/src/main/{oauth-loopback-callback,chatgpt-oauth}.ts`,
+  `desktop/src/main/oauth-loopback-page.html`,
   `desktop/src/{provider-network-policy,services-sidecar,preload}.ts`,
   `desktop/src/bridge/contract.ts`, `desktop/src/main/ipc-handlers.ts`, and
   `desktop/src/main.ts` — fixed configuration, callback/orchestration,
-  exact network grants, sidecar construction, guarded bridge, and shutdown.
+  escaped callback HTML, exact network grants, sidecar construction, guarded
+  bridge, and shutdown.
 - [Desktop composition](desktop/src/sidecar/daemon.ts), [its tests](desktop/src/sidecar/daemon.test.ts), and [built media-entry isolation tests](packages/grida-ai-host/src/media-server-isolation.test.ts) — retained-service startup never constructs a chat provider; the dedicated native subscription host owns credential use.
 - [Native subscription custody](packages/grida-ai-host/src/chatgpt-host.ts)
   and [its ceremony tests](packages/grida-ai-host/src/chatgpt-host.test.ts),

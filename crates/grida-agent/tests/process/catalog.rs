@@ -42,6 +42,85 @@ fn ids(result: &Value) -> Vec<&str> {
 }
 
 #[tokio::test]
+async fn workspace_catalog_reports_open_user_input_during_work_and_clears_it_at_completion() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let workspace = TempDir::new().unwrap();
+    let foreign = TempDir::new().unwrap();
+    let (release, held) = tokio::sync::oneshot::channel();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Question("question_async"),
+        Reply::Release("Independent work is finished.", held),
+    ])
+    .await;
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut writer = super::questions::question_socket(&url, true).await;
+    let mut observer = catalog_client(&url).await;
+    let chat = new_session(&mut writer, 2, workspace.path()).await;
+    let started = ws_rpc(
+        &mut writer,
+        3,
+        "_co.grida/session/submit",
+        prompt_request(&chat, "catalog-question", "Prepare the document."),
+    )
+    .await;
+    assert!(started["result"]["turnId"].is_string(), "{started}");
+    endpoint.request().await;
+    endpoint.request().await;
+    let page = ws_rpc(
+        &mut observer,
+        2,
+        "session/list",
+        json!({"cwd":workspace.path()}),
+    )
+    .await;
+    assert_eq!(
+        page["result"]["_meta"]["co.grida/runningSessionIds"],
+        json!([&chat])
+    );
+    assert_eq!(
+        page["result"]["_meta"]["co.grida/inputNeededSessionIds"],
+        json!([&chat])
+    );
+    assert!(!page.to_string().contains("Which edition?"));
+    let other = ws_rpc(
+        &mut observer,
+        3,
+        "session/list",
+        json!({"cwd":foreign.path()}),
+    )
+    .await;
+    assert_eq!(
+        other["result"]["_meta"]["co.grida/inputNeededSessionIds"],
+        json!([])
+    );
+    release.send(()).unwrap();
+    wait_for_snapshot(&mut writer, &chat, |snapshot| {
+        snapshot["latest"]["status"] == "succeeded"
+    })
+    .await;
+    let page = ws_rpc(
+        &mut observer,
+        4,
+        "session/list",
+        json!({"cwd":workspace.path()}),
+    )
+    .await;
+    assert_eq!(
+        page["result"]["_meta"]["co.grida/runningSessionIds"],
+        json!([])
+    );
+    assert_eq!(
+        page["result"]["_meta"]["co.grida/inputNeededSessionIds"],
+        json!([])
+    );
+    drop(writer);
+    drop(observer);
+    terminate_shared_server(host).await;
+    endpoint.done().await;
+}
+
+#[tokio::test]
 async fn standard_acp_catalog_discovers_saved_workspace_sessions_without_loading_them() {
     let temporary = TempDir::new().unwrap();
     let state = temporary.path().join("agent-state");

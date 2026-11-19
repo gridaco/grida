@@ -894,7 +894,7 @@ impl Host {
             .store
             .inspect_turn_with(session.clone(), turn.clone(), |state| {
                 Ok(state.waits().values().all(|wait| {
-                    !wait.is_pending()
+                    !grida_agent_master::questions::blocks_progress(wait)
                         && (!grida_agent_master::wakeups::is_wakeup(wait)
                             || wakeups::was_delivered(wait))
                 }))

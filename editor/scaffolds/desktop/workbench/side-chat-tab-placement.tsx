@@ -1,4 +1,9 @@
 import { MessageSquareTextIcon } from "lucide-react";
+import {
+  attachedChatActivity,
+  type ChatActivity,
+} from "@/lib/agent-chat/native-chat-activity";
+import { ChatActivityIndicators } from "./chat-activity-indicators";
 import { NativeSideChatPane } from "./native-agent-pane";
 import { EditorTabChatPreview } from "./editor-tab-chat-preview";
 import type {
@@ -6,6 +11,13 @@ import type {
   SideChatPresentation,
 } from "./side-chat-placement";
 import type { WorkbenchPanels } from "./workbench-panels";
+
+type SideTab = {
+  presentation: SideChatPresentation;
+  title: string;
+  activity: ChatActivity;
+  stop: () => void;
+};
 
 /**
  * Presents each side chat as its own tab in the workbench's editor group.
@@ -18,10 +30,7 @@ import type { WorkbenchPanels } from "./workbench-panels";
  * the side chat itself has ended. See test/desktop-agent-chat-side-chat-tab.md.
  */
 export class SideChatTabPlacement implements SideChatPlacement {
-  private readonly shown = new Map<
-    string,
-    { presentation: SideChatPresentation; title: string; stop: () => void }
-  >();
+  private readonly shown = new Map<string, SideTab>();
   /** Side chats whose tab was closed while they are still ending. */
   private readonly dismissed = new Set<string>();
 
@@ -40,12 +49,19 @@ export class SideChatTabPlacement implements SideChatPlacement {
     const entry = {
       presentation,
       title: chat.sideChatTitle(),
-      // The tab follows the side chat's title as it arrives.
+      activity: attachedChatActivity(chat.read()),
       stop: chat.subscribe(() => {
         if (this.shown.get(id) !== entry) return;
         const title = chat.sideChatTitle();
-        if (title === entry.title) return;
+        const activity = attachedChatActivity(chat.read());
+        if (
+          title === entry.title &&
+          activity.running === entry.activity.running &&
+          activity.inputNeeded === entry.activity.inputNeeded
+        )
+          return;
         entry.title = title;
+        entry.activity = activity;
         this.show(entry);
       }),
     };
@@ -63,18 +79,19 @@ export class SideChatTabPlacement implements SideChatPlacement {
     this.panels.withdraw(SideChatTabPlacement.panel(id));
   }
 
-  private show(entry: {
-    presentation: SideChatPresentation;
-    title: string;
-    stop: () => void;
-  }): void {
-    const { presentation, title } = entry;
+  private show(entry: SideTab): void {
+    const { presentation, title, activity } = entry;
     const { id } = presentation;
     this.panels.show(
       SideChatTabPlacement.panel(id),
       {
         title,
-        icon: <MessageSquareTextIcon />,
+        icon:
+          activity.running || activity.inputNeeded ? (
+            <ChatActivityIndicators {...activity} />
+          ) : (
+            <MessageSquareTextIcon />
+          ),
         content: <NativeSideChatPane presentation={presentation} />,
         preview: (
           <EditorTabChatPreview title={title} source={presentation.chat} />

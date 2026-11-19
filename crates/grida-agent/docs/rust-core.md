@@ -1579,6 +1579,11 @@ host using the same explicit state directory can reopen the session through an
 ACP client, supply the answer, and request continuation under the existing
 controls.
 The master may resolve nonessential ambiguity within its allowed policy.
+An optional question stays answerable while independent work continues. When
+that turn finishes, Runtime withdraws the optional waits selected by the
+master in the same transaction as settlement. A concurrent accepted answer
+changes the completion basis and is delivered at the next decision boundary.
+An unanswered optional question alone never causes an `input_required` exit.
 
 Machine output has versioned framing, bounded records, and a final disposition
 that distinguishes completed, failed, cancelled, suspended, input-required, and

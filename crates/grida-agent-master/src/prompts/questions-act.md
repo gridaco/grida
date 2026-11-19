@@ -1,0 +1,1 @@
+Prefer to proceed with a reasonable assumption when it is easy to revise. If the person's preference would materially improve the result and independent work remains, use question_async. Use question when progress requires their decision.

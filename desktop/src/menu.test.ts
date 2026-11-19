@@ -48,6 +48,7 @@ const fixture = vi.hoisted(() => {
     error: vi.fn<(title: string, message: string) => void>(),
     picker: vi.fn<() => Promise<{ canceled: boolean; filePaths: string[] }>>(),
     sidecarReady: true,
+    about: vi.fn<(app: App) => Promise<void>>(),
     settings: vi.fn<(options: object) => object>(() => ({})),
     focusSettings: vi.fn<(pathname: string) => boolean>(() => false),
   };
@@ -72,6 +73,7 @@ vi.mock("./window", () => ({
   open_settings_window: fixture.settings,
 }));
 vi.mock("./env", () => ({ EDITOR_BASE_URL: "https://fixture.invalid" }));
+vi.mock("./main/about-window", () => ({ openAboutWindow: fixture.about }));
 vi.mock("./main/services-sidecar-supervisor", () => ({
   getServicesSidecarInfo: () => (fixture.sidecarReady ? {} : null),
 }));
@@ -96,6 +98,28 @@ beforeEach(() => {
   fixture.sidecarReady = true;
   fixture.focusSettings.mockReturnValue(false);
 });
+
+it.skipIf(process.platform !== "darwin")(
+  "opens About before work admission or retained services are ready",
+  async () => {
+    const app = { name: "Grida fixture" } as App;
+    fixture.sidecarReady = false;
+    await rebuild_application_menu(app, {} as Shell, {
+      windowAdmission: {
+        can_open: () => false,
+        register: () => false,
+        focus_entry: () => {},
+      },
+    });
+    const appMenu = fixture.template.find((item) => item.label === app.name)!;
+    const about = (appMenu.submenu as MenuItemConstructorOptions[]).find(
+      (item) => item.label === "About Grida fixture"
+    )!;
+    expect(about.role).toBeUndefined();
+    click(about);
+    expect(fixture.about).toHaveBeenCalledExactlyOnceWith(app);
+  }
+);
 
 it("opens and focuses Settings through the same admitted action as its native menu", async () => {
   const app = { name: "Grida fixture" } as App;

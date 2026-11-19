@@ -15,7 +15,7 @@ use agent_kit_runtime::{TurnOperations, TurnView as OperationView};
 use serde_json::json;
 
 pub(super) const TOOL: &str = "design_search";
-const REQUEST: &str = "grida.agent.library-selection";
+pub(super) const REQUEST: &str = "grida.agent.library-selection";
 const ANSWER: &str = "grida.agent.library-selection.answer";
 const QUERY_LIMIT: usize = 2048;
 
@@ -431,10 +431,10 @@ impl Host {
                             wait.answer.clone(),
                             state.outcome().is_none()
                                 && state.controls().admits_work()
-                                && state
-                                    .waits()
-                                    .values()
-                                    .all(|other| other.id == wait.id || !other.is_pending()),
+                                && state.waits().values().all(|other| {
+                                    other.id == wait.id
+                                        || !grida_agent_master::questions::blocks_progress(other)
+                                }),
                         ))
                     },
                 )

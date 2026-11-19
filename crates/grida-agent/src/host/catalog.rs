@@ -100,6 +100,19 @@ pub(crate) struct CatalogListing {
     pub has_more: bool,
 }
 
+/// Whether an open wait is a decision the person can answer. Scheduled
+/// wakeups and other host-owned waits do not request a person's attention.
+pub fn needs_user_input(schemas: &BTreeSet<SchemaId>) -> bool {
+    schemas.iter().any(|schema| {
+        matches!(
+            schema.as_str(),
+            grida_agent_master::questions::REQUEST_SCHEMA
+                | crate::permissions::REQUEST
+                | library::REQUEST
+        )
+    })
+}
+
 pub struct SessionCatalog {
     pub cwd: PathBuf,
     pub entries: Vec<CatalogRecord>,
@@ -341,6 +354,7 @@ impl Host {
             latest_turn_activity_ms: None,
             last_message_ms: None,
             current_turn_disposition: None,
+            pending_request_schemas: BTreeSet::new(),
         })
     }
 }

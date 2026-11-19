@@ -2,6 +2,10 @@
 export class KeyedSerialQueue {
   private readonly tails = new Map<string, Promise<void>>();
 
+  has(key: string): boolean {
+    return this.tails.has(key);
+  }
+
   async run<T>(key: string, operation: () => Promise<T>): Promise<T> {
     const previous = this.tails.get(key) ?? Promise.resolve();
     const result = previous.then(operation);

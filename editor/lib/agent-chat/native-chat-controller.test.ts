@@ -22,6 +22,7 @@ import type {
   NativeEditorSurfaceSnapshot,
 } from "@grida/desktop-bridge";
 import { NEW_CHAT_TITLE, NativeChatController } from "./native-chat-controller";
+import { chatActivity, type ChatActivity } from "./native-chat-activity";
 import { native_message_parts } from "./native-message-parts";
 import { video_attachment } from "./video-attachment";
 import { image_attachment_preview } from "./image-attachment-preview";
@@ -1736,10 +1737,10 @@ it("keeps a cancelled deletion open and ignores replay after a confirmed retirem
   await controller.select("chat-a");
   await vi.waitFor(() => expect(controller.canDeleteSavedChat).toBe(true));
   const late = updates.get("chat-a")!;
-  await controller.deleteSavedChat();
+  await expect(controller.deleteSavedChat()).resolves.toBe(false);
   expect(controller.read().messages[0]?.text).toBe("Old transcript");
   expect(controller.read().selected).toBe("chat-a");
-  await controller.deleteSavedChat();
+  await expect(controller.deleteSavedChat()).resolves.toBe(true);
   expect(remove.mock.calls).toEqual([
     ["chat-a", "observation-chat-a", 4],
     ["chat-a", "observation-chat-a", 4],
@@ -3550,8 +3551,65 @@ it("opens a new side chat for each /side with a question", async () => {
   await first.chat.submit("One more thing.");
   await controller.submit("/side");
   expect(controller.read().sideChats.map(({ focus }) => focus)).toEqual([2, 2]);
+  // A notification names its own session even when another side was used last.
+  await controller.showSideChat("side/side-2");
+  expect(controller.read().sideChats.map(({ focus }) => focus)).toEqual([2, 3]);
+  await controller.showSideChat("side/discarded");
+  expect(controller.read().sideChats.map(({ focus }) => focus)).toEqual([2, 3]);
   expect(open).toHaveBeenCalledTimes(2);
   controller.disconnect();
+});
+
+it("publishes this frame's running side chat and question on its idle parent only", async () => {
+  const { bridge, controller, running } = sideFixture();
+  const observe = bridge.observe.bind(bridge);
+  bridge.observe = async (id) => {
+    const result = await observe(id);
+    const current = result.snapshot.current;
+    return current
+      ? {
+          ...result,
+          snapshot: {
+            ...result.snapshot,
+            current: { ...current, inputNeeded: true },
+          },
+        }
+      : result;
+  };
+  await controller.select("chat-a");
+  await controller.openSideChat();
+  const [side] = controller.read().sideChats;
+  await side.chat.opened();
+  const published = vi.fn<() => ChatActivity>(() =>
+    chatActivity(controller.read(), "chat-a")
+  );
+  const stop = controller.subscribe(published);
+  try {
+    running.add("side-1");
+    side.chat.checkObservation();
+    await vi.waitFor(() =>
+      expect(published).toHaveLastReturnedWith({
+        running: true,
+        inputNeeded: true,
+      })
+    );
+    expect(chatActivity(controller.read(), "chat-b")).toEqual({
+      running: false,
+      inputNeeded: false,
+    });
+    expect(controller.read().sideChats[0]).toBe(side);
+    running.clear();
+    side.chat.checkObservation();
+    await vi.waitFor(() =>
+      expect(published).toHaveLastReturnedWith({
+        running: false,
+        inputNeeded: false,
+      })
+    );
+  } finally {
+    stop();
+    controller.disconnect();
+  }
 });
 
 it("offers in a side chat only what its snapshot does not refuse", async () => {
@@ -5741,6 +5799,8 @@ it.each([
   ["native-provider-key-required", "native-provider-key-required"],
   ["native-gateway-unavailable", "native-gateway-unavailable"],
   ["native-provider-model-unavailable", "native-provider-model-unavailable"],
+  ["native-hooks-review-required", "native-hooks-review-required"],
+  ["native-hooks-configuration-invalid", "native-hooks-configuration-invalid"],
   [
     "native-provider-endpoint-https-required",
     "native-provider-endpoint-https-required",
@@ -5841,6 +5901,7 @@ it("retains catalog activity by chat and drops it when a later page omits the me
   bridge.list = vi.fn<DesktopNativeChat["list"]>().mockResolvedValue({
     sessionIds: ["chat-a", "chat-b"],
     runningSessionIds: ["chat-a"],
+    inputNeededSessionIds: ["chat-b"],
     lastActivity: [{ sessionId: "chat-b", atMs }],
     nextCursor: "v1/chat-b",
   });
@@ -5849,12 +5910,14 @@ it("retains catalog activity by chat and drops it when a later page omits the me
   expect(controller.chatLastActivityAtMs("chat-a")).toBeUndefined();
   expect(controller.chatLastActivityAtMs("chat-b")).toBe(atMs);
   expect(controller.read().runningSessionIds).toEqual(["chat-a"]);
+  expect(controller.read().inputNeededSessionIds).toEqual(["chat-b"]);
   expect(controller.read().sessions).toEqual(["chat-a", "chat-b"]);
   bridge.list = async () => ({ sessionIds: ["chat-c"], nextCursor: null });
   await controller.listChats("v1/chat-b");
   expect(controller.chatLastActivityAtMs("chat-b")).toBeUndefined();
   expect(controller.chatLastActivityAtMs("chat-c")).toBeUndefined();
   expect(controller.read().runningSessionIds).toBeUndefined();
+  expect(controller.read().inputNeededSessionIds).toBeUndefined();
   controller.disconnect();
 });
 
@@ -5904,8 +5967,29 @@ it("serializes picker refreshes with page navigation and retires observation whe
     list.mockClear();
     await vi.advanceTimersByTimeAsync(10_000);
     expect(list).not.toHaveBeenCalled();
-    list.mockResolvedValueOnce({ ...recent, runningSessionIds: [] });
+    // Another client can ask or answer while every chat on the page is idle.
+    // A host may expose just one of the two independent activity projections.
+    list.mockResolvedValueOnce({
+      sessionIds: ["a"],
+      inputNeededSessionIds: [],
+      nextCursor: null,
+    });
     await controller.listChats();
+    list.mockResolvedValueOnce({
+      sessionIds: ["a"],
+      inputNeededSessionIds: ["a"],
+      nextCursor: null,
+    });
+    await vi.advanceTimersToNextTimerAsync();
+    expect(controller.read().inputNeededSessionIds).toEqual(["a"]);
+    expect(controller.read().runningSessionIds).toBeUndefined();
+    list.mockResolvedValueOnce({
+      ...recent,
+      runningSessionIds: [],
+      inputNeededSessionIds: [],
+    });
+    await vi.advanceTimersToNextTimerAsync();
+    expect(controller.read().inputNeededSessionIds).toEqual([]);
     const late = Promise.withResolvers<NativeChatPage>();
     list.mockReturnValueOnce(late.promise);
     await vi.advanceTimersToNextTimerAsync();
@@ -5915,6 +5999,13 @@ it("serializes picker refreshes with page navigation and retires observation whe
     await vi.advanceTimersByTimeAsync(10_000);
     expect(list).not.toHaveBeenCalled();
     expect(controller.read().runningSessionIds).toEqual([]);
+    list.mockResolvedValueOnce({ sessionIds: ["a"], nextCursor: null });
+    await controller.listChats();
+    list.mockClear();
+    const stopLegacy = controller.observeChatList(() => true);
+    await vi.advanceTimersByTimeAsync(10_000);
+    stopLegacy();
+    expect(list).not.toHaveBeenCalled();
   } finally {
     close();
     controller.disconnect();
@@ -6003,7 +6094,11 @@ it("uses catalog membership, retains an exact rename draft on conflict, and igno
   await vi.waitFor(() =>
     expect(list.mock.results.at(-1)?.value).toBe(stalePage.promise)
   );
-  await expect(controller.setChatArchived(true)).resolves.toBe(true);
+  await expect(controller.setChatArchived(true)).resolves.toMatchObject({
+    sessionId: "chat-a",
+    archived: true,
+    revision: 4,
+  });
   stalePage.resolve({ sessionIds: ["chat-a"], nextCursor: null });
   await refresh;
   expect(controller.read().sessions).not.toContain("chat-a");
@@ -8124,8 +8219,15 @@ describe("recommended model connections", () => {
     const choose = vi.fn<NonNullable<DesktopNativeChat["selectProfile"]>>(
       async () => {}
     );
+    const open = vi.fn<NonNullable<DesktopNativeChat["startWorkspaceChat"]>>(
+      async () => ({
+        readiness: "native-ready",
+        selectedProfileId: recommended,
+      })
+    );
     bridge.status = status;
     bridge.selectProfile = choose;
+    bridge.startWorkspaceChat = open;
     bridge.profiles = async () => catalog();
     const publish = vi.fn<(state: string | null, profileId?: string) => void>();
     const stop = NativeChatController.watchReadiness(bridge, publish, null, {
@@ -8138,13 +8240,12 @@ describe("recommended model connections", () => {
       await vi.waitFor(() =>
         expect(publish).toHaveBeenLastCalledWith("native-ready", recommended)
       );
-      expect(choose).toHaveBeenCalledExactlyOnceWith({
+      expect(open).toHaveBeenCalledExactlyOnceWith({
         kind: "new",
         id: recommended,
       });
-      expect(choose.mock.invocationCallOrder[0]).toBeLessThan(
-        status.mock.invocationCallOrder[1]!
-      );
+      expect(choose).not.toHaveBeenCalled();
+      expect(status.mock.calls).toEqual([[]]);
       controller.connect(null, recommended);
       await vi.waitFor(() =>
         expect(JSON.parse(stored.get("workspace")!).profileId).toBe(recommended)
@@ -8282,7 +8383,7 @@ describe("recommended model connections", () => {
     }
   );
 
-  it("does not retain a recommendation the host refused", async () => {
+  it("does not retain a recommendation when Main opened a fallback connection", async () => {
     const { bridge } = fixture();
     const status = vi.fn<DesktopNativeChat["status"]>();
     status
@@ -8294,9 +8395,11 @@ describe("recommended model connections", () => {
         ...bridge,
         status,
         profiles: async () => catalog(),
-        selectProfile: async () => {
-          throw new Error("connection changed");
-        },
+        selectProfile: vi.fn<NonNullable<DesktopNativeChat["selectProfile"]>>(),
+        startWorkspaceChat: async () => ({
+          readiness: "native-ready",
+          selectedProfileId: explicit,
+        }),
       },
       publish,
       null,

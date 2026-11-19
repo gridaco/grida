@@ -13,6 +13,7 @@ export const uiNavGroups: NavGroup[] = [
       { name: "Spinner", href: "/ui/components/spinner" },
       { name: "Progress", href: "/ui/components/progress" },
       { name: "Composer", href: "/ui/components/composer" },
+      { name: "Workspace Tabs", href: "/ui/components/workspace-tabs" },
       { name: "Rich Text Editor", href: "/ui/components/rich-text-editor" },
       { name: "Code Editor (CodeMirror)", href: "/ui/components/codemirror" },
       { name: "Timeline", href: "/ui/components/timeline" },

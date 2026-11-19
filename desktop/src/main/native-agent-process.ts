@@ -190,6 +190,7 @@ export class NativeAgentProcess {
   private historyRevision = false;
   private transcriptWindow = false;
   private activityOrder = false;
+  private optionalQuestions = false;
   private catalogQuery = false;
   private modelChange = false;
   private inputRoutes = false;
@@ -309,6 +310,10 @@ export class NativeAgentProcess {
 
   get acceptsCatalogQuery(): boolean {
     return this.connected && this.catalogQuery;
+  }
+
+  get acceptsOptionalQuestions(): boolean {
+    return this.connected && this.optionalQuestions;
   }
 
   get acceptsEditorContext(): boolean {
@@ -712,6 +717,8 @@ export class NativeAgentProcess {
       const advertised = object(agentCapabilities?._meta);
       processOwner.transcriptWindow = advertised?.[TRANSCRIPT_WINDOW] === 1;
       processOwner.catalogQuery = advertised?.[CATALOG_QUERY] === 1;
+      processOwner.optionalQuestions =
+        advertised?.["co.grida/session/optional-questions"] === 1;
       processOwner.activityOrder =
         advertised?.[NativeActivityOrder.capability] === 1;
       processOwner.modelChange = advertised?.[MODEL_CHANGE] === 1;

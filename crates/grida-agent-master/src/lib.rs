@@ -57,14 +57,36 @@ pub enum OperatingRegime {
     Plan,
 }
 
+/// Shared product instructions captured when the host accepts new work.
+pub const CORE_INSTRUCTIONS: &str = include_str!("prompts/core.md").trim_ascii_end();
+
 impl OperatingRegime {
+    /// Instructions for a turn whose inventory offers the question tools.
+    pub fn question_instructions(self) -> &'static str {
+        match self {
+            Self::Act => concat!(
+                include_str!("prompts/questions-act.md"),
+                "\n",
+                include_str!("prompts/questions-async.md")
+            ),
+            Self::Plan => concat!(
+                include_str!("prompts/questions-plan.md"),
+                "\n",
+                include_str!("prompts/questions-async.md")
+            ),
+        }
+        .trim_ascii_end()
+    }
     pub fn is_act(&self) -> bool {
         *self == Self::Act
     }
 
     pub fn apply(self, config: &mut MasterConfig) {
         if self == Self::Plan {
-            config.instructions.push_str("\n\nPlan is active. Investigate permitted material and ask useful questions. End with a reviewable proposal describing the intended outcome, important decisions, and how to verify the work. Leave execution for an explicitly authorized Act turn.");
+            config.instructions.push_str("\n\n");
+            config
+                .instructions
+                .push_str(include_str!("prompts/plan.md").trim_end());
         }
     }
 }
@@ -550,7 +572,7 @@ impl Master {
                     continuation.outcome = None;
                     continue;
                 }
-                if view.state.waits().values().any(|wait| wait.is_pending()) {
+                if view.state.waits().values().any(questions::blocks_progress) {
                     match self.suspend(&mut turn, &continuation, &view).await? {
                         Some(outcome) => return Ok(outcome),
                         None => continue,
@@ -1706,10 +1728,16 @@ impl Master {
             expected_history: basis.state.history().position(),
             outcome,
         };
-        let finished = match state_change {
-            Some(change) => turn.try_finish_with_driver_state(draft, change).await?,
-            None => turn.try_finish(draft).await?,
-        };
+        let optional = basis
+            .state
+            .waits()
+            .values()
+            .filter(|wait| wait.is_pending() && questions::is_optional(wait))
+            .map(|wait| wait.id.clone())
+            .collect();
+        let finished = turn
+            .try_finish_with_interactions(draft, state_change, optional)
+            .await?;
         match finished {
             FinishOutcome::Settled(receipt) => Ok(Some(MasterOutcome::Settled(*receipt))),
             FinishOutcome::Continue(error) if error.kind == ErrorKind::Conflict => {

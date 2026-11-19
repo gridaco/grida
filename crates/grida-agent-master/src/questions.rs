@@ -4,7 +4,8 @@ use crate::{decode, encode};
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::inference::InputFormat;
 use agent_kit_core::messages::{
-    Content, Message, OutcomeStatus, Provenance, ProvenanceKind, ResultContent, Role, ToolArguments,
+    Content, Message, OutcomeStatus, Provenance, ProvenanceKind, ResultContent, Role,
+    ToolArguments, ToolResult,
 };
 use agent_kit_core::tools::{
     Invocation, InvocationContext, InvocationRecovery, RecoveryKind, Tool, ToolDefinition,
@@ -20,19 +21,25 @@ use agent_kit_core::{
 use agent_kit_runtime::{ToolAdmission, ToolDecision, TurnOperations, TurnView};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
-const REQUEST_SCHEMA: &str = "grida.agent.question";
+/// Request identity used to recognize registered questions without opening their payload.
+pub const REQUEST_SCHEMA: &str = "grida.agent.question";
 const ANSWER_SCHEMA: &str = "grida.agent.question.answer";
 pub(crate) const ANSWER_SOURCE: &str = "question_response";
+pub(crate) const TOOL_ANSWER_SOURCE: &str = "question_tool_response";
 
 /// Whether this saved message is a user contribution accepted by the question owner.
 pub fn is_answer_contribution(message: &Message) -> bool {
     message.role == Role::User
         && message.provenance.kind == ProvenanceKind::Supplied
-        && message.provenance.source == ANSWER_SOURCE
+        && matches!(
+            message.provenance.source.as_str(),
+            ANSWER_SOURCE | TOOL_ANSWER_SOURCE
+        )
 }
-
+const OPEN_REPLY: &str = "<send_user_message_question_reply>";
+const CLOSE_REPLY: &str = "</send_user_message_question_reply>";
 const REGISTRATION_SCHEMA: &str = "grida.agent.question.registration";
 const ANSWER_DEPENDENT: &str = "question";
 const NONBLOCKING: &str = "question_async";
@@ -131,6 +138,137 @@ pub struct PreparedAnswer {
     pub contribution: Option<HistoryRecord>,
 }
 
+/// A correlated reply in the model's contextual user message.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct QuestionReply {
+    pub question_item_id: WaitId,
+    pub question: String,
+    pub answer: String,
+}
+
+/// A question reply is attributed by its host-created message. A user can
+/// freely quote or paste the same markup without changing how it is displayed.
+pub fn visible_reply(message: &Message) -> Option<QuestionReply> {
+    if message.role != Role::User
+        || !matches!(
+            message.provenance.source.as_str(),
+            ANSWER_SOURCE | TOOL_ANSWER_SOURCE
+        )
+    {
+        return None;
+    }
+    let [Content::Text(content)] = message.content.as_slice() else {
+        return None;
+    };
+    let body = content
+        .strip_prefix(OPEN_REPLY)?
+        .strip_suffix(CLOSE_REPLY)?;
+    let [reply]: [QuestionReply; 1] = serde_json::from_str(body).ok()?;
+    let attributed = match message.provenance.kind {
+        ProvenanceKind::Supplied => message.id.as_str() == reply.question_item_id.as_str(),
+        ProvenanceKind::Transformed => message.id.as_str().starts_with("seed/"),
+        _ => false,
+    };
+    attributed.then_some(reply)
+}
+
+/// Older turns recorded required answers only in the tool result and used a
+/// plain user message for optional answers. Render them from the original
+/// journaled wait without changing their model inputs or stored history.
+pub fn transcript(state: &agent_kit_core::turn::TurnState) -> Vec<HistoryRecord> {
+    let mut records = crate::history::project(state);
+    if !state
+        .waits()
+        .values()
+        .any(|wait| wait.request.schema().as_str() == REQUEST_SCHEMA && wait.answer.is_some())
+    {
+        return records;
+    }
+    let positions: BTreeMap<_, _> = records
+        .iter()
+        .enumerate()
+        .filter_map(|(index, record)| {
+            let HistoryRecord::Message(message) = record;
+            matches!(
+                message.provenance.source.as_str(),
+                ANSWER_SOURCE | TOOL_ANSWER_SOURCE
+            )
+            .then_some((message.id.as_str().to_owned(), index))
+        })
+        .collect();
+    let mut by_wait = BTreeMap::new();
+    for wait in state.waits().values() {
+        let Some(answer) = wait
+            .answer
+            .as_ref()
+            .filter(|_| wait.request.schema().as_str() == REQUEST_SCHEMA)
+        else {
+            continue;
+        };
+        let position = positions.get(wait.id.as_str()).copied();
+        if let Some(index) = position {
+            let HistoryRecord::Message(message) = &records[index];
+            if visible_reply(message).is_some() {
+                continue;
+            }
+        }
+        let Some(reply) = decode(ANSWER_SCHEMA, answer)
+            .ok()
+            .and_then(|answer| prepare_answer(wait, answer).ok())
+            .and_then(|prepared| prepared.contribution)
+        else {
+            continue;
+        };
+        if let Some(index) = position {
+            records[index] = reply;
+        } else {
+            by_wait.insert(wait.id.as_str(), reply);
+        }
+    }
+    if by_wait.is_empty() {
+        return records;
+    }
+    let mut output = Vec::with_capacity(records.len() + by_wait.len());
+    for record in records {
+        let HistoryRecord::Message(message) = &record;
+        let following: Vec<_> = message
+            .content
+            .iter()
+            .filter_map(|part| match part {
+                Content::ToolResult(result) if message.role == Role::Tool => {
+                    answered_wait(result).and_then(|wait| by_wait.remove(wait))
+                }
+                _ => None,
+            })
+            .collect();
+        output.push(record);
+        output.extend(following);
+    }
+    output.extend(by_wait.into_values());
+    output
+}
+
+/// A required tool result identifies the exact wait consumed by that step,
+/// even when a provider reuses a tool call ID in a subsequent generation.
+pub(crate) fn answered_wait(result: &ToolResult) -> Option<&str> {
+    let data = result.structured.as_ref()?;
+    (data.get("status")?.as_str()? == "answered")
+        .then(|| data.get("wait")?.as_str())
+        .flatten()
+}
+
+/// Every unknown wait remains required. Only a validated optional product
+/// question may stay open while other work resumes or finishes.
+pub fn blocks_progress(wait: &WaitRecord) -> bool {
+    wait.is_pending() && !is_optional(wait)
+}
+
+pub(crate) fn is_optional(wait: &WaitRecord) -> bool {
+    wait.request.schema().as_str() == REQUEST_SCHEMA
+        && read_question(wait).is_ok_and(|request| request.style == QuestionStyle::Nonblocking)
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct QuestionRegistration {
     pub wait: WaitId,
@@ -176,17 +314,31 @@ pub fn prepare_answer(wait: &WaitRecord, answer: QuestionAnswer) -> Result<Prepa
             "question_no_longer_answerable",
         ));
     }
-    let contribution = if request.style == QuestionStyle::Nonblocking {
+    let contribution = if request.style == QuestionStyle::Nonblocking
+        || !matches!(answer, QuestionAnswer::Skipped)
+    {
+        let reply = QuestionReply {
+            question_item_id: wait.id.clone(),
+            question: request.prompt.question.clone(),
+            answer: text.to_owned(),
+        };
+        // Keep quoted markup in model- or user-authored strings inside JSON.
+        let body = serde_json::to_string(&[reply])
+            .map_err(|_| Error::new(ErrorKind::InvalidInput, "question_reply_invalid"))?
+            .replace('<', "\\u003c");
         Some(HistoryRecord::Message(Message {
             id: MessageId::new(wait.id.as_str())?,
             role: Role::User,
             phase: None,
             content: vec![Content::Text(format!(
-                "Response to question {}\n\n{}",
-                wait.id, text,
+                "{OPEN_REPLY}\n{body}\n{CLOSE_REPLY}"
             ))],
             provenance: Provenance {
-                source: ANSWER_SOURCE.into(),
+                source: match request.style {
+                    QuestionStyle::Nonblocking => ANSWER_SOURCE,
+                    QuestionStyle::AnswerDependent => TOOL_ANSWER_SOURCE,
+                }
+                .into(),
                 kind: ProvenanceKind::Supplied,
                 fingerprint: Some(Fingerprint::of(&(&wait.id, &envelope))?),
             },

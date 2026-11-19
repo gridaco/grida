@@ -55,6 +55,7 @@ import type {
   NativeEditorSvgText,
   NativeSubagentClient,
 } from "@grida/desktop-bridge";
+import { attachedChatActivity } from "./native-chat-activity";
 import { GoalSpending } from "./goal-spending";
 import { ComposerDrafts, type ComposerDraftPending } from "./composer-drafts";
 import { isSupportedImageType } from "./image-attachment";
@@ -182,14 +183,17 @@ export type NativeChatView = Readonly<{
   selected: string | null;
   sessions: readonly string[];
   runningSessionIds?: readonly string[];
+  inputNeededSessionIds?: readonly string[];
   catalogCursor: string | null;
   nextCatalogCursor: string | null;
   catalogLoading: boolean;
   catalogError: string | null;
   catalogArchived: boolean;
   profiles: NativeChatProfileCatalog | null;
+  profilesLoaded: boolean;
   profileBusy: boolean;
   permissionMode: NativeChatPermissionState | null;
+  permissionModeLoading: boolean;
   permissionModeAvailable: boolean;
   permissionModeBusy: boolean;
   permissionModeUncertain: boolean;
@@ -316,6 +320,8 @@ type Scope = {
   selectionReady?: Promise<void>;
   selectionChange?: Promise<void>;
   firstInputId?: string;
+  /** The document the person could edit before the host confirmed this draft. */
+  startupComposer?: { key: string; original: unknown };
   /** Preserved only when the same send activates a different worker route. */
   submission?: object;
   effortRead?: Promise<void>;
@@ -433,6 +439,7 @@ type SideChatScope = {
   shown: NativeChatSideChat;
   /** Grows each time it opens, shows or sends; the largest is the latest used. */
   used: number;
+  stopActivity: () => void;
 };
 
 const SIDE_CHAT_UNAVAILABLE = "Side chats are unavailable in this chat.";
@@ -472,8 +479,10 @@ const EMPTY: NativeChatView = Object.freeze({
   catalogError: null,
   catalogArchived: false,
   profiles: null,
+  profilesLoaded: false,
   profileBusy: false,
   permissionMode: null,
+  permissionModeLoading: false,
   permissionModeAvailable: false,
   permissionModeBusy: false,
   permissionModeUncertain: false,
@@ -546,12 +555,14 @@ const EMPTY: NativeChatView = Object.freeze({
 const SESSION_INDEPENDENT_FIELDS = [
   "sessions",
   "runningSessionIds",
+  "inputNeededSessionIds",
   "catalogCursor",
   "nextCatalogCursor",
   "catalogLoading",
   "catalogError",
   "catalogArchived",
   "profiles",
+  "profilesLoaded",
   "profileBusy",
   "profileError",
   "profileReadError",
@@ -625,6 +636,25 @@ export class NativeChatController {
     return !!this.fixed;
   }
 
+  get modelSelectionRead(): "loading" | "failed" | "unavailable" | "settled" {
+    if (!this.remembersSelection || !this.scope) return "settled";
+    if (this.scope.selection)
+      return this.scope.selection.selection ? "settled" : "unavailable";
+    return this.view.loading ? "loading" : "failed";
+  }
+
+  get presentedAttachmentId(): string | undefined {
+    return this.scope?.attachment?.attachmentId;
+  }
+
+  get supportsPermissionModeRead(): boolean {
+    return (
+      !this.fixed &&
+      !!this.bridge.permissionMode &&
+      !!this.bridge.acceptsPermissionMode
+    );
+  }
+
   /**
    * Whether this chat offers `feature`. A side chat refuses what its snapshot
    * lists, and a fixed chat offers none of them before its first snapshot.
@@ -641,18 +671,35 @@ export class NativeChatController {
   }
 
   private drafts?: { store: ComposerDrafts; workspace: string };
+  private startupComposer?: Scope["startupComposer"];
 
   /**
    * Keep Plan, Goal and an attachment with each chat's unsent draft. The
    * composer keeps the text in the same store under the same key.
    */
-  keepDrafts(store: ComposerDrafts, workspace: string): void {
+  keepDrafts(
+    store: ComposerDrafts,
+    workspace: string,
+    opening?: { sessionId: string | null; fromHome: boolean }
+  ): void {
     this.drafts = { store, workspace };
+    if (opening && this.remembersSelection) {
+      const saved = this.restore();
+      const remembered =
+        saved.selected ?? (saved.draftId && `draft/${saved.draftId}`);
+      const target =
+        opening.sessionId ?? (opening.fromHome ? "new" : (remembered ?? "new"));
+      const key = `${workspace}:${target}`;
+      this.startupComposer = { key, original: store.read(key) };
+    }
   }
 
   /** Where the composer keeps the selected chat's unsent draft. */
   composerDraft(): { key: string; store: ComposerDrafts } | undefined {
-    const key = this.draftKey();
+    const key =
+      this.startupComposer?.key ??
+      this.scope?.startupComposer?.key ??
+      this.draftKey();
     return key && this.drafts ? { key, store: this.drafts.store } : undefined;
   }
 
@@ -728,6 +775,7 @@ export class NativeChatController {
       scope.draftRestored = true;
       return Promise.resolve();
     }
+    const { store } = this.drafts;
     return (scope.draftReady ??= this.restoreDraftState(scope)
       .catch(() => {
         if (this.owns(scope)) {
@@ -739,6 +787,22 @@ export class NativeChatController {
         }
       })
       .finally(() => {
+        const startup = scope.startupComposer;
+        const target = this.scopeDraftKey(scope);
+        if (startup && target && startup.key !== target && this.owns(scope)) {
+          // A workspace may already have migrated its old singleton draft.
+          // Transfer only text edited during this visit to the new draft.
+          const edited = store.read(startup.key);
+          if (
+            edited !== null &&
+            store.read(target) === null &&
+            JSON.stringify(edited) !== JSON.stringify(startup.original)
+          ) {
+            store.write(target, edited);
+            store.write(startup.key, null);
+          }
+        }
+        scope.startupComposer = undefined;
         scope.draftRestored = true;
         if (this.owns(scope)) this.update({});
       }));
@@ -925,7 +989,8 @@ export class NativeChatController {
       memory?: Pick<Storage, "getItem">;
       key?: string;
       initialSession: string | null;
-    }>
+    }>,
+    scope: "workspace" | "file" = "workspace"
   ): () => void {
     let watching = true;
     const probe = async () => {
@@ -943,7 +1008,8 @@ export class NativeChatController {
             recommendation &&
             !recommendation.initialSession &&
             bridge.profiles &&
-            bridge.selectProfile &&
+            (bridge.selectProfile ||
+              (scope === "workspace" && bridge.startWorkspaceChat)) &&
             !NativeChatController.readMemory(
               recommendation.memory,
               recommendation.key
@@ -965,18 +1031,29 @@ export class NativeChatController {
               }
             }
           }
-          if (preferred && bridge.selectProfile)
-            await bridge.selectProfile(preferred).catch(() => {
+          if (scope === "workspace" && bridge.startWorkspaceChat) {
+            const opened = await bridge.startWorkspaceChat(
+              preferred ?? undefined
+            );
+            result = opened.readiness;
+            if (opened.selectedProfileId !== recommendedProfileId)
               recommendedProfileId = undefined;
-            });
-          if (!watching) return;
-          result = await bridge.status(true);
+          } else {
+            if (preferred && bridge.selectProfile)
+              await bridge.selectProfile(preferred).catch(() => {
+                recommendedProfileId = undefined;
+              });
+            if (!watching) return;
+            result = await bridge.status(true);
+          }
         }
         if (!watching) return;
         switch (result) {
           case "native-ready":
           case "native-provider-key-required":
           case "native-provider-model-unavailable":
+          case "native-hooks-review-required":
+          case "native-hooks-configuration-invalid":
           case "native-provider-endpoint-https-required":
           case "native-provider-endpoint-approval-required":
           case "native-gateway-unavailable":
@@ -1012,7 +1089,11 @@ export class NativeChatController {
     };
   };
 
-  connect(initial: string | null, profileId?: string | null): void {
+  connect(
+    initial: string | null,
+    profileId?: string | null,
+    recovered?: NativeChatProfileSelection
+  ): void {
     if (this.fixed) {
       this.binding ??= this.bind(null);
       return;
@@ -1021,7 +1102,20 @@ export class NativeChatController {
     if (this.remembersSelection) {
       this.restoredDraftId = saved.draftId;
       void this.listChats();
-      void this.select(initial ?? saved.selected);
+      const opening = this.select(initial ?? saved.selected);
+      const scope = this.scope;
+      if (recovered && scope)
+        void opening.then(() =>
+          this.saveSelection(
+            scope,
+            recovered.kind === "default" ? null : recovered.id,
+            this.view.effort
+          )
+        );
+      return;
+    }
+    if (recovered) {
+      void this.selectProfile(recovered, initial ?? saved.selected);
       return;
     }
     if (profileId !== null && profileId !== undefined) {
@@ -1046,19 +1140,28 @@ export class NativeChatController {
    * point cannot send the message again; a pane closed before then leaves
    * the message for the next connection. When the message cannot be sent,
    * the chat says why and the taken text is returned so the composer can
-   * keep it.
+   * keep it. Choosing a different model during connection recovery returns
+   * the prepared request to the composer for an explicit send.
    */
   async startChat(
     profileId: string | null,
     take: () => NativeChatFirstInput | null,
-    composer?: NativeChatInitialComposer
+    composer?: NativeChatInitialComposer,
+    recovered?: NativeChatProfileSelection
   ): Promise<string | null> {
+    const chosen = recovered
+      ? recovered.kind === "default"
+        ? null
+        : recovered.id
+      : profileId;
+    const keepDraft = chosen !== profileId;
     if (composer?.preparedSessionId)
       return this.startPreparedChat(
         composer.preparedSessionId,
         profileId,
         take,
-        composer
+        composer,
+        keepDraft
       );
     if (this.remembersSelection) {
       this.beginConnection();
@@ -1074,13 +1177,18 @@ export class NativeChatController {
         this.startingChat = false;
       }
       if (this.chatStart !== run || !scope || !this.owns(scope)) return null;
-      if (scope.selection?.selection?.profileId !== profileId)
-        await this.saveSelection(scope, profileId, this.view.effort);
+      if (scope.selection?.selection?.profileId !== chosen)
+        await this.saveSelection(scope, chosen, this.view.effort);
       if (this.chatStart !== run || !this.owns(scope)) return null;
       await this.prepareFirstMessage(composer);
       if (this.chatStart !== run || !this.owns(scope)) return null;
       this.chatStart = undefined;
-      if (!this.canSubmit || this.view.profileError || this.view.error)
+      if (
+        keepDraft ||
+        !this.canSubmit ||
+        this.view.profileError ||
+        this.view.error
+      )
         return this.declineMessage(take);
       const input = take();
       if (!input) return null;
@@ -1096,8 +1204,8 @@ export class NativeChatController {
     this.chatStart = run;
     this.startingChat = true;
     try {
-      if (profileId !== null)
-        await this.selectProfile({ kind: "new", id: profileId }, null);
+      if (chosen !== null)
+        await this.selectProfile({ kind: "new", id: chosen }, null);
       else {
         void this.listChats();
         await this.select(null);
@@ -1113,14 +1221,14 @@ export class NativeChatController {
     this.chatStart = undefined;
     const ready =
       !!scope &&
-      this.profileId === profileId &&
+      this.profileId === chosen &&
       !this.view.profileError &&
       !this.view.error &&
       this.canSubmit &&
       this.view.selected === null &&
       scope.requested === null &&
       !scope.attachment;
-    if (!ready || !scope) return this.declineMessage(take);
+    if (keepDraft || !ready || !scope) return this.declineMessage(take);
     const input = take();
     if (!input) return null;
     try {
@@ -1139,7 +1247,8 @@ export class NativeChatController {
     sessionId: string,
     profileId: string | null,
     take: () => NativeChatFirstInput | null,
-    composer: NativeChatInitialComposer
+    composer: NativeChatInitialComposer,
+    keepDraft: boolean
   ): Promise<string | null> {
     this.beginConnection();
     const run = {};
@@ -1201,6 +1310,7 @@ export class NativeChatController {
       });
       return this.declineMessage(take);
     }
+    if (keepDraft) return this.declineMessage(take);
     const input = take();
     if (!input) {
       this.update({});
@@ -1368,6 +1478,7 @@ export class NativeChatController {
     this.update({
       sessions: this.sessionChoices(),
       runningSessionIds: undefined,
+      inputNeededSessionIds: undefined,
       catalogCursor: null,
       nextCatalogCursor: null,
       catalogLoading: false,
@@ -1415,6 +1526,7 @@ export class NativeChatController {
         backgroundProcesses: null,
         submitting: false,
         runningSessionIds: undefined,
+        inputNeededSessionIds: undefined,
       });
   }
 
@@ -1435,7 +1547,8 @@ export class NativeChatController {
         !this.view.catalogError &&
         !this.listing &&
         !this.view.catalogArchived &&
-        this.catalog?.runningSessionIds !== undefined
+        (this.catalog?.runningSessionIds !== undefined ||
+          this.catalog?.inputNeededSessionIds !== undefined)
       )
         void this.readChatPage(this.view.catalogCursor, false, observer.signal);
     }, CHAT_LIST_REFRESH_MS);
@@ -1473,6 +1586,7 @@ export class NativeChatController {
         catalogLoading: true,
         catalogError: null,
         runningSessionIds: undefined,
+        inputNeededSessionIds: undefined,
       });
     try {
       // A reconnect can happen before the old page releases the frame's slot.
@@ -1487,6 +1601,7 @@ export class NativeChatController {
       this.update({
         sessions: this.sessionChoices(),
         runningSessionIds: page.runningSessionIds,
+        inputNeededSessionIds: page.inputNeededSessionIds,
         catalogCursor: cursor,
         nextCatalogCursor: page.nextCursor,
       });
@@ -1512,6 +1627,7 @@ export class NativeChatController {
           error.message === "invalid_session_cursor";
         this.update({
           runningSessionIds: undefined,
+          inputNeededSessionIds: undefined,
           ...((!observer || invalidPage) && {
             catalogError: invalidPage
               ? "This chat page changed. Choose Newest chats to refresh it."
@@ -1530,6 +1646,7 @@ export class NativeChatController {
     this.catalogConnection = {};
     this.update({
       profiles: null,
+      profilesLoaded: false,
       profileBusy: false,
       profileError: null,
       profileReadError: null,
@@ -1541,25 +1658,6 @@ export class NativeChatController {
   async selectConnection(
     selection: NativeChatProfileSelection
   ): Promise<boolean> {
-    if (this.remembersSelection && !this.scope) {
-      await this.bind(null);
-      let scope = this.scope as Scope | undefined;
-      if (!scope) return false;
-      await this.saveSelection(
-        scope,
-        selection.kind === "default" ? null : selection.id,
-        this.view.effort
-      );
-      if (this.view.profileError || !scope.selection?.selection) return false;
-      try {
-        scope = await this.activateSelection(scope);
-        return this.owns(scope);
-      } catch (error) {
-        if (this.owns(scope))
-          this.update({ profileError: modelChangeRefusal(error) });
-        return false;
-      }
-    }
     const connection = this.catalogConnection;
     if (
       this.scope ||
@@ -1592,6 +1690,8 @@ export class NativeChatController {
       return this.profileRead.done;
     const request = { connection, done: Promise.resolve() };
     this.profileRead = request;
+    if (!this.view.profilesLoaded && this.view.profileReadError)
+      this.update({ profileReadError: null });
     const owns = () =>
       this.catalogConnection === connection && this.profileRead === request;
     request.done = (async () => {
@@ -1606,6 +1706,7 @@ export class NativeChatController {
               profiles && selected
                 ? { ...profiles, active: selected.profileId }
                 : profiles,
+            profilesLoaded: true,
             profileReadError: null,
           });
         }
@@ -1977,6 +2078,7 @@ export class NativeChatController {
         }),
         sessions: this.sessionChoices(),
         runningSessionIds: undefined,
+        inputNeededSessionIds: undefined,
         catalogCursor: null,
         nextCatalogCursor: null,
         catalogLoading: false,
@@ -2065,11 +2167,17 @@ export class NativeChatController {
       gaps: new Set(),
       observation: null,
       replay: true,
+      startupComposer:
+        this.startupComposer ??
+        (this.scope?.requested === sessionId
+          ? this.scope.startupComposer
+          : undefined),
       ...((this.startingChat || prepared) && {
         startsWithMessage: true as const,
       }),
       ...(prepared && { preparedStart: true as const }),
     };
+    this.startupComposer = undefined;
     this.scope = scope;
     // Every per-chat field starts empty; only what belongs to the workspace
     // carries over to the next chat.
@@ -2078,6 +2186,8 @@ export class NativeChatController {
       ...pickSessionIndependent(this.view),
       scope: scope.id,
       selected: sessionId,
+      permissionModeLoading:
+        sessionId !== null && this.supportsPermissionModeRead,
       ...(this.fixed && { effort: this.fixed.effort }),
       messages: retained?.messages ?? [],
       turnRecords: retained?.turnRecords ?? [],
@@ -2092,8 +2202,8 @@ export class NativeChatController {
         if (this.owns(scope))
           this.update({
             loading: false,
-            profileError:
-              "Couldn't read this chat's saved model and effort. Reopen the chat to retry.",
+            permissionModeLoading: false,
+            profileError: "Couldn't read this chat's saved model and effort.",
           });
         return;
       }
@@ -2161,7 +2271,7 @@ export class NativeChatController {
       }
     } finally {
       if (this.owns(scope)) {
-        this.update({ loading: false });
+        this.update({ loading: false, permissionModeLoading: false });
         await this.restoreDraft(scope);
       }
     }
@@ -2789,8 +2899,15 @@ export class NativeChatController {
     )
       return;
     const read = {};
+    const firstRead = !scope.permissionRead;
     scope.permissionRead = read;
     const attachment = scope.attachment;
+    if (
+      firstRead &&
+      !this.view.permissionModeLoading &&
+      !this.view.permissionMode
+    )
+      this.update({ permissionModeLoading: true });
     try {
       const available = await this.bridge.acceptsPermissionMode();
       const state = available
@@ -2804,6 +2921,7 @@ export class NativeChatController {
       ) {
         this.update({
           permissionMode: state,
+          permissionModeLoading: false,
           permissionModeUncertain: false,
           ...(this.view.permissionModeUncertain && {
             permissionModeError: null,
@@ -2820,6 +2938,7 @@ export class NativeChatController {
         scope.permissionRead === read
       )
         this.update({
+          permissionModeLoading: false,
           permissionModeAvailable: false,
           permissionModeUncertain: true,
           permissionModeError:
@@ -3094,25 +3213,61 @@ export class NativeChatController {
     });
   }
 
-  async setChatArchived(archived: boolean): Promise<boolean> {
+  async setChatArchived(archived: boolean) {
     const scope = this.scope;
     const entry = this.view.catalogEntry;
+    const profileId = this.view.profiles?.active ?? this.profileId ?? undefined;
     if (
       !scope ||
       !entry ||
       this.view.catalogDraft ||
       entry.archived === archived
     )
-      return false;
-    const changed = await this.organize({
+      return null;
+    const saved = await this.organize({
       revision: entry.revision,
       title: entry.title,
       archived,
     });
     // A late reply must not replace another chat the person already opened.
-    if (!changed || !this.owns(scope)) return false;
-    if (archived) await this.select(null);
-    return true;
+    if (!saved || !this.owns(scope)) return null;
+    const replacesSelection =
+      archived && this.view.selected === saved.sessionId;
+    // Selection changes immediately. Its draft reads can finish after confirmation is shown.
+    if (replacesSelection) void this.select(null);
+    const replacement = replacesSelection ? this.scope : undefined;
+
+    const receipt = saved.archiveUndo;
+    return {
+      ...saved,
+      undo:
+        receipt && this.bridge.undoArchive
+          ? async () => {
+              await this.undoArchive(receipt);
+              const draft = this.composerDraft();
+              // Only replace the empty draft this archive opened.
+              if (
+                replacement &&
+                this.owns(replacement) &&
+                !replacement.attachment &&
+                this.view.selected === null &&
+                !this.view.submitting &&
+                !this.focusBlocked() &&
+                !draft?.store.read(draft.key)
+              ) {
+                await this.focusChat(saved.sessionId, profileId);
+              }
+            }
+          : undefined,
+    };
+  }
+
+  private async undoArchive(receipt: string): Promise<void> {
+    const connection = this.catalogConnection;
+    if (!connection || !this.bridge.undoArchive)
+      throw new Error("native_chat_archive_undo_unavailable");
+    await this.bridge.undoArchive(receipt);
+    if (this.catalogConnection === connection) void this.listChats();
   }
 
   get canDeleteSavedChat(): boolean {
@@ -3129,7 +3284,7 @@ export class NativeChatController {
     );
   }
 
-  async deleteSavedChat(): Promise<void> {
+  async deleteSavedChat(): Promise<boolean> {
     const scope = this.scope;
     const connection = this.catalogConnection;
     const attachment = scope?.attachment;
@@ -3143,7 +3298,7 @@ export class NativeChatController {
       !entry ||
       !this.bridge.deleteSavedChat
     )
-      return;
+      return false;
     this.update({ catalogChanging: true, catalogEntryError: null });
     try {
       const deleted = await this.bridge.deleteSavedChat(
@@ -3153,11 +3308,12 @@ export class NativeChatController {
       );
       if (deleted && this.catalogConnection === connection)
         this.forgetDeletedChat(scope);
+      return deleted;
     } catch (error) {
-      if (!this.owns(scope)) return;
+      if (!this.owns(scope)) return false;
       if (deletedAttachment(error)) {
         this.forgetDeletedChat(scope);
-        return;
+        return false;
       }
       const reason = error instanceof Error ? error.message : "";
       if (
@@ -3166,9 +3322,10 @@ export class NativeChatController {
         reason.includes("stale_session_revision")
       ) {
         await Promise.all([this.readCatalogEntry(scope), this.refresh(scope)]);
-        if (!this.owns(scope)) return;
+        if (!this.owns(scope)) return false;
       }
       this.update({ catalogEntryError: deletionError(reason) });
+      return false;
     } finally {
       if (this.owns(scope)) this.update({ catalogChanging: false });
     }
@@ -3383,11 +3540,22 @@ export class NativeChatController {
         sent: () => this.useSide(scope, side),
       }
     );
+    let activity = attachedChatActivity(chat.read());
     const side: SideChatScope = {
       chat,
       opened,
       shown: Object.freeze({ id, chat, focus: 1 }),
       used: ++this.sideUse,
+      stopActivity: chat.subscribe(() => {
+        const latest = attachedChatActivity(chat.read());
+        if (
+          activity.running === latest.running &&
+          activity.inputNeeded === latest.inputNeeded
+        )
+          return;
+        activity = latest;
+        this.publishSides(scope);
+      }),
     };
     // A side chat's draft ends with it.
     chat.keepDrafts(new ComposerDrafts(null, null), "side");
@@ -3396,7 +3564,7 @@ export class NativeChatController {
       () => true,
       (error: unknown) => {
         if (!this.removeSide(scope, side)) return false;
-        chat.disconnect();
+        void this.releaseSide(side);
         if (this.owns(scope))
           this.update({
             error: describeSideRefusal(error),
@@ -3414,16 +3582,18 @@ export class NativeChatController {
   }
 
   /**
-   * Show the side chat of this chat used most recently, or open a new one
-   * when none is open.
+   * An explicit session can only focus an existing side of this chat. Without a
+   * session, show the most recently used side or open the first one.
    */
-  async showSideChat(): Promise<void> {
+  async showSideChat(sessionId?: string): Promise<void> {
     const scope = this.scope;
-    const latest = scope?.sides.reduce<SideChatScope | undefined>(
-      (found, side) => (found && found.used > side.used ? found : side),
-      undefined
-    );
-    if (!scope || !latest) return this.openSideChat();
+    const latest = sessionId
+      ? scope?.sides.find((side) => side.chat.read().selected === sessionId)
+      : scope?.sides.reduce<SideChatScope | undefined>(
+          (found, side) => (found && found.used > side.used ? found : side),
+          undefined
+        );
+    if (!scope || !latest) return sessionId ? undefined : this.openSideChat();
     latest.shown = Object.freeze({
       ...latest.shown,
       focus: latest.shown.focus + 1,
@@ -3477,6 +3647,7 @@ export class NativeChatController {
 
   /** End a side chat: its view goes first, then its session is discarded. */
   private async releaseSide(side: SideChatScope): Promise<void> {
+    side.stopActivity();
     side.chat.disconnect();
     const attachment = await side.opened.catch(() => null);
     if (attachment) await this.bridge.closeSideChat?.(attachment.attachmentId);
@@ -4778,7 +4949,10 @@ export class NativeChatController {
         ...scope.earlierPages.flatMap((page) => page.messages),
         ...scope.durable,
       ].some(
-        (message) => message.messageId === messageId && message.role === "user"
+        (message) =>
+          message.messageId === messageId &&
+          message.role === "user" &&
+          !message.questionReply
       )
     )
       return;
@@ -6013,19 +6187,26 @@ export class NativeChatController {
         question.reviewId,
         answer
       );
-      if (this.owns(scope))
+      // A poll already in flight may have inspected the turn before acceptance.
+      await scope.refreshing;
+      if (this.owns(scope)) {
+        scope.replay = true;
         this.update({
           questions: this.view.questions.filter(
             (entry) => entry.questionId !== questionId
           ),
           questionReady: false,
         });
+      }
       return true;
-    } catch {
+    } catch (error) {
       if (this.owns(scope))
         this.update({
           error:
-            "Couldn't confirm the answer. Check the question and try again.",
+            error instanceof Error &&
+            error.message.includes("question_no_longer_answerable")
+              ? "This question is no longer open."
+              : "Couldn't confirm the answer. Check the question and try again.",
         });
       return false;
     } finally {
@@ -6488,7 +6669,7 @@ export class NativeChatController {
     return entry;
   }
 
-  private async organize(change: NativeChatCatalogChange): Promise<boolean> {
+  private async organize(change: NativeChatCatalogChange) {
     const scope = this.scope;
     const attachment = scope?.attachment;
     if (
@@ -6497,25 +6678,25 @@ export class NativeChatController {
       !this.bridge.organize ||
       this.view.catalogChanging
     )
-      return false;
+      return null;
     this.update({ catalogChanging: true, catalogEntryError: null });
     try {
       const saved = await this.bridge.organize(attachment.attachmentId, change);
-      if (!this.owns(scope)) return false;
+      if (!this.owns(scope)) return null;
       if (saved.sessionId !== attachment.sessionId)
         throw new Error("native_chat_catalog_entry_mismatch");
       this.installCatalogEntry(saved);
       this.update({ catalogDraft: null });
       void this.listChats();
-      return true;
+      return saved;
     } catch (error) {
-      if (!this.owns(scope)) return false;
+      if (!this.owns(scope)) return null;
       if (
         error instanceof Error &&
         error.message.includes("session_catalog_revision_changed")
       ) {
         const entry = await this.readCatalogEntry(scope);
-        if (!this.owns(scope)) return false;
+        if (!this.owns(scope)) return null;
         const draft = this.view.catalogDraft;
         this.update({
           ...(draft && entry && { catalogDraft: { ...draft, basis: entry } }),
@@ -6530,7 +6711,7 @@ export class NativeChatController {
     } finally {
       if (this.owns(scope)) this.update({ catalogChanging: false });
     }
-    return false;
+    return null;
   }
 
   private refresh(scope: Scope): Promise<void> {
@@ -6610,7 +6791,7 @@ export class NativeChatController {
           this.readPermissionMode(scope),
         ]);
         if (!this.owns(scope)) return;
-        if (!replay) return;
+        if (!replay && !scope.replay) return;
         if (scope.earlierRead) {
           // The observation already advanced. Keep its replay pending until
           // the earlier page releases the shared transcript reader.
@@ -6924,6 +7105,14 @@ export class NativeChatController {
       );
       if (!this.owns(scope)) return;
       scope.questionBasis = observation.observationId;
+      // Another client may have answered without changing the running disposition.
+      if (
+        this.view.questions.some(
+          (prior) =>
+            !questions.some((entry) => entry.questionId === prior.questionId)
+        )
+      )
+        scope.replay = true;
       this.update({ questions, questionReady: true, questionError: null });
     } catch (error) {
       if (
@@ -7379,7 +7568,7 @@ function observationTransportFailure(error: unknown): boolean {
 
 function deletionError(reason: string): string {
   if (reason.includes("deletion_unverified"))
-    return "Couldn't confirm deletion. Try Delete chat again to check the same request.";
+    return "Couldn't confirm deletion. Choose Permanently delete again to check the same request.";
   if (reason.includes("has_subagents"))
     return "This connection can't delete a chat with named subagents.";
   if (reason.includes("deletion_dependencies_changed"))
@@ -7756,9 +7945,15 @@ export namespace NativeChatController {
   export class ModelSelection {
     private state: Readonly<{
       profiles: NativeChatProfileCatalog | null;
+      profilesLoaded: boolean;
       profileId: string | null;
       error: string | null;
-    }> = { profiles: null, profileId: null, error: null };
+    }> = {
+      profiles: null,
+      profilesLoaded: false,
+      profileId: null,
+      error: null,
+    };
     private explicit = false;
     private request?: {
       read: () => Promise<NativeChatProfileCatalog | null>;
@@ -7789,6 +7984,8 @@ export namespace NativeChatController {
       if (this.request?.read === read) return this.request.done;
       const request = { read, done: Promise.resolve() };
       this.request = request;
+      if (!this.state.profilesLoaded && this.state.error)
+        this.update({ ...this.state, error: null });
       request.done = (async () => {
         try {
           let profiles = await read();
@@ -7813,6 +8010,7 @@ export namespace NativeChatController {
           }
           this.update({
             profiles,
+            profilesLoaded: true,
             profileId: this.explicit
               ? current
               : profiles?.newChatDefault

@@ -291,6 +291,8 @@ export type DesktopBridge = {
   archives?: {
     list: (cursor?: string | null) => Promise<DesktopArchivedChatPage>;
     unarchive: (id: string, revision: number) => Promise<void>;
+    /** Opens the chat restored from this Settings window using the same row id. */
+    openRestored?: (id: string) => Promise<void>;
   };
   nativeExternalAgent?: DesktopNativeExternalAgent;
   /**

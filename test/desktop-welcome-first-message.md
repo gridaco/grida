@@ -37,12 +37,16 @@ however long that takes, and survives a reload before it is sent. Once the
 chat sends it, a reload does not send it again. When the chat cannot send it —
 the chosen model cannot open, the send fails, or the workspace needs a model
 choice first — the chat says the Welcome message wasn't sent and puts its text
-in the composer. When chat cannot open in the workspace at all, the
-unavailability notice says the message wasn't sent.
+in the composer. If startup is temporarily unavailable, the workspace keeps
+the waiting message for **Retry**. Reopening the workspace while a previous
+visit is still starting must allow the current visit to finish connecting,
+list its existing chats, and send the waiting message once.
 
 When Full access is selected on Home, the same confirmation as a workspace
 chat appears immediately. Confirming keeps the composer on Home and lets the
-person continue drafting. Send opens the exact approved chat with Full access.
+person continue drafting. Switching presets for the same project keeps the
+approved access in supporting Desktop builds. Changing projects returns the
+composer to Default. Send opens the exact approved chat with Full access.
 Cancel keeps the draft and Default access. If copying a selected Slides
 template fails, the composer keeps the approval and draft for retry. If the
 handoff fails after the chat is prepared, retrying from the same Home composer
@@ -91,8 +95,10 @@ attachment also keeps it with an explanation instead of omitting it.
 5. Remove the provider key used in step 3 in Settings, return to Welcome
    (where that model is no longer offered), choose **Default** while signed
    out of Grida with no other provider key, type a request, and send.
-   - Expected: the workspace asks for a model, says the Welcome message wasn't
-     sent, and the request is in the composer.
+   - Expected: the workspace explains the connection problem and keeps the
+     request while you retry. Restore the original connection and choose
+     **Retry** to send it once. Alternatively, choose a working model. The
+     request appears in the composer for you to review and send.
 6. Send a text-only request from Welcome and reload the workspace window while
    its chat is still starting.
    - Expected: after the reload the chat starts and sends the message once.
@@ -112,8 +118,11 @@ attachment also keeps it with an explanation instead of omitting it.
 11. On Home, type a request and choose Full access.
     - Expected: the Full access dialog appears immediately on Home. Cancel
       keeps the message and Default access. Choose Full access again and
-      confirm. Home remains open. Send to open the approved new chat and
-      start the message with Full access. No second confirmation appears.
+      confirm. Home remains open. Select Workflows, then go Back and Forward
+      to revisit Home and Workflows. The draft and Full access choice persist.
+      Send to open the approved new chat and start the message with Full
+      access. No second confirmation appears. Return to Home, approve Full
+      access again, and pick a different project. The picker shows Default.
 12. On Workflows, click three cards. Hover a composer chip and use a card's
     Open button. Remove reference 2, reselect that card, then remove it again.
     Send “Use the approach from 1 and the layout from 2.”

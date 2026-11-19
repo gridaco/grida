@@ -89,7 +89,7 @@ fn command() -> Command {
                     Arg::new("questions")
                         .long("questions")
                         .action(ArgAction::SetTrue)
-                        .help("Allow questions and exit with an identified input-required result."),
+                        .help("Allow questions. Required answers produce an input_required exit. Optional questions expire at completion."),
                 )
                 .arg(
                     Arg::new("skill")
@@ -264,9 +264,25 @@ fn command() -> Command {
                 ),
         )
         .subcommand(
+            Command::new("bake-prompt")
+                .about("Print the composed system prompt of an offline sample turn")
+                .arg(Arg::new("mode").long("mode").value_parser(["act", "plan"]).default_value("act"))
+                .arg(Arg::new("role").long("role").value_parser(["main", "side"]).default_value("main"))
+                .arg(Arg::new("effort").long("effort").value_parser(["standard", "ultra"]).default_value("standard"))
+                .arg(Arg::new("no-questions").long("no-questions").action(ArgAction::SetTrue))
+                .arg(Arg::new("subagents").long("subagents").action(ArgAction::SetTrue).help("Allow general-purpose delegated work in an eligible Act turn"))
+                .arg(Arg::new("cwd").long("cwd").value_parser(value_parser!(PathBuf)).conflicts_with("permission-profile")
+                    .help("Include project guidance from this directory"))
+                .arg(Arg::new("permission-profile").long("permission-profile").value_parser(value_parser!(PathBuf))
+                    .help("Compose with a reviewed launch profile without executable hooks"))
+                .arg(Arg::new("json").long("json").action(ArgAction::SetTrue).help("Include ordered system text and tool declarations as JSON")),
+        )
+        .subcommand(
             Command::new("inspect")
                 .about("Read a persisted session without running a prompt")
                 .arg(state_dir())
+                .arg(Arg::new("prompt-turn").long("prompt-turn").value_name("TURN_ID").help("List this turn's prepared inference operation IDs, request fingerprints and attempt counts"))
+                .arg(Arg::new("operation").long("operation").requires("prompt-turn").value_name("OPERATION_ID").help("Include the selected request's system messages and offered tools"))
                 .arg(Arg::new("session").value_name("SESSION_ID").required(true)),
         )
         .subcommand(
@@ -470,6 +486,35 @@ fn launch(command: Command) -> Command {
 
 async fn dispatch(matches: ArgMatches) -> Result<u8> {
     let (name, args) = matches.subcommand().expect("required subcommand");
+    if name == "bake-prompt" {
+        let regime = if args.get_one::<String>("mode").map(String::as_str) == Some("plan") {
+            OperatingRegime::Plan
+        } else {
+            OperatingRegime::Act
+        };
+        let effort = if args.get_one::<String>("effort").map(String::as_str) == Some("ultra") {
+            EffortPreset::Ultra
+        } else {
+            EffortPreset::Standard
+        };
+        let prompt = grida_agent::host::prompt_preview::bake(
+            regime,
+            args.get_one::<String>("role").map(String::as_str) == Some("side"),
+            effort,
+            !args.get_flag("no-questions"),
+            args.get_flag("subagents"),
+            args.get_one::<PathBuf>("cwd").map(PathBuf::as_path),
+            args.get_one::<PathBuf>("permission-profile")
+                .map(PathBuf::as_path),
+        )
+        .await?;
+        if args.get_flag("json") {
+            process::write_record(&prompt).await?;
+        } else {
+            println!("{}", prompt.instructions.join("\n\n"));
+        }
+        return Ok(0);
+    }
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     if name == "workspace-file" {
         return grida_agent::workspace_file::serve_stdio().map(|()| 0);
@@ -658,6 +703,17 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
     if name == "inspect" {
         let host = Host::open(state_dir, None)?;
         let id = SessionId::new(args.get_one::<String>("session").expect("required session"))?;
+        if let Some(turn) = args.get_one::<String>("prompt-turn") {
+            let operation = args
+                .get_one::<String>("operation")
+                .map(agent_kit_core::OperationId::new)
+                .transpose()?;
+            let prompts = host
+                .recorded_prompts(id, agent_kit_core::TurnId::new(turn)?, operation)
+                .await?;
+            process::write_record(&prompts).await?;
+            return Ok(0);
+        }
         let view = host.inspect(id).await?;
         let title = host.session_title(view.session.clone()).await?;
         process::write_record(&json!({
@@ -667,6 +723,8 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
             "title": title,
             "revision": view.revision,
             "admission_paused": view.admission_paused,
+            "input_needed": view.current.as_ref().is_some_and(|turn| !turn.controls.cancelled
+                && grida_agent::host::needs_user_input(&turn.pending_request_schemas)),
             "current": view.current,
             "latest": view.latest,
         }))

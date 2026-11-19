@@ -11,10 +11,16 @@ updated: 2026-11-15
 automatable: false
 covered_by:
   - editor/scaffolds/desktop/workbench/native-chat-controls.test.tsx
+  - editor/scaffolds/desktop/workbench/native-chat-focus.browser.tsx
   - editor/lib/agent-chat/native-chat-controller.test.ts
 ---
 
 ## Behavior
+
+Home and workspace composers show a compact loading placeholder until the
+initial catalogue and selection are known. A failed first read offers Retry in
+the toolbar. A loaded empty catalogue can still resolve to Default model. The
+draft stays editable through these transitions.
 
 Model choices stay current without a permanent refresh button. Entering the
 model list reloads its choices; opening the chat's effort settings alone does

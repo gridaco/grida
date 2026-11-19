@@ -181,6 +181,7 @@ fn capability_keys(
         .into_iter()
         .chain(lifecycle::CAPABILITIES)
         .chain(questions::CAPABILITIES)
+        .chain([questions::OPTIONAL])
         .chain(approvals::capabilities(reviewer))
         .chain(history::CAPABILITIES)
         .chain([compaction::COMPACT])
@@ -561,6 +562,8 @@ struct TurnSummary {
     paused: bool,
     cancelled: bool,
     disposition: TurnDisposition,
+    #[serde(default)]
+    input_needed: bool,
     status: Option<OutcomeStatus>,
 }
 
@@ -575,6 +578,8 @@ impl From<TurnView> for TurnSummary {
             paused: turn.controls.paused,
             cancelled: turn.controls.cancelled,
             disposition: turn.disposition,
+            input_needed: !turn.controls.cancelled
+                && crate::host::needs_user_input(&turn.pending_request_schemas),
             status: turn.outcome.map(|outcome| outcome.status),
         }
     }

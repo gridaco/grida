@@ -1,16 +1,18 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { ArchiveRestoreIcon, Loader2, RefreshCwIcon } from "lucide-react";
 import { Button } from "@app/ui/components/button";
+import { toast } from "sonner";
 import { getDesktopBridge } from "@/lib/desktop/bridge";
-import { SettingsArchives } from "@/lib/desktop/settings-archives";
+import type { SettingsArchives } from "@/lib/desktop/settings-archives";
 import { ChatActivityDate } from "@/scaffolds/desktop/shared/chat-activity-date";
 
-export function ArchivedChatsSettings() {
-  const [controller] = useState(
-    () => new SettingsArchives.Controller(() => getDesktopBridge()?.archives)
-  );
+export function ArchivedChatsSettings({
+  controller,
+}: {
+  controller: SettingsArchives.Controller;
+}) {
   const state = useSyncExternalStore(
     controller.subscribe,
     controller.read,
@@ -20,12 +22,26 @@ export function ArchivedChatsSettings() {
     const refresh = () => void controller.refresh();
     refresh();
     window.addEventListener("focus", refresh);
-    return () => {
-      window.removeEventListener("focus", refresh);
-      controller.cancel();
-    };
+    return () => window.removeEventListener("focus", refresh);
   }, [controller]);
   const busy = state.loading || state.restoring !== null;
+
+  async function unarchive(id: string) {
+    if (!(await controller.unarchive(id))) return;
+    const openRestored = getDesktopBridge()?.archives?.openRestored;
+    toast("Chat unarchived", {
+      icon: <ArchiveRestoreIcon aria-hidden className="size-4" />,
+      action: openRestored && {
+        label: "View",
+        onClick: () => {
+          void openRestored(id).catch(() => {
+            toast.error("Couldn't open this chat.");
+          });
+        },
+      },
+    });
+  }
+
   return (
     <section data-testid="settings-archived-chats" className="space-y-5">
       <header className="flex items-start justify-between gap-3">
@@ -92,7 +108,7 @@ export function ArchivedChatsSettings() {
                   variant="outline"
                   disabled={busy}
                   aria-label={`Unarchive ${chat.title || "Untitled chat"}`}
-                  onClick={() => void controller.unarchive(chat.id)}
+                  onClick={() => void unarchive(chat.id)}
                 >
                   {state.restoring === chat.id ? (
                     <Loader2 className="size-3.5 animate-spin" />

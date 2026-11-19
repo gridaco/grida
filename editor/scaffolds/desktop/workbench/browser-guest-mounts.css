@@ -26,3 +26,7 @@
     calc(var(--desktop-content-radius) - var(--desktop-content-border))
   );
 }
+
+body:has([data-workbench-resize-capture]) [data-browser-guest-layer] {
+  pointer-events: none;
+}

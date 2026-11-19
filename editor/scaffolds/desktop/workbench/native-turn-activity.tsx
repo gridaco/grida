@@ -6,6 +6,7 @@ import type {
 } from "@grida/desktop-bridge";
 import { ChatMessageView, ToolCallGroupView } from "@/kits/agent-chat";
 import { native_tool_parts } from "@/lib/agent-chat/native-tool-parts";
+import { native_message_parts } from "@/lib/agent-chat/native-message-parts";
 import { turn_activity } from "@/lib/agent-chat/turn-activity";
 import { NativeSubagentIdentity } from "./native-subagent-identity";
 
@@ -83,7 +84,7 @@ export function NativeTurnActivity({
               message={{
                 id: item.message.messageId,
                 role: item.message.role,
-                parts: [{ type: "text", text: item.message.text }],
+                parts: native_message_parts.of(item.message),
               }}
             />
           ) : item.kind === "subagent" ? (

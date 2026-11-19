@@ -2153,6 +2153,12 @@ fn turn_view(inner: &Inner, state: &TurnState) -> Result<TurnView> {
             controls: state.controls().clone(),
             suspended: state.is_suspended(),
             outcome: state.outcome().cloned(),
+            pending_request_schemas: state
+                .waits()
+                .values()
+                .filter(|wait| wait.is_pending())
+                .map(|wait| wait.request.schema().clone())
+                .collect(),
         },
     )
 }
@@ -2183,6 +2189,7 @@ fn view_from(inner: &Inner, facts: turn_layout::HeadFacts) -> Result<TurnView> {
         history_position: facts.history_position,
         controls: facts.controls,
         disposition,
+        pending_request_schemas: facts.pending_request_schemas,
         outcome: facts.outcome,
     })
 }

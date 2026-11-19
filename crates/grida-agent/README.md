@@ -34,6 +34,44 @@ feature's current behavior, intended outcome, caveats, and availability.
 - [Native sandbox](docs/rust-sandbox.md) — native command confinement, its
   launch contract, and platform boundaries.
 
+## Review the effective prompt
+
+Run `grida-agent bake-prompt` to print the merged system text for a sample
+turn. Compare `--mode act` and `--mode plan`, `--role main` and
+`--role side`, or add `--no-questions`. Add `--json` to inspect each system
+message in order alongside the exact tools and schemas offered to that sample.
+The command uses a temporary native session with a fixed text model and an
+offline transport. It needs no credentials or model subscription.
+
+```sh
+target/debug/grida-agent bake-prompt --mode act --json
+target/debug/grida-agent bake-prompt --mode plan --role side
+target/debug/grida-agent bake-prompt --effort ultra --json
+```
+
+An optional `--cwd DIRECTORY` includes that directory’s project guidance in
+request preparation. Project and user messages have their own roles and are
+excluded from this system-instruction view. To inspect a specific permission
+posture, use `--permission-profile FILE` with a reviewed launch profile that
+has no executable hooks. Side chats use standard effort. As in a headless
+run, Ultra enables independent review and offers general-purpose delegation
+when eligible. Add `--subagents` to offer general delegation at standard effort.
+
+For an actual past turn on a stopped host, use
+`grida-agent inspect --state-dir DIRECTORY SESSION_ID --prompt-turn TURN_ID`.
+The result lists each recorded inference by operation ID with its original
+request fingerprint, model, message count, and attempt count. The IDs are
+in lexical order. Add
+`--operation OPERATION_ID` to read the selected call's system messages
+and tool declarations, including role, capability, and runtime additions.
+These system messages can contain private workspace or hook context. The
+fingerprint covers the complete prepared request. A new preview uses today's build.
+
+The [product prompt assets](../grida-agent-master/src/prompts) own shared
+wording, mode guidance and role instructions. The host selects them from the
+accepted configuration. Tool descriptions stay beside their schemas. The
+[title task](src/prompts/title.md) has separate user-role instructions.
+
 ## Run locally
 
 Build with `cargo build -p grida-agent --locked`. Use an absolute workspace

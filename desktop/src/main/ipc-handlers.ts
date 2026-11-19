@@ -78,6 +78,7 @@ import { NativeExternalRunIpc } from "./native-external-run-ipc";
 import type { NativeExternalRuns } from "./native-external-runs";
 import { takeNativeNotificationFocus } from "./agent-notifications";
 import { NativeArchiveIpc } from "./native-archive-ipc";
+import { confirmChatDeletion } from "./chat-deletion-dialog";
 import { listDesktopChats } from "./chat-catalog-ipc";
 import type { NativeChatCatalog } from "./native-chat-catalog";
 import type { NativeArchives } from "./native-archives";
@@ -97,10 +98,12 @@ type RegisterIpcHandlersOptions = {
   browser_history?: BrowserHistory;
   browser_downloads?: BrowserDownloads;
   on_browser_tools?: (tools: DesktopBrowserTools) => void;
+  on_native_chat?: (chat: NativeChatIpc) => void;
   resolve_ipc_role: (window: BrowserWindow) => DesktopIpcRole | null;
   open_settings: () => void;
   archives?: NativeArchives;
   chat_catalog?: NativeChatCatalog;
+  open_restored_chat?: (workspaceId: string, sessionId: string) => boolean;
   global_hooks?: NativeAgentHooks;
   recent_files?: Pick<RecentStore, "list" | "touch" | "pin" | "forget">;
   document_files?: NativeDocumentFiles;
@@ -231,21 +234,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     },
     async (sender, title, ownedChildren) => {
       const window = admittedWindow(sender);
-      if (!window) return false;
-      const chat = title ? `“${title}”` : "This chat";
-      const children = ownedChildren
-        ? ` This also deletes ${ownedChildren} named ${ownedChildren === 1 ? "subagent" : "subagents"} and their private data.`
-        : "";
-      const result = await dialog.showMessageBox(window, {
-        type: "warning",
-        message: "Delete this saved chat?",
-        detail: `${chat} and its private attachments and working copies will be permanently removed.${children} Project files and independent forks stay available.`,
-        buttons: ["Cancel", "Delete chat"],
-        defaultId: 0,
-        cancelId: 0,
-        noLink: true,
-      });
-      return result.response === 1;
+      return window ? confirmChatDeletion(window, title, ownedChildren) : false;
     },
     async (sender) => {
       const window = admittedWindow(sender);
@@ -314,6 +303,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     browserTools,
     options.resolve_welcome_chat_workspace
   );
+  options.on_native_chat?.(nativeChat);
   const externalAgent = new NativeExternalRunIpc(
     EDITOR_ORIGIN,
     (sender) => admittedWindow(sender) !== null,
@@ -496,7 +486,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
 
   const archives = new NativeArchiveIpc(
     options.archives,
-    (sender) => admittedWindow(sender) !== null
+    (sender) => admittedWindow(sender) !== null,
+    options.open_restored_chat
   );
   guarded(IPC_CHANNELS.CHAT_CATALOG_LIST, (event, query: unknown) =>
     listDesktopChats(
@@ -513,6 +504,9 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     IPC_CHANNELS.ARCHIVES_UNARCHIVE,
     (event, id: unknown, revision: unknown) =>
       archives.unarchive(event, id, revision)
+  );
+  guarded(IPC_CHANNELS.ARCHIVES_OPEN_RESTORED, (event, id: unknown) =>
+    archives.openRestored(event, id)
   );
 
   guarded(IPC_CHANNELS.AGENT_SERVER_INFO, () => {
@@ -575,6 +569,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   guarded(IPC_CHANNELS.NATIVE_CHAT_STATUS, (event, start?: boolean) =>
     nativeChat.status(event, start)
   );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_START_WORKSPACE,
+    (event, preferred?: unknown) =>
+      nativeChat.startWorkspaceChat(event, preferred)
+  );
   guarded(IPC_CHANNELS.NATIVE_CHAT_LIST, (event, cursor?: string | null) =>
     nativeChat.list(event, cursor)
   );
@@ -624,6 +623,9 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     IPC_CHANNELS.NATIVE_CHAT_ORGANIZE,
     (event, id: string, change: unknown) =>
       nativeChat.organize(event, id, change)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_UNDO_ARCHIVE, (event, receipt: unknown) =>
+    nativeChat.undoArchive(event, receipt)
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_DELETE,
@@ -943,6 +945,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_OBSERVE, (event, id: string) =>
     nativeChat.observe(event, id)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_SET_PRESENTED,
+    (event, id: string, visible: unknown) =>
+      nativeChat.setPresented(event, id, visible)
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_TURN_SUMMARY,

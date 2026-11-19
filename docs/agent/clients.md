@@ -299,6 +299,14 @@ same filter and order, or start a fresh first page to see new activity. A chat
 with no recorded message time follows dated chats, including a chat whose
 messages all predate message timestamping.
 
+Supporting hosts include independent page-level metadata arrays
+`co.grida/runningSessionIds` and `co.grida/inputNeededSessionIds` in
+`_meta`. A chat can appear in both when an optional question is open during
+work. Refresh the visible page to observe changes. An attached side chat
+reports its own `current.disposition` and `current.inputNeeded` in the
+session snapshot. Clients can include the side chats they own when showing a
+parent's activity.
+
 Clients that negotiate `co.grida/session/initial-title` version 1 can send
 the optional `_meta["co.grida/initialTitle"]` string with a first
 `session/prompt`. Acceptance saves the excerpt for workspace listing.

@@ -557,7 +557,11 @@ and returns its receipt immediately. A nonblocking question tool reports that
 registration as its result. The answer later arrives as a correlated control
 and is incorporated into the task at a recorded decision boundary. An
 answer-dependent tool can instead retain a pending invocation until the answer
-is available. Its response contract has the same durable identity.
+is available. Its response contract has the same durable identity. Optional
+questions remain answerable until the turn finishes. The master selects them
+for withdrawal in the settlement commit, so explicit Pause preserves them and
+a reply racing normal completion either contributes to the turn or sees a
+closed question. Required questions continue to hold dependent work.
 
 When there is no useful work to do, the master can intentionally suspend the
 unfinished turn. Runtime records its continuation basis and accounts for active

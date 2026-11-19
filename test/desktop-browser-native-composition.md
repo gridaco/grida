@@ -7,7 +7,7 @@ tags: [browser, layout, overlays, zoom, focus]
 status: untested
 severity: high
 date: 2026-11-17
-updated: 2026-11-17
+updated: 2026-11-19
 automatable: partial
 covered_by:
   - desktop/src/main/browser-host.electron.test.ts
@@ -33,10 +33,13 @@ geometry or leak page input into another tab.
 1. Open a workspace browser on a controlled local page containing a bright
    animated canvas, continuously advancing video, a frame counter and form
    input. Confirm frame-refusing headers do not prevent it from loading.
-2. Resize the window, chat divider, File Explorer and terminal. Scroll inside
-   the website. Expected: browser pixels remain inside the content frame and
-   below the toolbar. No rectangle synchronization or overlay placeholder is
-   involved.
+2. Hover on each side of the chat divider. Expected: the divider highlights and
+   the resize cursor appears across the grab area. Begin a drag near either
+   edge of that area and quickly move the pointer into the website. Expected:
+   the divider follows the drag through release. The website stays visible
+   during the drag and accepts clicks again after release. Resize the window,
+   File Explorer and terminal, and scroll within the website. Its content stays
+   inside the frame and below the toolbar.
 3. Open the browser **…** menu and a workbench popover/preview overlapping the
    page. Expected: controls appear above continuously changing video/animation.
    Dismiss with Escape; normal page input immediately works again.

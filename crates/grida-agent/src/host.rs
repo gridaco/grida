@@ -29,6 +29,7 @@ pub(crate) mod live;
 pub(crate) mod message_context;
 pub(crate) mod model_change;
 mod permissions;
+pub mod prompt_preview;
 mod questions;
 mod queued_text;
 mod retained_file;
@@ -47,7 +48,7 @@ mod wakeups;
 pub use access::{PermissionModeReceipt, PermissionModeSnapshot, PermissionModeUpdate};
 pub(crate) use catalog::CatalogListing;
 pub(crate) use catalog::is_archived;
-pub use catalog::{CatalogOrder, SessionCatalog};
+pub use catalog::{CatalogOrder, SessionCatalog, needs_user_input};
 pub use compaction::{CompactRequest, CompactionReport, CompactionStatus};
 pub use goals::{GoalAction, GoalControl, GoalInspection, GoalRequest, GoalView};
 pub(crate) use history::RevisionTarget;
@@ -164,8 +165,9 @@ const MAX_TURN_STEPS: u32 = 200;
 /// Turn storage keeps each message once, so a turn's stored size grows with
 /// what it adds.
 const MAX_TURN_OPERATIONS: usize = 1024;
-/// The product's base instructions for every native agent turn.
-const CORE_INSTRUCTIONS: &str = include_str!("prompts/core.md");
+/// Preserve the exact bytes used by continuation fingerprints for inputs
+/// accepted before host submissions captured their base instructions.
+const LEGACY_CORE_INSTRUCTIONS: &str = include_str!("prompts/core-v1.md");
 const UPDATE_CAPACITY: usize = 128;
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(8);
 /// How long stopping a chat's processes waits for each to end.
@@ -466,6 +468,10 @@ impl DurableSubmission {
 
 #[derive(Serialize, Deserialize)]
 struct StoredPrompt {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    initial_instructions: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    question_instructions: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     provider_configuration: Option<Fingerprint>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1051,7 +1057,7 @@ impl Host {
         self.validate_session_workspace(id.clone(), cwd).await?;
         let start = self.transcript_seed_start(&id).await?;
         self.store
-            .open_history_replay(id, grida_agent_master::history::project, start)
+            .open_history_replay(id, grida_agent_master::questions::transcript, start)
             .await
     }
 
@@ -2801,6 +2807,9 @@ impl Host {
         Ok(Submission {
             id,
             payload: encode_stored_prompt(&StoredPrompt {
+                initial_instructions: Some(grida_agent_master::CORE_INSTRUCTIONS.to_owned()),
+                question_instructions: (questions && !child_work)
+                    .then(|| operating_regime.question_instructions().to_owned()),
                 provider_configuration: self
                     .selected_route
                     .as_ref()
@@ -2903,6 +2912,17 @@ impl Host {
         ) = match input.payload.version() {
             INPUT_VERSION if input.payload.schema().as_str() == INPUT_SCHEMA => {
                 let stored: StoredPrompt = decode_input(input)?;
+                config.instructions = stored
+                    .initial_instructions
+                    .clone()
+                    .unwrap_or_else(|| LEGACY_CORE_INSTRUCTIONS.trim().to_owned());
+                // Derived workers retain the parent's accepted policy but have no question tools.
+                if stored.questions
+                    && let Some(guidance) = &stored.question_instructions
+                {
+                    config.instructions.push_str("\n\n");
+                    config.instructions.push_str(guidance);
+                }
                 if !cancellation_only
                     && stored
                         .provider_configuration
@@ -3893,7 +3913,18 @@ impl Execution {
         supervised: Option<crate::SupervisedProvider>,
         retained_inputs: Option<Arc<retained_inputs::RetainedInputs>>,
     ) -> Result<Self> {
+        Self::with_transport(state_dir, options, supervised, retained_inputs, |http| http)
+    }
+
+    fn with_transport(
+        state_dir: &Path,
+        options: ProviderOptions,
+        supervised: Option<crate::SupervisedProvider>,
+        retained_inputs: Option<Arc<retained_inputs::RetainedInputs>>,
+        bind: impl FnOnce(Arc<HttpTransport>) -> Arc<dyn StreamingTransport>,
+    ) -> Result<Self> {
         let transport = Arc::new(HttpTransport::new(state_dir, &options, supervised)?);
+        let dispatch = bind(transport.clone());
         let configuration = transport.selection();
         let binding = transport.binding().clone();
         let mut capabilities = text_capabilities(options.protocol.as_str())?;
@@ -3955,7 +3986,7 @@ impl Execution {
                             },
                         },
                     )]),
-                    transport.clone(),
+                    dispatch,
                     PROVIDER_LIMITS,
                     image_resolver,
                 )?;
@@ -3970,7 +4001,7 @@ impl Execution {
             ProviderProtocol::Anthropic => Arc::new(Anthropic::new(
                 binding.clone(),
                 BTreeMap::from([(options.model.clone(), capabilities)]),
-                transport.clone(),
+                dispatch,
                 PROVIDER_LIMITS,
             )?),
             ProviderProtocol::Responses => Arc::new(Responses::with_image_resolver(
@@ -3987,7 +4018,7 @@ impl Execution {
                         reasoning_effort: None,
                     },
                 )]),
-                transport.clone(),
+                dispatch,
                 PROVIDER_LIMITS,
                 image_resolver,
             )?),
@@ -4003,7 +4034,7 @@ impl Execution {
                         requires_tool_signatures: gemini_flash,
                     },
                 )]),
-                transport.clone(),
+                dispatch,
                 PROVIDER_LIMITS,
                 image_resolver,
             )?),
@@ -4204,7 +4235,7 @@ impl Execution {
             gateway_billing: true,
             config: MasterConfig {
                 model,
-                instructions: CORE_INSTRUCTIONS.trim().into(),
+                instructions: grida_agent_master::CORE_INSTRUCTIONS.to_owned(),
                 max_steps: MAX_TURN_STEPS,
                 max_output_tokens,
                 reasoning: Default::default(),
@@ -4296,14 +4327,12 @@ async fn drive(
     parent: Option<activity_order::Parent>,
 ) -> Result<RunResult> {
     let agent_kit_runtime::OpenedTurn { turn, mut observer } = opened;
-    let binding = observer.snapshot().state.binding().clone();
-    let mut ordering = activity_order::Publisher::new(
-        ordering,
-        binding.clone(),
-        parent,
-        &observer.snapshot().state,
-    );
-    let mut live = live.map(|sender| live::Publisher::new(sender, binding.clone()));
+    let initial = observer.snapshot();
+    let binding = initial.state.binding().clone();
+    let mut ordering =
+        activity_order::Publisher::new(ordering, binding.clone(), parent, &initial.state);
+    let mut live = live.map(|sender| live::Publisher::new(sender, &initial.state));
+    drop(initial);
     let review = turn
         .operations()
         .operation_id(&grida_agent_master::approval_review::operation_key())?;

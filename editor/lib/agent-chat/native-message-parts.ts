@@ -11,6 +11,11 @@ import { video_attachment } from "./video-attachment";
 export namespace native_message_parts {
   export function of(message: NativeChatMessage): ChatMessage["parts"] {
     const parts: ChatMessage["parts"] = [];
+    if (message.role === "user" && message.questionReply)
+      parts.push({
+        type: chat_vocabulary.CONTEXT_PARTS.questionReply,
+        data: message.questionReply.question,
+      });
     if (message.role === "user" && message.svgTextSelection)
       parts.push({
         type: chat_vocabulary.CONTEXT_PARTS.svgTextSelection,

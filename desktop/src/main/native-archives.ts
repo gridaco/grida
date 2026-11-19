@@ -19,6 +19,11 @@ type CatalogPage = {
   nextCursor: string | null;
 };
 type Receipt = { workspace: Workspace; session: string; revision: number };
+export type NativeRestoredChat = Readonly<{
+  workspaceId: string;
+  sessionId: string;
+  checkWorkspace(): Promise<void>;
+}>;
 type Cursor = { workspaces: Workspace[]; index: number; after: string | null };
 type Active = {
   archiveCatalog?(cursor: string | null): Promise<unknown>;
@@ -150,7 +155,7 @@ export class NativeArchives {
     id: string,
     revision: number,
     check: () => void = () => {}
-  ): Promise<void> {
+  ): Promise<NativeRestoredChat> {
     return this.exclusive(async () => {
       check();
       const receipt = this.receipts.get(id);
@@ -193,6 +198,11 @@ export class NativeArchives {
       await this.requireWorkspace(receipt.workspace);
       check();
       this.receipts.delete(id);
+      return {
+        workspaceId: receipt.workspace.id,
+        sessionId: receipt.session,
+        checkWorkspace: () => this.requireWorkspace(receipt.workspace),
+      };
     });
   }
 

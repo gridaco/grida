@@ -196,6 +196,17 @@ describe("WorkspaceBrowserTabs", () => {
     );
     expect(tabs.getSnapshot().entries.get("browser")?.page?.url).toBe(page.url);
     expect(host.pages.size).toBe(1);
+    const pageId = tabs.getSnapshot().entries.get("browser")?.page?.id;
+    group.move("file:a.svg", "browser:browser");
+    expect(WorkspaceViewState.read(storage, "workspace")?.content).toEqual({
+      open: [
+        { kind: "file", relPath: "a.svg" },
+        { kind: "browser", id: "browser", url: page.url },
+      ],
+      active: 1,
+    });
+    expect(tabs.getSnapshot().entries.get("browser")?.page?.id).toBe(pageId);
+    expect(host.closed).toEqual([]);
     tabs.stop();
   });
 

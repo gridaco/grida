@@ -206,6 +206,7 @@ const MAX_CATALOG_SESSIONS = 32;
 const MAX_TITLE_BYTES = 256;
 const LIFECYCLE = "co.grida/session/lifecycle";
 const RECENT_LIFECYCLE = 256;
+const NOTIFICATION_PREVIEW_TIMEOUT_MS = 3_000;
 const MAX_QUEUE_INPUTS = 256;
 const QUEUE_PAGE_SIZE = 8;
 const QUEUE_PREVIEW_LENGTH = 2048;
@@ -224,10 +225,27 @@ export type NativeAgentChatLaunch = Omit<
   onLifecycle?: (event: NativeChatLifecycle, current: () => boolean) => void;
 };
 
+export type NativeChatCompletionPreview = Readonly<{
+  title: string | null;
+  text: string | null;
+}>;
+
 export type NativeChatLifecycle = Readonly<
   { sessionId: string; turnId: string } & (
-    | { kind: "settled"; status: NativeChatTurnSummary["status"] }
+    | {
+        kind: "settled";
+        status: NativeChatTurnSummary["status"];
+        readPreview?: () => Promise<NativeChatCompletionPreview>;
+      }
     | { kind: "approval_required"; waitId: string }
+    | {
+        kind: "question_asked";
+        waitId: string;
+        session: NativeChatSession;
+        side: boolean;
+        title: string | null;
+        question: string;
+      }
   )
 >;
 
@@ -245,7 +263,10 @@ type TaskBasis = Readonly<{
 }>;
 
 export type NativeQuestionReview = Readonly<
-  Pick<NativeChatQuestion, "style" | "question" | "options"> & {
+  Pick<
+    NativeChatQuestion,
+    "style" | "question" | "options" | "expiresWithTurn"
+  > & {
     task: TaskBasis;
     waitId: string;
     expectedHistoryPosition: number;
@@ -827,12 +848,14 @@ export class NativeAgentChat {
   }
 
   async catalogEntry(
-    session: NativeChatSession
+    session: NativeChatSession,
+    timeoutMs?: number
   ): Promise<NativeChatCatalogEntry> {
     const sessionId = this.requireAttached(session);
     const result = await this.process.request(
       "_co.grida/session/catalog-entry",
-      { sessionId }
+      { sessionId },
+      timeoutMs
     );
     this.requireAttached(session);
     return catalogEntry(result, sessionId);
@@ -1617,11 +1640,8 @@ export class NativeAgentChat {
       })
     );
     this.requireAttached(session);
+    const text = summaryText(result, latest.turnId, latest.status);
     if (
-      result.turnId !== latest.turnId ||
-      result.status !== latest.status ||
-      typeof result.text !== "string" ||
-      Buffer.byteLength(result.text) > MAX_SUMMARY_BYTES ||
       !Array.isArray(result.checks) ||
       result.checks.length > MAX_SUMMARY_CHECKS
     )
@@ -1699,7 +1719,7 @@ export class NativeAgentChat {
     return Object.freeze({
       turnId: latest.turnId,
       status: latest.status,
-      text: result.text,
+      text,
       textTruncated: flag(result.textTruncated),
       steps: result.steps === null ? null : revision(result.steps),
       unresolvedOperations:
@@ -2302,6 +2322,10 @@ export class NativeAgentChat {
         waitId,
         expectedHistoryPosition,
         style,
+        ...(style === "nonblocking" &&
+          this.process.acceptsOptionalQuestions && {
+            expiresWithTurn: true as const,
+          }),
         question,
         options: Object.freeze(options),
       });
@@ -2717,6 +2741,10 @@ export class NativeAgentChat {
             role === "user"
               ? this.readDisplayParts(attribution?.displayParts)
               : undefined;
+          const reply =
+            role === "user" && attribution?.questionReply !== undefined
+              ? object(attribution.questionReply)
+              : undefined;
           const order = NativeActivityOrder.notification(
             metadata,
             attribution,
@@ -2728,6 +2756,12 @@ export class NativeAgentChat {
             phase: messagePhase(attribution?.phase, role),
             ...order,
             ...(displayParts?.length && { displayParts }),
+            ...(reply && {
+              questionReply: {
+                waitId: identity(reply.waitId),
+                question: boundedText(reply.question, 2048),
+              },
+            }),
             ...(role === "user" &&
               attribution?.turnId !== undefined &&
               attribution.svgTextSelection === true && {
@@ -2797,14 +2831,18 @@ export class NativeAgentChat {
       content.text !== ""
     )
       return;
-    // A side chat is shown only in the frame that opened it; it never
-    // raises a notification that would open it elsewhere.
-    if (this.sideChats.has(session.id)) return;
     const record = object(value);
     if (Object.keys(record).length !== 3) return;
     const turnId = identity(record.turnId);
     const sessionId = session.id;
     const { kind, status } = record;
+    if (kind === "question_asked") {
+      const waitId = identity(record.waitId);
+      if (this.rememberLifecycle([sessionId, turnId, kind, waitId]))
+        void this.notifyQuestion(session, turnId, waitId).catch(() => {});
+      return;
+    }
+    if (this.sideChats.has(session.id)) return;
     let event: NativeChatLifecycle;
     if (kind === "approval_required") {
       event = { kind, sessionId, turnId, waitId: identity(record.waitId) };
@@ -2815,16 +2853,98 @@ export class NativeAgentChat {
         status === "cancelled" ||
         status === "uncertain")
     ) {
-      event = { kind, sessionId, turnId, status };
+      event = {
+        kind,
+        sessionId,
+        turnId,
+        status,
+        ...(status === "succeeded" && {
+          readPreview: () => this.completionPreview(session, turnId),
+        }),
+      };
     } else return;
-    const key = JSON.stringify(event);
-    if (this.lifecycleSeen.has(key)) return;
+    const detail = event.kind === "settled" ? event.status : event.waitId;
+    if (this.rememberLifecycle([sessionId, turnId, kind, detail]))
+      this.onLifecycle?.(event, () => this.ownsSession(session));
+  }
+
+  private rememberLifecycle(identity: unknown): boolean {
+    const key = JSON.stringify(identity);
+    if (this.lifecycleSeen.has(key)) return false;
     this.lifecycleSeen.add(key);
     if (this.lifecycleSeen.size > RECENT_LIFECYCLE) {
       const oldest = this.lifecycleSeen.values().next().value;
       if (oldest !== undefined) this.lifecycleSeen.delete(oldest);
     }
-    this.onLifecycle?.(event, () => this.ownsSession(session));
+    return true;
+  }
+
+  private async completionPreview(
+    session: NativeChatSession,
+    turnId: string
+  ): Promise<NativeChatCompletionPreview> {
+    const sessionId = this.requireAttached(session);
+    const [title, text] = await Promise.all([
+      this.catalogEntry(session, NOTIFICATION_PREVIEW_TIMEOUT_MS)
+        .then((entry) => entry.title)
+        .catch(() => null),
+      this.process
+        .request(
+          "_co.grida/session/turn-summary",
+          { sessionId, turnId },
+          NOTIFICATION_PREVIEW_TIMEOUT_MS
+        )
+        .then((result) => summaryText(object(result), turnId, "succeeded"))
+        .catch(() => null),
+    ]);
+    this.requireAttached(session);
+    return { title, text };
+  }
+
+  /** A lifecycle fact carries identity only. Read the text from the authorized pending wait. */
+  private async notifyQuestion(
+    session: NativeChatSession,
+    turnId: string,
+    waitId: string
+  ) {
+    const sessionId = this.requireAttached(session);
+    const side = this.sideChats.has(sessionId);
+    const title = await (
+      side
+        ? this.observe(session).then((snapshot) => snapshot.side?.title ?? null)
+        : this.catalogEntry(session).then((entry) => entry.title)
+    ).catch(() => null);
+    const pending = object(
+      await this.process.request("_co.grida/session/questions", {
+        sessionId,
+        turnId,
+      })
+    );
+    if (
+      pending.sessionId !== sessionId ||
+      pending.turnId !== turnId ||
+      !Array.isArray(pending.questions) ||
+      !this.ownsSession(session)
+    )
+      return;
+    const match = pending.questions.find(
+      (entry: unknown) => object(entry).waitId === waitId
+    );
+    if (!match) return;
+    const question = boundedText(object(match).question, 2048);
+    this.onLifecycle?.(
+      {
+        kind: "question_asked",
+        sessionId,
+        turnId,
+        waitId,
+        session,
+        side,
+        title,
+        question,
+      },
+      () => this.ownsSession(session)
+    );
   }
 
   private async control(
@@ -2981,11 +3101,14 @@ function captureText(
     | "activityOrderIncomplete"
     | "svgTextSelection"
     | "displayParts"
+    | "questionReply"
   >
 ): void {
   if (capture.overflow) return;
   const previous = capture.messages.get(messageId);
   capture.bytes += Buffer.byteLength(text);
+  if (attribution?.questionReply)
+    capture.bytes += Buffer.byteLength(attribution.questionReply.question);
   if (attribution?.displayParts)
     capture.bytes += Buffer.byteLength(
       JSON.stringify(attribution.displayParts)
@@ -3007,6 +3130,9 @@ function captureText(
     ...kept,
     ...(attribution?.turnId && { turnId: attribution.turnId }),
     ...(attribution?.phase && { phase: attribution.phase }),
+    ...(attribution?.questionReply && {
+      questionReply: attribution.questionReply,
+    }),
     ...(attribution?.svgTextSelection && { svgTextSelection: true }),
     ...(attribution?.displayParts && {
       displayParts: attribution.displayParts,
@@ -3291,6 +3417,9 @@ function turn(value: unknown): NativeChatTurn {
     paused: flag(result.paused),
     cancelled: flag(result.cancelled),
     disposition: choice(result.disposition, TURN_DISPOSITIONS),
+    ...(result.inputNeeded !== undefined && {
+      inputNeeded: flag(result.inputNeeded),
+    }),
     status:
       result.status === null ? null : choice(result.status, TURN_STATUSES),
   });
@@ -3325,6 +3454,21 @@ function boundedText(value: unknown, bytes: number): string {
   )
     throw invalidResponse();
   return value;
+}
+
+function summaryText(
+  result: Record<string, unknown>,
+  turnId: string,
+  status: NativeChatTurnSummary["status"]
+): string {
+  if (
+    result.turnId !== turnId ||
+    result.status !== status ||
+    typeof result.text !== "string" ||
+    Buffer.byteLength(result.text) > MAX_SUMMARY_BYTES
+  )
+    throw invalidResponse();
+  return result.text;
 }
 
 function textPrompt(text: string, allowEmpty = false) {

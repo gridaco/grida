@@ -108,7 +108,13 @@ impl Host {
         let start = seed_start(side.then(|| session.clone()));
         let mut window = self
             .store
-            .history_replay_window(session, before, project, measure, start)
+            .history_replay_window(
+                session,
+                before,
+                grida_agent_master::questions::transcript,
+                measure,
+                start,
+            )
             .await?;
         if side {
             // A side chat compacts only its inherited history, so its
@@ -919,6 +925,17 @@ fn history_message(
         || message_context::is_supplemental(message)
     {
         return None;
+    }
+    if let Some(reply) = grida_agent_master::questions::visible_reply(message) {
+        let end = reply
+            .answer
+            .floor_char_boundary(HISTORY_PREVIEW_BYTES.min(reply.answer.len()));
+        return Some(HistoryMessage {
+            anchor,
+            role: message.role,
+            editable: false,
+            preview: reply.answer[..end].to_owned(),
+        });
     }
     if super::editor_observation::is_observation(message) {
         return Some(HistoryMessage {

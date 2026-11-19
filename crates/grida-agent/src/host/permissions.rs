@@ -430,10 +430,10 @@ impl Host {
                             approval_answer(wait, decision)?,
                             state.outcome().is_none()
                                 && state.controls().admits_work()
-                                && state
-                                    .waits()
-                                    .values()
-                                    .all(|other| other.id == wait_id || !other.is_pending()),
+                                && state.waits().values().all(|other| {
+                                    other.id == wait_id
+                                        || !grida_agent_master::questions::blocks_progress(other)
+                                }),
                         ))
                     }
                 })

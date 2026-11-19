@@ -1,17 +1,17 @@
 ---
 id: TC-DESKTOP-STARTUP-001
-title: Cold launch resumes the last focused workspace, with Welcome fallback
+title: Cold launch restores the last focused Desktop window's content
 module: desktop
 area: startup
 tags: [startup, workspace, welcome, restore, launch-intent]
 status: untested
 severity: high
 date: 2026-07-23
-updated: 2026-11-19
+updated: 2026-11-20
 automatable: false
 covered_by:
   - desktop/src/main/startup-window-policy.test.ts
-  - editor/lib/desktop/last-workspace.test.ts
+  - editor/lib/desktop/window-content-state.test.ts
   - editor/lib/desktop/workspace-view-state.test.ts
   - editor/scaffolds/desktop/workbench/editor-group.test.ts
   - editor/scaffolds/desktop/workbench/workspace-surface-host.test.ts
@@ -19,11 +19,10 @@ covered_by:
 
 ## Behavior
 
-A normal cold launch should continue the last workspace-backed surface the
-user focused: either its workbench and ordered real tab group, or its `.canvas`
-editor. Restoration is a convenience, not new filesystem authority: the saved
-opaque workspace ID and every relative artifact path must be revalidated
-through the desktop workspace bridge before it is rendered.
+A normal cold launch restores the last focused window's content. It opens Home,
+the workspace workbench with its ordered real tabs, or the standalone `.canvas`
+editor. The saved workspace ID and artifact paths must be revalidated through
+the Desktop workspace bridge before restoration.
 
 If no target was saved, it is no longer registered, or its directory is no
 longer available, startup stays on Welcome. An explicit launch target (for
@@ -39,7 +38,7 @@ implicit restoration.
    - Expected: Welcome opens; no workspace is invented or selected.
 2. Open workspace A, wait for its workbench to finish loading, quit the app,
    and relaunch it normally.
-   - Expected: a brief **Opening last workspace…** state appears, then
+   - Expected: a brief **Restoring window…** state appears, then
      workspace A opens without a Welcome flash.
 3. In workspace A's workbench, open three artifacts, then activate the middle
    tab. Quit and relaunch.
@@ -80,11 +79,16 @@ implicit restoration.
     bar again.
     - Expected: Home appears first. The arrow that would return to Home is
       hidden in both cases. Back remains available from Home to the workspace.
+14. Click **Home** in the workspace, wait for Home to display, then quit and
+    relaunch.
+    - Expected: Home opens, with the workspace still available in Recents.
+15. Open a workspace from Home again, then go Back to Home. Quit and relaunch.
+    - Expected: Home opens. Reopening the workspace restores its real tabs.
 
 ## Notes
 
-- This deliberately tests the narrow one-workspace experiment; full window
-  session/crash recovery is a separate product decision.
+- This test covers the content of one focused window. Workspace tab continuity
+  uses its own saved state.
 - Signed-out startup still follows the existing Welcome sign-in gate. After
   authentication it lands on Welcome rather than revealing prior-account
   workspace context.

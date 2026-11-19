@@ -204,13 +204,19 @@ it("projects bounded catalog activity metadata and accepts older hosts without i
     for (const archived of [false, true]) {
       request.mockResolvedValueOnce({
         sessions: [dated, { sessionId: "older", cwd: test.cwd }],
-        _meta: { "co.grida/runningSessionIds": ["dated"] },
+        _meta: {
+          "co.grida/runningSessionIds": ["dated"],
+          "co.grida/inputNeededSessionIds": ["older", "dated"],
+        },
       });
       await expect(client.list(null, archived)).resolves.toEqual({
         sessionIds: ["dated", "older"],
         nextCursor: null,
         lastActivity: [{ sessionId: "dated", atMs }],
-        ...(!archived && { runningSessionIds: ["dated"] }),
+        ...(!archived && {
+          runningSessionIds: ["dated"],
+          inputNeededSessionIds: ["older", "dated"],
+        }),
       });
       expect(request).toHaveBeenLastCalledWith(
         archived ? "_co.grida/session/list-archived" : "session/list",
@@ -231,20 +237,24 @@ it("projects bounded catalog activity metadata and accepts older hosts without i
     await expect(client.list()).resolves.toMatchObject({
       runningSessionIds: [],
     });
-    for (const invalid of [
-      null,
-      "dated",
-      ["outside-page"],
-      ["dated", "dated"],
-    ]) {
-      request.mockResolvedValueOnce({
-        sessions: [dated, { sessionId: "older", cwd: test.cwd }],
-        _meta: { "co.grida/runningSessionIds": invalid },
-      });
-      await expect(client.list()).rejects.toThrow(
-        "native_chat_invalid_protocol_value"
-      );
-    }
+    for (const key of [
+      "co.grida/runningSessionIds",
+      "co.grida/inputNeededSessionIds",
+    ])
+      for (const invalid of [
+        null,
+        "dated",
+        ["outside-page"],
+        ["dated", "dated"],
+      ]) {
+        request.mockResolvedValueOnce({
+          sessions: [dated, { sessionId: "older", cwd: test.cwd }],
+          _meta: { [key]: invalid },
+        });
+        await expect(client.list()).rejects.toThrow(
+          "native_chat_invalid_protocol_value"
+        );
+      }
     for (const invalid of [null, -1, 1.5, "today", 8_640_000_000_000_001]) {
       request.mockResolvedValueOnce({
         sessions: [
@@ -1467,6 +1477,7 @@ it.runIf(Boolean(packaged))(
         sessionIds: saved.slice(32),
         nextCursor: null,
         runningSessionIds: [],
+        inputNeededSessionIds: [],
       });
       await expect(
         client.list({ cwd: otherWorkspace } as unknown as string)
@@ -1544,6 +1555,7 @@ it.runIf(Boolean(packaged))(
         sessionIds: [other.id],
         nextCursor: null,
         runningSessionIds: [],
+        inputNeededSessionIds: [],
       });
     } finally {
       await client?.close();

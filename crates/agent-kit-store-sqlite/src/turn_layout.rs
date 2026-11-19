@@ -29,12 +29,12 @@
 use super::{MAX_STORED_TURN_BYTES, Result, database_error, decode, encode, error, now_ms};
 use agent_kit_core::history::HistoryPosition;
 use agent_kit_core::turn::{ControlSnapshot, JournalPosition, TurnBinding, TurnOutcome, TurnState};
-use agent_kit_core::{ErrorKind, Fingerprint, SessionId, TurnId};
+use agent_kit_core::{ErrorKind, Fingerprint, SchemaId, SessionId, TurnId};
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
 /// The assembled state a reader holds in memory. Repeated context is shared
@@ -544,23 +544,38 @@ pub(crate) struct HeadFacts {
     pub(crate) controls: ControlSnapshot,
     pub(crate) suspended: bool,
     pub(crate) outcome: Option<TurnOutcome>,
+    pub(crate) pending_request_schemas: BTreeSet<SchemaId>,
 }
 
 /// The head fields readers of controls and views need.
 #[derive(Deserialize)]
-struct StoredHead {
+struct StoredHead<W> {
     binding: TurnBinding,
     position: JournalPosition,
     controls: ControlSnapshot,
     suspended: bool,
     outcome: Option<TurnOutcome>,
+    waits: W,
 }
 
-fn stored_head(
+/// Observe wait kinds without decoding request or answer payloads.
+#[derive(Deserialize)]
+struct StoredWait {
+    request: StoredRequest,
+    answer: Option<serde::de::IgnoredAny>,
+    withdrawn: bool,
+}
+
+#[derive(Deserialize)]
+struct StoredRequest {
+    schema: SchemaId,
+}
+
+fn stored_head<W: serde::de::DeserializeOwned>(
     connection: &Connection,
     session: &SessionId,
     turn: &TurnId,
-) -> Result<(StoredHead, u64)> {
+) -> Result<(StoredHead<W>, u64)> {
     let (head, history_len): (Vec<u8>, i64) = connection
         .query_row(
             "SELECT head,history_len FROM turns WHERE session=?1 AND id=?2",
@@ -573,7 +588,7 @@ fn stored_head(
     if head.len() > MAX_STORED_TURN_BYTES {
         return Err(error(ErrorKind::LimitExceeded, "turn_snapshot_too_large"));
     }
-    let head: StoredHead = decode(&head)?;
+    let head: StoredHead<W> = decode(&head)?;
     if &head.binding.session != session || &head.binding.turn != turn {
         return Err(error(
             ErrorKind::InvalidState,
@@ -591,7 +606,7 @@ pub(crate) fn read_controls(
     session: &SessionId,
     turn: &TurnId,
 ) -> Result<(TurnBinding, ControlSnapshot)> {
-    let (head, _) = stored_head(connection, session, turn)?;
+    let (head, _) = stored_head::<serde::de::IgnoredAny>(connection, session, turn)?;
     Ok((head.binding, head.controls))
 }
 
@@ -602,7 +617,7 @@ pub(crate) fn read_facts(
     session: &SessionId,
     turn: &TurnId,
 ) -> Result<HeadFacts> {
-    let (head, records) = stored_head(connection, session, turn)?;
+    let (head, records) = stored_head::<BTreeMap<String, StoredWait>>(connection, session, turn)?;
     Ok(HeadFacts {
         binding: head.binding,
         position: head.position,
@@ -610,6 +625,12 @@ pub(crate) fn read_facts(
         controls: head.controls,
         suspended: head.suspended,
         outcome: head.outcome,
+        pending_request_schemas: head
+            .waits
+            .into_values()
+            .filter(|wait| !wait.withdrawn && wait.answer.is_none())
+            .map(|wait| wait.request.schema)
+            .collect(),
     })
 }
 

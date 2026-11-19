@@ -8,6 +8,8 @@ use grida_agent_master::questions::QuestionAnswer;
 const QUESTIONS: &str = "co.grida/session/questions";
 const ANSWER: &str = "co.grida/session/answer-question";
 pub(super) const CAPABILITIES: [&str; 2] = [QUESTIONS, ANSWER];
+/// Semantic support for dismissing a question locally until turn completion.
+pub(super) const OPTIONAL: &str = "co.grida/session/optional-questions";
 
 pub(super) fn available(sessions: &Mutex<ConnectionSessions>) -> bool {
     let sessions = sessions.lock().unwrap();

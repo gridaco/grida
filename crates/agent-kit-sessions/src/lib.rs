@@ -7,9 +7,10 @@ use agent_kit_core::turn::{
     SettlementReceipt, SuspensionReceipt, TurnBinding, TurnLease, TurnOutcome,
 };
 use agent_kit_core::{
-    BoxFuture, ChangeId, Envelope, Error, ErrorKind, Result, SessionId, TurnId, WaitId,
+    BoxFuture, ChangeId, Envelope, Error, ErrorKind, Result, SchemaId, SessionId, TurnId, WaitId,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 /// A session's committed revision. It advances whenever the session's
@@ -241,6 +242,9 @@ pub struct TurnView {
     pub history_position: HistoryPosition,
     pub controls: ControlSnapshot,
     pub disposition: TurnDisposition,
+    /// Request schema identities of open waits. Their contents stay with the turn.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub pending_request_schemas: BTreeSet<SchemaId>,
     pub outcome: Option<TurnOutcome>,
 }
 

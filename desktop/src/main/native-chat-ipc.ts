@@ -42,6 +42,7 @@ import type {
   NativeChatQueuePage,
   NativeChatQueueReceipt,
   NativeChatReadiness,
+  NativeChatStartupResult,
   NativeChatRevisionReceipt,
   NativeChatRevisionTarget,
   NativeChatSideAttachment,
@@ -55,6 +56,7 @@ import type {
 import { IPC_CHANNELS } from "../bridge/contract";
 import { DesktopGatewayGrantUnavailable } from "./account-session";
 import { ipc_sender } from "./ipc-sender";
+import { KeyedSerialQueue } from "./keyed-serial-queue";
 import type {
   NativeAgentChat,
   NativeChatSession,
@@ -78,6 +80,8 @@ import type { NativeChatSelections } from "./native-chat-selections";
 import type { DesktopBrowserTools } from "./desktop-browser-tools";
 
 const MAX_ATTACHMENTS = 16;
+const MAX_ARCHIVE_UNDOS = 16;
+const ARCHIVE_UNDO_TTL_MS = 60_000;
 const MAX_OBSERVATIONS = 16;
 const MAX_REVIEWS = 16;
 const MAX_SUBSCRIPTIONS = 8;
@@ -231,6 +235,7 @@ type PermissionReview = {
 };
 
 type Attachment = {
+  presented?: boolean;
   permissionReview?: PermissionReview;
   id: string;
   session: NativeChatSession;
@@ -271,6 +276,10 @@ type Owner = {
   href: string;
   active: ActiveNativeChat;
   attachments: Map<string, Attachment>;
+  archiveUndos: Map<
+    string,
+    Readonly<{ sessionId: string; revision: number; expiresAt: number }>
+  >;
   retired: Set<string>;
   editorContexts: Map<
     string,
@@ -291,7 +300,7 @@ type Startup = {
   frame: WebFrameMain;
   href: string;
   workspaceId: string;
-  result: Promise<NativeChatReadiness>;
+  result: Promise<NativeChatStartupResult>;
   release(): void;
 };
 
@@ -377,6 +386,8 @@ export class NativeChatIpc {
   private readonly nestedDeckFrames = new Map<WebContents, NestedDeckFrame>();
   private readonly documentFrames = new Map<WebContents, DocumentFrame>();
   private readonly startups = new Map<WebContents, Startup>();
+  // Frame authority can expire before the shared workspace worker finishes opening.
+  private readonly workspaceOpenings = new KeyedSerialQueue();
   private readonly deleting = new WeakSet<NativeChatSession>();
   private readonly savingArtifact = new WeakSet<WebContents>();
   private readonly readingInputImages = new WeakMap<Owner, number>();
@@ -389,7 +400,10 @@ export class NativeChatIpc {
     WebContents,
     { frame: WebFrameMain; href: string; state: NativeChatSelections.View }
   >();
-  private readonly selectingProfile = new WeakSet<WebContents>();
+  private readonly selectingProfile = new Map<
+    WebContents,
+    { workspaceId: string; release(): void }
+  >();
   private readonly selectingPermissionMode = new WeakSet<Owner>();
   private readonly welcomePermissionReviews = new WeakMap<
     WebContents,
@@ -584,6 +598,9 @@ export class NativeChatIpc {
     for (const startup of this.startups.values()) {
       if (startup.workspaceId === workspaceId) startup.release();
     }
+    for (const selection of this.selectingProfile.values()) {
+      if (selection.workspaceId === workspaceId) selection.release();
+    }
   }
 
   private bindNestedDeck(
@@ -704,34 +721,66 @@ export class NativeChatIpc {
   }
 
   async status(
-    { sender, senderFrame: frame }: IpcMainInvokeEvent,
+    event: IpcMainInvokeEvent,
     start = false
   ): Promise<NativeChatReadiness> {
     if (typeof start !== "boolean")
       throw new Error("native_chat_start_invalid");
+    return (await this.readiness(event, start)).readiness;
+  }
+
+  /** One cold-start intent selects a connection and opens the workspace. */
+  async startWorkspaceChat(
+    event: IpcMainInvokeEvent,
+    preferred?: unknown
+  ): Promise<NativeChatStartupResult> {
+    if (ipc_sender.pathname(event.senderFrame?.url) !== "/desktop/workspace")
+      throw new Error("native_chat_scope_changed");
+    return this.readiness(
+      event,
+      true,
+      preferred === undefined ? undefined : chatProfileSelection(preferred)
+    );
+  }
+
+  private async readiness(
+    { sender, senderFrame: frame }: IpcMainInvokeEvent,
+    start: boolean,
+    preferred?: NativeChatProfileSelection
+  ): Promise<NativeChatStartupResult> {
     const workspaceId = this.workspaceId(sender, frame);
     if (!frame || !workspaceId) throw new Error("native_chat_scope_changed");
-    if (this.disabled) return "native-unavailable";
-    const href = frame.url;
-    if (this.scope(sender, frame)) return "native-ready";
+    if (this.disabled) return { readiness: "native-unavailable" };
+    const active = (): NativeChatStartupResult | undefined => {
+      const owner = this.scope(sender, frame);
+      if (!owner) return undefined;
+      return {
+        readiness: "native-ready",
+        ...(owner.profileId && { selectedProfileId: owner.profileId }),
+      };
+    };
+    // A connected worker may already be retiring. A new visit observes the
+    // owner only after its workspace's pending profile change has settled.
+    if (!this.workspaceOpenings.has(workspaceId)) {
+      const connected = active();
+      if (connected) return connected;
+    }
     const startup = this.startup;
-    if (!startup) return "native-unavailable";
-    if (!start) return "native-starting";
+    if (!startup) return { readiness: "native-unavailable" };
+    if (!start) return { readiness: "native-starting" };
 
+    const href = frame.url;
     const existing = this.startups.get(sender);
     if (existing?.frame === frame && existing.href === href)
       return existing.result;
     existing?.release();
     const document = this.documentFrame(sender, frame);
     const nested = this.nestedDeckFrame(sender, frame);
-    const profile = this.profile(sender, frame, workspaceId);
-
     const requireCurrent = () => {
       if (
         this.startups.get(sender) !== pending ||
         frame.url !== href ||
-        this.workspaceId(sender, frame) !== workspaceId ||
-        this.profile(sender, frame, workspaceId) !== profile
+        this.workspaceId(sender, frame) !== workspaceId
       )
         throw new Error("native_chat_scope_changed");
     };
@@ -739,116 +788,111 @@ export class NativeChatIpc {
       if (this.startups.get(sender) === pending) this.startups.delete(sender);
       stopWatching();
     };
+    const open = async (): Promise<NativeChatStartupResult> => {
+      requireCurrent();
+      // Another admitted visit may have opened the workspace while we waited.
+      const connected = active();
+      if (connected) return connected;
+      try {
+        if (document && this.documents) {
+          await document.recheck();
+          await this.documents.ensure(workspaceId, requireCurrent);
+          await document.recheck();
+        } else if (nested?.grant && this.nestedDecks) {
+          await this.nestedDecks.ensure(nested.grant, async () => {
+            requireCurrent();
+            await nested.recheck();
+            requireCurrent();
+          });
+          await nested.recheck();
+        } else {
+          await this.openWorkspaceConnection(
+            sender,
+            frame,
+            workspaceId,
+            preferred,
+            requireCurrent,
+            () => startup.ensure(workspaceId, requireCurrent)
+          );
+        }
+        requireCurrent();
+        return active() ?? { readiness: "native-unavailable" };
+      } catch (error) {
+        requireCurrent();
+        return { readiness: startupFailure(error) };
+      }
+    };
     const stopWatching = ipc_sender.watchNavigation(sender, release);
     const pending: Startup = {
       frame,
       href,
       workspaceId,
       release,
-      result: Promise.resolve()
-        .then(async () => {
-          requireCurrent();
-          try {
-            if (document && this.documents) {
-              await document.recheck();
-              await this.documents.ensure(workspaceId, requireCurrent);
-              await document.recheck();
-            } else if (nested?.grant && this.nestedDecks) {
-              await this.nestedDecks.ensure(nested.grant, async () => {
-                requireCurrent();
-                await nested.recheck();
-                requireCurrent();
-              });
-              await nested.recheck();
-            } else if (profile && this.profilesOwner)
-              await this.profilesOwner.select(
-                workspaceId,
-                { kind: "saved", id: profile.id },
-                requireCurrent
-              );
-            else await startup.ensure(workspaceId);
-          } catch (error) {
-            requireCurrent();
-            // Without the default Gateway, continue with a saved provider key
-            // before asking. Only no usable connection is a failure.
-            if (
-              error instanceof DesktopGatewayGrantUnavailable &&
-              !profile &&
-              this.profilesOwner?.fallback &&
-              (await this.startFallback(
-                this.profilesOwner,
-                { sender, frame, href, workspaceId },
-                requireCurrent
-              ))
-            )
-              return this.scope(sender, frame)
-                ? "native-ready"
-                : "native-unavailable";
-            // Forward only known recovery states. Startup errors can contain
-            // private provider or host details.
-            if (error instanceof DesktopGatewayGrantUnavailable)
-              return "native-gateway-unavailable";
-            switch (error instanceof Error ? error.message : null) {
-              case "native_provider_byok_key_missing":
-                return "native-provider-key-required";
-              case "native_provider_model_unavailable":
-                return "native-provider-model-unavailable";
-              case "native_hooks_review_required":
-                return "native-hooks-review-required";
-              case "native_hooks_configuration_invalid":
-                return "native-hooks-configuration-invalid";
-              case "native_provider_endpoint_https_required":
-                return "native-provider-endpoint-https-required";
-              case "native_provider_endpoint_not_approved":
-                return "native-provider-endpoint-approval-required";
-              case "native_workspace_capacity_reached":
-                return "native-workspace-capacity";
-              default:
-                return "native-unavailable";
-            }
-          }
-          requireCurrent();
-          return this.scope(sender, frame)
-            ? "native-ready"
-            : "native-unavailable";
-        })
-        .finally(release),
+      result: (document || nested
+        ? Promise.resolve().then(open)
+        : this.workspaceOpenings.run(workspaceId, open)
+      ).finally(release),
     };
     this.startups.set(sender, pending);
     return pending.result;
   }
 
-  private async startFallback(
-    owner: NativeChatProfileOwner,
-    target: Readonly<{
-      sender: WebContents;
-      frame: WebFrameMain;
-      href: string;
-      workspaceId: string;
-    }>,
-    requireCurrent: () => void
-  ): Promise<boolean> {
-    try {
-      const id = await owner.fallback?.(target.workspaceId);
-      requireCurrent();
-      if (!id) return false;
-      await owner.select(
-        target.workspaceId,
-        { kind: "new", id },
-        requireCurrent
+  private async openWorkspaceConnection(
+    sender: WebContents,
+    frame: WebFrameMain,
+    workspaceId: string,
+    preferred: NativeChatProfileSelection | undefined,
+    check: () => void,
+    startDefault: () => Promise<void>
+  ): Promise<void> {
+    const profiles = this.profilesOwner;
+    const selected = this.profile(sender, frame, workspaceId);
+    if (selected && profiles) {
+      await profiles.select(
+        workspaceId,
+        { kind: "saved", id: selected.id },
+        check
       );
-      requireCurrent();
-      this.adoptProfile(
-        target.sender,
-        target.frame,
-        target.href,
-        target.workspaceId,
-        id
-      );
+      return;
+    }
+    let profileFailure: Error | undefined;
+    const tryProfile = async (choice: NativeChatProfileSelection) => {
+      if (!profiles || choice.kind === "default") return false;
+      try {
+        await profiles.select(workspaceId, choice, check);
+      } catch (error) {
+        check();
+        if (
+          error instanceof Error &&
+          startupFailure(error) !== "native-unavailable"
+        )
+          profileFailure ??= error;
+        return false;
+      }
+      check();
+      if (
+        this.resolve(sender, workspaceId, choice.id)?.workspaceId !==
+        workspaceId
+      )
+        return false;
+      this.adoptProfile(sender, frame, frame.url, workspaceId, choice.id);
       return true;
-    } catch {
-      requireCurrent();
-      return false;
+    };
+    if (preferred && (await tryProfile(preferred))) return;
+    check();
+    try {
+      await startDefault();
+    } catch (error) {
+      check();
+      if (
+        !(error instanceof DesktopGatewayGrantUnavailable) ||
+        !profiles?.fallback
+      )
+        throw profileFailure ?? error;
+      const fallback = await profiles.fallback(workspaceId).catch(() => null);
+      check();
+      if (!fallback || !(await tryProfile({ kind: "new", id: fallback })))
+        throw profileFailure ?? error;
     }
   }
 
@@ -930,7 +974,9 @@ export class NativeChatIpc {
         active:
           active?.profileId !== undefined
             ? active.profileId
-            : (profile?.id ?? null),
+            : active && profile
+              ? profile.id
+              : null,
         ...(newChatDefault && { newChatDefault }),
       };
     } finally {
@@ -1030,6 +1076,7 @@ export class NativeChatIpc {
       throw new Error("native_chat_permission_mode_busy");
     existing?.release();
     const expiresAt = Date.now() + PERMISSION_REVIEW_TTL_MS;
+    let currentHref = href;
     const review: WelcomePermissionReview = {
       id: randomUUID(),
       phase: "pending",
@@ -1037,7 +1084,7 @@ export class NativeChatIpc {
         if (
           this.welcomePermissionReviews.get(sender) !== review ||
           (review.phase === "pending" && Date.now() >= expiresAt) ||
-          !this.frameCurrent(sender, frame, href)
+          !this.frameCurrent(sender, frame, currentHref)
         )
           throw new Error("native_chat_permission_mode_review_changed");
       },
@@ -1049,7 +1096,18 @@ export class NativeChatIpc {
         stopWatching();
       },
     };
-    const stopWatching = ipc_sender.watchNavigation(sender, review.release);
+    const stopWatching = ipc_sender.watchNavigation(
+      sender,
+      review.release,
+      (url, stage) => {
+        if (!welcomePresetChanged(currentHref, url)) return false;
+        if (stage === "commit") {
+          if (!this.frameCurrent(sender, frame, url)) return false;
+          currentHref = url;
+        }
+        return true;
+      }
+    );
     const timer = setTimeout(review.release, PERMISSION_REVIEW_TTL_MS);
     timer.unref();
     this.welcomePermissionReviews.set(sender, review);
@@ -1132,21 +1190,24 @@ export class NativeChatIpc {
       const { directoryIdentity } = workspace;
       if (workspaceId !== workspace.workspaceId)
         throw new Error("native_chat_scope_changed");
-      const latest = await this.resolveWelcomeWorkspace(workspaceId);
-      review.check();
-      if (
-        latest.workspaceId !== workspaceId ||
-        !sameDirectory(latest.directoryIdentity, directoryIdentity)
-      )
-        throw new Error("native_chat_scope_changed");
-      const existing = this.resolve(
-        sender,
-        workspaceId,
-        profileId ?? undefined
-      );
-      if (!existing?.chat.acceptsInputRoutes) {
-        if (profileId === null)
-          await this.startup.ensure(workspaceId, review.check);
+      const startup = this.startup;
+      const resolveWorkspace = this.resolveWelcomeWorkspace;
+      await this.workspaceOpenings.run(workspaceId, async () => {
+        review.check();
+        const latest = await resolveWorkspace(workspaceId);
+        review.check();
+        if (
+          latest.workspaceId !== workspaceId ||
+          !sameDirectory(latest.directoryIdentity, directoryIdentity)
+        )
+          throw new Error("native_chat_scope_changed");
+        const existing = this.resolve(
+          sender,
+          workspaceId,
+          profileId ?? undefined
+        );
+        if (existing?.chat.acceptsInputRoutes) return;
+        if (profileId === null) await startup.ensure(workspaceId, review.check);
         else {
           if (!this.profilesOwner)
             throw new Error("native_chat_profiles_unavailable");
@@ -1156,7 +1217,7 @@ export class NativeChatIpc {
             review.check
           );
         }
-      }
+      });
       review.check();
       const active = this.resolve(sender, workspaceId, profileId ?? undefined);
       const chat = active?.chat;
@@ -1281,35 +1342,37 @@ export class NativeChatIpc {
     const chosen = chatProfileSelection(selection);
     if (this.selectingProfile.has(sender))
       throw new Error("native_chat_profile_selection_busy");
-    this.selectingProfile.add(sender);
-    let admitted = true;
-    const stopWatching = ipc_sender.watchNavigation(sender, () => {
-      admitted = false;
-    });
+    const release = () => {
+      if (this.selectingProfile.get(sender)?.release === release)
+        this.selectingProfile.delete(sender);
+      stopWatching();
+    };
+    const stopWatching = ipc_sender.watchNavigation(sender, release);
+    this.selectingProfile.set(sender, { workspaceId, release });
     const requireCurrent = () => {
       if (
-        !admitted ||
+        this.selectingProfile.get(sender)?.release !== release ||
         frame.url !== href ||
         this.workspaceId(sender, frame) !== workspaceId
       )
         throw new Error("native_chat_scope_changed");
     };
     try {
-      await owner.select(workspaceId, chosen, requireCurrent);
-      requireCurrent();
-      const id = chosen.kind === "default" ? undefined : chosen.id;
-      if (this.resolve(sender, workspaceId, id)?.workspaceId !== workspaceId)
-        throw new Error("native_chat_profile_unavailable");
-      const previous = this.profile(sender, frame, workspaceId);
-      if (previous?.id === id) return;
-      this.owners.get(sender)?.release();
-      this.startups.get(sender)?.release();
-      previous?.release();
-      if (!id) return;
-      this.adoptProfile(sender, frame, href, workspaceId, id);
+      await this.workspaceOpenings.run(workspaceId, async () => {
+        requireCurrent();
+        await owner.select(workspaceId, chosen, requireCurrent);
+        requireCurrent();
+        const id = chosen.kind === "default" ? undefined : chosen.id;
+        if (this.resolve(sender, workspaceId, id)?.workspaceId !== workspaceId)
+          throw new Error("native_chat_profile_unavailable");
+        const previous = this.profile(sender, frame, workspaceId);
+        if (previous?.id === id) return;
+        this.owners.get(sender)?.release();
+        previous?.release();
+        if (id) this.adoptProfile(sender, frame, href, workspaceId, id);
+      });
     } finally {
-      stopWatching();
-      this.selectingProfile.delete(sender);
+      release();
     }
   }
 
@@ -1963,11 +2026,73 @@ export class NativeChatIpc {
     event: IpcMainInvokeEvent,
     attachmentId: string,
     change: unknown
-  ): Promise<NativeChatCatalogEntry> {
+  ): Promise<NativeChatCatalogEntry & { archiveUndo?: string }> {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
-    const entry = await owner.active.chat.organize(attachment.session, change);
+    const { chat } = owner.active;
+    const archiveRevision =
+      chat.unarchiveCatalog &&
+      !attachment.sideOf &&
+      ipc_sender.pathname(owner.href) === "/desktop/workspace" &&
+      typeof change === "object" &&
+      change !== null &&
+      "archived" in change &&
+      change.archived === true &&
+      "revision" in change &&
+      typeof change.revision === "number"
+        ? change.revision
+        : undefined;
+    const previous =
+      archiveRevision === undefined
+        ? null
+        : await chat.catalogEntry(attachment.session).catch(() => null);
+    if (archiveRevision !== undefined) this.revalidate(owner, attachment);
+    const entry = await chat.organize(attachment.session, change);
     this.revalidate(owner, attachment);
-    return this.deletableEntry(owner, entry);
+    const result = this.deletableEntry(owner, entry);
+    if (
+      !previous ||
+      previous.archived ||
+      previous.revision !== archiveRevision ||
+      !entry.archived ||
+      previous.sessionId !== attachment.session.id ||
+      entry.sessionId !== attachment.session.id ||
+      entry.revision <= previous.revision
+    )
+      return result;
+
+    const receipt = randomUUID();
+    owner.archiveUndos.set(receipt, {
+      sessionId: entry.sessionId,
+      revision: entry.revision,
+      expiresAt: Date.now() + ARCHIVE_UNDO_TTL_MS,
+    });
+    if (owner.archiveUndos.size > MAX_ARCHIVE_UNDOS) {
+      const oldest = owner.archiveUndos.keys().next().value;
+      if (oldest) owner.archiveUndos.delete(oldest);
+    }
+    return { ...result, archiveUndo: receipt };
+  }
+
+  async undoArchive(
+    event: IpcMainInvokeEvent,
+    receipt: unknown
+  ): Promise<void> {
+    const owner = this.owners.get(event.sender);
+    if (
+      !owner ||
+      owner.frame !== event.senderFrame ||
+      ipc_sender.pathname(owner.href) !== "/desktop/workspace" ||
+      !token(receipt)
+    )
+      throw new Error("native_chat_archive_undo_unavailable");
+    this.revalidate(owner);
+    const target = owner.archiveUndos.get(receipt);
+    owner.archiveUndos.delete(receipt);
+    const { chat } = owner.active;
+    if (!target || target.expiresAt <= Date.now() || !chat.unarchiveCatalog)
+      throw new Error("native_chat_archive_undo_unavailable");
+    await chat.unarchiveCatalog(target.sessionId, target.revision);
+    this.revalidate(owner);
   }
 
   async deleteSavedChat(
@@ -2113,6 +2238,35 @@ export class NativeChatIpc {
         link.opening = undefined;
       });
     return sideAttachment(await link.opening);
+  }
+
+  setPresented(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    visible: unknown
+  ): void {
+    if (typeof visible !== "boolean")
+      throw new Error("native_chat_presentation_invalid");
+    this.requireAttachment(event, attachmentId).attachment.presented = visible;
+  }
+
+  /** Undefined for any surface that does not own this precise native session. */
+  questionPresentation(
+    sender: WebContents,
+    session: NativeChatSession
+  ): boolean | undefined {
+    const owner = this.owners.get(sender);
+    if (!owner) return;
+    const attachment = [...owner.attachments.values()].find(
+      (item) => item.session === session
+    );
+    if (!attachment) return;
+    try {
+      this.revalidate(owner, attachment);
+      return attachment.presented === true;
+    } catch {
+      return;
+    }
   }
 
   /** Discard a side chat by its own attachment. */
@@ -3357,6 +3511,7 @@ export class NativeChatIpc {
       questionId: JSON.stringify([review.task.turnId, review.waitId]),
       reviewId: retainReview(attachment.questions, review, sameQuestion),
       style: review.style,
+      ...(review.expiresWithTurn && { expiresWithTurn: true }),
       question: review.question,
       options: review.options,
     }));
@@ -3631,6 +3786,7 @@ export class NativeChatIpc {
       href: frame.url,
       active,
       attachments: new Map(),
+      archiveUndos: new Map(),
       retired: new Set(),
       editorContexts: new Map(),
       subscriptions: new Map(),
@@ -3952,6 +4108,32 @@ export class NativeChatIpc {
   }
 }
 
+/** Only fixed recovery states cross the renderer boundary. */
+function startupFailure(error: unknown): NativeChatReadiness {
+  if (error instanceof DesktopGatewayGrantUnavailable)
+    return "native-gateway-unavailable";
+  switch (error instanceof Error ? error.message : null) {
+    case "native_provider_byok_key_missing":
+      return "native-provider-key-required";
+    case "native_chat_profile_unavailable":
+    case "native_chat_profile_changed":
+    case "native_provider_model_unavailable":
+      return "native-provider-model-unavailable";
+    case "native_hooks_review_required":
+      return "native-hooks-review-required";
+    case "native_hooks_configuration_invalid":
+      return "native-hooks-configuration-invalid";
+    case "native_provider_endpoint_https_required":
+      return "native-provider-endpoint-https-required";
+    case "native_provider_endpoint_not_approved":
+      return "native-provider-endpoint-approval-required";
+    case "native_workspace_capacity_reached":
+      return "native-workspace-capacity";
+    default:
+      return "native-unavailable";
+  }
+}
+
 function fileScopeBusy(error: unknown): boolean {
   return (
     error instanceof NativeDocumentIdentityBusy ||
@@ -3987,6 +4169,25 @@ function chatProfileSelection(value: unknown): NativeChatProfileSelection {
 
 function validWelcomeWorkspaceId(value: unknown): value is string {
   return typeof value === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(value);
+}
+
+/** The display preset does not change the reviewed destination. */
+function welcomePresetChanged(currentHref: string, href: string): boolean {
+  const current = URL.parse(currentHref);
+  const next = URL.parse(href);
+  if (
+    !current ||
+    !next ||
+    current.pathname !== "/desktop/welcome" ||
+    next.pathname !== "/desktop/welcome" ||
+    current.searchParams.getAll("preset").length > 1 ||
+    next.searchParams.getAll("preset").length > 1 ||
+    current.searchParams.get("preset") === next.searchParams.get("preset")
+  )
+    return false;
+  current.searchParams.delete("preset");
+  next.searchParams.delete("preset");
+  return current.href === next.href;
 }
 
 function welcomePermissionChoice(value: unknown): {
