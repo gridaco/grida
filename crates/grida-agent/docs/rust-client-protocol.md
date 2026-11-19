@@ -130,7 +130,9 @@ retrying the query.
   requires `cwd`. Send opaque continuations with the same scope, limit, and
   order. Refresh the first page after registry changes, service restart, or
   `invalid_session_cursor`. Removal from the registry revokes both listing
-  and read-state mutations.
+  and read-state mutations. The host rechecks the workspace and its store after
+  obtaining the write transaction. A request still waiting for that transaction
+  when its workspace is removed leaves the read position unchanged.
 - The host reads the public index and current turn heads in committed SQLite
   snapshots. A store-owned live turn lease is visible across processes and
   released by the OS if its owner dies. Filesystem and owner-exit notifications
@@ -148,6 +150,10 @@ host records its last final reply and advances the read revision in that
 transaction. Progress, streamed text, and new user submissions leave this
 position alone. Existing chats start read when the store upgrades, with
 `replyId: null` until the next final reply.
+
+Revising history preserves the read state of a reply retained in the new
+transcript and uses its new message ID. Removing the tracked reply clears its
+read position. A change of reply ID invalidates outstanding acknowledgements.
 
 Negotiate `co.grida/session/read-state` version 1. The request
 `_co.grida/session/read-state` takes an absolute workspace `cwd`, a public

@@ -73,6 +73,50 @@ impl Marker {
         Ok(Self { leases, file })
     }
 
+    /// The writer's private transaction state. Track only fields exposed by
+    /// the catalog; an aborted write rolls its invalidation back with the data.
+    pub(super) fn track(connection: &Connection) -> Result<()> {
+        connection.execute_batch("
+            CREATE TEMP TABLE catalog_dirty (id INTEGER PRIMARY KEY);
+            CREATE TEMP TRIGGER catalog_insert AFTER INSERT ON main.sessions
+                WHEN NEW.conversation_group IS NOT NULL
+                BEGIN INSERT OR IGNORE INTO catalog_dirty VALUES(1); END;
+            CREATE TEMP TRIGGER catalog_delete AFTER DELETE ON main.sessions
+                WHEN OLD.conversation_group IS NOT NULL
+                BEGIN INSERT OR IGNORE INTO catalog_dirty VALUES(1); END;
+            CREATE TEMP TRIGGER catalog_update
+                AFTER UPDATE OF catalog_revision,active_turn,last_message_ms,reply_id ON main.sessions
+                WHEN NEW.conversation_group IS NOT NULL AND
+                    (OLD.catalog_revision IS NOT NEW.catalog_revision OR
+                     OLD.active_turn IS NOT NEW.active_turn OR
+                     OLD.last_message_ms IS NOT NEW.last_message_ms OR
+                     OLD.read_revision IS NOT NEW.read_revision)
+                BEGIN INSERT OR IGNORE INTO catalog_dirty VALUES(1); END;
+        ").map_err(database_error)
+    }
+
+    /// Turn-head fields and OS ownership are projected separately from the
+    /// session row. Stage their wake in the same transaction as the new head.
+    pub(super) fn stage_turn(tx: &Transaction<'_>, session: &SessionId) -> Result<()> {
+        tx.prepare_cached(
+            "INSERT OR IGNORE INTO temp.catalog_dirty SELECT 1 FROM sessions
+             WHERE id=?1 AND conversation_group IS NOT NULL",
+        )
+        .map_err(database_error)?
+        .execute([session.as_str()])
+        .map_err(database_error)?;
+        Ok(())
+    }
+
+    pub(super) fn take_change(tx: &Transaction<'_>) -> Result<bool> {
+        Ok(tx
+            .prepare_cached("DELETE FROM temp.catalog_dirty")
+            .map_err(database_error)?
+            .execute([])
+            .map_err(database_error)?
+            != 0)
+    }
+
     pub(super) fn changed(&self) {
         signal_change(&self.file);
     }
@@ -89,10 +133,25 @@ fn signal_change(file: &File) {
 pub(super) struct TurnOwner(Option<(File, PathBuf)>);
 
 impl TurnOwner {
-    pub(super) fn acquire(inner: &Inner, binding: &TurnBinding) -> Result<Self> {
+    pub(super) fn acquire(
+        inner: &Inner,
+        tx: &Transaction<'_>,
+        binding: &TurnBinding,
+    ) -> Result<Self> {
         let Some(marker) = &inner.catalog_marker else {
             return Ok(Self(None));
         };
+        let public: bool = tx
+            .prepare_cached("SELECT conversation_group IS NOT NULL FROM sessions WHERE id=?1")
+            .map_err(database_error)?
+            .query_row([binding.session.as_str()], |row| row.get(0))
+            .map_err(database_error)?;
+        if !public {
+            return Ok(Self(None));
+        }
+        // A recovered claim can keep the same active_turn. Wake after its
+        // new binding is committed as well as when the lease disappears.
+        Marker::stage_turn(tx, &binding.session)?;
         Self::publish(&marker.leases, binding)
     }
 
@@ -226,6 +285,36 @@ impl CatalogReader {
         }))
     }
 
+    /// Upgrade an existing legacy database only while its normal writer is
+    /// idle. A simultaneously starting writer waits for that short upgrade.
+    pub fn open_with_conversations(
+        path: &Path,
+        writable: bool,
+        scope: catalog::ScopeProjection,
+        links: Option<turn_links::TurnLinkProjection>,
+        conversations: catalog::ConversationProjection,
+    ) -> Result<Option<Self>> {
+        let needs_upgrade = |err: &Error| err.code.as_str() == "catalog_migration_required";
+        match Self::open(path, writable) {
+            Err(err) if needs_upgrade(&err) => with_store_opening(path, |path| {
+                // Another opener may have upgraded or removed the database.
+                match Self::open(path, writable) {
+                    Err(err) if needs_upgrade(&err) => {
+                        drop(SqliteStore::open_writer(
+                            path,
+                            Some(scope),
+                            links,
+                            Some(conversations),
+                        )?);
+                        Self::open(path, writable)
+                    }
+                    result => result,
+                }
+            }),
+            result => result,
+        }
+    }
+
     /// Read the index, row and turn head in one snapshot. Inspecting a running
     /// lease never acquires session execution ownership.
     pub fn list(
@@ -260,15 +349,23 @@ impl CatalogReader {
     }
 
     /// The read position is the only mutation available on a catalog connection.
+    /// Revalidate the caller's grant once SQLite has granted the write transaction.
     pub fn update_read_state(
         &mut self,
         group: &str,
         session: &SessionId,
         update: &ReadStateUpdate,
+        admit: impl FnOnce() -> Result<()>,
     ) -> Result<ConversationReadState> {
         let marker = open_private_file(&self.leases.directory.join(CHANGE_FILE))?;
-        let (state, changed) =
-            catalog::update_conversation_read(&mut self.connection, group, 0, session, update)?;
+        let (state, changed) = catalog::update_conversation_read(
+            &mut self.connection,
+            group,
+            0,
+            session,
+            update,
+            admit,
+        )?;
         if changed {
             signal_change(&marker);
         }

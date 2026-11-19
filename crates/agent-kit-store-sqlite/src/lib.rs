@@ -255,24 +255,21 @@ impl SqliteStore {
         turn_links: Option<turn_links::TurnLinkProjection>,
         conversations: Option<catalog::ConversationProjection>,
     ) -> Result<Self> {
-        if path.file_name().is_none() || !path.parent().is_some_and(Path::is_dir) {
-            return Err(error(ErrorKind::InvalidInput, "store_directory_missing"));
-        }
-        let parent = path
-            .parent()
-            .ok_or_else(|| error(ErrorKind::InvalidInput, "store_directory_missing"))?;
-        require_private_directory(parent)?;
-        let path = parent
-            .canonicalize()
-            .map_err(|_| error(ErrorKind::Unavailable, "store_directory_unavailable"))?
-            .join(
-                path.file_name()
-                    .ok_or_else(|| error(ErrorKind::InvalidInput, "store_filename_missing"))?,
-            );
-        let lock = WriterLock::acquire(&path)?;
-        let database = open_private_file(&path)?;
+        with_store_opening(path, |path| {
+            Self::open_writer(path, catalog, turn_links, conversations)
+        })
+    }
+
+    fn open_writer(
+        path: &Path,
+        catalog: Option<catalog::ScopeProjection>,
+        turn_links: Option<turn_links::TurnLinkProjection>,
+        conversations: Option<catalog::ConversationProjection>,
+    ) -> Result<Self> {
+        let lock = WriterLock::acquire(path)?;
+        let database = open_private_file(path)?;
         drop(database);
-        let connection = Connection::open(&path).map_err(database_error)?;
+        let connection = Connection::open(path).map_err(database_error)?;
         Self::initialize(Some(lock), connection, catalog, turn_links, conversations)
     }
 
@@ -306,6 +303,14 @@ impl SqliteStore {
                 .pragma_update(None, "synchronous", "FULL")
                 .map_err(database_error)?;
         }
+        let catalog_marker = lock
+            .as_ref()
+            .filter(|_| conversations.is_some())
+            .map(|writer| catalog_reader::Marker::open_for_writer(&writer.database))
+            .transpose()?;
+        if catalog_marker.is_some() {
+            catalog_reader::Marker::track(&connection)?;
+        }
         Ok(Self {
             inner: Arc::new(Inner {
                 connection: Mutex::new(connection),
@@ -315,11 +320,7 @@ impl SqliteStore {
                 catalog,
                 conversations,
                 turn_links,
-                catalog_marker: lock
-                    .as_ref()
-                    .filter(|_| conversations.is_some())
-                    .map(|writer| catalog_reader::Marker::open_for_writer(&writer.database))
-                    .transpose()?,
+                catalog_marker,
                 _lock: lock,
             }),
         })
@@ -978,7 +979,7 @@ fn prepare_pending_claim(
             (state, inputs)
         }
     };
-    let owner = register_owner(inner, state.binding())?;
+    let owner = register_owner(inner, transaction, state.binding())?;
     session.active_turn = Some(state.binding().turn.clone());
     bump_revision(&mut session)?;
     save_session(transaction, &request.session, &session)?;
@@ -1074,7 +1075,7 @@ impl SessionStore for SqliteStore {
                 require_released(inner, state.binding())?;
                 rebind(&mut state)?;
                 save_turn(inner, &transaction, &state)?;
-                let owner = register_owner(inner, state.binding())?;
+                let owner = register_owner(inner, &transaction, state.binding())?;
                 bump_revision(&mut session)?;
                 save_session(&transaction, &request.session, &session)?;
                 save_request(
@@ -2072,7 +2073,33 @@ fn apply_turn_change(
 ) -> Result<CommitReceipt> {
     let previous = state.history().records().len();
     let was_settled = state.outcome().is_some();
+    // Checkpoint, attempt and driver updates are private execution details.
+    // Only these transitions can change the catalog's view of a live head.
+    let changes_activity = inner.catalog_marker.is_some()
+        && change.actions().iter().any(|action| {
+            matches!(
+                action,
+                JournalAction::OpenWait(_)
+                    | JournalAction::ResolveWait { .. }
+                    | JournalAction::WithdrawWait(_)
+                    | JournalAction::Control(ControlDirective::Cancel)
+                    | JournalAction::Suspend
+            )
+        });
+    let activity = |state: &TurnState| {
+        let requests: BTreeSet<_> = state
+            .waits()
+            .values()
+            .filter(|wait| !state.controls().cancelled && wait.is_pending())
+            .map(|wait| wait.request.schema().clone())
+            .collect();
+        (state.is_suspended(), requests)
+    };
+    let previous_activity = changes_activity.then(|| activity(state));
     let receipt = state.apply(change)?;
+    if previous_activity.is_some_and(|previous| previous != activity(state)) {
+        catalog_reader::Marker::stage_turn(tx, &state.binding().session)?;
+    }
     if let Some(project) = inner.conversations
         && state.history().records()[previous..]
             .iter()
@@ -2260,14 +2287,18 @@ fn require_released(inner: &Inner, binding: &TurnBinding) -> Result<()> {
     Ok(())
 }
 
-fn register_owner(inner: &Inner, binding: &TurnBinding) -> Result<Arc<catalog_reader::TurnOwner>> {
+fn register_owner(
+    inner: &Inner,
+    tx: &Transaction<'_>,
+    binding: &TurnBinding,
+) -> Result<Arc<catalog_reader::TurnOwner>> {
     let mut owners = owners(inner);
     owners.retain(|_, owner| owner.strong_count() > 0);
     let key = (binding.session.clone(), binding.turn.clone());
     if owners.contains_key(&key) {
         return Err(error(ErrorKind::Conflict, "turn_still_owned"));
     }
-    let owner = Arc::new(catalog_reader::TurnOwner::acquire(inner, binding)?);
+    let owner = Arc::new(catalog_reader::TurnOwner::acquire(inner, tx, binding)?);
     owners.insert(key, Arc::downgrade(&owner));
     Ok(owner)
 }
@@ -2336,13 +2367,43 @@ fn commit_error(_: rusqlite::Error) -> Error {
 /// Commit a store transaction, then remember the turns it wrote. Nothing is
 /// remembered unless the commit succeeded.
 fn commit(inner: &Inner, transaction: Transaction<'_>) -> Result<()> {
+    let publish = if let Some(marker) = &inner.catalog_marker {
+        catalog_reader::Marker::take_change(&transaction)?.then_some(marker)
+    } else {
+        None
+    };
     transaction.commit().map_err(commit_error)?;
     turn_layout::lock(&inner.turns).publish();
-    if let Some(marker) = &inner.catalog_marker {
+    if let Some(marker) = publish {
         marker.changed();
     }
     Ok(())
 }
+/// Serialize writer *startup* with a catalog's one-time upgrade. The separate
+/// lifetime writer lock still rejects a second execution host immediately.
+fn with_store_opening<T>(path: &Path, open: impl FnOnce(&Path) -> Result<T>) -> Result<T> {
+    if path.file_name().is_none() || !path.parent().is_some_and(Path::is_dir) {
+        return Err(error(ErrorKind::InvalidInput, "store_directory_missing"));
+    }
+    let parent = path
+        .parent()
+        .ok_or_else(|| error(ErrorKind::InvalidInput, "store_directory_missing"))?;
+    require_private_directory(parent)?;
+    let path = parent
+        .canonicalize()
+        .map_err(|_| error(ErrorKind::Unavailable, "store_directory_unavailable"))?
+        .join(
+            path.file_name()
+                .ok_or_else(|| error(ErrorKind::InvalidInput, "store_filename_missing"))?,
+        );
+    let mut name = path.as_os_str().to_owned();
+    name.push(".opening");
+    let gate = open_private_file(Path::new(&name))?;
+    gate.lock()
+        .map_err(|_| error(ErrorKind::Unavailable, "store_opening_unavailable"))?;
+    open(&path)
+}
+
 fn lock_path(path: &Path) -> PathBuf {
     let mut value = path.as_os_str().to_os_string();
     value.push(".lock");

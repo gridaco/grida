@@ -674,12 +674,13 @@ async fn an_earlier_revision_retains_original_view_and_captures_fresh_permission
     let state = fixture.state.clone();
     let workspace = fixture.primary.clone();
     std::fs::write(workspace.join("note.txt"), "Fixture note content").unwrap();
+    let (release, held) = tokio::sync::oneshot::channel();
     let mut endpoint = Endpoint::start(vec![
         Reply::Tool("read_file", r#"{"path":"note.txt"}"#),
         Reply::Finished("First answer"),
         Reply::Finished("Second answer"),
         Reply::Finished("Third answer"),
-        Reply::Finished("Replacement answer"),
+        Reply::Release("Replacement answer", held),
         Reply::Finished("Explicitly resumed queued work."),
     ])
     .await;
@@ -750,6 +751,12 @@ async fn an_earlier_revision_retains_original_view_and_captures_fresh_permission
     assert!(old_previews[4].starts_with("Third input"));
     assert!(old_previews[4].contains("fixture://linked-context"));
     assert_eq!(old_previews[5], "Third answer");
+    let mut catalog = super::catalog::catalog_client(&url).await;
+    let query = json!({"cwd":workspace});
+    let list = ws_rpc(&mut catalog, 2, "session/list", query.clone()).await;
+    let previous = &list["result"]["sessions"][0]["_meta"]["co.grida/readState"];
+    assert_eq!(previous["replyId"], old["messages"][5]["anchor"]["message"]);
+    assert_eq!(previous["unread"], true);
     let target = revision_target(&mut socket, &session, &old, 2).await;
     assert_eq!(target["result"]["text"], original);
     assert_eq!(target["result"]["sessionRevision"], old["sessionRevision"]);
@@ -776,6 +783,13 @@ async fn an_earlier_revision_retains_original_view_and_captures_fresh_permission
     assert_eq!(changed["result"]["sessionId"], session, "{changed}");
     assert_eq!(changed["result"]["inputId"], "replacement");
     let next = endpoint.request().await;
+    let list = ws_rpc(&mut catalog, 3, "session/list", query).await;
+    let revised = &list["result"]["sessions"][0]["_meta"]["co.grida/readState"];
+    assert_eq!(revised["replyId"], Value::Null);
+    assert_eq!(revised["unread"], false);
+    assert!(revised["revision"].as_u64().unwrap() > previous["revision"].as_u64().unwrap());
+    drop(catalog);
+    release.send(()).unwrap();
     let conversation = next["messages"].as_array().unwrap();
     let instructions = conversation[0]["content"].as_str().unwrap();
     assert!(instructions.contains("tool calls (1)"));

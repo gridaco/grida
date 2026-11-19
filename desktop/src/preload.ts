@@ -21,6 +21,7 @@ import { MediaTransport } from "@grida/ai-host/media-transport";
 import { FileReferenceRequest } from "./bridge/file-reference-request";
 import { SelectedImageRequest } from "./bridge/selected-image-request";
 import { NativeChatInvoke } from "./bridge/native-chat-invoke";
+import { catalogWorkspaceId } from "./bridge/chat-catalog-route";
 import {
   DesktopBrowser,
   NativeEditorSurfaces,
@@ -688,18 +689,18 @@ const bridge: DesktopBridge = {
       selectProfile: (selection) =>
         nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_SELECT_PROFILE, selection),
     }),
-    ...(location.pathname === "/desktop/workspace" && {
-      observeCatalog: (onChanged: () => void) => {
-        const workspaceId = new URLSearchParams(location.search).get("id");
-        return workspaceId
-          ? observeChatCatalog({ workspaceId }, onChanged)
-          : Promise.resolve(null);
-      },
-      setReadState: (
-        id: string,
-        change: import("@grida/desktop-bridge").NativeChatReadChange
-      ) => nativeChatInvoke(IPC_CHANNELS.CHAT_CATALOG_READ, id, change),
-    }),
+    observeCatalog: (onChanged) => {
+      const workspaceId = catalogWorkspaceId(location);
+      return workspaceId
+        ? observeChatCatalog({ workspaceId }, onChanged)
+        : Promise.resolve(null);
+    },
+    canSetReadState: () => catalogWorkspaceId(location) !== null,
+    setReadState: async (id, change) => {
+      if (!catalogWorkspaceId(location))
+        throw new Error("chat_catalog_unavailable");
+      await nativeChatInvoke(IPC_CHANNELS.CHAT_CATALOG_READ, id, change);
+    },
     listArchived: (cursor) =>
       nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_LIST_ARCHIVED, cursor),
     catalogEntry: (attachmentId) =>

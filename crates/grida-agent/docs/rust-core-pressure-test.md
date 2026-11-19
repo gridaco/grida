@@ -134,6 +134,13 @@ the chat's read state. The [store catalog regression](../../agent-kit-store-sqli
 exercises settlement and reopening. The [native catalog regression](../tests/process/catalog.rs)
 checks the public wire operations from two clients against a synthetic provider.
 
+When a user edits an earlier message, the catalog must follow the current
+history view. The [history revision regression](../tests/process/history.rs)
+holds the replacement turn open so a new reply cannot mask an obsolete read
+position. Catalog recovery must also preserve observation across a replaced
+store directory and allow a worker to open an older store during discovery.
+Private journal changes should leave an unrelated catalog observer idle.
+
 ### Discovery audits
 
 Discovery draws on independent sources rather than waiting for a remembered

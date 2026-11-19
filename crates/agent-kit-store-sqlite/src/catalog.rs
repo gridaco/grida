@@ -23,6 +23,8 @@ pub struct ConversationProjection {
     pub message: fn(&Message) -> bool,
     /// Select the last user-visible reply from a newly settled turn.
     pub final_reply: fn(&TurnState) -> Option<agent_kit_core::MessageId>,
+    /// Locate the same reply in a replacement view, whose seed may re-key messages.
+    pub revised_reply: fn(&history::HistorySeed, &str) -> Result<Option<agent_kit_core::MessageId>>,
 }
 
 /// Last projected reply and the revision a client must have displayed to
@@ -64,10 +66,12 @@ pub(crate) fn update_conversation_read(
     bucket: u8,
     session: &SessionId,
     update: &ReadStateUpdate,
+    admit: impl FnOnce() -> Result<()>,
 ) -> Result<(ConversationReadState, bool)> {
     let tx = connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(database_error)?;
+    admit()?;
     let mut current = tx
         .query_row(
             "SELECT unread,read_revision,reply_id FROM sessions
@@ -184,7 +188,7 @@ impl SqliteStore {
     ) -> Result<ConversationReadState> {
         execute(Arc::clone(&self.inner), move |inner, connection| {
             let (state, changed) =
-                update_conversation_read(connection, &group, bucket, &session, &update)?;
+                update_conversation_read(connection, &group, bucket, &session, &update, || Ok(()))?;
             if changed && let Some(marker) = &inner.catalog_marker {
                 marker.changed();
             }
@@ -725,6 +729,44 @@ pub(crate) fn record_with_view(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn read_state_admission_runs_under_the_write_lock_before_any_mutation() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("catalog.sqlite");
+        let mut db = Connection::open(&path).unwrap();
+        schema::install_for_test(&mut db);
+        db.execute("INSERT INTO sessions(id, configuration, revision, paused, next_input, conversation_group)
+                    VALUES('chat', X'00', 0, 0, 0, 'project')", []).unwrap();
+        let other = Connection::open(&path).unwrap();
+        other.busy_timeout(std::time::Duration::ZERO).unwrap();
+        let result = update_conversation_read(
+            &mut db,
+            "project",
+            0,
+            &SessionId::new("chat").unwrap(),
+            &ReadStateUpdate::MarkUnread,
+            || {
+                assert_eq!(
+                    other
+                        .execute_batch("BEGIN IMMEDIATE")
+                        .unwrap_err()
+                        .sqlite_error_code(),
+                    Some(rusqlite::ErrorCode::DatabaseBusy)
+                );
+                Err(error(ErrorKind::Unavailable, "grant_withdrawn"))
+            },
+        );
+        assert_eq!(result.unwrap_err().code, "grant_withdrawn");
+        let stored = other
+            .query_row(
+                "SELECT unread,read_revision,reply_id FROM sessions WHERE id='chat'",
+                [],
+                |row| read_state(row, 0),
+            )
+            .unwrap();
+        assert_eq!(stored, ConversationReadState::default());
+    }
 
     #[test]
     fn conversation_pages_seek_the_ordering_tuple_in_the_index() {

@@ -421,6 +421,7 @@ mod tests {
             input: |_| false,
             message: |_| false,
             final_reply: |_| None,
+            revised_reply: |_, _| Ok(None),
         };
         prepare(
             &mut db,
@@ -451,7 +452,11 @@ mod tests {
             std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))
                 .unwrap();
         }
-        let path = directory.path().join("legacy.sqlite");
+        let path = directory
+            .path()
+            .canonicalize()
+            .unwrap()
+            .join("legacy.sqlite");
         drop(crate::open_private_file(&path).unwrap());
         let db = Connection::open(&path).unwrap();
         db.execute_batch(SCHEMA_V1).unwrap();
@@ -475,19 +480,16 @@ mod tests {
                 params![name,encode(&config).unwrap(),scope(&config).unwrap().bytes().as_slice()]).unwrap();
         }
         drop(db);
-        let open = || {
-            SqliteStore::open_with_conversations(
-                &path,
-                scope,
-                Some(|_, _| Ok(TurnLinkDecision::Unrelated)),
-                ConversationProjection {
-                    group: |config| (config.bytes() == b"public").then(|| "public".to_owned()),
-                    input: |_| true,
-                    message: |_| false,
-                    final_reply: |_| None,
-                },
-            )
+        let links: Option<crate::turn_links::TurnLinkProjection> =
+            Some(|_, _| Ok(TurnLinkDecision::Unrelated));
+        let conversations = ConversationProjection {
+            group: |config| (config.bytes() == b"public").then(|| "public".to_owned()),
+            input: |_| true,
+            message: |_| false,
+            final_reply: |_| None,
+            revised_reply: |_, _| Ok(None),
         };
+        let open = || SqliteStore::open_with_conversations(&path, scope, links, conversations);
         let version = || {
             Connection::open(&path)
                 .unwrap()
@@ -505,9 +507,43 @@ mod tests {
         assert_eq!(open().err().unwrap().code, "store_schema_unsupported");
         assert_eq!(version(), 1);
         db.execute("DROP TABLE unrecognized", []).unwrap();
-        drop(db);
 
-        let store = open().unwrap();
+        // Stall a real migration after it acquired the legacy writer lock,
+        // then start the execution host while that lock is still occupied.
+        db.execute_batch("BEGIN IMMEDIATE").unwrap();
+        let store = std::thread::scope(|threads| {
+            use crate::catalog_reader::CatalogReader;
+            use std::{
+                sync::mpsc,
+                thread,
+                time::{Duration, Instant},
+            };
+            let reader = threads.spawn(|| {
+                CatalogReader::open_with_conversations(&path, false, scope, links, conversations)
+                    .unwrap()
+                    .is_some()
+            });
+            let deadline = Instant::now() + Duration::from_secs(3);
+            while std::fs::metadata(crate::lock_path(&path)).unwrap().len() == 0 {
+                assert!(
+                    Instant::now() < deadline,
+                    "catalog never acquired the migration lock"
+                );
+                thread::sleep(Duration::from_millis(2));
+            }
+            let (tx, rx) = mpsc::channel();
+            threads.spawn(move || tx.send(open()).unwrap());
+            assert!(matches!(
+                rx.recv_timeout(Duration::from_millis(100)),
+                Err(mpsc::RecvTimeoutError::Timeout)
+            ));
+            db.execute_batch("ROLLBACK").unwrap();
+            assert!(reader.join().unwrap());
+            rx.recv().unwrap().unwrap()
+        });
+        drop(db);
+        // Only startup waits; a second actual execution owner still fails.
+        assert_eq!(open().err().unwrap().code, "store_already_owned");
         assert_eq!(version(), VERSION);
         let list = |store: &SqliteStore| {
             let store = store.clone();

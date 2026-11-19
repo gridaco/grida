@@ -145,6 +145,21 @@ pub fn open_store(database: &Path) -> Result<SqliteStore> {
     )
 }
 
+/// Open the same projected database for catalog observation. Closed legacy
+/// stores upgrade with the writer's profile under the store's startup lock.
+pub(crate) fn open_catalog(
+    database: &Path,
+    writable: bool,
+) -> Result<Option<agent_kit_store_sqlite::catalog_reader::CatalogReader>> {
+    agent_kit_store_sqlite::catalog_reader::CatalogReader::open_with_conversations(
+        database,
+        writable,
+        catalog::configuration_scope,
+        Some(subagents::turn_link),
+        catalog::CONVERSATIONS,
+    )
+}
+
 const SESSION_SCHEMA: &str = "grida.agent.native.session";
 const INPUT_SCHEMA: &str = "grida.agent.native.input";
 /// The one stored version of each envelope this host writes and reads.

@@ -249,16 +249,18 @@ impl Catalog {
         let mut reader = scope
             .reader(true)?
             .ok_or_else(|| problem("session_catalog_entry_missing"))?;
-        let result = reader.update_read_state(
+        reader.update_read_state(
             cwd.to_str()
                 .ok_or_else(|| problem("invalid_workspace_path"))?,
             &session,
             &update,
-        )?;
-        if self.visible(Some(&cwd))?.first() != Some(&scope) {
-            return Err(problem("catalog_scope_changed"));
-        }
-        Ok(result)
+            || {
+                if self.visible(Some(&cwd))?.first() != Some(&scope) {
+                    return Err(problem("catalog_scope_changed"));
+                }
+                Ok(())
+            },
+        )
     }
 }
 
@@ -273,14 +275,7 @@ fn normal_absolute(path: &Path) -> bool {
 impl Workspace {
     fn reader(&self, writable: bool) -> HostResult<Option<CatalogReader>> {
         let database = self.state_dir.join(crate::host::DATABASE_FILE);
-        match CatalogReader::open(&database, writable) {
-            Err(err) if err.code.as_str() == "catalog_migration_required" => {
-                // A closed legacy store may upgrade only through its normal owner.
-                drop(crate::host::open_store(&database)?);
-                CatalogReader::open(&database, writable)
-            }
-            result => result,
-        }
+        crate::host::open_catalog(&database, writable)
     }
 }
 

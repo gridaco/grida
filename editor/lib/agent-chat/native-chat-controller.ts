@@ -406,6 +406,11 @@ type Scope = {
   pendingRevision?: NativeChatRevisionInput;
   replay: boolean;
   historyLoaded?: true;
+  readReceipt?: {
+    replyId: string | null;
+    revision: number;
+    delivery?: Promise<void>;
+  };
   draftReady?: Promise<void>;
   draftRestored?: true;
   pendingRestoreFailed?: true;
@@ -1586,6 +1591,7 @@ export class NativeChatController {
               ))
           )
             await this.readCatalogEntry(scope, true);
+          if (scope?.readReceipt) await this.deliverReadReceipt(scope);
         }
       } finally {
         refreshing = false;
@@ -3242,13 +3248,21 @@ export class NativeChatController {
     return title ?? NEW_CHAT_TITLE;
   }
 
+  /** Read receipts belong to active workspace chats, including when opened off-page. */
   chatReadState(sessionId: string) {
-    const listed = this.catalog?.readStates?.find(
-      (row) => row.sessionId === sessionId
-    );
+    if (
+      this.fixed ||
+      !this.bridge.setReadState ||
+      this.bridge.canSetReadState?.() === false
+    )
+      return;
     const selected = this.view.catalogEntry;
-    const opened =
-      selected?.sessionId === sessionId ? selected.readState : undefined;
+    const entry = selected?.sessionId === sessionId ? selected : undefined;
+    if (entry?.archived) return;
+    const listed = this.view.catalogArchived
+      ? undefined
+      : this.catalog?.readStates?.find((row) => row.sessionId === sessionId);
+    const opened = entry?.readState;
     return opened && (!listed || opened.revision >= listed.revision)
       ? opened
       : listed;
@@ -3283,17 +3297,48 @@ export class NativeChatController {
     replyId: string | null,
     revision: number
   ): Promise<void> {
-    if (this.scope?.attachment?.sessionId !== sessionId)
+    const scope = this.scope;
+    if (!scope || scope.attachment?.sessionId !== sessionId)
       return Promise.resolve();
-    return (
-      this.bridge
-        .setReadState?.(sessionId, {
-          kind: "acknowledge",
-          replyId,
-          revision,
-        })
-        .catch(() => {}) ?? Promise.resolve()
+    if (
+      scope.readReceipt?.revision !== revision ||
+      scope.readReceipt.replyId !== replyId
+    )
+      scope.readReceipt = { replyId, revision };
+    return this.deliverReadReceipt(scope);
+  }
+
+  private async deliverReadReceipt(scope: Scope) {
+    const receipt = scope.readReceipt;
+    const sessionId = scope.attachment?.sessionId;
+    const send = this.bridge.setReadState;
+    if (!receipt || !sessionId || !send) return;
+    // A reconnect may refresh the catalog before the write on the old
+    // connection has rejected. Serialize the two attempts.
+    receipt.delivery = (receipt.delivery ?? Promise.resolve()).then(
+      async () => {
+        if (!this.owns(scope) || scope.readReceipt !== receipt) return;
+        const state = this.chatReadState(sessionId);
+        if (
+          state?.unread &&
+          state.revision === receipt.revision &&
+          state.replyId === receipt.replyId
+        ) {
+          try {
+            await send.call(this.bridge, sessionId, {
+              kind: "acknowledge",
+              replyId: receipt.replyId,
+              revision: receipt.revision,
+            });
+          } catch {
+            // Retain the displayed revision for the next catalog refresh.
+            return;
+          }
+        }
+        if (scope.readReceipt === receipt) scope.readReceipt = undefined;
+      }
     );
+    await receipt.delivery;
   }
 
   chatLastActivityAtMs(sessionId: string): number | undefined {

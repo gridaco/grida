@@ -156,7 +156,7 @@ impl SqliteStore {
                 vec![JournalAction::SetCheckpoint(request.checkpoint)],
             )?)?;
             turn_layout::write(&inner.turns, &transaction, &state, true)?;
-            let owner = register_owner(inner, state.binding())?;
+            let owner = register_owner(inner, &transaction, state.binding())?;
             session.active_turn = Some(request.turn.clone());
             bump_revision(&mut session)?;
             save_session(&transaction, id, &session)?;

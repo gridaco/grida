@@ -239,6 +239,18 @@ async fn catalog_subscription_observes_other_writers_scopes_and_owner_loss() {
     endpoint.done().await;
 }
 
+fn stdio_catalog(manifest: &Path) -> super::approvals::Stdio {
+    let child = executable()
+        .args(["serve-catalog", "--stdio", "--catalog-registry"])
+        .arg(manifest)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    super::approvals::Stdio::from_child(child)
+}
+
 #[tokio::test]
 async fn stdio_catalog_snapshots_cover_setup_bursts_and_disconnected_changes() {
     use super::approvals::Stdio;
@@ -250,17 +262,7 @@ async fn stdio_catalog_snapshots_cover_setup_bursts_and_disconnected_changes() {
     let state = root.join("state");
     let manifest = root.join("registry.json");
     registry(&manifest, &[(&cwd, &state)]);
-    let catalog = || {
-        let child = executable()
-            .args(["serve-catalog", "--stdio", "--catalog-registry"])
-            .arg(&manifest)
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .spawn()
-            .unwrap();
-        Stdio::from_child(child)
-    };
+    let catalog = || stdio_catalog(&manifest);
     let mut init = extension_initialize();
     init["clientCapabilities"]["_meta"][WATCH] = json!(1);
     init["clientCapabilities"]["_meta"]["co.grida/session/organize"] = json!(1);
@@ -312,5 +314,68 @@ async fn stdio_catalog_snapshots_cover_setup_bursts_and_disconnected_changes() {
         rows.iter()
             .any(|r| r["sessionId"] == sessions[1] && r["title"] == "Reviewed")
     );
+    assert!(observer.finish().await.status.success());
+}
+
+#[tokio::test]
+async fn catalog_subscription_continues_when_a_store_directory_is_replaced() {
+    use super::approvals::Stdio;
+    let directory = TempDir::new().unwrap();
+    let root = directory.path().canonicalize().unwrap();
+    fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
+    let cwd = root.join("workspace");
+    let state = root.join("stores/state");
+    fs::create_dir(&cwd).unwrap();
+    fs::create_dir_all(&state).unwrap();
+    fs::set_permissions(&state, fs::Permissions::from_mode(0o700)).unwrap();
+    let manifest = root.join("registry.json");
+    registry(&manifest, &[(&cwd, &state)]);
+    let mut init = extension_initialize();
+    init["clientCapabilities"]["_meta"][WATCH] = json!(1);
+    let mut observer = stdio_catalog(&manifest);
+    observer.request("initialize", init.clone()).await;
+    assert!(
+        observer
+            .request("_co.grida/catalog/subscribe", json!({}))
+            .await["result"]
+            .is_object()
+    );
+
+    // Replace the inode before the observer consumes the removal. The registry
+    // and its containing directory remain unchanged.
+    fs::remove_dir(&state).unwrap();
+    fs::create_dir(&state).unwrap();
+    fs::set_permissions(&state, fs::Permissions::from_mode(0o700)).unwrap();
+    assert_eq!(observer.read_frame().await["method"], CHANGED);
+    assert_eq!(
+        observer.request("session/list", json!({})).await["result"]["sessions"],
+        json!([])
+    );
+
+    let mut writer = Stdio::from_child(spawn_serve(&state, "http://127.0.0.1:1"));
+    writer.request("initialize", init).await;
+    for _ in 0..2 {
+        let row = writer
+            .request("session/new", json!({"cwd":cwd,"mcpServers":[]}))
+            .await;
+        let session = row["result"]["sessionId"].as_str().unwrap();
+        timeout(WAIT, async {
+            loop {
+                assert_eq!(observer.read_frame().await["method"], CHANGED);
+                let page = observer.request("session/list", json!({})).await;
+                if page["result"]["sessions"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|item| item["sessionId"] == session)
+                {
+                    break;
+                }
+            }
+        })
+        .await
+        .unwrap();
+    }
+    assert!(writer.finish().await.status.success());
     assert!(observer.finish().await.status.success());
 }

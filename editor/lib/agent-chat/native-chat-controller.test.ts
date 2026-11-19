@@ -5941,6 +5941,7 @@ it("refreshes a live picker after registration and a racing burst without idle p
       { sessionId: "switched-away", revision: unread ? 1 : 2, replyId, unread },
     ],
   });
+  bridge.setReadState = vi.fn<NonNullable<DesktopNativeChat["setReadState"]>>();
   const list = vi.fn<DesktopNativeChat["list"]>(async () => page("a", false));
   bridge.list = list;
   const subscribed = Promise.withResolvers<(() => void) | null>();

@@ -8,6 +8,7 @@ import type { IpcMainInvokeEvent, WebContents } from "electron";
 import { ipc_sender } from "./ipc-sender";
 import type { DesktopChatCatalog } from "./native-desktop-chat-catalog";
 import { IPC_CHANNELS } from "../bridge/contract";
+import { catalogWorkspaceId } from "../bridge/chat-catalog-route";
 
 function readQuery(value: unknown = {}): DesktopChatCatalogQuery {
   if (!value || typeof value !== "object" || Array.isArray(value))
@@ -97,8 +98,7 @@ export async function listDesktopChats(
 function currentWorkspace(event: IpcMainInvokeEvent) {
   const url = event.senderFrame?.url;
   if (!url || ipc_sender.pathname(url) !== "/desktop/workspace") return null;
-  const id = new URL(url).searchParams.get("id");
-  return id && /^[a-f0-9]{16}$/.test(id) ? id : null;
+  return catalogWorkspaceId(new URL(url));
 }
 
 /** Keep each observer on its admitted top-level document. Window navigation releases it. */

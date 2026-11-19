@@ -256,6 +256,8 @@ it("shows an unread reply in another chat, acknowledges it on display, and prese
     else if (action.revision === seen.revision)
       set(id, false, seen.revision + 1);
   });
+  const interrupted = Promise.withResolvers<void>();
+  change.mockImplementationOnce(() => interrupted.promise);
   const otherPane = document.createElement("button");
   document.body.append(otherPane);
   await act(async () => {
@@ -289,6 +291,25 @@ it("shows an unread reply in another chat, acknowledges it on display, and prese
       ],
     ]);
 
+  // The catalog reconnects while the display acknowledgement is still in
+  // flight. Retry the same displayed revision without a focus or scroll event.
+  await act(async () => {
+    invalidate();
+    interrupted.reject(new Error("catalog disconnected"));
+  });
+  await expect
+    .poll(() => change.mock.calls)
+    .toEqual([
+      [
+        f.second,
+        { kind: "acknowledge", revision: 5, replyId: `answer-${f.second}` },
+      ],
+      [
+        f.second,
+        { kind: "acknowledge", revision: 5, replyId: `answer-${f.second}` },
+      ],
+    ]);
+
   await click("Chat options");
   await act(async () =>
     page.getByRole("menuitem", { name: "Mark unread" }).click()
@@ -316,7 +337,7 @@ it("shows an unread reply in another chat, acknowledges it on display, and prese
   await expect
     .element(secondRow.getByRole("img", { name: "Unread" }))
     .toBeVisible();
-  expect(change).toHaveBeenCalledTimes(3);
+  expect(change).toHaveBeenCalledTimes(4);
   await act(async () => secondRow.click());
   await expect
     .poll(() => change.mock.lastCall)
@@ -325,6 +346,40 @@ it("shows an unread reply in another chat, acknowledges it on display, and prese
       { kind: "acknowledge", revision: 7, replyId: `answer-${f.second}` },
     ]);
 });
+
+it.each(["file window", "archived chat"] as const)(
+  "withholds read actions and receipts (%s)",
+  async (surface) => {
+    const receipt = vi.fn<NonNullable<DesktopNativeChat["setReadState"]>>();
+    const readState = { unread: true, revision: 1, replyId: null };
+    const f = await setup({
+      canSetReadState: () => surface !== "file window",
+      setReadState: receipt,
+      catalogEntry: async (sessionId) => ({
+        sessionId,
+        revision: 1,
+        title: "Saved chat",
+        archived: surface === "archived chat",
+        readState,
+      }),
+    });
+    await expect
+      .element(page.getByTitle("Saved chat", { exact: true }))
+      .toBeVisible();
+    await act(async () => {
+      f.composer.focus();
+      await new Promise(requestAnimationFrame);
+    });
+    await click("Chat options");
+    await expect
+      .element(page.getByRole("menuitem", { name: "Rename" }))
+      .toBeVisible();
+    await expect
+      .element(page.getByRole("menuitem", { name: "Mark unread" }))
+      .not.toBeInTheDocument();
+    expect(receipt).not.toHaveBeenCalled();
+  }
+);
 
 it("clears a manual unread mark on an empty chat only after its retained history is displayed", async () => {
   const history = Promise.withResolvers<readonly NativeChatMessage[]>();

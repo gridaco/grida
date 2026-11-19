@@ -80,6 +80,11 @@ pub(super) const CONVERSATIONS: ConversationProjection = ConversationProjection 
             })
             .map(|message| message.id.clone())
     },
+    revised_reply: |seed, reply| {
+        let lineage =
+            grida_agent_master::conversation_seed::SeedProvenance::decode(&seed.provenance)?;
+        Ok(lineage.retained_message_id(reply).cloned())
+    },
 };
 
 #[derive(Clone, Copy, Eq, PartialEq, Serialize)]

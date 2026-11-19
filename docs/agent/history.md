@@ -41,11 +41,11 @@ to its parent's indicators in the window that opened it. Its tab shows its own
 status. The list refreshes while open, including for saved chats you switched
 away from. Each indicator clears when its corresponding work or request ends.
 
-An unread indicator beside a chat means a final reply is waiting or you
-marked the chat unread yourself. Viewing the reply in a focused conversation
-clears the indicator across connected clients. A reply that arrives while
-you are viewing an earlier one stays unread. Choose **Mark unread** to return
-to the conversation later. This keeps its place in Recents.
+In the workspace picker, an unread indicator beside an active chat means a
+final reply is waiting or you marked the chat unread yourself. Viewing the
+reply in a focused conversation clears the indicator across connected clients.
+A reply that arrives while you are viewing an earlier one stays unread. Choose
+**Mark unread** to return to the conversation later. This keeps its place in Recents.
 
 The chat picker groups chats under **Today**, **Yesterday**, **Earlier**, and
 **Undated** by the local date of the latest user message or final agent reply.

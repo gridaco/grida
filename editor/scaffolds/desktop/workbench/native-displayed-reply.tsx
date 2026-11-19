@@ -31,9 +31,10 @@ export function NativeDisplayedReply({
     const target =
       readState.replyId === null && historyLoaded ? pane.current : message;
     if (!target) return;
+    const observedReply = readState.replyId;
     return observeDisplayedReply(target, pane.current, () => {
       const { unread, replyId, revision } = displayed.current;
-      if (unread)
+      if (unread && replyId === observedReply)
         void controller.acknowledgeReply(sessionId, replyId, revision);
     });
   }, [

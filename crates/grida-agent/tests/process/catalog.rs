@@ -3,7 +3,7 @@ use super::lifecycle::{
 };
 use super::*;
 
-async fn catalog_client(url: &str) -> SharedSocket {
+pub(super) async fn catalog_client(url: &str) -> SharedSocket {
     let mut socket = connect_shared(url, Some(SERVER_TOKEN), None, None)
         .await
         .unwrap();

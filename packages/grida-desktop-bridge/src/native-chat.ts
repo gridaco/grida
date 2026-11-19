@@ -1079,6 +1079,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     }>
   ): Promise<NativeChatSelectionState>;
   observeCatalog?(onChanged: () => void): Promise<(() => void) | null>;
+  /** Whether the current Desktop page can update a catalog row's read state. */
+  canSetReadState?(): boolean;
   setReadState?(sessionId: string, change: NativeChatReadChange): Promise<void>;
   listArchived?(cursor?: string | null): Promise<NativeChatPage>;
   catalogEntry?(attachmentId: string): Promise<NativeChatCatalogEntry>;

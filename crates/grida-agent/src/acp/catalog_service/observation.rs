@@ -23,6 +23,12 @@ struct Queue {
 }
 
 impl Queue {
+    fn watcher(self: &Arc<Self>) -> HostResult<RecommendedWatcher> {
+        let queue = self.clone();
+        notify::recommended_watcher(move |event| queue.event(event))
+            .map_err(|_| problem("catalog_watch_unavailable"))
+    }
+
     fn event(&self, event: notify::Result<Event>) {
         let mut dirty = self.pending.lock().unwrap();
         if let Ok(event) = event
@@ -31,6 +37,10 @@ impl Queue {
             if event.kind.is_access() {
                 return;
             }
+            let replaced = matches!(
+                event.kind,
+                EventKind::Remove(_) | EventKind::Modify(notify::event::ModifyKind::Name(_))
+            );
             for path in event.paths.iter().take(MAX_WORKSPACES * 4) {
                 if path == self.registry.as_ref() {
                     dirty.registry = true;
@@ -38,6 +48,12 @@ impl Queue {
                 let sources = &mut *dirty;
                 for w in &sources.sources {
                     let is_store = path == &w.state_dir || w.state_dir.starts_with(path);
+                    // inotify follows the directory inode and drops its watch on
+                    // deletion. The same path may already name a new directory
+                    // by the time we coalesce this event.
+                    if is_store && replaced {
+                        sources.rescan = true;
+                    }
                     let file = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
                     // WAL updates alone may precede commit. The post-commit marker
                     // closes this window; writer exit covers abrupt process loss.
@@ -45,7 +61,7 @@ impl Queue {
                         || path.parent() == Some(&w.state_dir)
                             && (file == CHANGE_FILE
                                 || file.starts_with(LEASE_PREFIX)
-                                || file == "agent.sqlite"
+                                || file == "agent.sqlite" && (event.kind.is_create() || replaced)
                                 || file == "agent.sqlite.lock")
                     {
                         sources.cwds.insert(w.cwd.clone());
@@ -84,9 +100,7 @@ impl Observer {
             pending: Default::default(),
             ready: Notify::new(),
         });
-        let handler = queue.clone();
-        let watcher = notify::recommended_watcher(move |event| handler.event(event))
-            .map_err(|_| problem("catalog_watch_unavailable"))?;
+        let watcher = queue.watcher()?;
         let mut value = Self {
             catalog,
             cwd,
@@ -115,9 +129,14 @@ impl Observer {
             self.queue.pending.lock().unwrap().sources = sources.clone();
             changed |= self.add_watches(&paths)?;
             for path in self.watching.difference(&paths) {
-                self.watcher
-                    .unwatch(path)
-                    .map_err(|_| problem("catalog_watch_unavailable"))?;
+                if let Err(error) = self.watcher.unwatch(path)
+                    && !matches!(
+                        error.kind,
+                        notify::ErrorKind::WatchNotFound | notify::ErrorKind::PathNotFound
+                    )
+                {
+                    return Err(problem("catalog_watch_unavailable"));
+                }
                 changed = true;
             }
             self.watching = paths;
@@ -241,6 +260,10 @@ impl Observer {
                 (std::mem::take(&mut d.rescan), std::mem::take(&mut d.cwds))
             };
             let before = self.sources.clone();
+            if rescan {
+                self.watcher = self.queue.watcher()?;
+                self.watching.clear();
+            }
             let rearmed = self.sync()?;
             if before != self.sources || rescan {
                 return Ok(None);
