@@ -100,6 +100,7 @@ export namespace NativeProviderSelection {
       ...(reasoning && { reasoning: true as const }),
       ...(imageGeneration && { imageGeneration }),
       providerNetwork: {
+        isCurrent: () => custody.isCurrent(network),
         prepare: (url, headers) =>
           url === target &&
           /^Bearer [!-~]+$/.test(headers.get("authorization") ?? "")
@@ -170,6 +171,10 @@ export namespace NativeProviderSelection {
         configuredEndpointKey: config.id,
       }),
       providerNetwork: {
+        isCurrent: () =>
+          custody
+            ? custody.isCurrent(network)
+            : (network.isCurrent?.() ?? true),
         prepare: (url, headers) =>
           (url === target.href || url === countTarget) &&
           (hasKey
@@ -203,6 +208,12 @@ export namespace NativeProviderSelection {
     // Headers strips trailing ASCII spaces; never include key bytes in errors.
     const bearer = Buffer.from(`Bearer ${wireKey}`.replace(/ +$/, ""));
     return {
+      async isCurrent(network: NativeProviderNetwork) {
+        return (
+          (await network.isCurrent?.()) !== false &&
+          store.admit(provider, key, () => true)
+        );
+      },
       prepare(network: NativeProviderNetwork, url: string, headers: Headers) {
         const provided = Buffer.from(headers.get("authorization") ?? "");
         if (

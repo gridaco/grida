@@ -1920,7 +1920,17 @@ it("queues separately and uses the new review token for the same question", asyn
   bridge.answerQuestion = answer;
   await controller.select("chat-a");
   expect(controller.read().questions[0]?.reviewId).toBe("review-0");
-  await controller.submit("Check the page numbers.");
+  // A lifecycle read taken before acceptance can still be in flight when
+  // the queue receipt arrives. The new review must come from a later read.
+  const prior = await bridge.observe("chat-a");
+  const stale = Promise.withResolvers<NativeChatObservation>();
+  vi.spyOn(bridge, "observe").mockReturnValueOnce(stale.promise);
+  controller.checkObservation();
+  const submitted = controller.submit("Check the page numbers.");
+  await vi.waitFor(() => expect(enqueue).toHaveBeenCalledOnce());
+  stale.resolve(prior);
+  await submitted;
+  expect(controller.read().observation?.snapshot.queuedInputs).toBe(1);
   expect(enqueue).toHaveBeenCalledExactlyOnceWith(
     "chat-a",
     expect.any(String),

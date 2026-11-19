@@ -292,9 +292,10 @@ current model and effort, and applies Full access before handing back its
 session identity. The Welcome operation carries no message and issues no
 workspace attachment. When a permission reply is unverified, sending the
 same request from the current Welcome frame checks the original grant and
-chat. Navigation still revokes the review. Changes require an idle chat, an
-empty queue and no running command processes. The process list and Stop
-controls remain the owner of those processes.
+chat. Navigation still revokes the review. A chat can change access while a
+turn runs, messages are queued or a background command remains alive. The host
+captures access at input acceptance and bounds later terminal use by the
+command's launch authority. The person can stop the command through Processes.
 
 Full access uses a separate explicit unconfined native scope. It permits
 ordinary-user filesystem, internet and local-network access and intentionally

@@ -880,7 +880,7 @@ it("keeps the shared placeholder across modes and attachments while preserving r
   await act(async () => userEvent.click(access));
   await expect
     .poll(() => document.querySelector('[role="dialog"]')?.textContent)
-    .toContain("What can the agent access?");
+    .toContain("Access for new messages");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain(
     "Reads and edits this project's files and runs sandboxed commands. Commands cannot use the internet."
   );

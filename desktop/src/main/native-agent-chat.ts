@@ -41,6 +41,7 @@ import type {
   NativeChatQuestionAnswer,
   NativeChatQueueChange,
   NativeChatQueuedMessage,
+  NativeChatQueueItem,
   NativeChatQueuePage,
   NativeChatQueueReceipt,
   NativeChatSideRefusal,
@@ -229,7 +230,11 @@ export type NativeChatLifecycle = Readonly<
   )
 >;
 
-export type NativeChatSession = Readonly<{ id: string }>;
+export type NativeChatSession = Readonly<{
+  id: string;
+  /** Image capability of the fixed execution inherited by a side chat. */
+  sideImageInput?: boolean;
+}>;
 type TaskBasis = Readonly<{
   sessionId: string;
   turnId: string;
@@ -257,6 +262,7 @@ export type NativeLibrarySelectionReview = Readonly<{
 type QueuePosition = Readonly<{
   inputId: string;
   inputPosition: number;
+  preview?: string;
   goalStart?: NativeChatGoalRequest;
   operatingRegime?: NativeChatOperatingRegime;
   effort?: "ultra";
@@ -375,6 +381,10 @@ export class NativeAgentChat {
       (method, input) => this.process.request(method, input),
       this.cwd
     ).update(session.id, revision, requestId, mode);
+  }
+
+  get acceptsInputRoutes(): boolean {
+    return this.connected && this.process.acceptsInputRoutes;
   }
 
   get acceptsSelection(): boolean {
@@ -966,7 +976,7 @@ export class NativeAgentChat {
       await this.sideChats.close(side.id).catch(() => {});
       throw error;
     }
-    return { session: this.attach(side.id), side };
+    return { session: this.attach(side.id, side.imageInput), side };
   }
 
   /**
@@ -1139,13 +1149,25 @@ export class NativeAgentChat {
     );
   }
 
+  private acceptsImageFor(
+    session: NativeChatSession,
+    selectionRevision: unknown
+  ) {
+    return (
+      session.sideImageInput ??
+      (this.acceptsPng ||
+        (this.acceptsInputRoutes && selectionRevision !== undefined))
+    );
+  }
+
   async submitImage(
     session: NativeChatSession,
     value: unknown
   ): Promise<NativeChatAcceptance> {
     this.requireAttached(session);
-    if (!this.acceptsPng) throw new Error("image_input_unavailable");
     const input = object(value);
+    if (!this.acceptsImageFor(session, input.selectionRevision))
+      throw new Error("image_input_unavailable");
     const effort =
       input.effort === undefined
         ? undefined
@@ -1179,9 +1201,13 @@ export class NativeAgentChat {
     value: unknown
   ): Promise<NativeChatAcceptance> {
     const sessionId = this.requireAttached(session);
-    if (!this.acceptsSelectedImage || !this.selectedImages)
-      throw new Error("image_input_unavailable");
     const input = object(value);
+    if (
+      !this.acceptsImageFor(session, input.selectionRevision) ||
+      !this.supportsSelectedImage ||
+      !this.selectedImages
+    )
+      throw new Error("image_input_unavailable");
     const known = new Set([
       "action",
       "inputId",
@@ -1492,16 +1518,36 @@ export class NativeAgentChat {
     this.requireAttached(session);
     if (result.sessionId !== sessionId) throw invalidResponse();
     const queuedInputs = revision(result.queuedInputs);
-    const queue = queuePositions(result.queue, queuedInputs);
+    const queue = queuePositions(
+      result.queue,
+      queuedInputs,
+      this.process.acceptsQueuedMessages
+    );
     const pending = queue.filter((row) => row.goalStart);
     if (pending.length > 1) throw invalidResponse();
     const current = result.current === null ? null : turn(result.current);
     const admissionPaused = flag(result.admissionPaused);
+    // Older hosts expose only the durable queue, without scheduler ownership.
+    const canResumeIdleQueue =
+      result.idleQueueResumeAvailable === undefined ||
+      flag(result.idleQueueResumeAvailable);
     const retryAt = result.retryNotBeforeMs;
     const snapshot = Object.freeze({
       sessionId,
       sessionRevision: revision(result.sessionRevision),
       queuedInputs,
+      ...(queuedInputs > 0 && {
+        queuePreview: {
+          items: queue
+            .slice(0, QUEUE_PAGE_SIZE)
+            .map((row) =>
+              queueItem(row, row.goalStart?.objective ?? row.preview ?? null)
+            ),
+          offset: 0,
+          previousOffset: null,
+          nextOffset: queuedInputs > QUEUE_PAGE_SIZE ? QUEUE_PAGE_SIZE : null,
+        },
+      }),
       ...(pending[0] && { pendingGoalId: pending[0].inputId }),
       ...(this.process.acceptsHistoryRevision && {
         historyRevisionAvailable: true as const,
@@ -1528,7 +1574,8 @@ export class NativeAgentChat {
         Number.isSafeInteger(retryAt) &&
         retryAt > 0 && { retryNotBeforeMs: retryAt }),
       admissionPaused,
-      ...(!admissionPaused &&
+      ...(canResumeIdleQueue &&
+        !admissionPaused &&
         !current &&
         queuedInputs > 0 && { idleQueueResumeAvailable: true as const }),
       current,
@@ -1739,7 +1786,22 @@ export class NativeAgentChat {
       let text: string | null;
       let textOnly: boolean | undefined;
       if (this.process.acceptsQueuedMessages && !row.goalStart) {
-        display = await this.queuedMessage(session, snapshot, row.inputId);
+        try {
+          display = await this.queuedMessage(session, snapshot, row.inputId);
+        } catch (error) {
+          if (error instanceof Error) {
+            // Private message inspection also uses "unavailable" when the
+            // input has just left the queue. Only suppress a proven stale read.
+            if (
+              error.message.includes("session_revision_changed") ||
+              (error.message.includes("queued_input_image_unavailable") &&
+                (await this.observe(session)).sessionRevision !==
+                  snapshot.sessionRevision)
+            )
+              throw new Error("native_chat_queue_changed", { cause: error });
+          }
+          throw error;
+        }
         text = display.text;
         textOnly = display.textOnly;
         displayParts = display.displayParts;
@@ -1752,22 +1814,14 @@ export class NativeAgentChat {
         textOnly = row.goalStart ? undefined : input.textOnly;
         displayParts = input.displayParts;
       }
-      const preview =
-        text && text.length > QUEUE_PREVIEW_LENGTH
-          ? `${text.slice(0, QUEUE_PREVIEW_LENGTH)}…`
-          : text;
       items.push({
-        inputId: row.inputId,
-        preview,
+        ...queueItem(row, text),
         ...(textOnly !== undefined && { textOnly }),
         ...(display?.textEditable !== undefined && {
           textEditable: display.textEditable,
         }),
         ...(display?.attachments && { attachments: display.attachments }),
         ...(displayParts && { displayParts }),
-        ...(row.goalStart && { goalStart: row.goalStart }),
-        ...(row.operatingRegime && { operatingRegime: row.operatingRegime }),
-        ...(row.effort && { effort: row.effort }),
       });
     }
     return {
@@ -2861,11 +2915,14 @@ export class NativeAgentChat {
     if (parts?.length) return parts;
   }
 
-  private attach(id: string): NativeChatSession {
+  private attach(id: string, sideImageInput?: boolean): NativeChatSession {
     this.requireOpen();
     const existing = this.attached.get(id);
     if (existing) return existing;
-    const session = Object.freeze({ id });
+    const session = Object.freeze({
+      id,
+      ...(sideImageInput !== undefined && { sideImageInput }),
+    });
     this.attached.set(id, session);
     return session;
   }
@@ -3347,7 +3404,8 @@ function selectedFile(name: unknown, value: unknown) {
 
 function queuePositions(
   value: unknown,
-  count: number
+  count: number,
+  includePreviews: boolean
 ): readonly QueuePosition[] {
   if (
     !Array.isArray(value) ||
@@ -3355,12 +3413,18 @@ function queuePositions(
     count > MAX_QUEUE_INPUTS
   )
     throw invalidResponse();
-  const queue = value.map((entry: unknown) => {
+  const queue = value.map((entry: unknown, index: number) => {
     const row = object(entry);
     const settings = object(row.settings);
     return {
       inputId: identity(row.inputId),
       inputPosition: revision(row.inputPosition),
+      ...(includePreviews &&
+        index < QUEUE_PAGE_SIZE &&
+        typeof row.preview === "string" &&
+        Buffer.byteLength(row.preview) <= QUEUE_PREVIEW_LENGTH && {
+          preview: row.preview,
+        }),
       ...(settings.operatingRegime === "plan" && {
         operatingRegime: "plan" as const,
       }),
@@ -3380,6 +3444,22 @@ function queuePositions(
   if (new Set(queue.map((row) => row.inputId)).size !== count)
     throw invalidResponse();
   return queue;
+}
+
+function queueItem(
+  row: QueuePosition,
+  text: string | null
+): NativeChatQueueItem {
+  return {
+    inputId: row.inputId,
+    preview:
+      text && text.length > QUEUE_PREVIEW_LENGTH
+        ? `${text.slice(0, QUEUE_PREVIEW_LENGTH)}…`
+        : text,
+    ...(row.goalStart && { goalStart: row.goalStart }),
+    ...(row.operatingRegime && { operatingRegime: row.operatingRegime }),
+    ...(row.effort && { effort: row.effort }),
+  };
 }
 
 function identity(value: unknown): string {

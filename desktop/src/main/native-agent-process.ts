@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { clearTimeout, setTimeout } from "node:timers";
 import type { NativeEditorSurfaceSnapshot } from "@grida/desktop-bridge";
+import { NativeProviderRoutes } from "./native-provider-routes";
 import { NativeAgentArtifacts } from "./native-agent-artifacts";
 import { NativeAgentBackgroundProcesses } from "./native-agent-background-processes";
 import { NativeAgentDeletion } from "./native-agent-deletion";
@@ -91,6 +92,8 @@ export type NativeAgentLaunch = {
   workspaceConfiguration?: Readonly<{ directory: string; epoch: string }>;
   hooks?: NativeAgentHooks;
   providerNetwork?: NativeProviderNetwork;
+  inputRouteConnectionId?: string | null;
+  lookupProviderRoute?: NativeProviderRoutes.Lookup;
   gatewayScope?: string;
   gatewayJobBilling?: NativeGatewayConnection["readJobBilling"];
   subscriptionScope?: string;
@@ -167,6 +170,7 @@ export class NativeAgentProcess {
   private nextId = 1;
   private ready = false;
   private imageInput = false;
+  private imageGenerationEnabled = false;
   private imageReference = false;
   private imagePlacementEnabled = false;
   private imageAttachmentEnabled = false;
@@ -185,6 +189,10 @@ export class NativeAgentProcess {
   private transcriptWindow = false;
   private activityOrder = false;
   private modelChange = false;
+  private inputRoutes = false;
+  get acceptsInputRoutes() {
+    return this.connected && this.inputRoutes;
+  }
   private changingModel = false;
   private gatewayBillingEnabled = false;
   private childGatewayBilling = false;
@@ -232,7 +240,8 @@ export class NativeAgentProcess {
     private readonly imageGeneration?: NativeImageGeneration,
     private readonly imagePlacement?: NativeImagePlacement,
     private readonly reviewImageReference?: ImageReferenceReview,
-    private readonly gatewayJobBilling?: NativeAgentLaunch["gatewayJobBilling"]
+    private readonly gatewayJobBilling?: NativeAgentLaunch["gatewayJobBilling"],
+    private readonly providerRoutes?: NativeProviderRoutes
   ) {
     if (permissions) {
       this.permissions = new NativeAgentPermissions(
@@ -449,73 +458,28 @@ export class NativeAgentProcess {
     const imageGeneration = options.workspace
       ? options.imageGeneration
       : undefined;
-    const imagePlacement = imageGeneration ? options.imagePlacement : undefined;
-    const reviewImageReference = imageGeneration?.supportsReference
-      ? options.reviewImageReference
-      : undefined;
-    if (
-      imageGeneration &&
-      (options.provider !== "openai-compatible" ||
-        options.endpoint !== imageGeneration.endpoint ||
-        !options.credentialHome ||
-        !options.providerNetwork ||
-        options.configuredEndpointKey !== undefined ||
-        options.gatewayScope !== undefined ||
-        options.subscriptionScope !== undefined)
-    )
-      throw new Error("native_agent_image_generation_profile_invalid");
-    if (
-      options.maxOutputTokens !== undefined &&
-      (!Number.isSafeInteger(options.maxOutputTokens) ||
-        options.maxOutputTokens < 1 ||
-        options.maxOutputTokens > 65_536)
-    )
-      throw new Error("native_agent_output_limit_invalid");
-    if (
-      options.compatibleOutputLimitField !== undefined &&
-      (options.compatibleOutputLimitField !== "max-tokens" ||
-        options.provider !== "openai-compatible" ||
-        !options.providerNetwork ||
-        (options.credentialHome !== undefined &&
-          options.configuredEndpointKey === undefined) ||
-        options.gatewayScope !== undefined ||
-        options.subscriptionScope !== undefined)
-    )
-      throw new Error("native_agent_compatible_output_limit_invalid");
+    const routeImages = !!(
+      options.workspace &&
+      options.providerNetwork &&
+      options.lookupProviderRoute
+    );
+    const imagePlacement =
+      imageGeneration || routeImages ? options.imagePlacement : undefined;
+    const reviewImageReference =
+      imageGeneration?.supportsReference || routeImages
+        ? options.reviewImageReference
+        : undefined;
+    const providerEgress = NativeProviderRoutes.egress({
+      ...options,
+      imageGeneration,
+    });
     if (options.workspaceConfiguration && !options.providerNetwork)
       throw new Error("native_workspace_configuration_requires_supervision");
     if (options.subagents && !options.providerNetwork)
       throw new Error("native_agent_subagent_transport_unavailable");
-    if (
-      options.configuredEndpointKey !== undefined &&
-      (!options.credentialHome ||
-        !options.providerNetwork ||
-        options.provider !== "openai-compatible" ||
-        options.gatewayScope !== undefined ||
-        options.subscriptionScope !== undefined)
-    )
-      throw new Error("native_agent_configured_endpoint_profile_invalid");
-    if (
-      options.subscriptionScope !== undefined &&
-      (!/^[a-f0-9]{64}$/.test(options.subscriptionScope) ||
-        options.provider !== "responses" ||
-        !options.providerNetwork ||
-        options.credentialHome !== undefined ||
-        options.gatewayScope !== undefined)
-    )
-      throw new Error("native_agent_subscription_profile_invalid");
-    if (
-      options.gatewayScope !== undefined &&
-      (!/^[a-f0-9]{64}$/.test(options.gatewayScope) ||
-        options.provider !== "openai-compatible" ||
-        !options.providerNetwork ||
-        options.credentialHome)
-    )
-      throw new Error("native_agent_gateway_profile_invalid");
     for (const directory of [
       options.resourcesPath,
       options.stateDirectory,
-      options.credentialHome,
       options.processCwd,
     ]) {
       if (directory !== undefined && !path.isAbsolute(directory)) {
@@ -539,16 +503,14 @@ export class NativeAgentProcess {
           )
         )
       : undefined;
-    const providerEgress = options.providerNetwork
-      ? new NativeProviderEgress(
-          options.providerNetwork,
-          options.subscriptionScope ? "chatgpt-subscription" : options.provider,
-          options.endpoint,
-          options.model,
-          options.llamaCppInputCount,
-          options.gatewayScope && options.gatewayJobBilling ? true : undefined
-        )
-      : undefined;
+    const providerRoutes =
+      providerEgress && options.lookupProviderRoute
+        ? new NativeProviderRoutes(
+            options.inputRouteConnectionId ?? null,
+            options,
+            options.lookupProviderRoute
+          )
+        : undefined;
     const capabilities: Record<string, 1> = {
       ...options.capabilities,
       ...(options.hooks ? NativeAgentHooks.capabilities : {}),
@@ -561,10 +523,6 @@ export class NativeAgentProcess {
       delete capabilities[NativeAgentGoals.fundedReviewCapability];
       delete capabilities[NativeAgentGoals.namedChildCapability];
     }
-    if (options.gatewayJobBilling && !options.gatewayScope)
-      throw new Error("native_agent_gateway_profile_invalid");
-    if (options.llamaCppInputCount && !providerEgress)
-      throw new Error("native_provider_input_count_unavailable");
     if (providerEgress) capabilities[NativeProviderEgress.capability] = 1;
     if (imageGeneration) capabilities[NativeImageGeneration.capability] = 1;
     const requestDeletion =
@@ -649,7 +607,8 @@ export class NativeAgentProcess {
       imageGeneration,
       imagePlacement,
       reviewImageReference,
-      options.gatewayJobBilling
+      options.gatewayJobBilling,
+      providerRoutes
     );
     try {
       const response = object(
@@ -660,7 +619,8 @@ export class NativeAgentProcess {
             clientCapabilities: {
               _meta: {
                 ...capabilities,
-                ...(imageGeneration?.supportsReference && {
+                ...(routeImages && { [NativeImageGeneration.capability]: 1 }),
+                ...((imageGeneration?.supportsReference || routeImages) && {
                   [NativeImageGeneration.referenceCapability]: 1,
                 }),
                 ...(imagePlacement && { [NativeImagePlacement.capability]: 1 }),
@@ -672,10 +632,10 @@ export class NativeAgentProcess {
                 ...NativeAgentRevisions.capabilities,
                 [NativeAgentGoals.completionCapability]: 1,
                 [NativeAgentGoals.manualContinuationCapability]: 1,
-                ...(options.gatewayScope &&
-                  options.gatewayJobBilling && {
-                    [NativeAgentGoals.spendingCapability]: 1,
-                  }),
+                ...(((options.gatewayScope && options.gatewayJobBilling) ||
+                  providerRoutes) && {
+                  [NativeAgentGoals.spendingCapability]: 1,
+                }),
                 ...(options.subagents && {
                   ...SUBAGENT_CAPABILITIES,
                   [CHILD_STEERING]: 1,
@@ -699,7 +659,7 @@ export class NativeAgentProcess {
                 }),
                 [NativeAgentArtifacts.capability]: 1,
                 [NativeAgentBackgroundProcesses.capability]: 1,
-                ...(options.gatewayJobBilling && {
+                ...((options.gatewayJobBilling || providerRoutes) && {
                   [NativeGatewayConnection.billingCapability]: 1,
                   [NativeGatewayConnection.childBillingCapability]: 1,
                 }),
@@ -715,6 +675,7 @@ export class NativeAgentProcess {
                 [TRANSCRIPT_WINDOW]: 1,
                 [NativeActivityOrder.capability]: 1,
                 [MODEL_CHANGE]: 1,
+                ...(providerRoutes && { [NativeProviderRoutes.capability]: 1 }),
                 "co.grida/session/selection": 1,
                 "co.grida/session/permission-mode": 1,
                 ...(requestDeletion && {
@@ -739,12 +700,14 @@ export class NativeAgentProcess {
       processOwner.activityOrder =
         advertised?.[NativeActivityOrder.capability] === 1;
       processOwner.modelChange = advertised?.[MODEL_CHANGE] === 1;
+      processOwner.inputRoutes =
+        !!providerRoutes && advertised?.[NativeProviderRoutes.capability] === 1;
       processOwner.permissionMode =
         advertised?.["co.grida/session/permission-mode"] === 1;
       processOwner.chatSelection =
         advertised?.["co.grida/session/selection"] === 1;
       processOwner.gatewayBillingEnabled =
-        options.gatewayJobBilling !== undefined &&
+        (options.gatewayJobBilling !== undefined || processOwner.inputRoutes) &&
         advertised?.[NativeGatewayConnection.billingCapability] === 1;
       processOwner.childGatewayBilling =
         processOwner.gatewayBillingEnabled &&
@@ -755,23 +718,30 @@ export class NativeAgentProcess {
       }
       processOwner.imageInput =
         object(agentCapabilities?.promptCapabilities)?.image === true;
+      const routedImages = routeImages && processOwner.inputRoutes;
+      processOwner.imageGenerationEnabled =
+        (!!imageGeneration || routedImages) &&
+        advertised?.[NativeImageGeneration.capability] === 1;
       processOwner.imageReference =
-        imageGeneration?.supportsReference === true &&
-        processOwner.imageInput &&
+        ((imageGeneration?.supportsReference === true &&
+          processOwner.imageInput) ||
+          routedImages) &&
         advertised?.[NativeImageGeneration.referenceCapability] === 1;
       processOwner.imagePlacementEnabled =
+        (imageGeneration !== undefined || routedImages) &&
         imagePlacement !== undefined &&
         advertised?.[NativeImagePlacement.capability] === 1;
       processOwner.imageAttachmentEnabled =
         reviewImageReference !== undefined &&
-        processOwner.imageInput &&
+        (processOwner.imageInput || routedImages) &&
         advertised?.[NativeImageGeneration.attachmentCapability] === 1;
       processOwner.imageWorkspaceReferenceEnabled =
+        (imageGeneration?.supportsReference === true || routedImages) &&
         reviewImageReference !== undefined &&
         advertised?.[NativeImageGeneration.workspaceReferenceCapability] === 1;
       processOwner.librarySelection =
         options.workspace !== undefined &&
-        processOwner.imageInput &&
+        (processOwner.imageInput || routedImages) &&
         Object.keys(LIBRARY_SELECTION_CAPABILITIES).every(
           (key) => advertised?.[key] === 1
         );
@@ -803,8 +773,8 @@ export class NativeAgentProcess {
         processOwner.agentEffort &&
         advertised?.[NativeAgentGoals.fundedReviewCapability] === 1;
       processOwner.goalSpending =
-        !!options.gatewayScope &&
-        !!options.gatewayJobBilling &&
+        ((!!options.gatewayScope && !!options.gatewayJobBilling) ||
+          processOwner.inputRoutes) &&
         advertised?.[NativeAgentGoals.spendingCapability] === 1;
       processOwner.goalNamedChild =
         processOwner.goalFundedReview &&
@@ -998,6 +968,7 @@ export class NativeAgentProcess {
 
   private async stop(): Promise<void> {
     this.providerEgress?.close();
+    this.providerRoutes?.close();
     this.cancelGatewayBillingRequests();
     this.imageGeneration?.close();
     this.imagePlacement?.close();
@@ -1172,6 +1143,43 @@ export class NativeAgentProcess {
         if (typeof message.id !== "string" && typeof message.id !== "number")
           throw new Error("native_agent_invalid_message");
         if (
+          message.method === NativeProviderRoutes.resolveMethod &&
+          this.acceptsInputRoutes
+        ) {
+          const id = message.id;
+          if (this.providerRequests.has(id))
+            throw new Error("native_agent_provider_request_id_reused");
+          if (this.providerRequests.size >= REQUEST_LIMIT) {
+            this.write({
+              jsonrpc: "2.0",
+              id,
+              error: { code: -32602, message: "Provider route unavailable" },
+            });
+            return;
+          }
+          this.providerRequests.add(id);
+          void this.providerRoutes!.resolve(message.params)
+            .then(
+              (result) => {
+                if (this.connected) this.write({ jsonrpc: "2.0", id, result });
+              },
+              () => {
+                if (this.connected)
+                  this.write({
+                    jsonrpc: "2.0",
+                    id,
+                    error: {
+                      code: -32602,
+                      message: "Provider route unavailable",
+                    },
+                  });
+              }
+            )
+            .catch(() => this.disconnect("native_agent_provider_reply_failed"))
+            .finally(() => this.providerRequests.delete(id));
+          return;
+        }
+        if (
           message.method === NativeProviderEgress.exchangeMethod &&
           this.ready &&
           this.providerEgress &&
@@ -1183,7 +1191,6 @@ export class NativeAgentProcess {
         if (
           this.connected &&
           this.gatewayBillingEnabled &&
-          this.gatewayJobBilling &&
           message.method === NativeGatewayConnection.readJobBillingMethod
         ) {
           this.gatewayBillingRequest(message.id, message.params);
@@ -1191,13 +1198,26 @@ export class NativeAgentProcess {
         }
         if (
           this.connected &&
-          this.imageGeneration &&
+          this.imageGenerationEnabled &&
           message.method === NativeImageGeneration.method
         ) {
           const id = message.id;
-          void this.imageGeneration
-            .generate(id, message.params, {
-              libraryReference: this.imageReference,
+          const { routeId, ...params } = object(message.params) ?? {};
+          const route = this.acceptsInputRoutes
+            ? this.providerRoutes?.get(routeId)
+            : undefined;
+          const generation =
+            routeId === undefined
+              ? this.imageGeneration
+              : route?.launch.imageGeneration;
+          if (!generation) {
+            this.write({ jsonrpc: "2.0", id, result: { kind: "unavailable" } });
+            return;
+          }
+          void generation
+            .generate(id, params, {
+              libraryReference:
+                this.imageReference && generation.supportsReference,
               placement: this.imagePlacementEnabled,
               reviewAttachment: this.imageAttachmentEnabled
                 ? this.reviewImageReference
@@ -1316,7 +1336,7 @@ export class NativeAgentProcess {
           error: { code: -32601, message: "Method not found" },
         });
       } else if (message.method === NativeProviderEgress.cancelMethod) {
-        this.providerEgress?.cancel(message.params);
+        this.egress(message.params)?.cancel(message.params);
       } else if (message.method === "$/cancel_request") {
         const id = object(message.params)?.requestId;
         if (typeof id === "number" || typeof id === "string") {
@@ -1327,6 +1347,8 @@ export class NativeAgentProcess {
           this.removeBrowserBusyReply(id);
         }
         this.imageGeneration?.cancel(id);
+        if (typeof id === "string" || typeof id === "number")
+          this.providerRoutes?.cancelImage(id);
         this.imagePlacement?.cancel(id);
       } else if (message.method === "session/update") {
         try {
@@ -1367,6 +1389,7 @@ export class NativeAgentProcess {
   private fail(error: Error): void {
     this.failure ??= error;
     this.providerEgress?.close();
+    this.providerRoutes?.close();
     this.cancelGatewayBillingRequests();
     this.imageGeneration?.close();
     this.imagePlacement?.close();
@@ -1403,9 +1426,17 @@ export class NativeAgentProcess {
     if (this.gatewayBillingRequests.has(id))
       throw new Error("native_agent_gateway_request_id_reused");
     const value = object(params);
+    const routeId = value?.routeId;
+    const billing =
+      routeId === undefined
+        ? this.gatewayJobBilling
+        : this.acceptsInputRoutes
+          ? this.providerRoutes?.get(routeId)?.launch.gatewayJobBilling
+          : undefined;
     if (
+      !billing ||
       this.gatewayBillingRequests.size >= REQUEST_LIMIT ||
-      Object.keys(value ?? {}).length !== 1 ||
+      Object.keys(value ?? {}).length !== (routeId === undefined ? 1 : 2) ||
       typeof value?.requestId !== "string"
     ) {
       this.write({ jsonrpc: "2.0", id, result: { kind: "unavailable" } });
@@ -1413,7 +1444,7 @@ export class NativeAgentProcess {
     }
     const controller = new AbortController();
     this.gatewayBillingRequests.set(id, controller);
-    void this.gatewayJobBilling!(value.requestId, controller.signal)
+    void billing(value.requestId, controller.signal)
       .then((result) => {
         if (this.connected && !controller.signal.aborted)
           this.write({ jsonrpc: "2.0", id, result });
@@ -1422,17 +1453,34 @@ export class NativeAgentProcess {
       .finally(() => this.gatewayBillingRequests.delete(id));
   }
 
+  private egress(params: unknown): NativeProviderEgress | undefined {
+    const routeId = object(params)?.routeId;
+    if (routeId === undefined) return this.providerEgress;
+    return this.acceptsInputRoutes
+      ? this.providerRoutes?.get(routeId)?.egress
+      : undefined;
+  }
+
   private providerRequest(id: number | string, params: unknown): void {
     if (this.providerRequests.has(id))
       throw new Error("native_agent_provider_request_id_reused");
-    if (this.providerRequests.size >= REQUEST_LIMIT) {
+    const egress = this.egress(params);
+    if (
+      !egress ||
+      this.providerRequests.size >= REQUEST_LIMIT ||
+      (object(params)?.action === "open" &&
+        (this.providerRoutes?.openExchangeCount ?? 0) +
+          (this.providerEgress?.openExchangeCount ?? 0) >=
+          NativeProviderEgress.maxExchanges)
+    ) {
       // Too many concurrent exchanges fail only this request; the agent
       // reports it as an unavailable transport and other chats keep running.
       this.write({ jsonrpc: "2.0", id, result: { status: "unavailable" } });
       return;
     }
     this.providerRequests.add(id);
-    void this.providerEgress!.exchange(params)
+    void egress
+      .exchange(params)
       .then((result) => {
         if (!this.failure && !this.shutdown)
           this.write({ jsonrpc: "2.0", id, result });

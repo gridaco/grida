@@ -558,9 +558,10 @@ Confirmation marks the reservation approved. Starting the chat consumes that
 approval once and applies Full access. Home receives the session identity
 without an attachment or a send capability. The private,
 negotiated permission-mode operation is not a model tool. The host records the
-per-chat selection and captures it with accepted work; other new chats remain
-restricted. Changes require an idle chat, an empty queue and no running
-command process. Workers inherit their assignment's captured posture.
+per-chat selection at a serialized admission boundary. Running turns, queued
+inputs and worker assignments keep their captured posture. New chats start
+restricted. Only a turn with captured Full access can interact with a process
+launched unconfined. The supervisor can still list and stop the chat's processes.
 
 Full access deliberately removes model-command filesystem, network and IPC
 confinement. Same-user code can read or modify local credentials, Grida state,
@@ -592,12 +593,11 @@ when its wait ends is kept by its chat in the host's process store. Turn end,
 cancellation, pause and approval waits leave it running; it ends when the
 model or a person stops it, it is evicted for a newer process (64 per chat),
 its chat is deleted, or the host shuts down. Kept processes run under a
-24-hour scope. A changed permission profile applies to later launches; it
-does not stop a process that is already running. Input written to a terminal process
-after launch is covered by the launch approval and is not separately
-reviewed, so a policy that must see every command should refuse interactive
-terminals. Cleanup that cannot be verified is reported at host shutdown
-rather than holding the queue. Filesystem grants, network denial, private
+24-hour scope. A changed composer permission choice applies to later inputs.
+Processes keep their launch posture. Within a compatible turn, the launch
+approval covers terminal input. A policy that must review every command
+should refuse interactive terminals. The host reports unverified cleanup at
+shutdown and lets the queue proceed. Filesystem grants, network denial, private
 temporary storage, and the termination guarantee come from the host and
 native sandbox.
 A host profile can let programs read and execute anywhere except its protected

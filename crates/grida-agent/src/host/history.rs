@@ -585,6 +585,7 @@ impl Host {
                     let source_view = host.store.inspect(source.clone()).await?;
                     let execution = host.execution()?;
                     let configuration = SessionConfiguration {
+                        inherited_route: None,
                         cwd: canonical_workspace(&session_configuration(&source_view)?.cwd)?,
                         execution: execution.configuration,
                         owner: execution.owner,
@@ -635,6 +636,17 @@ impl Host {
             // Wait out a settled turn's worker before admission, which that
             // worker's next queued input may need. Idleness is checked below.
             drop(host.settled_work(&session).await);
+            let (host, selected_revision) = if host.has_routes()
+                && host
+                    .store
+                    .input(session.clone(), replacement.id.clone())
+                    .await?
+                    .is_none()
+            {
+                host.for_derived_session(&session).await?
+            } else {
+                (host, None)
+            };
             let _admission = host.configuration_admission.lock().await;
             let cut = ConversationCut::BeforeEditableUser(derivation.anchor);
             // Read and question capabilities are captured settings of the
@@ -679,7 +691,10 @@ impl Host {
                     }
                 }
                 let view = host.store.inspect(session.clone()).await?;
-                host.check_execution(&view).await?;
+                if let Some(revision) = selected_revision {
+                    host.selection_at_revision(&view, revision)?;
+                }
+                host.check_new_submission(&view).await?;
                 super::goals::require_goal_resolved_for_revision(&view)?;
                 if !view.admission_paused {
                     host.check_ready_capacity(&session).await?;

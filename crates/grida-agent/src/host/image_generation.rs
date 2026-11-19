@@ -164,10 +164,14 @@ pub(super) fn summary_note(state: &TurnState) -> Option<&'static str> {
 
 #[derive(Clone)]
 pub(crate) struct DesktopImageGeneration {
+    route_id: Option<Uuid>,
     binding: BindingId,
-    connection: Arc<Mutex<Option<DesktopConnection>>>,
+    pub(super) connection: ImageConnection,
     transport: Arc<HttpTransport>,
 }
+
+#[derive(Clone, Default)]
+pub(crate) struct ImageConnection(Arc<Mutex<Option<DesktopConnection>>>);
 
 struct DesktopConnection {
     client: ConnectionTo<Client>,
@@ -285,27 +289,23 @@ impl Host {
                 "desktop_image_generation_provider_invalid",
             ));
         };
-        if binding.len() != 64
-            || !binding
-                .bytes()
-                .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
-            || self.desktop_image_generation.is_some()
-        {
+        if self.desktop_image_generation.is_some() {
             return Err(problem(
                 ErrorKind::InvalidInput,
                 "desktop_image_generation_binding_invalid",
             ));
         }
-        self.desktop_image_generation = Some(DesktopImageGeneration {
-            binding: BindingId::new(binding)?,
-            connection: Arc::default(),
-            transport: transport.clone(),
-        });
+        self.desktop_image_generation = Some(DesktopImageGeneration::new(
+            binding,
+            None,
+            transport.clone(),
+            Default::default(),
+        )?);
         Ok(self)
     }
 }
 
-impl DesktopImageGeneration {
+impl ImageConnection {
     pub(crate) fn attach(
         &self,
         client: ConnectionTo<Client>,
@@ -314,7 +314,7 @@ impl DesktopImageGeneration {
         attachment_references: bool,
         workspace_references: bool,
     ) {
-        *self.connection.lock().unwrap() = Some(DesktopConnection {
+        *self.0.lock().unwrap() = Some(DesktopConnection {
             client,
             references,
             placement,
@@ -324,16 +324,43 @@ impl DesktopImageGeneration {
     }
 
     pub(crate) fn detach(&self) {
-        self.connection.lock().unwrap().take();
+        self.0.lock().unwrap().take();
+    }
+}
+
+impl DesktopImageGeneration {
+    pub(super) fn new(
+        binding: &str,
+        route_id: Option<Uuid>,
+        transport: Arc<HttpTransport>,
+        connection: ImageConnection,
+    ) -> Result<Self> {
+        if binding.len() != 64
+            || !binding
+                .bytes()
+                .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+        {
+            return Err(problem(
+                ErrorKind::InvalidInput,
+                "desktop_image_generation_binding_invalid",
+            ));
+        }
+        Ok(Self {
+            route_id,
+            binding: BindingId::new(binding)?,
+            connection,
+            transport,
+        })
     }
 
     pub(super) fn capture(&self) -> Option<BindingId> {
-        self.connection.lock().unwrap().as_ref()?;
+        self.connection.0.lock().unwrap().as_ref()?;
         Some(self.binding.clone())
     }
 
     pub(super) fn references(&self) -> bool {
         self.connection
+            .0
             .lock()
             .unwrap()
             .as_ref()
@@ -342,6 +369,7 @@ impl DesktopImageGeneration {
 
     pub(super) fn placement(&self) -> bool {
         self.connection
+            .0
             .lock()
             .unwrap()
             .as_ref()
@@ -350,6 +378,7 @@ impl DesktopImageGeneration {
 
     pub(super) fn attachment_references(&self) -> bool {
         self.connection
+            .0
             .lock()
             .unwrap()
             .as_ref()
@@ -358,6 +387,7 @@ impl DesktopImageGeneration {
 
     pub(super) fn workspace_references(&self) -> bool {
         self.connection
+            .0
             .lock()
             .unwrap()
             .as_ref()
@@ -547,6 +577,8 @@ impl Arguments {
 #[request(method = "_co.grida/media/generate-image", response = Reply)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Request {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    route_id: Option<Uuid>,
     session_id: SessionId,
     call_id: BindingId,
     prompt: String,
@@ -837,6 +869,7 @@ impl DispatchImage {
         let client = self
             .owner
             .connection
+            .0
             .lock()
             .unwrap()
             .as_ref()
@@ -864,6 +897,7 @@ impl DispatchImage {
             None => (None, None, None),
         };
         let request = Request {
+            route_id: self.owner.route_id,
             session_id: self.session.clone(),
             call_id: call.binding.id.clone(),
             prompt,
@@ -896,6 +930,7 @@ mod tests {
         )
         .unwrap();
         let request = Request {
+            route_id: None,
             session_id: SessionId::new("fixture-session").unwrap(),
             call_id: BindingId::new("fixture-call").unwrap(),
             prompt: accepted.prompt,

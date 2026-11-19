@@ -36,6 +36,7 @@ export function AgentComposerTools({
             variant="ghost"
             className={`shrink-0 gap-1 rounded-xl px-1.5 ${full ? "text-amber-600 hover:text-amber-600" : "text-muted-foreground"}`}
             aria-label={`Access: ${label}`}
+            title={`Access for new messages: ${label}`}
             disabled={access?.busy}
           >
             {full ? (
@@ -54,7 +55,7 @@ export function AgentComposerTools({
           <p className="px-2 pt-1.5 pb-1 text-xs text-muted-foreground">
             {access?.staged
               ? "What can the new chat access?"
-              : "What can the agent access?"}
+              : "Access for new messages"}
           </p>
           <button
             type="button"

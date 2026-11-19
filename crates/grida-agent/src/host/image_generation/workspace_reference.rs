@@ -309,6 +309,7 @@ mod tests {
         assert!(Arguments::parse(&json!({"prompt":"Create a variant", "path":"ref.png"})).is_err());
         assert!(Arguments::parse(&json!({"prompt":"Create a variant", "workspace_reference_id":"capture", "attached_image":true})).is_err());
         let request = Request {
+            route_id: None,
             session_id: SessionId::new("session").unwrap(),
             call_id: BindingId::new("generate").unwrap(),
             prompt: "Create a variant".into(),

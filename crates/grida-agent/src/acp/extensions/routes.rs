@@ -39,6 +39,39 @@ impl RequestRoutes {
         self
     }
 
+    /// A handler that may ask the supervising client for a provider route.
+    /// The connection must keep reading while the owned task awaits that reply.
+    pub(super) fn on_supervised_request<Req, F, ToFut>(self, operation: F, to_future: ToFut) -> Self
+    where
+        Req: JsonRpcRequest,
+        F: AsyncFnMut(Req, Responder<Req::Response>, ConnectionTo<Client>) -> Result<()>
+            + Clone
+            + Sync
+            + Send
+            + 'static,
+        ToFut: Fn(
+                &mut F,
+                Req,
+                Responder<Req::Response>,
+                ConnectionTo<Client>,
+            ) -> BoxFuture<'_, Result<()>>
+            + Clone
+            + Sync
+            + Send
+            + 'static,
+    {
+        self.on_receive_request(
+            async move |request, responder, connection: ConnectionTo<Client>| {
+                let mut operation = operation.clone();
+                let to_future = to_future.clone();
+                connection.clone().spawn(async move {
+                    to_future(&mut operation, request, responder, connection).await
+                })
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+    }
+
     pub(super) fn extend(mut self, other: Self) -> Self {
         self.0.extend(other.0);
         self

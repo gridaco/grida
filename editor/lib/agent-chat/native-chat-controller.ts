@@ -1171,7 +1171,7 @@ export class NativeChatController {
       attachment?.sessionId === sessionId &&
       scope.selection?.selection?.profileId === profileId &&
       scope.selection?.available === true &&
-      this.profileId === profileId &&
+      (this.view.profiles?.inputRoutes || this.profileId === profileId) &&
       scope.selectedAttachment === stagedAttachment &&
       this.view.operatingRegime === operatingRegime &&
       this.view.goalIntent === goalIntent &&
@@ -1687,7 +1687,7 @@ export class NativeChatController {
     }
   }
 
-  /** A deliberate send activates its saved route; opening history does not. */
+  /** Older hosts need a matching launch route. New hosts bind it during admission. */
   private async activateSelection(scope: Scope): Promise<Scope> {
     if (!this.remembersSelection) return scope;
     await scope.selectionReady;
@@ -1702,7 +1702,7 @@ export class NativeChatController {
     const id = scope.selection.selection.profileId;
     await this.readProfiles();
     if (!this.owns(scope)) throw new Error("native_chat_scope_changed");
-    if (id === this.profileId) return scope;
+    if (id === this.profileId || this.view.profiles?.inputRoutes) return scope;
     if (!this.bridge.selectProfile)
       throw new Error("native_chat_selection_unavailable");
     try {
@@ -2042,21 +2042,30 @@ export class NativeChatController {
       if (prepared) {
         const connection = this.catalogConnection;
         const profileId = prepared.profileId;
+        await this.readProfiles();
+        if (!this.owns(scope)) return;
         if (
           !connection ||
           !this.remembersSelection ||
-          !this.bridge.selectProfile ||
           !scope.selection?.available ||
-          scope.selection.selection?.profileId !== profileId ||
-          !(await this.commitProfile(
-            profileId ? { kind: "saved", id: profileId } : { kind: "default" },
-            connection
-          ))
+          scope.selection.selection?.profileId !== profileId
         )
           throw new Error(PREPARED_MESSAGE_NOT_SENT);
-        if (!this.owns(scope)) return;
-        this.profileRead = undefined;
-        this.profileId = profileId;
+        if (!this.view.profiles?.inputRoutes) {
+          if (
+            !this.bridge.selectProfile ||
+            !(await this.commitProfile(
+              profileId
+                ? { kind: "saved", id: profileId }
+                : { kind: "default" },
+              connection
+            ))
+          )
+            throw new Error(PREPARED_MESSAGE_NOT_SENT);
+          if (!this.owns(scope)) return;
+          this.profileRead = undefined;
+          this.profileId = profileId;
+        }
         void this.readEffortCapability(scope);
         void this.readProfiles();
         void this.listChats();
@@ -2576,7 +2585,8 @@ export class NativeChatController {
     scope.permissionRead = {};
     this.update({ permissionModeBusy: true, permissionModeError: null });
     try {
-      if (this.remembersSelection) scope = await this.activateSelection(scope);
+      if (this.remembersSelection && !scope.attachment)
+        scope = await this.activateSelection(scope);
       if (!this.owns(scope)) return;
       // Creating this exact chat submits no model work. Full access never
       // becomes a workspace/global default or an unbound renderer preference.
@@ -2669,13 +2679,17 @@ export class NativeChatController {
           scope.pendingPermission.review = undefined;
         this.update({
           permissionModeUncertain: !busy && !changed && !reviewChanged,
-          permissionModeError: busy
-            ? "Finish or stop this chat's accepted work and background processes before changing access."
-            : changed
-              ? "This chat's access changed in another window. Review it and try again."
-              : reviewChanged
-                ? "Full access confirmation expired. Choose Full access again to review it."
-                : "Couldn't confirm this chat's access. Check access before sending.",
+          permissionModeError:
+            error instanceof Error &&
+            error.message.includes("native_chat_permission_mode_busy")
+              ? "Another access change is in progress. Try again after it finishes."
+              : busy
+                ? "The chat is busy and couldn't change access. Try again when it is ready."
+                : changed
+                  ? "This chat's access changed in another window. Review it and try again."
+                  : reviewChanged
+                    ? "Full access confirmation expired. Choose Full access again to review it."
+                    : "Couldn't confirm this chat's access. Check access before sending.",
         });
         await this.readPermissionMode(scope, true);
       }
@@ -2763,7 +2777,8 @@ export class NativeChatController {
       queuedText,
       permissionMode,
     ] = await Promise.all([
-      this.bridge.submitImage && this.bridge.acceptsPng?.().catch(() => false),
+      this.bridge.submitImage &&
+        this.bridge.acceptsPng?.(attachment?.attachmentId).catch(() => false),
       this.bridge.submitFile && this.bridge.acceptsFile?.().catch(() => false),
       this.libraryPicker &&
         this.bridge.submitWithLibrarySelection &&
@@ -2777,7 +2792,9 @@ export class NativeChatController {
         this.bridge.canReferenceFile &&
         this.bridge.acceptsDirectoryReference?.().catch(() => false),
       this.bridge.submitSelectedImage &&
-        this.bridge.acceptsSelectedImage?.().catch(() => false),
+        this.bridge
+          .acceptsSelectedImage?.(attachment?.attachmentId)
+          .catch(() => false),
       this.bridge.acceptsQueuedTextReplacement?.().catch(() => false),
       !this.fixed &&
         this.bridge.permissionMode &&
@@ -3568,6 +3585,17 @@ export class NativeChatController {
     return !!(await this.startGoalInScope(request, maximumUsd));
   }
 
+  private get canFundNewGoal(): boolean {
+    if (!this.view.observation?.snapshot.goalSpendingAvailable) return false;
+    const catalog = this.view.profiles;
+    if (!catalog?.inputRoutes) return true;
+    return catalog.active === null
+      ? catalog.defaultGoalSpending === true
+      : catalog.choices.some(
+          (choice) => choice.id === catalog.active && choice.goalSpending
+        );
+  }
+
   private async startGoalInScope(
     request: Omit<NativeChatGoalStartInput, "operatingRegime">,
     maximumUsd?: string
@@ -3668,8 +3696,7 @@ export class NativeChatController {
         )
           throw new Error("native_chat_goal_observation_unavailable");
         const routeProblem =
-          request.maxCostMills !== undefined &&
-          !scope.observation.snapshot.goalSpendingAvailable
+          request.maxCostMills !== undefined && !this.canFundNewGoal
             ? "Enter a positive USD spending limit on a connection that supports enforced goal spending."
             : goalRequestProblem(request, this.view);
         if (routeProblem) {
@@ -3959,10 +3986,27 @@ export class NativeChatController {
       this.update({ effort });
   }
 
-  async submit(
+  /** The composer can retire its draft once the host confirms the input. */
+  submitFromComposer(text: string, scopeId: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      // Commands and other intents without an input receipt settle on completion.
+      this.send(text, scopeId, undefined, resolve).then(resolve, reject);
+    });
+  }
+
+  submit(
     text: string,
     scopeId = this.view.scope,
     editorContextId?: string
+  ): Promise<void> {
+    return this.send(text, scopeId, editorContextId);
+  }
+
+  private async send(
+    text: string,
+    scopeId: number,
+    editorContextId?: string,
+    onAccepted?: () => void
   ): Promise<void> {
     const scope = this.scope;
     if (!scope || scope.id !== scopeId)
@@ -3970,8 +4014,19 @@ export class NativeChatController {
     const submission = {};
     scope.submission = submission;
     this.update({ submitting: true });
+    const finishSubmitting = () => {
+      // Route activation carries the token. A chat switch starts a new scope.
+      const current = this.scope;
+      if (current?.submission === submission) {
+        current.submission = undefined;
+        this.update({ submitting: false });
+      }
+    };
     try {
-      await this.submitInScope(text, scopeId, editorContextId);
+      await this.submitInScope(text, scopeId, editorContextId, () => {
+        finishSubmitting();
+        onAccepted?.();
+      });
     } catch (error) {
       const current = this.scope;
       if (
@@ -3982,20 +4037,15 @@ export class NativeChatController {
         this.requestObservationRecovery(current, error);
       throw error;
     } finally {
-      // Route activation can replace this scope during the same send. A real
-      // chat switch starts without this token and must keep its own feedback.
-      const current = this.scope;
-      if (current?.submission === submission) {
-        current.submission = undefined;
-        this.update({ submitting: false });
-      }
+      finishSubmitting();
     }
   }
 
   private async submitInScope(
     text: string,
     scopeId: number,
-    editorContextId?: string
+    editorContextId: string | undefined,
+    onAccepted: () => void
   ): Promise<void> {
     let scope = this.scope;
     if (
@@ -4034,7 +4084,7 @@ export class NativeChatController {
             throw error;
           });
         if (receipt) {
-          await this.completeSubmission(scope, original, receipt);
+          await this.completeSubmission(scope, original, receipt, onAccepted);
           return;
         }
       } finally {
@@ -4403,20 +4453,25 @@ export class NativeChatController {
           .inputReceipt(attachment.attachmentId, pending.inputId)
           .catch(async (receiptError: unknown) => {
             if (
-              error instanceof Error &&
-              error.message === "native_chat_editor_context_unavailable" &&
               receiptError instanceof Error &&
               receiptError.message === "input_unavailable" &&
               this.owns(submissionScope) &&
               submissionScope.pending === pending
             ) {
-              await this.discardPending(submissionScope);
-              throw new Error("native_chat_editor_context_reselect");
+              if (
+                error instanceof Error &&
+                error.message === "native_chat_editor_context_unavailable"
+              ) {
+                await this.discardPending(submissionScope);
+                throw new Error("native_chat_editor_context_reselect");
+              }
+              if (selectionRouteRefused(error))
+                await this.discardPending(submissionScope);
             }
             throw error;
           });
       }
-      await this.completeSubmission(scope, pending, accepted);
+      await this.completeSubmission(scope, pending, accepted, onAccepted);
       if (next && this.owns(scope)) await this.playNext(scope, pending.inputId);
     } catch (error) {
       if (
@@ -5202,7 +5257,8 @@ export class NativeChatController {
   private async completeSubmission(
     scope: Scope,
     pending: NonNullable<Scope["pending"]>,
-    accepted: NativeChatAcceptance
+    accepted: NativeChatAcceptance,
+    onAccepted: () => void
   ): Promise<void> {
     const key = this.scopeDraftKey(scope);
     if (key && this.drafts)
@@ -5225,6 +5281,10 @@ export class NativeChatController {
         scope.selectedAttachment = undefined;
         this.update({ attachmentDraft: null, attachmentNotice: null });
       }
+      onAccepted();
+      // A read already in flight can describe the chat before this receipt.
+      if (scope.refreshing) await scope.refreshing;
+      if (!this.owns(scope)) return;
       scope.awaitingTurn = accepted.turnId ?? undefined;
       scope.replay = true;
       await this.refresh(scope);
@@ -6418,8 +6478,19 @@ export class NativeChatController {
             next.snapshot.latest?.turnId === scope.awaitingTurn)
         )
           scope.awaitingTurn = undefined;
+        const { queuedInputs, queuePreview, sessionRevision } = next.snapshot;
+        const offset =
+          queuePreview?.nextOffset === null
+            ? 0
+            : (this.view.queue?.offset ?? scope.queueBasis?.offset ?? 0);
+        // Membership comes from the snapshot. Only a detailed page at this
+        // revision can supply attachment reads, full text and editing controls.
+        let queue = offset === 0 ? (queuePreview ?? null) : null;
+        if (queuedInputs && scope.queueBasis?.revision === sessionRevision)
+          queue = this.view.queue;
         this.update({
           observation: next,
+          queue: queuedInputs ? queue : null,
           subagents: scope.subagents ?? null,
           ...(turnChanged && {
             questions: [],
@@ -6431,7 +6502,7 @@ export class NativeChatController {
           }),
         });
         this.refreshTurnSummary(scope, attachment, next);
-        void this.refreshQueue(scope, this.view.queue?.offset ?? 0);
+        void this.refreshQueue(scope, offset);
         await Promise.all([
           this.refreshApprovals(scope, attachment, next),
           this.refreshQuestions(scope, attachment, next),
@@ -7357,7 +7428,7 @@ function goalStartRefusal(error: unknown): string {
   if (message.includes("session_goal_exists"))
     return "This chat already has a goal. Clear it before starting another.";
   if (message.includes("side_chat_goals_unavailable")) return GOALS_UNAVAILABLE;
-  return "Couldn't start the goal.";
+  return describe(error, "Couldn't start the goal.");
 }
 
 /** Why a side chat could not open, for the chat that asked for it. */
@@ -7372,6 +7443,15 @@ function describeSideRefusal(error: unknown): string {
   return "Couldn't open a side chat.";
 }
 
+function selectionRouteRefused(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    /^(?:native_)?chat_selection_route_(?:changed|unavailable)$/.test(
+      error.message
+    )
+  );
+}
+
 function describe(error: unknown, fallback: string): string {
   if (!(error instanceof Error)) return fallback;
   if (error.message === "native_chat_editor_context_reselect")
@@ -7380,16 +7460,18 @@ function describe(error: unknown, fallback: string): string {
     return MESSAGE_CONTEXT_UNAVAILABLE;
   if (error.message.includes("native_chat_model_change_"))
     return modelChangeRefusal(error);
+  if (selectionRouteRefused(error))
+    return "The selected model connection is unavailable. Restore it or choose another connection.";
   if (error.message.includes("session_execution_configuration_changed"))
     return "This Desktop version couldn't safely continue the chat after a model change. Update Desktop and retry.";
   if (error.message.includes("session_active_route_changed"))
     return "This unfinished turn needs the model connection that accepted it. Restore that connection, or stop the turn.";
   if (error.message.includes("session_queued_route_changed"))
-    return "Queued messages need their original model connection. Run or remove them before changing connections.";
+    return "Queued messages need their original model connection. Restore it to run them, or remove those messages.";
   if (error.message.includes("session_goal_route_changed"))
-    return "This active goal needs its original model connection. Finish or clear the goal before changing connections.";
+    return "This active goal needs its original model connection. Restore it to continue the goal.";
   if (error.message.includes("session_delegated_route_changed"))
-    return "Delegated work needs its parent's model connection. Finish or stop that work before changing connections.";
+    return "Delegated work needs its parent's original model connection. Restore it to continue that work.";
   if (
     /retained_(?:model|authority)_changed|continuation_authority_changed|retry_authority_changed/.test(
       error.message

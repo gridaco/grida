@@ -209,7 +209,7 @@ pub(super) fn handlers(
     let steer = (host.clone(), sessions.clone());
     let pause = (host.clone(), sessions.clone());
     RequestRoutes::default()
-        .on_receive_request(
+        .on_supervised_request(
             async move |request: Enqueue, responder, _| {
                 let result = async {
                     require(&enqueue.1, ENQUEUE, Some(&request.session_id))?;
@@ -223,7 +223,7 @@ pub(super) fn handlers(
                     )?;
                     let mut parts = identified_prompt(
                         request.prompt,
-                        image_intake,
+                        image_intake || enqueue.0.has_routes(),
                         embedded_context,
                         request.selected_file,
                         request.selected_image,
@@ -295,7 +295,7 @@ pub(super) fn handlers(
             },
             on_receive_request!(),
         )
-        .on_receive_request(
+        .on_supervised_request(
             async move |request: Replace, responder, _| {
                 let result = async {
                     require(&replace.1, REPLACE, Some(&request.queue.session_id))?;
@@ -375,7 +375,7 @@ pub(super) fn handlers(
             },
             on_receive_request!(),
         )
-        .on_receive_request(
+        .on_supervised_request(
             async move |ResumeQueue(queue): ResumeQueue, responder, _| {
                 let result = async {
                     require(&resume_queue.1, RESUME_QUEUE, Some(&queue.session_id))?;
@@ -434,7 +434,7 @@ pub(super) fn handlers(
             },
             on_receive_request!(),
         )
-        .on_receive_request(
+        .on_supervised_request(
             async move |request: Resume, responder, _| {
                 let result = async {
                     let session = request.task.session_id.clone();

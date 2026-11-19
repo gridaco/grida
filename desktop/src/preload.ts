@@ -884,7 +884,8 @@ const bridge: DesktopBridge = {
         attachmentId,
         ...(processIds === undefined ? [] : [[...processIds]])
       ),
-    acceptsPng: () => nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PNG),
+    acceptsPng: (attachmentId) =>
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PNG, attachmentId),
     acceptsLibrarySelection: () =>
       nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_LIBRARY_SELECTION),
     submitWithLibrarySelection: (
@@ -920,8 +921,11 @@ const bridge: DesktopBridge = {
         attachmentId,
         input
       ),
-    acceptsSelectedImage: () =>
-      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_SELECTED_IMAGE),
+    acceptsSelectedImage: (attachmentId) =>
+      nativeChatInvoke(
+        IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_SELECTED_IMAGE,
+        attachmentId
+      ),
     submitSelectedImage: async (attachmentId, input) =>
       nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_SUBMIT_SELECTED_IMAGE,

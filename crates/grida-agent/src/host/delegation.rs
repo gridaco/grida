@@ -1107,6 +1107,8 @@ impl Host {
             &self.execution()?.authority.inference.authority,
         )?;
         let driver_state = profile.reserve(&Default::default())?;
+        config.execution = self.execution()?.configuration;
+        config.inherited_route = self.selected_route.clone();
         config.subagent = Some(profile);
         config.worker = captured.worker.clone();
         Ok(OperationClaim {

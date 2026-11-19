@@ -9,7 +9,7 @@ const CAPABILITY: &str = "co.grida/session/permission-mode";
 const INSPECT: &str = "_co.grida/session/permission-mode";
 const UPDATE: &str = "_co.grida/session/permission-mode/update";
 
-fn fixture(allow: bool) -> Fixture {
+pub(super) fn fixture(allow: bool) -> Fixture {
     let fixture = Fixture::new(true);
     let mut profile: Value = serde_json::from_slice(&fs::read(&fixture.profile).unwrap()).unwrap();
     profile["directories"][0]["commandReadWrite"] = json!("allow");
@@ -103,7 +103,7 @@ fn tool(name: &'static str, arguments: Value) -> Reply {
     Reply::Tool(name, Box::leak(arguments.to_string().into_boxed_str()))
 }
 
-fn last_tool(request: &Value) -> Value {
+pub(super) fn last_tool(request: &Value) -> Value {
     let message = request["messages"]
         .as_array()
         .unwrap()
@@ -500,17 +500,46 @@ async fn full_access_installs_a_local_http_package_with_cache_and_lifecycle_scri
 
 #[tokio::test]
 #[ignore = "requires the current native helper"]
-async fn running_full_access_process_prevents_a_misleading_downgrade_until_stopped() {
+async fn changing_to_default_keeps_the_running_turn_and_fences_its_full_access_terminal() {
     let fixture = fixture(true);
-    let beat = fixture.primary.join("full-access-beat");
-    let endpoint = Endpoint::start(vec![
-        tool("exec_command",json!({"access":"read_write","cmd":"while :; do printf . >> full-access-beat; /bin/sleep 0.05; done","yield_time_ms":1000})),
+    let (release, wait) = tokio::sync::oneshot::channel();
+    let mut endpoint = Endpoint::start(vec![
+        tool(
+            "exec_command",
+            json!({"access":"read","cmd":"exec /bin/cat","tty":true,"yield_time_ms":250}),
+        ),
+        Reply::After(
+            wait,
+            Box::new(tool(
+                "write_stdin",
+                json!({"session_id":1,"chars":"first turn\n","yield_time_ms":250}),
+            )),
+        ),
         Reply::Choose(Box::new(|request| {
             let result = last_tool(request);
-            assert!(result["content"].to_string().contains("Process running with session ID"),"{result}");
-            Reply::Finished("The process remains owned by this chat.")
+            assert!(
+                result["content"].to_string().contains("first turn"),
+                "{result}"
+            );
+            Reply::Finished("The first turn used its own terminal.")
         })),
-    ]).await;
+        tool(
+            "write_stdin",
+            json!({"session_id":1,"chars":"next turn\n","yield_time_ms":250}),
+        ),
+        Reply::Choose(Box::new(|request| {
+            let result = last_tool(request);
+            assert_eq!(result["status"], "failed", "{result}");
+            assert!(
+                result["content"]
+                    .to_string()
+                    .contains("process_requires_full_access"),
+                "{result}"
+            );
+            Reply::Finished("The new turn cannot use that terminal.")
+        })),
+    ])
+    .await;
     let mut client = start(&fixture, &endpoint.url, true).await;
     let session = session(&mut client, &fixture).await;
     let enabled = client
@@ -520,14 +549,28 @@ async fn running_full_access_process_prevents_a_misleading_downgrade_until_stopp
         )
         .await;
     assert!(enabled.get("error").is_none(), "{enabled}");
-    prompt(&mut client, &session).await;
-    assert!(fs::metadata(&beat).unwrap().len() > 0);
+    let first = client.send("session/prompt", json!({"sessionId":session,"prompt":[{"type":"text","text":"Use a terminal for this turn."}]})).await;
+    endpoint.request().await;
+    let after_launch = endpoint.request().await;
+    assert!(
+        last_tool(&after_launch)["content"]
+            .to_string()
+            .contains("Process running with session ID 1")
+    );
     let update = change(&fixture, &session, 1, "disable-process", "restricted");
-    let busy = client.request(UPDATE, update.clone()).await;
-    assert_eq!(busy["error"]["data"], "permission_mode_busy", "{busy}");
+    let disabled = client.request(UPDATE, update).await;
+    assert_eq!(disabled["result"]["mode"], "restricted", "{disabled}");
+    release.send(()).unwrap();
+    let completed = client.read_reply().await;
+    assert_eq!(completed["id"], first);
+    assert!(completed.get("error").is_none(), "{completed}");
+    prompt(&mut client, &session).await;
+    let listed = client
+        .request("_co.grida/session/processes", json!({"sessionId":session}))
+        .await;
     assert_eq!(
-        client.request(INSPECT, target(&fixture, &session)).await["result"]["mode"],
-        "full_access"
+        listed["result"]["processes"][0]["state"], "running",
+        "{listed}"
     );
     let stopped = client
         .request(
@@ -536,11 +579,7 @@ async fn running_full_access_process_prevents_a_misleading_downgrade_until_stopp
         )
         .await;
     assert!(stopped.get("error").is_none(), "{stopped}");
-    let after = fs::metadata(&beat).unwrap().len();
-    tokio::time::sleep(Duration::from_millis(250)).await;
-    assert_eq!(fs::metadata(&beat).unwrap().len(), after);
-    let disabled = client.request(UPDATE, update).await;
-    assert_eq!(disabled["result"]["mode"], "restricted", "{disabled}");
+    assert_eq!(stopped["result"]["stopped"], json!([1]), "{stopped}");
     client.close().await;
     endpoint.done().await;
 }

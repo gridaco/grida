@@ -195,9 +195,11 @@ individual fields.
 
 Full access requires the separate explicit user or trusted-launch choice
 defined above. A project configuration or inherited new-chat preference cannot
-authorize it. Hosts may require idle work, an empty queue and retired processes
-before changing a chat's posture so a displayed restriction cannot coexist
-with accepted broader work. Exact change receipts and retained authority must
+authorize it. The composer shows the access for newly accepted messages.
+A change can commit during a running turn or with inputs waiting in the queue.
+Each accepted input and each running command keeps its captured authority.
+A restricted turn cannot drive a terminal started with Full access. The person
+can still stop that process. Exact change receipts and retained authority must
 remain recoverable without new model work.
 
 ## Conformance scenarios

@@ -79,14 +79,13 @@ export function NativeComposerTray({
   const pendingGoal = !!view.observation?.snapshot.pendingGoalId;
   const showGoal = pendingGoal || (!!goal && goal.state.status !== "cleared");
   const items = queue?.items ?? [];
+  const count = view.observation?.snapshot.queuedInputs ?? items.length;
   // An interrupted turn pauses the queue. An idle queue can also wait with
   // nothing paused (after a restart); a goal that is starting is its own row.
   const interrupted = !!view.observation?.snapshot.admissionPaused;
   const held =
-    items.length > 0 &&
-    controller.canResumeQueue &&
-    (interrupted || !pendingGoal);
-  if (!items.length && !showGoal) return null;
+    count > 0 && controller.canResumeQueue && (interrupted || !pendingGoal);
+  if (!count && !showGoal) return null;
   return (
     <div
       data-testid="workspace-composer-tray"
@@ -113,12 +112,17 @@ export function NativeComposerTray({
           </Button>
         </div>
       )}
+      {count > 0 && !items.length && !held && (
+        <p role="status" className="text-muted-foreground px-3 py-2">
+          {count === 1 ? "1 queued message" : `${count} queued messages`}
+        </p>
+      )}
       {queue && items.length > 0 && (
         <NativeComposerQueue
           controller={controller}
           view={view}
           queue={queue}
-          count={view.observation?.snapshot.queuedInputs ?? queue.items.length}
+          count={count}
           onReturnedText={onReturnedText}
         />
       )}
@@ -300,7 +304,7 @@ function QueueRow({
   const summary =
     item.preview ||
     item.attachments?.map((entry) => entry.name).join(", ") ||
-    "Message with other content";
+    "Queued message";
   const label = item.goalStart
     ? `Goal: ${item.preview ?? item.goalStart.objective}`
     : `${item.operatingRegime === "plan" ? "Plan · " : ""}${item.effort === "ultra" ? "Ultra · " : ""}${summary}`;
@@ -342,9 +346,9 @@ function QueueRow({
           controller.readQueuedAttachmentPreview(item.inputId, previewId)
         }
         readText={
-          item.goalStart
-            ? undefined
-            : () => controller.readQueuedText(item.inputId)
+          controller.queueCurrent && !item.goalStart
+            ? () => controller.readQueuedText(item.inputId)
+            : undefined
         }
       />
       {editing && (

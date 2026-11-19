@@ -152,7 +152,7 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
             },
             on_receive_request!(),
         )
-        .on_receive_request(
+        .on_supervised_request(
             async move |request: Revise, responder, _| {
                 let result = async {
                     require(&sessions, REVISE, Some(&request.session_id))?;

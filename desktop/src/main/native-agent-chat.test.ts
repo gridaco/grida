@@ -261,7 +261,14 @@ it("opens a saved queue passively and resumes idle queued work on an exact obser
     sessionId,
     sessionRevision: 8,
     queuedInputs: 1,
-    queue: [{ inputId: "saved-input", inputPosition: 1, settings: {} }],
+    queue: [
+      {
+        inputId: "saved-input",
+        inputPosition: 1,
+        settings: {},
+        preview: "Waiting message",
+      },
+    ],
     admissionPaused: false,
     current: null,
     latest: null,
@@ -272,6 +279,7 @@ it("opens a saved queue passively and resumes idle queued work on an exact obser
     >();
   const start = vi.spyOn(NativeAgentProcess, "start").mockResolvedValueOnce({
     request,
+    acceptsQueuedMessages: true,
     close: async () => {},
   } as unknown as NativeAgentProcess);
   let client: NativeAgentChat | undefined;
@@ -325,6 +333,12 @@ it("opens a saved queue passively and resumes idle queued work on an exact obser
     request.mockResolvedValueOnce(saved);
     const observed = await client.observe(session);
     expect(observed.idleQueueResumeAvailable).toBe(true);
+    expect(observed.queuePreview).toEqual({
+      items: [{ inputId: "saved-input", preview: "Waiting message" }],
+      offset: 0,
+      previousOffset: null,
+      nextOffset: null,
+    });
     expect(request.mock.calls.map(([method]) => method)).toEqual([
       "session/load",
       "_co.grida/session/snapshot",
@@ -353,6 +367,32 @@ it("opens a saved queue passively and resumes idle queued work on an exact obser
     ];
     expect(request.mock.calls[4]).toEqual(call);
     expect(request.mock.calls[6]).toEqual(call);
+
+    // Identical durable state can also occur between two live workers.
+    request.mockResolvedValueOnce({
+      ...saved,
+      idleQueueResumeAvailable: false,
+    });
+    const advancing = await client.observe(session);
+    expect(advancing).not.toHaveProperty("idleQueueResumeAvailable");
+    await expect(client.editQueue(session, advancing, change)).rejects.toThrow(
+      "native_chat_queue_not_paused"
+    );
+    request.mockResolvedValueOnce({ ...saved, idleQueueResumeAvailable: true });
+    expect((await client.observe(session)).idleQueueResumeAvailable).toBe(true);
+
+    const unavailable = new Error("queued_input_image_unavailable");
+    request.mockRejectedValueOnce(unavailable).mockResolvedValueOnce(saved);
+    await expect(client.queue(session, observed, 0)).rejects.toBe(unavailable);
+    request.mockRejectedValueOnce(unavailable).mockResolvedValueOnce({
+      ...saved,
+      sessionRevision: 9,
+      queue: [],
+      queuedInputs: 0,
+    });
+    await expect(client.queue(session, observed, 0)).rejects.toThrow(
+      "native_chat_queue_changed"
+    );
   } finally {
     await client?.close();
     start.mockRestore();

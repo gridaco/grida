@@ -122,13 +122,17 @@ async fn supplied_message_context_separates_model_text_and_display_on_cold_repla
     let submission = json!({
         "sessionId":session,"inputId":"queued-context",
         "messageContext":{"modelText":QUEUED_MODEL_TEXT,"displayParts":display},
-        "prompt":[{"type":"text","text":"Earlier caption."}]
+        "prompt":[{"type":"text","text":"é".repeat(1025)}]
     });
     let accepted = client
         .request("_co.grida/session/enqueue", submission)
         .await;
     assert_eq!(accepted["result"]["disposition"], "queued", "{accepted}");
     let view = snapshot(&mut client, session).await;
+    assert_eq!(
+        view["queue"][0]["preview"],
+        format!("{}…", "é".repeat(1022))
+    );
     let edited = client
         .request(
             "_co.grida/session/replace-text",
@@ -144,6 +148,9 @@ async fn supplied_message_context_separates_model_text_and_display_on_cold_repla
         .await;
     assert!(edited["result"].is_object(), "{edited}");
     let view = snapshot(&mut client, session).await;
+    assert_eq!(view["queue"][0]["inputId"], "edited-context");
+    assert_eq!(view["queue"][0]["preview"], CAPTION);
+    assert!(!view["queue"].to_string().contains(QUEUED_MODEL_TEXT));
     let expected = queued(&mut client, session, "edited-context", &view).await;
     assert_eq!(expected["prompt"], json!([{"type":"text","text":CAPTION}]));
     assert_eq!(expected["displayParts"], display);

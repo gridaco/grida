@@ -544,6 +544,7 @@ impl Host {
                     SESSION_SCHEMA,
                     SESSION_VERSION,
                     &SessionConfiguration {
+                        inherited_route: None,
                         cwd: cwd.clone(),
                         execution: execution.configuration,
                         owner: execution.owner,
@@ -745,6 +746,33 @@ impl Host {
         store.write_fork(&intent)
     }
 
+    pub(super) fn selected_provider(
+        &self,
+        session: &SessionView,
+        revision: u64,
+    ) -> Result<ChatSelection> {
+        self.selection_at_revision(session, revision)?
+            .ok_or_else(|| problem(ErrorKind::Conflict, "chat_selection_revision_changed"))
+    }
+
+    pub(super) fn selection_at_revision(
+        &self,
+        session: &SessionView,
+        revision: u64,
+    ) -> Result<Option<ChatSelection>> {
+        match SelectionStore::new(self)?.read(&session.session)? {
+            None if revision == 0 => Ok(None),
+            Some(ledger) if !ledger.retired && ledger.head.revision == revision => {
+                ledger.require_scope(&session_configuration(session)?.cwd)?;
+                Ok(Some(ledger.head.selection))
+            }
+            _ => Err(problem(
+                ErrorKind::Conflict,
+                "chat_selection_revision_changed",
+            )),
+        }
+    }
+
     pub(super) fn capture_chat_selection(
         &self,
         session: &SessionView,
@@ -756,23 +784,13 @@ impl Host {
         let Some(revision) = expected else {
             return Ok(None);
         };
-        let store = SelectionStore::new(self)?;
-        let ledger = store
-            .read(&session.session)?
-            .ok_or_else(|| problem(ErrorKind::Conflict, "chat_selection_revision_changed"))?;
-        if ledger.retired || ledger.head.revision != revision {
-            return Err(problem(
-                ErrorKind::Conflict,
-                "chat_selection_revision_changed",
-            ));
-        }
-        ledger.require_scope(&session_configuration(session)?.cwd)?;
+        let selection = self.selected_provider(session, revision)?;
         let execution = self.execution()?;
-        if ledger.head.selection.model != execution.config.model {
+        if selection.model != execution.config.model {
             return Err(problem(ErrorKind::Conflict, "chat_selection_route_changed"));
         }
         let ultra = effort.is_some_and(|effort| effort.preset() == EffortPreset::Ultra);
-        if ultra != (ledger.head.selection.effort == SelectionEffort::Ultra) {
+        if ultra != (selection.effort == SelectionEffort::Ultra) {
             return Err(problem(
                 ErrorKind::Conflict,
                 "chat_selection_effort_changed",
@@ -780,7 +798,7 @@ impl Host {
         }
         if !goal {
             use agent_kit_core::inference::ReasoningEffort;
-            let expected_reasoning = match ledger.head.selection.effort {
+            let expected_reasoning = match selection.effort {
                 SelectionEffort::Low => ReasoningEffort::Low,
                 SelectionEffort::Medium => ReasoningEffort::Medium,
                 SelectionEffort::High => ReasoningEffort::High,
@@ -790,7 +808,7 @@ impl Host {
             // Ultra may let its configured harness choose the reasoning level.
             if reasoning.map_or(
                 !matches!(
-                    ledger.head.selection.effort,
+                    selection.effort,
                     SelectionEffort::Medium | SelectionEffort::Ultra
                 ),
                 |level| level != expected_reasoning,
@@ -804,7 +822,7 @@ impl Host {
         Ok(Some(SelectionSnapshot {
             session_id: session.session.clone(),
             revision,
-            selection: Some(ledger.head.selection),
+            selection: Some(selection),
             legacy: None,
         }))
     }
@@ -985,9 +1003,22 @@ mod tests {
         );
         let a_pair = pair("model-a", SelectionEffort::Low);
         let b_pair = pair("model-b", SelectionEffort::High);
+        host.attach_routes(Default::default()).unwrap();
+        let (_, revision) = host.for_derived_session(&a).await.unwrap();
+        let revision = revision.expect("routed derivation must recheck the first selection");
+        assert_eq!(
+            host.selection_at_revision(&before_a, revision).unwrap(),
+            None
+        );
         host.update_chat_selection(update(&cwd, &a, 0, "select-a", a_pair.clone()))
             .await
             .unwrap();
+        assert_eq!(
+            host.selection_at_revision(&before_a, revision)
+                .unwrap_err()
+                .code,
+            "chat_selection_revision_changed"
+        );
         host.update_chat_selection(update(&cwd, &b, 0, "select-b", b_pair.clone()))
             .await
             .unwrap();

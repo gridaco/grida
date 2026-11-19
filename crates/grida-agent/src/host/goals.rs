@@ -177,7 +177,7 @@ impl Host {
     pub(crate) fn supports_goal_spending(&self) -> bool {
         cfg!(any(target_os = "macos", target_os = "linux"))
             && self.state_dir.is_some()
-            && self.supervised_gateway().is_some()
+            && self.supports_gateway_billing_status()
     }
 
     async fn accept_goal(
@@ -205,6 +205,21 @@ impl Host {
         }
         validate_prompt_parts(&request.parts)?;
         goal.start(request.id.clone())?;
+        // Resolve outside the admission lock so a supervisor callback can be
+        // serviced while another client inspects or changes the selection.
+        let host = if selection_revision.is_some()
+            && self.has_routes()
+            && self
+                .store
+                .input(request.session.clone(), request.id.clone())
+                .await?
+                .is_none()
+        {
+            self.for_selection(&request.session, selection_revision)
+                .await?
+        } else {
+            self.clone()
+        };
         let _admission = self.configuration_admission.lock().await;
         let previous = self
             .store
@@ -225,10 +240,10 @@ impl Host {
             max_cost_mills
                 .as_ref()
                 .map(|maximum| {
-                    if !self.supports_goal_spending() {
+                    if !host.supports_goal_spending() {
                         return Err(problem(ErrorKind::Unsupported, "goal_spending_unavailable"));
                     }
-                    let gateway = self.supervised_gateway().ok_or_else(|| {
+                    let gateway = host.supervised_gateway().ok_or_else(|| {
                         problem(ErrorKind::Unsupported, "goal_spending_unavailable")
                     })?;
                     gateway.validate()?;
@@ -266,7 +281,7 @@ impl Host {
                 self.spending.inspect(selection)?;
             }
             if accepted.disposition == InputDisposition::Queued
-                && (effort != EffortPreset::Ultra || self.goal_sponsorship_available())
+                && (effort != EffortPreset::Ultra || host.goal_sponsorship_available())
             {
                 self.kick_queue(request.session.clone()).await;
             }
@@ -288,7 +303,7 @@ impl Host {
         let mut attempts = 0;
         let (accepted, title) = loop {
             let view = self.store.inspect(request.session.clone()).await?;
-            self.check_execution(&view).await?;
+            host.check_new_submission(&view).await?;
             if self
                 .permissions
                 .as_ref()
@@ -304,12 +319,12 @@ impl Host {
                     "before_tool_hook_goal_unavailable",
                 ));
             }
-            if effort == EffortPreset::Ultra && !self.goal_sponsorship_available() {
+            if effort == EffortPreset::Ultra && !host.goal_sponsorship_available() {
                 return Err(funded_review_unavailable());
             }
             require_goal_start(&view)?;
             if let Some(child) = &goal.named_child {
-                self.require_goal_named_child(&request.session, child)
+                host.require_goal_named_child(&request.session, child)
                     .await?;
             }
             // A start behind a running turn or other queued work waits in the
@@ -317,7 +332,7 @@ impl Host {
             if view.current.is_none() && !view.admission_paused {
                 self.check_ready_capacity(&request.session).await?;
             }
-            let mut policy = self.submission_policy(&request, allow_wakeups)?;
+            let mut policy = host.submission_policy(&request, allow_wakeups)?;
             policy.selection_revision = selection_revision;
             policy.selection_goal = true;
             if goal.named_child.is_some() && !policy.operating_regime.is_act() {
@@ -343,8 +358,8 @@ impl Host {
             }
             // A chat started as a goal is titled from its objective, like any
             // other first request.
-            let title = self.title_candidate(&view, &request.parts);
-            let mut input = self
+            let title = host.title_candidate(&view, &request.parts);
+            let mut input = host
                 .capture_input(&view, request.id.clone(), request.parts.clone(), policy)
                 .await?;
             let mut stored: StoredPrompt = decode_input(&input)?;
@@ -373,7 +388,7 @@ impl Host {
                 )
             })?;
         }
-        self.start_title(title);
+        host.start_title(title);
         self.kick_queue(accepted.session.clone()).await;
         Ok(DurableSubmission {
             session: accepted.session,
@@ -456,10 +471,32 @@ impl Host {
     pub async fn recover_goal_work(&self, session: SessionId) -> Result<()> {
         self.owned_control(move |host| async move {
             let view = host.store.inspect(session.clone()).await?;
-            host.check_execution(&view).await?;
-            if view.driver_state.value().is_none() {
-                return Err(problem(ErrorKind::Unavailable, "goal_missing"));
-            }
+            let goal = Goal::decode(
+                view.driver_state
+                    .value()
+                    .ok_or_else(|| problem(ErrorKind::Unavailable, "goal_missing"))?,
+            )?;
+            let host = if host.has_routes() {
+                let original = host
+                    .store
+                    .input(session.clone(), goal.basis().goal.clone())
+                    .await?
+                    .ok_or_else(|| problem(ErrorKind::InvalidState, "goal_origin_unavailable"))?;
+                let host = host
+                    .for_retained_input(&original.input, "session_goal_route_changed")
+                    .await?;
+                if !CapturedRoute::admits(
+                    &original.input,
+                    host.execution()?,
+                    session_configuration(&view)?.execution,
+                ) {
+                    return Err(problem(ErrorKind::Conflict, "session_goal_route_changed"));
+                }
+                host
+            } else {
+                host.check_execution(&view).await?;
+                host
+            };
             host.reconcile_goal_child(&view).await?;
             host.check_ready_capacity(&session).await?;
             host.kick_queue(session).await;
@@ -840,7 +877,7 @@ impl Host {
             wake.revision != view.revision
                 || wake.binding != current.binding
                 || wake.position != current.position
-        }) || (wake.is_some() && self.check_execution(view).await.is_err())
+        }) || (wake.is_some() && !self.has_routes() && self.check_execution(view).await.is_err())
             || require_resumable(view, &current.binding.turn).is_err()
         {
             return;

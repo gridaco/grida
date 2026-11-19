@@ -147,22 +147,62 @@ it("reports desired-binding image eligibility without borrowing another active m
     selections
   );
   Object.defineProperties(chat, {
+    acceptsPng: { value: true, configurable: true },
     acceptsSelectedImage: { value: true, configurable: true },
     supportsSelectedImage: { value: true },
+    acceptsInputRoutes: { value: true },
   });
+  const session = await ipc.load(first.event, "saved");
+  chat.inputReceipt = vi.fn<typeof chat.inputReceipt>(async () => {
+    throw new Error("input_unavailable");
+  });
+  const submit = (chat.submitSelectedImage =
+    vi.fn<NonNullable<typeof chat.submitSelectedImage>>());
+  const send = () =>
+    ipc.submitSelectedImage(first.event, session.attachmentId, {
+      inputId: "image",
+      selectionRevision: state.revision,
+    });
   await ipc.selection(first.event, { sessionId: "saved" });
+  expect(await ipc.acceptsPng(first.event, session.attachmentId)).toBe(false);
   expect(await ipc.acceptsSelectedImage(first.event)).toBe(false);
+  await expect(send()).rejects.toThrow("image_input_unavailable");
+  expect(submit).not.toHaveBeenCalled();
   state = {
     ...state,
     revision: 2,
     selection: { ...state.selection, profileId: image, modelId: "image-model" },
   };
-  Object.defineProperty(chat, "acceptsSelectedImage", { value: false });
+  Object.defineProperties(chat, {
+    acceptsPng: { value: false },
+    acceptsSelectedImage: { value: false },
+  });
   await ipc.selection(first.event, { sessionId: "saved" });
+  expect(await ipc.acceptsPng(first.event, session.attachmentId)).toBe(true);
   expect(await ipc.acceptsSelectedImage(first.event)).toBe(true);
+  await send();
+  expect(submit).toHaveBeenCalledTimes(1);
+  const openSide = chat.openSideChat.bind(chat);
+  vi.spyOn(chat, "openSideChat").mockImplementation(async (parent) => {
+    const opened = await openSide(parent);
+    return {
+      ...opened,
+      session: { ...opened.session, sideImageInput: true },
+    };
+  });
+  const side = await ipc.openSideChat(first.event, session.attachmentId);
   state = { ...state, available: false };
   await ipc.selection(first.event, { sessionId: "saved" });
+  expect(await ipc.acceptsPng(first.event, session.attachmentId)).toBe(false);
   expect(await ipc.acceptsSelectedImage(first.event)).toBe(false);
+  expect(await ipc.acceptsPng(first.event, side.attachmentId)).toBe(true);
+  expect(await ipc.acceptsSelectedImage(first.event, side.attachmentId)).toBe(
+    true
+  );
+  await ipc.submitSelectedImage(first.event, side.attachmentId, {
+    inputId: "side-image",
+  });
+  expect(submit).toHaveBeenCalledTimes(2);
   expect(select).not.toHaveBeenCalled();
 });
 
@@ -3817,41 +3857,47 @@ describe("saved selection IPC", () => {
     expect(submit).not.toHaveBeenCalled();
   });
 
-  it("forwards a validated fresh selection revision in its own argument slot", async () => {
-    const selections = owner(
-      vi.fn<NativeChatSelections["read"]>(async () => state("session-0"))
-    );
-    const f = setup(undefined, undefined, undefined, undefined, selections);
-    f.scopes.set(f.first.sender, {
-      workspaceId: WORKSPACE,
-      chat: f.chat,
-      profileId: profile,
-    });
-    f.chat.inputReceipt = vi.fn<typeof f.chat.inputReceipt>(async () => {
-      throw new Error("input_unavailable");
-    });
-    const attachment = await f.ipc.create(f.first.event);
-    const submit = vi.spyOn(f.chat, "submit");
-    await f.ipc.submit(
-      f.first.event,
-      attachment.attachmentId,
-      "fresh",
-      "Hello",
-      "act",
-      "high",
-      undefined,
-      2
-    );
-    expect(submit).toHaveBeenCalledExactlyOnceWith(
-      expect.objectContaining({ id: attachment.sessionId }),
-      "fresh",
-      "Hello",
-      "act",
-      undefined,
-      "high",
-      2
-    );
-  });
+  it.each([false, true])(
+    "forwards a validated fresh selection revision (per-input routes: %s)",
+    async (inputRoutes) => {
+      const selections = owner(
+        vi.fn<NativeChatSelections["read"]>(async () => state("session-0"))
+      );
+      const f = setup(undefined, undefined, undefined, undefined, selections);
+      f.scopes.set(f.first.sender, {
+        workspaceId: WORKSPACE,
+        chat: f.chat,
+        profileId: inputRoutes ? "b".repeat(64) : profile,
+      });
+      Object.defineProperty(f.chat, "acceptsInputRoutes", {
+        value: inputRoutes,
+      });
+      f.chat.inputReceipt = vi.fn<typeof f.chat.inputReceipt>(async () => {
+        throw new Error("input_unavailable");
+      });
+      const attachment = await f.ipc.create(f.first.event);
+      const submit = vi.spyOn(f.chat, "submit");
+      await f.ipc.submit(
+        f.first.event,
+        attachment.attachmentId,
+        "fresh",
+        "Hello",
+        "act",
+        "high",
+        undefined,
+        2
+      );
+      expect(submit).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ id: attachment.sessionId }),
+        "fresh",
+        "Hello",
+        "act",
+        undefined,
+        "high",
+        2
+      );
+    }
+  );
 });
 
 it("uses the verified fixed route's image capability for a default-profile subscription", async () => {

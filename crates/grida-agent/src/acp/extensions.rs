@@ -453,6 +453,8 @@ struct SnapshotResponse {
     queued_inputs: usize,
     queue: Vec<QueuedInput>,
     admission_paused: bool,
+    #[serde(default)]
+    idle_queue_resume_available: bool,
     current: Option<TurnSummary>,
     latest: Option<TurnSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -468,13 +470,36 @@ struct QueuedInput {
     input_id: ChangeId,
     input_position: u64,
     settings: InputSettings,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    preview: Option<String>,
 }
 
-fn queued_input(view: &InputView) -> Result<QueuedInput> {
+// Bound the extra display text in a snapshot independently of the queue length.
+const QUEUE_PREVIEW_ROWS: usize = 8;
+const QUEUE_PREVIEW_BYTES: usize = 2048;
+
+fn queued_input(view: &InputView, include_preview: bool) -> Result<QueuedInput> {
+    let (settings, parts) = InputSettings::with_parts(&view.input).map_err(host_error)?;
+    let preview = if include_preview {
+        parts.into_iter().find_map(|part| match part {
+            PromptPart::Text { text } if !text.trim().is_empty() => {
+                if text.len() > QUEUE_PREVIEW_BYTES {
+                    let end = text.floor_char_boundary(QUEUE_PREVIEW_BYTES - '…'.len_utf8());
+                    Some(format!("{}…", &text[..end]))
+                } else {
+                    Some(text)
+                }
+            }
+            _ => None,
+        })
+    } else {
+        None
+    };
     Ok(QueuedInput {
         input_id: view.input.id.clone(),
         input_position: view.position,
-        settings: InputSettings::for_input(&view.input).map_err(host_error)?,
+        settings,
+        preview,
     })
 }
 
@@ -626,7 +651,7 @@ pub(super) fn handlers(
             sessions.clone(),
             side_chats,
         ))
-        .on_receive_request(
+        .on_supervised_request(
             async move |request: Submit, responder, _| {
                 let result = async {
                     require(&submit_sessions, SUBMIT, Some(&request.session_id))?;
@@ -646,7 +671,7 @@ pub(super) fn handlers(
                     )?;
                     let mut parts = identified_prompt(
                         request.prompt,
-                        image_intake,
+                        image_intake || submit_host.has_routes(),
                         embedded_context,
                         request.selected_file,
                         request.selected_image,
@@ -695,14 +720,21 @@ pub(super) fn handlers(
             async move |request: Snapshot, responder, _| {
                 let result = async {
                     require(&snapshot_sessions, SNAPSHOT, Some(&request.session_id))?;
-                    let (snapshot, retry_not_before_ms) = snapshot_host
-                        .inspect_with_retry(request.session_id)
-                        .await
-                        .map_err(host_error)?;
+                    let (snapshot, retry_not_before_ms, idle_queue_resume_available) =
+                        snapshot_host
+                            .inspect_snapshot(request.session_id)
+                            .await
+                            .map_err(host_error)?;
                     let side = snapshot_host
                         .side_snapshot(&snapshot)
                         .await
                         .map_err(host_error)?;
+                    let previews = require(
+                        &snapshot_sessions,
+                        input_images::QUEUED,
+                        Some(&snapshot.session),
+                    )
+                    .is_ok();
                     Ok(SnapshotResponse {
                         side,
                         session_id: snapshot.session,
@@ -711,9 +743,13 @@ pub(super) fn handlers(
                         queue: snapshot
                             .queued
                             .iter()
-                            .map(queued_input)
+                            .enumerate()
+                            .map(|(index, view)| {
+                                queued_input(view, previews && index < QUEUE_PREVIEW_ROWS)
+                            })
                             .collect::<Result<_>>()?,
                         admission_paused: snapshot.admission_paused,
+                        idle_queue_resume_available,
                         current: snapshot.current.map(TurnSummary::from),
                         latest: snapshot.latest.map(TurnSummary::from),
                         retry_not_before_ms,

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -1324,6 +1325,158 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
       }
     }
   );
+
+  it("retains an open launch exchange while the next model uses its own revocable network authority", async () => {
+    const test = fixture(
+      `
+      if (request.method === 'fixture/worker-request') {
+        send({id: 'worker-' + request.id, ...request.params});
+      } else if (String(request.id).startsWith('worker-')) {
+        send({id: Number(request.id.slice(7)), result: request.result ?? {error: request.error.message}});
+      }`,
+      1,
+      {}
+    );
+    let agent: NativeAgentProcess | undefined;
+    let generation = 1;
+    let listed = true;
+    const dispatches: string[] = [];
+    const network = (name: string) => {
+      const captured = generation;
+      const isCurrent = () => generation === captured;
+      return {
+        isCurrent,
+        prepare: () =>
+          !isCurrent()
+            ? null
+            : async () => {
+                dispatches.push(name);
+                return new Response("data: ok", {
+                  headers: { "content-type": "text/event-stream" },
+                });
+              },
+      };
+    };
+    try {
+      const connectionId = "b".repeat(64);
+      const endpoint = "http://127.0.0.1:2/v1";
+      agent = await NativeAgentProcess.start({
+        ...test.options,
+        providerNetwork: network("A"),
+        lookupProviderRoute: async (id, model) => {
+          const primary = id === null && model === test.options.model;
+          if (!primary && (!listed || id !== connectionId || model !== "B"))
+            throw new Error("unknown selection");
+          return {
+            prepare: async () => ({
+              launch: {
+                provider: "openai-compatible",
+                model,
+                endpoint: primary ? test.options.endpoint : endpoint,
+                providerNetwork: network(primary ? "A" : "B"),
+              },
+            }),
+          };
+        },
+      });
+      expect(agent.acceptsInputRoutes).toBe(true);
+      const worker = (method: string, params: Record<string, unknown>) =>
+        agent!.request("fixture/worker-request", { method, params });
+      const exchange = (params: Record<string, unknown>) =>
+        worker("_co.grida/provider/exchange", params);
+      const open = (id: string, base: string, routeId?: string) =>
+        exchange({
+          action: "open",
+          id,
+          routeId,
+          target: base + "/chat/completions",
+          headers: [
+            ["content-type", "application/json"],
+            ["accept", "text/event-stream"],
+          ],
+          initial: Buffer.from("{}").toString("base64"),
+          timeoutMs: 10_000,
+          maxResponseBytes: 32,
+        });
+      const resolve = (id: string | null, model: string) =>
+        worker("_co.grida/provider/resolve", {
+          connectionId: id,
+          model,
+        }) as Promise<{ routeId: string }>;
+      expect(await resolve(null, test.options.model)).toMatchObject({
+        kind: "launch",
+      });
+      const active = randomUUID(),
+        next = randomUUID();
+      expect(await open(active, test.options.endpoint)).toEqual({
+        status: "accepted",
+      });
+      const route = await resolve(connectionId, "B");
+      expect(route).toMatchObject({
+        kind: "http",
+        protocol: "openai-compatible",
+        model: "B",
+        endpoint,
+      });
+      expect(await open(next, test.options.endpoint, route.routeId)).toEqual({
+        status: "unavailable",
+      });
+      expect(await open(next, endpoint, randomUUID())).toEqual({
+        status: "unavailable",
+      });
+      expect(await open(next, endpoint, route.routeId)).toEqual({
+        status: "accepted",
+      });
+      expect(await exchange({ action: "dispatch", id: next })).toEqual({
+        status: "unavailable",
+      });
+      expect(
+        await exchange({ action: "dispatch", id: next, routeId: route.routeId })
+      ).toMatchObject({ status: "ready" });
+      expect(await exchange({ action: "dispatch", id: active })).toMatchObject({
+        status: "ready",
+      });
+      const revoked = randomUUID();
+      expect(await open(revoked, endpoint, route.routeId)).toEqual({
+        status: "accepted",
+      });
+      generation++;
+      expect(
+        await exchange({
+          action: "dispatch",
+          id: revoked,
+          routeId: route.routeId,
+        })
+      ).toEqual({ status: "unavailable" });
+      expect(await resolve(null, test.options.model)).toMatchObject({
+        kind: "http",
+        endpoint: test.options.endpoint,
+      });
+      const reauthorized = await resolve(connectionId, "B");
+      expect(reauthorized.routeId).toBeDefined();
+      expect(reauthorized.routeId).not.toBe(route.routeId);
+      const fresh = randomUUID();
+      expect(await open(fresh, endpoint, reauthorized.routeId)).toMatchObject({
+        status: "accepted",
+      });
+      expect(
+        await exchange({
+          action: "dispatch",
+          id: fresh,
+          routeId: reauthorized.routeId,
+        })
+      ).toMatchObject({ status: "ready" });
+      listed = false;
+      expect(await resolve(connectionId, "B")).toHaveProperty("error");
+      expect(dispatches).toEqual(["B", "A", "B"]);
+    } finally {
+      try {
+        await agent?.close();
+      } finally {
+        test.close();
+      }
+    }
+  });
 
   it("answers a provider exchange beyond the concurrency bound without disconnecting", async () => {
     const test = fixture(

@@ -270,6 +270,8 @@ export type NativeChatProfileChoice = Readonly<{
   reasoning?: true;
   /** The connection can run Ultra's extended work and independent review. */
   ultra?: true;
+  /** New Goals on this connection can enforce a USD spending limit. */
+  goalSpending?: true;
   /** The model's context window in tokens, when known. */
   contextWindow?: number;
 }>;
@@ -280,10 +282,14 @@ export type NativeChatProfileCatalog = Readonly<{
   newChatDefault?: NativeChatSelection;
   /** Main guards worker replacement and preserves accepted work across chats. */
   modelChanges?: true;
+  /** The live host can resolve each accepted input's saved connection independently. */
+  inputRoutes?: true;
   /** A currently offered choice recommended only for an untouched new chat. */
   recommendedProfileId?: string;
   /** Context window of the default model, when known. */
   defaultContextWindow?: number;
+  /** New Goals on the default connection can enforce a USD spending limit. */
+  defaultGoalSpending?: true;
   choices: readonly NativeChatProfileChoice[];
   saved: readonly (NativeChatProfileChoice & { available: boolean })[];
 }>;
@@ -372,6 +378,8 @@ export type NativeChatSnapshot = Readonly<{
   sessionId: string;
   sessionRevision: number;
   queuedInputs: number;
+  /** First page of waiting rows from this observation. Richer details can load separately. */
+  queuePreview?: NativeChatQueuePage;
   pendingGoalId?: string;
   historyRevisionAvailable?: true;
   subagentsAvailable?: true;
@@ -1122,7 +1130,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     attachmentId: string,
     processIds?: readonly number[]
   ): Promise<readonly number[]>;
-  acceptsPng?(): Promise<boolean>;
+  /** Uses the composer's selected model or the attached side chat's inherited model. */
+  acceptsPng?(attachmentId?: string): Promise<boolean>;
   acceptsLibrarySelection?(): Promise<boolean>;
   submitWithLibrarySelection?(
     attachmentId: string,
@@ -1142,7 +1151,7 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
    * Whether the selected model and host accept selected raster image Files.
    * False for text-only models; independent of legacy bounded inline PNG intake.
    */
-  acceptsSelectedImage?(): Promise<boolean>;
+  acceptsSelectedImage?(attachmentId?: string): Promise<boolean>;
   submitSelectedImage?(
     attachmentId: string,
     input: NativeChatSelectedImageInput

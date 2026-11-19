@@ -105,6 +105,8 @@ impl Refusal {
 pub(crate) struct SideChatView {
     pub side_chat_id: SessionId,
     pub parent_session_id: SessionId,
+    /// Whether the side chat's inherited execution accepts image inputs.
+    pub image_input: bool,
     /// The parent's committed history the side chat was forked from.
     pub source_context: HistoryBasis,
     /// The parent's model context had been compacted. The side chat still
@@ -165,6 +167,7 @@ impl Host {
     /// under the parent's execution.
     async fn open_side_chat(&self, parent: SessionId) -> Result<SideChatView> {
         self.owned_control(move |host| async move {
+            let (host, revision) = host.for_derived_session(&parent).await?;
             // Deleting the parent holds this admission from its idle check
             // until its data is gone, then discards the side chats it can
             // list. Opening under the same admission either completes first,
@@ -181,7 +184,10 @@ impl Host {
             }
             let execution = host.execution()?;
             let source = host.store.inspect(parent.clone()).await?;
-            host.check_execution(&source).await?;
+            if let Some(revision) = revision {
+                host.selection_at_revision(&source, revision)?;
+            }
+            host.check_new_submission(&source).await?;
             let configuration = session_configuration(&source)?;
             if configuration.side.is_some() {
                 return Err(Refusal::SideChat.error());
@@ -197,6 +203,7 @@ impl Host {
                     SESSION_SCHEMA,
                     SESSION_VERSION,
                     &SessionConfiguration {
+                        inherited_route: host.selected_route.clone(),
                         cwd: canonical_workspace(&configuration.cwd)?,
                         execution: execution.configuration,
                         owner: execution.owner,
@@ -264,6 +271,7 @@ impl Host {
             Ok(SideChatView {
                 side_chat_id: side,
                 parent_session_id: parent,
+                image_input: host.accepts_images(),
                 source_context: basis,
                 compacted,
                 omissions,

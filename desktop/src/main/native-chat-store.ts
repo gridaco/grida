@@ -209,7 +209,7 @@ export class NativeChatStore {
     return await this.startAt({ ...launch, cwd, processCwd: cwd }, state);
   }
 
-  private async requireProviderIsolation(
+  async requireProviderIsolation(
     launch: Pick<Launch, "credentialHome">
   ): Promise<void> {
     if (

@@ -213,6 +213,7 @@ export type ActiveNativeChat = Readonly<{
         | "acceptsPermissionMode"
         | "permissionMode"
         | "setPermissionMode"
+        | "acceptsInputRoutes"
         | "acceptsSelection"
         | "selectionRequest"
         | "createSelected"
@@ -924,6 +925,7 @@ export class NativeChatIpc {
       const newChatDefault = this.newChatDefault();
       return {
         ...result,
+        ...(active?.chat.acceptsInputRoutes && { inputRoutes: true as const }),
         active:
           active?.profileId !== undefined
             ? active.profileId
@@ -1136,16 +1138,23 @@ export class NativeChatIpc {
         !sameDirectory(latest.directoryIdentity, directoryIdentity)
       )
         throw new Error("native_chat_scope_changed");
-      if (profileId === null)
-        await this.startup.ensure(workspaceId, review.check);
-      else {
-        if (!this.profilesOwner)
-          throw new Error("native_chat_profiles_unavailable");
-        await this.profilesOwner.select(
-          workspaceId,
-          { kind: "new", id: profileId },
-          review.check
-        );
+      const existing = this.resolve(
+        sender,
+        workspaceId,
+        profileId ?? undefined
+      );
+      if (!existing?.chat.acceptsInputRoutes) {
+        if (profileId === null)
+          await this.startup.ensure(workspaceId, review.check);
+        else {
+          if (!this.profilesOwner)
+            throw new Error("native_chat_profiles_unavailable");
+          await this.profilesOwner.select(
+            workspaceId,
+            { kind: "new", id: profileId },
+            review.check
+          );
+        }
       }
       review.check();
       const active = this.resolve(sender, workspaceId, profileId ?? undefined);
@@ -1153,7 +1162,7 @@ export class NativeChatIpc {
       if (
         !active ||
         active.workspaceId !== workspaceId ||
-        active.profileId !== profileId ||
+        (!chat?.acceptsInputRoutes && active.profileId !== profileId) ||
         !active.directoryIdentity ||
         !sameDirectory(active.directoryIdentity, directoryIdentity) ||
         !chat?.createSelected ||
@@ -1553,7 +1562,10 @@ export class NativeChatIpc {
         ? active.profileId
         : (this.profile(event.sender, event.senderFrame, workspaceId)?.id ??
           null);
-    if (selected !== creation.selection.connectionId)
+    if (
+      !active?.chat.acceptsInputRoutes &&
+      selected !== creation.selection.connectionId
+    )
       throw new Error("native_chat_selection_route_changed");
     const attached = await this.attach(event, (chat) => {
       if (!chat.createSelected)
@@ -1583,7 +1595,8 @@ export class NativeChatIpc {
     owner: Owner,
     attachment: Attachment,
     inputId: string,
-    selectionRevision: unknown
+    selectionRevision: unknown,
+    image?: true
   ): Promise<NativeChatAcceptance | null> {
     if (attachment.sideOf) return null;
     if (selectionRevision === undefined) {
@@ -1623,10 +1636,16 @@ export class NativeChatIpc {
     if (
       state.revision !== selectionRevision ||
       !state.selection ||
-      state.selection.profileId !== active
+      (!owner.active.chat.acceptsInputRoutes &&
+        state.selection.profileId !== active)
     )
       throw new Error("native_chat_selection_revision_changed");
     if (!state.available) throw new Error("native_chat_selection_unavailable");
+    if (image && owner.active.chat.acceptsInputRoutes) {
+      const supported = await this.modelAcceptsImage(owner, state.selection);
+      this.revalidate(owner, attachment);
+      if (!supported) throw new Error("image_input_unavailable");
+    }
     return null;
   }
 
@@ -2502,39 +2521,73 @@ export class NativeChatIpc {
     return result;
   }
 
-  acceptsPng(event: IpcMainInvokeEvent): boolean {
-    return this.owner(event).active.chat.acceptsPng;
+  acceptsPng(event: IpcMainInvokeEvent, attachmentId?: string) {
+    return this.imageCapability(event, attachmentId, "png");
   }
 
-  async acceptsSelectedImage(event: IpcMainInvokeEvent): Promise<boolean> {
-    const owner = this.owner(event);
+  async acceptsSelectedImage(
+    event: IpcMainInvokeEvent,
+    attachmentId?: string
+  ): Promise<boolean> {
+    return this.imageCapability(event, attachmentId, "selected");
+  }
+
+  private imageCapability(
+    event: IpcMainInvokeEvent,
+    attachmentId: string | undefined,
+    kind: "png" | "selected"
+  ) {
+    const { owner, attachment } =
+      attachmentId === undefined
+        ? { owner: this.owner(event), attachment: undefined }
+        : this.requireAttachment(event, attachmentId);
+    const chat = owner.active.chat;
+    const launch =
+      kind === "png" ? chat.acceptsPng : chat.acceptsSelectedImage === true;
+    if (attachment?.sideOf) {
+      const image = attachment.session.sideImageInput;
+      if (image === undefined) return launch;
+      return image && (kind === "png" || chat.supportsSelectedImage === true);
+    }
     const desired = this.selectedSettings(event);
-    if (!desired) return owner.active.chat.acceptsSelectedImage === true;
+    if (!desired || (kind === "png" && !chat.acceptsInputRoutes)) return launch;
     if (
-      !owner.active.chat.supportsSelectedImage ||
+      (kind === "selected" && !chat.supportsSelectedImage) ||
       !desired.available ||
-      !desired.selection
+      !desired.selection ||
+      (attachment &&
+        "sessionId" in desired.target &&
+        desired.target.sessionId !== attachment.session.id)
     )
       return false;
-    if (desired.selection.profileId === null) {
+    return this.modelAcceptsImage(owner, desired.selection).then(
+      (supported) => {
+        this.revalidate(owner, attachment);
+        return this.selectedSettings(event) === desired && supported;
+      }
+    );
+  }
+
+  private async modelAcceptsImage(
+    owner: Owner,
+    selection: NonNullable<NativeChatSelections.View["selection"]>
+  ) {
+    if (selection.profileId === null) {
       if (
         (owner.active.profileId ?? null) === null &&
-        owner.active.chat.modelId === desired.selection.modelId
+        owner.active.chat.modelId === selection.modelId
       )
-        return owner.active.chat.acceptsSelectedImage === true;
-      return NativeChatProfiles.imageInput(
-        GG_PROVIDER_ID,
-        desired.selection.modelId
-      );
+        return (
+          owner.active.chat.acceptsPng ||
+          owner.active.chat.acceptsSelectedImage === true
+        );
+      return NativeChatProfiles.imageInput(GG_PROVIDER_ID, selection.modelId);
     }
-    const catalogue = await this.profiles(event);
-    this.revalidate(owner);
-    if (this.selectedSettings(event) !== desired) return false;
+    const catalogue = await this.profilesOwner?.list(owner.active.workspaceId);
     return (
       catalogue?.choices.some(
         (choice) =>
-          choice.id === desired.selection!.profileId &&
-          choice.imageInput === true
+          choice.id === selection.profileId && choice.imageInput === true
       ) === true
     );
   }
@@ -2650,7 +2703,8 @@ export class NativeChatIpc {
       owner,
       attachment,
       String(data?.inputId ?? ""),
-      data?.selectionRevision
+      data?.selectionRevision,
+      true
     );
     if (prior) return prior;
     const result = await owner.active.chat.submitImage(
@@ -2691,11 +2745,18 @@ export class NativeChatIpc {
       owner,
       attachment,
       input.inputId,
-      input.selectionRevision
+      input.selectionRevision,
+      true
     );
     if (prior) return prior;
     const chat = owner.active.chat;
-    if (!chat.acceptsSelectedImage || !chat.submitSelectedImage)
+    const routed =
+      input.selectionRevision !== undefined && chat.acceptsInputRoutes;
+    const modelAcceptsImage =
+      attachment.session.sideImageInput ??
+      (routed || chat.acceptsSelectedImage);
+    const transport = chat.supportsSelectedImage ?? chat.acceptsSelectedImage;
+    if (!modelAcceptsImage || !transport || !chat.submitSelectedImage)
       throw new Error("image_input_unavailable");
     const result = await chat.submitSelectedImage(attachment.session, input);
     this.revalidate(owner, attachment);

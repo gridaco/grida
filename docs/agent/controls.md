@@ -52,8 +52,11 @@ composer as an unsent draft.
 
 Send an ordinary follow-up while a turn is running to put it in the queue. For
 example, “When the deck is ready, describe the changes” can run as its own
-turn. Each waiting message keeps the options selected when you sent it; a
-**Plan** or **Ultra** choice is shown on the message, but its model is not.
+turn. It appears above the composer while its details load. After the current
+turn finishes normally, the next waiting message starts automatically when
+there is room to run it. Each waiting message keeps the options you selected
+when you sent it. The row shows a **Plan** or **Ultra** choice. The model
+selection stays in the message's saved settings.
 
 Hover or focus a waiting message to read its full text, including line breaks.
 Every message keeps its queue icon. An attached image also shows a leading

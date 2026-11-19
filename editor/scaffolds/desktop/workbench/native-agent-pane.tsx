@@ -1196,7 +1196,9 @@ function NativeChatPane({
             }
             submissionScope={state.scope}
             draftRef={draft}
-            onSubmit={(text) => controller.submit(text, state.scope)}
+            onSubmit={(text) =>
+              controller.submitFromComposer(text, state.scope)
+            }
             onStop={() => void controller.control("stop")}
             actions={{
               files:

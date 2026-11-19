@@ -52,7 +52,9 @@ chat, a failed send, an error, switching to another chat and back, and
 restarting the application. Each chat keeps its own draft as the person left
 it: the text with inline references, Plan or Goal, and an attached file. Only
 two things remove part of it: the person removing it, or a send the agent has
-accepted. A send that fails or is still unconfirmed keeps the draft. An
+accepted. Confirmation clears the matching draft even while the conversation
+is still loading. Edits made since sending survive that confirmation.
+A send that fails or is still unconfirmed keeps the draft. An
 attachment the selected model cannot use stays with the draft, and the
 composer says so, until the person removes it or chooses a model that accepts
 it.
@@ -223,10 +225,10 @@ silently applied. A change states when it takes effect. A default change
 applies to later accepted requests; already accepted work keeps its recorded
 settings. Missing information about model capacity remains visible.
 
-The model is chosen in the composer and can change between turns. Choosing
-another model keeps the conversation and its history in place; the next request
-uses the new model with the earlier turns as context. A turn already running
-finishes with the model that started it. Without a usable default model, the
+The person can choose another model in the composer while a turn runs.
+The next message they send uses that model with the earlier turns as context.
+The running turn and messages already accepted in the queue keep their model
+and permission profile. Without a usable default model, the
 conversation still opens and its composer asks the person to choose one.
 
 Using this feature requires no knowledge of field names: the agent finds and
@@ -426,8 +428,10 @@ refuses it, its text returns to the person as an unsent draft. That draft is
 held by the client until it is sent again; closing the client between the
 withdrawal and the refusal loses it.
 
-A queued request is immediately visible as waiting. It retains its place until
-the current task has settled and the queue is allowed to continue. The person can
+A queued request is visible when the chat reports it waiting, even while its
+full text and attachments load. The runtime advances the queue automatically
+after ordinary task settlement. Waiting for the next task to claim its place or
+for execution capacity does not require a person to resume the queue. The person can
 inspect, edit, reorder, or cancel waiting requests. Editing a request whose execution has
 already begun requires a visible choice to update that task or send another one.
 The person can see the model, effort, and operating settings captured when a

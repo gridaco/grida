@@ -1429,9 +1429,9 @@ or retired members fail before the host opens session state or sends provider
 work. Catalogue membership updates do not change owner, route or continuation
 bindings, and do not migrate saved choices to another model.
 
-An idle top-level chat can follow an explicitly selected authorized provider or
-credential connection. Creation configuration records provenance; it does not
-own future inputs. Current turns, queued inputs, delegated sessions and unresolved
+A top-level chat can accept inputs on an explicitly selected authorized
+connection while earlier work uses a different one. The host binds the model,
+principal, scope and permission profile at acceptance. Current turns, queued inputs, delegated sessions and unresolved
 Goals keep their accepted model, principal and scope. Admission and recovery
 validate those accepted identities, including work accepted after a model change.
 A legacy input with no captured model keeps the exact creation-execution

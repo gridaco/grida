@@ -853,8 +853,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     (event, id: string, processIds?: unknown) =>
       nativeChat.stopBackgroundProcesses(event, id, processIds)
   );
-  guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PNG, (event) =>
-    nativeChat.acceptsPng(event)
+  guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PNG, (event, id?: string) =>
+    nativeChat.acceptsPng(event, id)
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_LIBRARY_SELECTION, (event) =>
     nativeChat.acceptsLibrarySelection(event)
@@ -906,8 +906,9 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     (event, id: string, input: unknown) =>
       nativeChat.submitFile(event, id, input)
   );
-  guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_SELECTED_IMAGE, (event) =>
-    nativeChat.acceptsSelectedImage(event)
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_SELECTED_IMAGE,
+    (event, id?: string) => nativeChat.acceptsSelectedImage(event, id)
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_SUBMIT_SELECTED_IMAGE,

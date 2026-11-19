@@ -392,6 +392,21 @@ A queue basis contains `sessionId`, `requestId`, and
 summaries, with `sessionRevision`, `controlRevision`, `historyPosition`,
 `journalPosition`, and turn `epoch` for conditional operations.
 
+Snapshot also reports `idleQueueResumeAvailable`. An open queue with a runnable
+input and no current turn offers explicit recovery when the host has no worker
+or scheduler dispatch handling it. This includes a saved queue left unclaimed
+after the host restarted. Normal turn handoff and queues waiting for a host slot
+report `false`. An explicit admission hold is reported by `admissionPaused`.
+Reading either fact is passive.
+
+Private clients that negotiate waiting-message inspection can display the
+first eight ordered queue rows immediately from that snapshot. Each of those
+rows with user text carries an optional `preview` from the first nonblank
+text block, limited to 2,048 UTF-8 bytes including any ellipsis. Attachments
+and structured display parts remain available through inspection of the
+queued input at the same session revision. Supplemental model context is
+excluded from the preview.
+
 ### Retained tool-result images
 
 Private stdio clients on macOS and Linux can negotiate
@@ -668,11 +683,13 @@ deadline. New inputs capture version 2 with bounded raster preparation and a
 three-second limit. An older serialized invocation therefore does not acquire
 new semantics or fail merely because the current product offers raster tools.
 
-On the private stdio Responses PNG profile or reviewed saved OpenRouter PNG
-profile, negotiate both
+Private stdio clients negotiate both
 `co.grida/session/library-selections` and `co.grida/session/answer-library-selection`
-at version 1. An identified Submit with `allowLibrarySelection: true` can
-offer `design_search` for that input. The tool asks the attached client to
+at version 1. A fixed connection offers these capabilities when it supports
+image tool results. A supervisor with per-input provider routes can negotiate
+them once for the connection. An identified Submit with `allowLibrarySelection: true`
+offers `design_search` on a compatible input route. A text-only route accepts
+the prompt with the tool omitted. The tool asks the attached client to
 present a Library picker, with the recorded initial query. The client owns
 search, refinement, and access to the selected item.
 
@@ -774,10 +791,10 @@ side chat it opened and close it. The same `requestId` with another parent
 returns `side_chat_request_conflict`. Once its side chat is closed, a
 `requestId` names nothing and opens a new side chat.
 
-| Method suffix | Parameters and result                                                                                                                                                                                                                        |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `open`        | `sessionId` of an attached parent and optional `requestId`. Fork its committed conversation into a temporary session attached here and return `sideChatId`, `parentSessionId`, `sourceContext`, `compacted`, `omissions`, `temporary: true`. |
-| `close`       | `sideChatId` opened on this connection. Cancel its running turn, stop its processes, remove its data and detach it. Returns `{}`.                                                                                                            |
+| Method suffix | Parameters and result                                                                                                                                                                                                                                                                                                |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `open`        | `sessionId` of an attached parent and optional `requestId`. Fork its committed conversation into a temporary session attached here and return `sideChatId`, `parentSessionId`, `sourceContext`, `compacted`, `omissions`, `temporary: true`, and `imageInput` indicating whether its inherited model accepts images. |
+| `close`       | `sideChatId` opened on this connection. Cancel its running turn, stop its processes, remove its data and detach it. Returns `{}`.                                                                                                                                                                                    |
 
 Every session method works on `sideChatId`: `session/prompt`, `session/cancel`,
 `_co.grida/session/submit`, queue edits, steer, stop, pause and resume,
@@ -887,12 +904,15 @@ the supervisor can select that mode.
   exact pending change until its outcome is confirmed, then acknowledge it;
   the saved mode remains. Outstanding unacknowledged receipts are bounded.
 
-Changes require an idle ordinary parent chat, an empty queue and no running
-command processes. `permission_mode_busy` leaves the choice unchanged. Child
-and side chats cannot select their own broader posture. The host captures
-authority with accepted input and worker assignments; inspection, replay and
-reopening do not change it. Saved Full access is unavailable when the current
-trusted launch does not authorize it.
+The update selects the mode for inputs accepted after it in this ordinary
+parent chat. Running turns, queued inputs and worker assignments keep their
+captured mode through replay and recovery. Child and side chats cannot select
+their own broader posture. A running command retains its launch permissions.
+Only turns with Full access can read or write its terminal when it launched
+unconfined. The supervisor can always list and stop the chat's processes.
+Saved Full access is unavailable when the current trusted launch does not
+authorize it. Earlier implementations can return `permission_mode_busy` when
+work or running processes remain.
 
 Desktop presents an in-app confirmation bound to the exact chat before
 enabling Full access. Clients must feature-detect the capability; older hosts
@@ -1265,8 +1285,9 @@ The worker resolves the dispatch receipt under the captured Gateway scope.
 Main reads the current status through its fixed authenticated jobs route.
 
 The worker then asks the client for that job's settlement with the reverse
-`_co.grida/gateway/read-job-billing` request, carrying only the opaque
-`requestId` of the retained dispatch. The client answers within 15 seconds or
+`_co.grida/gateway/read-job-billing` request. It carries the opaque
+`requestId` of the retained dispatch and, for an alternate supervised
+Gateway connection, the supervisor-local `routeId` for that scope. The client answers within 15 seconds or
 the lookup reports `unavailable`.
 
 A response reports `kind` as `pending`, `unavailable`, or `settled`.
@@ -1490,6 +1511,39 @@ before `dispatch`, or an `unavailable` reply to it, means the request was not
 sent; a lost or invalid reply to `dispatch` or during reading leaves the
 attempt interrupted. Desktop's Gateway
 profile uses the same pipe and attaches its short-lived grant at dispatch.
+
+#### Selecting a provider for each input
+
+The private supervising client may also negotiate `co.grida/provider/routes` version 1.
+One native host then owns the store, turns and queue while different accepted
+inputs can use different provider connections. The agent asks the supervisor
+to resolve the input's saved choice with `_co.grida/provider/resolve`.
+Its parameters are the saved `connectionId` (null selects the configured
+default) and the exact `model`. Only the supervising client supplies an
+endpoint, custody configuration or Gateway/subscription scope.
+
+Every successful response carries the same model and a supervisor-local
+`routeId` UUID. The `kind` determines the remaining fields.
+
+| Kind      | Fields                                                                                                                                                                                                                        |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `launch`  | Reuses the process launch configuration and its existing provider exchange.                                                                                                                                                   |
+| `http`    | `endpoint`, `protocol`, and applicable native provider settings: `maxOutputTokens`, `credentialHome`, `configuredEndpointKey`, `compatibleOutputLimitField`, `llamaCppInputCount`, `reasoning`, and `imageGenerationBinding`. |
+| `gateway` | `endpoint`, `scope`, optional `maxOutputTokens`, and `gatewayBilling` when the supervisor can read billing for this exact scope.                                                                                              |
+| `chatgpt` | `endpoint` and `scope` for the subscription connection.                                                                                                                                                                       |
+
+For alternate routes every provider exchange action and cancellation includes
+the `routeId`. Image generation and Gateway billing reads also include this
+identifier when using an alternate route. The native host checks the selected
+adapter, captured model and credential authority. The supervisor checks the
+registered route before using its credential or executing an optional callback.
+Both sides must support a capability before an input can capture it.
+
+An accepted input retains the durable selection and authority. Queue dispatch,
+resumption and recovery resolve that choice again on the current private pipe.
+Route UUIDs have process lifetime and never enter the journal. A missing or
+changed authorized route leaves the input available for explicit recovery.
+Clients without this extension retain the single-provider launch contract.
 
 ### Configuration operations
 

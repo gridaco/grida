@@ -220,7 +220,7 @@ function Composer({ controller }: { controller: NativeChatController }) {
         canSubmit={controller.canSubmit}
         busy={false}
         isStreaming={false}
-        onSubmit={(text) => controller.submit(text, state.scope)}
+        onSubmit={(text) => controller.submitFromComposer(text, state.scope)}
         onStop={() => {}}
         toolbarEnd={
           <button

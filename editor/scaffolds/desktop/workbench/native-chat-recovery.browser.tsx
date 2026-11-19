@@ -80,6 +80,22 @@ async function setup() {
     sessionId,
     attachmentId: crypto.randomUUID(),
   }));
+  const startTurn = (inputId: string, text: string, inputPosition: number) => {
+    const turnId = crypto.randomUUID();
+    current = {
+      turnId,
+      epoch: 1,
+      historyPosition: inputPosition,
+      journalPosition: 1,
+      controlRevision: 0,
+      paused: false,
+      cancelled: false,
+      disposition: "running",
+      status: null,
+    };
+    messages.push({ messageId: inputId, turnId, role: "user", text });
+    return turnId;
+  };
   const submit = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(
     async (action, _attachment, inputId, text) => {
       revision++;
@@ -94,19 +110,7 @@ async function setup() {
           disposition: "queued",
         };
       }
-      const turnId = crypto.randomUUID();
-      current = {
-        turnId,
-        epoch: 1,
-        historyPosition: inputPosition,
-        journalPosition: 1,
-        controlRevision: 0,
-        paused: false,
-        cancelled: false,
-        disposition: "running",
-        status: null,
-      };
-      messages.push({ messageId: inputId, turnId, role: "user", text });
+      const turnId = startTurn(inputId, text, inputPosition);
       return {
         sessionId: chat,
         inputId,
@@ -132,6 +136,12 @@ async function setup() {
       },
     };
   });
+  const queuePage = () => ({
+    items: [...waiting],
+    offset: 0,
+    previousOffset: null,
+    nextOffset: null,
+  });
   const bridge: DesktopNativeChat = {
     status: async () => (hostAvailable ? "native-ready" : "native-unavailable"),
     takeNotificationFocus: async () => null,
@@ -154,6 +164,7 @@ async function setup() {
           sessionId: chat,
           sessionRevision: revision,
           queuedInputs: waiting.length,
+          ...(waiting.length > 0 && { queuePreview: queuePage() }),
           admissionPaused,
           current,
           latest,
@@ -168,12 +179,7 @@ async function setup() {
       older: null,
     }),
     control,
-    queue: async () => ({
-      items: [...waiting],
-      offset: 0,
-      previousOffset: null,
-      nextOffset: null,
-    }),
+    queue: async () => queuePage(),
     queuedText: async (_, __, inputId) => {
       const text = waiting.find((item) => item.inputId === inputId)?.preview;
       if (typeof text !== "string") throw new Error("fixture_input_missing");
@@ -249,6 +255,14 @@ async function setup() {
   return {
     bridge,
     chat,
+    claimNext: () => {
+      if (current || admissionPaused) throw new Error("fixture_queue_blocked");
+      const input = waiting.shift();
+      if (!input?.preview) throw new Error("fixture_queued_text_missing");
+      startTurn(input.inputId, input.preview, messages.length + 1);
+      revision++;
+      publish({ kind: "resync" });
+    },
     control,
     interrupt,
     load,
@@ -283,6 +297,91 @@ async function send(text: string) {
   );
   await expect.poll(() => composer()?.textContent).toBe("");
 }
+
+it.each(["submit", "enqueue"] as const)(
+  "clears the composer on the %s receipt while transcript replay is pending",
+  async (action) => {
+    const f = await setup();
+    if (action === "enqueue") {
+      await send("Start the review.");
+      await expect
+        .element(page.getByText("Start the review.", { exact: true }))
+        .toBeVisible();
+    }
+    const text = "Check the margins.";
+    await writeDraft(text);
+    await expect
+      .element(page.getByRole("button", { name: "Send", exact: true }))
+      .toBeEnabled();
+    const receipt = Promise.withResolvers<void>();
+    const replay = Promise.withResolvers<void>();
+    const submit = f.submit.getMockImplementation()!;
+    f.submit.mockImplementationOnce(async (...args) => {
+      await receipt.promise;
+      return submit(...args);
+    });
+    const read = f.bridge.transcriptPage!;
+    const transcript = vi
+      .spyOn(f.bridge, "transcriptPage")
+      .mockImplementationOnce(async (...args) => {
+        await replay.promise;
+        return read(...args);
+      });
+    const sending = page.getByRole("button", { name: "Sending…" });
+    try {
+      await act(async () => userEvent.keyboard("{Enter}"));
+      await expect.element(sending).toBeDisabled();
+      expect(composer()?.textContent).toBe(text);
+      await act(async () => receipt.resolve());
+      await expect.poll(() => transcript.mock.calls.length).toBe(1);
+      expect(f.submit.mock.lastCall?.[0]).toBe(action);
+      await expect.poll(() => composer()?.textContent).toBe("");
+      await expect.element(sending).not.toBeInTheDocument();
+    } finally {
+      receipt.resolve();
+      await act(async () => replay.resolve());
+    }
+  }
+);
+
+it("shows a waiting input through automatic handoff while its queue details are delayed", async () => {
+  const f = await setup();
+  await send("Review the cover.");
+  const detail = Promise.withResolvers<void>();
+  const readPage = f.bridge.queue!;
+  vi.spyOn(f.bridge, "queue").mockImplementation(async (...args) => {
+    const page = await readPage(...args);
+    await detail.promise;
+    return page;
+  });
+  const text = "Check the margins.";
+  const queue = page.getByTestId("native-composer-queue");
+  const row = queue.getByText(text, { exact: true });
+  const log = page.getByRole("log");
+  const message = log.getByText(text, { exact: true });
+  try {
+    await send(text);
+    await expect.element(row, { timeout: 3000 }).toBeVisible();
+    await act(async () => f.settle("succeeded", "Cover reviewed."));
+    await expect.element(log.getByText("Cover reviewed.")).toBeVisible();
+    await expect.element(row).toBeVisible();
+    await expect
+      .element(page.getByRole("button", { name: /^Resume( queue)?$/ }))
+      .not.toBeInTheDocument();
+
+    await act(async () => f.claimNext());
+    await expect.element(message).toBeVisible();
+  } finally {
+    await act(async () => detail.resolve());
+  }
+  await expect.element(row).not.toBeInTheDocument();
+  expect(message.elements()).toHaveLength(1);
+  expect(f.submit.mock.calls.map(([action]) => action)).toEqual([
+    "submit",
+    "enqueue",
+  ]);
+  expect(f.bridge.editQueue).not.toHaveBeenCalled();
+});
 
 it("lets the person reopen an uncertain turn and send one successful follow-up in the same chat", async () => {
   const f = await setup();
@@ -403,6 +502,9 @@ it("offers an explicit way to end interrupted work while keeping its queue held"
   await expect
     .element(page.getByText("Queue paused because you interrupted"))
     .toBeVisible();
+  await expect
+    .element(page.getByRole("button", { name: "Resume queue", exact: true }))
+    .toBeEnabled();
   await expect
     .element(page.getByText("Check the spacing.", { exact: true }))
     .toBeVisible();

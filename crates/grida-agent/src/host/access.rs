@@ -219,9 +219,7 @@ impl Host {
         &self,
         update: PermissionModeUpdate,
     ) -> Result<PermissionModeReceipt> {
-        // Settlement is recorded before the host retires child work and joins
-        // command cleanup. Follow the same barrier as deletion and derivation.
-        drop(self.settled_work(&update.session_id).await);
+        // A setting change and each input's permission capture are ordered at admission.
         let _admission = self.configuration_admission.lock().await;
         let view = self
             .permission_mode_scope(&update.cwd, &update.session_id)
@@ -253,9 +251,7 @@ impl Host {
             if work.closed {
                 return Err(problem(ErrorKind::Unavailable, "host_shutting_down"));
             }
-            if work.retiring.contains(&update.session_id)
-                || (ledger.mode != update.mode && work.active.contains_key(&update.session_id))
-            {
+            if work.retiring.contains(&update.session_id) {
                 return Err(problem(ErrorKind::Conflict, "permission_mode_busy"));
             }
         }
@@ -281,19 +277,6 @@ impl Host {
                 .as_ref()
                 .ok_or_else(storage_unavailable)?
                 .full_access_profile()?;
-        }
-        // A displayed downgrade must not leave an accepted turn or retained
-        // command running with broader authority. End/stop it first.
-        if ledger.mode != update.mode
-            && (view.current.is_some()
-                || !view.queued.is_empty()
-                || self
-                    .processes
-                    .list(&update.session_id)
-                    .iter()
-                    .any(|p| p.state == crate::processes::ProcessState::Running))
-        {
-            return Err(problem(ErrorKind::Conflict, "permission_mode_busy"));
         }
         ledger.revision = ledger
             .revision
@@ -557,7 +540,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn downgrade_waits_for_the_settled_turns_host_cleanup_to_release_ownership() {
+    async fn the_next_permission_choice_can_change_while_a_settled_turn_finishes_cleanup() {
         let root = tempfile::tempdir().unwrap();
         let cwd = root.path().canonicalize().unwrap();
         let host = host(&cwd.join("state"));
@@ -592,21 +575,11 @@ mod tests {
             "downgrade",
             PermissionMode::Restricted,
         ));
-        tokio::pin!(change);
-        tokio::select! {
-            result = &mut change => panic!("changed mode before native cleanup released ownership: {result:?}"),
-            _ = tokio::time::sleep(Duration::from_millis(25)) => {}
-        }
-        assert_eq!(
-            host.read_permission_mode(&session, &cwd)
-                .unwrap()
-                .unwrap()
-                .mode,
-            PermissionMode::FullAccess
-        );
-        host.work.lock().await.active.remove(&session);
-        host.changed.notify_waiters();
-        assert_eq!(change.await.unwrap().state.mode, PermissionMode::Restricted);
+        let receipt = tokio::time::timeout(Duration::from_secs(2), change)
+            .await
+            .expect("the composer choice is independent of process cleanup")
+            .unwrap();
+        assert_eq!(receipt.state.mode, PermissionMode::Restricted);
         cleanup.abort();
     }
 

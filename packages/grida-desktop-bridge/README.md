@@ -68,9 +68,12 @@ start the workspace chat. Known setup failures are fixed readiness values.
 it does not identify a worker or storage failure. `profiles()` remains available
 before startup succeeds. An explicit `selectProfile()` can open a saved or
 configured connection, with no implicit fallback or default retry.
-The optional catalogue flag `modelChanges` advertises guarded replacement of
-the workspace worker. A renderer must withhold existing-chat model changes
-when this flag is absent. Selection validates the destination before closing
+The optional catalogue flag `inputRoutes` means the live workspace host can
+accept inputs on different saved connections. After saving the chat selection,
+submit or enqueue with its revision on the existing attachment. An accepted
+input keeps its own connection across subsequent model calls and queue waits.
+For hosts that require changing the workspace worker, the optional catalogue
+flag `modelChanges` advertises guarded replacement. Replacement validates the destination before closing
 the previous connection, checks all chats for captured work, and saves a new
 profile only after launch succeeds. A refusal keeps the previous worker;
 `native_chat_model_change_failed_restored` requires loading the previous chat

@@ -11,6 +11,7 @@ mod completion_checks;
 mod delegation;
 pub(crate) mod deletion;
 pub(crate) mod editor_observation;
+mod execution_routes;
 mod file_references;
 mod goals;
 mod history;
@@ -120,8 +121,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::num::NonZeroU64;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Weak};
 use std::time::Duration;
 use tokio::sync::{Mutex, MutexGuard, Notify, Semaphore, broadcast, oneshot};
 use tokio::task::AbortHandle;
@@ -186,6 +187,10 @@ pub struct Host {
     store: Arc<SqliteStore>,
     state_dir: Option<Arc<Path>>,
     execution: Option<Arc<Execution>>,
+    routes: Arc<std::sync::OnceLock<execution_routes::Routes>>,
+    /// Provider choice inherited by work derived from a routed turn.
+    selected_route: Option<execution_routes::Selection>,
+    route_id: Option<uuid::Uuid>,
     gg_connection: Option<Arc<GgConnection>>,
     spending: Arc<spending::Store>,
     configuration: Option<Arc<Configuration>>,
@@ -221,6 +226,8 @@ pub struct Host {
 }
 
 struct Execution {
+    /// The supervisor offers billing lookup for this Gateway route.
+    gateway_billing: bool,
     configuration: Fingerprint,
     owner: Fingerprint,
     runtime: Runtime,
@@ -248,6 +255,8 @@ struct Work {
     model_change_prepared: bool,
     unverified: bool,
     active: BTreeMap<SessionId, Active>,
+    /// A worker can still own the next queue kick after releasing its active slot.
+    queue_dispatch: BTreeMap<SessionId, Weak<()>>,
     retiring: BTreeSet<SessionId>,
     ready: VecDeque<ReadyWork>,
     missed_stops: bool,
@@ -287,6 +296,30 @@ impl ReadyWork {
 }
 
 impl Work {
+    /// Keep automatic dispatch observable across worker handoff and ready-queue removal.
+    /// Overlapping dispatchers for a session share the same lifetime.
+    fn track_queue_dispatch(&mut self, session: &SessionId) -> Arc<()> {
+        if let Some(dispatch) = self.queue_dispatch.get(session).and_then(Weak::upgrade) {
+            return dispatch;
+        }
+        self.queue_dispatch
+            .retain(|_, entry| entry.strong_count() > 0);
+        let dispatch = Arc::new(());
+        self.queue_dispatch
+            .insert(session.clone(), Arc::downgrade(&dispatch));
+        dispatch
+    }
+
+    fn owns_queue_dispatch(&self, session: &SessionId) -> bool {
+        self.queue_dispatch
+            .get(session)
+            .is_some_and(|entry| entry.strong_count() > 0)
+            || self
+                .ready
+                .iter()
+                .any(|work| matches!(work, ReadyWork::Queue(owner, _) if owner == session))
+    }
+
     fn defer(&mut self, ready: ReadyWork) {
         if self.retiring.contains(ready.session()) {
             return;
@@ -430,6 +463,10 @@ impl DurableSubmission {
 
 #[derive(Serialize, Deserialize)]
 struct StoredPrompt {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    provider_configuration: Option<Fingerprint>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    inherited_route: Option<execution_routes::Selection>,
     #[serde(
         default,
         skip_serializing_if = "crate::file_tools::ImageView::is_legacy"
@@ -465,6 +502,10 @@ struct StoredPrompt {
     allow_wakeups: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     allow_library_selection: bool,
+    // The client opted in, but the accepted route cannot return image tool results.
+    // Keep the original request distinguishable when replaying its input ID.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    unavailable_library_selection_requested: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     permission_capture: Option<crate::permissions::PermissionCapture>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -512,6 +553,8 @@ struct CapturedAuthority {
 #[derive(Deserialize)]
 struct CapturedRoute {
     #[serde(default)]
+    provider_configuration: Option<Fingerprint>,
+    #[serde(default)]
     model: Option<agent_kit_core::ModelId>,
     #[serde(default)]
     authority: Option<CapturedAuthority>,
@@ -527,10 +570,13 @@ impl CapturedRoute {
         let live = &execution.authority.inference.authority;
         decode_input::<Self>(input).is_ok_and(|route| {
             route
-                .model
-                .map_or(legacy_execution == execution.configuration, |model| {
-                    model == execution.config.model
-                })
+                .provider_configuration
+                .is_none_or(|captured| captured == execution.configuration)
+                && route
+                    .model
+                    .map_or(legacy_execution == execution.configuration, |model| {
+                        model == execution.config.model
+                    })
                 && route.authority.is_some_and(|captured| {
                     captured.principal == live.principal && captured.scope == live.scope
                 })
@@ -595,7 +641,7 @@ enum Launch {
     Queued(Option<Acceptance>, Option<SessionRevision>),
     Sponsored(Box<sponsorship::SponsoredClaim>),
     Delegated(Box<agent_kit_store_sqlite::OperationClaim>),
-    Compact(ChangeId),
+    Compact(ChangeId, Option<u64>),
     RecoverCompaction(RecoveryRequest),
     Resume(ClaimRequest),
     ResumeSponsored(sponsorship::SponsoredWake),
@@ -698,6 +744,9 @@ pub enum RunResult {
 
 #[derive(Serialize, Deserialize)]
 struct SessionConfiguration {
+    /// A child or side chat inherits the choice made when it was opened.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    inherited_route: Option<execution_routes::Selection>,
     cwd: PathBuf,
     execution: Fingerprint,
     /// Credential-owner provenance at creation; accepted work captures its own authority.
@@ -875,6 +924,9 @@ impl Host {
             store,
             state_dir: Some(state_dir.into()),
             execution,
+            routes: Default::default(),
+            selected_route: None,
+            route_id: None,
             gg_connection: None,
             configuration,
             permissions: None,
@@ -949,6 +1001,7 @@ impl Host {
         }
         let execution = self.execution()?;
         let configuration = SessionConfiguration {
+            inherited_route: None,
             cwd: canonical_workspace(&cwd)?,
             execution: execution.configuration,
             owner: execution.owner,
@@ -1009,6 +1062,10 @@ impl Host {
 
     pub(crate) fn supports_gateway_billing_status(&self) -> bool {
         self.supervised_gateway().is_some()
+            && self
+                .execution
+                .as_ref()
+                .is_some_and(|execution| execution.gateway_billing)
     }
 
     pub(crate) async fn gateway_billing_request_id(
@@ -1019,6 +1076,9 @@ impl Host {
         attempt: agent_kit_core::AttemptId,
         child: Option<GatewayChildBillingRef>,
     ) -> Option<String> {
+        if !self.supports_gateway_billing_status() {
+            return None;
+        }
         let gateway = self.supervised_gateway()?.clone();
         gateway.validate().ok()?;
         if let Some(child) = child {
@@ -1093,8 +1153,14 @@ impl Host {
         Option<&'static str>,
         Option<crate::gg::GatewayTurnBilling>,
     )> {
-        let gateway = self
-            .supervised_gateway()
+        let host = if include_gateway_billing && self.has_routes() {
+            self.for_turn(&session, &turn).await.ok()
+        } else {
+            Some(self.clone())
+        };
+        let gateway = host
+            .as_ref()
+            .and_then(Self::supervised_gateway)
             .filter(|owner| include_gateway_billing && owner.validate().is_ok())
             .cloned();
         let parent_gateway = gateway.clone();
@@ -1124,7 +1190,9 @@ impl Host {
         let children = match gateway.as_ref().filter(|_| include_child_billing) {
             Some(gateway) => {
                 let after = child_billing_after.is_some();
-                let page = self
+                let page = host
+                    .as_ref()
+                    .expect("gateway resolved")
                     .gateway_child_billing(
                         session.clone(),
                         turn.clone(),
@@ -1159,7 +1227,11 @@ impl Host {
 
     async fn require_gateway_billing_parent(&self, session: &SessionId) -> Result<()> {
         let view = self.store.inspect(session.clone()).await?;
-        self.check_execution(&view).await?;
+        // A resolved historical turn has already proved its captured authority.
+        // Concurrent inputs in the same chat can belong to another provider.
+        if !self.has_routes() || self.selected_route.is_none() {
+            self.check_execution(&view).await?;
+        }
         if session_configuration(&view)?.subagent.is_some() {
             return Err(problem(
                 ErrorKind::Unavailable,
@@ -1361,7 +1433,9 @@ impl Host {
         let host = self.clone();
         let worker_session = session.clone();
         let worker_turn = turn.clone();
+        let queue_dispatch = work.track_queue_dispatch(&session);
         let task = async move {
+            let _queue_dispatch = queue_dispatch;
             // The worker checks the same lock used for registration before
             // any durable claim, even when its requesting client disappears.
             let answered = match &launch {
@@ -1390,7 +1464,18 @@ impl Host {
                 _ => None,
             };
             let queue_admission = identified || matches!(&launch, Launch::Queued(..));
-            let result = host.admit(&worker_session, &worker_turn, launch).await;
+            let (host, result) = match host
+                .for_launch(&worker_session, &worker_turn, &launch)
+                .await
+            {
+                Ok((routed, route_basis)) => {
+                    let result = routed
+                        .admit(&worker_session, &worker_turn, launch, route_basis)
+                        .await;
+                    (routed, result)
+                }
+                Err(error) => (host, Err(error)),
+            };
             let admitted = match result {
                 Ok(Some(run)) => run,
                 Ok(None) => {
@@ -1552,6 +1637,7 @@ impl Host {
         session: &SessionId,
         turn: &TurnId,
         launch: Launch,
+        route_basis: Option<SessionRevision>,
     ) -> Result<Option<Admitted>> {
         if self.work.lock().await.closed {
             return Err(problem(ErrorKind::Unavailable, "host_shutting_down"));
@@ -1584,7 +1670,7 @@ impl Host {
                     session,
                     turn,
                     direct.as_ref().map(|acceptance| &acceptance.input),
-                    *recovery,
+                    recovery.or(route_basis),
                 )
                 .await
         {
@@ -1599,8 +1685,10 @@ impl Host {
             return Ok(admitted);
         }
         let maintenance_claim = match &launch {
-            Launch::Compact(request) => {
-                return self.admit_compaction(session, turn, request.clone()).await;
+            Launch::Compact(request, revision) => {
+                return self
+                    .admit_compaction(session, turn, request.clone(), *revision)
+                    .await;
             }
             Launch::Resume(request) => Some(WorkerClaim::Select(request.clone())),
             Launch::RecoverStopped(request) | Launch::RecoverCompaction(request) => {
@@ -1627,6 +1715,9 @@ impl Host {
             && revision != &view.revision
         {
             return Ok(None);
+        }
+        if route_basis.is_some_and(|basis| basis != view.revision) {
+            return Err(problem(ErrorKind::Conflict, "stale_session_revision"));
         }
         // Only an already-cancelled retained turn may cross execution routes
         // for local finalization. Its recovery cannot dispatch new work.
@@ -1746,7 +1837,7 @@ impl Host {
                     .await?;
                 (WorkerClaim::Recover(request), None, None, history)
             }
-            Launch::Compact(_) | Launch::RecoverCompaction(_) => {
+            Launch::Compact(..) | Launch::RecoverCompaction(_) => {
                 return Err(problem(ErrorKind::InvalidState, "compaction_plan_missing"));
             }
             Launch::Sponsored(_) | Launch::Delegated(_) | Launch::Identified { .. } => {
@@ -2361,7 +2452,8 @@ impl Host {
     }
 
     /// Accepted work owns its route; creation configuration is provenance.
-    /// Only a new idle input may deliberately capture a different connection.
+    /// A fixed-profile host must be able to serve its outstanding work. A
+    /// routing supervisor resolves only the current turn or next queue head.
     async fn check_execution(&self, view: &SessionView) -> Result<()> {
         let execution = self.execution()?;
         let configuration = session_configuration(view)?;
@@ -2401,21 +2493,26 @@ impl Host {
                 return Err(problem(ErrorKind::Conflict, "session_active_route_changed"));
             }
         }
+        let mut queued = view
+            .queued
+            .iter()
+            .map(|queued| &queued.input)
+            .filter(|input| !(configuration.subagent.is_some() && subagents::is_message(input)));
         if view.current.is_none()
-            && view
-                .queued
-                .iter()
-                .filter(|queued| {
-                    !(configuration.subagent.is_some() && subagents::is_message(&queued.input))
+            && queued
+                .by_ref()
+                .take(if self.routes.get().is_some() {
+                    1
+                } else {
+                    usize::MAX
                 })
-                .any(|queued| {
-                    !CapturedRoute::admits(&queued.input, execution, configuration.execution)
-                })
+                .any(|input| !CapturedRoute::admits(input, execution, configuration.execution))
         {
             return Err(problem(ErrorKind::Conflict, "session_queued_route_changed"));
         }
         if configuration.subagent.is_none()
             && goals::require_resolved_goal(&view.driver_state).is_err()
+            && (self.routes.get().is_none() || (view.current.is_none() && view.queued.is_empty()))
             && !self.goal_matches_execution(view).await?
         {
             return Err(problem(ErrorKind::Conflict, "session_goal_route_changed"));
@@ -2523,12 +2620,17 @@ impl Host {
         )?;
         let configuration = self.with_configuration(Configuration::snapshot).await?;
         let child_work = subagent.is_some();
-        if allow_library_selection && (!execution.tool_result_images || child_work) {
+        let unavailable_library_selection_requested =
+            allow_library_selection && !execution.tool_result_images;
+        if (allow_library_selection && child_work)
+            || (unavailable_library_selection_requested && !self.has_routes())
+        {
             return Err(problem(
                 ErrorKind::Unsupported,
                 "library_selection_unavailable",
             ));
         }
+        let allow_library_selection = allow_library_selection && execution.tool_result_images;
         if session_configuration(session)?.side.is_some() {
             if allow_wakeups {
                 return Err(side_chats::Refusal::Wakeups.error());
@@ -2637,6 +2739,7 @@ impl Host {
             parts
         };
         let allow_attachment_reference = desktop_image_generation.is_some()
+            && self.supports_attachment_reference()
             && self
                 .desktop_image_generation
                 .as_ref()
@@ -2663,6 +2766,14 @@ impl Host {
         Ok(Submission {
             id,
             payload: encode_stored_prompt(&StoredPrompt {
+                provider_configuration: self
+                    .selected_route
+                    .as_ref()
+                    .map(|_| execution.configuration),
+                inherited_route: selection
+                    .is_none()
+                    .then(|| self.selected_route.clone())
+                    .flatten(),
                 image_view: crate::file_tools::ImageView::Raster,
                 subscription_image_input: execution.legacy_subscription_provider.is_some()
                     && execution.accepts_selected_png,
@@ -2691,6 +2802,7 @@ impl Host {
                 questions,
                 allow_wakeups,
                 allow_library_selection,
+                unavailable_library_selection_requested,
                 permission_capture,
                 allow_reviewer_primary_read,
                 host_tools_capture,
@@ -2756,6 +2868,13 @@ impl Host {
         ) = match input.payload.version() {
             INPUT_VERSION if input.payload.schema().as_str() == INPUT_SCHEMA => {
                 let stored: StoredPrompt = decode_input(input)?;
+                if !cancellation_only
+                    && stored
+                        .provider_configuration
+                        .is_some_and(|captured| captured != execution.configuration)
+                {
+                    return Err(problem(ErrorKind::Conflict, "chat_selection_route_changed"));
+                }
                 image_view = stored.image_view;
                 subscription_image_input = stored.subscription_image_input;
                 image_tool_results = stored
@@ -3256,7 +3375,7 @@ impl Host {
                 self.scan_missed_stops().await;
                 continue;
             }
-            let next = {
+            let (next, _queue_dispatch) = {
                 let mut work = self.work.lock().await;
                 if work.closed || work.active.len() >= MAX_ACTIVE_RUNS {
                     return;
@@ -3303,7 +3422,12 @@ impl Host {
                     }
                     continue;
                 }
-                work.ready.remove(index)
+                let next = work.ready.remove(index);
+                let dispatch = match &next {
+                    Some(ReadyWork::Queue(session, _)) => Some(work.track_queue_dispatch(session)),
+                    _ => None,
+                };
+                (next, dispatch)
             };
             match next {
                 Some(ReadyWork::Queue(session, recovery)) => {
@@ -3364,12 +3488,15 @@ impl Host {
         if let Some(accepted) = self.existing_submission(&request, &context).await? {
             return Ok(accepted);
         }
-        let mut policy = self.submission_policy(&request, context.allow_wakeups)?;
+        let host = self
+            .for_selection(&request.session, context.selection_revision)
+            .await?;
+        let mut policy = host.submission_policy(&request, context.allow_wakeups)?;
         policy.selection_revision = context.selection_revision;
-        self.bind_editor(&mut policy, &request, &context)?;
+        host.bind_editor(&mut policy, &request, &context)?;
         policy.allow_library_selection = context.allow_library_selection;
         let result = async {
-            let ticket = self.register_prompt(request.clone(), true, policy).await?;
+            let ticket = host.register_prompt(request.clone(), true, policy).await?;
             prompt_acceptance(ticket.admission).await
         }
         .await;
@@ -3437,8 +3564,12 @@ impl Host {
         else {
             return Ok(None);
         };
-        let editor_browser_tools =
-            lifecycle::check_input(&view.input, &request.parts)?.editor_browser_tools;
+        let StoredPrompt {
+            allow_library_selection,
+            unavailable_library_selection_requested,
+            editor_browser_tools,
+            ..
+        } = lifecycle::check_input(&view.input, &request.parts)?;
         let settings = InputSettings::for_input(&view.input)?;
         settings.require_effort(request.effort, request.reasoning)?;
         if request
@@ -3456,7 +3587,9 @@ impl Host {
                 "submission_wakeup_permission_changed",
             ));
         }
-        if settings.allow_library_selection != context.allow_library_selection {
+        if (allow_library_selection || unavailable_library_selection_requested)
+            != context.allow_library_selection
+        {
             return Err(problem(
                 ErrorKind::Conflict,
                 "submission_library_selection_changed",
@@ -4031,6 +4164,7 @@ impl Execution {
             configuration,
             owner,
             runtime,
+            gateway_billing: true,
             config: MasterConfig {
                 model,
                 instructions: CORE_INSTRUCTIONS.trim().into(),

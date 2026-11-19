@@ -489,7 +489,12 @@ export class NativeWorkspaceAgents {
     if ("root" in workspace) {
       if (workspace.nestedDeck) await workspace.nestedDeck.requireCurrent();
       workspace.requireDirectoryCurrent?.();
-      const options = { ...launch, cwd: workspace.root };
+      const options = {
+        ...launch,
+        cwd: workspace.root,
+        ...(launch.lookupProviderRoute &&
+          profile && { inputRouteConnectionId: profile.id }),
+      };
       return profile
         ? this.store.startWorkspace(workspace.id, options, profile.id)
         : this.store.startWorkspace(workspace.id, options);

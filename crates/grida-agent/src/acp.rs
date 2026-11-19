@@ -82,11 +82,10 @@ async fn serve(
     let (sdk, wire) = Channel::duplex();
     let (incoming, outgoing) = wire.into_parts();
     let editor_surfaces = host.editor_surfaces.clone();
-    let desktop_image_generation = host.desktop_image_generation.clone();
     let read = async {
         let result = transport::read(input, outgoing, delivery.clone()).await;
         editor_surfaces.detach();
-        if let Some(generation) = &desktop_image_generation {
+        if let Some(generation) = host.image_connection() {
             generation.detach();
         }
         if let Some(provider) = &provider {
@@ -107,7 +106,7 @@ async fn serve(
         transport::write(output, incoming, delivery.clone()),
     );
     editor_surfaces.detach();
-    if let Some(generation) = &desktop_image_generation {
+    if let Some(generation) = host.image_connection() {
         generation.detach();
     }
     if let Some(provider) = &provider {
@@ -216,8 +215,9 @@ async fn serve_connection(
                 let goal_effort = initialized_host.goal_sponsorship_available();
                 let mut advertised =
                     extensions::advertised(reviewer, subagents, deletion, effort, goal_effort, files);
-                let library_selection = reviewer && initialized_host.accepts_library_selection();
-                let spending = reviewer && initialized_host.supports_goal_spending();
+                let routed = reviewer && provider.is_some() && offered(crate::supervised_provider::ROUTES);
+                let library_selection = reviewer && (routed || initialized_host.accepts_library_selection());
+                let spending = reviewer && (routed || initialized_host.supports_goal_spending());
                 let spending_negotiated = spending && offered(extensions::GOAL_SPENDING);
                 if spending {
                     advertised.insert(extensions::GOAL_SPENDING.into(), 1.into());
@@ -241,9 +241,16 @@ async fn serve_connection(
                         return responder.respond_with_error(host_error(error));
                     }
                     advertised.insert(capability.into(), 1.into());
+                    let routes = crate::supervised_provider::ROUTES;
+                    if routed {
+                        if let Err(error) = initialized_host.attach_routes(provider.clone()) {
+                            return responder.respond_with_error(host_error(error));
+                        }
+                        advertised.insert(routes.into(), 1.into());
+                    }
                     let billing = extensions::gateway_billing::CAPABILITY;
                     if reviewer
-                        && initialized_host.supports_gateway_billing_status()
+                        && (routed || initialized_host.supports_gateway_billing_status())
                         && offered(billing)
                     {
                         advertised.insert(billing.into(), 1.into());
@@ -254,7 +261,7 @@ async fn serve_connection(
                     }
                     let capability = crate::host::image_generation::CAPABILITY;
                     if reviewer
-                        && let Some(generation) = &initialized_host.desktop_image_generation
+                        && let Some(generation) = initialized_host.image_connection()
                         && offered(capability)
                     {
                         let reference = crate::host::image_generation::REFERENCE_CAPABILITY;
@@ -262,10 +269,10 @@ async fn serve_connection(
                         let placement = crate::host::image_generation::PLACE_CAPABILITY;
                         let place = offered(placement);
                         let attachment = crate::host::image_generation::ATTACHMENT_CAPABILITY;
-                        let attachments = initialized_host.supports_attachment_reference()
+                        let attachments = (routed || initialized_host.supports_attachment_reference())
                             && offered(attachment);
                         let workspace_reference = crate::host::image_generation::WORKSPACE_CAPABILITY;
-                        let workspace_references = initialized_host.supports_workspace_image_reference()
+                        let workspace_references = (routed || initialized_host.supports_workspace_image_reference())
                             && offered(workspace_reference);
                         generation.attach(connection.clone(), references, place, attachments, workspace_references);
                         advertised.insert(capability.into(), 1.into());

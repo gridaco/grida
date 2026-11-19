@@ -131,6 +131,8 @@ export class ProviderNetworkHost {
   ): Promise<NativeProviderNetwork> {
     const networkSession = await ProviderNetworkHost.networkSession();
     return {
+      isCurrent: () =>
+        authority.nativeGrants().some((grant) => grant.id === grantId),
       prepare: (target, headers) => {
         const approved = ProviderNetworkPolicy.authorize(
           authority.nativeGrants(),

@@ -833,8 +833,8 @@ withholds command and mutation tools.
 
 The supervisor negotiates `co.grida/session/permission-mode` version 1 on
 private stdio. Inspection and update create no model work. A mode change is
-durable per chat, requires its current revision and an exact request identity,
-and is refused while work, queue entries or running processes remain.
+durable per chat and requires its current revision and an exact request identity.
+It applies to inputs accepted after the change, including while a turn runs.
 Accepted work and child assignments retain the captured mode through recovery;
 a launcher lacking Full access authority cannot resume a Full access capture.
 See the [client protocol](./docs/rust-client-protocol.md#per-chat-permission-mode).
@@ -863,6 +863,8 @@ polls: 5000 to 300000) and `max_output_tokens`. A pipe process accepts only
 `"\u0003"`, delivered as an interrupt; a terminal process receives the
 characters. A call's wait ends two seconds before its operation deadline. It
 needs no approval of its own and reaches only the calling chat's processes.
+Reading or writing an unconfined process requires a turn with captured Full access.
+The supervisor can list and stop it after a change to Default.
 The response text is:
 
 ```text
