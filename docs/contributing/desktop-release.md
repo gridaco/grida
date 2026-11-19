@@ -4,7 +4,10 @@ format: md
 
 # Contributing to Grida | Desktop release
 
-Runbook for cutting desktop releases — macOS / Windows / Linux signed, notarized, autoupdating via [`update.electronjs.org`](https://github.com/electron/update.electronjs.org). Target audience: maintainers with `release` environment approver rights.
+This runbook is for Desktop release maintainers with `release` environment
+approver rights. macOS and Windows use the
+[Electron update feed](https://github.com/electron/update.electronjs.org).
+Linux uses DEB and RPM packages.
 
 > Triggering the workflow does **not** ship anything until an approver clicks "Approve and deploy" in the [`release` environment](https://github.com/gridaco/grida/settings/environments) gate.
 
@@ -22,9 +25,17 @@ Runbook for cutting desktop releases — macOS / Windows / Linux signed, notariz
 
    Or via UI: **Actions → Publish Desktop App → Run workflow**.
 
-3. **Approve in the environment gate.** Each platform job pauses at the `release` environment — that's **four** jobs to approve: `macos-apple-silicon`, `macos-intel`, `windows`, `linux` (macOS builds one arch per runner, see [Hard constraints](#hard-constraints)). Open the run in Actions and click "Review deployments → Approve and deploy."
+3. **Approve in the environment gate.** The five platform jobs pause at the
+   `release` environment. Open the run in Actions and choose
+   **Review deployments → Approve and deploy**.
 
-4. **Verify.** When the run finishes, the GitHub Release page has both macOS arches — `Grida-darwin-arm64-<version>.zip` + `Grida-darwin-x64-<version>.zip` and their `.dmg` siblings (`Grida-<version>-arm64.dmg`, `Grida-<version>-x64.dmg`) — plus Windows `.exe` + nupkg and Linux `.deb` / `.rpm`. Confirm the feed serves **each arch** (the autoupdate feed URL is per-`<platform>-<arch>`):
+4. **Review and publish the draft.** The workflow assembles a GitHub draft
+   release. Check the notes and built artifacts, then publish it.
+
+5. **Verify the public release.** Check both macOS architectures (ZIP and
+   DMG), Windows x64 (EXE and NUPKG), and both Linux architectures (DEB and
+   RPM). Confirm the applicable updater feeds return the published version.
+   For example, check both macOS architectures with this command.
 
    ```sh
    for ARCH in arm64 x64; do
@@ -46,6 +57,72 @@ Same as above but with `-f prerelease=true`. The release shows up on GitHub Rele
 
 To promote a prerelease to stable: edit the GitHub Release in the UI and uncheck "Set as a pre-release." The feed will pick it up on the next poll (~6h default).
 
+## Hosted renderer compatibility
+
+Desktop patch releases are optional within a supported major and minor
+version line. A new major or minor line becomes required for older builds
+when the hosted editor activates its minimum supported version. Publishing
+a binary and activating the minimum are separate release steps. Patch
+releases can advance the installer target while keeping the same minimum.
+The bridge protocol and capability checks still govern which calls and
+features a compatible Desktop build supports.
+
+The hosted editor serves the policy from `GET /desktop/compatibility`.
+Set the following variables on the production editor deployment:
+
+| Variable                        | Value                                                                                                                              |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `GRIDA_DESKTOP_MINIMUM_VERSION` | Start of the supported version line, such as `0.7.0`. Leave it unset during the initial rollout.                                   |
+| `GRIDA_DESKTOP_UPDATE_VERSION`  | Exact stable Desktop release with verified installers, such as `0.7.0`. Use a build at or above the minimum when a minimum is set. |
+
+The endpoint returns `minimumSupportedVersion` and `updateVersion` as
+version strings or `null`. With both variables unset, the endpoint
+publishes an inactive policy. An update version by itself supplies
+an optional installer. The hosted layout uses the same policy to give
+older clients an update screen with a link to the selected release.
+Electron Main checks the policy before opening the hosted editor in
+packaged production builds and handles the updater. It accepts the older
+hosted deployment's 404 or same-origin `/sign-in?next=/desktop` redirect
+during the transition. For a timeout, invalid response, or other failure,
+it shows a local connection error with **Retry**. The bundled recovery page and the
+native **Check for Updates…** menu work independently of the hosted UI.
+The macOS and Windows updater checks the release feed at launch and in the
+background. On Linux, manual checks use the installer target from the
+policy.
+
+### Activate a version line
+
+1. **Ship the transition first.** Deploy the policy endpoint and hosted
+   recovery with the previous minimum, or with the minimum unset on the
+   first rollout. Verify the new packaged app against the current hosted
+   editor. The first release with Main-owned compatibility checks is
+   Desktop `0.7.0`.
+2. **Verify that users can upgrade.** Publish the stable release. Open its
+   exact release page and verify the installers for macOS arm64/x64,
+   Windows x64, and Linux arm64/x64 in both package formats. Check the
+   macOS and Windows updater from an older installed build. On Linux,
+   verify the manual installer path. Exercise **Check for Updates…**,
+   including available, current, and unavailable results. Exercise startup
+   recovery and reopening after installation. Confirm that an open document
+   can be saved before a user-initiated restart.
+3. **Activate the minimum.** The release maintainer coordinates the
+   production editor deployment with its deploy owner. Set the verified
+   update version and the new minimum alongside any renderer changes that
+   require the new line. For the `0.7` activation, set both values to
+   `0.7.0` if that is the verified installer. Check the live endpoint and
+   launch supported and below-minimum builds. Below-minimum builds should
+   reach recovery before incompatible native calls. Builds from the
+   supported line should open the editor.
+
+### Roll back the minimum
+
+Restore a hosted renderer that supports the previous line before lowering
+the floor, or deploy the compatible renderer and previous policy together.
+Keep the verified installer target reachable throughout. Check the live
+policy and launch both an older build and an already-upgraded build against
+the rollback deployment. If only the installer target was wrong, restore a
+verified release that meets the current floor.
+
 ---
 
 ## What lives where
@@ -55,7 +132,7 @@ To promote a prerelease to stable: edit the GitHub Release in the UI and uncheck
 | Workflow                      | [`.github/workflows/realease-desktop-app.yml`](https://github.com/gridaco/grida/blob/main/.github/workflows/realease-desktop-app.yml) |
 | Build + signing config        | [`desktop/forge.config.ts`](https://github.com/gridaco/grida/blob/main/desktop/forge.config.ts)                                       |
 | Hardened-runtime entitlements | [`desktop/build/entitlements.mac.plist`](https://github.com/gridaco/grida/blob/main/desktop/build/entitlements.mac.plist)             |
-| In-app updater wiring         | [`desktop/src/main.ts`](https://github.com/gridaco/grida/blob/main/desktop/src/main.ts) — `updateElectronApp({ notifyUser: true })`   |
+| In-app updater entry point    | [`desktop/src/main.ts`](https://github.com/gridaco/grida/blob/main/desktop/src/main.ts)                                               |
 | pnpm native-module allowlist  | [`desktop/pnpm-workspace.yaml`](https://github.com/gridaco/grida/blob/main/desktop/pnpm-workspace.yaml) — `allowBuilds`               |
 | Apple secrets                 | `release` environment on `gridaco/grida` — `gh secret list --env release --repo gridaco/grida`                                        |
 

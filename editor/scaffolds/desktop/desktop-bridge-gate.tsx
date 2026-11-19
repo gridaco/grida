@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { DesktopCompatibility } from "@grida/desktop-bridge";
 import {
   DESKTOP_BRIDGE_PROTOCOL,
   useDesktopBridgeStatus,
@@ -10,9 +11,8 @@ import { OpenInDesktopCta } from "./open-in-desktop-cta";
 const BRIDGE_SETTLE_DELAY_MS = 150;
 
 /**
- * Render `children` only when the desktop bridge is present
- * (`window.grida` exposed by the Electron preload). Web visitors see
- * the fallback — by default {@link OpenInDesktopCta}.
+ * Render `children` only when the preload bridge and installed app are
+ * compatible. Web visitors see the fallback, by default {@link OpenInDesktopCta}.
  *
  * Gate **all** `/desktop/*` content through this component. The bridge
  * snapshot is intentionally ambiguous during SSR/hydration: `null`
@@ -24,10 +24,12 @@ const BRIDGE_SETTLE_DELAY_MS = 150;
  */
 export function DesktopBridgeGate({
   children,
+  compatibility,
   fallback,
   surface,
 }: {
   children: ReactNode;
+  compatibility: DesktopCompatibility.Policy | null;
   fallback?: ReactNode;
   /** Forwarded to the default CTA when `fallback` is omitted. */
   surface?: string;
@@ -54,8 +56,48 @@ export function DesktopBridgeGate({
   if (status.kind === "missing") {
     return fallback ?? <OpenInDesktopCta surface={surface} />;
   }
+  if (!compatibility) {
+    return (
+      <DesktopCompatibilityNotice
+        title="Couldn’t check compatibility"
+        action={
+          <button
+            className="mt-6 text-sm font-medium underline"
+            type="button"
+            onClick={() => window.location.reload()}
+          >
+            Try again
+          </button>
+        }
+      >
+        Retry the compatibility check to open Grida Desktop.
+      </DesktopCompatibilityNotice>
+    );
+  }
+  const downloadHref = compatibility.updateVersion
+    ? DesktopCompatibility.releaseUrl(compatibility.updateVersion)
+    : null;
   if (status.kind === "unsupported") {
-    return <UnsupportedDesktopBridge protocol={status.protocol} />;
+    return (
+      <DesktopUpdateRequired downloadHref={downloadHref}>
+        This desktop page needs bridge protocol {DESKTOP_BRIDGE_PROTOCOL}, but
+        the running app exposed {String(status.protocol ?? "no protocol")}.
+      </DesktopUpdateRequired>
+    );
+  }
+  const bridgeVersion = status.bridge.app?.version;
+  const installedVersion =
+    typeof bridgeVersion === "string" ? bridgeVersion : "";
+  if (
+    compatibility.minimumSupportedVersion &&
+    DesktopCompatibility.requiresUpdate(installedVersion, compatibility)
+  ) {
+    return (
+      <DesktopUpdateRequired downloadHref={downloadHref}>
+        This page requires Grida Desktop {compatibility.minimumSupportedVersion}{" "}
+        or later. Installed version: {installedVersion || "unknown"}.
+      </DesktopUpdateRequired>
+    );
   }
   return children;
 }
@@ -69,16 +111,48 @@ function DesktopBridgePending() {
   );
 }
 
-function UnsupportedDesktopBridge({ protocol }: { protocol: unknown }) {
+function DesktopUpdateRequired({
+  children,
+  downloadHref,
+}: {
+  children: ReactNode;
+  downloadHref: string | null;
+}) {
+  return (
+    <DesktopCompatibilityNotice
+      title="Update Grida Desktop"
+      action={
+        downloadHref && (
+          <a
+            className="mt-6 text-sm font-medium underline"
+            href={downloadHref}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Download Grida Desktop
+          </a>
+        )
+      }
+    >
+      {children}
+    </DesktopCompatibilityNotice>
+  );
+}
+
+function DesktopCompatibilityNotice({
+  title,
+  children,
+  action,
+}: {
+  title: string;
+  children: ReactNode;
+  action: ReactNode;
+}) {
   return (
     <main className="mx-auto flex min-h-svh w-full max-w-xl flex-col items-center justify-center px-6 py-10 text-center">
-      <h1 className="text-2xl font-semibold tracking-tight">
-        Update Grida Desktop
-      </h1>
-      <p className="mt-3 text-sm text-muted-foreground">
-        This desktop page needs bridge protocol {DESKTOP_BRIDGE_PROTOCOL}, but
-        the running app exposed {String(protocol ?? "no protocol")}.
-      </p>
+      <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+      <p className="mt-3 text-sm text-muted-foreground">{children}</p>
+      {action}
     </main>
   );
 }

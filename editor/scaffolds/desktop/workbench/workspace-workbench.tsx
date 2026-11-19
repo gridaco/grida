@@ -266,6 +266,19 @@ export function WorkspaceWorkbench({
   const [dirtyPaths, setDirtyPaths] = useState<ReadonlySet<string>>(
     () => new Set()
   );
+  const hasUnsavedChanges = dirtyPaths.size > 0;
+  useEffect(() => {
+    void getDesktopBridge()
+      ?.window.set_document_edited(hasUnsavedChanges)
+      .catch(() => {});
+  }, [hasUnsavedChanges]);
+  useEffect(() => {
+    return () => {
+      void getDesktopBridge()
+        ?.window.set_document_edited(false)
+        .catch(() => {});
+    };
+  }, []);
   const onTabDirtyChange = useCallback((relPath: string, dirty: boolean) => {
     setDirtyPaths((prev) => {
       if (prev.has(relPath) === dirty) return prev;

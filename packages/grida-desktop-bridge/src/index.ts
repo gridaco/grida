@@ -3,10 +3,10 @@
 /**
  * GRIDA-SEC-004 — renderer-visible Desktop bridge protocol.
  *
- * This package carries only the `window.grida` contract that a URL-loaded
- * renderer may compile against. Electron IPC channel names and native
- * implementation details stay in the Desktop app; daemon HTTP stays in
- * `@grida/daemon/transport` + `@grida/ai-host/media-transport`.
+ * This package carries the `window.grida` contract and public Desktop version
+ * compatibility metadata. Electron IPC channel names and native implementation
+ * details stay in the Desktop app; daemon HTTP stays in `@grida/daemon/transport`
+ * + `@grida/ai-host/media-transport`.
  */
 
 import type {
@@ -62,6 +62,7 @@ import type { NativeEditorSurfaceSnapshot } from "./native-editor-surfaces";
 import type { DesktopBrowser } from "./browser";
 import type { DesktopFxViewer } from "./fx-viewer";
 export { DesktopBrowser } from "./browser";
+export { DesktopCompatibility } from "./compatibility";
 export type { DesktopFxViewer } from "./fx-viewer";
 export type * from "./native-chat";
 export * from "./native-chat-message-context";

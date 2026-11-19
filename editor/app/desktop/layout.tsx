@@ -5,6 +5,7 @@ import { Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@app/ui/components/tooltip";
 import { Toaster } from "@app/ui/components/sonner";
+import { readDesktopCompatibilityPolicy } from "@/lib/desktop/compatibility-policy";
 import { DesktopBridgeGate } from "@/scaffolds/desktop/desktop-bridge-gate";
 import "../editor.css";
 
@@ -58,7 +59,9 @@ export default async function DesktopRootLayout({
       >
         <ThemeProvider nonce={nonce}>
           <TooltipProvider>
-            <DesktopBridgeGate>{children}</DesktopBridgeGate>
+            <DesktopBridgeGate compatibility={readDesktopCompatibilityPolicy()}>
+              {children}
+            </DesktopBridgeGate>
             <Toaster />
           </TooltipProvider>
         </ThemeProvider>

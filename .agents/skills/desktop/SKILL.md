@@ -266,6 +266,11 @@ from `https://grida.co/desktop/*`, and the native app containing Electron plus
 the bundled daemon/services sidecar. A change can require a Desktop release
 without touching `desktop/src/**`.
 
+Follow the [hosted renderer compatibility runbook](../../../docs/contributing/desktop-release.md#hosted-renderer-compatibility)
+when activating or rolling back a supported version line. The hosted editor
+publishes the policy. Electron Main checks it at startup and owns the local
+recovery page and **Check for Updates…** menu action.
+
 At the start and before handoff, run the bundled audit from the repository
 root. It reports the release-scoped diff, uncommitted paths, and whether the
 current Desktop version already has a GitHub release:

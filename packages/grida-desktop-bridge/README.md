@@ -1,6 +1,7 @@
 # @grida/desktop-bridge
 
-Private renderer-visible contract for Grida Desktop's `window.grida` bridge.
+Private contract for Grida Desktop's `window.grida` bridge and public
+hosted-editor compatibility metadata.
 
 This package exists so the Electron preload and the URL-loaded `/desktop/*`
 renderer compile against the same bridge protocol without the editor importing
@@ -13,6 +14,13 @@ Desktop source files directly.
 - Owns Desktop-native capability names exposed to the renderer.
 - Re-exports shared AgentHost DTOs from `@grida/ai-host` where the bridge forwards
   package-owned HTTP contracts.
+
+`DesktopCompatibility` describes the read-only policy the hosted editor
+publishes to Desktop. It validates `minimumSupportedVersion` and
+`updateVersion`, compares installed versions, and resolves recovery links
+to exact stable release tags. The policy describes compatibility for
+opening the editor. Desktop Main owns update checks, installation, and
+restart. [Desktop release runbook](https://grida.co/docs/contributing/desktop-release)
 
 `chatgpt.connect()` preserves the secret-free
 `ChatGptSubscriptionStatus` object on success. An explicit user cancellation

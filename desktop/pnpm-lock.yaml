@@ -141,9 +141,6 @@ importers:
       typescript:
         specifier: ^6
         version: 6.0.3
-      update-electron-app:
-        specifier: ^3.2.0
-        version: 3.2.0
       vite:
         specifier: ^8.0.13
         version: 8.0.13(@types/node@24.12.2)(jiti@2.6.1)(terser@5.46.1)
@@ -1619,9 +1616,6 @@ packages:
     resolution: {integrity: sha512-nBF+F1rAZVCu/p7rjzgA+Yb4lfYXrpl7a6VmJrU8wF9I1CKvP/QwPNZHnOlwbTkY6dvtFIzFMSyQXbLoTQPRpA==}
     engines: {node: '>=8'}
 
-  github-url-to-object@4.0.6:
-    resolution: {integrity: sha512-NaqbYHMUAlPcmWFdrAB7bcxrNIiiJWJe8s/2+iOc9vlcHlwHqSGrPk+Yi3nu6ebTwgsZEa7igz+NH2vEq3gYwQ==}
-
   glob-parent@5.1.2:
     resolution: {integrity: sha512-AOIgSQCepiJYwP3ARnGx+5VnTu2HBYdzbGP45eLw1vr3zB3vZLeyed1sC9hnbcOc9/SrMyM5RPQrkGz4aS9Zow==}
     engines: {node: '>= 6'}
@@ -1798,9 +1792,6 @@ packages:
   is-unicode-supported@0.1.0:
     resolution: {integrity: sha512-knxG2q4UC3u8stRGyAVJCOdxFmv5DZiRcdlIaAQXAbSfJya+OhopNotLQrstBhququ4ZpuKbDc/8S6mgXgPFPw==}
     engines: {node: '>=10'}
-
-  is-url@1.2.4:
-    resolution: {integrity: sha512-ITvGim8FhRiYe4IQ5uHSkj7pVaPDrCTkNd3yq3cV7iZAcJdHTUMPMEHcqSOy9xZ9qFenQCvi+2wjH9a1nXqHww==}
 
   isbinaryfile@4.0.10:
     resolution: {integrity: sha512-iHrqe5shvBUcFbmZq9zOQHBoeOhZJu6RQGrDpBgenUm/Am+F3JM2MgQj+rK3Z601fzrL5gLZWtAPH2OBaSVcyw==}
@@ -2742,9 +2733,6 @@ packages:
     hasBin: true
     peerDependencies:
       browserslist: '>= 4.21.0'
-
-  update-electron-app@3.2.0:
-    resolution: {integrity: sha512-l2e7bzsW+rw70pfyyQeA9E/ofpNY2ZS99XuYxD2qWL4fEy3qMjpqwwgB0me7ESpGogIQE1CM0SaDvKGsK4Jg3Q==}
 
   username@5.1.0:
     resolution: {integrity: sha512-PCKbdWw85JsYMvmCv5GH3kXmM66rCd9m1hBEDutPNv94b/pqCMT4NtcKyeWYvLFiE8b+ha1Jdl8XAaUdPn5QTg==}
@@ -4720,10 +4708,6 @@ snapshots:
     dependencies:
       pump: 3.0.2
 
-  github-url-to-object@4.0.6:
-    dependencies:
-      is-url: 1.2.4
-
   glob-parent@5.1.2:
     dependencies:
       is-glob: 4.0.3
@@ -4903,8 +4887,6 @@ snapshots:
   is-stream@1.1.0: {}
 
   is-unicode-supported@0.1.0: {}
-
-  is-url@1.2.4: {}
 
   isbinaryfile@4.0.10: {}
 
@@ -5779,11 +5761,6 @@ snapshots:
       browserslist: 4.28.2
       escalade: 3.2.0
       picocolors: 1.1.1
-
-  update-electron-app@3.2.0:
-    dependencies:
-      github-url-to-object: 4.0.6
-      ms: 2.1.3
 
   username@5.1.0:
     dependencies:

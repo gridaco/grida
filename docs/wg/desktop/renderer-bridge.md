@@ -34,17 +34,14 @@ we're not willing to pay:
 - **Two release trains.** Every editor change would require an Electron
   rebuild, signing, notarization (macOS), and update propagation. The
   web is `next deploy`; bundled desktop would lag by days.
-- **Update friction.** Editor fixes ship instantly to the web; desktop
-  users would wait for the next `update-electron-app` cycle. For an app
-  whose value is "the latest editor, locally," that's the wrong
-  direction.
+- **Update friction.** A bundled editor would make Desktop users wait for
+  a native release and an app update to receive editor fixes.
 - **Codebase drift.** "Same source, different bundle" rots fast. The
   web side grows web-only deps (analytics, dynamic Next features) and
   the bundled desktop accrues a permanent porting tax.
 
-URL-loading flips it: editor improvements ship to both surfaces the
-moment they deploy. The Electron build only changes when the **shell**
-changes — new IPC, new agent server surface, OS integration.
+Compatible editor improvements ship to both surfaces when they deploy.
+Changes to native capabilities and OS integration ship with the shell.
 
 ## The capability boundary
 
@@ -88,10 +85,10 @@ grida.co  (one Next.js app)
 | `window.grida` shape           | `@grida/desktop-bridge`                      |
 
 The bridge type shape lives in `@grida/desktop-bridge`. Desktop preload
-and the editor-side typed client both consume that contract — single
-source of truth for what the renderer can see. The package is only the
-renderer-visible bridge protocol; Electron IPC channel names stay in Desktop
-source, and daemon HTTP stays in `@grida/daemon/transport` + `@grida/ai-host/media-transport`.
+and the editor-side typed client both consume that contract. The package
+also describes the public compatibility policy read by the shell and the
+hosted editor. Electron IPC channel names stay in Desktop source, and
+daemon HTTP stays in `@grida/daemon/transport` + `@grida/ai-host/media-transport`.
 
 `window.grida.protocol` is currently `1`. `/desktop/*` routes must distinguish
 a missing bridge from an unsupported protocol before rendering agent UI. Native
@@ -99,22 +96,35 @@ capabilities live under `bridge.caps.native`; daemon route capabilities come
 from `bridge.handshake()` so they are the real server capabilities, not a static
 Desktop guess.
 
+## Version compatibility
+
+The hosted editor publishes a minimum shell version and a verified installer
+release. The shell checks the policy before it loads the editor and owns
+update checks, installation, and restart. A bundled recovery screen keeps
+these controls available when the hosted UI cannot load. The hosted layout
+also applies the version policy so older shells can reach an installer.
+Protocol and capability checks govern the native actions the editor can use
+after the version check passes.
+
+Version-line activation and rollback are defined in the
+[Desktop release runbook](../../contributing/desktop-release.md#hosted-renderer-compatibility).
+
 ## Division of responsibility
 
-**Web codebase.** All UI inside `/desktop/*`. The `DesktopBridgeGate`
-and the `OpenInDesktopCta` fallback. A CSP-strict layout for the route
+**Web codebase.** The hosted editor under `/desktop/*`, its bridge and
+version gate, and the browser fallback. A CSP-strict layout for the route
 group (no third-party scripts, no analytics, no Sentry). An ESLint
 boundary rule restricting `(desktop)` and `scaffolds/desktop/` imports
 to bridge clients + UI primitives + `@grida/*` packages. Without the
 rule, the layering rots silently.
 
-**Electron host.** Load only `EDITOR_BASE_URL + /desktop/...`; block
-navigation elsewhere via preload history guards plus main-process
+**Electron host.** Load the workstation from `EDITOR_BASE_URL + /desktop/...`.
+Block workstation navigation elsewhere via preload history guards plus main-process
 `will-navigate` / `did-navigate-in-page`; route external links through
 `shell.openExternal`. Expose `window.grida` exclusively when the
 renderer is under `/desktop/*`, never leaking agent server credentials onto
-`window`. All native-OS calls (dialogs, file paths, deep links, Dock menus)
-— renderer asks, main answers.
+`window`. Main handles native operations such as dialogs, file paths, and
+deep links. It also owns the application menu and the bundled update screen.
 
 **`ServicesSidecar`.** See [process-model](./process-model.md). Short version:
 secrets, settings and media; chat runs in the native host. Desktop preload

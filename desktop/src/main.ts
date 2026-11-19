@@ -1,7 +1,14 @@
 // GRIDA-SEC-008 — close the main-owned OAuth callback before sidecar shutdown.
-import { app, shell, BrowserWindow, Menu, dialog, session } from "electron";
+import {
+  app,
+  autoUpdater,
+  shell,
+  BrowserWindow,
+  Menu,
+  dialog,
+  session,
+} from "electron";
 import path from "node:path";
-import { updateElectronApp } from "update-electron-app";
 import started from "electron-squirrel-startup";
 import { MediaStore, RecentStore } from "@grida/daemon/server";
 import create_menu, {
@@ -12,7 +19,7 @@ import create_menu, {
 import { createDesktopArchives } from "./main/native-desktop-archives";
 import { createDesktopChatCatalog } from "./main/native-desktop-chat-catalog";
 import { open_document_window } from "./window";
-import { DEEP_LINK_SCHEME, EDITOR_BASE_URL } from "./env";
+import { DEEP_LINK_SCHEME, EDITOR_BASE_URL, IS_DEV, IS_INSIDERS } from "./env";
 import {
   RUNTIME_APP_NAME,
   USE_DEV_INSIDERS_BRANDING,
@@ -64,6 +71,8 @@ import { DesktopMediaRoot } from "./main/media-root";
 import { NativeImagePlacement } from "./main/native-image-placement";
 import type { ImageReferenceReview } from "./main/native-image-generation";
 import { NativeWorkspaceReview } from "./main/native-workspace-review";
+import { DesktopUpdateFeed } from "./main/desktop-update-feed";
+import { DesktopUpdates } from "./main/desktop-updates";
 
 // GRIDA-SEC-004 — single-instance enforcement is acquired in the `ready`
 // handler, NOT here at module top. It must run AFTER `open-file` has fired:
@@ -151,6 +160,9 @@ let nativeQuitDrain: Promise<void> | undefined;
 let nativeEditorMcp: NativeEditorMcpExport | undefined;
 let nativeExternalRuns: NativeExternalRuns | undefined;
 let nativeQuitReady = false;
+let desktopUpdates: DesktopUpdates | undefined;
+let installAfterQuit: (() => void) | undefined;
+let installingUpdate = false;
 const windowAdmission = {
   can_open: () => entryWindow?.isMain ?? false,
   admits: (window: BrowserWindow) => entryWindow?.ipcRoleFor(window) === "main",
@@ -189,6 +201,17 @@ function destroyAfterIpcReply(window: BrowserWindow): void {
 }
 
 app.on("web-contents-created", (_event, contents) => {
+  const id = contents.id;
+  contents.once("destroyed", () => dirtyState.forget(id));
+  contents.on("will-prevent-unload", (event) => {
+    const restart = installAfterQuit;
+    if (!restart || !BrowserWindow.fromWebContents(contents)) return;
+    // The window's own listener decides whether to allow this unload.
+    queueMicrotask(() => {
+      if (!event.defaultPrevented && installAfterQuit === restart)
+        installAfterQuit = undefined;
+    });
+  });
   // GRIDA-SEC-016 — installed before any renderer can create a webview. The
   // browser host may not exist yet; absence is denial, never guest authority.
   contents.on("will-attach-webview", (event, preferences, params) => {
@@ -237,6 +260,7 @@ app.on("web-contents-created", (_event, contents) => {
   };
 
   contents.on("did-navigate", (_navigationEvent, rawUrl) => {
+    dirtyState.forget(id);
     reconcileContainedAuthControl(rawUrl);
   });
   contents.on(
@@ -254,6 +278,7 @@ app.on("web-contents-created", (_event, contents) => {
 const menu = create_menu(app, shell, {
   onOpenFile: handleFilePath,
   windowAdmission,
+  onCheckForUpdates: checkForDesktopUpdates,
 });
 Menu.setApplicationMenu(menu);
 
@@ -270,9 +295,76 @@ function refresh_recent_menu(): void {
   rebuild_application_menu(app, shell, {
     onOpenFile: handleFilePath,
     windowAdmission,
+    onCheckForUpdates: checkForDesktopUpdates,
   }).catch((err) =>
     console.error("[grida] open-recent menu rebuild failed:", err)
   );
+}
+
+function checkForDesktopUpdates(): void {
+  if (desktopUpdates) {
+    desktopUpdates.checkFromMenu();
+    return;
+  }
+  void dialog.showMessageBox({
+    type: "info",
+    message: "Updates are available in the installed Grida app.",
+    buttons: ["OK"],
+  });
+}
+
+function requestDesktopUpdateRestart(install: () => void): void {
+  if (installAfterQuit || installingUpdate) return;
+  const windows = BrowserWindow.getAllWindows();
+  if (windows.some(({ webContents }) => dirtyState.is(webContents.id))) {
+    void dialog.showMessageBox({
+      type: "info",
+      message: "Save your changes before restarting Grida.",
+      buttons: ["OK"],
+    });
+    return;
+  }
+  const workspaceUrl = new URL("/desktop/workspace", EDITOR_BASE_URL);
+  if (
+    windows.some(({ webContents }) => {
+      const url = URL.parse(webContents.getURL());
+      return (
+        url?.origin === workspaceUrl.origin &&
+        url.pathname === workspaceUrl.pathname &&
+        !dirtyState.hasReport(webContents.id)
+      );
+    })
+  ) {
+    void dialog.showMessageBox({
+      type: "info",
+      message:
+        "Save your work and leave open workspaces before restarting Grida.",
+      buttons: ["OK"],
+    });
+    return;
+  }
+  // Let normal window close and native service shutdown complete before
+  // invoking Electron's platform installer.
+  installAfterQuit = install;
+  app.quit();
+}
+
+function desktopUpdateInstallFailed(downloadUrl?: string): void {
+  void dialog
+    .showMessageBox({
+      type: "error",
+      message: "Grida couldn't install the update",
+      detail: downloadUrl
+        ? "Download the installer and update Grida manually."
+        : "Reopen Grida and try again.",
+      buttons: downloadUrl ? ["Download installer", "Quit"] : ["Quit"],
+      cancelId: downloadUrl ? 1 : 0,
+    })
+    .then(async ({ response }) => {
+      if (response === 0 && downloadUrl) await shell.openExternal(downloadUrl);
+    })
+    .catch(() => console.warn("[grida] update recovery unavailable"))
+    .finally(() => app.quit());
 }
 let accountRevalidationTimer: NodeJS.Timeout | null = null;
 app.on("browser-window-focus", () => {
@@ -343,7 +435,8 @@ function attach_dirty_close_handler(window: BrowserWindow) {
       dirtyState.markForceClose(wcId);
       window.destroy();
     }
-    // choice === 1 (Cancel) — leave window open
+    // A close canceled by a document also cancels the requested restart.
+    if (choice === 1) installAfterQuit = undefined;
   });
   window.on("closed", () => {
     dirtyState.forget(wcId);
@@ -527,7 +620,8 @@ for (const open of open_handoff.fromArgv(process.argv)) {
 app.on("second-instance", (_event, argv, _workingDirectory, additionalData) => {
   // Focus the controller-owned entry window, never an arbitrary Settings or
   // document window.
-  entryWindow?.focus();
+  if (entryWindow) entryWindow.focus();
+  else desktopUpdates?.focus();
   // Prefer the forwarded `additionalData` — the secondary's captured opens.
   // This is the ONLY reliable channel on macOS, where the opened document
   // never appears in the second instance's argv (it arrives as an `open-file`
@@ -629,13 +723,43 @@ app.on("ready", async () => {
     return;
   }
 
-  // Agent commands run in the person's login-shell environment. Capturing it
-  // takes about a second, so start now, alongside window creation, instead of
-  // when the first chat launches its agent.
-  void NativeCommandProfiles.programEnvironment();
-
   // Keep a disposable profile on the build it was launched to exercise.
   const nativeProfile = NativeDesktopProfile.selected();
+  if (!IS_DEV && !IS_INSIDERS && !nativeProfile) {
+    const version = app.getVersion();
+    desktopUpdates = new DesktopUpdates({
+      version,
+      origin: EDITOR_BASE_URL,
+      fetch,
+      openExternal: (url) => shell.openExternal(url),
+      restart: requestDesktopUpdateRestart,
+      installFailed: desktopUpdateInstallFailed,
+      showError: () =>
+        dialog.showErrorBox(
+          "Couldn't open the Grida update window",
+          "Reopen Grida and try again."
+        ),
+      feed:
+        process.platform === "darwin" || process.platform === "win32"
+          ? new DesktopUpdateFeed(
+              autoUpdater,
+              version,
+              process.platform,
+              process.arch
+            )
+          : undefined,
+    });
+    // Check after single-instance acquisition and before any hosted window,
+    // account callback, sidecar, or local document is admitted.
+    if (!(await desktopUpdates.admitStartup())) {
+      if (!installAfterQuit && !installingUpdate) app.quit();
+      return;
+    }
+    desktopUpdates.startBackgroundChecks();
+  }
+
+  // Capture the login-shell environment alongside hosted window startup.
+  void NativeCommandProfiles.programEnvironment();
   const ordinaryNativeChat = NativeDesktopProfile.ordinaryChat();
   const nativeResources = NativeDesktopProfile.resourcesPath(app);
   let externalProfile: string | undefined;
@@ -652,9 +776,6 @@ app.on("ready", async () => {
     app.quit();
     return;
   }
-  // A disposable profile stays on the build it was launched to exercise.
-  if (!nativeProfile) updateElectronApp({ notifyUser: true });
-
   if (USE_DEV_INSIDERS_BRANDING && process.platform === "darwin") {
     app.dock?.setIcon(create_runtime_app_icon());
   }
@@ -1081,13 +1202,18 @@ app.on("ready", async () => {
 
 app.on("window-all-closed", () => {
   // macOS keeps the app alive (`activate` re-opens a window); Win/Linux quit.
-  if (process.platform !== "darwin") {
+  // The startup gate closes its local recovery window before opening the
+  // canonical entry window. That handoff still belongs to the ready handler.
+  if (process.platform !== "darwin" && (entryWindow || !desktopUpdates)) {
     app.quit();
   }
 });
 
 app.on("activate", () => {
-  if (!servicesSidecarInfo || !entryWindow) return;
+  if (!servicesSidecarInfo || !entryWindow) {
+    desktopUpdates?.focus();
+    return;
+  }
   void entryWindow.reconcile({ focus: true }).catch((error) => {
     console.warn("[grida] account revalidation failed:", error);
     entryWindow?.focus();
@@ -1097,6 +1223,7 @@ app.on("activate", () => {
 app.once("will-quit", () => {
   // A dirty window can cancel quit. Keep shared services available until
   // Electron confirms that all windows have closed.
+  desktopUpdates?.stopBackgroundChecks();
   stopServicesSidecar();
   disposeAllTerminals();
   void disposeAllWorkspaceWatches();
@@ -1114,8 +1241,16 @@ app.on("will-quit", (event) => {
       !nativeExternalRuns &&
       !browserHistory) ||
     nativeQuitReady
-  )
+  ) {
+    if (installAfterQuit) {
+      const install = installAfterQuit;
+      installAfterQuit = undefined;
+      installingUpdate = true;
+      event.preventDefault();
+      setImmediate(install);
+    }
     return;
+  }
   event.preventDefault();
   nativeQuitDrain ??= Promise.allSettled([
     browserHistory
