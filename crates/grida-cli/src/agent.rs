@@ -2,7 +2,7 @@
 // GRIDA-GG: provider — invocation-owned chat authority with scoped renewal.
 
 use crate::error::{Error, Result};
-use crate::{AgentAction, AgentCommand, ExternalAgentCommand, account, host, http};
+use crate::{AgentAction, AgentCommand, AgentRunArgs, ExternalAgentCommand, account, host, http};
 use agent_kit_core::inference::RequestControl;
 use agent_kit_core::{BoxFuture, Error as CoreError, ErrorKind, Result as CoreResult};
 use agent_kit_providers::{
@@ -78,17 +78,18 @@ pub async fn dispatch(command: AgentCommand) -> Result<u8> {
     let signal = process::shutdown_signal();
     tokio::pin!(signal);
     let run = match command.action {
-        AgentAction::Run {
-            cwd,
-            session,
-            prompt,
-            initial_title,
-            input_png,
-            input_file,
-            skills,
-            questions,
-            deadline_ms,
-        } => {
+        AgentAction::Run(args) => {
+            let AgentRunArgs {
+                cwd,
+                session,
+                prompt,
+                initial_title,
+                input_png,
+                input_file,
+                skills,
+                questions,
+                deadline_ms,
+            } = *args;
             let cwd = cwd
                 .canonicalize()
                 .ok()

@@ -59,18 +59,21 @@ pub struct AgentCommand {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AgentAction {
-    Run {
-        cwd: PathBuf,
-        session: Option<SessionId>,
-        prompt: Option<String>,
-        initial_title: Option<String>,
-        input_png: Option<PathBuf>,
-        input_file: Option<PathBuf>,
-        skills: Vec<grida_agent::skills::SkillReference>,
-        questions: bool,
-        deadline_ms: u64,
-    },
+    Run(Box<AgentRunArgs>),
     ServeStdio,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AgentRunArgs {
+    pub cwd: PathBuf,
+    pub session: Option<SessionId>,
+    pub prompt: Option<String>,
+    pub initial_title: Option<String>,
+    pub input_png: Option<PathBuf>,
+    pub input_file: Option<PathBuf>,
+    pub skills: Vec<grida_agent::skills::SkillReference>,
+    pub questions: bool,
+    pub deadline_ms: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -613,7 +616,7 @@ fn parse_agent(tokens: &Tokens, run: bool) -> Result<AgentCommand, Failure> {
         max_output_tokens: integer("max-output-tokens", "4096", 65_536)?,
         selector: tokens.organization()?,
         action: if run {
-            AgentAction::Run {
+            AgentAction::Run(Box::new(AgentRunArgs {
                 cwd: absolute("cwd")?,
                 session: tokens
                     .value("session")
@@ -633,7 +636,7 @@ fn parse_agent(tokens: &Tokens, run: bool) -> Result<AgentCommand, Failure> {
                     .map_err(|_| Failure::usage())?,
                 questions: tokens.flag("questions"),
                 deadline_ms: integer("deadline-ms", "120000", 600_000)?,
-            }
+            }))
         } else {
             AgentAction::ServeStdio
         },
@@ -953,27 +956,29 @@ mod tests {
             "--model=openai/gpt-5.6-sol",
             STATE_DIR,
             CWD,
+            "--initial-title=Draft",
             "--input-png=example.png",
         ];
         let Command::Agent(AgentCommand {
-            action: AgentAction::Run { input_png, .. },
+            action: AgentAction::Run(run),
             ..
         }) = parsed(&arguments).command
         else {
             panic!("expected agent run");
         };
-        assert_eq!(input_png, Some(PathBuf::from("example.png")));
+        assert_eq!(run.input_png, Some(PathBuf::from("example.png")));
+        assert_eq!(run.initial_title.as_deref(), Some("Draft"));
         let mut file_arguments = arguments.to_vec();
         file_arguments.pop();
         file_arguments.push("--input-file=document.pdf");
         let Command::Agent(AgentCommand {
-            action: AgentAction::Run { input_file, .. },
+            action: AgentAction::Run(run),
             ..
         }) = parsed(&file_arguments).command
         else {
             panic!("expected agent run");
         };
-        assert_eq!(input_file, Some(PathBuf::from("document.pdf")));
+        assert_eq!(run.input_file, Some(PathBuf::from("document.pdf")));
         let mut duplicate = arguments.to_vec();
         duplicate.push("--input-png=other.png");
         assert!(parse(&args(&duplicate)).is_err());
@@ -1007,14 +1012,17 @@ mod tests {
             "--skill=svg",
         ]);
         let Command::Agent(AgentCommand {
-            action: AgentAction::Run { skills, .. },
+            action: AgentAction::Run(run),
             ..
         }) = invocation.command
         else {
             panic!("expected agent run");
         };
         assert_eq!(
-            skills.iter().map(|skill| skill.name()).collect::<Vec<_>>(),
+            run.skills
+                .iter()
+                .map(|skill| skill.name())
+                .collect::<Vec<_>>(),
             ["slides", "svg"]
         );
         assert_eq!(
