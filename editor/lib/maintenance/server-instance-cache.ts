@@ -28,22 +28,20 @@
  *
  * Trade-off: toggling maintenance mode **on and off** can each take up to the
  * remaining TTL to reach a warm instance, in addition to Edge Config's own
- * propagation delay. The default is deliberately short for that reason.
+ * propagation delay. The default adds no cache window after a read completes.
  */
 
 /**
  * Cache window in milliseconds, as a non-negative integer.
  *
  * - unset or blank: {@link DEFAULT_TTL_MS}
- * - `0`: disabled; every request reads Edge Config (concurrent reads are still
- *   shared, which never returns a value older than the read itself)
- * - anything else (negative, fractional, non-numeric, unsafe integer): ignored
- *   with a warning, and {@link DEFAULT_TTL_MS} applies
+ * - `0`: each request starts or joins a fresh read
+ * - a positive safe integer: reuse successful reads for that many milliseconds
+ * - invalid values: warn and use {@link DEFAULT_TTL_MS}
  */
 export const TTL_MS_ENV = "GRIDA_MAINTENANCE_MODE_CACHE_TTL_MS";
 
-/** Bounds the extra toggle delay while cutting per-request reads on warm instances. */
-export const DEFAULT_TTL_MS = 10_000;
+const DEFAULT_TTL_MS = 0;
 
 const EDGE_CONFIG_KEY = "IS_IN_MAINTENANCE_MODE";
 

@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  DEFAULT_TTL_MS,
   createMaintenanceModeServerInstanceCache,
   parseTtlMs,
   TTL_MS_ENV,
@@ -40,9 +39,9 @@ function harness(ttlMs = 1_000) {
 
 describe("parseTtlMs", () => {
   it.each([
-    [undefined, DEFAULT_TTL_MS],
-    ["", DEFAULT_TTL_MS],
-    ["  ", DEFAULT_TTL_MS],
+    [undefined, 0],
+    ["", 0],
+    ["  ", 0],
     ["0", 0],
     ["60000", 60_000],
     [" 2500 ", 2_500],
@@ -204,25 +203,28 @@ describe("isInMaintenanceMode (process instance)", () => {
     vi.restoreAllMocks();
   });
 
-  it("reads IS_IN_MAINTENANCE_MODE and reuses it for the default TTL", async () => {
+  it("reads IS_IN_MAINTENANCE_MODE and shares only concurrent reads by default", async () => {
     vi.stubEnv(TTL_MS_ENV, undefined);
     edge.get.mockResolvedValue(true);
     const { isInMaintenanceMode } = await import("./server-instance-cache");
-    await expect(isInMaintenanceMode()).resolves.toBe(true);
-    vi.advanceTimersByTime(DEFAULT_TTL_MS - 1);
-    await expect(isInMaintenanceMode()).resolves.toBe(true);
+    await expect(
+      Promise.all([isInMaintenanceMode(), isInMaintenanceMode()])
+    ).resolves.toEqual([true, true]);
     expect(edge.get).toHaveBeenCalledOnce();
     expect(edge.get).toHaveBeenCalledWith("IS_IN_MAINTENANCE_MODE");
-    vi.advanceTimersByTime(1);
-    await isInMaintenanceMode();
+    await expect(isInMaintenanceMode()).resolves.toBe(true);
     expect(edge.get).toHaveBeenCalledTimes(2);
   });
 
-  it("honors a configured TTL", async () => {
-    vi.stubEnv(TTL_MS_ENV, "0");
+  it("reuses completed reads when a positive TTL is configured", async () => {
+    vi.stubEnv(TTL_MS_ENV, "10000");
     edge.get.mockResolvedValue(false);
     const { isInMaintenanceMode } = await import("./server-instance-cache");
     await isInMaintenanceMode();
+    vi.advanceTimersByTime(9_999);
+    await isInMaintenanceMode();
+    expect(edge.get).toHaveBeenCalledOnce();
+    vi.advanceTimersByTime(1);
     await isInMaintenanceMode();
     expect(edge.get).toHaveBeenCalledTimes(2);
   });
@@ -233,9 +235,8 @@ describe("isInMaintenanceMode (process instance)", () => {
     edge.get.mockResolvedValue(false);
     const { isInMaintenanceMode } = await import("./server-instance-cache");
     await isInMaintenanceMode();
-    vi.advanceTimersByTime(DEFAULT_TTL_MS - 1);
     await isInMaintenanceMode();
-    expect(edge.get).toHaveBeenCalledOnce();
+    expect(edge.get).toHaveBeenCalledTimes(2);
     expect(warn).toHaveBeenCalledOnce();
     expect(String(warn.mock.calls[0][0])).toContain(TTL_MS_ENV);
     expect(String(warn.mock.calls[0][0])).not.toContain("secret-looking-value");

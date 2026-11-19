@@ -39,11 +39,12 @@ proxy, API handlers, bearer verification, or GG signing/verification.
 The full web application is outside this build. A minimal layout and web route
 replace unrelated pages. Web maintenance lookup, Supabase cookie refresh, and
 tenant routing are replaced by recording tripwires. The proof disables the
-per-instance maintenance cache (`GRIDA_MAINTENANCE_MODE_CACHE_TTL_MS=0`) so each
+per-instance maintenance TTL (`GRIDA_MAINTENANCE_MODE_CACHE_TTL_MS=0`) so each
 web request records its own lookup. API, redirect, and blocked insiders requests
 must leave those records empty. A positive web request must record all three
-calls and emit its synthetic cookie, proving the tripwires are active. This verifies dispatch and calls, not import-time behavior of the
-original web modules. A fixture insiders handler must never run in production.
+calls and emit its synthetic cookie, proving the tripwires are active. The
+tripwires record calls. Unit tests cover lazy imports. A fixture insiders
+handler must never run in production.
 
 Two independently owned loopback HTTP servers represent canonical Auth and a
 separate Data API origin, such as a read-replica alias. `GRIDA_OAUTH_ISSUER` selects
