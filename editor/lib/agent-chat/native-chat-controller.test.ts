@@ -3442,6 +3442,7 @@ function sideFixture() {
   let opened = 0;
   /** Side chats the host has titled, by attachment. */
   const titles = new Map<string, string>();
+  const pendingTitles = new Set<string>();
   const observe = f.bridge.observe.bind(f.bridge);
   f.bridge.observe = async (id) => {
     const observation = await observe(id);
@@ -3456,6 +3457,9 @@ function sideFixture() {
               temporary: true as const,
               unavailable: SIDE_REFUSALS,
               ...(title && { title }),
+              ...(pendingTitles.has(id) && {
+                titleGenerationPending: true as const,
+              }),
             },
           },
         }
@@ -3480,7 +3484,7 @@ function sideFixture() {
   f.bridge.closeSideChat = close;
   f.bridge.commands = async () => ["compact", "fork"];
   f.bridge.runCommand = vi.fn<NonNullable<DesktopNativeChat["runCommand"]>>();
-  return { ...f, open, close, titles };
+  return { ...f, open, close, titles, pendingTitles };
 }
 
 it("opens a side chat at once on /side, and /side alone shows it again", async () => {
@@ -3695,6 +3699,33 @@ it("titles a side chat once its snapshot carries the generated title", async () 
   expect(side.chat.canOrganizeChats).toBe(false);
   expect(controller.chatTitle("chat-a")).toBe("New chat");
   controller.disconnect();
+});
+
+it("follows a provisional side title past the final turn snapshot without rereading its transcript", async () => {
+  const { controller, bridge, titles, pendingTitles } = sideFixture();
+  titles.set("side-1", "Which banner sizes?");
+  pendingTitles.add("side-1");
+  vi.useFakeTimers();
+  try {
+    await controller.select("chat-a");
+    await controller.openSideChat();
+    const [side] = controller.read().sideChats;
+    await side.chat.opened();
+    expect(side.chat.sideChatTitle()).toBe("Which banner sizes?");
+    const transcript = vi.spyOn(bridge, "transcript");
+    await vi.advanceTimersByTimeAsync(6_000);
+    titles.set("side-1", "Banner sizes");
+    pendingTitles.clear();
+    await vi.advanceTimersByTimeAsync(6_000);
+    expect(side.chat.sideChatTitle()).toBe("Banner sizes");
+    const observe = vi.spyOn(bridge, "observe");
+    await vi.advanceTimersByTimeAsync(18_000);
+    expect(observe).not.toHaveBeenCalled();
+    expect(transcript).not.toHaveBeenCalled();
+  } finally {
+    controller.disconnect();
+    vi.useRealTimers();
+  }
 });
 
 it("needs an attached chat to open a side chat", async () => {
@@ -6046,6 +6077,176 @@ it("picks up the title the host writes for an untitled chat as its turn settles"
     entry = { ...entry, revision: 2, title: "Other" };
     expect(controller.read().catalogDraft?.text).toBe("Mine");
   });
+});
+
+function titleCatalog(bridge: DesktopNativeChat, title: string | null) {
+  let entry: NativeChatCatalogEntry = {
+    sessionId: "new",
+    revision: title ? 1 : 0,
+    title,
+    archived: false,
+    ...(title && { titleGenerationPending: true as const }),
+  };
+  const read = vi.fn<NonNullable<DesktopNativeChat["catalogEntry"]>>(
+    async () => entry
+  );
+  bridge.catalogEntry = read;
+  bridge.list = async () => ({
+    sessionIds: ["new"],
+    titles:
+      entry.title === null ? [] : [{ sessionId: "new", title: entry.title }],
+    nextCursor: null,
+  });
+  bridge.listArchived = async () => ({ sessionIds: [], nextCursor: null });
+  const organize = vi.fn<NonNullable<DesktopNativeChat["organize"]>>(
+    async (sessionId, change) => {
+      entry = { ...change, sessionId, revision: entry.revision + 1 };
+      return entry;
+    }
+  );
+  bridge.organize = organize;
+  return {
+    read,
+    organize,
+    update(change: Partial<NativeChatCatalogEntry>) {
+      entry = { ...entry, ...change };
+    },
+  };
+}
+
+it("shows the catalog title on first acceptance, keeps a rejected draft untitled, and reopens it from the picker", async () => {
+  const { bridge, controller } = fixture();
+  const catalog = titleCatalog(bridge, null);
+  const send = vi
+    .spyOn(bridge, "submit")
+    .mockRejectedValueOnce(new Error("session_admission_paused"));
+  const accepted = Promise.withResolvers<void>();
+  send.mockImplementationOnce(async (sessionId, inputId) => {
+    await accepted.promise;
+    catalog.update({
+      revision: 1,
+      title: "Accepted excerpt",
+      titleGenerationPending: true,
+    });
+    return {
+      sessionId,
+      inputId,
+      disposition: "claimed",
+      inputPosition: 0,
+      turnId: "turn-new",
+    };
+  });
+  controller.connect(null);
+  try {
+    expect(controller.read().selected).toBeNull();
+    await expect(controller.submit("A longer first request")).rejects.toThrow(
+      "session_admission_paused"
+    );
+    expect(controller.chatTitle("new")).toBe(NEW_CHAT_TITLE);
+    const retry = controller.submit("A longer first request");
+    await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(2));
+    expect(controller.chatTitle("new")).toBe(NEW_CHAT_TITLE);
+    const stalledHistory =
+      Promise.withResolvers<readonly NativeChatMessage[]>();
+    vi.spyOn(bridge, "transcript").mockReturnValueOnce(stalledHistory.promise);
+    const olderPage = Promise.withResolvers<NativeChatPage>();
+    vi.spyOn(bridge, "list").mockReturnValueOnce(olderPage.promise);
+    const navigation = controller.listChats("older");
+    accepted.resolve();
+    try {
+      await vi.waitFor(() =>
+        expect(controller.chatTitle("new")).toBe("Accepted excerpt")
+      );
+    } finally {
+      stalledHistory.resolve([]);
+      olderPage.resolve({ sessionIds: ["old"], nextCursor: null });
+      await navigation;
+      await retry;
+    }
+    expect(controller.read().catalogCursor).toBe("older");
+    expect(controller.read().sessions).toEqual(["old"]);
+    await controller.listChats();
+    await controller.select(null);
+    expect(controller.read().selected).toBeNull();
+    expect(controller.chatTitle("new")).toBe("Accepted excerpt");
+    await controller.select("new");
+    expect(controller.chatTitle("new")).toBe("Accepted excerpt");
+  } finally {
+    accepted.resolve();
+    controller.disconnect();
+  }
+});
+
+it.each(["Generated title", null])(
+  "follows a reopened chat's pending title without reading history and stops after the titler returns %s",
+  async (generated) => {
+    const { bridge } = fixture();
+    const catalog = titleCatalog(bridge, "First message excerpt");
+    const transcript = vi.spyOn(bridge, "transcript");
+    vi.useFakeTimers();
+    try {
+      await controller_select(bridge, "new", async (controller) => {
+        expect(controller.chatTitle("new")).toBe("First message excerpt");
+        transcript.mockClear();
+        await vi.advanceTimersByTimeAsync(6_000);
+        expect(controller.read().catalogEntry?.titleGenerationPending).toBe(
+          true
+        );
+        catalog.update({
+          titleGenerationPending: undefined,
+          ...(generated && { title: generated, revision: 2 }),
+        });
+        await vi.advanceTimersByTimeAsync(6_000);
+        expect(
+          controller.read().catalogEntry?.titleGenerationPending
+        ).toBeUndefined();
+        expect(controller.chatTitle("new")).toBe(
+          generated ?? "First message excerpt"
+        );
+        catalog.read.mockClear();
+        await vi.advanceTimersByTimeAsync(18_000);
+        expect(catalog.read).not.toHaveBeenCalled();
+        expect(transcript).not.toHaveBeenCalled();
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  }
+);
+
+it("confirms a provisional label as a manual rename while a generated title read is in flight", async () => {
+  const { bridge } = fixture();
+  const title = "First message excerpt";
+  const catalog = titleCatalog(bridge, title);
+  vi.useFakeTimers();
+  try {
+    await controller_select(bridge, "new", async (controller) => {
+      controller.beginRename();
+      const generated = {
+        sessionId: "new",
+        revision: 2,
+        title: "Generated title",
+        archived: false,
+      };
+      catalog.update(generated);
+      const earlier = Promise.withResolvers<NativeChatCatalogEntry>();
+      catalog.read.mockReturnValueOnce(earlier.promise);
+      await vi.advanceTimersByTimeAsync(6_000);
+      await controller.saveTitle();
+      expect(catalog.organize).toHaveBeenCalledExactlyOnceWith("new", {
+        revision: 1,
+        title,
+        archived: false,
+      });
+      earlier.resolve(generated);
+      await vi.advanceTimersByTimeAsync(12_000);
+      expect(controller.chatTitle("new")).toBe(title);
+      expect(controller.read().catalogDraft).toBeNull();
+      expect(controller.read().catalogEntry?.revision).toBe(3);
+    });
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 async function controller_select(

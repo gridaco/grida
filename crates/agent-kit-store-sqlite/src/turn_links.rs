@@ -81,7 +81,7 @@ impl SqliteStore {
             let entries = cursors
                 .into_iter()
                 .map(|cursor| {
-                    let configuration = configuration(connection, &cursor.session)?;
+                    let configuration = load_configuration(connection, &cursor.session)?;
                     let input = load_input(connection, &cursor.session, &cursor.input)?;
                     let turn = input_turn(inner, connection, &cursor.session, &input.disposition)?
                         .map(|state| Ok((state.binding().turn.clone(), project(&state)?)))
@@ -160,15 +160,6 @@ fn cursor((session, input): (String, String)) -> Result<TurnLinkCursor> {
         session: SessionId::new(session)?,
         input: ChangeId::new(input)?,
     })
-}
-
-fn configuration(connection: &Connection, session: &SessionId) -> Result<Envelope> {
-    let bytes: Vec<u8> = connection
-        .prepare_cached("SELECT configuration FROM sessions WHERE id=?1")
-        .map_err(database_error)?
-        .query_row([session.as_str()], |row| row.get(0))
-        .map_err(database_error)?;
-    decode(&bytes)
 }
 
 fn input_turn(

@@ -300,8 +300,10 @@ cleanup and uncertain outcomes keep their original attempt identity.
 | 6    | Verified suspension for a question or approval       |
 | 130  | Stopped run or process signal                        |
 
-`inspect` reads the latest and current persisted turn state without provider
-configuration. Use it after the process that owns the state directory exits.
+`run --initial-title TITLE` suggests a catalog title for the first accepted
+message. `inspect` reports the saved catalog `title` (null for an untitled
+chat) alongside the latest and current persisted turn state. Use it after the
+process that owns the state directory exits. It needs no provider configuration.
 
 ### Check a command before it runs
 
@@ -593,6 +595,7 @@ with an underscore.
 | Capability                                        | Behavior                                                                            |
 | ------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | `co.grida/session/submit`                         | Accept an identified prompt for an idle session.                                    |
+| `co.grida/session/initial-title`                  | Suggest a provisional catalog title when the first message is accepted.             |
 | `co.grida/session/snapshot`                       | Read revisions, ordered queue settings, and turn summaries.                         |
 | `co.grida/session/enqueue`, `input`               | Accept waiting work or read an accepted input and its settings.                     |
 | `co.grida/session/replace`, `withdraw`, `reorder` | Edit waiting work with revision checks and retained receipts.                       |

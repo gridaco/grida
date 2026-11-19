@@ -8,7 +8,10 @@ use agent_kit_sessions::{
     ClaimOutcome, ClaimRequest, CreateSession, RecoveryRequest, SessionStore, TurnDisposition,
     TurnSelection,
 };
-use agent_kit_store_sqlite::{SqliteStore, catalog::CatalogPage};
+use agent_kit_store_sqlite::{
+    SqliteStore,
+    catalog::{CatalogPage, InitialLabel},
+};
 use support::{change, payload, private_directory, submission};
 
 fn project(config: &Envelope) -> Option<Fingerprint> {
@@ -192,6 +195,240 @@ async fn catalog_organization_fences_edits() {
 
     let reopened = SqliteStore::open_cataloged(&filename, project).unwrap();
     assert_eq!(reopened.catalog_entry(id).await.unwrap(), archived);
+}
+
+#[tokio::test]
+async fn the_first_input_and_its_label_commit_and_replay_together() {
+    let directory = private_directory();
+    let filename = directory.path().join("sessions.sqlite");
+    let store = SqliteStore::open_cataloged(&filename, project).unwrap();
+    let chat = create("first-label", "a");
+    let id = chat.id.clone();
+    store.create(chat).await.unwrap();
+    let first = submission("first", "request");
+    let rejected = store
+        .submit_with_initial_label(
+            id.clone(),
+            first.clone(),
+            None,
+            Some(InitialLabel::Display("x".repeat(257))),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(rejected.code, "session_catalog_label_too_large");
+    assert!(store.inspect(id.clone()).await.unwrap().queued.is_empty());
+    assert!(
+        store
+            .catalog_entry(id.clone())
+            .await
+            .unwrap()
+            .label
+            .is_none()
+    );
+
+    let (receipt, basis) = store
+        .submit_with_initial_label(
+            id.clone(),
+            first.clone(),
+            None,
+            Some(InitialLabel::Display("Excerpt".into())),
+        )
+        .await
+        .unwrap();
+    assert_eq!(receipt.position, 0);
+    let provisional = store.catalog_entry(id.clone()).await.unwrap();
+    assert_eq!(basis, Some(provisional.revision));
+    assert_eq!(provisional.label.as_deref(), Some("Excerpt"));
+    // Legacy submitters accepted inputs without a catalog suggestion receipt.
+    let legacy = create("legacy", "a");
+    let legacy_id = legacy.id.clone();
+    store.create(legacy).await.unwrap();
+    store
+        .submit(legacy_id.clone(), submission("old", "existing input"))
+        .await
+        .unwrap();
+    drop(store);
+
+    let store = SqliteStore::open_cataloged(&filename, project).unwrap();
+    let retry = store
+        .submit_with_initial_label(
+            id.clone(),
+            first,
+            None,
+            Some(InitialLabel::Display("Retry".into())),
+        )
+        .await
+        .unwrap();
+    assert_eq!(retry, (receipt, None));
+    let (later, basis) = store
+        .submit_with_initial_label(
+            id.clone(),
+            submission("later", "second request"),
+            None,
+            Some(InitialLabel::Display("Later".into())),
+        )
+        .await
+        .unwrap();
+    assert_eq!(later.position, 1);
+    assert!(basis.is_none());
+    assert_eq!(store.catalog_entry(id).await.unwrap(), provisional);
+    let (_, late) = store
+        .submit_with_initial_label(
+            legacy_id.clone(),
+            submission("new", "new input"),
+            None,
+            Some(InitialLabel::Display("Too late".into())),
+        )
+        .await
+        .unwrap();
+    assert!(late.is_none());
+    assert!(
+        store
+            .catalog_entry(legacy_id)
+            .await
+            .unwrap()
+            .label
+            .is_none()
+    );
+}
+
+#[tokio::test]
+async fn confirming_or_clearing_a_provisional_label_revokes_the_generation_revision() {
+    let store = SqliteStore::open_in_memory().unwrap();
+    for (name, initial, explicit) in [
+        (
+            "confirm",
+            InitialLabel::Display("Excerpt".into()),
+            Some("Excerpt".into()),
+        ),
+        ("clear", InitialLabel::Display("Excerpt".into()), None),
+        ("keep-untitled", InitialLabel::AwaitSuggestion, None),
+    ] {
+        let chat = create(name, "a");
+        let id = chat.id.clone();
+        store.create(chat).await.unwrap();
+        let (_, basis) = store
+            .submit_with_initial_label(
+                id.clone(),
+                submission("first", "request"),
+                None,
+                Some(initial),
+            )
+            .await
+            .unwrap();
+        let mut manual = store.catalog_entry(id.clone()).await.unwrap();
+        manual.label = explicit;
+        let confirmed = store.replace_catalog_entry(manual.clone()).await.unwrap();
+        assert!(confirmed.revision > basis.unwrap());
+        assert_eq!(
+            store.replace_catalog_entry(manual).await.unwrap(),
+            confirmed
+        );
+        store
+            .finish_label_suggestion(id.clone(), basis.unwrap(), "Generated".into())
+            .await
+            .unwrap();
+        assert_eq!(store.catalog_entry(id).await.unwrap(), confirmed);
+    }
+}
+
+#[tokio::test]
+async fn a_rename_can_cross_only_the_automatic_catalog_revisions() {
+    let directory = private_directory();
+    let filename = directory.path().join("sessions.sqlite");
+    let store = SqliteStore::open_cataloged(&filename, project).unwrap();
+    let chat = create("no-hint", "a");
+    let id = chat.id.clone();
+    store.create(chat).await.unwrap();
+    let (_, basis) = store
+        .submit_with_initial_label(
+            id.clone(),
+            submission("first", "request"),
+            None,
+            Some(InitialLabel::AwaitSuggestion),
+        )
+        .await
+        .unwrap();
+    let before = store.catalog_entry(id.clone()).await.unwrap();
+    store
+        .finish_label_suggestion(id.clone(), basis.unwrap(), "Generated".into())
+        .await
+        .unwrap();
+    drop(store);
+    let store = SqliteStore::open_cataloged(&filename, project).unwrap();
+    let generated = store.catalog_entry(id.clone()).await.unwrap();
+    assert_eq!(generated.label.as_deref(), Some("Generated"));
+    let mut stale_move = before.clone();
+    stale_move.bucket = 1;
+    assert_eq!(
+        store
+            .replace_catalog_entry(stale_move)
+            .await
+            .unwrap_err()
+            .code,
+        "session_catalog_revision_changed"
+    );
+    let cleared = store.replace_catalog_entry(before).await.unwrap();
+    assert!(cleared.revision > generated.revision && cleared.label.is_none());
+    let mut stale_rename = generated;
+    stale_rename.label = Some("Competing human rename".into());
+    assert_eq!(
+        store
+            .replace_catalog_entry(stale_rename)
+            .await
+            .unwrap_err()
+            .code,
+        "session_catalog_revision_changed"
+    );
+}
+
+#[tokio::test]
+async fn moving_a_chat_before_or_during_its_first_submission_preserves_title_ownership() {
+    let store = SqliteStore::open_in_memory().unwrap();
+    let chat = create("moved", "a");
+    let id = chat.id.clone();
+    store.create(chat).await.unwrap();
+    let mut entry = store.catalog_entry(id.clone()).await.unwrap();
+    entry.bucket = 1;
+    let mut archived = store.replace_catalog_entry(entry).await.unwrap();
+    archived.bucket = 0;
+    store.replace_catalog_entry(archived).await.unwrap();
+    let (_, basis) = store
+        .submit_with_initial_label(
+            id.clone(),
+            submission("first", "request"),
+            None,
+            Some(InitialLabel::Display("Excerpt".into())),
+        )
+        .await
+        .unwrap();
+    let provisional = store.catalog_entry(id.clone()).await.unwrap();
+    assert_eq!(provisional.label.as_deref(), Some("Excerpt"));
+    let mut archive = provisional.clone();
+    archive.bucket = 1;
+    let archived = store.replace_catalog_entry(archive.clone()).await.unwrap();
+    assert_eq!(
+        store.replace_catalog_entry(archive).await.unwrap(),
+        archived
+    );
+    store
+        .finish_label_suggestion(id.clone(), basis.unwrap(), "Generated".into())
+        .await
+        .unwrap();
+    let finished = store.catalog_entry(id.clone()).await.unwrap();
+    assert_eq!(finished.bucket, 1);
+    assert_eq!(finished.label.as_deref(), Some("Generated"));
+    let mut stale = provisional;
+    stale.label = Some("Stale".into());
+    assert_eq!(
+        store.replace_catalog_entry(stale).await.unwrap_err().code,
+        "session_catalog_revision_changed"
+    );
+    let mut human = archived;
+    human.label = Some("Owner".into());
+    let saved = store.replace_catalog_entry(human).await.unwrap();
+    assert_eq!(saved.bucket, 1);
+    assert_eq!(saved.label.as_deref(), Some("Owner"));
 }
 
 #[tokio::test]

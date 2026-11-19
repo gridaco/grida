@@ -52,6 +52,7 @@ use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
 
 const SUBMIT: &str = "co.grida/session/submit";
+const INITIAL_TITLE: &str = "co.grida/session/initial-title";
 const FILE_INTAKE: &str = "co.grida/session/selected-file";
 const IMAGE_INTAKE: &str = "co.grida/session/selected-image";
 /// A prompt `resource_link` with a `file:` URI names a local file or directory by
@@ -66,8 +67,9 @@ const EFFORT: &str = "co.grida/session/effort";
 const CONFIG_INSPECT: &str = "co.grida/config/inspect";
 const CONFIG_UPDATE: &str = "co.grida/config/update";
 const CONFIG_RELOAD: &str = "co.grida/config/reload";
-const CAPABILITIES: [&str; 7] = [
+const CAPABILITIES: [&str; 8] = [
     SUBMIT,
+    INITIAL_TITLE,
     SNAPSHOT,
     STOP,
     OPERATING_REGIME,
@@ -107,6 +109,29 @@ fn operating_regime(
         require(sessions, OPERATING_REGIME, None)?;
     }
     Ok(selection)
+}
+
+fn initial_title(
+    sessions: &Mutex<ConnectionSessions>,
+    title: Option<String>,
+) -> Result<Option<String>> {
+    if title.is_some() {
+        require(sessions, INITIAL_TITLE, None)?;
+    }
+    Ok(title)
+}
+
+pub(super) fn prompt_initial_title(
+    sessions: &Mutex<ConnectionSessions>,
+    meta: Option<&Meta>,
+) -> Result<Option<String>> {
+    let Some(value) = meta.and_then(|meta| meta.get("co.grida/initialTitle")) else {
+        return Ok(None);
+    };
+    let title = value
+        .as_str()
+        .ok_or_else(|| Error::invalid_params().data("invalid_initial_title"))?;
+    initial_title(sessions, Some(title.to_owned()))
 }
 
 pub(super) fn negotiated(
@@ -178,6 +203,7 @@ struct Submit {
     meta: Option<Meta>,
     session_id: SessionId,
     input_id: ChangeId,
+    initial_title: Option<String>,
     prompt: Vec<ContentBlock>,
     selected_file: Option<SelectedFile>,
     selected_image: Option<crate::host::SelectedImage>,
@@ -695,6 +721,10 @@ pub(super) fn handlers(
                                 reasoning: request.reasoning,
                             },
                             SubmissionContext {
+                                initial_title: initial_title(
+                                    &submit_sessions,
+                                    request.initial_title,
+                                )?,
                                 selection_revision: selection::revision(
                                     request.meta.as_ref(),
                                     &submit_sessions,

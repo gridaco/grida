@@ -152,6 +152,7 @@ it.runIf(Boolean(packaged))(
         const settled = await ipc.observe(event, side.attachmentId);
         expect(settled.snapshot.latest?.turnId).toBe(asked.turnId);
         expect(settled.snapshot.latest?.status).toBe("succeeded");
+        expect(settled.snapshot.side?.title).toBe("Explain one decision.");
       });
       const shown = JSON.stringify(
         await ipc.transcript(event, side.attachmentId)

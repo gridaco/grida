@@ -32,6 +32,7 @@ struct Start {
     meta: Option<Meta>,
     session_id: SessionId,
     input_id: ChangeId,
+    initial_title: Option<String>,
     prompt: Vec<ContentBlock>,
     selected_image: Option<crate::host::SelectedImage>,
     message_context: Option<MessageContext>,
@@ -146,6 +147,7 @@ pub(super) fn handlers(
                             request.allow_wakeups,
                             request.max_cost_mills,
                             selection::revision(request.meta.as_ref(), &start.1)?,
+                            initial_title(&start.1, request.initial_title)?,
                         )
                         .await
                         .map(SubmitResponse::from)

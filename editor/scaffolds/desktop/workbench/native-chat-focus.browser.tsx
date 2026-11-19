@@ -180,6 +180,37 @@ async function expectComposerFocus(composer: HTMLElement, text: string) {
   expect(range.toString()).toBe(text);
 }
 
+it("shows a reopened chat's catalog title in the header and picker when the titler finishes", async () => {
+  const f = await setup();
+  const initial: NativeChatCatalogEntry = {
+    ...f.entries.get(f.second)!,
+    title: "First request excerpt",
+    titleGenerationPending: true,
+  };
+  f.entries.set(f.second, initial);
+  await selectChat("First request excerpt");
+  await expect.element(page.getByTitle("First request excerpt")).toBeVisible();
+  const transcript = vi.spyOn(f.bridge, "transcript");
+  await click("Open chat list");
+  await expect
+    .element(page.getByRole("option", { name: initial.title! }))
+    .toBeVisible();
+
+  f.entries.set(f.second, {
+    ...initial,
+    revision: initial.revision + 1,
+    title: "Spring launch kit",
+    titleGenerationPending: undefined,
+  });
+  await expect
+    .element(page.getByRole("option", { name: "Spring launch kit" }), {
+      timeout: 5_000,
+    })
+    .toBeVisible();
+  await expect.element(page.getByTitle("Spring launch kit")).toBeVisible();
+  expect(transcript).not.toHaveBeenCalled();
+});
+
 it("keeps the background chat's running indicator current after switching chats", async () => {
   const f = await setup();
   f.running.add(f.first);

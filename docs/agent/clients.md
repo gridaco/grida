@@ -289,6 +289,11 @@ Follow `nextCursor` with the same workspace to get the next page. The list
 shows chat identities and optional titles in newest-created order. Choose a
 chat and call `session/load` to open its transcript. [ACP session listing](https://agentclientprotocol.com/protocol/v1/session-list)
 
+Clients that negotiate `co.grida/session/initial-title` version 1 can send
+the optional `_meta["co.grida/initialTitle"]` string with a first
+`session/prompt`. Acceptance saves the excerpt for workspace listing.
+Successful generation can replace it, and a manual rename takes precedence.
+
 Clients can negotiate `co.grida/session/organize` to list archived chats in
 the same workspace. For an attached chat, read the current title, archive state,
 and revision before renaming, archiving, or restoring. Archiving leaves active
@@ -565,8 +570,9 @@ and only those can be edited with a revision. The summary of a compacted copy
 does not appear in the side chat's transcript either.
 
 A side chat's snapshot includes `side`: its `parentSessionId`,
-`temporary: true`, an `unavailable` list and, once the host titles it from its
-first message, its `title`. Each listed operation is refused with its code:
+`temporary: true`, an `unavailable` list and, when available, its current
+`title`. An optional `titleGenerationPending: true` marks a title still
+being generated. Each listed operation is refused with its code:
 
 | `unavailable` | Refused operation                                                 | Code                               |
 | ------------- | ----------------------------------------------------------------- | ---------------------------------- |

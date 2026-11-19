@@ -1605,7 +1605,7 @@ mod tests {
         );
         host.update_chat_selection(request.clone()).await.unwrap();
         let before = host.inspect(session.clone()).await.unwrap();
-        let catalog = host.catalog_entry(session.clone()).await.unwrap();
+        let (catalog, _) = host.catalog_entry(session.clone()).await.unwrap();
         let store = SelectionStore::new(&host).unwrap();
         let path = store.path(&session).unwrap();
         let before_retirement = std::fs::read(&path).unwrap();

@@ -18,6 +18,7 @@ import { NativeSelectedImages } from "./native-selected-images";
 import { NativeSubagentActivity } from "./native-subagent-activity";
 import { NativeActivityOrder } from "./native-activity-order";
 import { NativeEditorSurfaceEndpoints } from "./native-editor-surfaces";
+import { NativeChatTitle } from "./native-chat-title";
 
 function state() {
   const root = fs.mkdtempSync(
@@ -330,7 +331,9 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
       modelText: "<sample><reference /></sample>",
       displayParts,
     };
-    const literal = "<sample>My own words</sample>";
+    const userText = "<sample>My own words</sample>";
+    const literal = `  ${userText}\n${"🌱".repeat(60)}  `;
+    const expectedTitle = `${userText} ${"🌱".repeat(48 - userText.length)}…`;
     const test = fixture(
       `
       if (request.method === 'session/new') { send({id:request.id,result:{sessionId:'chat'}}); return; }
@@ -339,8 +342,10 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
       if (request.method === '_co.grida/session/submit' || request.method === '_co.grida/session/enqueue') {
         const empty = request.method.endsWith('/submit');
         const expected = empty ? [] : [{type:'text',text:${JSON.stringify(literal)}}];
+        const expectedTitle = empty ? undefined : ${JSON.stringify(expectedTitle)};
         if (!requested['${capability}'] || JSON.stringify(messageContext) !== JSON.stringify(expectContext)
-            || JSON.stringify(prompt) !== JSON.stringify(expected)) throw Error('incorrect separation');
+            || JSON.stringify(prompt) !== JSON.stringify(expected) || request.params.initialTitle !== expectedTitle)
+          throw Error('incorrect separation');
         send({id:request.id,result:{sessionId:'chat',inputId,inputPosition:1,turnId:empty?'turn':null,disposition:empty?'claimed':'queued'}}); return;
       }
       if (request.method !== 'session/load') throw Error('unexpected fixture method');
@@ -404,12 +409,19 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
     }
   });
 
-  it("refuses supplied message context when the host lacks the capability", async () => {
+  it("sends plain messages to older hosts without optional title or message context support", async () => {
     const test = fixture(
       `if (request.method === 'session/new') { send({id:request.id,result:{sessionId:'chat'}}); return; }
+      if (request.method === '_co.grida/session/submit' && !('initialTitle' in request.params)) {
+        send({id:request.id,result:{sessionId:'chat',inputId:'plain',inputPosition:0,turnId:'turn',disposition:'claimed'}}); return;
+      }
       throw Error('unexpected fixture method');`,
       1,
-      { [TRANSCRIPT_WINDOW]: 1, "co.grida/session/message-context": null }
+      {
+        [TRANSCRIPT_WINDOW]: 1,
+        "co.grida/session/message-context": null,
+        [NativeChatTitle.capability]: null,
+      }
     );
     let chat: NativeAgentChat | undefined;
     try {
@@ -426,6 +438,9 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
           messageContext: { modelText: "Extra context", displayParts: [] },
         })
       ).rejects.toThrow("native_chat_message_context_unavailable");
+      await expect(
+        chat.submit(session, "plain", "My own words")
+      ).resolves.toMatchObject({ inputId: "plain" });
     } finally {
       await chat?.close();
       test.close();

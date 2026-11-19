@@ -209,6 +209,7 @@ async fn organizer(url: &str) -> SharedSocket {
         .unwrap();
     let mut request = extension_initialize();
     request["clientCapabilities"]["_meta"]["co.grida/session/organize"] = 1.into();
+    request["clientCapabilities"]["_meta"]["co.grida/session/initial-title"] = 1.into();
     request["clientCapabilities"]["_meta"]["co.grida/settings/archive-catalog"] = 1.into();
     let init = ws_rpc(&mut socket, 1, "initialize", request).await;
     assert_eq!(
@@ -435,16 +436,7 @@ async fn archived_chat_keeps_its_turn_and_reopens_with_the_same_title() {
     terminate_shared_server(second).await;
 }
 
-#[tokio::test]
-async fn a_first_request_titles_an_untitled_chat_without_overriding_a_rename() {
-    let temporary = TempDir::new().unwrap();
-    let state = temporary.path().join("agent-state");
-    let workspace = TempDir::new().unwrap();
-    let mut endpoint = Endpoint::start(vec![
-        Reply::Finished("Here is a plan."),
-        Reply::Finished("Done."),
-    ])
-    .await;
+async fn title_server(state: &Path, endpoint: &Endpoint) -> (Child, String) {
     let mut command = executable();
     command
         .args([
@@ -457,8 +449,21 @@ async fn a_first_request_titles_an_untitled_chat_without_overriding_a_rename() {
         ])
         .env("GRIDA_AGENT_FIXTURE_SERVER_TOKEN", SERVER_TOKEN)
         .env("GRIDA_AGENT_PROCESS_TEST_KEY", TEST_CREDENTIAL);
-    configured(&mut command, &state, &endpoint.url);
-    let (child, url) = spawn_shared_server(command).await;
+    configured(&mut command, state, &endpoint.url);
+    spawn_shared_server(command).await
+}
+
+#[tokio::test]
+async fn a_first_request_titles_an_untitled_chat_without_overriding_a_rename() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Finished("Here is a plan."),
+        Reply::Finished("Done."),
+    ])
+    .await;
+    let (child, url) = title_server(&state, &endpoint).await;
     let mut client = organizer(&url).await;
     let session = new_session(&mut client, 2, workspace.path()).await;
     let prompt = |id: u64, text: &str| {
@@ -527,6 +532,206 @@ async fn a_first_request_titles_an_untitled_chat_without_overriding_a_rename() {
     assert_eq!(after["result"]["title"], "Spring launch");
     endpoint.done().await;
     terminate_shared_server(child).await;
+}
+
+#[tokio::test]
+async fn first_accepted_title_survives_retries_and_either_order_of_rename_and_generation() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint =
+        Endpoint::start(vec![Reply::Finished("Done."), Reply::Finished("Done.")]).await;
+    let (child, url) = title_server(&state, &endpoint).await;
+    let mut client = organizer(&url).await;
+    let mut observer = catalog_client(&url).await;
+    for rename_first in [true, false] {
+        let (release, held) = tokio::sync::oneshot::channel();
+        assert!(
+            endpoint
+                .title_replies
+                .send(Reply::After(held, Box::new(Reply::Finished(FIXTURE_TITLE))))
+                .is_ok()
+        );
+        let session = new_session(&mut client, 2, workspace.path()).await;
+        let read = json!({"sessionId":session});
+        let rejected = ws_rpc(
+            &mut client,
+            3,
+            "_co.grida/session/submit",
+            json!({
+                "sessionId": session,
+                "inputId": "first",
+                "prompt": [],
+                "initialTitle": "Rejected title"
+            }),
+        )
+        .await;
+        assert_eq!(
+            rejected["error"]["data"], "invalid_prompt_parts",
+            "{rejected}"
+        );
+        let empty = ws_rpc(
+            &mut client,
+            4,
+            "_co.grida/session/catalog-entry",
+            read.clone(),
+        )
+        .await;
+        assert_eq!(empty["result"]["revision"], 0, "{empty}");
+        assert!(empty["result"]["title"].is_null());
+
+        let mut first = prompt_request(
+            &session,
+            "first",
+            "Plan a spring launch with the design team",
+        );
+        first["initialTitle"] = json!("Launch planning");
+        let accepted = ws_rpc(&mut client, 5, "_co.grida/session/submit", first.clone()).await;
+        assert!(accepted["result"]["turnId"].is_string(), "{accepted}");
+        assert!(
+            !endpoint
+                .request()
+                .await
+                .to_string()
+                .contains("Launch planning")
+        );
+        endpoint.title_request().await;
+        let provisional = ws_rpc(&mut client, 6, "_co.grida/session/catalog-entry", read).await;
+        assert_eq!(
+            provisional["result"]["title"], "Launch planning",
+            "{provisional}"
+        );
+        assert_eq!(provisional["result"]["titleGenerationPending"], true);
+        let listed = ws_rpc(
+            &mut observer,
+            7,
+            "session/list",
+            json!({"cwd":workspace.path()}),
+        )
+        .await;
+        assert_eq!(listed["result"]["sessions"][0]["sessionId"], session);
+        assert_eq!(listed["result"]["sessions"][0]["title"], "Launch planning");
+
+        let rename = json!({"sessionId":session,"revision":provisional["result"]["revision"],
+            "title":"My launch plan","archived":false});
+        if rename_first {
+            let renamed =
+                ws_rpc(&mut client, 8, "_co.grida/session/organize", rename.clone()).await;
+            assert_eq!(renamed["result"]["title"], "My launch plan", "{renamed}");
+        }
+        release.send(()).unwrap();
+        if !rename_first {
+            let generated = wait_for_title_worker(&mut client, &session).await;
+            assert_eq!(generated["title"], FIXTURE_TITLE, "{generated}");
+            let renamed = ws_rpc(&mut client, 9, "_co.grida/session/organize", rename).await;
+            assert_eq!(renamed["result"]["title"], "My launch plan", "{renamed}");
+        }
+        let retry = ws_rpc(&mut client, 10, "_co.grida/session/submit", first).await;
+        assert_eq!(
+            retry["result"]["turnId"], accepted["result"]["turnId"],
+            "{retry}"
+        );
+        let settled = wait_for_title_worker(&mut client, &session).await;
+        assert_eq!(settled["title"], "My launch plan");
+    }
+    terminate_shared_server(child).await;
+    endpoint.done().await;
+}
+
+async fn wait_for_title_worker(client: &mut SharedSocket, session: &str) -> Value {
+    timeout(WAIT, async {
+        loop {
+            let entry = ws_rpc(
+                client,
+                20,
+                "_co.grida/session/catalog-entry",
+                json!({"sessionId":session}),
+            )
+            .await;
+            let entry = entry.get("result").unwrap_or_else(|| panic!("{entry}"));
+            if entry.get("titleGenerationPending").is_none() {
+                break entry.clone();
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("the background title request settled")
+}
+
+#[tokio::test]
+async fn failed_generation_keeps_the_standard_prompt_title_after_restart() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Finished("Done."),
+        Reply::Finished("Done again."),
+    ])
+    .await;
+    let (release, held) = tokio::sync::oneshot::channel();
+    let failure = Reply::RawHttp(
+        "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".into(),
+    );
+    assert!(
+        endpoint
+            .title_replies
+            .send(Reply::After(held, Box::new(failure)))
+            .is_ok()
+    );
+    let (child, url) = title_server(&state, &endpoint).await;
+    let mut client = organizer(&url).await;
+    let session = new_session(&mut client, 2, workspace.path()).await;
+    let first = ws_rpc(
+        &mut client,
+        3,
+        "session/prompt",
+        json!({"sessionId":session,"prompt":[{"type":"text","text":"Compare the drafts"}],
+            "_meta":{"co.grida/initialTitle":"Draft comparison"}}),
+    )
+    .await;
+    assert_eq!(first["result"]["stopReason"], "end_turn", "{first}");
+    endpoint.request().await;
+    endpoint.title_request().await;
+    release.send(()).unwrap();
+    let retained = wait_for_title_worker(&mut client, &session).await;
+    assert_eq!(retained["title"], "Draft comparison");
+    let mut later = prompt_request(&session, "later", "Now summarize the differences");
+    later["initialTitle"] = json!("Later message");
+    let reply = ws_rpc(&mut client, 4, "_co.grida/session/submit", later).await;
+    assert!(reply["result"]["turnId"].is_string(), "{reply}");
+    endpoint.request().await;
+    wait_for_snapshot(&mut client, &session, |view| {
+        view["latest"]["turnId"] == reply["result"]["turnId"] && view["current"].is_null()
+    })
+    .await;
+    terminate_shared_server(child).await;
+    let inspected = executable()
+        .args(["inspect", "--state-dir"])
+        .arg(&state)
+        .arg(&session)
+        .output()
+        .await
+        .unwrap();
+    assert!(
+        inspected.status.success(),
+        "{}",
+        String::from_utf8_lossy(&inspected.stderr)
+    );
+    assert_eq!(records(&inspected.stdout)[0]["title"], "Draft comparison");
+    let (child, url) = title_server(&state, &endpoint).await;
+    let mut observer = catalog_client(&url).await;
+    let listed = ws_rpc(
+        &mut observer,
+        2,
+        "session/list",
+        json!({"cwd":workspace.path()}),
+    )
+    .await;
+    assert_eq!(ids(&listed["result"]), [session.as_str()]);
+    assert_eq!(listed["result"]["sessions"][0]["title"], "Draft comparison");
+    terminate_shared_server(child).await;
+    endpoint.done().await;
 }
 
 #[tokio::test]

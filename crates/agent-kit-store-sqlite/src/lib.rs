@@ -374,6 +374,14 @@ impl SqliteStore {
         .await
     }
 
+    /// Read the immutable configuration without observing execution or queued inputs.
+    pub async fn configuration(&self, session: SessionId) -> Result<Envelope> {
+        execute(Arc::clone(&self.inner), move |_, connection| {
+            load_configuration(connection, &session)
+        })
+        .await
+    }
+
     /// Observe a submission's retained payload and disposition in its session.
     pub async fn input(&self, session: SessionId, input: ChangeId) -> Result<Option<InputView>> {
         execute(Arc::clone(&self.inner), move |_, connection| {
@@ -555,7 +563,10 @@ impl SqliteStore {
         input: Submission,
         expected: SessionRevision,
     ) -> Result<Acceptance> {
-        self.accept(session, input, Some(expected)).await
+        Ok(self
+            .submit_with_initial_label(session, input, Some(expected), None)
+            .await?
+            .0)
     }
 
     /// Claim new work and conditionally change the session driver's state in the
@@ -700,29 +711,39 @@ impl SqliteStore {
         finish_claim(inner, prepared)
     }
 
-    fn accept(
+    /// Accept the input and, on its first insertion at position zero, initialize
+    /// an untouched catalog label in the same transaction. The returned catalog
+    /// revision authorizes a later suggestion; replay never creates a new basis.
+    pub fn submit_with_initial_label(
         &self,
         session_id: SessionId,
         input: Submission,
         expected: Option<SessionRevision>,
-    ) -> BoxFuture<'_, Result<Acceptance>> {
+        initial_label: Option<catalog::InitialLabel>,
+    ) -> BoxFuture<'_, Result<(Acceptance, Option<u64>)>> {
         execute(Arc::clone(&self.inner), move |inner, connection| {
             let transaction = connection
                 .transaction_with_behavior(TransactionBehavior::Immediate)
                 .map_err(database_error)?;
             let mut session = load_session(&transaction, &session_id)?;
             if let Some(receipt) = accepted(&transaction, &session_id, &input)? {
-                return Ok(receipt);
+                return Ok((receipt, None));
             }
             if let Some(expected) = expected {
                 require_revision(&session, expected)?;
             }
             let receipt =
                 insert_input(inner, &transaction, &session_id, &mut session, &input, None)?;
+            let label_basis = if let Some(initial) = initial_label.filter(|_| receipt.position == 0)
+            {
+                catalog::initial_label(&transaction, &session_id, initial)?
+            } else {
+                None
+            };
             bump_revision(&mut session)?;
             save_session(&transaction, &session_id, &session)?;
             commit(inner, transaction)?;
-            Ok(receipt)
+            Ok((receipt, label_basis))
         })
     }
 
@@ -978,7 +999,12 @@ impl SessionStore for SqliteStore {
         session_id: SessionId,
         input: Submission,
     ) -> BoxFuture<'_, Result<Acceptance>> {
-        self.accept(session_id, input, None)
+        Box::pin(async move {
+            Ok(self
+                .submit_with_initial_label(session_id, input, None, None)
+                .await?
+                .0)
+        })
     }
 
     fn claim(&self, request: ClaimRequest) -> BoxFuture<'_, Result<ClaimOutcome>> {
@@ -1369,6 +1395,17 @@ fn require_operation_owner(
     // the interval between checking the source and publishing the claim.
     live_owner(inner, binding)?
         .ok_or_else(|| error(ErrorKind::Conflict, "operation_claim_source_not_owned"))
+}
+
+fn load_configuration(connection: &Connection, session: &SessionId) -> Result<Envelope> {
+    let bytes: Vec<u8> = connection
+        .prepare_cached("SELECT configuration FROM sessions WHERE id=?1")
+        .map_err(database_error)?
+        .query_row([session.as_str()], |row| row.get(0))
+        .optional()
+        .map_err(database_error)?
+        .ok_or_else(|| error(ErrorKind::InvalidInput, "session_missing"))?;
+    decode(&bytes)
 }
 
 fn load_session(connection: &Connection, id: &SessionId) -> Result<SessionRecord> {

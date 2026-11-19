@@ -30,6 +30,11 @@ pub struct ArchiveCatalogPage {
 }
 
 impl Host {
+    /// Read the saved display title without loading history or contacting a provider.
+    pub async fn session_title(&self, id: SessionId) -> Result<Option<String>> {
+        Ok(self.store.catalog_entry(id).await?.label)
+    }
+
     /// Settings reads metadata without attaching a session or enabling execution.
     pub async fn archive_catalog(
         &self,
@@ -72,8 +77,10 @@ impl Host {
                 "session_catalog_revision_changed",
             ));
         }
-        entry.bucket = ACTIVE;
-        self.store.replace_catalog_entry(entry).await?;
+        if entry.bucket != ACTIVE {
+            entry.bucket = ACTIVE;
+            self.store.replace_catalog_entry(entry).await?;
+        }
         Ok(())
     }
 
@@ -97,10 +104,11 @@ impl Host {
         })
     }
 
-    pub(crate) async fn catalog_entry(&self, id: SessionId) -> Result<CatalogRecord> {
+    pub(crate) async fn catalog_entry(&self, id: SessionId) -> Result<(CatalogRecord, bool)> {
         self.refuse_in_side_chat(&id, side_chats::Refusal::Catalog)
             .await?;
-        self.store.catalog_record(id).await
+        self.read_with_title_state(&id, self.store.catalog_record(id.clone()))
+            .await
     }
 
     pub(crate) async fn organize_session(
@@ -110,13 +118,7 @@ impl Host {
         title: Option<String>,
         archived: bool,
     ) -> Result<CatalogRecord> {
-        let title = title.map(|title| title.trim().to_owned());
-        if title
-            .as_ref()
-            .is_some_and(|title| title.is_empty() || title.chars().any(char::is_control))
-        {
-            return Err(problem(ErrorKind::InvalidInput, "invalid_session_title"));
-        }
+        let title = normalize_title(title)?;
         self.refuse_in_side_chat(&id, side_chats::Refusal::Catalog)
             .await?;
         let entry = self
@@ -136,6 +138,17 @@ impl Host {
             current_turn_disposition: None,
         })
     }
+}
+
+pub(super) fn normalize_title(title: Option<String>) -> Result<Option<String>> {
+    let title = title.map(|title| title.trim().to_owned());
+    if title
+        .as_ref()
+        .is_some_and(|title| title.is_empty() || title.chars().any(char::is_control))
+    {
+        return Err(problem(ErrorKind::InvalidInput, "invalid_session_title"));
+    }
+    Ok(title)
 }
 
 pub(crate) fn is_archived(entry: &CatalogEntry) -> bool {

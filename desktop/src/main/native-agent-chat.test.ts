@@ -266,6 +266,16 @@ it("projects bounded catalog activity metadata and accepts older hosts without i
     });
     request.mockResolvedValueOnce(entry);
     await expect(client.catalogEntry(session)).resolves.toEqual(entry);
+    request.mockResolvedValueOnce({
+      ...entry,
+      title: "First line",
+      titleGenerationPending: true,
+    });
+    await expect(client.catalogEntry(session)).resolves.toEqual({
+      ...entry,
+      title: "First line",
+      titleGenerationPending: true,
+    });
     request.mockResolvedValueOnce({ ...entry, lastActivityAtMs: -1 });
     await expect(client.catalogEntry(session)).rejects.toThrow(
       "native_chat_invalid_protocol_value"
@@ -1082,6 +1092,9 @@ it.runIf(Boolean(packaged))(
 
       await client.close();
       client = await NativeAgentChat.start(launch);
+      expect((await client.list()).titles).toEqual([
+        { sessionId: session.id, title: original },
+      ]);
       const reopened = await client.load(session.id);
       expect(reopened.id).toBe(session.id);
       const snapshot = await client.observe(reopened);

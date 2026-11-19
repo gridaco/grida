@@ -57,17 +57,34 @@ An empty array means no chat on the page was running.
 An absent field means the host did not report running status. A client can
 refresh the visible page using its original cursor without loading any session.
 
+Negotiate `co.grida/session/initial-title` version 1 to suggest a provisional
+catalog title on submission. Standard `session/prompt` takes the optional
+string in `_meta["co.grida/initialTitle"]`. The private `session/submit`,
+`session/enqueue` and `goal/start` requests take an optional top-level
+`initialTitle`. Omit the extension field when the host did not advertise it.
+A supplied title uses the catalog's rename limits. After trimming it must
+be nonempty, contain no control characters and fit in 256 UTF-8 bytes.
+The host records the title only when it accepts the first input. A rejection
+leaves the title available for a later accepted send. Retries and later
+inputs preserve the current title. The title is catalog metadata and never
+becomes part of the prompt or transcript. Workspace listing and the attached
+catalog entry return the same title.
+
 Negotiate `co.grida/session/organize` version 1 for archived listing and
 catalog changes. `_co.grida/session/list-archived` accepts the standard
 workspace and cursor fields and returns the standard page shape.
 `_co.grida/session/catalog-entry` accepts an attached `sessionId` and
 returns `sessionId`, `title`, `archived`, and `revision`, plus optional
 `lastActivityAtMs` with the same retained-turn meaning as listing metadata.
+The attached read can also return `titleGenerationPending: true` while a
+title worker is active. Clients can reread this entry to observe the result.
+A successful generation can replace a provisional title. Failure leaves it
+in place, including after restart. A manual rename takes precedence even if
+generation finishes between the client's read and its rename request.
 `_co.grida/session/organize` replaces the title and archive state at that
-revision. Send a null title to clear it. An already-matching value succeeds
-without another write. On a revision conflict, read the current entry before
-asking the user to reapply the edit. Archiving and restoring preserve chat
-identity and leave execution controls unchanged.
+revision. Send a null title to clear it. On a revision conflict, read the
+current entry before asking the user to reapply the edit. Archiving and
+restoring preserve chat identity and leave execution controls unchanged.
 Mutation receipts omit activity; read the entry or list again for that optional
 observation. Activity is never accepted as a catalog mutation input.
 
@@ -821,7 +838,7 @@ history page's `seed` still names the parent the side chat was forked from.
 Revision targets are the side chat's own messages; revising one keeps the
 earlier side turns in the transcript, now as inherited anchors with
 `editable: true`, and the parent's history stays hidden. The snapshot carries
-`side: { parentSessionId, temporary: true, unavailable, title? }`, where
+`side: { parentSessionId, temporary: true, unavailable, title?, titleGenerationPending? }`, where
 `unavailable` lists `fork`, `side_chat`, `compaction`, `goals`, `subagents`,
 `delegation`, `wakeups` and `catalog`. The host refuses each with
 `side_chat_fork_unavailable`, `side_chat_nested_unavailable`,
@@ -836,10 +853,10 @@ background too, so the side chat's transcript window leaves out the turn that
 wrote it. Once the side chat has a turn, automatic compaction no longer
 selects it.
 
-A host launched with chat titles titles a side chat from its first message,
-as it titles a chat. `title` appears in the side chat's snapshot once written;
-a client reads it there, since the catalog entry stays refused. The title is
-kept only on the side chat's own record and is discarded with it.
+A side chat exposes the accepted excerpt and any subsequent generated title
+in its own snapshot. While `titleGenerationPending` is true a client can
+reread that snapshot to observe completion. The title is kept on the side
+chat's own record and is discarded with it.
 
 Side chats live in a catalog scope outside every workspace, so listings,
 archive listings and deletion previews never include them. Loading one from a

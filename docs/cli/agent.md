@@ -13,6 +13,10 @@ The source-built native CLI supports `grida agent run` for scripts and
 model and, when needed, a funding organization. Use a private state directory
 to keep your chats across launches.
 
+Pass `--initial-title "Draft comparison"` to `grida agent run` to give the
+chat a provisional title when its first message is accepted. ACP clients
+can read the saved title with `session/list` for that workspace.
+
 For setup, commands, exit codes, and the available client controls, see
 [Connect an agent client](../agent/clients.md#use-your-grida-login).
 

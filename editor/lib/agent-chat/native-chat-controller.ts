@@ -1490,6 +1490,20 @@ export class NativeChatController {
         catalogCursor: cursor,
         nextCatalogCursor: page.nextCursor,
       });
+      // A page has labels but no rename revisions. Reconcile the selected
+      // entry if another client or the titler changed its label.
+      const selected = this.view.catalogEntry;
+      if (
+        this.scope &&
+        selected &&
+        page.sessionIds.includes(selected.sessionId)
+      ) {
+        const title =
+          page.titles?.find((row) => row.sessionId === selected.sessionId)
+            ?.title ?? null;
+        if (title !== selected.title)
+          void this.readCatalogEntry(this.scope, true);
+      }
     } catch (error) {
       if (owns()) {
         const invalidPage =
@@ -3017,7 +3031,6 @@ export class NativeChatController {
         ? selected.title
         : this.catalog?.titles?.find((entry) => entry.sessionId === sessionId)
             ?.title;
-    // The host titles a new chat in the background; until then it is new.
     return title ?? NEW_CHAT_TITLE;
   }
 
@@ -3058,10 +3071,10 @@ export class NativeChatController {
     const draft = this.view.catalogDraft;
     if (!draft) return;
     const text = draft.text.trim();
-    // Leaving the field without a change is not a rename; an untitled chat
-    // keeps waiting for its generated title.
+    // Confirming a provisional label keeps it even if generation finishes later.
     if (
-      (text || null) === (draft.basis.title ?? null) ||
+      ((text || null) === draft.basis.title &&
+        !(draft.basis.title !== null && draft.basis.titleGenerationPending)) ||
       (draft.basis.title === null && text === NEW_CHAT_TITLE)
     ) {
       this.cancelRename();
@@ -3720,6 +3733,7 @@ export class NativeChatController {
       if (accepted && this.owns(scope)) {
         scope.pendingGoalStart = undefined;
         scope.firstInputId = undefined;
+        this.readFirstTitle(scope, accepted);
         scope.awaitingGoalId = accepted.inputId;
         scope.replay = true;
         await this.refresh(scope);
@@ -3787,6 +3801,7 @@ export class NativeChatController {
       scope.pendingGoalStart = undefined;
       scope.firstInputId = undefined;
       if (!this.owns(scope)) return false;
+      this.readFirstTitle(scope, receipt);
       scope.awaitingGoalId =
         this.view.goal?.goal?.goalId === receipt.inputId
           ? undefined
@@ -5337,6 +5352,7 @@ export class NativeChatController {
         this.update({ attachmentDraft: null, attachmentNotice: null });
       }
       onAccepted();
+      this.readFirstTitle(scope, accepted);
       // A read already in flight can describe the chat before this receipt.
       if (scope.refreshing) await scope.refreshing;
       if (!this.owns(scope)) return;
@@ -6289,8 +6305,17 @@ export class NativeChatController {
       .catch(() => {});
   }
 
+  /** The native input position identifies a first acceptance, including receipt replay. */
+  private readFirstTitle(scope: Scope, receipt: NativeChatAcceptance): void {
+    if (receipt.inputPosition !== 0 || this.fixed) return;
+    void this.readCatalogEntry(scope, true);
+    // A picker navigation already in flight owns the page it requested.
+    if (!this.view.catalogLoading) void this.listChats(this.view.catalogCursor);
+  }
+
   private async readCatalogEntry(
-    scope: Scope
+    scope: Scope,
+    quiet = false
   ): Promise<NativeChatCatalogEntry | null> {
     const attachment = scope.attachment;
     if (!attachment || !this.canOrganizeChats || !this.bridge.catalogEntry)
@@ -6300,11 +6325,34 @@ export class NativeChatController {
       if (!this.owns(scope)) return null;
       if (entry.sessionId !== attachment.sessionId)
         throw new Error("native_chat_catalog_entry_mismatch");
-      return this.installCatalogEntry(entry);
+      const previous = this.view.catalogEntry;
+      const installed = this.installCatalogEntry(entry);
+      if (
+        installed === entry &&
+        previous &&
+        previous.title !== entry.title &&
+        entry.title !== null &&
+        !entry.titleGenerationPending &&
+        (previous.title === null || previous.titleGenerationPending) &&
+        !this.view.catalogDraft
+      )
+        this.update({ titleArrived: entry.sessionId });
+      return installed;
     } catch {
-      if (this.owns(scope))
+      if (!quiet && this.owns(scope))
         this.update({ catalogEntryError: "Couldn't load the chat details." });
       return null;
+    } finally {
+      if (this.owns(scope) && this.view.catalogEntry?.titleGenerationPending) {
+        clearTimeout(scope.titleCheck);
+        scope.titleCheck = setTimeout(() => {
+          if (
+            this.owns(scope) &&
+            this.view.catalogEntry?.titleGenerationPending
+          )
+            void this.readCatalogEntry(scope, true);
+        }, TITLE_RECHECK_MS);
+      }
     }
   }
 
@@ -6373,17 +6421,15 @@ export class NativeChatController {
   }
 
   /**
-   * An untitled chat is titled by the host from its first request, in the
-   * background. Pick the title up as turns progress, and once more shortly
-   * after, without surfacing errors from this background read. A side chat
-   * reads its title from its snapshot.
+   * Hosts without title-worker status can publish a title shortly after the
+   * first turn. Recheck an untitled chat once after a lifecycle change.
    */
   private refreshUntitled(scope: Scope): void {
     const side = scope.observation?.snapshot.side;
     if (side) {
       // A side chat's title arrives through its snapshot; look once more
       // shortly after, as the title can follow the turn that asked for it.
-      if (side.title !== undefined) return;
+      if (side.title !== undefined || side.titleGenerationPending) return;
       clearTimeout(scope.titleCheck);
       scope.titleCheck = setTimeout(
         () => void this.refresh(scope),
@@ -6391,37 +6437,24 @@ export class NativeChatController {
       );
       return;
     }
-    const read = this.bridge.catalogEntry;
-    const attachment = scope.attachment;
     if (
-      !read ||
-      !attachment ||
       !this.canOrganizeChats ||
+      this.view.catalogEntry?.titleGenerationPending ||
       this.view.catalogEntry?.title !== null ||
       this.view.catalogDraft
     )
       return;
-    const check = async () => {
-      if (!this.owns(scope) || this.view.catalogEntry?.title !== null) return;
-      try {
-        const entry = await read.call(this.bridge, attachment.attachmentId);
-        if (
-          !this.owns(scope) ||
-          entry.sessionId !== attachment.sessionId ||
-          entry.title === null ||
-          this.view.catalogDraft
-        )
-          return;
-        this.installCatalogEntry(entry);
-        this.update({ titleArrived: entry.sessionId });
-        void this.listChats();
-      } catch {
-        // The title stays as it is; a later turn or reopening reads it again.
-      }
+    const check = () => {
+      if (
+        this.owns(scope) &&
+        this.view.catalogEntry?.title === null &&
+        !this.view.catalogDraft
+      )
+        void this.readCatalogEntry(scope, true);
     };
-    void check();
+    check();
     clearTimeout(scope.titleCheck);
-    scope.titleCheck = setTimeout(() => void check(), TITLE_RECHECK_MS);
+    scope.titleCheck = setTimeout(check, TITLE_RECHECK_MS);
   }
 
   private installCatalogEntry(
@@ -6429,16 +6462,27 @@ export class NativeChatController {
   ): NativeChatCatalogEntry {
     const current = this.view.catalogEntry;
     if (current && current.revision > entry.revision) return current;
-    if (this.catalog && entry.archived !== this.view.catalogArchived)
+    const page = this.catalog;
+    if (page && entry.archived !== this.view.catalogArchived)
       this.catalog = {
-        ...this.catalog,
-        sessionIds: this.catalog.sessionIds.filter(
-          (id) => id !== entry.sessionId
-        ),
+        ...page,
+        sessionIds: page.sessionIds.filter((id) => id !== entry.sessionId),
       };
+    else if (page?.sessionIds.includes(entry.sessionId)) {
+      const listed =
+        page.titles?.find((row) => row.sessionId === entry.sessionId)?.title ??
+        null;
+      if (listed !== entry.title) {
+        const titles =
+          page.titles?.filter((row) => row.sessionId !== entry.sessionId) ?? [];
+        if (entry.title !== null)
+          titles.push({ sessionId: entry.sessionId, title: entry.title });
+        this.catalog = { ...page, titles };
+      }
+    }
     this.update({
       catalogEntry: entry,
-      catalogEntryError: null,
+      ...(this.view.catalogDraft === null && { catalogEntryError: null }),
       sessions: this.sessionChoices(entry),
     });
     return entry;
@@ -6629,22 +6673,24 @@ export class NativeChatController {
       })
       .finally(() => {
         scope.refreshing = undefined;
-        if (
-          observable &&
-          this.owns(scope) &&
-          (scope.observation?.snapshot.current ||
-            this.view.commandRunning === "compact" ||
-            this.view.revisionDraft?.unverified ||
-            (scope.observation?.snapshot.queuedInputs &&
-              !scope.observation.snapshot.admissionPaused) ||
-            scope.replay ||
-            scope.awaitingTurn ||
-            scope.awaitingGoalId ||
-            scope.goalNeedsRefresh)
-        ) {
-          scope.timer = setTimeout(() => {
-            void this.refresh(scope);
-          }, POLL_MS);
+        if (!observable || !this.owns(scope)) return;
+        const snapshot = scope.observation?.snapshot;
+        const active =
+          snapshot?.current ||
+          this.view.commandRunning === "compact" ||
+          this.view.revisionDraft?.unverified ||
+          (snapshot?.queuedInputs && !snapshot.admissionPaused) ||
+          scope.replay ||
+          scope.awaitingTurn ||
+          scope.awaitingGoalId ||
+          scope.goalNeedsRefresh;
+        if (active || snapshot?.side?.titleGenerationPending) {
+          scope.timer = setTimeout(
+            () => {
+              void this.refresh(scope);
+            },
+            active ? POLL_MS : TITLE_RECHECK_MS
+          );
         }
       });
     return scope.refreshing;

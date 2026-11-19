@@ -575,16 +575,21 @@ async fn serve_connection(
                     // ACP JSON-RPC IDs correlate requests on one connection. A
                     // distinct host-generated ID identifies each durable input.
                     let id = ChangeId::new(uuid::Uuid::new_v4().to_string()).map_err(host_error)?;
+                    let initial_title = extensions::prompt_initial_title(
+                        &prompt_sessions,
+                        request.meta.as_ref(),
+                    )?;
+                    let prompt = PromptRequest {
+                        id,
+                        session,
+                        parts,
+                        questions: false,
+                        operating_regime: None,
+                        effort: None,
+                        reasoning: Default::default(),
+                    };
                     prompt_host
-                        .start_prompt(PromptRequest {
-                            id,
-                            session,
-                            parts,
-                            questions: false,
-                            operating_regime: None,
-                            effort: None,
-                            reasoning: Default::default(),
-                        })
+                        .start_prompt_with_initial_title(prompt, initial_title)
                         .await
                         .map_err(host_error)
                 }

@@ -63,6 +63,7 @@ pub enum AgentAction {
         cwd: PathBuf,
         session: Option<SessionId>,
         prompt: Option<String>,
+        initial_title: Option<String>,
         input_png: Option<PathBuf>,
         input_file: Option<PathBuf>,
         skills: Vec<grida_agent::skills::SkillReference>,
@@ -233,6 +234,7 @@ const STRINGS: &[&str] = &[
     "prompt-file",
     "input-png",
     "input-file",
+    "initial-title",
     "text",
     "text-file",
     "image",
@@ -573,6 +575,7 @@ fn parse_agent(tokens: &Tokens, run: bool) -> Result<AgentCommand, Failure> {
             "prompt",
             "input-png",
             "input-file",
+            "initial-title",
             "skill",
             "questions",
             "deadline-ms",
@@ -618,6 +621,7 @@ fn parse_agent(tokens: &Tokens, run: bool) -> Result<AgentCommand, Failure> {
                     .transpose()
                     .map_err(|_| Failure::usage())?,
                 prompt: tokens.value("prompt").map(str::to_owned),
+                initial_title: tokens.value("initial-title").map(str::to_owned),
                 input_png: tokens.value("input-png").map(PathBuf::from),
                 input_file: tokens.value("input-file").map(PathBuf::from),
                 skills: tokens

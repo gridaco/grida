@@ -307,6 +307,8 @@ export type NativeChatCatalogEntry = Readonly<{
   archived: boolean;
   /** Latest local turn activity, not archive time or exact message time. */
   lastActivityAtMs?: number;
+  /** A native titler for this chat is still running. */
+  titleGenerationPending?: true;
   deletionAvailable?: true;
 }>;
 
@@ -344,11 +346,9 @@ export type NativeChatSideSnapshot = Readonly<{
   parentSessionId: string;
   temporary: true;
   unavailable: readonly NativeChatSideRefusal[];
-  /**
-   * The title generated from the side chat's first message, once written.
-   * It lives and ends with the side chat and is never listed.
-   */
+  /** The current title lives and ends with the side chat. */
   title?: string;
+  titleGenerationPending?: true;
 }>;
 
 export type NativeChatReadiness =

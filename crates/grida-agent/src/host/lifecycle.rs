@@ -119,7 +119,7 @@ mod tests {
         let competing = prompt("competing");
         let policy = host.submission_policy(&competing, false).unwrap();
         let first = host
-            .register_prompt(competing, false, policy)
+            .register_prompt(competing, false, policy, None)
             .await
             .unwrap();
         let receipt = stop().await.unwrap();
@@ -140,7 +140,10 @@ mod tests {
         admission = host.configuration_admission.lock().await;
         let another = prompt("another");
         let policy = host.submission_policy(&another, false).unwrap();
-        let second = host.register_prompt(another, false, policy).await.unwrap();
+        let second = host
+            .register_prompt(another, false, policy, None)
+            .await
+            .unwrap();
         {
             let work = host.work.lock().await;
             assert!(work.ready.iter().any(|ready| matches!(ready, ReadyWork::Stop(owner, target) if owner == &session && target == &turn)));
@@ -964,12 +967,14 @@ impl Host {
         let mut policy = host.submission_policy(&request, context.allow_wakeups)?;
         policy.selection_revision = context.selection_revision;
         host.bind_editor(&mut policy, &request, &context)?;
-        let title = host.title_candidate(&view, &request.parts);
+        let title = host.title_candidate(&view, &request.parts, context.initial_title)?;
         let input = host
             .capture_input(&view, request.id, request.parts, policy)
             .await?;
-        let acceptance = self.store.submit(request.session, input).await?;
-        host.start_title(title);
+        let acceptance = host
+            .accept_with_title(request.session, input, None, title)
+            .await?
+            .start_title();
         self.kick_queue(acceptance.session.clone()).await;
         drop(admission);
         Ok(DurableSubmission {

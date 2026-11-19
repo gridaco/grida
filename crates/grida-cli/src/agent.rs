@@ -82,6 +82,7 @@ pub async fn dispatch(command: AgentCommand) -> Result<u8> {
             cwd,
             session,
             prompt,
+            initial_title,
             input_png,
             input_file,
             skills,
@@ -124,6 +125,7 @@ pub async fn dispatch(command: AgentCommand) -> Result<u8> {
                     timeout: Duration::from_millis(deadline_ms),
                 },
                 input_file,
+                initial_title,
             ))
         }
         AgentAction::ServeStdio => None,
@@ -172,8 +174,8 @@ pub async fn dispatch(command: AgentCommand) -> Result<u8> {
         )
         .map_err(failure)?,
     );
-    if let Some((run, input_file)) = run {
-        process::run_with_file(&host, run, input_file, signal)
+    if let Some((run, input_file, initial_title)) = run {
+        process::run_with_input(&host, run, input_file, initial_title, signal)
             .await
             .map_err(failure)
     } else {

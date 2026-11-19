@@ -36,6 +36,7 @@ struct Enqueue {
     meta: Option<Meta>,
     session_id: SessionId,
     input_id: ChangeId,
+    initial_title: Option<String>,
     prompt: Vec<ContentBlock>,
     selected_file: Option<SelectedFile>,
     selected_image: Option<crate::host::SelectedImage>,
@@ -248,6 +249,7 @@ pub(super) fn handlers(
                                 reasoning: request.reasoning,
                             },
                             SubmissionContext {
+                                initial_title: initial_title(&enqueue.1, request.initial_title)?,
                                 selection_revision: selection::revision(
                                     request.meta.as_ref(),
                                     &enqueue.1,

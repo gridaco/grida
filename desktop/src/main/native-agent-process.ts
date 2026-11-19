@@ -14,6 +14,7 @@ import { NativeAgentHooks } from "./native-agent-hooks";
 import { NativeAgentRevisions } from "./native-agent-revisions";
 import type { NativeMcpLaunch } from "./native-mcp-launch";
 import { NativeAgentGoals } from "./native-agent-goals";
+import { NativeChatTitle } from "./native-chat-title";
 import {
   NativeImageGeneration,
   type ImageReferenceReview,
@@ -216,6 +217,7 @@ export class NativeAgentProcess {
   private editorBrowserTools = false;
   private editorContext = false;
   private messageContext = false;
+  private initialTitle = false;
   private readonly editorBrowserRequests = new Map<
     string | number,
     BrowserRequest
@@ -309,6 +311,10 @@ export class NativeAgentProcess {
 
   get acceptsMessageContext(): boolean {
     return this.connected && this.messageContext;
+  }
+
+  get acceptsInitialTitle(): boolean {
+    return this.connected && this.initialTitle;
   }
 
   get acceptsChildGatewayBilling(): boolean {
@@ -652,6 +658,7 @@ export class NativeAgentProcess {
                 [NativeEditorSurfaceEndpoints.capability]: 1,
                 ...(options.workspace && { [EDITOR_CONTEXT]: 1 }),
                 [MESSAGE_CONTEXT]: 1,
+                [NativeChatTitle.capability]: 1,
                 ...(providerEgress && {
                   [NativeEditorSurfaceEndpoints.openCapability]: 1,
                   [NativeEditorSurfaceEndpoints.svgTextCapability]: 1,
@@ -819,6 +826,8 @@ export class NativeAgentProcess {
         options.workspace !== undefined && advertised?.[EDITOR_CONTEXT] === 1;
       processOwner.messageContext =
         processOwner.transcriptWindow && advertised?.[MESSAGE_CONTEXT] === 1;
+      processOwner.initialTitle =
+        advertised?.[NativeChatTitle.capability] === 1;
       processOwner.ready = true;
       return processOwner;
     } catch (error) {

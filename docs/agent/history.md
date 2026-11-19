@@ -50,11 +50,16 @@ image support keeps the file card. An unavailable retained image shows an
 unavailable notice.
 [Inspect attachments](./results.md#inspect-an-attachment)
 
-A new chat gets a short title from its first request while the agent starts
-working. To change it, double-click the title, or open **Chat options** (the
-three-dot menu) and choose **Rename chat**. Type the new title and press
-Enter, or click elsewhere; Escape keeps the old one. A title you set is never
-replaced.
+An empty draft shows **New chat**. If your first message contains text, its
+opening words appear in the header and workspace chat picker as soon as the
+host accepts it. The agent can replace this excerpt with a generated title.
+If generation fails, the excerpt stays, including when you reopen the chat.
+A rejected send leaves the draft untitled.
+
+To choose your own title, double-click the title or open **Chat options** and
+choose **Rename chat**. Press Enter or click elsewhere to save, or press Escape
+to cancel. Your saved title takes precedence even if the agent is still
+generating one.
 
 **Archive chat** moves a chat out of the active list and lets any ongoing
 work continue. After confirmation, Desktop opens a new-chat draft and shows

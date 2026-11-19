@@ -124,9 +124,11 @@ pub(crate) struct SideSnapshot {
     parent_session_id: SessionId,
     temporary: bool,
     unavailable: [Refusal; 8],
-    /// The title generated from the side chat's first message, once written.
+    /// The side chat's current title, including an accepted provisional label.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     title: Option<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    title_generation_pending: bool,
 }
 
 impl Host {
@@ -135,19 +137,27 @@ impl Host {
         let Some(side) = session_configuration(view)?.side else {
             return Ok(None);
         };
-        let title = self.store.catalog_entry(view.session.clone()).await?.label;
+        let (entry, title_generation_pending) = self
+            .read_with_title_state(
+                &view.session,
+                self.store.catalog_entry(view.session.clone()),
+            )
+            .await?;
         Ok(Some(SideSnapshot {
             parent_session_id: side.parent,
             temporary: true,
             unavailable: Refusal::ALL,
-            title,
+            title: entry.label,
+            title_generation_pending,
         }))
     }
 
     /// The parent of a side session, or `None` for any other session.
     pub(crate) async fn side_parent(&self, session: &SessionId) -> Result<Option<SessionId>> {
-        let view = self.store.inspect(session.clone()).await?;
-        Ok(session_configuration(&view)?.side.map(|side| side.parent))
+        let configuration = self.store.configuration(session.clone()).await?;
+        Ok(decode_session_configuration(&configuration)?
+            .side
+            .map(|side| side.parent))
     }
 
     /// Refuse `refusal` for a side session. Other sessions, and sessions that

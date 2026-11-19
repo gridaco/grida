@@ -130,11 +130,8 @@ impl Host {
         goal: GoalRequest,
         allow_wakeups: bool,
     ) -> Result<DurableSubmission> {
-        self.owned_control(move |host| async move {
-            host.accept_goal(request, goal, allow_wakeups, None, None)
-                .await
-        })
-        .await
+        self.start_goal_with_selection(request, goal, allow_wakeups, None, None, None)
+            .await
     }
 
     /// Start a Gateway Goal with a retained exact USD-mills spending ceiling.
@@ -146,10 +143,14 @@ impl Host {
         max_cost_mills: String,
         allow_wakeups: bool,
     ) -> Result<DurableSubmission> {
-        self.owned_control(move |host| async move {
-            host.accept_goal(request, goal, allow_wakeups, Some(max_cost_mills), None)
-                .await
-        })
+        self.start_goal_with_selection(
+            request,
+            goal,
+            allow_wakeups,
+            Some(max_cost_mills),
+            None,
+            None,
+        )
         .await
     }
 
@@ -160,6 +161,7 @@ impl Host {
         allow_wakeups: bool,
         max_cost_mills: Option<String>,
         selection_revision: Option<u64>,
+        initial_title: Option<String>,
     ) -> Result<DurableSubmission> {
         self.owned_control(move |host| async move {
             host.accept_goal(
@@ -168,6 +170,7 @@ impl Host {
                 allow_wakeups,
                 max_cost_mills,
                 selection_revision,
+                initial_title,
             )
             .await
         })
@@ -187,6 +190,7 @@ impl Host {
         allow_wakeups: bool,
         max_cost_mills: Option<String>,
         selection_revision: Option<u64>,
+        initial_title: Option<String>,
     ) -> Result<DurableSubmission> {
         self.refuse_in_side_chat(&request.session, side_chats::Refusal::Goals)
             .await?;
@@ -301,7 +305,7 @@ impl Host {
         // checked at. A running turn can settle meanwhile; every precondition,
         // the title and the captured input are taken again from the newer view.
         let mut attempts = 0;
-        let (accepted, title) = loop {
+        let accepted = loop {
             let view = self.store.inspect(request.session.clone()).await?;
             host.check_new_submission(&view).await?;
             if self
@@ -358,7 +362,7 @@ impl Host {
             }
             // A chat started as a goal is titled from its objective, like any
             // other first request.
-            let title = host.title_candidate(&view, &request.parts);
+            let title = host.title_candidate(&view, &request.parts, initial_title.clone())?;
             let mut input = host
                 .capture_input(&view, request.id.clone(), request.parts.clone(), policy)
                 .await?;
@@ -366,12 +370,11 @@ impl Host {
             stored.allow_reviewer_primary_read = false;
             stored.goal = Some(GoalInput::Start(goal.clone()));
             input.payload = encode_stored_prompt(&stored)?;
-            match self
-                .store
-                .submit_at_revision(request.session.clone(), input, view.revision)
+            match host
+                .accept_with_title(request.session.clone(), input, Some(view.revision), title)
                 .await
             {
-                Ok(accepted) => break (accepted, title),
+                Ok(accepted) => break accepted,
                 Err(error)
                     if error.code == "stale_session_revision" && attempts < GOAL_START_ATTEMPTS =>
                 {
@@ -388,7 +391,7 @@ impl Host {
                 )
             })?;
         }
-        host.start_title(title);
+        let accepted = accepted.start_title();
         self.kick_queue(accepted.session.clone()).await;
         Ok(DurableSubmission {
             session: accepted.session,

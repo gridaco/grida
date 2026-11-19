@@ -216,7 +216,8 @@ pub struct Host {
     work: Arc<Mutex<Work>>,
     wake_lock: Arc<Mutex<()>>,
     workers: Arc<AtomicUsize>,
-    title_workers: Arc<AtomicUsize>,
+    title_observation: Arc<tokio::sync::RwLock<()>>,
+    title_workers: Arc<std::sync::Mutex<BTreeSet<SessionId>>>,
     changed: Arc<Notify>,
     live_updates: broadcast::Sender<live::LiveUpdate>,
     subagent_activity: Arc<subagent_activity::State>,
@@ -627,12 +628,14 @@ impl InputAuthority {
 
 enum Launch {
     Prompt {
+        initial_title: Option<String>,
         id: ChangeId,
         parts: Vec<PromptPart>,
         policy: SubmissionPolicy,
         publish_text: bool,
     },
     Identified {
+        initial_title: Option<String>,
         id: ChangeId,
         parts: Vec<PromptPart>,
         policy: SubmissionPolicy,
@@ -725,6 +728,7 @@ pub struct PendingInteractions {
 
 #[derive(Default)]
 pub(crate) struct SubmissionContext {
+    pub initial_title: Option<String>,
     pub selection_revision: Option<u64>,
     pub allow_wakeups: bool,
     pub allow_library_selection: bool,
@@ -949,6 +953,7 @@ impl Host {
             work: Arc::default(),
             wake_lock: Arc::default(),
             workers: Arc::default(),
+            title_observation: Arc::default(),
             title_workers: Arc::default(),
             changed: Arc::default(),
             processes: Arc::new(crate::processes::ProcessSessions::with_live(
@@ -1343,8 +1348,19 @@ impl Host {
     }
 
     pub async fn start_prompt(&self, request: PromptRequest) -> Result<AcceptedRun> {
+        self.start_prompt_with_initial_title(request, None).await
+    }
+
+    /// Accept a prompt with an optional catalog label for its first submission.
+    pub async fn start_prompt_with_initial_title(
+        &self,
+        request: PromptRequest,
+        initial_title: Option<String>,
+    ) -> Result<AcceptedRun> {
         let policy = self.submission_policy(&request, false)?;
-        let ticket = self.register_prompt(request, false, policy).await?;
+        let ticket = self
+            .register_prompt(request, false, policy, initial_title)
+            .await?;
         let acceptance = prompt_acceptance(ticket.admission).await?;
         let InputDisposition::Claimed { turn } = acceptance.disposition else {
             return Err(problem(ErrorKind::Uncertain, "prompt_claim_missing"));
@@ -1364,6 +1380,7 @@ impl Host {
         request: PromptRequest,
         identified: bool,
         policy: SubmissionPolicy,
+        initial_title: Option<String>,
     ) -> Result<LaunchTicket> {
         self.execution()?;
         let PromptRequest {
@@ -1371,13 +1388,19 @@ impl Host {
         } = request;
         validate_prompt_parts(&parts)?;
         let launch = if identified && compaction::ordinary_text(policy.effort.is_some(), &parts) {
-            Launch::Identified { id, parts, policy }
+            Launch::Identified {
+                id,
+                parts,
+                policy,
+                initial_title,
+            }
         } else {
             Launch::Prompt {
                 id,
                 parts,
                 policy,
                 publish_text: identified,
+                initial_title,
             }
         };
         let mut work = self.settled_work(&session).await?;
@@ -1645,7 +1668,12 @@ impl Host {
         let launch = match launch {
             Launch::Sponsored(request) => return self.admit_sponsored(*request).await,
             Launch::Delegated(request) => return self.admit_delegated(*request).await,
-            Launch::Identified { id, parts, policy } => {
+            Launch::Identified {
+                id,
+                parts,
+                policy,
+                initial_title,
+            } => {
                 let _admission = self.configuration_admission.lock().await;
                 let view = self.store.inspect(session.clone()).await?;
                 self.check_execution(&view).await?;
@@ -1653,13 +1681,12 @@ impl Host {
                 if !view.queued.is_empty() {
                     return Err(problem(ErrorKind::Conflict, "session_queue_waiting"));
                 }
-                let title = self.title_candidate(&view, &parts);
+                let title = self.title_candidate(&view, &parts, initial_title)?;
                 let input = self.capture_input(&view, id, parts, policy).await?;
                 let accepted = self
-                    .store
-                    .submit_at_revision(session.clone(), input, view.revision)
-                    .await?;
-                self.start_title(title);
+                    .accept_with_title(session.clone(), input, Some(view.revision), title)
+                    .await?
+                    .start_title();
                 Launch::Queued(Some(accepted), None)
             }
             other => other,
@@ -1738,17 +1765,23 @@ impl Host {
         let side = side.is_some();
         let (claim_request, input, acceptance, history) = match launch {
             Launch::Prompt {
-                id, parts, policy, ..
+                id,
+                parts,
+                policy,
+                initial_title,
+                ..
             } => {
                 require_idle(&view)?;
                 if !view.queued.is_empty() {
                     return Err(problem(ErrorKind::Conflict, "session_queue_waiting"));
                 }
                 let history = self.provider_history(session.clone(), None, side).await?;
-                let title = self.title_candidate(&view, &parts);
+                let title = self.title_candidate(&view, &parts, initial_title)?;
                 let input = self.capture_input(&view, id, parts, policy).await?;
-                let acceptance = self.store.submit(session.clone(), input.clone()).await?;
-                self.start_title(title);
+                let acceptance = self
+                    .accept_with_title(session.clone(), input.clone(), None, title)
+                    .await?
+                    .start_title();
                 let view = self.store.inspect(session.clone()).await?;
                 if view.queued.first().map(|head| &head.input.id) != Some(&input.id) {
                     return Err(problem(ErrorKind::Conflict, "session_queue_waiting"));
@@ -3496,7 +3529,9 @@ impl Host {
         host.bind_editor(&mut policy, &request, &context)?;
         policy.allow_library_selection = context.allow_library_selection;
         let result = async {
-            let ticket = host.register_prompt(request.clone(), true, policy).await?;
+            let ticket = host
+                .register_prompt(request.clone(), true, policy, context.initial_title.clone())
+                .await?;
             prompt_acceptance(ticket.admission).await
         }
         .await;

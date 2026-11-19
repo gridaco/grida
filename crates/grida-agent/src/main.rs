@@ -79,6 +79,8 @@ fn command() -> Command {
                         .help("Attach one explicitly selected regular file for bounded local inspection"),
                 )
                 .arg(Arg::new("session").long("session").value_name("SESSION_ID"))
+                .arg(Arg::new("initial-title").long("initial-title").value_name("TITLE")
+                    .help("Suggest a catalog title when the first message is accepted"))
                 .arg(Arg::new("subagents").long("subagents").action(ArgAction::SetTrue)
                     .help("Allow bounded general-purpose delegated work"))
                 .arg(Arg::new("effort").long("effort").value_parser(["standard", "ultra"])
@@ -632,10 +634,12 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
         let host = Host::open(state_dir, None)?;
         let id = SessionId::new(args.get_one::<String>("session").expect("required session"))?;
         let view = host.inspect(id).await?;
+        let title = host.session_title(view.session.clone()).await?;
         process::write_record(&json!({
             "schema_version": 1,
             "kind": "session",
             "session_id": view.session,
+            "title": title,
             "revision": view.revision,
             "admission_paused": view.admission_paused,
             "current": view.current,
@@ -875,7 +879,7 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
         }
         return process::serve(host, listener, process::shutdown_signal()).await;
     }
-    process::run_with_file(
+    process::run_with_input(
         &host,
         RunOptions {
             cwd: match run_cwd {
@@ -906,6 +910,7 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
             ),
         },
         args.get_one::<PathBuf>("input-file").cloned(),
+        args.get_one::<String>("initial-title").cloned(),
         process::shutdown_signal(),
     )
     .await

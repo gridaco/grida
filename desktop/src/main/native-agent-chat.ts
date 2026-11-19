@@ -99,6 +99,7 @@ import {
 } from "./native-agent-process";
 import { NativeGatewayConnection } from "./native-gateway-connection";
 import type { NativeChatSelections } from "./native-chat-selections";
+import { NativeChatTitle } from "./native-chat-title";
 
 const CAPABILITIES = {
   "co.grida/session/submit": 1,
@@ -1436,20 +1437,25 @@ export class NativeAgentChat {
       throw new Error("native_chat_effort_unavailable");
     if (editorContext && !this.acceptsEditorContext)
       throw new Error("native_chat_editor_context_unavailable");
+    const prompt = textPrompt(
+      text,
+      !!messageContext &&
+        (!!messageContext.displayParts.length ||
+          !!image ||
+          !!selectedImage ||
+          !!file ||
+          !!reference)
+    );
+    const initialTitle = this.process.acceptsInitialTitle
+      ? NativeChatTitle.excerpt(text)
+      : undefined;
     return acceptance(
       await this.process.request(`_co.grida/session/${mode}`, {
         sessionId,
         inputId,
+        ...(initialTitle && { initialTitle }),
         prompt: [
-          ...textPrompt(
-            text,
-            !!messageContext &&
-              (!!messageContext.displayParts.length ||
-                !!image ||
-                !!selectedImage ||
-                !!file ||
-                !!reference)
-          ),
+          ...prompt,
           ...(image ? [image] : []),
           ...(reference ? [reference] : []),
         ],
@@ -2100,6 +2106,7 @@ export class NativeAgentChat {
         namedChild: this.process.acceptsGoalNamedChild,
         spending: this.process.acceptsGoalSpending,
         messageContext: this.process.acceptsMessageContext,
+        initialTitle: this.process.acceptsInitialTitle,
       });
     } catch (error) {
       if (NativeAgentGoals.isUnverifiedStart(error))
@@ -3519,6 +3526,9 @@ function sideSnapshot(value: unknown, opened: boolean): NativeChatSideSnapshot {
       )
     ),
     ...(title !== null && { title }),
+    ...(titleGenerationPending(side.titleGenerationPending) && {
+      titleGenerationPending: true as const,
+    }),
   });
 }
 
@@ -3546,6 +3556,10 @@ function catalogTitle(value: unknown): string | null {
   return value;
 }
 
+function titleGenerationPending(value: unknown): boolean {
+  return value !== undefined && flag(value);
+}
+
 function catalogEntry(
   value: unknown,
   sessionId: string
@@ -3558,6 +3572,9 @@ function catalogEntry(
     revision: revision(entry.revision),
     title: catalogTitle(entry.title),
     archived: flag(entry.archived),
+    ...(titleGenerationPending(entry.titleGenerationPending) && {
+      titleGenerationPending: true as const,
+    }),
     ...(lastActivityAtMs !== undefined && { lastActivityAtMs }),
   });
 }

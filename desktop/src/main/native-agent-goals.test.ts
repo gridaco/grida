@@ -67,6 +67,7 @@ it("leaves an omitted allowance to the host's product default", async () => {
   });
   const [, params] = request.mock.calls[0] as [string, { goal: object }];
   expect(params.goal).not.toHaveProperty("allowance");
+  expect(params).not.toHaveProperty("initialTitle");
   expect(() =>
     goals.start(
       "session",
@@ -82,7 +83,11 @@ it("binds a named reviewer only to a negotiated Ultra Goal start", async () => {
     vi.fn<(method: string, params: unknown) => Promise<unknown>>();
   const goals = new NativeAgentGoals(request);
   const named = { ...REQUEST, effort: "ultra", namedChildId: "named-reviewer" };
-  const capabilities = { fundedReview: true, namedChild: true };
+  const capabilities = {
+    fundedReview: true,
+    namedChild: true,
+    initialTitle: true,
+  };
   expect(() =>
     goals.start("session", "input", named, {
       ...capabilities,
@@ -112,6 +117,7 @@ it("binds a named reviewer only to a negotiated Ultra Goal start", async () => {
     expect.objectContaining({
       sessionId: "session",
       inputId: "input",
+      initialTitle: REQUEST.objective,
       effort: "ultra",
       operatingRegime: "act",
       goal: expect.objectContaining({ named_child: "named-reviewer" }),

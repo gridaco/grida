@@ -24,6 +24,13 @@ pub struct CatalogEntry {
     pub revision: u64,
 }
 
+/// The owner can propose a label at first input acceptance, or reserve an
+/// untitled entry for a later conditional suggestion.
+pub enum InitialLabel {
+    Display(String),
+    AwaitSuggestion,
+}
+
 /// Catalog metadata with read-only facts about local turn activity.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CatalogRecord {
@@ -118,17 +125,12 @@ impl SqliteStore {
     ) -> Result<CatalogPage<(SessionId, Envelope)>> {
         execute(Arc::clone(&self.inner), move |_, connection| {
             let page = read_page(connection, scope, bucket, after)?;
-            let mut statement = connection
-                .prepare_cached("SELECT configuration FROM sessions WHERE id=?1")
-                .map_err(database_error)?;
             let entries = page
                 .entries
                 .into_iter()
                 .map(|entry| {
-                    let configuration: Vec<u8> = statement
-                        .query_row([entry.session.as_str()], |row| row.get(0))
-                        .map_err(database_error)?;
-                    Ok((entry.session, decode(&configuration)?))
+                    let configuration = load_configuration(connection, &entry.session)?;
+                    Ok((entry.session, configuration))
                 })
                 .collect::<Result<_>>()?;
             Ok(CatalogPage {
@@ -156,42 +158,186 @@ impl SqliteStore {
         .await
     }
 
-    /// Replace only presentation metadata at the observed catalog revision.
-    /// Session execution and its revision are independent of this record.
+    /// Replace catalog metadata at its observed revision. A label edit may
+    /// cross an automatic label update within the same bucket. Any intervening
+    /// human edit or bucket change fences stale revisions.
     pub async fn replace_catalog_entry(&self, entry: CatalogEntry) -> Result<CatalogEntry> {
-        if entry
-            .label
-            .as_ref()
-            .is_some_and(|label| label.len() > MAX_LABEL_BYTES)
-        {
-            return Err(error(
-                ErrorKind::InvalidInput,
-                "session_catalog_label_too_large",
-            ));
-        }
+        validate_label(entry.label.as_deref())?;
         execute(Arc::clone(&self.inner), move |inner, connection| {
             let transaction = connection
                 .transaction_with_behavior(TransactionBehavior::Immediate)
                 .map_err(database_error)?;
             let current = lookup(&transaction, &entry.session)?;
-            if current.bucket == entry.bucket && current.label == entry.label {
+            let same_label = current.label == entry.label;
+            let same_bucket = current.bucket == entry.bucket;
+            let manual = label_change(&transaction, &entry.session, MANUAL)?.is_some();
+            let initial = label_change(&transaction, &entry.session, INITIAL)?;
+            let generated = label_change(&transaction, &entry.session, GENERATED)?;
+            let pending = !manual && initial.is_some() && generated.is_none();
+            // A rename can cross automatic label writes only. Any intervening
+            // move or human edit ends that range, including a move away and back.
+            let can_rebase_rename = same_bucket
+                && !manual
+                && generated.or(initial).is_some_and(|change| {
+                    change.revision == current.revision
+                        && (change.basis..change.revision).contains(&entry.revision)
+                });
+            let can_apply = current.revision == entry.revision || can_rebase_rename;
+            // A retry of an already-applied move must not take over the title.
+            if same_label && same_bucket && (!pending || !can_apply) {
                 return Ok(current);
             }
-            if current.revision != entry.revision {
-                return Err(error(ErrorKind::Conflict, "session_catalog_revision_changed"));
+            if !can_apply {
+                return Err(error(
+                    ErrorKind::Conflict,
+                    "session_catalog_revision_changed",
+                ));
             }
-            transaction
-                .execute(
-                    "UPDATE sessions SET bucket=?1,label=?2,catalog_revision=catalog_revision+1 WHERE id=?3",
-                    params![entry.bucket, entry.label, entry.session.as_str()],
-                )
-                .map_err(database_error)?;
+            let revision =
+                write_entry(&transaction, &current, entry.bucket, entry.label.as_deref())?;
+            if !manual && (!same_label || same_bucket) {
+                // Reaffirming the displayed label also claims it. A bucket-only
+                // move preserves both the current label and its pending suggestion.
+                record_label_change(
+                    &transaction,
+                    &entry.session,
+                    MANUAL,
+                    current.revision,
+                    revision,
+                )?;
+            }
             let updated = lookup(&transaction, &entry.session)?;
             commit(inner, transaction)?;
             Ok(updated)
         })
         .await
     }
+
+    /// Finalize the first input's suggestion after any bucket-only moves.
+    /// A human label edit (including clearing or confirming it) wins.
+    pub async fn finish_label_suggestion(
+        &self,
+        session: SessionId,
+        expected: u64,
+        label: String,
+    ) -> Result<()> {
+        validate_label(Some(&label))?;
+        execute(Arc::clone(&self.inner), move |inner, connection| {
+            let tx = connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(database_error)?;
+            let Some(initial) = label_change(&tx, &session, INITIAL)? else {
+                return Ok(());
+            };
+            if initial.revision != expected
+                || label_change(&tx, &session, MANUAL)?.is_some()
+                || label_change(&tx, &session, GENERATED)?.is_some()
+            {
+                return Ok(());
+            }
+            let current = lookup(&tx, &session)?;
+            let basis = if current.revision == expected {
+                initial.basis
+            } else {
+                current.revision
+            };
+            let revision = write_entry(&tx, &current, current.bucket, Some(&label))?;
+            record_label_change(&tx, &session, GENERATED, basis, revision)?;
+            commit(inner, tx)?;
+            Ok(())
+        })
+        .await
+    }
+}
+
+fn validate_label(label: Option<&str>) -> Result<()> {
+    if label.is_some_and(|v| v.len() > MAX_LABEL_BYTES) {
+        return Err(error(
+            ErrorKind::InvalidInput,
+            "session_catalog_label_too_large",
+        ));
+    }
+    Ok(())
+}
+
+/// The first accepted input can initialize an unlabeled catalog entry after
+/// placement changes. A label already assigned or cleared by its owner wins.
+pub(super) fn initial_label(
+    tx: &Transaction<'_>,
+    session: &SessionId,
+    initial: InitialLabel,
+) -> Result<Option<u64>> {
+    let entry = lookup(tx, session)?;
+    if entry.label.is_some() || label_change(tx, session, MANUAL)?.is_some() {
+        return Ok(None);
+    }
+    let revision = match initial {
+        InitialLabel::Display(label) => {
+            validate_label(Some(&label))?;
+            write_entry(tx, &entry, entry.bucket, Some(&label))?
+        }
+        InitialLabel::AwaitSuggestion => entry.revision,
+    };
+    record_label_change(tx, session, INITIAL, entry.revision, revision)?;
+    Ok(Some(revision))
+}
+
+// Three immutable receipts at most, regardless of how many times a session is
+// organized. Existing databases without these receipts keep their own labels.
+const LABEL_CHANGE: &str = "catalog_label_change";
+const INITIAL: &str = "initial";
+const GENERATED: &str = "generated";
+const MANUAL: &str = "manual";
+
+#[derive(Clone, Copy, Serialize, Deserialize)]
+struct LabelChange {
+    basis: u64,
+    revision: u64,
+}
+
+fn label_change(
+    connection: &Connection,
+    session: &SessionId,
+    kind: &str,
+) -> Result<Option<LabelChange>> {
+    lookup_request(
+        connection,
+        session,
+        LABEL_CHANGE,
+        &ChangeId::new(kind)?,
+        Fingerprint::of(&kind)?,
+    )
+}
+
+fn record_label_change(
+    tx: &Transaction<'_>,
+    session: &SessionId,
+    kind: &str,
+    basis: u64,
+    revision: u64,
+) -> Result<()> {
+    save_request(
+        tx,
+        session,
+        LABEL_CHANGE,
+        &ChangeId::new(kind)?,
+        Fingerprint::of(&kind)?,
+        &LabelChange { basis, revision },
+    )
+}
+
+fn write_entry(
+    tx: &Transaction<'_>,
+    current: &CatalogEntry,
+    bucket: u8,
+    label: Option<&str>,
+) -> Result<u64> {
+    tx.execute(
+        "UPDATE sessions SET bucket=?1,label=?2,catalog_revision=catalog_revision+1 WHERE id=?3",
+        params![bucket, label, current.session.as_str()],
+    )
+    .map_err(database_error)?;
+    Ok(current.revision + 1)
 }
 
 fn read_page(
