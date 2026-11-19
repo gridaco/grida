@@ -49,7 +49,9 @@ as a Desktop workspace chat, the agent sees each available skill's name and
 description. When you name a skill or ask for work a skill describes, for
 example "make a short deck about tides", the agent reads that skill's full
 instructions and follows them. It says which skill it is using. The bundled
-skills are `dotcanvas`, `slides` and `svg`. The agent reads a bundled skill
+skills include `dotcanvas`, `slides` and `svg`. Workspace chats with bundled
+FX also offer `desktop-fx` for [generating a workspace PNG](./results.md#generate-a-workspace-png-with-fx)
+and working with FX workflows. The agent reads a bundled skill
 from Grida itself and a project skill as a project file, under the chat's
 existing access. A skill adds guidance, never access.
 

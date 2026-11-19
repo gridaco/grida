@@ -16,8 +16,9 @@ npm install -g grida
 grida --help
 ```
 
-`grida fx` runs [Grida FX](https://grida.co/fx) workflows: generative asset
-pipelines that are priced before anything is spent, cached and recorded.
+`grida fx call image.generate` generates a single PNG from a text prompt.
+You can also use FX to plan, run and inspect reusable asset workflows.
+[Use FX in the CLI](https://grida.co/docs/cli/fx)
 
 [Read the docs](https://grida.co/docs/cli) for setup, supported platforms,
 provider configuration and examples.

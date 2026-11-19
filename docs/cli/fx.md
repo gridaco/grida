@@ -1,6 +1,6 @@
 ---
 title: Grida FX in the Grida CLI
-description: Plan, price and run Grida FX workflows with grida fx, the generative asset pipeline engine that ships with the Grida CLI.
+description: Generate a single image or plan and run an asset workflow with the Grida FX engine bundled in the Grida CLI.
 keywords: [grida, cli, fx, workflow, generative assets, pipeline]
 sidebar_label: FX
 sidebar_position: 7
@@ -10,9 +10,26 @@ format: md
 
 # Grida FX in the Grida CLI
 
-`grida fx` runs [Grida FX](https://grida.co/fx): write a workflow file, and FX
-plans it, prices it before anything is spent, caches every paid call by its
-request, and records the run.
+`grida fx` can generate a single image from text or run a reusable asset
+workflow. FX plans the request, reuses cached results and records each run.
+
+## Generate one image
+
+Preview the prompt and route first. This example selects the Codex route,
+which uses your signed-in Codex CLI for generation. If your FX project already
+sets an image route, you can omit `--route`.
+
+```sh
+grida fx call image.generate --prompt 'A red kite above a foggy hill' --route imagegen@codex --dry-run --json
+```
+
+When you're ready to generate, replace `--dry-run` with `--live`. Add
+`--out kite.png` to deliver a copy to an unused filename. For a dollar-billed
+route, supply `--max-usd` or set the project's budget. The result's `output`
+names the PNG. Use `grida fx inspect <run>` with the returned `run` folder to
+see how it was made.
+
+## Run a workflow
 
 ```sh
 grida fx --help
@@ -35,10 +52,9 @@ are unaffected.
 
 ## Provider keys
 
-FX reads provider keys from the environment, or from a `.env` file in the FX
-project. `grida fx doctor` reports which keys each workflow needs and which it
-found, never their values. Reading the keys that
-[`grida ai providers`](./providers.md) stores is planned.
+FX checks the environment, then the project's `.env`. On macOS and Linux,
+eligible providers can also use a key saved with `grida ai providers configure`.
+Use `grida fx doctor` to check your setup. [Configure provider keys](./providers.md)
 
 ## FX on its own
 

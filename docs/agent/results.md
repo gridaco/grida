@@ -127,6 +127,18 @@ If a different file is already there, Desktop leaves it intact. You can ask
 the same chat to retry placement or choose another destination. The retry
 uses the kept image, including after you reopen the chat.
 
+### Generate a workspace PNG with FX
+
+In a macOS or Linux workspace chat, try “Generate a red kite above a foggy
+hill with FX and save it as `kite.png`.” Desktop's bundled FX can generate
+one image from text, including on chat connections that lack a built-in image
+tool. The agent can preview the request and show which route it will use.
+
+Live generation needs **Full access** and a configured FX route. A metered
+route uses the spending ceiling you agree to. If you choose your signed-in
+Codex CLI, generation uses that subscription. FX saves the PNG in the
+workspace and records the run so you can inspect it later.
+
 ## See an artifact while work continues
 
 In a Desktop project chat, ask the agent to open an existing artifact, for
