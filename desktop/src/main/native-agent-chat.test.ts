@@ -1,6 +1,6 @@
 import { once } from "node:events";
 import fs from "node:fs";
-import { createServer } from "node:http";
+import { createServer, type ServerResponse } from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { expect, it, vi } from "vitest";
@@ -82,6 +82,65 @@ async function heldProvider() {
   return {
     endpoint: `http://127.0.0.1:${address.port}/v1`,
     prompts,
+    close: async () => {
+      const closed = once(server, "close");
+      server.close();
+      server.closeAllConnections();
+      await closed;
+    },
+  };
+}
+
+function chatChunk(delta: unknown, finishReason: "stop" | null = null) {
+  return `data: ${JSON.stringify({
+    id: "fixture",
+    choices: [{ index: 0, delta, finish_reason: finishReason }],
+  })}\n\n`;
+}
+
+function finishReply(text: string) {
+  return (response: ServerResponse) => {
+    response.writeHead(200, { "content-type": "text/event-stream" });
+    response.end(
+      chatChunk({ role: "assistant", content: text }) +
+        chatChunk({}, "stop") +
+        "data: [DONE]\n\n"
+    );
+  };
+}
+
+async function scriptedProvider(
+  replies: ReadonlyArray<(response: ServerResponse) => void>
+) {
+  const requests: string[] = [];
+  const server = createServer((request, response) => {
+    request.setEncoding("utf8");
+    let body = "";
+    request.on("data", (chunk: string) => {
+      body += chunk;
+    });
+    request.on("end", () => {
+      const reply = replies[requests.length];
+      requests.push(body);
+      if (
+        request.method !== "POST" ||
+        request.url !== "/v1/chat/completions" ||
+        !reply
+      ) {
+        response.writeHead(400).end();
+        return;
+      }
+      reply(response);
+    });
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  if (!address || typeof address === "string")
+    throw new Error("fixture_listener_unavailable");
+  return {
+    endpoint: `http://127.0.0.1:${address.port}/v1`,
+    requests,
     close: async () => {
       const closed = once(server, "close");
       server.close();
@@ -899,6 +958,183 @@ it.runIf(Boolean(packaged))(
         provider.closeAllConnections();
         await closed;
       }
+      test.close();
+    }
+  },
+  15_000
+);
+
+it.runIf(Boolean(packaged))(
+  "continues a reopened chat after an uncertain provider stream without repeating the original input",
+  async () => {
+    const test = fixture();
+    const original = "Keep this context for the next turn.";
+    const partial = "Partial response before the connection closed.";
+    const followUp = "Continue from the retained request.";
+    const answer = "Successful answer after reopening.";
+    let interrupted: ServerResponse | undefined;
+    const provider = await scriptedProvider([
+      (response) => {
+        interrupted = response;
+        response.writeHead(200, { "content-type": "text/event-stream" });
+        response.write(chatChunk({ role: "assistant", content: partial }));
+      },
+      finishReply(answer),
+    ]);
+    const launch: NativeAgentChatLaunch = {
+      resourcesPath: packaged!,
+      stateDirectory: test.stateDirectory,
+      cwd: test.cwd,
+      endpoint: provider.endpoint,
+      provider: "openai-compatible",
+      model: "fixture",
+    };
+    let client: NativeAgentChat | undefined;
+    try {
+      client = await NativeAgentChat.start(launch);
+      const session = await client.create();
+      const updates: NativeChatStreamUpdate[] = [];
+      client.subscribe(session, (update) => updates.push(update));
+      const first = await client.submit(session, "interrupted-input", original);
+      await vi.waitFor(() => {
+        expect(updates).toContainEqual(
+          expect.objectContaining({
+            kind: "text",
+            turnId: first.turnId,
+            text: partial,
+          })
+        );
+      });
+      interrupted!.destroy();
+      await vi.waitFor(async () => {
+        const snapshot = await client!.observe(session);
+        expect(snapshot.current).toBeNull();
+        expect(snapshot.latest).toMatchObject({
+          turnId: first.turnId,
+          status: "uncertain",
+        });
+      });
+      expect(provider.requests).toHaveLength(1);
+
+      await client.close();
+      client = await NativeAgentChat.start(launch);
+      const reopened = await client.load(session.id);
+      expect(reopened.id).toBe(session.id);
+      const snapshot = await client.observe(reopened);
+      expect(snapshot.latest).toMatchObject({
+        turnId: first.turnId,
+        status: "uncertain",
+      });
+      expect(
+        (await client.transcript(reopened))
+          .filter((entry) => entry.role === "user")
+          .map((entry) => entry.text)
+      ).toEqual([original]);
+      expect(provider.requests).toHaveLength(1);
+
+      const second = await client.submit(reopened, "follow-up-input", followUp);
+      expect(second.turnId).toEqual(expect.any(String));
+      expect(second.turnId).not.toBe(first.turnId);
+      await vi.waitFor(async () => {
+        const settled = await client!.observe(reopened);
+        expect(settled.current).toBeNull();
+        expect(settled.latest).toMatchObject({
+          turnId: second.turnId,
+          status: "succeeded",
+        });
+      });
+      expect(provider.requests).toHaveLength(2);
+      const { messages } = JSON.parse(provider.requests[1]);
+      expect(
+        messages.filter(({ role }: { role: string }) => role === "user")
+      ).toEqual([
+        { role: "user", content: original },
+        { role: "user", content: followUp },
+      ]);
+      expect((await client.transcript(reopened)).at(-1)).toMatchObject({
+        role: "assistant",
+        text: answer,
+      });
+    } finally {
+      await client?.close();
+      await provider.close();
+      test.close();
+    }
+  },
+  15_000
+);
+
+it.runIf(Boolean(packaged))(
+  "recovers one native acceptance and dispatch when its acknowledgement is lost",
+  async () => {
+    const test = fixture();
+    const inputId = "unconfirmed-input";
+    const text = "Persist the request before reporting its result.";
+    const answer = "One completed response.";
+    const provider = await scriptedProvider([finishReply(answer)]);
+    let client: NativeAgentChat | undefined;
+    try {
+      client = await NativeAgentChat.start({
+        resourcesPath: packaged!,
+        stateDirectory: test.stateDirectory,
+        cwd: test.cwd,
+        endpoint: provider.endpoint,
+        provider: "openai-compatible",
+        model: "fixture",
+      });
+      const session = await client.create();
+      const request = NativeAgentProcess.prototype.request;
+      let discarded: unknown;
+      const loseAcknowledgement = vi
+        .spyOn(NativeAgentProcess.prototype, "request")
+        .mockImplementationOnce(async function (
+          this: NativeAgentProcess,
+          ...args
+        ) {
+          // Drop the reply only after the real native host commits acceptance.
+          discarded = await request.apply(this, args);
+          throw new Error("native_agent_request_timeout");
+        });
+      try {
+        await expect(client.submit(session, inputId, text)).rejects.toThrow(
+          "native_agent_request_timeout"
+        );
+      } finally {
+        loseAcknowledgement.mockRestore();
+      }
+      const recovered = await client.inputReceipt(session, inputId);
+      expect(recovered).toMatchObject({
+        sessionId: session.id,
+        inputId,
+        turnId: expect.any(String),
+      });
+      expect(discarded).toMatchObject({
+        sessionId: recovered.sessionId,
+        inputId: recovered.inputId,
+        inputPosition: recovered.inputPosition,
+        turnId: recovered.turnId,
+      });
+      const retried = await client.submit(session, inputId, text);
+      expect(retried).toMatchObject({
+        inputId,
+        inputPosition: recovered.inputPosition,
+        turnId: recovered.turnId,
+      });
+      await vi.waitFor(async () => {
+        const snapshot = await client!.observe(session);
+        expect(snapshot.current).toBeNull();
+        expect(snapshot.latest).toMatchObject({
+          turnId: recovered.turnId,
+          status: "succeeded",
+        });
+      });
+      expect(
+        (await client.transcript(session)).map(({ text }) => text)
+      ).toEqual([text, answer]);
+      expect(provider.requests).toHaveLength(1);
+    } finally {
+      await client?.close();
+      await provider.close();
       test.close();
     }
   },

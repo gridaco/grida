@@ -20,6 +20,8 @@ use reqwest::{Client, Url};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
+use std::error::Error as _;
+use std::io;
 use std::net::{IpAddr, SocketAddr};
 use std::num::NonZeroU64;
 use std::path::{Path, PathBuf};
@@ -462,7 +464,7 @@ impl StreamingTransport for HttpTransport {
             let response = tokio::select! {
                 biased;
                 _ = control.cancellation.cancelled() => return Err(TransportFailure::Interrupted),
-                response = outbound.send() => response.map_err(|_| TransportFailure::Interrupted)?,
+                response = outbound.send() => response.map_err(classify_send_error)?,
             };
             let status = response.status().as_u16();
             let request_id = response
@@ -537,6 +539,22 @@ impl StreamingTransport for HttpTransport {
                 body,
             })
         })
+    }
+}
+
+fn classify_send_error(error: reqwest::Error) -> TransportFailure {
+    // The direct client never redirects or retries a dispatched request.
+    // Restrict positive evidence to refusals while establishing a connection.
+    if error.is_connect()
+        && std::iter::successors(error.source(), |&cause| cause.source()).any(|cause| {
+            cause
+                .downcast_ref::<io::Error>()
+                .is_some_and(|error| error.kind() == io::ErrorKind::ConnectionRefused)
+        })
+    {
+        TransportFailure::ConnectRefused
+    } else {
+        TransportFailure::Interrupted
     }
 }
 

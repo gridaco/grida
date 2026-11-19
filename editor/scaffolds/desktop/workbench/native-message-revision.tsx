@@ -7,6 +7,7 @@ export function NativeMessageRevision({
   draft,
   submitting,
   effortAvailable,
+  disconnected,
   onChange,
   onCancel,
   onSubmit,
@@ -16,10 +17,12 @@ export function NativeMessageRevision({
     text: string;
     subsequentMessages: number;
     unverified: boolean;
+    reviewExpired?: true;
     effort?: "ultra";
   };
   submitting: boolean;
   effortAvailable: boolean;
+  disconnected: boolean;
   onChange: (text: string) => void;
   onCancel: () => void;
   onSubmit: () => void;
@@ -36,8 +39,9 @@ export function NativeMessageRevision({
       edit={{
         text: draft.text,
         submitting,
-        readOnly: draft.unverified,
-        submitDisabled: effortUnavailable,
+        readOnly: draft.unverified && !draft.reviewExpired,
+        submitDisabled:
+          effortUnavailable || disconnected || draft.reviewExpired,
         submitLabel: draft.unverified ? "Retry edit" : "Send",
         onChange,
         onCancel,
@@ -50,6 +54,12 @@ export function NativeMessageRevision({
                 : "Replaces this message."}{" "}
               Completed work isn’t undone.
             </p>
+            {draft.reviewExpired && (
+              <p>
+                The edit review expired when the chat reconnected. You can copy
+                your edit, then cancel and review the saved message again.
+              </p>
+            )}
             {draft.effort === "ultra" && (
               <p>
                 {effortUnavailable

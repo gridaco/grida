@@ -81,6 +81,27 @@ async function fixture() {
   };
 }
 
+function crashableAgent(resourcesPath: string) {
+  const executableDir = path.join(resourcesPath, "native-agent");
+  fs.mkdirSync(executableDir, { mode: 0o700 });
+  const original = path.join(nativeResources!, "native-agent", "grida-agent");
+  const pidFile = path.join(resourcesPath, "fixture.pid");
+  const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
+  fs.writeFileSync(
+    path.join(executableDir, "grida-agent"),
+    `#!/bin/sh\nprintf '%s' "$$" > ${quote(pidFile)}\nexec ${quote(original)} "$@"\n`,
+    { mode: 0o700 }
+  );
+  return {
+    resourcesPath,
+    crash() {
+      const pid = Number(fs.readFileSync(pidFile, "utf8"));
+      expect(pid).toBeGreaterThan(1);
+      process.kill(pid, "SIGKILL");
+    },
+  };
+}
+
 describe.skipIf(!supported)("Native chat store", () => {
   it.runIf(Boolean(nativeResources))(
     "reopens an ordinary native chat after a temp-root change",
@@ -570,28 +591,14 @@ describe.skipIf(!supported)("Native chat store", () => {
       const test = await fixture();
       const prepared = await test.NativeChatStore.prepareFresh();
       const workspace = { id: "work", root: test.launch.cwd };
-      const resourcesPath = test.child("crash-resources");
-      const executableDir = path.join(resourcesPath, "native-agent");
-      fs.mkdirSync(executableDir, { mode: 0o700 });
-      const original = path.join(
-        nativeResources!,
-        "native-agent",
-        "grida-agent"
-      );
-      const pidFile = path.join(resourcesPath, "fixture.pid");
-      const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
-      fs.writeFileSync(
-        path.join(executableDir, "grida-agent"),
-        `#!/bin/sh\nprintf '%s' "$$" > ${quote(pidFile)}\nexec ${quote(original)} "$@"\n`,
-        { mode: 0o700 }
-      );
+      const agent = crashableAgent(test.child("crash-resources"));
       const requested = Promise.withResolvers<void>();
       let attempts = 0;
       const release = vi.fn<() => void>();
       const owners = new NativeWorkspaceAgents(prepared, async () => ({
         launch: {
           ...test.launch,
-          resourcesPath,
+          resourcesPath: agent.resourcesPath,
           providerNetwork: {
             prepare: () => async () => {
               attempts += 1;
@@ -613,9 +620,7 @@ describe.skipIf(!supported)("Native chat store", () => {
           "Hold this attempt"
         );
         await requested.promise;
-        const pid = Number(fs.readFileSync(pidFile, "utf8"));
-        expect(pid).toBeGreaterThan(1);
-        process.kill(pid, "SIGKILL");
+        agent.crash();
         await vi.waitFor(() => expect(owners.current(workspace.id)).toBeNull());
         const replacement = await owners.open(workspace);
         expect(replacement).not.toBe(first);
@@ -632,6 +637,143 @@ describe.skipIf(!supported)("Native chat store", () => {
         await owners.close();
       }
       expect(release).toHaveBeenCalledTimes(2);
+    },
+    15_000
+  );
+
+  it.runIf(Boolean(nativeResources))(
+    "restarts an exited native host through IPC and continues the same chat without redispatch",
+    async () => {
+      const test = await fixture();
+      const prepared = await test.NativeChatStore.prepareFresh();
+      const workspace = { id: "work", root: test.launch.cwd };
+      const agent = crashableAgent(test.child("crash-resources"));
+      const attempts: string[] = [];
+      const owners = new NativeWorkspaceAgents(prepared, async () => ({
+        launch: {
+          ...test.launch,
+          resourcesPath: agent.resourcesPath,
+          providerNetwork: {
+            prepare: () => async (body) => {
+              attempts.push(body.toString());
+              const event = (delta: object, finish_reason: string | null) =>
+                `data: ${JSON.stringify({ id: "fixture", choices: [{ index: 0, delta, finish_reason }] })}\n\n`;
+              return new Response(
+                event({ content: `Reply ${attempts.length}.` }, null) +
+                  event({}, "stop") +
+                  "data: [DONE]\n\n",
+                { headers: { "content-type": "text/event-stream" } }
+              );
+            },
+          },
+        },
+      }));
+      const origin = "https://editor.fixture.invalid";
+      const frame = {
+        url: `${origin}/desktop/workspace?id=${workspace.id}`,
+        send: vi.fn<(channel: string, payload: unknown) => void>(),
+      };
+      const contents = Object.assign(new EventEmitter(), {
+        mainFrame: frame,
+        isDestroyed: () => false,
+        isLoadingMainFrame: () => false,
+      });
+      const event = {
+        sender: contents,
+        senderFrame: frame,
+      } as unknown as IpcMainInvokeEvent;
+      const ipc = new NativeChatIpc(
+        origin,
+        (_sender, id, profile) => owners.current(id, profile),
+        {
+          admits: (sender) => sender === event.sender,
+          ensure: async (id) => {
+            expect(id).toBe(workspace.id);
+            await owners.open(workspace);
+          },
+        }
+      );
+      const settled = async (attachmentId: string, turnId: string | null) => {
+        await vi.waitFor(
+          async () => {
+            const { snapshot } = await ipc.observe(event, attachmentId);
+            expect(snapshot.current).toBeNull();
+            expect(snapshot.latest).toMatchObject({
+              turnId,
+              status: "succeeded",
+            });
+          },
+          { timeout: 5000 }
+        );
+      };
+      try {
+        expect(await ipc.status(event, true)).toBe("native-ready");
+        const firstWorker = owners.current(workspace.id);
+        const first = await ipc.create(event);
+        const accepted = await ipc.submit(
+          event,
+          first.attachmentId,
+          "before-exit",
+          "Keep this detail."
+        );
+        await settled(first.attachmentId, accepted.turnId);
+        const transcript = await ipc.transcript(event, first.attachmentId);
+        expect(transcript.map(({ text }) => text)).toEqual([
+          "Keep this detail.",
+          "Reply 1.",
+        ]);
+        expect(attempts).toHaveLength(1);
+
+        agent.crash();
+        await vi.waitFor(() => expect(owners.current(workspace.id)).toBeNull());
+        await expect(ipc.observe(event, first.attachmentId)).rejects.toThrow(
+          "native_chat_scope_changed"
+        );
+        expect(await ipc.status(event)).toBe("native-starting");
+        expect(await ipc.status(event, true)).toBe("native-ready");
+        expect(owners.current(workspace.id)).not.toBe(firstWorker);
+        const reopened = await ipc.load(event, first.sessionId);
+        expect(reopened.sessionId).toBe(first.sessionId);
+        expect(reopened.attachmentId).not.toBe(first.attachmentId);
+        expect(await ipc.transcript(event, reopened.attachmentId)).toEqual(
+          transcript
+        );
+        await settled(reopened.attachmentId, accepted.turnId);
+        await expect(ipc.observe(event, first.attachmentId)).rejects.toThrow(
+          "native_chat_attachment_unavailable"
+        );
+        expect(attempts).toHaveLength(1);
+
+        const subscriptionId = randomUUID();
+        ipc.subscribe(event, reopened.attachmentId, subscriptionId);
+        const next = await ipc.submit(
+          event,
+          reopened.attachmentId,
+          "after-exit",
+          "Use that detail."
+        );
+        expect(next.turnId).toEqual(expect.any(String));
+        expect(next.turnId).not.toBe(accepted.turnId);
+        await settled(reopened.attachmentId, next.turnId);
+        expect(frame.send).toHaveBeenCalledWith(
+          IPC_CHANNELS.NATIVE_CHAT_UPDATE,
+          {
+            attachmentId: reopened.attachmentId,
+            subscriptionId,
+            update: expect.objectContaining({
+              kind: "text",
+              turnId: next.turnId,
+              text: "Reply 2.",
+            }),
+          }
+        );
+        expect(attempts).toHaveLength(2);
+        expect(attempts[1]).toContain("Keep this detail.");
+        expect(attempts[1]).toContain("Use that detail.");
+      } finally {
+        contents.emit("destroyed");
+        await owners.close();
+      }
     },
     15_000
   );

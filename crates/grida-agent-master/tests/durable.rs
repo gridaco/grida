@@ -118,6 +118,7 @@ fn input() -> Vec<Message> {
 enum Script {
     Answer,
     AdmissionLimit(u64),
+    ConnectRefused,
     UsageAnswer,
     Failure(FailureKind),
     DeadlineCut,
@@ -218,17 +219,26 @@ impl Provider for ScriptProvider {
             .lock()
             .unwrap()
             .push(request.request().clone());
-        if let Script::AdmissionLimit(delay) = self.script
-            && index == 0
+        let rejection = match self.script {
+            Script::AdmissionLimit(delay) => {
+                Some((FailureKind::RateLimit, "rate_limit", Some(delay)))
+            }
+            Script::ConnectRefused => {
+                Some((FailureKind::Transient, "transport_connect_refused", None))
+            }
+            _ => None,
+        };
+        if index == 0
+            && let Some((kind, code, retry_after_ms)) = rejection
         {
             let outcome = InferenceOutcome {
                 status: InferenceStatus::Failed,
                 messages: Vec::new(),
                 usage: Vec::new(),
                 failure: Some(InferenceFailure {
-                    kind: FailureKind::RateLimit,
-                    code: "rate_limit".into(),
-                    retry_after_ms: Some(delay),
+                    kind,
+                    code: code.into(),
+                    retry_after_ms,
                     dispatch: Some(DispatchEvidence::RejectedBeforeExecution),
                 }),
                 receipt: None,
@@ -981,6 +991,7 @@ enum PublicationInterruption {
     BeforeDispatch,
     AfterRequestCheckpoint,
     ControlAfterCommit(ControlDirective),
+    StopAfterRetryReservation,
     ControlBeforeBoundary(ControlDirective),
     InputAfterCommit,
     QuestionAfterCommit,
@@ -1063,6 +1074,9 @@ impl TurnJournal for InterruptPublication {
                 .actions()
                 .iter()
                 .any(|action| matches!(action, JournalAction::CompleteAttempt { .. })),
+            PublicationInterruption::StopAfterRetryReservation => change.actions().iter().any(|action| {
+                matches!(action, JournalAction::SetCheckpoint(checkpoint) if retry_due_time(checkpoint).is_some())
+            }),
             _ => publishes_history && publishes_continuation,
         };
         let interrupt = boundary_matches && self.armed.swap(false, Ordering::SeqCst);
@@ -1091,9 +1105,20 @@ impl TurnJournal for InterruptPublication {
                     self.loads_before_control.store(2, Ordering::SeqCst);
                     Ok(receipt)
                 }
-                PublicationInterruption::ControlAfterCommit(directive) => {
+                PublicationInterruption::ControlAfterCommit(_)
+                | PublicationInterruption::StopAfterRetryReservation => {
                     let receipt = self.lease.journal().commit(change).await?;
                     let state = self.lease.journal().load().await?;
+                    let directive = match self.interruption {
+                        PublicationInterruption::ControlAfterCommit(directive) => directive,
+                        PublicationInterruption::StopAfterRetryReservation => {
+                            assert!(
+                                grida_agent_master::pending_retry_not_before(&state)?.is_some()
+                            );
+                            ControlDirective::Cancel
+                        }
+                        _ => unreachable!(),
+                    };
                     let control = JournalChange::new(
                         change_id("injected-control"),
                         state.binding().clone(),
@@ -2588,6 +2613,11 @@ async fn cancellation_after_answer_publication_precedes_successful_settlement() 
     store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
 }
 
+fn retry_due_time(checkpoint: &Envelope) -> Option<u64> {
+    let value: serde_json::Value = serde_json::from_slice(checkpoint.bytes()).unwrap();
+    value["retry"]["not_before_ms"].as_u64()
+}
+
 async fn wait_for_retry(observer: &mut TurnObserver) -> u64 {
     tokio::time::timeout(Duration::from_secs(2), async {
         loop {
@@ -2595,11 +2625,7 @@ async fn wait_for_retry(observer: &mut TurnObserver) -> u64 {
                 .snapshot()
                 .state
                 .checkpoint()
-                .and_then(|checkpoint| {
-                    let value: serde_json::Value =
-                        serde_json::from_slice(checkpoint.bytes()).unwrap();
-                    value["retry"]["not_before_ms"].as_u64()
-                })
+                .and_then(retry_due_time)
             {
                 return due;
             }
@@ -2771,6 +2797,31 @@ async fn stopping_during_backoff_dispatches_no_retry() {
         .unwrap()
     else {
         panic!("Stop must interrupt the backoff");
+    };
+    assert_eq!(receipt.outcome.status, OutcomeStatus::Cancelled);
+    assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
+    store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
+}
+
+#[tokio::test]
+async fn stopping_at_the_connection_retry_reservation_dispatches_no_retry() {
+    let fixture = Fixture::new(Script::ConnectRefused);
+    let store = fixture.store();
+    let claim = fixture.claim(&store).await;
+    // Commit cancellation at the durable retry barrier before the driver's
+    // wait starts. This leaves no wall-clock race with the short retry delay.
+    let lease = intercept_publication(
+        claim.lease,
+        PublicationInterruption::StopAfterRetryReservation,
+    );
+    let opened = fixture.runtime().open(lease).await.unwrap();
+    let MasterOutcome::Settled(receipt) = fixture
+        .master(4, "Be concise")
+        .run(opened.turn, input())
+        .await
+        .unwrap()
+    else {
+        panic!("Stop must settle the original turn");
     };
     assert_eq!(receipt.outcome.status, OutcomeStatus::Cancelled);
     assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);

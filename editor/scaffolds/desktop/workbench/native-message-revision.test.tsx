@@ -17,6 +17,7 @@ function render(
       draft={draft}
       submitting={false}
       effortAvailable={true}
+      disconnected={false}
       onChange={() => {}}
       onCancel={() => {}}
       onSubmit={() => {}}
@@ -52,6 +53,16 @@ describe("Native message revision presentation", () => {
     expect(html).toContain('readOnly=""');
     expect(html.match(/disabled=""/g)).toHaveLength(1);
     expect(html).toContain(">Retry edit</button>");
+  });
+
+  it("keeps the text available when an unconfirmed edit loses its review", () => {
+    const html = render({
+      draft: { ...draft, unverified: true, reviewExpired: true },
+    });
+    expect(html).toContain(draft.text);
+    expect(html).toContain("The edit review expired");
+    expect(html.match(/disabled=""/g)).toHaveLength(1);
+    expect(html).not.toContain('readOnly=""');
   });
 
   it("blocks original Ultra resubmission while its connection is unavailable", () => {

@@ -59,6 +59,7 @@ export default defineConfig(async () => {
       include: [
         "scaffolds/desktop/workbench/conversation-scrollbar.browser.tsx",
         "scaffolds/desktop/workbench/native-chat-focus.browser.tsx",
+        "scaffolds/desktop/workbench/native-chat-recovery.browser.tsx",
         "scaffolds/desktop/workbench/native-tool-image.browser.tsx",
         "scaffolds/desktop/workbench/native-message-revision.browser.tsx",
         "scaffolds/desktop/workbench/native-permission-mode.browser.tsx",

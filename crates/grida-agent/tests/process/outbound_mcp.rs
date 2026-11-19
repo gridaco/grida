@@ -11,6 +11,8 @@ const TOOL: &str = "mcp_grida_surface_open";
 const NATIVE: &str = "surface_open";
 const OPEN_ARGUMENTS: &str = r#"{"path":"/poster.canvas"}"#;
 const TURN_SUMMARY: &str = "co.grida/session/turn-summary";
+const UPDATES: &str = "co.grida/session/updates";
+const MCP_RESULT: &str = "Recorded peer result";
 
 async fn local_mcp(workspace: &Path) -> (Child, String) {
     let mut child = executable()
@@ -310,10 +312,15 @@ async fn start_private(mut command: Command) -> PrivateStdio {
     let mut client = PrivateStdio::from_child(child);
     let mut capabilities = extension_initialize();
     capabilities["clientCapabilities"]["_meta"][TURN_SUMMARY] = 1.into();
+    capabilities["clientCapabilities"]["_meta"][UPDATES] = 1.into();
     let initialize = client.request("initialize", capabilities).await;
     assert_eq!(initialize["result"]["protocolVersion"], 1);
     assert_eq!(
         initialize["result"]["agentCapabilities"]["_meta"][TURN_SUMMARY],
+        1
+    );
+    assert_eq!(
+        initialize["result"]["agentCapabilities"]["_meta"][UPDATES],
         1
     );
     client
@@ -527,6 +534,7 @@ struct HeldResult {
 
 async fn independent_mcp(
     hold: Option<HeldResult>,
+    expect_reconnect: bool,
 ) -> (String, tokio::task::JoinHandle<TcpListener>) {
     use http_body_util::{BodyExt, Full};
     use hyper::body::{Bytes, Incoming};
@@ -539,7 +547,11 @@ async fn independent_mcp(
     let peer = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = format!("http://{}/mcp", peer.local_addr().unwrap());
     let exchange = tokio::spawn(async move {
-        for method in ["server/discover", "tools/list", "tools/call"] {
+        let reconnect = expect_reconnect.then_some(["server/discover", "tools/list"]);
+        for method in ["server/discover", "tools/list", "tools/call"]
+            .into_iter()
+            .chain(reconnect.into_iter().flatten())
+        {
             let (socket, _) = timeout(WAIT, peer.accept()).await.unwrap().unwrap();
             let held = hold.clone();
             let service = service_fn(move |request: Request<Incoming>| {
@@ -553,9 +565,15 @@ async fn independent_mcp(
                     let request: Value = serde_json::from_slice(&bytes).unwrap();
                     assert_eq!(request["method"], method);
                     let response = Response::builder().header("connection", "close");
+                    if method == "tools/call" {
+                        assert_eq!(request["params"]["name"], "surface_open");
+                        assert_eq!(
+                            request["params"]["arguments"],
+                            json!({"path":"/poster.canvas"})
+                        );
+                    }
                     if method == "tools/call" && held.is_none() {
                         // The operation was received, but the stream has no final result.
-                        assert_eq!(request["params"]["name"], "surface_open");
                         return Ok::<_, Infallible>(
                             response
                                 .header("content-type", "text/event-stream")
@@ -574,11 +592,10 @@ async fn independent_mcp(
                             "tools":[{"name":"surface_open","inputSchema":{"type":"object"}}]
                         })
                     } else {
-                        assert_eq!(request["params"]["name"], "surface_open");
                         let held = held.unwrap();
                         held.received.notify_one();
                         held.release.notified().await;
-                        json!({"resultType":"complete","content":[{"type":"text","text":"Late peer result"}]})
+                        json!({"resultType":"complete","content":[{"type":"text","text":MCP_RESULT}]})
                     };
                     let rpc =
                         json!({"jsonrpc":"2.0","id":request["id"],"result":result}).to_string();
@@ -607,7 +624,7 @@ async fn independent_mcp(
 async fn lost_mcp_result_is_reported_without_redispatch() {
     let temporary = TempDir::new().unwrap();
     let workspace = TempDir::new().unwrap();
-    let (address, exchange) = independent_mcp(None).await;
+    let (address, exchange) = independent_mcp(None, false).await;
     let mut provider = Endpoint::start(vec![Reply::Tool(TOOL, OPEN_ARGUMENTS)]).await;
     let output = timeout(
         WAIT,
@@ -654,7 +671,7 @@ async fn stop_during_an_mcp_call_retains_uncertainty_without_redispatch() {
         received: Default::default(),
         release: Default::default(),
     };
-    let (address, exchange) = independent_mcp(Some(hold.clone())).await;
+    let (address, exchange) = independent_mcp(Some(hold.clone()), false).await;
     let mut provider = Endpoint::start(vec![Reply::Tool(TOOL, OPEN_ARGUMENTS)]).await;
     let mut client = serve(&state, &provider.url, &address).await;
     let session = new_session(&mut client, workspace.path()).await;
@@ -699,10 +716,7 @@ async fn stop_during_an_mcp_call_retains_uncertainty_without_redispatch() {
         .await;
     assert_eq!(summary["result"]["status"], "cancelled", "{summary}");
     assert_eq!(summary["result"]["unresolvedOperations"], 1, "{summary}");
-    assert!(
-        !summary.to_string().contains("Late peer result"),
-        "{summary}"
-    );
+    assert!(!summary.to_string().contains(MCP_RESULT), "{summary}");
     client.close().await;
     let mut reopened = serve_surface(&state, &provider.url, false).await;
     let loaded = reopened
@@ -724,4 +738,242 @@ async fn stop_during_an_mcp_call_retains_uncertainty_without_redispatch() {
     assert!(provider.requests.try_recv().is_err());
     reopened.close().await;
     provider.done().await;
+}
+
+#[tokio::test]
+async fn a_truncated_provider_reply_leaves_committed_tool_work_available_to_the_next_turn() {
+    continue_with_retained_tool_result(false).await;
+}
+
+#[tokio::test]
+async fn ending_a_crashed_turn_preserves_committed_tool_work_for_the_next_turn() {
+    continue_with_retained_tool_result(true).await;
+}
+
+async fn continue_with_retained_tool_result(crash_during_inference: bool) {
+    const ORIGINAL: &str = "Present the poster and describe the outcome.";
+    const PARTIAL: &str = "Unfinished response after the tool.";
+    const FOLLOW_UP: &str = "What was the recorded outcome?";
+    const ANSWER: &str = "The recorded outcome is available.";
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let effect = HeldResult {
+        received: Default::default(),
+        release: Default::default(),
+    };
+    let (address, exchange) = independent_mcp(Some(effect.clone()), true).await;
+    let partial = Reply::Hold(PARTIAL);
+    let failure = if crash_during_inference {
+        partial
+    } else {
+        let body = fixture_body(partial, ProviderProtocol::OpenAiCompatible);
+        Reply::RawHttp(format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: 1048576\r\nConnection: close\r\n\r\n{body}"
+        ))
+    };
+    let mut provider = Endpoint::start(vec![
+        Reply::Tool(TOOL, OPEN_ARGUMENTS),
+        failure,
+        Reply::Finished(ANSWER),
+    ])
+    .await;
+    let mut first = serve(&state, &provider.url, &address).await;
+    let session = new_session(&mut first, workspace.path()).await;
+    let accepted = first
+        .request(
+            "_co.grida/session/submit",
+            prompt_request(&session, "original", ORIGINAL),
+        )
+        .await;
+    assert_eq!(accepted["result"]["disposition"], "claimed", "{accepted}");
+    let turn = accepted["result"]["turnId"].as_str().unwrap();
+    assert!(offered(&provider.request().await));
+    timeout(WAIT, effect.received.notified()).await.unwrap();
+    effect.release.notify_one();
+    // The provider has received a request containing the committed result.
+    assert_committed_mcp_result(&provider.request().await);
+    let target = json!({"sessionId":session,"turnId":turn});
+    let before_exit = if crash_during_inference {
+        // Wait until the host observes the partial stream. The tool has
+        // settled and the inference is still open when the process dies.
+        timeout(WAIT, async {
+            loop {
+                let frame = first.read_frame().await;
+                let update = &frame["params"]["update"];
+                if update["sessionUpdate"] == "agent_message_chunk" {
+                    assert_eq!(frame["params"]["sessionId"], session, "{frame}");
+                    assert_eq!(frame["params"]["_meta"][UPDATES]["turnId"], turn, "{frame}");
+                    assert_eq!(update["content"]["text"], PARTIAL, "{frame}");
+                    break;
+                }
+            }
+        })
+        .await
+        .unwrap();
+        None
+    } else {
+        settled_turn(&mut first, &session).await;
+        Some(
+            first
+                .request("_co.grida/session/turn-summary", target.clone())
+                .await,
+        )
+    };
+    first.kill().await;
+
+    let mut reopened = serve(&state, &provider.url, &address).await;
+    let peer = timeout(WAIT, exchange).await.unwrap().unwrap();
+    let loaded = reopened
+        .request(
+            "session/load",
+            json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]}),
+        )
+        .await;
+    assert!(loaded.get("result").is_some(), "{loaded}");
+    let state = snapshot(&mut reopened, &session).await;
+    if crash_during_inference {
+        assert_eq!(state["current"]["turnId"], turn, "{state}");
+        assert_eq!(state["current"]["disposition"], "interrupted", "{state}");
+        let stopped = reopened
+            .request(
+                "_co.grida/session/stop",
+                task_basis(&state, &session, "end-original"),
+            )
+            .await;
+        assert_eq!(stopped["result"]["requestId"], "end-original", "{stopped}");
+        let settled = settled_turn(&mut reopened, &session).await;
+        assert_eq!(settled["latest"]["turnId"], turn, "{settled}");
+        assert_eq!(settled["admissionPaused"], true, "{settled}");
+    } else {
+        assert!(state["current"].is_null(), "{state}");
+        assert_eq!(state["latest"]["turnId"], turn, "{state}");
+    }
+    let retained = reopened
+        .request("_co.grida/session/turn-summary", target)
+        .await;
+    if let Some(before_exit) = before_exit {
+        assert_eq!(retained["result"], before_exit["result"]);
+        assert_eq!(retained["result"]["status"], "uncertain", "{retained}");
+    } else {
+        assert_eq!(retained["result"]["status"], "cancelled", "{retained}");
+    }
+    assert_eq!(retained["result"]["unresolvedOperations"], 1, "{retained}");
+    assert_eq!(
+        retained["result"]["toolActivity"]["succeeded"], 1,
+        "{retained}"
+    );
+    assert!(provider.requests.try_recv().is_err());
+    assert!(
+        timeout(Duration::from_millis(50), peer.accept())
+            .await
+            .is_err()
+    );
+
+    let accepted = reopened
+        .request(
+            "_co.grida/session/enqueue",
+            prompt_request(&session, "follow-up", FOLLOW_UP),
+        )
+        .await;
+    assert_eq!(accepted["result"]["disposition"], "queued", "{accepted}");
+    if crash_during_inference {
+        let held = snapshot(&mut reopened, &session).await;
+        assert_eq!(held["queue"][0]["inputId"], "follow-up", "{held}");
+        assert!(held["current"].is_null(), "{held}");
+        assert!(provider.requests.try_recv().is_err());
+        let released = reopened
+            .request(
+                "_co.grida/session/resume-queue",
+                queue_basis(&held, &session, "release-follow-up"),
+            )
+            .await;
+        assert_eq!(
+            released["result"]["requestId"], "release-follow-up",
+            "{released}"
+        );
+    }
+    let request = provider.request().await;
+    assert!(offered(&request));
+    assert_committed_mcp_result(&request);
+    let messages = request["messages"].as_array().unwrap();
+    assert_eq!(messages.last().unwrap()["content"], FOLLOW_UP, "{request}");
+    if !crash_during_inference {
+        assert!(
+            messages
+                .iter()
+                .any(|message| message["role"] == "assistant" && message["content"] == PARTIAL),
+            "{request}"
+        );
+    }
+    assert_eq!(
+        messages
+            .iter()
+            .filter(|message| message["role"] == "user" && message["content"] == ORIGINAL)
+            .count(),
+        1,
+        "{request}"
+    );
+    let settled = settled_turn(&mut reopened, &session).await;
+    let next_turn = settled["latest"]["turnId"].as_str().unwrap();
+    assert_ne!(next_turn, turn);
+    let receipt = reopened
+        .request(
+            "_co.grida/session/input",
+            json!({"sessionId":session,"inputId":"follow-up"}),
+        )
+        .await;
+    assert_eq!(
+        receipt["result"]["receipt"]["turnId"], next_turn,
+        "{receipt}"
+    );
+    let summary = reopened
+        .request(
+            "_co.grida/session/turn-summary",
+            json!({"sessionId":session,"turnId":next_turn}),
+        )
+        .await;
+    assert_eq!(summary["result"]["status"], "succeeded", "{summary}");
+    assert_eq!(summary["result"]["text"], ANSWER, "{summary}");
+    reopened.close().await;
+    // The peer handled exactly one tools/call across both hosts.
+    assert!(
+        timeout(Duration::from_millis(50), peer.accept())
+            .await
+            .is_err()
+    );
+    provider.done().await;
+}
+
+async fn settled_turn(client: &mut PrivateStdio, session: &str) -> Value {
+    timeout(WAIT, async {
+        loop {
+            let view = snapshot(client, session).await;
+            if view["current"].is_null() && view["queuedInputs"] == 0 {
+                return view;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap()
+}
+
+fn assert_committed_mcp_result(request: &Value) {
+    let messages = request["messages"].as_array().unwrap();
+    let mut results = messages.iter().filter(|message| message["role"] == "tool");
+    let result_message = results.next().unwrap();
+    assert!(results.next().is_none(), "{request}");
+    let calls: Vec<_> = messages
+        .iter()
+        .filter_map(|message| message["tool_calls"].as_array())
+        .flatten()
+        .collect();
+    assert_eq!(calls.len(), 1, "{request}");
+    assert_eq!(calls[0]["function"]["name"], TOOL, "{request}");
+    assert_eq!(calls[0]["id"], result_message["tool_call_id"], "{request}");
+    let content = result_message["content"].as_str().unwrap();
+    let result: Value = serde_json::from_str(content).unwrap();
+    assert_eq!(result["status"], "succeeded", "{result}");
+    assert_eq!(result["content"], json!([MCP_RESULT]), "{result}");
 }

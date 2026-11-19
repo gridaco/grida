@@ -293,6 +293,14 @@ rate limiting, transient availability, and invalid protocol data, with provider
 code and retry-delay advice when available. They describe evidence, while the
 master decides whether and when another attempt is justified.
 
+Positive pre-execution evidence is distinct from a missing dispatch receipt.
+The direct HTTP host can establish a connection refusal when the connection
+failed before a request could be sent. Other send failures can leave execution
+unknown. The private supervised transport reports preflight failures and
+ambiguous dispatch separately, and its generic unavailability report does not
+establish a transient connection refusal. The provider adapter preserves this
+distinction for the master and its retry policy.
+
 Retry count, total retry time, and fallback selection are bounded master policy.
 Runtime records attempts and cancelable backoff under the same turn and allowance.
 A rejected credential or exhausted quota cannot become an endless transient

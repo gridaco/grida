@@ -141,6 +141,46 @@ and provider execution still require their own acceptance evidence.
 | R26 — follow a child without changing its parent | Opening a parent's child activity or conversation starts no work, preserves the parent's draft and controls, and shows actual exposed live/retained messages with captured execution. Lifecycle links resolve the same child. Recorded start/finish events interleave with parent commentary and individual tool calls in the same order live and after reopen, and break consecutive-tool grouping. Missing order is explicitly unplaced; no wall-clock or arrival-time guess fills it. Completed history, incomplete counts and missing transient output remain explicit. Child reads cannot cross parents or bypass ordinary child-load refusal. | [Native unit projection](../src/host/subagent_activity.rs), [publication-order process cases](../tests/process/delegation/activity_order.rs) and [subagent process cases](../tests/process/subagents.rs) cover bounded counts, actual pre-settlement text, reasoning omission, scoped paging, restart and captured metadata. [Main decoding](../../../desktop/src/main/native-subagent-activity.test.ts), [actual adapter/IPC execution](../../../desktop/src/main/native-agent-activity.test.ts) and [controller cases](../../../editor/lib/agent-chat/native-subagent-controller.test.ts) and [timeline browser case](../../../editor/scaffolds/desktop/workbench/native-activity-timeline.browser.tsx) exercise their respective boundaries. [Interaction case](../../../test/desktop-agent-chat-subagent-activity.md) remains untested.                                                                                                                                                                                                                              |
 | R27 — delegate independent ordinary work         | A person can request several general workers in ordinary Act without Ultra. Workers use captured execution and bounded native capabilities, produce separate outputs and return results correlated to their assignments. The parent collects those results before successful completion; replay, controls and recovery preserve authority and allowance.                                                                                                                                                                                                                                                                                            | [Built-process delegation](../tests/process/delegation.rs) exercises five workers through real native tools, parent integration, premature completion correction, four provider protocols, permission refusals and observational child activity/conversations. [Host cases](../src/host/delegation/tests.rs) cover source and capture boundaries, resource bounds, controls and recovery. [Master cases](../../grida-agent-master/tests/durable.rs) preserve exact collection obligations, final-answer presentation and Goal allowance isolation. Replies are synthetic; live provider behavior and human interaction are not certified.                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
+R1, R2 and R17 share the same recovery requirement. After losing observation,
+return to the same session and keep its queue held when required. After an
+accepted turn fails or becomes uncertain, let the person send a new turn in
+that conversation. After a host exit leaves a turn interrupted, offer an
+explicit end before more work can run. A retry of a send awaiting confirmation
+uses its original input identity. [Return to ongoing work](https://grida.co/docs/wg/ai/agent/experience#return-to-ongoing-work)
+owns the experience.
+
+- The [native acceptance cases](../tests/process/acceptance.rs) contrast a
+  reply the submitting client never reads with a real SQLite submission
+  transaction that rolls back. A replacement host recovers the original input
+  and turn identities with their current disposition, without redispatch. It
+  rejects changed content under the same input ID. The failed transaction
+  leaves prior history and queue position intact, with no receipt or provider
+  call. After storage is writable, the same input ID can be accepted and
+  completed once.
+- The [native outbound MCP cases](../tests/process/outbound_mcp.rs) independently
+  observe one tool call. After a truncated model response or a killed owner,
+  reopening retains the tool result and the unresolved inference. A distinct
+  turn succeeds in the original session with the recorded tool result in its
+  model context. The interrupted case settles through explicit Stop and queue
+  release.
+- The [built-host adapter cases](../../../desktop/src/main/native-agent-chat.test.ts)
+  exercise truncated provider output, same-chat follow-up after restart, and
+  lost acknowledgement after durable acceptance. They count requests and
+  assert successful follow-up settlement and the original acceptance receipt.
+- The [packaged IPC case](../../../desktop/src/main/native-chat-store.test.ts)
+  rejects the earlier attachment after a real child exit and loads the same
+  transcript under its replacement. Restoring observation makes zero provider
+  requests. A distinct follow-up streams through the replacement attachment.
+- The [native abrupt-exit test](../tests/process.rs) retains the interrupted
+  turn and its unresolved inference. Explicit Stop settles the turn without
+  redispatch and holds the queue. Explicit queue resume runs the next turn once.
+- [Controller cases](../../../editor/lib/agent-chat/native-chat-controller.test.ts)
+  cover loss and renewal of a subscription, bounded automatic recovery, and
+  retry of an unconfirmed send against a replacement attachment. The [rendered
+  chat cases](../../../editor/scaffolds/desktop/workbench/native-chat-recovery.browser.tsx)
+  exercise the composer and visible recovery controls through a scripted
+  bridge. Physical sleep/wake has a [separate interaction case](../../../test/desktop-agent-chat-return-after-sleep.md).
+
 Cases R9 and R10 retain commit-pinned evidence because the original files have
 since been reorganized.
 The rows add concrete observations to existing identity, ownership, input,
@@ -795,20 +835,32 @@ remains open, and native Windows command execution remains deferred.
 The complete input budget, error classification, and recovery path need explicit
 contracts even when the happy path is one model request.
 
-| Pressure case                                            | Required result                                                                                                                   |
-| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Messages fit but tool schemas/framing exceed the budget  | Measure the complete prepared input and retain its exact/upper-bound/estimated basis.                                             |
-| Rate limiting includes retry-delay advice                | Show waiting, honor the bounded policy, and allow Stop/Pause during backoff without an occupied inference permit.                 |
-| Authentication, quota, or refusal prevents a request     | Give its specific outcome and recovery path. Do not treat it as an endless transient retry.                                       |
-| A stream fails after one of its tools ran                | Retain that tool's actual outcome and reconcile before continuation or repetition. Fresh call IDs cannot hide a duplicate effect. |
-| A model emits malformed arguments or an unavailable tool | Preserve a correlated pre-execution error for bounded correction. Infrastructure failure remains distinguishable.                 |
-| Compaction finishes after input or lineage changes       | Validate its covered basis and preserve later input. Reject an incompatible candidate without replacing the live view.            |
-| Compaction fails or still leaves input too large         | Retain previous context and stop after bounded recovery with a clear explanation.                                                 |
+| Pressure case                                            | Required result                                                                                                                      |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Messages fit but tool schemas/framing exceed the budget  | Measure the complete prepared input and retain its exact/upper-bound/estimated basis.                                                |
+| Rate limiting includes retry-delay advice                | Show waiting, honor the bounded policy, and allow Stop/Pause during backoff without an occupied inference permit.                    |
+| A connection fails before the provider receives input    | Distinguish verified refusal from an ambiguous transport failure. Use the same bounded retry reservation only for eligible evidence. |
+| Authentication, quota, or refusal prevents a request     | Give its specific outcome and recovery path. Do not treat it as an endless transient retry.                                          |
+| A stream fails after one of its tools ran                | Retain that tool's actual outcome and reconcile before continuation or repetition. Fresh call IDs cannot hide a duplicate effect.    |
+| A model emits malformed arguments or an unavailable tool | Preserve a correlated pre-execution error for bounded correction. Infrastructure failure remains distinguishable.                    |
+| Compaction finishes after input or lineage changes       | Validate its covered basis and preserve later input. Reject an incompatible candidate without replacing the live view.               |
+| Compaction fails or still leaves input too large         | Retain previous context and stop after bounded recovery with a clear explanation.                                                    |
 
 Counting the provider representation of the complete request, and classifying
 a retryable failure separately from the wait that reports progress and handles
 cancellation, are the mechanisms these contracts need. Retry counts and
 compaction strategy remain product decisions.
+
+For R10, the [native process case](../tests/process.rs) exercises a direct
+connection refusal through its one retry, then a lost reply after the peer
+receives the request. It checks two attempts without execution in the first
+case, one received request and an uncertain result in the second, and a
+successful follow-up in the same session. The
+[master tests](../../grida-agent-master/tests/durable.rs) exercise Stop and a
+retained retry deadline across restart. The
+[supervised Responses cases](../tests/process/responses.rs) cover verified
+rate-limit advice and exhaustion. Generic transport failures from the
+supervisor cannot establish a transient connection refusal.
 
 ### Lifecycle hooks
 

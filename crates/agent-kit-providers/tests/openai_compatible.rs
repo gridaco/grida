@@ -1510,17 +1510,28 @@ async fn only_a_trusted_complete_code_and_type_prove_compatible_admission_reject
 async fn transport_failure_retains_dispatch_certainty() {
     let transport = FixtureTransport::new([
         Err(TransportFailure::Unavailable),
+        Err(TransportFailure::ConnectRefused),
         Err(TransportFailure::Interrupted),
     ]);
     let provider = adapter(transport);
-    assert_eq!(
-        execute(&provider, request(), "unavailable").await.status,
-        InferenceStatus::Failed
-    );
-    assert_eq!(
-        execute(&provider, request(), "interrupted").await.status,
-        InferenceStatus::Interrupted
-    );
+    for (code, status, dispatch) in [
+        ("transport_unavailable", InferenceStatus::Failed, None),
+        (
+            "transport_connect_refused",
+            InferenceStatus::Failed,
+            Some(DispatchEvidence::RejectedBeforeExecution),
+        ),
+        ("transport_interrupted", InferenceStatus::Interrupted, None),
+    ] {
+        let result = execute(&provider, request(), code).await;
+        assert_eq!(result.status, status);
+        assert!(result.messages.is_empty());
+        assert!(result.usage.is_empty());
+        let failure = result.failure.unwrap();
+        assert_eq!(failure.code, code);
+        assert_eq!(failure.kind, FailureKind::Transient);
+        assert_eq!(failure.dispatch, dispatch);
+    }
 }
 
 #[tokio::test]

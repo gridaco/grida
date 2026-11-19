@@ -80,6 +80,8 @@ pub struct TransportResponse {
 pub enum TransportFailure {
     /// The host can establish that no request was dispatched.
     Unavailable,
+    /// A connection refusal prevented dispatch of the request.
+    ConnectRefused,
     /// Dispatch may have occurred, and the response is incomplete.
     Interrupted,
 }

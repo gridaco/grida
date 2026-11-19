@@ -247,7 +247,7 @@ pub fn pending_retry_not_before(state: &TurnState) -> Result<Option<u64>> {
     let has_rejection = state.operations().values().any(|operation| {
         matches!(
             operation.outcome(),
-            Some(OperationOutcome::Inference(outcome)) if retry::admission_rejection(outcome).is_some()
+            Some(OperationOutcome::Inference(outcome)) if retry::admission_retry_delay(outcome).is_some()
         )
     });
     let Some(checkpoint) = state.checkpoint().filter(|checkpoint| {
@@ -655,7 +655,7 @@ impl Master {
                     } else if error.code == "retained_file_working_copy_unavailable" {
                         "The recorded attachment working copy is unavailable. Attach the file again in a new message."
                     } else if retry.is_some() {
-                        "The rate-limited request could not retry with its captured configuration."
+                        "The request could not retry with its captured configuration."
                     } else {
                         "The model input could not be prepared with the selected configuration."
                     };
@@ -1852,6 +1852,9 @@ fn inference_failure_text(inference: &InferenceOutcome) -> &'static str {
         }
         (FailureKind::Configuration, "provider_unavailable") => {
             "The selected provider is unavailable. Check its configuration or choose another provider."
+        }
+        (FailureKind::Transient, "transport_connect_refused") => {
+            "The provider connection was refused. Check the connection and send another message when the provider is available."
         }
         (FailureKind::Authentication, _) => {
             "The provider rejected authentication or access. Check the provider's credentials and permissions."

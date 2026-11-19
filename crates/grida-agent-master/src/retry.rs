@@ -26,11 +26,7 @@ impl AdmissionRetry {
         grants: &GrantSelection,
         inference: &InferenceOutcome,
     ) -> Option<Self> {
-        let failure = admission_rejection(inference)?;
-        let delay = failure.retry_after_ms?.max(MIN_DELAY_MS);
-        if delay > MAX_DELAY_MS {
-            return None;
-        }
+        let delay = admission_retry_delay(inference)?;
         Some(Self {
             step,
             not_before_ms: now_ms()?.checked_add(delay)?,
@@ -70,13 +66,28 @@ fn same_scope(current: &AuthorityBinding, captured: &AuthorityBinding) -> bool {
     current.principal == captured.principal && current.scope == captured.scope
 }
 
-pub(super) fn admission_rejection(inference: &InferenceOutcome) -> Option<&InferenceFailure> {
-    inference.failure.as_ref().filter(|failure| {
-        inference.status == InferenceStatus::Failed
-            && inference.messages.is_empty()
-            && failure.kind == FailureKind::RateLimit
-            && failure.dispatch == Some(DispatchEvidence::RejectedBeforeExecution)
-    })
+pub(super) fn admission_retry_delay(inference: &InferenceOutcome) -> Option<u64> {
+    let InferenceFailure {
+        kind,
+        retry_after_ms,
+        dispatch: Some(DispatchEvidence::RejectedBeforeExecution),
+        ..
+    } = inference.failure.as_ref()?
+    else {
+        return None;
+    };
+    if inference.status != InferenceStatus::Failed
+        || !inference.messages.is_empty()
+        || !inference.usage.is_empty()
+    {
+        return None;
+    }
+    let delay = match kind {
+        FailureKind::RateLimit => (*retry_after_ms)?.max(MIN_DELAY_MS),
+        FailureKind::Transient => MIN_DELAY_MS,
+        _ => return None,
+    };
+    (delay <= MAX_DELAY_MS).then_some(delay)
 }
 
 fn now_ms() -> Option<u64> {
@@ -100,6 +111,47 @@ fn clock_unavailable() -> Error {
 mod tests {
     use super::*;
     use agent_kit_core::{BindingId, GrantId, PrincipalId, ProviderId, ScopeId};
+
+    #[test]
+    fn a_transient_retry_requires_proof_that_execution_could_not_start() {
+        let refused = Some(DispatchEvidence::RejectedBeforeExecution);
+        for (status, kind, evidence, delay) in [
+            (
+                InferenceStatus::Failed,
+                FailureKind::Transient,
+                refused,
+                Some(MIN_DELAY_MS),
+            ),
+            (InferenceStatus::Failed, FailureKind::Transient, None, None),
+            (
+                InferenceStatus::Interrupted,
+                FailureKind::Transient,
+                refused,
+                None,
+            ),
+            (
+                InferenceStatus::Failed,
+                FailureKind::Authentication,
+                refused,
+                None,
+            ),
+        ] {
+            let outcome = InferenceOutcome {
+                status,
+                messages: Vec::new(),
+                usage: Vec::new(),
+                failure: Some(InferenceFailure {
+                    kind,
+                    dispatch: evidence,
+                    code: "fixture".into(),
+                    retry_after_ms: None,
+                }),
+                receipt: None,
+                terminal_receipt: None,
+            };
+            assert_eq!(admission_retry_delay(&outcome), delay);
+        }
+    }
 
     #[test]
     fn a_retry_does_not_take_a_different_grant_under_the_same_scope() {

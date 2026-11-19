@@ -1,3 +1,6 @@
+#[cfg(unix)]
+#[path = "process/acceptance.rs"]
+mod acceptance;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[path = "process/approvals.rs"]
 mod approvals;
@@ -193,6 +196,16 @@ impl Endpoint {
         wait: Duration,
     ) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        Self::from_listener(listener, protocol, replies, credential, wait)
+    }
+
+    fn from_listener(
+        listener: TcpListener,
+        protocol: ProviderProtocol,
+        replies: Vec<Reply>,
+        credential: Option<&'static str>,
+        wait: Duration,
+    ) -> Self {
         let version = if protocol == ProviderProtocol::Gemini {
             "v1beta"
         } else {
@@ -916,6 +929,125 @@ async fn embedded_run_and_restart_inspect_through_built_executable() {
             .windows(TEST_CREDENTIAL.len())
             .any(|bytes| bytes == TEST_CREDENTIAL.as_bytes())
     );
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn refused_connection_retries_once_but_a_dispatched_request_is_not_repeated() {
+    let directory = TempDir::new().unwrap();
+    let state = directory.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    drop(listener);
+    let url = format!("http://{address}/v1");
+    let run = |session: Option<&str>, prompt: &str| {
+        let mut command = executable();
+        command.arg("run");
+        configured(&mut command, &state, &url);
+        command.arg("--cwd").arg(workspace.path());
+        if let Some(session) = session {
+            command.args(["--session", session]);
+        }
+        command.args(["--prompt", prompt]);
+        timeout(WAIT, async move { command.output().await.unwrap() })
+    };
+
+    // Release the listener before starting the child. A socket that is merely
+    // bound can silently time out on macOS rather than refusing the connection.
+    assert_eq!(
+        TcpStream::connect(address).await.unwrap_err().kind(),
+        std::io::ErrorKind::ConnectionRefused
+    );
+    let first = run(None, "Remember the first request.").await.unwrap();
+    assert_eq!(
+        first.status.code(),
+        Some(1),
+        "{}",
+        String::from_utf8_lossy(&first.stdout)
+    );
+    let first = records(&first.stdout);
+    let session = first[0]["session_id"].as_str().unwrap();
+    let failed = &first[1];
+    assert_eq!(failed["disposition"], "failed");
+    assert_eq!(failed["account"]["steps"], 2);
+    assert_eq!(failed["account"]["unresolved"], json!([]));
+    assert_eq!(
+        failed["account"]["inference_failure"]["dispatch"],
+        "rejected_before_execution"
+    );
+    assert_eq!(
+        failed["account"]["inference_failure"]["code"],
+        "transport_connect_refused"
+    );
+    assert_eq!(
+        failed["account"]["inference_usage"]["observations"],
+        json!([])
+    );
+
+    let mut endpoint = Endpoint::from_listener(
+        TcpListener::bind(address).await.unwrap(),
+        ProviderProtocol::OpenAiCompatible,
+        vec![
+            // The peer reads the POST then drops its connection before headers.
+            Reply::RawHttp(String::new()),
+            Reply::Finished("The conversation continues."),
+        ],
+        Some(TEST_CREDENTIAL),
+        WAIT,
+    );
+    let second = run(Some(session), "Try another turn.").await.unwrap();
+    assert_eq!(second.status.code(), Some(5));
+    let second = records(&second.stdout);
+    let uncertain = &second[1];
+    assert_eq!(uncertain["session_id"], session);
+    assert_ne!(uncertain["turn_id"], failed["turn_id"]);
+    assert_eq!(uncertain["disposition"], "uncertain");
+    assert_eq!(uncertain["account"]["steps"], 1);
+    assert_eq!(
+        uncertain["account"]["unresolved"].as_array().unwrap().len(),
+        1
+    );
+    assert_eq!(
+        uncertain["account"]["inference_failure"]["code"],
+        "transport_interrupted"
+    );
+    assert!(uncertain["account"]["inference_failure"]["dispatch"].is_null());
+    let request = endpoint.request().await;
+    assert_eq!(
+        request["messages"].as_array().unwrap().last().unwrap()["content"],
+        "Try another turn."
+    );
+    assert!(endpoint.requests.try_recv().is_err());
+
+    let third = run(Some(session), "Continue in this chat.").await.unwrap();
+    assert!(
+        third.status.success(),
+        "{}",
+        String::from_utf8_lossy(&third.stderr)
+    );
+    let third = records(&third.stdout);
+    let succeeded = &third[1];
+    assert_eq!(succeeded["session_id"], session);
+    assert_ne!(succeeded["turn_id"], uncertain["turn_id"]);
+    assert_eq!(succeeded["disposition"], "succeeded");
+    assert_eq!(succeeded["account"]["text"], "The conversation continues.");
+    let request = endpoint.request().await;
+    let messages = request["messages"].as_array().unwrap();
+    let user_inputs: Vec<_> = messages
+        .iter()
+        .filter(|message| message["role"] == "user")
+        .map(|message| message["content"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        user_inputs,
+        [
+            "Remember the first request.",
+            "Try another turn.",
+            "Continue in this chat."
+        ]
+    );
+    endpoint.done().await;
 }
 
 #[tokio::test]
@@ -1888,7 +2020,11 @@ fn extension_initialize() -> Value {
 
 #[cfg(unix)]
 #[tokio::test]
-async fn abrupt_host_exit_retains_interrupted_turn_and_blocks_replacement() {
+async fn abrupt_host_exit_requires_explicit_stop_before_a_new_turn_can_run() {
+    use lifecycle::{
+        prompt_request, queue_basis, session_snapshot, task_basis, terminate_shared_server,
+        wait_for_snapshot,
+    };
     use std::os::unix::process::ExitStatusExt;
 
     let temporary = TempDir::new().unwrap();
@@ -1896,7 +2032,7 @@ async fn abrupt_host_exit_retains_interrupted_turn_and_blocks_replacement() {
     let workspace = TempDir::new().unwrap();
     let mut endpoint = Endpoint::start(vec![
         Reply::Hold("Started."),
-        Reply::Finished("Unexpected replacement."),
+        Reply::Finished("Follow-up completed."),
     ])
     .await;
     let mut child = spawn_serve(&state, &endpoint.url);
@@ -1990,7 +2126,99 @@ async fn abrupt_host_exit_retains_interrupted_turn_and_blocks_replacement() {
         endpoint.requests.try_recv(),
         Err(mpsc::error::TryRecvError::Empty)
     ));
-    endpoint.abort().await;
+
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = connect_shared(&url, Some(SERVER_TOKEN), None, None)
+        .await
+        .unwrap();
+    let mut capabilities = extension_initialize();
+    capabilities["clientCapabilities"]["_meta"]["co.grida/session/turn-summary"] = json!(1);
+    let initialized = ws_rpc(&mut socket, 1, "initialize", capabilities).await;
+    assert_eq!(initialized["result"]["protocolVersion"], 1);
+    let loaded = ws_rpc(
+        &mut socket,
+        2,
+        "session/load",
+        json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]}),
+    )
+    .await;
+    assert!(loaded.get("result").is_some(), "{loaded}");
+    let reopened = session_snapshot(&mut socket, &session).await;
+    let original_turn = current["binding"]["turn"].as_str().unwrap();
+    assert_eq!(reopened["current"]["turnId"], original_turn);
+    assert_eq!(reopened["current"]["disposition"], "interrupted");
+    let stopped = ws_rpc(
+        &mut socket,
+        3,
+        "_co.grida/session/stop",
+        task_basis(&reopened, &session, "end-interrupted"),
+    )
+    .await;
+    assert_eq!(
+        stopped["result"]["requestId"], "end-interrupted",
+        "{stopped}"
+    );
+    let settled = wait_for_snapshot(&mut socket, &session, |snapshot| {
+        snapshot["current"].is_null()
+    })
+    .await;
+    assert_eq!(settled["latest"]["turnId"], original_turn);
+    assert_eq!(settled["latest"]["status"], "cancelled");
+    assert_eq!(settled["admissionPaused"], true);
+    let summary = ws_rpc(
+        &mut socket,
+        4,
+        "_co.grida/session/turn-summary",
+        json!({"sessionId":session,"turnId":original_turn}),
+    )
+    .await;
+    assert_eq!(summary["result"]["unresolvedOperations"], 1, "{summary}");
+    assert!(endpoint.requests.try_recv().is_err());
+
+    let follow_up = "Continue from the interrupted turn.";
+    let queued = ws_rpc(
+        &mut socket,
+        5,
+        "_co.grida/session/enqueue",
+        prompt_request(&session, "follow-up", follow_up),
+    )
+    .await;
+    assert_eq!(queued["result"]["disposition"], "queued", "{queued}");
+    let held = session_snapshot(&mut socket, &session).await;
+    assert_eq!(held["queuedInputs"], 1);
+    assert!(held["current"].is_null());
+    assert!(endpoint.requests.try_recv().is_err());
+    let resumed = ws_rpc(
+        &mut socket,
+        6,
+        "_co.grida/session/resume-queue",
+        queue_basis(&held, &session, "release-follow-up"),
+    )
+    .await;
+    assert_eq!(
+        resumed["result"]["requestId"], "release-follow-up",
+        "{resumed}"
+    );
+    let request = endpoint.request().await;
+    let messages = request["messages"].as_array().unwrap();
+    assert_eq!(messages.last().unwrap()["content"], follow_up);
+    assert_eq!(
+        messages
+            .iter()
+            .filter(|message| message["role"] == "user" && message["content"] == "Hold")
+            .count(),
+        1,
+        "{request}"
+    );
+    let complete = wait_for_snapshot(&mut socket, &session, |snapshot| {
+        snapshot["current"].is_null() && snapshot["latest"]["status"] == "succeeded"
+    })
+    .await;
+    assert_ne!(complete["latest"]["turnId"], original_turn);
+
+    drop(socket);
+    terminate_shared_server(host).await;
+    endpoint.done().await;
 }
 
 #[tokio::test]

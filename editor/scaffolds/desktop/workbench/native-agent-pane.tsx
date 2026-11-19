@@ -523,9 +523,16 @@ function NativeChatPane({
     state.subagents?.read ?? readNoActivity
   );
   useEffect(() => {
-    const refresh = () => void controller.readProfiles();
+    const refresh = () => {
+      void controller.readProfiles();
+      controller.checkObservation();
+    };
     window.addEventListener("focus", refresh);
-    return () => window.removeEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", refresh);
+    };
   }, [controller]);
   // One preview per staged draft; a new draft object means a new attachment.
   const attachmentPreview = useMemo(
@@ -547,10 +554,11 @@ function NativeChatPane({
   } | null>(null);
   const snapshot = state.observation?.snapshot;
   const editHistory = controller.canReviseHistory && !state.revisionDraft;
-  const turn = snapshot?.current;
+  const turn = state.connectionRecovery ? null : snapshot?.current;
+  const interrupted = turn?.disposition === "interrupted";
   const running =
     turn?.disposition === "running" && !turn.paused && !turn.cancelled;
-  const canResume = controller.hasPausedTurn;
+  const canResume = !!turn && controller.hasPausedTurn;
   const goalTurn =
     !!turn && state.goal?.goal?.reservation?.turnId === turn.turnId;
   // A paused turn resumes from the composer; a Goal's own pause resumes from
@@ -558,7 +566,10 @@ function NativeChatPane({
   const resumable = canResume && !(goalTurn && state.goal?.goal?.paused);
   // Show Resume as soon as Pause is chosen; it waits for the pause to settle.
   const pausing =
-    !!turn && !turn.cancelled && (state.pausing === turn.turnId || turn.paused);
+    !!turn &&
+    !interrupted &&
+    !turn.cancelled &&
+    (state.pausing === turn.turnId || turn.paused);
   const approval =
     turn?.disposition === "suspended" && !turn.paused && !turn.cancelled
       ? state.approvals[0]
@@ -621,6 +632,7 @@ function NativeChatPane({
       draft={state.revisionDraft}
       submitting={state.revisionSubmitting}
       effortAvailable={state.effortAvailable}
+      disconnected={!!state.connectionRecovery}
       onChange={(text) => controller.changeRevisionText(text)}
       onCancel={() => controller.cancelRevision()}
       onSubmit={() => void controller.submitRevision()}
@@ -820,7 +832,58 @@ function NativeChatPane({
             Opening edit…
           </div>
         ) : null}
-        {error && (
+        {state.connectionRecovery === "reconnecting" && (
+          <div
+            role="status"
+            className="px-3 pt-2 text-xs text-muted-foreground"
+          >
+            Reconnecting to this chat…
+          </div>
+        )}
+        {state.connectionRecovery === "disconnected" && (
+          <div
+            role="alert"
+            className="flex items-center gap-2 px-3 pt-2 text-xs"
+          >
+            <span className="flex-1">
+              {controller.canReconnect
+                ? "This chat is disconnected. Saved messages are still visible."
+                : "This side chat has ended."}
+            </span>
+            {controller.canReconnect && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                onClick={() => void controller.repair()}
+              >
+                Reconnect
+              </Button>
+            )}
+          </div>
+        )}
+        {interrupted && (
+          <div
+            role="status"
+            className="flex items-center gap-2 px-3 pt-2 text-xs"
+          >
+            <span className="flex-1">
+              {turn.cancelled
+                ? "This turn was interrupted before it finished stopping."
+                : "This turn was interrupted. Review any partial work before continuing."}
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              disabled={state.acting}
+              onClick={() => void controller.control("stop")}
+            >
+              {turn.cancelled ? "Finish ending turn" : "End interrupted turn"}
+            </Button>
+          </div>
+        )}
+        {error && !state.connectionRecovery && (
           <div
             role="alert"
             className="flex items-center gap-2 px-3 pt-2 text-xs text-destructive"
@@ -1028,10 +1091,13 @@ function NativeChatPane({
             editing={
               state.queueDraft
                 ? {
-                    id: `${state.scope}:${state.queueDraft.inputId}`,
+                    id: `${state.selected}:${state.queueDraft.inputId}`,
                     text: state.queueDraft.text,
                     label: "Editing queued message",
-                    busy: state.acting,
+                    busy:
+                      state.acting ||
+                      state.queueLoading ||
+                      !!state.connectionRecovery,
                     allowEmpty: state.queueDraft.allowEmpty,
                     onSave: (text) => controller.saveQueueDraft(text),
                     onCancel: () => controller.closeQueueDraft(),

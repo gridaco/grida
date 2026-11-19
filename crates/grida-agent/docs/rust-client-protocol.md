@@ -749,7 +749,8 @@ An attached snapshot can include `retryNotBeforeMs`, a Unix time in
 milliseconds for the current turn's retained provider retry. It is the earliest
 dispatch time, subject to the same authority and task controls as the original
 request. Pause holds the retry and Stop closes it. The value is absent when
-there is no current retry.
+there is no current retry. An eligible pre-execution failure can reserve this
+retry, including a connection refusal verified by the direct HTTP host.
 
 Clients negotiate both question operations to enable the corresponding tools
 for newly accepted input. Answers use `{ "kind": "text", "text": "..." }`,

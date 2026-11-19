@@ -602,7 +602,7 @@ pub(super) async fn wait_for_partial_prompt(socket: &mut SharedSocket, session: 
     .unwrap();
 }
 
-async fn initialized_shared_socket(url: &str) -> SharedSocket {
+pub(super) async fn initialized_shared_socket(url: &str) -> SharedSocket {
     let mut socket = connect_shared(url, Some(SERVER_TOKEN), None, None)
         .await
         .unwrap();
