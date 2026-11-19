@@ -135,17 +135,20 @@ export function registerWorkspaceFileRoutes(
     }
   });
 
-  // POST /workspaces/readfile { workspaceId, relPath } → {content, mtime}
+  // POST /workspaces/readfile { workspace_id, rel_path, svg_document? }
   app.post("/workspaces/readfile", async (c) => {
     const r = await body(c, {
       workspace_id: v.string,
       rel_path: v.string,
+      svg_document: v.optional(v.boolean),
     });
     if (!r.ok) return r.res;
     const workspace = await requireWorkspace(c, registry, r.data.workspace_id);
     if (workspace instanceof Response) return workspace;
     try {
-      const result = await workspaceFs.readFile(workspace, r.data.rel_path);
+      const result = r.data.svg_document
+        ? await workspaceFs.readSvgDocument(workspace, r.data.rel_path)
+        : await workspaceFs.readFile(workspace, r.data.rel_path);
       return c.json(result);
     } catch (err) {
       return mapFsError(err, c);

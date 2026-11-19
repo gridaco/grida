@@ -228,6 +228,7 @@ export function DesktopCanvasShell({
  * Slide thumbnails are projections of the slide SVG plus every local resource
  * it references. Track those dependencies per slide so external asset writes
  * refresh the strip and presentation, not only the active editor.
+ * See test/desktop-workbench-large-svg.md for the large-source regression.
  */
 function useSlideThumbnails(
   workspaceId: string,
@@ -246,7 +247,7 @@ function useSlideThumbnails(
       const request = controller.begin(src);
       if (!request) return;
       void workspacesNs
-        .readFile(workspaceId, request.relPath)
+        .readSvgDocument(workspaceId, request.relPath)
         .then(async (r) => {
           const materialized = await materializeSlideSvgResources(r.content, {
             workspaceId,
@@ -525,7 +526,7 @@ function ActiveSlide({
     let cancelled = false;
     setState({ kind: "loading" });
     workspacesNs
-      .readFile(workspaceId, relPath)
+      .readSvgDocument(workspaceId, relPath)
       .then(async (r) => {
         const prepared = await prepareContentForEditor(r.content);
         if (!cancelled) {

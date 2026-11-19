@@ -81,6 +81,10 @@ export type WorkspaceReadFileResult = {
   mtime: number;
 };
 
+export type WorkspaceReadSvgDocumentResult =
+  | WorkspaceReadFileResult
+  | { error: "file-too-large"; size: number; max_size: number };
+
 export type WorkspaceReadFileBytesResult = {
   base64: string;
   size: number;

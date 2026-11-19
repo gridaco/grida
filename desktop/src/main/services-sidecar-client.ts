@@ -168,6 +168,17 @@ export namespace servicesSidecarClient {
       : await client().workspaces.readdir(id, relative);
   }
 
+  export async function readWorkspaceSvgDocument(
+    id: string,
+    relative: string,
+    signal: AbortSignal
+  ) {
+    const reads = nativeWorkspaceReader();
+    return reads
+      ? await reads.readSvgDocument(id, relative, signal)
+      : await client().workspaces.read_svg_document(id, relative);
+  }
+
   function nativeWorkspaceReader(): NativeWorkspaceReads | undefined {
     const workers = nativeWorkspaceMedia();
     if (!workers) return undefined;

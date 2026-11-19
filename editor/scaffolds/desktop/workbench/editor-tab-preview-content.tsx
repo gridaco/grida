@@ -106,6 +106,18 @@ function ThumbnailBody({
       );
     case "svg":
     case "image":
+      if (kind === "svg" && workspacesNs.supportsSvgDocumentReads()) {
+        return (
+          <WorkspaceSvgThumbnail
+            workspaceId={workspaceId}
+            basePath=""
+            src={relPath}
+            revision={revision}
+            fallback={null}
+            thumbnailCache={thumbnailCache}
+          />
+        );
+      }
       return (
         <WorkspaceImageThumbnail
           workspaceId={workspaceId}
@@ -335,7 +347,7 @@ function CanvasThumbnail({
     : null;
   return coverPath ? (
     WorkspaceFileKind.extension(state.model.cover ?? "") === ".svg" ? (
-      <CanvasSvgThumbnail
+      <WorkspaceSvgThumbnail
         workspaceId={workspaceId}
         basePath={basePath}
         src={state.model.cover ?? ""}
@@ -372,7 +384,7 @@ function CanvasFallbackThumbnail({
   switch (fallback.kind) {
     case "slide":
       return (
-        <CanvasSvgThumbnail
+        <WorkspaceSvgThumbnail
           workspaceId={workspaceId}
           basePath={basePath}
           src={fallback.src}
@@ -388,7 +400,7 @@ function CanvasFallbackThumbnail({
   }
 }
 
-function CanvasSvgThumbnail({
+function WorkspaceSvgThumbnail({
   workspaceId,
   basePath,
   src,
@@ -417,7 +429,7 @@ function CanvasSvgThumbnail({
     setState({ kind: "loading" });
     setDecodeFailed(false);
     const projection = thumbnailCache.svgProjection(async () => {
-      const result = await workspacesNs.readFile(workspaceId, relPath);
+      const result = await workspacesNs.readSvgDocument(workspaceId, relPath);
       const materialized = await materializeSlideSvgResources(result.content, {
         workspaceId,
         bundleBasePath: basePath,

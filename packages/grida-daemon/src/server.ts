@@ -50,6 +50,7 @@ export {
   type WorkspaceFileBody,
 } from "./http/workspace-file-response";
 export { FileRegistry } from "./files/registry";
+export { SvgDocumentRead } from "./files/svg-document";
 export { RecentStore } from "./files/recent";
 export { MediaStore, type MediaPersistence } from "./media";
 export { SecretsStore } from "./secrets";

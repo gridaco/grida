@@ -2,11 +2,13 @@
 import path from "node:path";
 import {
   MAX_BUFFERED_WORKSPACE_RESOURCE_BYTES,
+  SvgDocumentRead,
   workspaceFs,
 } from "@grida/daemon/server";
 import type {
   WorkspaceReadFileBytesResult,
   WorkspaceReadFileResult,
+  WorkspaceReadSvgDocumentResult,
   WorkspaceFsEntry,
 } from "@grida/daemon";
 import type { NativeWorkspaceCatalog } from "./native-workspace-catalog";
@@ -60,6 +62,44 @@ export class NativeWorkspaceReads {
       this.workers.list(grant, directory, signal)
     );
     return workspaceFs.projectDirectory(relative, entries);
+  }
+
+  async readSvgDocument(
+    workspaceId: string,
+    relative: string,
+    owner: AbortSignal
+  ): Promise<WorkspaceReadSvgDocumentResult> {
+    const scope = { id: workspaceId };
+    const filename = workspaceFilePath(workspaceId, relative);
+    workspaceFs.requireSvgDocument(scope, filename);
+    const max = SvgDocumentRead.MAX_BYTES;
+    return await this.withGrant(workspaceId, owner, async (grant, signal) => {
+      try {
+        const { bytes, mtime } = await this.buffer(
+          grant,
+          filename,
+          relative,
+          max,
+          signal
+        );
+        return {
+          content: workspaceFs.decodeText(scope, relative, bytes),
+          mtime,
+        };
+      } catch (error) {
+        if (
+          !(error instanceof workspaceFs.Exception) ||
+          error.detail.code !== "file-too-large" ||
+          error.detail.size === undefined
+        )
+          throw error;
+        return {
+          error: "file-too-large",
+          size: error.detail.size,
+          max_size: max,
+        };
+      }
+    });
   }
 
   private async withGrant<T>(

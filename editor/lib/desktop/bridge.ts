@@ -992,6 +992,38 @@ export namespace workspaces {
   ): Promise<WorkspaceReadFileResult> {
     return await bridgeOrThrow().workspaces.read_file(workspaceId, relPath);
   }
+  export function supportsSvgDocumentReads(): boolean {
+    return (
+      typeof getDesktopBridge()?.workspaces?.read_svg_document === "function"
+    );
+  }
+  /**
+   * Read SVG source using the host's document allowance. Older Desktop builds
+   * and deck entries with other extensions still use the generic text reader.
+   */
+  export async function readSvgDocument(
+    workspaceId: string,
+    relPath: string
+  ): Promise<WorkspaceReadFileResult> {
+    const bridge = bridgeOrThrow().workspaces;
+    const filename = relPath.split("/").at(-1) ?? relPath;
+    if (
+      !bridge.read_svg_document ||
+      filename.length <= 4 ||
+      !filename.toLowerCase().endsWith(".svg")
+    ) {
+      return await bridge.read_file(workspaceId, relPath);
+    }
+    const result = await bridge.read_svg_document(workspaceId, relPath);
+    if ("error" in result) {
+      const number = new Intl.NumberFormat();
+      const maxMiB = number.format(result.max_size / (1024 * 1024));
+      throw new Error(
+        `“${filename}” is ${number.format(result.size)} bytes. The SVG document limit is ${maxMiB} MiB (${number.format(result.max_size)} bytes).`
+      );
+    }
+    return result;
+  }
   /**
    * Read raw bytes (base64-encoded) for buffered workspace resources. The
    * agent host allows up to 8 MiB here, separately from {@link readFile}'s

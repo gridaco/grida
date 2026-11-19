@@ -13,6 +13,8 @@ import {
   type ReadStream as NodeReadStream,
 } from "node:fs";
 import path from "node:path";
+import { SvgDocumentRead } from "../files/svg-document";
+import type { WorkspaceReadSvgDocumentResult } from "../protocol/resources";
 import { atomicWrite } from "../storage/atomic-write";
 
 // ─────────────────────────── workspace fs ───────────────────────────
@@ -42,11 +44,7 @@ import { atomicWrite } from "../storage/atomic-write";
  */
 
 export namespace workspaceFs {
-  /** Hard cap on a single read/write. Larger files surface as an error
-   * rather than silently allocating tens of MB of buffer + JSON-encoded
-   * string. The client is supposed to be reading source files —
-   * 1 MiB is plenty for that, and binary blobs (PNGs, fonts, etc.) get
-   * sensibly rejected as a side effect. */
+  /** Default cap for text reads and whole-file bytes without a separate budget. */
   export const MAX_FILE_BYTES = 1_048_576; // 1 MiB
 
   /**
@@ -68,6 +66,7 @@ export namespace workspaceFs {
     | "path-escapes-workspace"
     | "not-a-directory"
     | "not-a-file"
+    | "not-an-svg-document"
     | "file-too-large"
     | "file-not-utf8"
     | "modified-since";
@@ -261,6 +260,45 @@ export namespace workspaceFs {
       content: decodeText(workspace, relPath, buf),
       mtime: stat.mtimeMs,
     };
+  }
+
+  export function requireSvgDocument(
+    workspace: Pick<Scope, "id">,
+    relPath: string
+  ): void {
+    if (SvgDocumentRead.isPath(relPath)) return;
+    throw new Exception({
+      code: "not-an-svg-document",
+      workspace_id: workspace.id,
+      rel_path: relPath,
+    });
+  }
+
+  /** Contained UTF-8 document read with the separate SVG source allowance. */
+  export async function readSvgDocument(
+    workspace: Scope,
+    relPath: string
+  ): Promise<WorkspaceReadSvgDocumentResult> {
+    requireSvgDocument(workspace, relPath);
+    const abs = await resolveInside(workspace, relPath, { must_exist: true });
+    try {
+      const { bytes, mtime } = await SvgDocumentRead.read(abs);
+      return { content: decodeText(workspace, relPath, bytes), mtime };
+    } catch (error) {
+      if (error instanceof SvgDocumentRead.NotFile) {
+        throw new Exception({
+          code: "not-a-file",
+          workspace_id: workspace.id,
+          rel_path: relPath,
+        });
+      }
+      if (!(error instanceof SvgDocumentRead.TooLarge)) throw error;
+      return {
+        error: "file-too-large",
+        size: error.size,
+        max_size: SvgDocumentRead.MAX_BYTES,
+      };
+    }
   }
 
   /** Decode authorized bytes with the editor's existing UTF-8 and BOM policy. */

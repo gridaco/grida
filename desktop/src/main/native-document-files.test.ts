@@ -386,6 +386,38 @@ it.runIf(
   }
 });
 
+it.runIf(
+  Boolean(resources) &&
+    process.platform === "darwin" &&
+    process.arch === "arm64"
+)(
+  "admits native selected SVG source through 8 MiB with a named oversize error",
+  async () => {
+    const fixture = await documentFixture();
+    const { root, selected, owner } = fixture;
+    const workers = new WorkspaceFileWorkers(resources!);
+    const docs = new NativeDocumentFiles([], root, workers);
+    try {
+      const limit = 8 * 1024 * 1024;
+      const svg =
+        "<svg><!--" +
+        " ".repeat(limit - "<svg><!----></svg>".length) +
+        "--></svg>";
+      await fs.writeFile(selected, svg);
+      const id = await docs.register(selected);
+      const opened = await docs.read(id, owner);
+      expect(opened.content === svg).toBe(true);
+      await fs.truncate(selected, limit + 1);
+      await expect(docs.read(id, owner)).rejects.toThrow(
+        "drawing.svg is 8,388,609 bytes. The SVG limit is 8 MiB."
+      );
+    } finally {
+      workers.close();
+      await fixture.close();
+    }
+  }
+);
+
 /** Hold every worker open until released, counting how many started. */
 function holdOpens(workers: {
   openDocument: ReturnType<typeof vi.fn<WorkspaceFileWorkers["openDocument"]>>;
