@@ -4,7 +4,8 @@
 // The notice reads only a local record. A detached process refreshes that record at most once a
 // day with one anonymous GET of grida's public dist-tags; nothing about the user, the machine or
 // the command is sent. Never in CI, with --json, when stderr is not a terminal, with
-// GRIDA_NO_UPDATE_CHECK=1, or when GRIDA_HOME is set but not absolute. Failures stay silent.
+// GRIDA_NO_UPDATE_CHECK=1 or NO_UPDATE_NOTIFIER set, or when GRIDA_HOME is set but not absolute.
+// Failures stay silent.
 import { spawn } from "node:child_process";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -50,12 +51,14 @@ export function newer(candidate, current) {
   return false;
 }
 
-/** Whether this invocation may show a notice or start a check. */
+/** Whether this invocation may show a notice or start a check. `NO_UPDATE_NOTIFIER` is the
+ * common cross-tool opt-out; as with the tools that introduced it, being set at all opts out. */
 export function enabled(args, env = process.env, stderr = process.stderr) {
   return (
     Boolean(stderr.isTTY) &&
     !env.CI &&
     env.GRIDA_NO_UPDATE_CHECK !== "1" &&
+    env.NO_UPDATE_NOTIFIER === undefined &&
     !args.includes("--json")
   );
 }
