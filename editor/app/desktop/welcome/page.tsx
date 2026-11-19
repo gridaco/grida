@@ -7,7 +7,7 @@
  * from the gallery, and the workspace opens with that request as the first turn
  * of a new native chat (see {@link welcome_message}). The composer targets the
  * DEFAULT workspace — the managed root `~/Documents/Grida Projects`, always
- * registered — unless the top-left picker aims it at an existing project.
+ * registered — unless the workspace picker aims it at an existing project.
  * "Open folder…" and the recents list stay for opening work that already
  * exists. Submitting an otherwise empty composer simply enters the
  * selected/default workspace without starting a turn.
@@ -27,6 +27,7 @@
  */
 
 import {
+  Fragment,
   Suspense,
   useCallback,
   useEffect,
@@ -35,8 +36,10 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type ReactNode,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { XIcon } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@app/ui/lib/utils";
@@ -175,6 +178,57 @@ function StartupRestoreScreen() {
         Restoring window…
       </div>
     </div>
+  );
+}
+
+function WelcomeHeading({
+  question,
+  children,
+}: {
+  question: string;
+  children: ReactNode;
+}) {
+  const reduceMotion = useReducedMotion();
+
+  return (
+    <h1 className="absolute inset-x-0 bottom-full mb-8 flex items-baseline justify-center gap-x-1.5 text-center text-lg font-normal tracking-tight whitespace-nowrap select-none sm:text-xl">
+      <span className="sr-only">{question} </span>
+      <AnimatePresence initial={false} mode="popLayout">
+        <motion.span
+          key={question}
+          aria-hidden="true"
+          className="shrink-0"
+          exit={{ opacity: 0 }}
+          transition={{ duration: reduceMotion ? 0 : 0.12 }}
+        >
+          {question.split(" ").map((word, index) => (
+            <Fragment key={index}>
+              {index > 0 && " "}
+              <motion.span
+                className="inline-block"
+                initial={reduceMotion ? false : { opacity: 0, x: -4 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{
+                  delay: reduceMotion ? 0 : 0.085 + index * 0.026,
+                  duration: reduceMotion ? 0 : 0.16,
+                  ease: "easeOut",
+                }}
+              >
+                {word}
+              </motion.span>
+            </Fragment>
+          ))}
+        </motion.span>
+      </AnimatePresence>
+      <motion.span
+        layout={reduceMotion ? false : "position"}
+        transition={{ layout: { duration: 0.32, ease: "easeInOut" } }}
+        className="inline-flex min-w-0 max-w-full items-baseline"
+      >
+        <span className="shrink-0 pr-1">in</span>
+        {children}?
+      </motion.span>
+    </h1>
   );
 }
 
@@ -644,7 +698,7 @@ function WelcomeSurface({
             together (no nested scroll); the gallery virtualizes against this. */}
         <div
           ref={scrollRef}
-          className="min-h-0 flex-1 overflow-y-auto"
+          className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]"
           style={
             showWorkflows && docked
               ? {
@@ -654,20 +708,8 @@ function WelcomeSurface({
               : undefined
           }
         >
-          {/* Top-left workspace picker — where a start lands (the managed
-              ~/Documents/Grida Projects root by default, shown as "Default workspace")
-              or which existing project to aim at. Borderless + friendly;
-              replaces the old picker-above-composer + "start blank" row. */}
-          <div className="px-3 pt-3">
-            <WorkspacePicker
-              value={target}
-              onChange={setTarget}
-              workspaces={workspaces}
-              onOpenFolder={onOpen}
-            />
-          </div>
           <div
-            className="mx-auto flex w-full max-w-5xl flex-col gap-16 px-6 pb-10"
+            className="mx-auto flex w-full max-w-5xl flex-col gap-16 px-6 pt-11 pb-10"
             // Reserve room before docking so the end of the scroll range
             // already clears the composer on the scroll that docks it.
             style={
@@ -690,9 +732,18 @@ function WelcomeSurface({
               so detaching doesn't jump the gallery up. */}
               <div
                 ref={composerSlotRef}
-                className="mx-auto w-full max-w-2xl"
+                className="relative mx-auto w-full max-w-2xl"
                 style={docked ? { height: heroHeight } : undefined}
               >
+                <WelcomeHeading question={presetSpec.composerQuestion}>
+                  <WorkspacePicker
+                    inline
+                    value={target}
+                    onChange={setTarget}
+                    workspaces={workspaces}
+                    onOpenFolder={onOpen}
+                  />
+                </WelcomeHeading>
                 {/* The composer itself. In the hero it's a plain in-flow block; once
                 docked it becomes a floating card fixed to the bottom, sliding up
                 on entry. It's the SAME element in both states, so the Tiptap

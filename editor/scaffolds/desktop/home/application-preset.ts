@@ -26,6 +26,8 @@ export interface ApplicationPresetSpec {
   label: string;
   /** Icon-only rail glyph + composer chip glyph. */
   icon: ComponentType<{ className?: string }>;
+  /** Question above the composer, before the workspace picker. */
+  composerQuestion: string;
   /**
    * Short description for the rail's hover card.
    */
@@ -56,6 +58,7 @@ export namespace ApplicationPreset {
       id: "general",
       label: "Home",
       icon: HouseIcon,
+      composerQuestion: "What would you like to do",
       description:
         "Start anywhere. Describe an idea or drop a reference — Grida drafts the first version for you.",
     },
@@ -63,6 +66,7 @@ export namespace ApplicationPreset {
       id: "slides",
       label: "Slides",
       icon: PresentationIcon,
+      composerQuestion: "What deck are we making",
       description: "Create editable decks.",
       art: "/assets/desktop-home/presets/slides.svg",
       artTone: "light",
@@ -73,6 +77,7 @@ export namespace ApplicationPreset {
       id: "image",
       label: "Images",
       icon: ImageIcon,
+      composerQuestion: "What image should we make",
       description: "Generate images from a prompt.",
       art: "/assets/desktop-home/presets/image.svg",
       reducedMotionArt: "/assets/desktop-home/presets/image.svg#still",
@@ -81,6 +86,7 @@ export namespace ApplicationPreset {
       id: "workflows",
       label: "Workflows",
       icon: WorkflowIcon,
+      composerQuestion: "What should we automate",
       description: "Build and run FX workflows.",
       art: "/assets/desktop-home/presets/workflows.svg",
       reducedMotionArt: "/assets/desktop-home/presets/workflows.svg#still",
@@ -89,6 +95,7 @@ export namespace ApplicationPreset {
       id: "video",
       label: "Videos",
       icon: VideoIcon,
+      composerQuestion: "What should we bring to life",
       description: "Generate short video loops.",
       art: "/assets/desktop-home/presets/video.svg",
       reducedMotionArt: "/assets/desktop-home/presets/video.svg#still",
