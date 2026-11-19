@@ -1,46 +1,43 @@
 import { describe, expect, it } from "vitest";
 import { DesktopCompatibility } from "./compatibility";
 
-describe("Desktop compatibility policy", () => {
-  const dormant = {
-    minimumSupportedVersion: null,
-    updateVersion: null,
-  };
-  const active = {
-    minimumSupportedVersion: "0.7.0",
-    updateVersion: "0.7.4",
-  };
+describe("Desktop compatibility handshake", () => {
+  const handshake = { desktopVersion: "0.8.1" };
 
-  it("enforces the minimum release line independently from the update target", () => {
-    expect(DesktopCompatibility.parse(dormant)).toEqual(dormant);
-    expect(
-      DesktopCompatibility.parse({ ...dormant, updateVersion: "0.7.0" })
-    ).toEqual({ ...dormant, updateVersion: "0.7.0" });
-    expect(DesktopCompatibility.parse(active)).toEqual(active);
-    expect(DesktopCompatibility.requiresUpdate("0.6.98", dormant)).toBe(false);
-    expect(DesktopCompatibility.requiresUpdate("0.6.98", active)).toBe(true);
-    expect(DesktopCompatibility.requiresUpdate("0.7.0-rc.2", active)).toBe(
-      true
-    );
-    expect(DesktopCompatibility.requiresUpdate("0.7.0", active)).toBe(false);
-    expect(DesktopCompatibility.requiresUpdate("0.7.3", active)).toBe(false);
-    expect(DesktopCompatibility.requiresUpdate("0.10.0", active)).toBe(false);
-    expect(DesktopCompatibility.requiresUpdate("", active)).toBe(true);
+  it("keeps the exact patch version for the installer link", () => {
+    expect(DesktopCompatibility.parse(handshake)).toEqual(handshake);
   });
+
+  it.each([
+    ["0.7.99", "0.8.1", true],
+    ["0.99.99", "1.0.0", true],
+    ["0.8.0", "0.8.1", false],
+    ["0.8.0-rc.2", "0.8.1", false],
+    ["0.8.2", "0.8.1", false],
+    ["0.10.0", "0.8.1", false],
+    ["1.0.0", "0.8.1", false],
+    ["", "0.8.1", true],
+  ])(
+    "checks installed Desktop %s against hosted version %s",
+    (installed, hosted, required) => {
+      expect(DesktopCompatibility.requiresUpdate(installed, hosted)).toBe(
+        required
+      );
+    }
+  );
 
   it.each([
     null,
     {},
-    { ...active, updateVersion: null },
-    { ...active, updateVersion: "0.6.99" },
-    { ...active, updateVersion: "0.7.0-rc.1" },
-    { ...active, updateVersion: "0.7.0\n" },
-    { ...active, updateVersion: "https://example.com" },
-    { ...active, minimumSupportedVersion: "0.7.1" },
-    { ...active, minimumSupportedVersion: "0.07.0" },
-    { ...active, minimumSupportedVersion: "9007199254740992.7.0" },
-  ])("rejects invalid policy %j", (policy) => {
-    expect(DesktopCompatibility.parse(policy)).toBeNull();
+    { desktopVersion: null },
+    { desktopVersion: "0.8.0-rc.1" },
+    { desktopVersion: "0.8.0+build" },
+    { desktopVersion: "0.8.0\n" },
+    { desktopVersion: "https://example.com" },
+    { desktopVersion: "0.08.0" },
+    { desktopVersion: "9007199254740992.8.0" },
+  ])("rejects an invalid handshake %j", (value) => {
+    expect(DesktopCompatibility.parse(value)).toBeNull();
   });
 
   it("orders versions by SemVer precedence", () => {

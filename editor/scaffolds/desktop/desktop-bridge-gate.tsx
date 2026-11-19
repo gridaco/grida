@@ -29,7 +29,7 @@ export function DesktopBridgeGate({
   surface,
 }: {
   children: ReactNode;
-  compatibility: DesktopCompatibility.Policy | null;
+  compatibility: DesktopCompatibility.Handshake | null;
   fallback?: ReactNode;
   /** Forwarded to the default CTA when `fallback` is omitted. */
   surface?: string;
@@ -74,9 +74,9 @@ export function DesktopBridgeGate({
       </DesktopCompatibilityNotice>
     );
   }
-  const downloadHref = compatibility.updateVersion
-    ? DesktopCompatibility.releaseUrl(compatibility.updateVersion)
-    : null;
+  const downloadHref = DesktopCompatibility.releaseUrl(
+    compatibility.desktopVersion
+  );
   if (status.kind === "unsupported") {
     return (
       <DesktopUpdateRequired downloadHref={downloadHref}>
@@ -89,13 +89,15 @@ export function DesktopBridgeGate({
   const installedVersion =
     typeof bridgeVersion === "string" ? bridgeVersion : "";
   if (
-    compatibility.minimumSupportedVersion &&
-    DesktopCompatibility.requiresUpdate(installedVersion, compatibility)
+    DesktopCompatibility.requiresUpdate(
+      installedVersion,
+      compatibility.desktopVersion
+    )
   ) {
     return (
       <DesktopUpdateRequired downloadHref={downloadHref}>
-        This page requires Grida Desktop {compatibility.minimumSupportedVersion}{" "}
-        or later. Installed version: {installedVersion || "unknown"}.
+        This page requires a newer version of Grida Desktop. Installed version:{" "}
+        {installedVersion || "unknown"}.
       </DesktopUpdateRequired>
     );
   }

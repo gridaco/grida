@@ -56,7 +56,7 @@ Desktop sidecar composition
      requests and credential-free provider-asset downloads
 
 editor /desktop/*
-  -> publishes Desktop compatibility policy
+  -> publishes the Desktop version used to build the hosted editor
   -> owns the hosted UI, through typed bridge clients
 ```
 
@@ -493,19 +493,18 @@ We support macOS, Windows, and Linux distributions.
 
 In the production app, choose **Check for Updates…** from the **Grida**
 menu on macOS or the **Help** menu on Windows and Linux. Patch releases
-within a supported major and minor line are optional. When the hosted
-editor activates a new major or minor line, older Desktop builds need an
-update to open it.
+within a major and minor line are optional. Desktop builds on an older
+major or minor line need an update to open the hosted editor.
 
-Electron Main checks the hosted compatibility policy before opening the
-editor in packaged production builds. When an update is required, Desktop
+Electron Main checks the hosted editor's Desktop version before opening
+it in packaged production builds. When an update is required, Desktop
 can show its bundled update page even if the hosted UI is unavailable.
 Restart when Desktop says the update is ready. If automatic installation
 is unavailable, including on Linux, open the release from the update page
 and install the package for your platform.
 
-The [Desktop release runbook](https://grida.co/docs/contributing/desktop-release)
-covers when to activate a new minimum version and how to roll it back.
+The release runbook explains how to publish Desktop installers before
+promoting the matching hosted editor. [Desktop release runbook](https://grida.co/docs/contributing/desktop-release)
 
 # Building locally
 

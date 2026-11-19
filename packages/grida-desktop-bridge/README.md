@@ -15,12 +15,11 @@ Desktop source files directly.
 - Re-exports shared AgentHost DTOs from `@grida/ai-host` where the bridge forwards
   package-owned HTTP contracts.
 
-`DesktopCompatibility` describes the read-only policy the hosted editor
-publishes to Desktop. It validates `minimumSupportedVersion` and
-`updateVersion`, compares installed versions, and resolves recovery links
-to exact stable release tags. The policy describes compatibility for
-opening the editor. Desktop Main owns update checks, installation, and
-restart. [Desktop release runbook](https://grida.co/docs/contributing/desktop-release)
+`DesktopCompatibility` validates the `desktopVersion` published by the
+hosted editor. It requires an update for installed apps on an older major or
+minor version and resolves installer links to exact stable release tags.
+Desktop Main owns update checks, installation, and restart.
+[Desktop release runbook](https://grida.co/docs/contributing/desktop-release)
 
 `chatgpt.connect()` preserves the secret-free
 `ChatGptSubscriptionStatus` object on success. An explicit user cancellation

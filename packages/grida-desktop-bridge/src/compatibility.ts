@@ -1,10 +1,8 @@
 /** Public compatibility metadata shared by Desktop Main and the hosted editor. */
 export namespace DesktopCompatibility {
-  export type Policy = Readonly<{
-    /** The first patch of the oldest supported release line, or null. */
-    minimumSupportedVersion: string | null;
-    /** An installable stable release tag version, or null. */
-    updateVersion: string | null;
+  export type Handshake = Readonly<{
+    /** The Desktop manifest version from the editor's deployment revision. */
+    desktopVersion: string;
   }>;
 
   type Version = {
@@ -68,47 +66,33 @@ export namespace DesktopCompatibility {
     return a && b ? precedence(a, b) : null;
   }
 
-  export function parse(value: unknown): Policy | null {
+  export function parse(value: unknown): Handshake | null {
     if (
       typeof value !== "object" ||
       value === null ||
-      !("minimumSupportedVersion" in value) ||
-      !("updateVersion" in value)
+      !("desktopVersion" in value)
     ) {
       return null;
     }
 
-    const { minimumSupportedVersion, updateVersion } = value;
-    const update = stable(updateVersion);
-    if (
-      updateVersion !== null &&
-      (typeof updateVersion !== "string" || !update)
-    ) {
-      return null;
-    }
-    if (minimumSupportedVersion === null) {
-      return { minimumSupportedVersion, updateVersion };
-    }
-    const minimum = stable(minimumSupportedVersion);
-    if (
-      typeof minimumSupportedVersion !== "string" ||
-      !minimum ||
-      minimum.numbers[2] !== 0 ||
-      !update ||
-      precedence(update, minimum) < 0
-    ) {
-      return null;
-    }
-    return { minimumSupportedVersion, updateVersion };
+    const { desktopVersion } = value;
+    return typeof desktopVersion === "string" && stable(desktopVersion)
+      ? { desktopVersion }
+      : null;
   }
 
   export function requiresUpdate(
     installedVersion: string,
-    policy: Policy
+    desktopVersion: string
   ): boolean {
-    if (policy.minimumSupportedVersion === null) return false;
-    const result = compare(installedVersion, policy.minimumSupportedVersion);
-    return result === null || result < 0;
+    const installed = version(installedVersion);
+    const expected = stable(desktopVersion);
+    if (!installed || !expected) return true;
+
+    const major = order(installed.numbers[0], expected.numbers[0]);
+    return (
+      major < 0 || (major === 0 && installed.numbers[1] < expected.numbers[1])
+    );
   }
 
   /** Recovery uses the exact verified release tag, with a fixed publisher. */

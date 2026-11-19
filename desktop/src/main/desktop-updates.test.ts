@@ -37,11 +37,8 @@ beforeEach(() => {
   mock.windows.length = 0;
 });
 
-function policy(
-  minimumSupportedVersion: string,
-  updateVersion: string
-): Response {
-  return Response.json({ minimumSupportedVersion, updateVersion });
+function handshake(desktopVersion: string): Response {
+  return Response.json({ desktopVersion });
 }
 
 function fixture(
@@ -80,7 +77,8 @@ function fixture(
 }
 
 it.each([
-  ["an active policy that admits this version", () => policy("0.7.0", "0.7.1")],
+  ["the same release line with a newer patch", () => handshake("0.7.1")],
+  ["an earlier hosted release line", () => handshake("0.6.9")],
   ["a legacy 404", () => new Response(null, { status: 404 })],
   [
     "the previous hosted deployment's sign-in redirect",
@@ -108,7 +106,7 @@ it.each([
   expect(feed?.check).not.toHaveBeenCalled();
 });
 
-it("leaves an unexpected policy redirect in retryable recovery", async () => {
+it("leaves an unexpected handshake redirect in retryable recovery", async () => {
   const { updates, window } = fixture(
     async () =>
       new Response(null, {
@@ -124,9 +122,9 @@ it("leaves an unexpected policy redirect in retryable recovery", async () => {
   await expect(startup).resolves.toBe(false);
 });
 
-it("surfaces a retryable policy outage and admits startup after recovery", async () => {
+it("surfaces a retryable handshake outage and admits startup after recovery", async () => {
   const fetch = vi
-    .fn<DesktopUpdates.Options["fetch"]>(async () => policy("0.7.0", "0.7.0"))
+    .fn<DesktopUpdates.Options["fetch"]>(async () => handshake("0.7.0"))
     .mockRejectedValueOnce(new Error("offline"));
   const { updates, window } = fixture(fetch);
   const startup = updates.admitStartup();
@@ -147,9 +145,9 @@ it("surfaces a retryable policy outage and admits startup after recovery", async
   expect(fetch).toHaveBeenCalledTimes(2);
 });
 
-it("keeps startup gated when the downloaded version is below the floor", async () => {
+it("keeps startup gated when the downloaded version is on an older release line", async () => {
   const { updates, window, openExternal, restart, feed } = fixture(
-    async () => policy("0.8.0", "0.8.1"),
+    async () => handshake("0.8.1"),
     { kind: "downloaded", version: "0.7.5" }
   );
   const startup = updates.admitStartup();
@@ -159,7 +157,7 @@ it("keeps startup gated when the downloaded version is below the floor", async (
   await vi.waitFor(() => {
     expect(window.view).toMatchObject({
       title: "Update to continue",
-      message: "Install version 0.8.0 or later.",
+      message: "Install Grida 0.8.1.",
       actions: ["download", "retry"],
     });
   });
@@ -176,26 +174,33 @@ it("keeps startup gated when the downloaded version is below the floor", async (
   await expect(startup).resolves.toBe(false);
 });
 
-it("offers restart when the required update is ready", async () => {
-  const { updates, window } = fixture(async () => policy("0.8.0", "0.8.0"), {
-    kind: "downloaded",
-    version: "0.8.0",
-  });
-  const startup = updates.admitStartup();
-  await vi.waitFor(() => {
-    expect(window.view).toMatchObject({
-      title: "Update to continue",
-      message: "Version 0.8.0 is ready to install.",
-      actions: ["restart", "download"],
+it.each([
+  ["0.8.1", "0.8.0"],
+  ["1.0.0", "1.0.0"],
+])(
+  "offers restart when hosted %s can use downloaded version %s",
+  async (hostedVersion, downloadedVersion) => {
+    const { updates, window } = fixture(async () => handshake(hostedVersion), {
+      kind: "downloaded",
+      version: downloadedVersion,
     });
-  });
-  window.closeFromChrome();
-  await expect(startup).resolves.toBe(false);
-});
+    const startup = updates.admitStartup();
+    await vi.waitFor(() => {
+      expect(window.view).toMatchObject({
+        title: "Update to continue",
+        message: `Version ${downloadedVersion} is ready to install.`,
+        detail: `Installed 0.7.0 · Update ${downloadedVersion}`,
+        actions: ["restart", "download"],
+      });
+    });
+    window.closeFromChrome();
+    await expect(startup).resolves.toBe(false);
+  }
+);
 
 it("offers the downloaded patch and hands installation failures back to Main", async () => {
   const { updates, window, restart, feed, openExternal, installFailed } =
-    fixture(async () => policy("0.7.0", "0.7.1"), {
+    fixture(async () => handshake("0.7.1"), {
       kind: "downloaded",
       version: "0.7.2",
     });
@@ -227,7 +232,7 @@ it("offers the downloaded patch and hands installation failures back to Main", a
 
 it("offers the exact release installer page from Linux's manual menu check", async () => {
   const { updates, window, openExternal, restart } = fixture(async () =>
-    policy("0.7.0", "0.7.1")
+    handshake("0.7.1")
   );
   updates.checkFromMenu();
 

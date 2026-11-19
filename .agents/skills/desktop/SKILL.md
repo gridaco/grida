@@ -266,10 +266,11 @@ from `https://grida.co/desktop/*`, and the native app containing Electron plus
 the bundled daemon/services sidecar. A change can require a Desktop release
 without touching `desktop/src/**`.
 
-Follow the [hosted renderer compatibility runbook](../../../docs/contributing/desktop-release.md#hosted-renderer-compatibility)
-when activating or rolling back a supported version line. The hosted editor
-publishes the policy. Electron Main checks it at startup and owns the local
-recovery page and **Check for Updates…** menu action.
+The hosted editor publishes the Desktop manifest version from its build.
+Electron Main checks the version line at startup and owns the local recovery
+page and **Check for Updates…** menu action. Publish and verify the Desktop
+release before promoting an editor deployment built with that version.
+[Hosted renderer compatibility runbook](../../../docs/contributing/desktop-release.md#hosted-renderer-compatibility)
 
 At the start and before handoff, run the bundled audit from the repository
 root. It reports the release-scoped diff, uncommitted paths, and whether the
@@ -290,12 +291,10 @@ Decide from the shipped boundary, not the directory name:
   compatible with the latest published sidecar.
 - A release workflow or assembler change is release-impacting but does not by
   itself change the native payload; review its version/tag semantics directly.
-- A renderer change that sends a new model id, provider id, protocol field,
-  route, or bridge call that the published sidecar rejects is release-coupled.
-  Compare the validation code at the published tag and bump the Desktop
-  version, but block the incompatible hosted behavior until affected clients
-  are required to run that compatible version. Publishing or auto-update
-  notification alone does not update installed clients.
+- Bump at least the Desktop minor version when changing renderer-facing IPC,
+  including adding a channel or bridge method. Apply the same rule to other
+  compatibility changes, such as a hosted renderer sending a model ID,
+  provider ID, field, or route that the published sidecar rejects.
 
 When the scoped diff is non-empty, record one line in the PR description or
 handoff: `Desktop release impact: none`, `Desktop release impact: version bump

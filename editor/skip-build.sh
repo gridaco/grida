@@ -38,6 +38,7 @@ DEPS=(
   "editor/"
   "database/"             # @app/database
   "packages/"             # most @grida/* deps
+  "/desktop/package.json" # Desktop compatibility handshake version
 
   # build orchestration at the repo root
   "/package.json"

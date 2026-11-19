@@ -86,7 +86,7 @@ grida.co  (one Next.js app)
 
 The bridge type shape lives in `@grida/desktop-bridge`. Desktop preload
 and the editor-side typed client both consume that contract. The package
-also describes the public compatibility policy read by the shell and the
+also describes the published Desktop version read by the shell and the
 hosted editor. Electron IPC channel names stay in Desktop source, and
 daemon HTTP stays in `@grida/daemon/transport` + `@grida/ai-host/media-transport`.
 
@@ -98,16 +98,19 @@ Desktop guess.
 
 ## Version compatibility
 
-The hosted editor publishes a minimum shell version and a verified installer
-release. The shell checks the policy before it loads the editor and owns
-update checks, installation, and restart. A bundled recovery screen keeps
-these controls available when the hosted UI cannot load. The hosted layout
-also applies the version policy so older shells can reach an installer.
-Protocol and capability checks govern the native actions the editor can use
-after the version check passes.
+The hosted editor publishes the Desktop release version paired with its
+build. Shells on older major and minor version lines need an update.
+Shells on the same or a newer line pass the version check. Patch releases
+stay optional within the same line. The shell checks the hosted version
+before it loads the editor and owns update checks, installation, and
+restart. A bundled recovery screen keeps these controls available when
+the hosted UI cannot load. The hosted layout checks the version so older
+shells can reach an installer. Protocol and capability checks govern the
+native actions the editor can use after the version check passes.
 
-Version-line activation and rollback are defined in the
-[Desktop release runbook](../../contributing/desktop-release.md#hosted-renderer-compatibility).
+The release runbook covers staging the editor until Desktop installers
+are available and restoring a compatible editor deployment during rollback.
+[Desktop release runbook](../../contributing/desktop-release.md#hosted-renderer-compatibility)
 
 ## Division of responsibility
 

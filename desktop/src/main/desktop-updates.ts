@@ -2,16 +2,12 @@ import { DesktopCompatibility } from "@grida/desktop-bridge";
 import { DesktopUpdateFeed } from "./desktop-update-feed";
 import { DesktopUpdateWindow } from "./desktop-update-window";
 
-const POLICY_TIMEOUT_MS = 5_000;
-const POLICY_MAX_BYTES = 4_096;
+const HANDSHAKE_TIMEOUT_MS = 5_000;
+const HANDSHAKE_MAX_BYTES = 4_096;
 const FEED_WAIT_MS = 90_000;
 const CHECK_INTERVAL_MS = 10 * 60 * 1_000;
 const RELEASES_URL = "https://github.com/gridaco/grida/releases/latest";
 const REQUIRED_TITLE = "Update to continue";
-const INACTIVE: DesktopCompatibility.Policy = {
-  minimumSupportedVersion: null,
-  updateVersion: null,
-};
 
 /** Owns production compatibility admission and the user-visible updater. */
 export class DesktopUpdates {
@@ -20,7 +16,7 @@ export class DesktopUpdates {
   #startup?: PromiseWithResolvers<boolean>;
   #generation = 0;
   #open = false;
-  #policy?: DesktopCompatibility.Policy;
+  #hostedDesktopVersion?: string;
   #downloadUrl?: string;
   #restartAvailable = false;
   #lastNotification?: string;
@@ -119,10 +115,10 @@ export class DesktopUpdates {
         message: "Checking the installed version of Grida Desktop.",
       });
     }
-    const policy = await this.#fetchPolicy();
+    const hostedVersion = await this.#fetchHostedVersion();
     if (generation !== this.#generation) return;
-    if (!policy) {
-      this.#downloadUrl = this.#policyDownload(this.#policy);
+    if (hostedVersion === null) {
+      this.#downloadUrl = this.#hostedReleaseDownload();
       void this.#show({
         title: "Couldn't check for updates",
         message: "Check your internet connection and try again.",
@@ -132,14 +128,9 @@ export class DesktopUpdates {
       return;
     }
 
-    this.#policy = policy;
-    const minimumVersion = DesktopCompatibility.requiresUpdate(
-      this.#options.version,
-      policy
-    )
-      ? policy.minimumSupportedVersion
-      : null;
-    if (this.#startup && !minimumVersion) {
+    this.#hostedDesktopVersion = hostedVersion;
+    const required = this.#requiresUpdate(this.#options.version);
+    if (this.#startup && !required) {
       const startup = this.#startup;
       this.#startup = undefined;
       this.#dismiss();
@@ -148,14 +139,14 @@ export class DesktopUpdates {
       return;
     }
 
-    this.#downloadUrl = this.#policyDownload(policy);
-    if (minimumVersion || this.#options.feed) {
+    this.#downloadUrl = this.#hostedReleaseDownload();
+    if (required || this.#options.feed) {
       void this.#show({
-        title: minimumVersion ? REQUIRED_TITLE : "Checking for updates…",
-        message: minimumVersion
-          ? `Install version ${minimumVersion} or later.`
+        title: required ? REQUIRED_TITLE : "Checking for updates…",
+        message: required
+          ? `Install Grida ${hostedVersion}.`
           : "Looking for a newer version of Grida Desktop.",
-        detail: this.#versions(),
+        detail: this.#versions(this.#downloadUrl ? hostedVersion : undefined),
         actions: this.#downloadUrl ? ["download"] : undefined,
       });
     }
@@ -166,45 +157,36 @@ export class DesktopUpdates {
   }
 
   #present(result?: DesktopUpdateFeed.Result): void {
-    const policy = this.#policy ?? INACTIVE;
-    const minimumVersion = DesktopCompatibility.requiresUpdate(
-      this.#options.version,
-      policy
-    )
-      ? policy.minimumSupportedVersion
-      : null;
+    const hostedVersion = this.#hostedDesktopVersion;
+    const required = this.#requiresUpdate(this.#options.version);
     const ready =
-      result?.kind === "downloaded" &&
-      !DesktopCompatibility.requiresUpdate(result.version, policy)
+      result?.kind === "downloaded" && !this.#requiresUpdate(result.version)
         ? result.version
         : undefined;
     this.#restartAvailable = ready !== undefined;
     this.#downloadUrl =
       (ready ? DesktopCompatibility.releaseUrl(ready) : null) ??
-      this.#policyDownload(policy);
+      this.#hostedReleaseDownload();
 
     if (ready) {
       void this.#show({
-        title: minimumVersion ? REQUIRED_TITLE : "Update ready",
-        message: minimumVersion
+        title: required ? REQUIRED_TITLE : "Update ready",
+        message: required
           ? `Version ${ready} is ready to install.`
           : `Grida Desktop ${ready} is ready to install.`,
-        detail: this.#versions(),
+        detail: this.#versions(ready),
         actions: this.#downloadUrl ? ["restart", "download"] : ["restart"],
       });
-    } else if (minimumVersion || this.#downloadUrl) {
+    } else if (required || this.#downloadUrl) {
       void this.#show({
-        title: minimumVersion ? REQUIRED_TITLE : "Update available",
-        message: minimumVersion
-          ? `Install version ${minimumVersion} or later.`
+        title: required ? REQUIRED_TITLE : "Update available",
+        message: required
+          ? `Install Grida ${hostedVersion}.`
           : "Download the installer for your platform to update Grida Desktop.",
-        detail: this.#versions(),
+        detail: this.#versions(hostedVersion),
         actions: this.#options.feed ? ["download", "retry"] : ["download"],
       });
-    } else if (
-      result?.kind === "current" ||
-      (!result && policy.updateVersion)
-    ) {
+    } else if (result?.kind === "current" || (!result && hostedVersion)) {
       void this.#show({
         title: "Grida Desktop is up to date",
         message: `You’re running version ${this.#options.version}.`,
@@ -219,15 +201,21 @@ export class DesktopUpdates {
     }
   }
 
-  #versions(): string {
-    const floor = this.#policy?.minimumSupportedVersion;
-    return floor
-      ? `Installed ${this.#options.version} · Minimum ${floor}`
+  #versions(updateVersion?: string): string {
+    return updateVersion
+      ? `Installed ${this.#options.version} · Update ${updateVersion}`
       : `Installed ${this.#options.version}`;
   }
 
-  #policyDownload(policy?: DesktopCompatibility.Policy): string | undefined {
-    const target = policy?.updateVersion;
+  #requiresUpdate(version: string): boolean {
+    return (
+      this.#hostedDesktopVersion !== undefined &&
+      DesktopCompatibility.requiresUpdate(version, this.#hostedDesktopVersion)
+    );
+  }
+
+  #hostedReleaseDownload(): string | undefined {
+    const target = this.#hostedDesktopVersion;
     if (!target) return undefined;
     const order = DesktopCompatibility.compare(target, this.#options.version);
     return order === 1 || order === null
@@ -267,7 +255,8 @@ export class DesktopUpdates {
     }
   }
 
-  async #fetchPolicy(): Promise<DesktopCompatibility.Policy | null> {
+  /** undefined is the previous renderer without a handshake; null is a failed check. */
+  async #fetchHostedVersion(): Promise<string | undefined | null> {
     try {
       const response = await this.#options.fetch(
         new URL("/desktop/compatibility", this.#options.origin).href,
@@ -276,7 +265,7 @@ export class DesktopUpdates {
           redirect: "manual",
           cache: "no-store",
           headers: { Accept: "application/json" },
-          signal: AbortSignal.timeout(POLICY_TIMEOUT_MS),
+          signal: AbortSignal.timeout(HANDSHAKE_TIMEOUT_MS),
         }
       );
       // A candidate must also launch against the previous hosted deployment.
@@ -288,7 +277,7 @@ export class DesktopUpdates {
           new URL("/sign-in?next=/desktop", this.#options.origin).href;
       if (response.status === 404 || legacyRedirect) {
         void response.body?.cancel().catch(() => {});
-        return INACTIVE;
+        return undefined;
       }
       if (
         !response.ok ||
@@ -299,7 +288,7 @@ export class DesktopUpdates {
         return null;
       }
       const reader = response.body.getReader();
-      const bytes = new Uint8Array(POLICY_MAX_BYTES);
+      const bytes = new Uint8Array(HANDSHAKE_MAX_BYTES);
       let length = 0;
       for (;;) {
         const { done, value } = await reader.read();
@@ -311,9 +300,10 @@ export class DesktopUpdates {
         bytes.set(value, length);
         length += value.length;
       }
-      return DesktopCompatibility.parse(
+      const handshake = DesktopCompatibility.parse(
         JSON.parse(new TextDecoder().decode(bytes.subarray(0, length)))
       );
+      return handshake?.desktopVersion ?? null;
     } catch {
       return null;
     }
