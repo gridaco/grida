@@ -1210,15 +1210,24 @@ it.skipIf(!resourcesPath || !["darwin", "linux"].includes(process.platform))(
       );
       expect(desktopTools.mock.calls.map(([params]) => params)).toEqual([
         expect.objectContaining({
+          scope: { presentation: true, sources: true },
           message: expect.objectContaining({ method: "tools/list" }),
         }),
         ...paths.map((path) =>
           expect.objectContaining({
+            scope: { presentation: true, sources: true },
             message: expect.objectContaining({
               method: "tools/call",
               params: expect.objectContaining({
-                name: "surface_open",
+                name: "workbench_show",
                 arguments: { path },
+                _meta: expect.objectContaining({
+                  "co.grida/definitionRevision": 2,
+                  "co.grida/source": {
+                    id: "workbench",
+                    generation: expect.any(String),
+                  },
+                }),
               }),
             }),
           })
