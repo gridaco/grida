@@ -28,6 +28,7 @@ export function SlideSurface({
   initialMtime,
   resourceRevision = 0,
   active = true,
+  onDirtyChange,
   onSaved,
   liveText,
   prepareContentForEditor,
@@ -40,6 +41,7 @@ export function SlideSurface({
   resourceRevision?: number;
   /** Gates Cmd+S — false when this deck is a hidden workbench tab. */
   active?: boolean;
+  onDirtyChange: (dirty: boolean) => void;
   onSaved?: () => void;
   liveText?: { host: DocumentSurfaceHost; path: string };
   prepareContentForEditor?: (
@@ -74,10 +76,15 @@ export function SlideSurface({
     relPath,
     active,
     initialMtime,
+    onDirtyChange,
     onSaved,
     prepareContentForEditor,
     prepareContentForWrite,
   });
+  useEffect(() => {
+    // Only the active slide is mounted. Its buffer is discarded on unmount.
+    return () => onDirtyChange(false);
+  }, [onDirtyChange]);
   const appliedResourceRevisionRef = useRef(0);
   const refreshingResourceRevisionRef = useRef<number | null>(null);
 

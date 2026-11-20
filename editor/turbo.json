@@ -6,10 +6,15 @@
       "outputs": [".next/types/**", ".next/dev/types/**"]
     },
     "typecheck": {
-      "dependsOn": ["^typecheck", "typegen"]
+      "dependsOn": ["^typecheck", "typegen"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/desktop/package.json"]
+    },
+    "test": {
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/desktop/package.json"]
     },
     "build": {
       "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/desktop/package.json"],
       "outputs": [".next/**", "!.next/cache/**"],
       "env": [
         "BIRD_API_KEY",

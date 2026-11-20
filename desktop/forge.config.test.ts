@@ -171,9 +171,14 @@ describe("Desktop native agent package", () => {
       await prePackage(forge, platform, arch);
       fs.mkdirSync(resources, { recursive: true });
       fs.mkdirSync(build, { recursive: true });
+      const updatePage = fs.readFileSync(
+        new URL("./src/main/desktop-update-page.html", import.meta.url),
+        "utf8"
+      );
+      const bundledPage = `const page = ${JSON.stringify(updatePage)};`;
       fs.writeFileSync(
         path.join(build, "main.js"),
-        'require("missing-runtime-fixture");'
+        `${bundledPage}\nrequire("missing-runtime-fixture");`
       );
       await createPackage(app, path.join(resources, "app.asar"));
       await packageAfterCopy(
@@ -194,6 +199,11 @@ describe("Desktop native agent package", () => {
         "Desktop installers require a fresh verified package"
       );
       fs.writeFileSync(path.join(build, "main.js"), "void 0;");
+      await createPackage(app, path.join(resources, "app.asar"));
+      await expect(postPackage(forge, packaged)).rejects.toThrow(
+        /verify-packaged-bundle/
+      );
+      fs.writeFileSync(path.join(build, "main.js"), bundledPage);
       await createPackage(app, path.join(resources, "app.asar"));
       await postPackage(forge, packaged);
       await expect(preMake(forge)).resolves.toBeUndefined();

@@ -174,26 +174,27 @@ export async function proxy(req: NextRequest) {
     (!process.env.NEXT_PUBLIC_SUPABASE_URL ||
       !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
 
-  const publicCatalogueRead =
+  const publicMetadataRead =
     (req.method === "GET" || req.method === "HEAD") &&
     (req.nextUrl.pathname === "/ai/models" ||
-      req.nextUrl.pathname === "/ai/models/feed");
+      req.nextUrl.pathname === "/ai/models/feed" ||
+      req.nextUrl.pathname === "/desktop/compatibility");
 
-  // Public discovery never depends on identity/session refresh. Maintenance and
+  // Public metadata never depends on identity/session refresh. Maintenance and
   // tenant-host routing still apply; this grants no execution/account authority.
-  if (publicCatalogueRead) {
-    res = NextResponse.next({ request: req });
-  } else if (env_not_set_but_can_skip_on_local_dev) {
+  if (publicMetadataRead || env_not_set_but_can_skip_on_local_dev) {
     res = NextResponse.next({
       request: desktopHeaders.requestHeaders
         ? { headers: desktopHeaders.requestHeaders }
         : req,
     });
-    console.warn(
-      "SUPABASE_URL or SUPABASE_PUBLISHABLE_KEY is not set this will break all db-requests, please set them in the .env.local file",
-      "If you are just testing things around, you can ignore this message",
-      "Learn more at https://github.com/gridaco/grida/blob/main/CONTRIBUTING.md"
-    );
+    if (!publicMetadataRead) {
+      console.warn(
+        "SUPABASE_URL or SUPABASE_PUBLISHABLE_KEY is not set this will break all db-requests, please set them in the .env.local file",
+        "If you are just testing things around, you can ignore this message",
+        "Learn more at https://github.com/gridaco/grida/blob/main/CONTRIBUTING.md"
+      );
+    }
   } else {
     const { updateSession } = await import("./lib/supabase/proxy");
     res = await updateSession(req, desktopHeaders.requestHeaders);

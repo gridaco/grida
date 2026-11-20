@@ -143,6 +143,10 @@ const bundles = fs
   .readdirSync(buildDir)
   .filter((f) => f.endsWith(".js"))
   .map((f) => path.join(buildDir, f));
+const mainBundle = bundles.find((file) => path.basename(file) === "main.js");
+const shipsUpdatePage =
+  mainBundle !== undefined &&
+  fs.readFileSync(mainBundle, "utf8").includes("grida-desktop-update-page");
 
 // Verify the FULL transitive closure of every external is present in the
 // packaged tree — not just the top-level requires. A direct external can
@@ -224,6 +228,13 @@ const extra = shippedPackages(path.join(tmp, "node_modules")).filter(
 );
 
 fs.rmSync(tmp, { recursive: true, force: true });
+
+if (!shipsUpdatePage) {
+  console.error(
+    "✖ GRIDA-DESKTOP-BUILD-GUARD: the main bundle is missing the local Desktop update page."
+  );
+  process.exit(1);
+}
 
 if (missing.length > 0) {
   const lines = missing.map(

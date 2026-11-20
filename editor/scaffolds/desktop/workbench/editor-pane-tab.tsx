@@ -145,15 +145,14 @@ function ModeBody({
       );
     case "canvas":
       // A `.canvas` directory, scoped to its subpath within this workspace.
-      // Branch on the manifest `editor`: `board` → the infinite-canvas board
-      // host; `slides`/unknown → the slides deck. `active` gates the deck's
-      // Cmd+S (a hidden tab must not grab the save); both auto-persist, so no
-      // tab dirty state.
+      // The board host auto-persists. The slides deck reports unsaved edits
+      // and only handles Cmd+S when this tab is active.
       return (
         <DesktopCanvasBundleShell
           workspaceId={workspaceId}
           basePath={relPath}
           active={active}
+          onDirtyChange={onDirtyChange}
         />
       );
     case "markdown":

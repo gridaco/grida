@@ -15,7 +15,7 @@
  */
 
 export namespace dirtyState {
-  const dirty = new Set<number>();
+  const reported = new Map<number, boolean>();
   const forceClose = new Set<number>();
 
   /**
@@ -25,15 +25,18 @@ export namespace dirtyState {
    * doc is already dirty.
    */
   export function set(webContentsId: number, isDirty: boolean): boolean {
-    const was = dirty.has(webContentsId);
-    if (isDirty === was) return false;
-    if (isDirty) dirty.add(webContentsId);
-    else dirty.delete(webContentsId);
-    return true;
+    const was = reported.get(webContentsId) ?? false;
+    reported.set(webContentsId, isDirty);
+    return isDirty !== was;
   }
 
   export function is(webContentsId: number): boolean {
-    return dirty.has(webContentsId);
+    return reported.get(webContentsId) === true;
+  }
+
+  /** Older hosted workbenches may not report whether they have edits. */
+  export function hasReport(webContentsId: number): boolean {
+    return reported.has(webContentsId);
   }
 
   export function markForceClose(webContentsId: number): void {
@@ -48,7 +51,7 @@ export namespace dirtyState {
   }
 
   export function forget(webContentsId: number): void {
-    dirty.delete(webContentsId);
+    reported.delete(webContentsId);
     forceClose.delete(webContentsId);
   }
 }
