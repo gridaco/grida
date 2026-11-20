@@ -781,7 +781,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       effort?: unknown,
       svgTargetId?: unknown,
       selectionRevision?: unknown,
-      editorContextId?: unknown
+      editorContextId?: unknown,
+      editorToolContextId?: unknown
     ) =>
       nativeChat.submit(
         event,
@@ -792,13 +793,19 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         effort,
         svgTargetId,
         selectionRevision,
-        editorContextId
+        editorContextId,
+        editorToolContextId
       )
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT_RESULT,
     (event, attachmentId: string, callId: unknown, result: unknown) =>
       nativeChat.replyEditorSvgText(event, attachmentId, callId, result)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_SELECTION_RESULT,
+    (event, attachmentId: string, callId: unknown, result: unknown) =>
+      nativeChat.replyEditorSvgSelection(event, attachmentId, callId, result)
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_ENQUEUE,
@@ -811,7 +818,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       effort?: unknown,
       svgTargetId?: unknown,
       selectionRevision?: unknown,
-      editorContextId?: unknown
+      editorContextId?: unknown,
+      editorToolContextId?: unknown
     ) =>
       nativeChat.enqueue(
         event,
@@ -822,7 +830,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         effort,
         svgTargetId,
         selectionRevision,
-        editorContextId
+        editorContextId,
+        editorToolContextId
       )
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_EFFORT, (event) =>

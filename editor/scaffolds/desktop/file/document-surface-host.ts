@@ -1,5 +1,6 @@
 import type { NativeEditorSurfaceSnapshot } from "@grida/desktop-bridge";
 import type { SvgEditor } from "@grida/svg-editor";
+import { SelectedSvg } from "../shared/selected-svg";
 import { SelectedSvgText } from "../shared/selected-svg-text";
 
 /** The virtual path a file window's live SVG is published at. */
@@ -10,16 +11,19 @@ export class DocumentSurfaceHost {
   private editor: SvgEditor | null = null;
   private path: string = CANVAS_PATH;
   private readonly listeners = new Set<() => void>();
-  readonly svgText = new SelectedSvgText(() => {
+  private readonly surface = () => {
     const editor = this.editor;
     if (editor) return { basis: editor, editor, path: this.path };
-  });
+  };
+  readonly svgText = new SelectedSvgText(this.surface);
+  readonly svgSelection = new SelectedSvg(this.surface);
 
   setEditor(editor: SvgEditor | null, path: string = CANVAS_PATH): void {
     if (this.editor === editor && this.path === path) return;
     this.editor = editor;
     this.path = path;
     this.svgText.surfaceChanged();
+    this.svgSelection.surfaceChanged();
     for (const listener of this.listeners) listener();
   }
 

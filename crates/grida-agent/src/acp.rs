@@ -316,6 +316,10 @@ async fn serve_connection(
                         }
                         if desktop_tools_offered {
                             advertised.insert(desktop_tools.into(), 1.into());
+                            let context = crate::editor_surfaces::mcp::TOOL_CONTEXT_CAPABILITY;
+                            if offered(context) {
+                                advertised.insert(context.into(), 1.into());
+                            }
                         }
                         if browser_offered {
                             advertised.insert(browser.into(), 1.into());
@@ -347,6 +351,7 @@ async fn serve_connection(
                             crate::editor_surfaces::OPEN_CAPABILITY,
                             crate::editor_surfaces::SVG_TEXT_CAPABILITY,
                             crate::editor_surfaces::DESKTOP_TOOLS_CAPABILITY,
+                            crate::editor_surfaces::mcp::TOOL_CONTEXT_CAPABILITY,
                             crate::browser_tools::CAPABILITY,
                             extensions::gateway_billing::CAPABILITY,
                             extensions::gateway_billing::CHILD_CAPABILITY,
@@ -480,10 +485,13 @@ async fn serve_connection(
                             load_sessions.lock().unwrap().ensure_attached(&id)?;
                             let window = load_host.transcript_window(id.clone(), before, projection::visible_record_bytes).await.map_err(host_error)?;
                             let turn_ids = window.turns.iter().map(|turn| turn.id.clone()).collect::<Vec<_>>();
-                            let input_facts = load_host
+                            let mut input_facts = load_host
                                 .transcript_input_facts(id, &turn_ids)
                                 .await
                                 .map_err(host_error)?;
+                            if !load_sessions.lock().unwrap().negotiated.contains(crate::editor_surfaces::mcp::TOOL_CONTEXT_CAPABILITY) {
+                                input_facts.editor_tool_contexts.clear();
+                            }
                             let mut projection = Projection::new(request.session_id).with_tool_images(
                                 { let state = load_sessions.lock().unwrap(); state.negotiated.contains(extensions::tool_images::CAPABILITY) }
                             ).with_activity_order(

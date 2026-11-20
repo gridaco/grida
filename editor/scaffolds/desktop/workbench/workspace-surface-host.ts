@@ -22,6 +22,7 @@ import { WorkspaceSvgText } from "./workspace-svg-text";
  */
 export class WorkspaceSurfaceHost {
   readonly svgText: WorkspaceSvgText;
+  readonly svgSelection: WorkspaceSvgText["svgSelection"];
 
   constructor(
     private readonly readdir: WorkspaceArtifact.Readdir,
@@ -31,6 +32,7 @@ export class WorkspaceSurfaceHost {
     >
   ) {
     this.svgText = new WorkspaceSvgText(this.group);
+    this.svgSelection = this.svgText.svgSelection;
   }
 
   async open(

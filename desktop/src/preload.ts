@@ -25,6 +25,7 @@ import { catalogWorkspaceId } from "./bridge/chat-catalog-route";
 import {
   DesktopBrowser,
   NativeEditorSurfaces,
+  NativeEditorSvgSelection,
   NativeEditorSvgText,
   type NativeEditorSurfaceOpen,
 } from "@grida/desktop-bridge";
@@ -116,17 +117,28 @@ const nativeSvgTextHandlers = new Map<
     invoke(request: NativeEditorSvgText.Request): NativeEditorSvgText.Result;
   }
 >();
+const nativeSvgSelectionHandlers = new Map<
+  string,
+  {
+    href: string;
+    invoke(
+      request: NativeEditorSvgSelection.Request
+    ): NativeEditorSvgSelection.Result;
+  }
+>();
 
 function clearNativeChatDelivery(): void {
   nativeChatHandlers.clear();
   nativeEditorHandlers.clear();
   nativeSvgTextHandlers.clear();
+  nativeSvgSelectionHandlers.clear();
 }
 
 /** Stop delivering anything for an attachment this frame is giving up. */
 function forgetNativeChatAttachment(attachmentId: string): void {
   nativeEditorHandlers.delete(attachmentId);
   nativeSvgTextHandlers.delete(attachmentId);
+  nativeSvgSelectionHandlers.delete(attachmentId);
   for (const [id, subscriber] of nativeChatHandlers) {
     if (subscriber.attachmentId === attachmentId) nativeChatHandlers.delete(id);
   }
@@ -179,7 +191,7 @@ function selectedDocumentChatRoute(): boolean {
   );
 }
 
-function liveSvgTextRoute(): boolean {
+function liveSvgRoute(): boolean {
   if (location.pathname === "/desktop/workspace" || selectedDocumentChatRoute())
     return true;
   const params = new URLSearchParams(location.search);
@@ -191,13 +203,43 @@ function liveSvgTextRoute(): boolean {
   );
 }
 
-ipcRenderer.on(
+listenForSvgCall(
   IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT,
-  (_event, value: unknown) => {
-    if (!liveSvgTextRoute() || !value || typeof value !== "object") return;
+  IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT_RESULT,
+  nativeSvgTextHandlers,
+  NativeEditorSvgText.operation,
+  NativeEditorSvgText.result
+);
+listenForSvgCall(
+  IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_SELECTION,
+  IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_SELECTION_RESULT,
+  nativeSvgSelectionHandlers,
+  NativeEditorSvgSelection.operation,
+  NativeEditorSvgSelection.result
+);
+
+function listenForSvgCall<Operation, Result>(
+  channel: string,
+  resultChannel: string,
+  handlers: ReadonlyMap<
+    string,
+    {
+      href: string;
+      invoke(request: {
+        targetId: string;
+        expiresAtMs: number;
+        operation: Operation;
+      }): Result;
+    }
+  >,
+  parseOperation: (value: unknown) => Operation | undefined,
+  parseResult: (value: unknown) => Result | undefined
+): void {
+  ipcRenderer.on(channel, (_event, value: unknown) => {
+    if (!liveSvgRoute() || !value || typeof value !== "object") return;
     const { attachmentId, callId, targetId, expiresAtMs, operation } =
       value as Record<string, unknown>;
-    const action = NativeEditorSvgText.operation(operation);
+    const action = parseOperation(operation);
     if (
       !NativeEditorSvgText.isId(attachmentId) ||
       !NativeEditorSvgText.isId(callId) ||
@@ -207,28 +249,23 @@ ipcRenderer.on(
       !action
     )
       return;
-    const handler = nativeSvgTextHandlers.get(attachmentId);
+    const handler = handlers.get(attachmentId);
     try {
       const result =
         handler?.href === location.href && Date.now() < expiresAtMs
-          ? NativeEditorSvgText.result(
+          ? parseResult(
               handler.invoke({ targetId, expiresAtMs, operation: action })
             )
           : { kind: "unavailable" };
       if (result)
         void ipcRenderer
-          .invoke(
-            IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT_RESULT,
-            attachmentId,
-            callId,
-            result
-          )
+          .invoke(resultChannel, attachmentId, callId, result)
           .catch(() => {});
     } catch {
       // An exception after dispatch is unverified. Do not send a false receipt.
     }
-  }
-);
+  });
+}
 
 ipcRenderer.on(
   IPC_CHANNELS.NATIVE_CHAT_EDITOR_SURFACE_OPEN,
@@ -844,7 +881,7 @@ const bridge: DesktopBridge = {
         typeof invoke !== "function" ||
         nativeSvgTextHandlers.has(attachmentId) ||
         nativeSvgTextHandlers.size >= 16 ||
-        !liveSvgTextRoute()
+        !liveSvgRoute()
       )
         throw new Error("native_chat_svg_text_unavailable");
       const handler = { href: location.href, invoke };
@@ -852,6 +889,22 @@ const bridge: DesktopBridge = {
       return () => {
         if (nativeSvgTextHandlers.get(attachmentId) === handler)
           nativeSvgTextHandlers.delete(attachmentId);
+      };
+    },
+    onEditorSvgSelection: (attachmentId, invoke) => {
+      if (
+        !NativeEditorSvgSelection.isId(attachmentId) ||
+        typeof invoke !== "function" ||
+        nativeSvgSelectionHandlers.has(attachmentId) ||
+        nativeSvgSelectionHandlers.size >= 16 ||
+        !liveSvgRoute()
+      )
+        throw new Error("native_chat_svg_selection_unavailable");
+      const handler = { href: location.href, invoke };
+      nativeSvgSelectionHandlers.set(attachmentId, handler);
+      return () => {
+        if (nativeSvgSelectionHandlers.get(attachmentId) === handler)
+          nativeSvgSelectionHandlers.delete(attachmentId);
       };
     },
     submit: (attachmentId, inputId, text) =>
@@ -878,7 +931,8 @@ const bridge: DesktopBridge = {
       effort,
       editorSvgTargetId,
       selectionRevision,
-      editorContextId
+      editorContextId,
+      editorToolContextId
     ) =>
       nativeChatInvoke(
         action === "enqueue"
@@ -888,15 +942,23 @@ const bridge: DesktopBridge = {
         inputId,
         text,
         operatingRegime,
-        ...(editorContextId !== undefined
-          ? [effort, editorSvgTargetId, selectionRevision, editorContextId]
-          : selectionRevision !== undefined
-            ? [effort, editorSvgTargetId, selectionRevision]
-            : editorSvgTargetId !== undefined
-              ? [effort, editorSvgTargetId]
-              : effort === undefined
-                ? []
-                : [effort])
+        ...(editorToolContextId !== undefined
+          ? [
+              effort,
+              editorSvgTargetId,
+              selectionRevision,
+              editorContextId,
+              editorToolContextId,
+            ]
+          : editorContextId !== undefined
+            ? [effort, editorSvgTargetId, selectionRevision, editorContextId]
+            : selectionRevision !== undefined
+              ? [effort, editorSvgTargetId, selectionRevision]
+              : editorSvgTargetId !== undefined
+                ? [effort, editorSvgTargetId]
+                : effort === undefined
+                  ? []
+                  : [effort])
       ),
     enqueue: (attachmentId, inputId, text) =>
       nativeChatInvoke(

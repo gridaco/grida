@@ -1394,6 +1394,87 @@ it("keeps the captured SVG target when the same submission reply is lost", async
   }
 });
 
+it.each([
+  "Inspect these SVG objects.",
+  "/stop is a note. Inspect these objects.",
+])("freezes both SVG grants before the queued send of %s", async (prompt) => {
+  const { bridge, running } = fixture();
+  running.add("workbench");
+  bridge.publishEditorSurfaces = async () => {};
+  bridge.onEditorSvgText = () => () => {};
+  bridge.onEditorSvgSelection = () => () => {};
+  bridge.enqueue = async () => {
+    throw new Error("fixture uses submitInRegime");
+  };
+  const send = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(
+    async (_action, sessionId, inputId) => ({
+      sessionId,
+      inputId,
+      disposition: "queued",
+      inputPosition: 2,
+      turnId: null,
+    })
+  );
+  send.mockRejectedValueOnce(new Error("fixture lost reply"));
+  bridge.submitInRegime = send;
+  const originalText = crypto.randomUUID();
+  const originalSelection = crypto.randomUUID();
+  let textTarget = originalText;
+  let selectionTarget = originalSelection;
+  const captureText = vi.fn<() => string>(() => textTarget);
+  const captureSelection = vi.fn<() => string>(() => selectionTarget);
+  const controller = new NativeChatController(bridge, undefined, undefined, {
+    readEditorSurfaces: () => ({
+      active: "/poster.svg",
+      open: ["/poster.svg"],
+      truncated: false,
+    }),
+    subscribeToEditorSurfaces: () => () => {},
+    svgText: {
+      hasSelection: () => true,
+      subscribe: () => () => {},
+      capture: captureText,
+      invoke: () => ({ kind: "unavailable" }),
+    },
+    svgSelection: {
+      hasSelection: () => true,
+      subscribe: () => () => {},
+      capture: captureSelection,
+      invoke: () => ({ kind: "unavailable" }),
+    },
+  });
+  try {
+    await controller.select("workbench");
+    expect(controller.readComposerEditorSelection()).toBe("svg-selection");
+    controller.selectOperatingRegime("plan");
+    expect(controller.readComposerEditorSelection()).toBeUndefined();
+    controller.selectOperatingRegime("act");
+
+    const sending = controller.submit(prompt);
+    textTarget = crypto.randomUUID();
+    selectionTarget = crypto.randomUUID();
+    await expect(sending).rejects.toThrow("fixture lost reply");
+    await controller.submit(prompt);
+    expect(send.mock.calls[0]).toEqual([
+      "enqueue",
+      "workbench",
+      expect.any(String),
+      prompt,
+      "act",
+      undefined,
+      originalText,
+      undefined,
+      undefined,
+      originalSelection,
+    ]);
+    expect(send.mock.calls[1]).toEqual(send.mock.calls[0]);
+    expect(captureText).toHaveBeenCalledTimes(1);
+    expect(captureSelection).toHaveBeenCalledTimes(1);
+  } finally {
+    controller.disconnect();
+  }
+});
+
 it("retries the explicitly supplied editor context without sampling a new one", async () => {
   const { bridge } = fixture();
   const id = crypto.randomUUID();

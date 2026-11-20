@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { NativeAgentChat } from "./native-agent-chat";
 import { NativeAgentGoals } from "./native-agent-goals";
 import {
@@ -18,7 +18,8 @@ import { NativeSelectedImages } from "./native-selected-images";
 import { NativeSubagentActivity } from "./native-subagent-activity";
 import { NativeActivityOrder } from "./native-activity-order";
 import { NativeEditorSurfaceEndpoints } from "./native-editor-surfaces";
-import { NativeEditorSvgTextReplies } from "./native-editor-svg-text-replies";
+import { NativeEditorSvgText } from "@grida/desktop-bridge";
+import { NativeEditorSvgReplies } from "./native-editor-svg-replies";
 import { NativeDesktopTools } from "./native-desktop-tools";
 import { NativeChatTitle } from "./native-chat-title";
 
@@ -2024,7 +2025,10 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
     });
     const sent = Promise.withResolvers<void>();
     const settled = Promise.withResolvers<void>();
-    const replies = new NativeEditorSvgTextReplies();
+    const replies = new NativeEditorSvgReplies(
+      NativeEditorSvgText.result,
+      "native_chat_svg_text_unverified"
+    );
     try {
       const target = randomUUID();
       const callId = randomUUID();
@@ -2075,8 +2079,44 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
     }
   });
 
+  it("keeps the legacy SVG text grant when the native host omits the editor context capability", async () => {
+    const test = fixture("", 1, {
+      [NativeEditorSurfaceEndpoints.toolContextCapability]: null,
+    });
+    const agent = await NativeAgentProcess.start({
+      ...test.options,
+      providerNetwork: { prepare: () => null },
+    });
+    try {
+      const svgText = randomUUID();
+      const lease = agent.registerEditorSurfaces(
+        "chat",
+        { active: "/initial.svg", open: ["/initial.svg"], truncated: false },
+        () => {},
+        undefined,
+        undefined,
+        async () => ({ kind: "unavailable" }),
+        undefined,
+        async () => ({ kind: "stale" })
+      )!;
+      expect(agent.acceptsEditorToolContext).toBe(false);
+      expect(
+        lease.selection(svgText, { targetId: randomUUID(), inputId: "input" })
+      ).toEqual({
+        editorEndpointId: expect.any(String),
+        editorSvgTargetId: svgText,
+      });
+    } finally {
+      await agent.close();
+      test.close();
+    }
+  });
+
   it("settles the SVG reply when the owner is released during send", async () => {
-    const replies = new NativeEditorSvgTextReplies();
+    const replies = new NativeEditorSvgReplies(
+      NativeEditorSvgText.result,
+      "native_chat_svg_text_unverified"
+    );
     const scope = new AbortController();
     const callId = randomUUID();
     await expect(
@@ -2084,8 +2124,6 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
         "attachment",
         {
           callId,
-          targetId: randomUUID(),
-          operation: { kind: "read" },
           expiresAtMs: Date.now() + 1000,
         },
         () => {
@@ -2098,6 +2136,32 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
     expect(() =>
       replies.respond("attachment", callId, { kind: "unavailable" })
     ).toThrow("native_chat_svg_text_unverified");
+  });
+
+  it("rejects a renderer reply after the deadline even if the expiry timer has not run", async () => {
+    let now = 1000;
+    const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
+    try {
+      const replies = new NativeEditorSvgReplies(
+        NativeEditorSvgText.result,
+        "native_chat_svg_text_unverified"
+      );
+      const callId = randomUUID();
+      const pending = replies.dispatch(
+        "attachment",
+        { callId, expiresAtMs: 2000 },
+        () => {}
+      );
+      now = 2000;
+      replies.respond("attachment", callId, {
+        kind: "applied",
+        path: "/initial.svg",
+        saved: false,
+      });
+      await expect(pending).rejects.toThrow("native_chat_svg_text_unverified");
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   it.each([{ backpressure: false }, { backpressure: true }])(

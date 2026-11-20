@@ -75,6 +75,7 @@ import type { NativeHookInspection } from "@grida/desktop-bridge";
 import type {
   NativeEditorSurfaceDelivery,
   NativeEditorSurfaceSelection,
+  NativeEditorSvgSelectionDelivery,
   NativeEditorSvgTextDelivery,
 } from "./native-editor-surfaces";
 import type { DesktopBrowserToolLease } from "./desktop-browser-tools";
@@ -1014,7 +1015,8 @@ export class NativeAgentChat {
     deliver: NativeEditorSurfaceDelivery | undefined,
     revision?: number,
     svgText?: NativeEditorSvgTextDelivery,
-    browser?: DesktopBrowserToolLease
+    browser?: DesktopBrowserToolLease,
+    svgSelection?: NativeEditorSvgSelectionDelivery
   ) {
     return this.process.registerEditorSurfaces(
       this.requireAttached(session),
@@ -1023,12 +1025,17 @@ export class NativeAgentChat {
       deliver,
       revision,
       svgText,
-      browser
+      browser,
+      svgSelection
     );
   }
 
   get acceptsEditorContext(): boolean {
     return this.process.acceptsEditorContext;
+  }
+
+  get acceptsEditorToolContext(): boolean {
+    return this.process.acceptsEditorToolContext;
   }
 
   submit(
@@ -2773,6 +2780,11 @@ export class NativeAgentChat {
               attribution.svgTextSelection === true && {
                 svgTextSelection: true,
               }),
+            ...(role === "user" &&
+              attribution?.turnId !== undefined &&
+              attribution.editorToolContext === true && {
+                svgSelection: true,
+              }),
           });
         }
         return;
@@ -3106,6 +3118,7 @@ function captureText(
     | "activityOrder"
     | "activityOrderIncomplete"
     | "svgTextSelection"
+    | "svgSelection"
     | "displayParts"
     | "questionReply"
   >
@@ -3140,6 +3153,7 @@ function captureText(
       questionReply: attribution.questionReply,
     }),
     ...(attribution?.svgTextSelection && { svgTextSelection: true }),
+    ...(attribution?.svgSelection && { svgSelection: true }),
     ...(attribution?.displayParts && {
       displayParts: attribution.displayParts,
     }),

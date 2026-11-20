@@ -7,10 +7,11 @@ import type { WorkspaceMediaGrant } from "./workspace-media-registry";
 import type { NativeNestedDeckGrant } from "./native-workspace-catalog";
 import {
   NativeEditorSurfaces,
+  NativeEditorSvgSelection,
   NativeEditorSvgText,
   type NativeEditorSurfaceSnapshot,
 } from "@grida/desktop-bridge";
-import { NativeEditorSvgTextReplies } from "./native-editor-svg-text-replies";
+import { NativeEditorSvgReplies } from "./native-editor-svg-replies";
 import { NativeDocumentIdentityBusy } from "./native-document-files";
 import { NativeToolImages } from "./native-tool-images";
 import type {
@@ -210,6 +211,7 @@ export type ActiveNativeChat = Readonly<{
         | "stopBackgroundProcesses"
         | "registerEditorSurfaces"
         | "acceptsEditorContext"
+        | "acceptsEditorToolContext"
         | "submitMessage"
         | "inspectHooks"
         | "reviewHook"
@@ -409,7 +411,14 @@ export class NativeChatIpc {
     WebContents,
     WelcomePermissionReview
   >();
-  private readonly svgTextReplies = new NativeEditorSvgTextReplies();
+  private readonly svgTextReplies = new NativeEditorSvgReplies(
+    NativeEditorSvgText.result,
+    "native_chat_svg_text_unverified"
+  );
+  private readonly svgSelectionReplies = new NativeEditorSvgReplies(
+    NativeEditorSvgSelection.result,
+    "native_chat_svg_selection_unverified"
+  );
   /** Per window, the sessions it showed for each chat host. */
   private readonly shownSessions = new Map<
     WebContents,
@@ -2377,7 +2386,38 @@ export class NativeChatIpc {
           ? undefined
           : this.browserTools?.lease(owner.sender, owner.frame, () =>
               this.revalidate(owner, attachment)
-            )
+            ),
+        async (request, signal) => {
+          const slide = attachment.deckEditorSurface;
+          if (deck && !slide?.active) return { kind: "stale" };
+          try {
+            if (file) await file.recheck();
+            this.revalidate(owner, attachment);
+          } catch {
+            return { kind: "stale" };
+          }
+          if (deck && attachment.deckEditorSurface !== slide)
+            return { kind: "stale" };
+          const result = await this.svgSelectionReplies.dispatch(
+            attachment.id,
+            request,
+            () =>
+              owner.frame.send(IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_SELECTION, {
+                attachmentId: attachment.id,
+                ...request,
+              }),
+            signal
+          );
+          this.revalidate(owner, attachment);
+          if (file) await file.recheck();
+          if (
+            deck &&
+            (attachment.deckEditorSurface !== slide ||
+              ("path" in result && result.path !== slide?.active))
+          )
+            throw new Error("native_chat_svg_selection_unverified");
+          return result;
+        }
       );
     }
   }
@@ -2395,6 +2435,24 @@ export class NativeChatIpc {
         return this.svgTextReplies.respond(attachment.id, callId, null);
     }
     this.svgTextReplies.respond(attachment.id, callId, value);
+  }
+
+  replyEditorSvgSelection(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    callId: unknown,
+    value: unknown
+  ): void {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const result = NativeEditorSvgSelection.result(value);
+    if (
+      result &&
+      "path" in result &&
+      this.documentFrame(owner.sender, owner.frame) &&
+      result.path !== DOCUMENT_SURFACE
+    )
+      return this.svgSelectionReplies.respond(attachment.id, callId, null);
+    this.svgSelectionReplies.respond(attachment.id, callId, result);
   }
 
   async captureEditorContext(
@@ -2453,6 +2511,27 @@ export class NativeChatIpc {
     return capture.observation;
   }
 
+  private editorToolContext(
+    owner: Owner,
+    inputId: string,
+    text: string,
+    mode: NativeChatOperatingRegime | undefined,
+    targetId: unknown
+  ): { targetId: string; inputId: string } | undefined {
+    if (targetId === undefined) return;
+    if (
+      !NativeEditorSvgText.isId(targetId) ||
+      mode !== "act" ||
+      typeof inputId !== "string" ||
+      !/^[A-Za-z0-9_.:@/-]{1,256}$/.test(inputId) ||
+      typeof text !== "string" ||
+      text.trim().length === 0
+    )
+      throw new Error("native_chat_editor_tool_context_invalid");
+    if (owner.active.chat.acceptsEditorToolContext)
+      return { targetId, inputId };
+  }
+
   async submit(
     event: IpcMainInvokeEvent,
     attachmentId: string,
@@ -2462,17 +2541,26 @@ export class NativeChatIpc {
     effort?: unknown,
     svgTargetId?: unknown,
     selectionRevision?: unknown,
-    editorContextId?: unknown
+    editorContextId?: unknown,
+    editorToolContextId?: unknown
   ) {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const mode = operatingRegime(regime);
+    const context = this.editorToolContext(
+      owner,
+      inputId,
+      text,
+      mode,
+      editorToolContextId
+    );
     const prior = await this.selectionAdmission(
       owner,
       attachment,
       inputId,
       selectionRevision
     );
-    if (prior) return prior;
-    const mode = operatingRegime(regime);
+    this.revalidate(owner, attachment);
+    if (prior && !owner.active.chat.acceptsEditorToolContext) return prior;
     if (
       svgTargetId !== undefined &&
       (mode !== "act" || !NativeEditorSvgText.isId(svgTargetId))
@@ -2481,20 +2569,22 @@ export class NativeChatIpc {
     const selected = agentEffort(effort);
     const surfaces =
       mode === "act"
-        ? attachment.editorSurfaces?.selection(svgTargetId)
+        ? attachment.editorSurfaces?.selection(svgTargetId, context)
         : undefined;
-    const result = await owner.active.chat.submit(
-      attachment.session,
-      inputId,
-      text,
-      mode,
-      ...submitSelections(
-        surfaces,
-        selected,
-        selectionRevision,
-        this.editorContext(owner, attachment, inputId, editorContextId)
+    const result = await owner.active.chat
+      .submit(
+        attachment.session,
+        inputId,
+        text,
+        mode,
+        ...submitSelections(
+          surfaces,
+          selected,
+          selectionRevision,
+          this.editorContext(owner, attachment, inputId, editorContextId)
+        )
       )
-    );
+      .catch((error: unknown) => receiptAfterBrowserChange(error, prior));
     this.revalidate(owner, attachment);
     return result;
   }
@@ -2540,17 +2630,26 @@ export class NativeChatIpc {
     effort?: unknown,
     svgTargetId?: unknown,
     selectionRevision?: unknown,
-    editorContextId?: unknown
+    editorContextId?: unknown,
+    editorToolContextId?: unknown
   ) {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const mode = operatingRegime(regime);
+    const context = this.editorToolContext(
+      owner,
+      inputId,
+      text,
+      mode,
+      editorToolContextId
+    );
     const prior = await this.selectionAdmission(
       owner,
       attachment,
       inputId,
       selectionRevision
     );
-    if (prior) return prior;
-    const mode = operatingRegime(regime);
+    this.revalidate(owner, attachment);
+    if (prior && !owner.active.chat.acceptsEditorToolContext) return prior;
     if (
       svgTargetId !== undefined &&
       (mode !== "act" || !NativeEditorSvgText.isId(svgTargetId))
@@ -2559,20 +2658,22 @@ export class NativeChatIpc {
     const selected = agentEffort(effort);
     const surfaces =
       mode === "act"
-        ? attachment.editorSurfaces?.selection(svgTargetId)
+        ? attachment.editorSurfaces?.selection(svgTargetId, context)
         : undefined;
-    const result = await owner.active.chat.enqueue(
-      attachment.session,
-      inputId,
-      text,
-      mode,
-      ...submitSelections(
-        surfaces,
-        selected,
-        selectionRevision,
-        this.editorContext(owner, attachment, inputId, editorContextId)
+    const result = await owner.active.chat
+      .enqueue(
+        attachment.session,
+        inputId,
+        text,
+        mode,
+        ...submitSelections(
+          surfaces,
+          selected,
+          selectionRevision,
+          this.editorContext(owner, attachment, inputId, editorContextId)
+        )
       )
-    );
+      .catch((error: unknown) => receiptAfterBrowserChange(error, prior));
     this.revalidate(owner, attachment);
     return result;
   }
@@ -4374,6 +4475,21 @@ function submitSelections(
     return [surfaces, effort, selectionRevision as number];
   if (effort) return [surfaces, effort];
   return surfaces ? [surfaces] : [];
+}
+
+function receiptAfterBrowserChange(
+  error: unknown,
+  prior: NativeChatAcceptance | null
+): NativeChatAcceptance {
+  // The host verifies captured editor context before checking the live
+  // browser lease. Recover only the already accepted receipt in this case.
+  if (
+    prior &&
+    error instanceof Error &&
+    error.message === "submission_browser_tools_changed"
+  )
+    return prior;
+  throw error;
 }
 
 function requireObservation(

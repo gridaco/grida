@@ -1184,7 +1184,7 @@ pixels through this reader, with no additional filesystem or model grant.
   rechecks its physical identity before requests and delivery. Its chat worker
   uses private storage and a private working directory, without a project grant
   or external tool host. The attached editor can publish only `/canvas.svg`
-  and provide a captured plain text selection. The editor still owns Save.
+  and provide a captured SVG selection. The editor still owns Save.
   Document window retirement drains its worker. Workbench presentation and
   external-agent commands remain scoped to the workbench route.
   Attachments and observed control revisions are issued in Main. A copied
@@ -1280,7 +1280,7 @@ pixels through this reader, with no additional filesystem or model grant.
   capture one exact workbench, standalone SVG, or slide selection for an
   accepted Act text input, including queued input. Main dispatches to the
   admitted frame and validates the bounded
-  [correlated response](desktop/src/main/native-editor-svg-text-replies.ts).
+  [correlated response](desktop/src/main/native-editor-svg-replies.ts).
   Canceling the private request releases that pending reply and discards late
   renderer results. It supplies no evidence of reversing a dispatched edit.
   A deck may publish one bundle-relative slide and must reply for the same
@@ -1291,6 +1291,16 @@ pixels through this reader, with no additional filesystem or model grant.
   existing SVG text command can run. Its result is a live edit. The normal
   editor save remains a separate operation. An unverified mutation reply
   stays uncertain and is never replayed.
+- The [SVG selection tools](desktop/src/main/desktop-selected-svg-selection.ts)
+  use an additional negotiated editor-tool context for an eligible Act text
+  input. The scope resolves through the exact input and owning attachment.
+  The renderer captures the live document and selection at Send and rechecks
+  them before dispatch. Inspection supplies bounded pages of locators under
+  the attached file scope. The opacity operation verifies the capture revision
+  and invokes the editor command once. It leaves disk writes to Save. Main
+  validates the correlated reply, bound path, and original deadline before
+  accepting it. The transcript marker carries no token and the external
+  inventory has no grant.
 - [Live presentation](desktop/src/main/desktop-artifact-presentation.ts)
   requires a separately issued grant and a
   subscription from the exact attached workbench. Main dispatches a bounded

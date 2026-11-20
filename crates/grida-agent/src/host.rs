@@ -563,6 +563,8 @@ struct StoredPrompt {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     editor_svg_target: Option<BindingId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    editor_tool_context_id: Option<BindingId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     guidance: Option<crate::skills::CapturedGuidance>,
     /// Skills the model may read and follow without an explicit selection.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -629,6 +631,7 @@ struct SubmissionPolicy {
     editor_presentation: bool,
     editor_browser_tools: bool,
     editor_svg_target: Option<BindingId>,
+    editor_tool_context_id: Option<BindingId>,
     operating_regime: OperatingRegime,
     subagent: Option<grida_agent_master::subagents::Assignment>,
     effort: Option<EffortPolicy>,
@@ -769,6 +772,7 @@ pub(crate) struct SubmissionContext {
     pub editor_presentation: bool,
     pub editor_browser_tools: bool,
     pub editor_svg_target: Option<BindingId>,
+    pub editor_tool_context_id: Option<BindingId>,
 }
 
 #[derive(Debug, Serialize)]
@@ -2635,6 +2639,7 @@ impl Host {
             editor_presentation: false,
             editor_browser_tools: false,
             editor_svg_target: None,
+            editor_tool_context_id: None,
             operating_regime,
             subagent: None,
             effort: self.capture_effort(request.effort.unwrap_or(self.effort))?,
@@ -2663,6 +2668,7 @@ impl Host {
             editor_presentation,
             editor_browser_tools,
             editor_svg_target,
+            editor_tool_context_id,
             operating_regime,
             subagent,
             effort,
@@ -2754,6 +2760,7 @@ impl Host {
                     crate::editor_surfaces::mcp::Scope {
                         presentation: editor_presentation && !editor_browser_tools,
                         svg_target_id: editor_svg_target.clone(),
+                        context_id: editor_tool_context_id.clone(),
                     },
                 )
                 .await
@@ -2930,6 +2937,7 @@ impl Host {
                 editor_presentation,
                 editor_browser_tools,
                 editor_svg_target,
+                editor_tool_context_id,
                 guidance,
                 skills,
                 goal: None,
@@ -3127,6 +3135,7 @@ impl Host {
                             || stored.editor_presentation
                             || stored.editor_browser_tools
                             || stored.editor_svg_target.is_some()
+                            || stored.editor_tool_context_id.is_some()
                             || stored.guidance.is_some()
                             || stored.skills.is_some()
                             || stored.goal.is_some()
@@ -3216,6 +3225,15 @@ impl Host {
                     return Err(problem(ErrorKind::InvalidState, "invalid_svg_text_scope"));
                 }
                 if !cancellation_only
+                    && stored.editor_tool_context_id.is_some()
+                    && (stored.editor_endpoint.is_none() || stored.allow_wakeups)
+                {
+                    return Err(problem(
+                        ErrorKind::InvalidState,
+                        "invalid_editor_tool_context_scope",
+                    ));
+                }
+                if !cancellation_only
                     && stored.operating_regime.is_act()
                     && let Some(capture) = &stored.host_tools_capture
                 {
@@ -3252,7 +3270,8 @@ impl Host {
                             }
                         }
                     }
-                    let legacy = stored.editor_tool_catalog.is_none();
+                    let legacy = stored.editor_tool_catalog.is_none()
+                        && stored.editor_tool_context_id.is_none();
                     let scope = crate::editor_surfaces::LegacyToolScope {
                         inventory: legacy,
                         presentation: legacy && stored.editor_presentation,
@@ -3732,6 +3751,22 @@ impl Host {
                 "editor_surface_requires_workspace_act_text",
             ));
         }
+        if context.editor_tool_context_id.is_some()
+            && (editor_endpoint.is_none()
+                || context.allow_wakeups
+                || !request.parts.iter().any(
+                    |part| matches!(part, PromptPart::Text { text } if !text.trim().is_empty()),
+                )
+                || !request
+                    .parts
+                    .iter()
+                    .all(|part| matches!(part, PromptPart::Text { .. })))
+        {
+            return Err(problem(
+                ErrorKind::Unsupported,
+                "editor_tool_context_requires_attached_act_text",
+            ));
+        }
         if context.editor_browser_tools
             && (editor_endpoint.is_none() || !self.editor_surfaces.browser_tools_available())
         {
@@ -3743,6 +3778,7 @@ impl Host {
         policy.editor_endpoint = editor_endpoint;
         policy.editor_presentation = context.editor_presentation;
         policy.editor_svg_target = editor_svg_target;
+        policy.editor_tool_context_id = context.editor_tool_context_id.clone();
         policy.editor_browser_tools = context.editor_browser_tools;
         Ok(())
     }
@@ -3763,6 +3799,7 @@ impl Host {
             allow_library_selection,
             unavailable_library_selection_requested,
             editor_browser_tools,
+            editor_tool_context_id,
             ..
         } = lifecycle::check_input(&view.input, &request.parts)?;
         let settings = InputSettings::for_input(&view.input)?;
@@ -3790,7 +3827,16 @@ impl Host {
                 "submission_library_selection_changed",
             ));
         }
-        if editor_browser_tools != context.editor_browser_tools {
+        if editor_tool_context_id != context.editor_tool_context_id {
+            return Err(problem(
+                ErrorKind::Conflict,
+                "submission_editor_tool_context_changed",
+            ));
+        }
+        // A matching context recovers the accepted input and its catalog even
+        // if the current attachment no longer has the same browser lease.
+        if editor_tool_context_id.is_none() && editor_browser_tools != context.editor_browser_tools
+        {
             return Err(problem(
                 ErrorKind::Conflict,
                 "submission_browser_tools_changed",

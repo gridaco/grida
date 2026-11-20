@@ -94,6 +94,7 @@ pub(super) struct PriorContext {
 pub(crate) struct TranscriptInputFacts {
     pub(crate) goal_starts: BTreeSet<TurnId>,
     pub(crate) svg_text_selections: BTreeSet<MessageId>,
+    pub(crate) editor_tool_contexts: BTreeSet<MessageId>,
     pub(crate) display_parts: BTreeMap<MessageId, Vec<message_context::DisplayPart>>,
 }
 
@@ -190,6 +191,11 @@ impl Host {
                 if stored.editor_svg_target.is_some() {
                     facts
                         .svg_text_selections
+                        .insert(prompt_message_id(&input.id)?);
+                }
+                if stored.editor_tool_context_id.is_some() {
+                    facts
+                        .editor_tool_contexts
                         .insert(prompt_message_id(&input.id)?);
                 }
                 if let Some(context) = message_context::context(&stored.parts)

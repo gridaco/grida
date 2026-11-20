@@ -1273,7 +1273,7 @@ its catalog at input acceptance, including for queued input.
 `_co.grida/editor/desktop-tools` is a reverse ACP request with
 `sessionId`, `endpointId`, `timeoutMs`, `expiresAtMs` in Unix milliseconds,
 and `message`, an MCP JSON-RPC `tools/list` or `tools/call` request. An
-optional `scope` object names the accepted `svgTargetId` or sets
+optional `scope` object can include `svgTargetId`, `contextId`, or
 `presentation: true`. Main bounds the operation by the original absolute
 deadline and its local relative timeout. The reply echoes the session and
 endpoint and carries the correlated MCP reply in `message`.
@@ -1285,6 +1285,18 @@ cancellation applies to the individual outstanding call. A lost or
 uncorrelated reply after an execution request leaves the outcome uncertain.
 Accepted input cannot switch to a replacement source or retry its call
 through a legacy route.
+
+On private Desktop stdio, peers can additionally negotiate
+`co.grida/session/editor-tool-context` version 1. An eligible Act text Submit
+or Enqueue can include `editorToolContextId` alongside the editor endpoint.
+The host retains the opaque ID with the accepted input. An exact retry keeps
+the same capture and receipt. A retry that changes the ID fails. The catalog
+and invocation requests carry it as `scope.contextId`. Main authorizes that
+reference against the capture's owning attachment, session and endpoint.
+Inherited work receives no live editor-tool context. The local accepted
+user message may carry `editorToolContext: true` in the transcript metadata
+to indicate a capture was attached. The marker contains no capture identity
+or payload. Unsupported peers omit the new fields.
 
 The modern catalog supplies the file inventory, selected SVG operations and
 the exact file presentation operation where granted. New accepted inputs

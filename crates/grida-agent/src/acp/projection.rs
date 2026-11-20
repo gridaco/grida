@@ -227,6 +227,12 @@ impl Projection {
             {
                 text_meta["svgTextSelection"] = json!(true);
             }
+            if message.role == Role::User
+                && turn.is_some()
+                && input_facts.editor_tool_contexts.contains(&message.id)
+            {
+                text_meta["editorToolContext"] = json!(true);
+            }
             if message_context
                 && message.role == Role::User
                 && let Some(parts) = input_facts.display_parts.get(&message.id)

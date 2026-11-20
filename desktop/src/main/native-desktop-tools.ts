@@ -122,6 +122,10 @@ export namespace NativeDesktopTools {
     );
   }
 
+  export function isCall(value: unknown): boolean {
+    return parseRequest(value)?.method === "tools/call";
+  }
+
   export function unverified(id: string): Reply {
     return {
       jsonrpc: "2.0",

@@ -62,6 +62,20 @@ function render(parts: ChatMessage["parts"], controls?: ChatMessageActions) {
   );
 }
 
+it("shows one passive SVG selection marker on the accepted user message", () => {
+  const parts = native_message_parts.of({
+    messageId: "selected",
+    role: "user",
+    text: "Inspect these shapes.",
+    svgTextSelection: true,
+    svgSelection: true,
+  });
+  expect(parts[0]).toEqual({ type: "data-svg-selection", data: true });
+  const html = render(parts);
+  expect(html).toContain("SVG selection");
+  expect(html).not.toContain("SVG text selection");
+});
+
 /** Extract an actual rendered element including nested elements of its tag. */
 function region(html: string, attribute: string): string | null {
   const position = html.indexOf(attribute);

@@ -82,7 +82,7 @@ const NO_COMMANDS: ComposerCatalog["commands"] = [];
 const MAX_DRAFT_BYTES = 512 * 1024;
 const readNoActivity = () => null;
 const subscribeNoActivity = () => () => {};
-const readNoSvgSelection = () => false;
+const readNoSvgSelection = () => undefined;
 const APPROVAL_ACTION = {
   read_file: "Read file",
   list_files: "List folder",
@@ -565,9 +565,9 @@ function NativeChatPane({
     (awaitingProfiles && state.profileReadError) ||
     (selectionRead === "failed" && state.profileError) ||
     null;
-  const svgTextSelected = useSyncExternalStore(
-    controller.subscribeToComposerSvgText,
-    controller.readComposerSvgText,
+  const editorSelection = useSyncExternalStore(
+    controller.subscribeToComposerEditorSelection,
+    controller.readComposerEditorSelection,
     readNoSvgSelection
   );
   const subagentActivity = useSyncExternalStore(
@@ -1301,7 +1301,7 @@ function NativeChatPane({
               (!!state.draftMessageContext.displayParts.length ||
                 !!state.attachmentDraft)
             }
-            selectionContext={svgTextSelected ? "svg-text" : undefined}
+            selectionContext={editorSelection}
             onAttachmentTransfer={transferAttachment}
             awaitSubmission
             canSubmit={

@@ -30,6 +30,7 @@ import { NativeSelectedImages } from "./native-selected-images";
 import {
   NativeEditorSurfaceEndpoints,
   type NativeEditorSurfaceDelivery,
+  type NativeEditorSvgSelectionDelivery,
   type NativeEditorSvgTextDelivery,
 } from "./native-editor-surfaces";
 import type { DesktopBrowserToolLease } from "./desktop-browser-tools";
@@ -220,6 +221,7 @@ export class NativeAgentProcess {
   private editorBrowserTools = false;
   private editorTools = false;
   private editorContext = false;
+  private editorToolContext = false;
   private messageContext = false;
   private initialTitle = false;
   private readonly editorRequests = new Map<string | number, EditorRequest>();
@@ -322,6 +324,10 @@ export class NativeAgentProcess {
 
   get acceptsEditorContext(): boolean {
     return this.connected && this.editorContext;
+  }
+
+  get acceptsEditorToolContext(): boolean {
+    return this.connected && this.editorToolContext;
   }
 
   get acceptsMessageContext(): boolean {
@@ -730,6 +736,7 @@ export class NativeAgentProcess {
                   [NativeEditorSurfaceEndpoints.svgTextCapability]: 1,
                   [NativeEditorSurfaceEndpoints.browserCapability]: 1,
                   [NativeDesktopTools.capability]: 1,
+                  [NativeEditorSurfaceEndpoints.toolContextCapability]: 1,
                 }),
                 [NativeAgentArtifacts.capability]: 1,
                 [NativeAgentBackgroundProcesses.capability]: 1,
@@ -896,6 +903,9 @@ export class NativeAgentProcess {
       processOwner.editorTools =
         processOwner.editorSurfaces &&
         advertised?.[NativeDesktopTools.capability] === 1;
+      processOwner.editorToolContext =
+        processOwner.editorTools &&
+        advertised?.[NativeEditorSurfaceEndpoints.toolContextCapability] === 1;
       processOwner.editorContext =
         options.workspace !== undefined && advertised?.[EDITOR_CONTEXT] === 1;
       processOwner.messageContext =
@@ -988,7 +998,8 @@ export class NativeAgentProcess {
     deliver: NativeEditorSurfaceDelivery | undefined,
     revision?: number,
     svgText?: NativeEditorSvgTextDelivery,
-    browser?: DesktopBrowserToolLease
+    browser?: DesktopBrowserToolLease,
+    svgSelection?: NativeEditorSvgSelectionDelivery
   ) {
     if (this.connected && this.editorSurfaces)
       return this.editorEndpoints.register(
@@ -998,7 +1009,8 @@ export class NativeAgentProcess {
         this.editorSurfaceOpen || this.editorTools ? deliver : undefined,
         revision,
         this.editorSvgText || this.editorTools ? svgText : undefined,
-        this.editorBrowserTools ? browser : undefined
+        this.editorBrowserTools ? browser : undefined,
+        this.editorToolContext ? svgSelection : undefined
       );
   }
 

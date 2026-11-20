@@ -82,7 +82,8 @@ Source-built headless and ACP hosts use the permission profile you supply.
 
 In a Desktop **Act** chat with an attached workbench, describe the operation
 you need. The agent can look up the available Desktop tools for that task,
-such as listing open tabs or reading selected SVG text. The lookup uses
+such as listing open tabs, inspecting selected SVG objects or path points,
+or editing an object's opacity. The lookup uses
 the workbench bound when your message was sent. If it has since been closed
 or replaced, send a new message from the current workbench. Ask the agent to
 show a workspace file or web link and the workbench chooses its viewer. Ask

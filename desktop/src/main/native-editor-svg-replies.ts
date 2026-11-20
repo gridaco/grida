@@ -1,20 +1,26 @@
 // GRIDA-SEC-004 — replies to an already dispatched exact-frame SVG operation.
 import { NativeEditorSvgText } from "@grida/desktop-bridge";
 
-type Pending = Readonly<{
+type Pending<Result> = Readonly<{
   attachmentId: string;
-  reply: PromiseWithResolvers<NativeEditorSvgText.Result>;
+  expiresAtMs: number;
+  reply: PromiseWithResolvers<Result>;
 }>;
 
-export class NativeEditorSvgTextReplies {
-  private readonly pending = new Map<string, Pending>();
+export class NativeEditorSvgReplies<Result> {
+  private readonly pending = new Map<string, Pending<Result>>();
+
+  constructor(
+    private readonly parse: (value: unknown) => Result | undefined,
+    private readonly error: string
+  ) {}
 
   async dispatch(
     attachmentId: string,
-    request: NativeEditorSvgText.Request & { callId: string },
+    request: { callId: string; expiresAtMs: number },
     send: () => void,
     signal?: AbortSignal
-  ): Promise<NativeEditorSvgText.Result> {
+  ): Promise<Result | { kind: "unavailable" }> {
     const remaining = request.expiresAtMs - Date.now();
     if (
       remaining <= 0 ||
@@ -23,9 +29,13 @@ export class NativeEditorSvgTextReplies {
       this.pending.has(request.callId)
     )
       return { kind: "unavailable" };
-    const reply = Promise.withResolvers<NativeEditorSvgText.Result>();
-    this.pending.set(request.callId, { attachmentId, reply });
-    const unverify = () => reply.reject(unverified());
+    const reply = Promise.withResolvers<Result>();
+    this.pending.set(request.callId, {
+      attachmentId,
+      expiresAtMs: request.expiresAtMs,
+      reply,
+    });
+    const unverify = () => reply.reject(new Error(this.error));
     const timer = setTimeout(unverify, remaining);
     signal?.addEventListener("abort", unverify, { once: true });
     try {
@@ -47,13 +57,13 @@ export class NativeEditorSvgTextReplies {
     const pending = NativeEditorSvgText.isId(callId)
       ? this.pending.get(callId)
       : undefined;
-    if (pending?.attachmentId !== attachmentId) throw unverified();
-    const reply = NativeEditorSvgText.result(value);
-    if (reply) pending.reply.resolve(reply);
-    else pending.reply.reject(unverified());
+    if (pending?.attachmentId !== attachmentId) throw new Error(this.error);
+    if (Date.now() >= pending.expiresAtMs) {
+      pending.reply.reject(new Error(this.error));
+      return;
+    }
+    const reply = this.parse(value);
+    if (reply !== undefined) pending.reply.resolve(reply);
+    else pending.reply.reject(new Error(this.error));
   }
-}
-
-function unverified(): Error {
-  return new Error("native_chat_svg_text_unverified");
 }

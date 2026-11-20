@@ -3,6 +3,7 @@ import type {
   NativeEditorSurfaceOpen,
   NativeEditorSurfaceSnapshot,
 } from "./native-editor-surfaces";
+import type { NativeEditorSvgSelection } from "./native-editor-svg-selection";
 import type { NativeEditorSvgText } from "./native-editor-svg-text";
 import type { NativeSubagentClient } from "./native-subagents";
 import type {
@@ -641,6 +642,8 @@ export type NativeChatMessage = Readonly<{
   displayParts?: readonly NativeChatDisplayPart[];
   /** This user message carried a live SVG text binding when accepted. */
   svgTextSelection?: true;
+  /** This user message carried a live SVG selection binding when accepted. */
+  svgSelection?: true;
   /** A host-attributed question reply. The message text is the person's answer. */
   questionReply?: Readonly<{ waitId: string; question: string }>;
 }>;
@@ -1135,6 +1138,12 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     attachmentId: string,
     invoke: (request: NativeEditorSvgText.Request) => NativeEditorSvgText.Result
   ): () => void;
+  onEditorSvgSelection?(
+    attachmentId: string,
+    invoke: (
+      request: NativeEditorSvgSelection.Request
+    ) => NativeEditorSvgSelection.Result
+  ): () => void;
   /** Freeze the current workbench observation. Only its opaque ID leaves Main. */
   captureEditorContext?(): Promise<string | null>;
   submit(
@@ -1156,7 +1165,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     effort?: NativeChatEffort,
     editorSvgTargetId?: string,
     selectionRevision?: number,
-    editorContextId?: string
+    editorContextId?: string,
+    editorToolContextId?: string
   ): Promise<NativeChatAcceptance>;
   submitMessage?(
     attachmentId: string,

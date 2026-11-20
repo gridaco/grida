@@ -1,5 +1,5 @@
 // GRIDA-SEC-004 — editor observations belong to one exact chat attachment.
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   NativeEditorSurfaces,
   NativeEditorSvgText,
@@ -8,18 +8,23 @@ import {
 } from "@grida/desktop-bridge";
 import { DesktopArtifactPresentation } from "./desktop-artifact-presentation";
 import type { DesktopBrowserToolLease } from "./desktop-browser-tools";
+import { DesktopSelectedSvgSelection } from "./desktop-selected-svg-selection";
 import { DesktopSelectedSvgText } from "./desktop-selected-svg-text";
 import { DesktopWorkbenchInventory } from "./desktop-workbench-inventory";
 import { NativeDesktopTools } from "./native-desktop-tools";
 
 const MAX_ENDPOINTS = 32;
 const MAX_PRESENTATION_CALLS = 64;
+const MAX_EDITOR_TOOL_CONTEXTS = 1024;
 const PRESENTATION_WINDOW_MS = 2000;
 const SESSION_ID = /^[A-Za-z0-9_.:@/-]{1,256}$/;
 const ENDPOINT_ID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
 
 export type NativeEditorSurfaceLease = Readonly<{
-  selection(editorSvgTargetId?: string): NativeEditorSurfaceSelection;
+  selection(
+    editorSvgTargetId?: string,
+    context?: { targetId: string; inputId: string }
+  ): NativeEditorSurfaceSelection;
   update(snapshot: NativeEditorSurfaceSnapshot, revision?: number): void;
   close(): void;
 }>;
@@ -28,6 +33,7 @@ export type NativeEditorSurfaceSelection = Readonly<{
   editorEndpointId: string;
   editorPresentation?: true;
   editorSvgTargetId?: string;
+  editorToolContextId?: string;
   editorBrowserTools?: true;
 }>;
 
@@ -35,6 +41,8 @@ export type NativeEditorSurfaceDelivery = (
   request: NativeEditorSurfaceOpen
 ) => void;
 export type NativeEditorSvgTextDelivery = DesktopSelectedSvgText.Delivery;
+export type NativeEditorSvgSelectionDelivery =
+  DesktopSelectedSvgSelection.Delivery;
 
 type Endpoint = {
   sessionId: string;
@@ -43,6 +51,7 @@ type Endpoint = {
   revision?: number;
   deliver?: NativeEditorSurfaceDelivery;
   svgText?: NativeEditorSvgTextDelivery;
+  svgSelection?: NativeEditorSvgSelectionDelivery;
   browser?: DesktopBrowserToolLease;
   lifetime: AbortController;
   calls: Map<string, { path: string; requested: boolean }>;
@@ -68,10 +77,17 @@ export class NativeEditorSurfaceEndpoints {
   static readonly openMethod = "_co.grida/editor/surface-open";
   static readonly svgTextCapability = "co.grida/session/editor-svg-text";
   static readonly svgTextMethod = "_co.grida/editor/svg-selected-text";
+  static readonly toolContextCapability =
+    "co.grida/session/editor-tool-context";
   static readonly browserCapability = "co.grida/session/browser-tools";
   static readonly browserMethod = "_co.grida/editor/browser-tool";
 
   private readonly endpoints = new Map<string, Endpoint>();
+  private readonly contexts = new Map<
+    string,
+    { endpointId: string; targetId: string; path: string | null }
+  >();
+  private readonly targetContexts = new Map<string, string>();
 
   register(
     sessionId: string,
@@ -80,7 +96,8 @@ export class NativeEditorSurfaceEndpoints {
     deliver?: NativeEditorSurfaceDelivery,
     revision?: number,
     svgText?: NativeEditorSvgTextDelivery,
-    browser?: DesktopBrowserToolLease
+    browser?: DesktopBrowserToolLease,
+    svgSelection?: NativeEditorSvgSelectionDelivery
   ): NativeEditorSurfaceLease {
     requireCurrent();
     if (this.endpoints.size >= MAX_ENDPOINTS)
@@ -93,27 +110,41 @@ export class NativeEditorSurfaceEndpoints {
       revision,
       deliver,
       svgText,
+      svgSelection,
       browser,
       lifetime: new AbortController(),
       calls: new Map(),
     };
     this.endpoints.set(id, endpoint);
     return Object.freeze({
-      selection: (editorSvgTargetId?: string) => ({
-        editorEndpointId: id,
-        ...(this.endpoints.get(id) === endpoint &&
-          endpoint.deliver &&
-          endpoint.revision !== undefined && {
-            editorPresentation: true as const,
-          }),
-        ...(editorSvgTargetId &&
-          this.endpoints.get(id) === endpoint &&
-          endpoint.svgText && { editorSvgTargetId }),
-        ...(this.endpoints.get(id) === endpoint &&
-          endpoint.browser?.ready() && {
-            editorBrowserTools: true as const,
-          }),
-      }),
+      selection: (
+        editorSvgTargetId?: string,
+        context?: { targetId: string; inputId: string }
+      ) => {
+        const current = this.endpoints.get(id) === endpoint;
+        const contextId =
+          context && endpoint.svgSelection
+            ? this.bindContext(sessionId, id, context)
+            : undefined;
+        return {
+          editorEndpointId: id,
+          ...(current &&
+            endpoint.deliver &&
+            endpoint.revision !== undefined && {
+              editorPresentation: true as const,
+            }),
+          ...(editorSvgTargetId &&
+            current &&
+            endpoint.svgText && {
+              editorSvgTargetId,
+            }),
+          ...(contextId && { editorToolContextId: contextId }),
+          ...(current &&
+            endpoint.browser?.ready() && {
+              editorBrowserTools: true as const,
+            }),
+        };
+      },
       update: (next: NativeEditorSurfaceSnapshot, revision?: number) => {
         if (this.endpoints.get(id) !== endpoint) return;
         requireCurrent();
@@ -130,6 +161,56 @@ export class NativeEditorSurfaceEndpoints {
         this.release(id);
       },
     });
+  }
+
+  private bindContext(
+    sessionId: string,
+    endpointId: string,
+    { targetId, inputId }: { targetId: string; inputId: string }
+  ): string {
+    // Keep retry identity stable across native process replacement. Only an
+    // admitted endpoint has the mapping back to the editable renderer target.
+    const contextId = createHash("sha256")
+      .update(
+        JSON.stringify([
+          "desktop-editor-tool-context",
+          sessionId,
+          inputId,
+          targetId,
+        ])
+      )
+      .digest("hex")
+      .slice(0, 32)
+      .replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
+    const captured = this.targetContexts.get(targetId);
+    if (captured && captured !== contextId)
+      throw new Error("native_chat_editor_tool_context_unavailable");
+    const previous = this.contexts.get(contextId);
+    if (previous) {
+      if (
+        previous.endpointId !== endpointId &&
+        this.endpoints.has(previous.endpointId)
+      )
+        throw new Error("native_chat_editor_tool_context_unavailable");
+      // Keep the original binder even when its endpoint was retired.
+      return contextId;
+    }
+    const endpoint = this.current(sessionId, endpointId);
+    if (!endpoint) return contextId;
+    if (this.contexts.size >= MAX_EDITOR_TOOL_CONTEXTS) {
+      const oldest = this.contexts.entries().next().value;
+      if (oldest) {
+        this.contexts.delete(oldest[0]);
+        this.targetContexts.delete(oldest[1].targetId);
+      }
+    }
+    this.contexts.set(contextId, {
+      endpointId,
+      targetId,
+      path: endpoint.snapshot.active,
+    });
+    this.targetContexts.set(targetId, contextId);
+    return contextId;
   }
 
   browserBusy(value: unknown): NativeEditorBrowserReply | null {
@@ -340,6 +421,35 @@ export class NativeEditorSurfaceEndpoints {
       tools.push(
         ...DesktopSelectedSvgText.bind(scope.svgTargetId, endpoint.svgText)
       );
+    const svgSelection = endpoint?.svgSelection;
+    if (endpoint && svgSelection && tools && scope?.contextId) {
+      const context = this.contexts.get(scope.contextId);
+      if (context?.endpointId === endpointId)
+        tools.push(
+          ...DesktopSelectedSvgSelection.bind(
+            context.targetId,
+            async (request, signal) => {
+              if (
+                context.path === null ||
+                endpoint.snapshot.active !== context.path
+              )
+                return { kind: "stale" };
+              const result = await svgSelection(request, signal);
+              if ("path" in result && result.path !== context.path)
+                throw new Error("native_chat_svg_selection_unverified");
+              return result;
+            }
+          )
+        );
+      else if (NativeDesktopTools.isCall(message))
+        // A retained catalog may call after its live capture was retired.
+        // Deny it through the domain result and keep it out of discovery.
+        tools.push(
+          ...DesktopSelectedSvgSelection.bind(scope.contextId, async () => ({
+            kind: "stale",
+          }))
+        );
+    }
     const reply = await NativeDesktopTools.reply(message, tools, {
       signal: AbortSignal.any(
         endpoint
@@ -396,10 +506,15 @@ export class NativeEditorSurfaceEndpoints {
         typeof scoped !== "object" ||
         Array.isArray(scoped) ||
         !Object.keys(scoped).every(
-          (key) => key === "svgTargetId" || key === "presentation"
+          (key) =>
+            key === "svgTargetId" ||
+            key === "presentation" ||
+            key === "contextId"
         ) ||
         (Object.hasOwn(scoped, "svgTargetId") &&
           !NativeEditorSvgText.isId(scoped.svgTargetId)) ||
+        (Object.hasOwn(scoped, "contextId") &&
+          !NativeEditorSvgText.isId(scoped.contextId)) ||
         (Object.hasOwn(scoped, "presentation") && scoped.presentation !== true))
     )
       return null;
@@ -410,7 +525,11 @@ export class NativeEditorSurfaceEndpoints {
       timeoutMs,
       expiresAtMs,
       scope: scoped as
-        | Readonly<{ svgTargetId?: string; presentation?: true }>
+        | Readonly<{
+            svgTargetId?: string;
+            presentation?: true;
+            contextId?: string;
+          }>
         | undefined,
     };
   }
@@ -496,5 +615,7 @@ export class NativeEditorSurfaceEndpoints {
 
   close(): void {
     for (const id of this.endpoints.keys()) this.release(id);
+    this.contexts.clear();
+    this.targetContexts.clear();
   }
 }

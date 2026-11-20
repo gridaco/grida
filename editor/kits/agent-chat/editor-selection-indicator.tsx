@@ -1,4 +1,4 @@
-import { ScanTextIcon } from "lucide-react";
+import { ScanIcon, ScanTextIcon } from "lucide-react";
 import { cn } from "@app/ui/lib/utils";
 
 /** An editor context label shared by a draft and its sent message. */
@@ -6,9 +6,10 @@ export function EditorSelectionIndicator({
   kind,
   className,
 }: {
-  kind: "svg-text";
+  kind: keyof typeof LABELS;
   className?: string;
 }) {
+  const Icon = kind === "svg-text" ? ScanTextIcon : ScanIcon;
   return (
     <span
       className={cn(
@@ -16,7 +17,7 @@ export function EditorSelectionIndicator({
         className
       )}
     >
-      <ScanTextIcon aria-hidden="true" className="size-3.5 shrink-0" />
+      <Icon aria-hidden="true" className="size-3.5 shrink-0" />
       <span className="truncate">{LABELS[kind]}</span>
     </span>
   );
@@ -24,4 +25,5 @@ export function EditorSelectionIndicator({
 
 const LABELS = {
   "svg-text": "SVG text selection",
+  "svg-selection": "SVG selection",
 } as const;

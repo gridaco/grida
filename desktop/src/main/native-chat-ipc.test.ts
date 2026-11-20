@@ -3360,7 +3360,8 @@ describe("native chat IPC", () => {
         (key.startsWith("NATIVE_CHAT_") || key.startsWith("WELCOME_CHAT_")) &&
         key !== "NATIVE_CHAT_UPDATE" &&
         key !== "NATIVE_CHAT_EDITOR_SURFACE_OPEN" &&
-        key !== "NATIVE_CHAT_EDITOR_SVG_TEXT"
+        key !== "NATIVE_CHAT_EDITOR_SVG_TEXT" &&
+        key !== "NATIVE_CHAT_EDITOR_SVG_SELECTION"
     )) {
       expect(handlers).toMatch(
         new RegExp(`guarded\\(\\s*IPC_CHANNELS\\.${key}\\b`)
@@ -4201,6 +4202,83 @@ describe("saved selection IPC", () => {
     expect(read).not.toHaveBeenCalled();
     expect(submit).not.toHaveBeenCalled();
   });
+
+  it("lets the native host verify a routed retry when its capture or regime changed", async () => {
+    const selections = owner();
+    const f = setup(undefined, undefined, undefined, undefined, selections);
+    Object.defineProperty(f.chat, "acceptsEditorToolContext", { value: true });
+    const attachment = await f.ipc.create(f.first.event);
+    const accepted = {
+      sessionId: attachment.sessionId,
+      inputId: "original",
+      disposition: "completed" as const,
+      inputPosition: 1,
+      turnId: "old-turn",
+    };
+    f.chat.inputReceipt = vi.fn<typeof f.chat.inputReceipt>(
+      async () => accepted
+    );
+    const submit = vi
+      .spyOn(f.chat, "submit")
+      .mockRejectedValueOnce(
+        new Error("submission_editor_tool_context_changed")
+      )
+      .mockRejectedValueOnce(new Error("submission_operating_regime_changed"))
+      .mockRejectedValueOnce(
+        new Error("submission_editor_tool_context_changed")
+      )
+      .mockRejectedValueOnce(new Error("submission_browser_tools_changed"));
+    const retry = (mode: "act" | "plan" | undefined) =>
+      f.ipc.submit(
+        f.first.event,
+        attachment.attachmentId,
+        "original",
+        "Hello",
+        mode,
+        "high",
+        undefined,
+        1
+      );
+    await expect(retry("act")).rejects.toThrow(
+      "submission_editor_tool_context_changed"
+    );
+    await expect(retry("plan")).rejects.toThrow(
+      "submission_operating_regime_changed"
+    );
+    await expect(retry(undefined)).rejects.toThrow(
+      "submission_editor_tool_context_changed"
+    );
+    await expect(retry("act")).resolves.toEqual(accepted);
+    expect(submit).toHaveBeenCalledTimes(4);
+    expect(selections.read).not.toHaveBeenCalled();
+  });
+
+  it.each(["submit", "enqueue"] as const)(
+    "does not %s a captured SVG input after the frame navigates during admission",
+    async (action) => {
+      const { ipc, chat, first } = setup();
+      Object.defineProperty(chat, "acceptsEditorToolContext", { value: true });
+      const attachment = await ipc.create(first.event);
+      const send = vi.spyOn(chat, action);
+      const pending = ipc[action](
+        first.event,
+        attachment.attachmentId,
+        "input",
+        "Adjust opacity",
+        "act",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        randomUUID()
+      );
+      first.contents.emit("did-start-navigation", { isMainFrame: true });
+      await expect(pending).rejects.toThrow(
+        "native_chat_attachment_unavailable"
+      );
+      expect(send).not.toHaveBeenCalled();
+    }
+  );
 
   it.each([false, true])(
     "forwards a validated fresh selection revision (per-input routes: %s)",

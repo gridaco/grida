@@ -5,6 +5,7 @@ use super::*;
 use base64::{Engine, engine::general_purpose::STANDARD};
 
 const CAPABILITY: &str = "co.grida/session/desktop-tools";
+const TOOL_CONTEXT: &str = "co.grida/session/editor-tool-context";
 const METHOD: &str = "_co.grida/editor/desktop-tools";
 const LEGACY_READ: &str = "_co.grida/editor/surface-list-open";
 const BROWSER: &str = "co.grida/session/browser-tools";
@@ -16,6 +17,8 @@ const SHOW: &str = "workbench_show";
 const CLOSE_BROWSER_TAB: &str = "workbench_close_browser_tab";
 const SVG_TARGET: &str = "8207d29d-23ba-4ac8-9825-abf4e2ba7e04";
 const SVG_REPLACE: &str = "svg_replace_selected_text";
+const SELECTION_CONTEXT: &str = "af787f84-9ccf-4744-90ee-13231e26ff1b";
+const SVG_INSPECT: &str = "svg_inspect_selection";
 const DATA: &str = "/poster.svg";
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -27,9 +30,21 @@ enum Peer {
     Presentation,
     Svg,
     SvgLost,
+    Selection,
+    SelectionStale,
+    SelectionUnavailable,
     Browser,
     BrowserClose,
     BrowserSvg,
+}
+
+impl Peer {
+    fn has_selection(self) -> bool {
+        matches!(
+            self,
+            Self::Selection | Self::SelectionStale | Self::SelectionUnavailable
+        )
+    }
 }
 
 #[tokio::test]
@@ -65,6 +80,21 @@ async fn private_svg_edit_preserves_its_captured_target_and_unsaved_result() {
 #[tokio::test]
 async fn private_svg_edit_with_lost_reply_stays_uncertain_without_repeating() {
     check(Peer::SvgLost, "submit").await;
+}
+
+#[tokio::test]
+async fn a_captured_editor_selection_discovers_its_tool_through_the_generic_catalog() {
+    check(Peer::Selection, "submit").await;
+}
+
+#[tokio::test]
+async fn a_queued_editor_selection_keeps_its_stale_target() {
+    check(Peer::SelectionStale, "enqueue").await;
+}
+
+#[tokio::test]
+async fn missing_editor_selection_does_not_hide_the_workbench_inventory() {
+    check(Peer::SelectionUnavailable, "enqueue").await;
 }
 
 #[tokio::test]
@@ -288,6 +318,9 @@ async fn start(state: &TempDir, workspace: &TempDir, peer: Peer) -> (StdioClient
     if peer != Peer::Legacy {
         initialize["clientCapabilities"]["_meta"][CAPABILITY] = 1.into();
     }
+    if peer.has_selection() || peer == Peer::Legacy {
+        initialize["clientCapabilities"]["_meta"][TOOL_CONTEXT] = 1.into();
+    }
     let presentation = peer == Peer::Presentation;
     let svg = matches!(peer, Peer::Svg | Peer::SvgLost | Peer::BrowserSvg);
     let browser = matches!(peer, Peer::Browser | Peer::BrowserClose | Peer::BrowserSvg);
@@ -310,6 +343,10 @@ async fn start(state: &TempDir, workspace: &TempDir, peer: Peer) -> (StdioClient
     assert_eq!(
         capabilities[CAPABILITY].as_u64(),
         (peer != Peer::Legacy).then_some(1)
+    );
+    assert_eq!(
+        capabilities[TOOL_CONTEXT].as_u64(),
+        peer.has_selection().then_some(1)
     );
     let created = client
         .request(
@@ -344,6 +381,16 @@ async fn check(peer: Peer, admission: &str) {
     if browser {
         prompt["editorBrowserTools"] = true.into();
     }
+    if peer.has_selection() {
+        prompt["editorToolContextId"] = SELECTION_CONTEXT.into();
+    } else if matches!(peer, Peer::Desktop | Peer::Legacy) {
+        let mut unnegotiated = prompt.clone();
+        unnegotiated["editorToolContextId"] = SELECTION_CONTEXT.into();
+        let rejected = client
+            .request("_co.grida/session/submit", unnegotiated)
+            .await;
+        assert_eq!(rejected["error"]["code"], -32601, "{rejected}");
+    }
     let request = client
         .send(&format!("_co.grida/session/{admission}"), prompt)
         .await;
@@ -368,6 +415,18 @@ async fn check(peer: Peer, admission: &str) {
             r#"{"revision":"8207d29d-23ba-4ac8-9825-abf4e2ba7e04","text":"Revised title"}"#,
             json!({"svgTargetId":SVG_TARGET}),
             json!({"kind":"applied","path":DATA,"saved":false}),
+        ),
+        Peer::Selection | Peer::SelectionStale => (
+            SVG_INSPECT,
+            "{}",
+            json!({"contextId":SELECTION_CONTEXT}),
+            json!({"path":DATA,"entries":[{"kind":"element","path":[0]}]}),
+        ),
+        Peer::SelectionUnavailable => (
+            TOOL,
+            "{}",
+            json!({"contextId":SELECTION_CONTEXT}),
+            json!({"interactive": true, "active": DATA, "open": [DATA], "truncated": false}),
         ),
         Peer::Browser => (
             "surface_open",
@@ -404,7 +463,7 @@ async fn check(peer: Peer, admission: &str) {
             r#"{"query":"workbench_close_browser_tab","source":"workbench"}"#,
             r#"{"tabId":"fixture-tab"}"#,
         ),
-        Peer::Desktop | Peer::Reloaded | Peer::Unavailable => {
+        Peer::Desktop | Peer::Reloaded | Peer::Unavailable | Peer::SelectionUnavailable => {
             (TABS, r#"{"query":"workbench_list_tabs"}"#, wire_args)
         }
         Peer::Svg | Peer::SvgLost | Peer::BrowserSvg => (
@@ -412,6 +471,9 @@ async fn check(peer: Peer, admission: &str) {
             r#"{"query":"svg_replace_selected_text"}"#,
             wire_args,
         ),
+        Peer::Selection | Peer::SelectionStale => {
+            (wire_name, r#"{"query":"svg_inspect_selection"}"#, wire_args)
+        }
         Peer::Legacy => (wire_name, "{}", wire_args),
     };
     while !accepted || !completed {
@@ -482,11 +544,18 @@ async fn check(peer: Peer, admission: &str) {
                         );
                         assert_eq!(
                             message["params"]["_meta"]["co.grida/definitionRevision"],
-                            if svg { 1 } else { 2 }
+                            if svg || wire_name == SVG_INSPECT {
+                                1
+                            } else {
+                                2
+                            }
                         );
                         calls += 1;
                         match peer {
                             Peer::Reloaded => unavailable(id),
+                            Peer::SelectionStale => json!({"jsonrpc":"2.0","id":id,"result":{
+                                "resultType":"complete","isError":true,"content":[{"type":"text","text":"svg_selection_stale"}]
+                            }}),
                             Peer::Presentation | Peer::SvgLost => {
                                 completed = peer == Peer::SvgLost;
                                 json!({"jsonrpc":"2.0","id":"unverified","result":{"resultType":"complete","isError":false,"content":[]}})
@@ -542,6 +611,13 @@ async fn check(peer: Peer, admission: &str) {
                     Some("open") => {
                         let body = provider_body(params);
                         let tool = |name| offered_tool(&body, name);
+                        if peer.has_selection() {
+                            assert!(!body.to_string().contains(SELECTION_CONTEXT));
+                            assert!(tool(SVG_REPLACE).is_none());
+                        }
+                        if peer == Peer::SelectionUnavailable {
+                            assert!(tool(SVG_INSPECT).is_none());
+                        }
                         let reply = if peer == Peer::Unavailable {
                             assert!(
                                 tool(name).is_none() && tool(wire_name).is_none(),
@@ -587,6 +663,8 @@ async fn check(peer: Peer, admission: &str) {
                                 Peer::Desktop
                                 | Peer::Legacy
                                 | Peer::Svg
+                                | Peer::Selection
+                                | Peer::SelectionUnavailable
                                 | Peer::Browser
                                 | Peer::BrowserClose
                                 | Peer::BrowserSvg => {
@@ -600,6 +678,10 @@ async fn check(peer: Peer, admission: &str) {
                                             .to_string()
                                             .contains("editor_surface_endpoint_unavailable")
                                     );
+                                }
+                                Peer::SelectionStale => {
+                                    assert_eq!(outcome["status"], "failed");
+                                    assert!(outcome.to_string().contains("svg_selection_stale"));
                                 }
                                 Peer::Presentation => assert_eq!(outcome["status"], "uncertain"),
                                 Peer::Unavailable | Peer::SvgLost => unreachable!(),
@@ -701,13 +783,18 @@ fn descriptor(name: &str) -> Value {
             json!({"type":"object","properties":{"revision":{"type":"string","maxLength":36},"text":{"type":"string","maxLength":4096}},"required":["revision","text"],"additionalProperties":false}),
             1,
         ),
+        SVG_INSPECT => (
+            "Inspect the exact captured SVG selection.",
+            json!({"type":"object","additionalProperties":false}),
+            1,
+        ),
         _ => (
             "Read open files in the admitted workbench.",
             json!({"type":"object","additionalProperties":false}),
             2,
         ),
     };
-    json!({"name":name,"description":description,"inputSchema":input,"outputSchema":{"type":"object"},"annotations":{"readOnlyHint":name==TOOL},"_meta":{"co.grida/definitionRevision":revision}})
+    json!({"name":name,"description":description,"inputSchema":input,"outputSchema":{"type":"object"},"annotations":{"readOnlyHint":matches!(name, TOOL | SVG_INSPECT)},"_meta":{"co.grida/definitionRevision":revision}})
 }
 
 fn unavailable(id: &Value) -> Value {

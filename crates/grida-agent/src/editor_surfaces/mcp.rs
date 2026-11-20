@@ -26,6 +26,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
 pub(crate) const CAPABILITY: &str = "co.grida/session/desktop-tools";
+pub(crate) const TOOL_CONTEXT_CAPABILITY: &str = "co.grida/session/editor-tool-context";
 const REVISION: &str = "co.grida/definitionRevision";
 const TRUNCATED: &str = "co.grida/truncated";
 const MAX_TOOLS: usize = 16;
@@ -40,11 +41,13 @@ pub(crate) struct Scope {
     pub(crate) presentation: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) svg_target_id: Option<BindingId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) context_id: Option<BindingId>,
 }
 
 impl Scope {
     fn is_empty(&self) -> bool {
-        !self.presentation && self.svg_target_id.is_none()
+        !self.presentation && self.svg_target_id.is_none() && self.context_id.is_none()
     }
 }
 
@@ -554,7 +557,7 @@ mod tests {
             definitions: vec![list.clone(), show.clone()],
             scope: Scope {
                 presentation: true,
-                svg_target_id: None,
+                ..Scope::default()
             },
         };
         let captured = serde_json::to_value(&catalog).unwrap();

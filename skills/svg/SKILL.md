@@ -1,6 +1,6 @@
 ---
 name: svg
-description: Author and edit `.svg` files in a Grida editor session — live-canvas binding, SVG output style, and parse-error recovery. Use when creating or modifying an SVG document.
+description: Author and edit `.svg` files in a Grida editor session. Inspect an attached SVG selection and apply supported editor edits. Use when creating or modifying an SVG document.
 ---
 
 When you operate on `.svg` files inside a Grida editor session:
@@ -11,6 +11,18 @@ When you operate on `.svg` files inside a Grida editor session:
   scratch work — they persist across turns but do NOT render on the canvas.
 - On `edit_file` reason="parse_error", your output broke the SVG. Re-read and
   fix.
+
+## Work with the user's selection
+
+- When the user refers to their SVG selection, use `tool_search` to find
+  `svg_inspect_selection`. Its paths and point ordinals describe the captured
+  live editor revision. Follow `nextCursor` when the full selection matters.
+- For an object selection, pass the inspected revision to
+  `svg_set_selection_opacity` with a value from 0 to 1. The editor applies one
+  undoable change. Tell the user when the result still needs to be saved.
+- When the live tools offer text read and replace, use the revision returned by
+  `svg_read_selected_text`. If a tool reports a stale selection, ask the user
+  to select the targets again and send a new message.
 
 ## Show the result
 

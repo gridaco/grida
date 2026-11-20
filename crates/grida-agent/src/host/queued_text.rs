@@ -18,6 +18,12 @@ fn replacement(original: &Submission, id: ChangeId, text: String) -> Result<Subm
         return Err(problem(ErrorKind::Conflict, "queued_text_not_editable"));
     }
     let prompt = decode_input::<StoredPrompt>(original)?;
+    if prompt.editor_tool_context_id.is_some() && text.trim().is_empty() {
+        return Err(problem(
+            ErrorKind::Unsupported,
+            "editor_tool_context_requires_attached_act_text",
+        ));
+    }
     let mut inserted = false;
     let mut parts = Vec::with_capacity(prompt.parts.len() + 1);
     for part in prompt.parts {
