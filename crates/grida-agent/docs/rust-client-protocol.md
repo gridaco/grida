@@ -1300,6 +1300,30 @@ with a longest edge of at most 1,024 pixels. Browser call results carry
 Revocation and cancellation discard late replies. If the host cannot verify a
 dispatched effect, the result remains uncertain.
 
+Peers can negotiate `co.grida/session/desktop-tool-sources` version 1 to
+capture independent source registrations over the same carrier. These requests
+set `scope.sources: true`. Every listed definition carries
+`_meta["co.grida/source"]` with an `id`, a Main-issued `generation`, and a
+task-oriented `description` of up to 160 UTF-8 bytes. A call echoes that
+source's `id` and `generation` in the same metadata field along with the
+captured definition revision. Main assigns distinct private tool names when sources contribute
+operations with the same local name. Existing built-in model-facing names
+remain stable. Replacing a source assigns a new generation even when it lists
+the same definitions. Calls on the retired generation fail before invocation.
+A separate source on the same endpoint can continue to serve its grants.
+
+The source-qualified catalog uses the 24-definition and 48 KiB ceilings.
+Main admits source groups to the list in registration order, skipping any
+group that cannot fit. A source that retires while the response is queued
+is removed without discarding the other listed sources.
+The input and result size overrides and optional JPEG result type apply to
+qualified definitions under the same per-tool limits. A definition with
+`_meta["co.grida/resultDisposition"]: true` requires a matching disposition
+in the result metadata and structured content. Source descriptions and these
+result declarations convey no execution authority. Retained catalogs keep
+their chosen dialect. A peer without source negotiation continues to serve
+the earlier catalog and call format.
+
 On private Desktop stdio, peers can additionally negotiate
 `co.grida/session/editor-tool-context` version 1. An eligible Act text Submit
 or Enqueue can include `editorToolContextId` alongside the editor endpoint.

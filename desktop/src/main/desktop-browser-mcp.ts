@@ -7,8 +7,6 @@ import { NativeDesktopTools } from "./native-desktop-tools";
 
 /** Browser and browser-aware Workbench definitions for the private carrier. */
 export namespace DesktopBrowserMcp {
-  const MAX_INPUT_BYTES = 40 * 1024;
-  const MAX_OUTPUT_BYTES = 448 * 1024;
   const MAX_BASE64_BYTES = Math.ceil((256 * 1024) / 3) * 4;
   const WORKBENCH_SHOW = "workbench_show";
   const CLOSE_TAB = "workbench_close_browser_tab";
@@ -21,7 +19,10 @@ export namespace DesktopBrowserMcp {
     "definition" | "revision" | "transfer"
   > & {
     operation: string;
+    source: Source;
   };
+
+  export type Source = "browser" | "workbench";
 
   const definitions = catalog.flatMap(definitionsFor);
   const names = new Set(definitions.map(({ definition }) => definition.name));
@@ -32,16 +33,20 @@ export namespace DesktopBrowserMcp {
 
   export function bind(
     lease: DesktopBrowserToolLease | undefined,
-    presentation: boolean
+    presentation: boolean,
+    source?: Source
   ): NativeDesktopTools.Tool[] {
     return definitions
       .filter(
-        ({ definition }) => presentation || definition.name !== WORKBENCH_SHOW
+        (entry) =>
+          (source === undefined || entry.source === source) &&
+          (presentation || entry.definition.name !== WORKBENCH_SHOW)
       )
       .map(({ definition, revision, transfer, operation }) => ({
         definition,
         revision,
         transfer,
+        resultDisposition: true,
         async invoke(args, call) {
           if (!lease?.ready()) return project(refused("owner_revoked"));
           if (call.signal.aborted || Date.now() >= call.expiresAtMs)
@@ -112,7 +117,7 @@ export namespace DesktopBrowserMcp {
   function definitionsFor(descriptor: Descriptor): Definition[] {
     const { name, description, inputSchema, outputSchema, effect, version } =
       descriptor;
-    const original = {
+    const original: Definition = {
       definition: {
         name,
         description,
@@ -122,9 +127,10 @@ export namespace DesktopBrowserMcp {
       },
       revision: version,
       operation: name,
+      source: "browser",
       transfer: {
-        maxInputBytes: MAX_INPUT_BYTES,
-        maxOutputBytes: MAX_OUTPUT_BYTES,
+        maxInputBytes: NativeDesktopTools.maxInputBytes,
+        maxOutputBytes: NativeDesktopTools.maxOutputBytes,
         ...(name === "browser_capture" && {
           resultMimeType: "image/jpeg" as const,
         }),
@@ -134,6 +140,7 @@ export namespace DesktopBrowserMcp {
       return [
         {
           ...original,
+          source: "workbench",
           definition: { ...original.definition, name: "workbench_list_tabs" },
         },
       ];
@@ -141,6 +148,7 @@ export namespace DesktopBrowserMcp {
       return [
         {
           ...original,
+          source: "workbench",
           definition: {
             ...original.definition,
             name: WORKBENCH_SHOW,
@@ -175,6 +183,7 @@ export namespace DesktopBrowserMcp {
       {
         ...original,
         revision: 1,
+        source: "workbench",
         definition: {
           ...original.definition,
           name: CLOSE_TAB,

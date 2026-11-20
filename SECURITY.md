@@ -1268,6 +1268,11 @@ pixels through this reader, with no additional filesystem or model grant.
   each request with this endpoint and limits discovery and calls to its
   accepted tool scope. It checks the tool definition revision and preserves
   the original request deadline through dispatch.
+  The [source registry](desktop/src/main/native-desktop-tool-sources.ts)
+  keeps a distinct Main-issued generation and lifetime for each registered
+  source on the endpoint. The carrier checks the captured registration before
+  dispatch and discards a late result if that registration retires. Copying a
+  tool name and revision cannot redirect a call to a different registration.
   Native workbench and browser grants distinguish visible tab closure from
   background page cleanup. Both operations retain the exact bound page and
   workbench validation at the Main receiver.

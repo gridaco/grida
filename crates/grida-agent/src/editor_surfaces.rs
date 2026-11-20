@@ -40,6 +40,7 @@ struct EditorConnectionState {
     connection: Option<DesktopConnection>,
     tool_source: Option<BindingId>,
     browser_mcp: bool,
+    tool_sources: bool,
 }
 
 struct DesktopConnection {
@@ -48,6 +49,15 @@ struct DesktopConnection {
     svg_text: bool,
     browser: bool,
     tools: Option<mcp::Source>,
+}
+
+pub(crate) struct DesktopCapabilities {
+    pub(crate) presentation: bool,
+    pub(crate) svg_text: bool,
+    pub(crate) browser: bool,
+    pub(crate) tools: bool,
+    pub(crate) browser_mcp: bool,
+    pub(crate) tool_sources: bool,
 }
 
 pub(crate) struct LegacyToolScope {
@@ -62,13 +72,10 @@ impl EditorSurfaces {
     pub(crate) fn attach(
         &self,
         client: ConnectionTo<Client>,
-        presentation: bool,
-        svg_text: bool,
-        browser: bool,
-        desktop_tools: bool,
-        browser_mcp: bool,
+        capabilities: DesktopCapabilities,
     ) -> Result<()> {
-        let tools = desktop_tools
+        let tools = capabilities
+            .tools
             .then(|| mcp::Source::new(client.clone()))
             .transpose()?;
         let mut state = self.state.lock().unwrap();
@@ -80,12 +87,13 @@ impl EditorSurfaces {
             tools.close();
         }
         state.tool_source = tools.as_ref().map(|source| source.id().clone());
-        state.browser_mcp = browser_mcp;
+        state.browser_mcp = capabilities.browser_mcp;
+        state.tool_sources = capabilities.tool_sources;
         state.connection = Some(DesktopConnection {
             client,
-            presentation,
-            svg_text,
-            browser,
+            presentation: capabilities.presentation,
+            svg_text: capabilities.svg_text,
+            browser: capabilities.browser,
             tools,
         });
         Ok(())
@@ -119,6 +127,10 @@ impl EditorSurfaces {
 
     pub(crate) fn browser_mcp_negotiated(&self) -> bool {
         self.state.lock().unwrap().browser_mcp
+    }
+
+    pub(crate) fn tool_sources_negotiated(&self) -> bool {
+        self.state.lock().unwrap().tool_sources
     }
 
     pub(crate) async fn discover_tools(

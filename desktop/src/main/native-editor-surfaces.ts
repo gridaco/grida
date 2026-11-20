@@ -12,6 +12,10 @@ import type { DesktopBrowserToolLease } from "./desktop-browser-tools";
 import { DesktopSelectedSvgSelection } from "./desktop-selected-svg-selection";
 import { DesktopSelectedSvgText } from "./desktop-selected-svg-text";
 import { DesktopWorkbenchInventory } from "./desktop-workbench-inventory";
+import {
+  NativeDesktopToolSources,
+  type DesktopToolSource,
+} from "./native-desktop-tool-sources";
 import { NativeDesktopTools } from "./native-desktop-tools";
 
 const MAX_ENDPOINTS = 32;
@@ -27,6 +31,7 @@ export type NativeEditorSurfaceLease = Readonly<{
     context?: { targetId: string; inputId: string }
   ): NativeEditorSurfaceSelection;
   update(snapshot: NativeEditorSurfaceSnapshot, revision?: number): void;
+  registerToolSource(source: DesktopToolSource): { close(): void };
   close(): void;
 }>;
 
@@ -45,6 +50,16 @@ export type NativeEditorSvgTextDelivery = DesktopSelectedSvgText.Delivery;
 export type NativeEditorSvgSelectionDelivery =
   DesktopSelectedSvgSelection.Delivery;
 
+type ToolScope = Readonly<{
+  svgTargetId?: string;
+  presentation?: true;
+  contextId?: string;
+  browser?: true;
+  sources?: true;
+}>;
+
+type ScopedTools = Readonly<{ scope?: ToolScope; call: boolean }>;
+
 type Endpoint = {
   sessionId: string;
   snapshot: NativeEditorSurfaceSnapshot;
@@ -55,6 +70,7 @@ type Endpoint = {
   svgSelection?: NativeEditorSvgSelectionDelivery;
   browser?: DesktopBrowserToolLease;
   lifetime: AbortController;
+  sources: NativeDesktopToolSources<ScopedTools>;
   calls: Map<string, { path: string; requested: boolean }>;
 };
 
@@ -114,8 +130,19 @@ export class NativeEditorSurfaceEndpoints {
       svgSelection,
       browser,
       lifetime: new AbortController(),
+      sources: new NativeDesktopToolSources(),
       calls: new Map(),
     };
+    endpoint.sources.registerBuiltin(
+      "workbench",
+      "List and show tabs or files in the attached Desktop workbench and operate on eligible editor selections.",
+      (grant) => this.editorTools(id, endpoint, grant, "workbench")
+    );
+    endpoint.sources.registerBuiltin(
+      "browser",
+      "Open background pages and inspect, navigate, or interact with an exact authorized web page.",
+      (grant) => this.editorTools(id, endpoint, grant, "browser")
+    );
     this.endpoints.set(id, endpoint);
     return Object.freeze({
       selection: (
@@ -157,6 +184,11 @@ export class NativeEditorSurfaceEndpoints {
           return;
         endpoint.snapshot = next;
         endpoint.revision = revision;
+      },
+      registerToolSource: (source: DesktopToolSource) => {
+        if (!this.current(sessionId, id))
+          throw new Error("editor_surface_endpoint_unavailable");
+        return endpoint.sources.register(source);
       },
       close: () => {
         this.release(id);
@@ -378,21 +410,39 @@ export class NativeEditorSurfaceEndpoints {
 
   desktopToolsBusy(
     value: unknown,
-    browserNegotiated = false
+    browserNegotiated = false,
+    sourcesNegotiated = false
   ): NativeDesktopToolReply | null {
-    const request = this.desktopToolRequest(value, browserNegotiated);
+    const request = this.desktopToolRequest(
+      value,
+      browserNegotiated,
+      sourcesNegotiated
+    );
     if (!request) return null;
-    const { sessionId, endpointId, message } = request;
+    const { sessionId, endpointId, message, scope } = request;
     const reply = NativeDesktopTools.busy(message);
-    return reply && { sessionId, endpointId, message: reply };
+    if (!reply) return null;
+    const binding = scope?.sources && NativeDesktopTools.toolSource(message);
+    const unavailable =
+      binding && !this.current(sessionId, endpointId)?.sources.current(binding);
+    return {
+      sessionId,
+      endpointId,
+      message: unavailable ? NativeDesktopTools.unavailable(reply.id) : reply,
+    };
   }
 
   async desktopTools(
     value: unknown,
     signal: AbortSignal,
-    browserNegotiated = false
+    browserNegotiated = false,
+    sourcesNegotiated = false
   ): Promise<NativeDesktopToolReply | null> {
-    const request = this.desktopToolRequest(value, browserNegotiated);
+    const request = this.desktopToolRequest(
+      value,
+      browserNegotiated,
+      sourcesNegotiated
+    );
     if (!request) return null;
     const { sessionId, endpointId, scope, message, timeoutMs } = request;
     const now = Date.now();
@@ -400,22 +450,53 @@ export class NativeEditorSurfaceEndpoints {
     const expiresAtMs = Math.min(request.expiresAtMs, now + timeoutMs);
     const deadline = AbortSignal.timeout(Math.max(0, expiresAtMs - now));
     const endpoint = this.current(sessionId, endpointId);
-    const browser = endpoint?.browser;
+    const call = NativeDesktopTools.isCall(message);
+    const grant = { scope, call };
+    const binding = scope?.sources
+      ? NativeDesktopTools.toolSource(message)
+      : undefined;
     const tools =
-      endpoint &&
-      (scope?.browser
-        ? browser?.ready() || NativeDesktopTools.isCall(message)
-          ? DesktopBrowserMcp.bind(
-              browser,
-              scope.presentation === true &&
-                endpoint.deliver !== undefined &&
-                endpoint.revision !== undefined
-            )
-          : []
-        : [DesktopWorkbenchInventory.bind(endpoint.snapshot)]);
+      endpoint && (!binding || endpoint.sources.current(binding))
+        ? scope?.sources
+          ? {
+              sources: true as const,
+              tools: endpoint.sources.tools(grant, binding),
+            }
+          : this.editorTools(endpointId, endpoint, grant)
+        : undefined;
+    const reply = await NativeDesktopTools.reply(message, tools, {
+      signal: AbortSignal.any(
+        endpoint
+          ? [signal, deadline, endpoint.lifetime.signal]
+          : [signal, deadline]
+      ),
+      expiresAtMs,
+    });
+    return reply && { sessionId, endpointId, message: reply };
+  }
+
+  private editorTools(
+    endpointId: string,
+    endpoint: Endpoint,
+    { scope, call }: ScopedTools,
+    source?: DesktopBrowserMcp.Source
+  ): NativeDesktopTools.Tool[] {
+    const browser = endpoint.browser;
+    const tools = scope?.browser
+      ? browser?.ready() || call
+        ? DesktopBrowserMcp.bind(
+            browser,
+            scope.presentation === true &&
+              endpoint.deliver !== undefined &&
+              endpoint.revision !== undefined,
+            source
+          )
+        : []
+      : source === "browser"
+        ? []
+        : [DesktopWorkbenchInventory.bind(endpoint.snapshot)];
+    if (source === "browser") return tools;
     if (
-      endpoint &&
-      tools &&
       !scope?.browser &&
       scope?.presentation &&
       endpoint.deliver &&
@@ -424,7 +505,7 @@ export class NativeEditorSurfaceEndpoints {
       tools.push(
         DesktopArtifactPresentation.bind((path, callId, expiresAtMs) =>
           this.requestPresentation(
-            sessionId,
+            endpoint.sessionId,
             endpointId,
             callId,
             path,
@@ -433,12 +514,12 @@ export class NativeEditorSurfaceEndpoints {
         )
       );
     }
-    if (endpoint?.svgText && tools && scope?.svgTargetId)
+    if (endpoint.svgText && scope?.svgTargetId)
       tools.push(
         ...DesktopSelectedSvgText.bind(scope.svgTargetId, endpoint.svgText)
       );
-    const svgSelection = endpoint?.svgSelection;
-    if (endpoint && svgSelection && tools && scope?.contextId) {
+    const svgSelection = endpoint.svgSelection;
+    if (svgSelection && scope?.contextId) {
       const context = this.contexts.get(scope.contextId);
       if (context?.endpointId === endpointId)
         tools.push(
@@ -457,7 +538,7 @@ export class NativeEditorSurfaceEndpoints {
             }
           )
         );
-      else if (NativeDesktopTools.isCall(message))
+      else if (call)
         // A retained catalog may call after its live capture was retired.
         // Deny it through the domain result and keep it out of discovery.
         tools.push(
@@ -466,26 +547,41 @@ export class NativeEditorSurfaceEndpoints {
           }))
         );
     }
-    const reply = await NativeDesktopTools.reply(message, tools, {
-      signal: AbortSignal.any(
-        endpoint
-          ? [signal, deadline, endpoint.lifetime.signal]
-          : [signal, deadline]
-      ),
-      expiresAtMs,
-    });
-    return reply && { sessionId, endpointId, message: reply };
+    return scope?.sources && !scope.browser
+      ? tools.map((tool) => {
+          const name =
+            tool.definition.name === "surface_list_open"
+              ? "workbench_list_tabs"
+              : tool.definition.name === "surface_open"
+                ? "workbench_show"
+                : tool.definition.name;
+          return name === tool.definition.name
+            ? tool
+            : { ...tool, definition: { ...tool.definition, name } };
+        })
+      : tools;
   }
 
   desktopToolsReplyGuard(
     reply: NativeDesktopToolReply,
     value?: unknown,
-    browserNegotiated = false
+    browserNegotiated = false,
+    sourcesNegotiated = false
   ) {
-    const request = this.desktopToolRequest(value, browserNegotiated);
+    const request = this.desktopToolRequest(
+      value,
+      browserNegotiated,
+      sourcesNegotiated
+    );
     const browserScope = request?.scope?.browser === true;
-    const call = browserScope && NativeDesktopTools.isCall(request.message);
+    const call = NativeDesktopTools.isCall(request?.message);
+    const binding =
+      request?.scope?.sources && call
+        ? NativeDesktopTools.toolSource(request.message)
+        : undefined;
+    let catalog = request?.scope?.sources && !call ? reply.message : undefined;
     const browserCall =
+      browserScope &&
       call &&
       DesktopBrowserMcp.hasDefinition(
         NativeDesktopTools.toolName(request.message)
@@ -505,15 +601,33 @@ export class NativeEditorSurfaceEndpoints {
             message: DesktopBrowserMcp.revokeReply(reply.message, reason),
           };
       }
-      if (!endpoint || (browserScope && !call && !endpoint.browser?.ready()))
+      if (
+        !endpoint ||
+        (binding && !endpoint.sources.current(binding)) ||
+        (!catalog && browserScope && !call && !endpoint.browser?.ready())
+      )
         return {
           ...reply,
           message: NativeDesktopTools.unverified(reply.message.id),
         };
+      if (catalog) {
+        const browserReady = !browserScope || endpoint.browser?.ready();
+        catalog = NativeDesktopTools.filterCatalog(
+          catalog,
+          (name, source) =>
+            endpoint.sources.current(source) &&
+            (browserReady === true || !DesktopBrowserMcp.hasDefinition(name))
+        );
+        if (catalog !== reply.message) return { ...reply, message: catalog };
+      }
     };
   }
 
-  private desktopToolRequest(value: unknown, browserNegotiated: boolean) {
+  private desktopToolRequest(
+    value: unknown,
+    browserNegotiated: boolean,
+    sourcesNegotiated: boolean
+  ) {
     if (!value || typeof value !== "object" || Array.isArray(value))
       return null;
     const { sessionId, endpointId, message, scope, timeoutMs, expiresAtMs } =
@@ -554,7 +668,8 @@ export class NativeEditorSurfaceEndpoints {
             key === "svgTargetId" ||
             key === "presentation" ||
             key === "contextId" ||
-            key === "browser"
+            key === "browser" ||
+            key === "sources"
         ) ||
         (Object.hasOwn(scoped, "svgTargetId") &&
           !NativeEditorSvgText.isId(scoped.svgTargetId)) ||
@@ -562,6 +677,8 @@ export class NativeEditorSurfaceEndpoints {
           !NativeEditorSvgText.isId(scoped.contextId)) ||
         (Object.hasOwn(scoped, "browser") &&
           (!browserNegotiated || scoped.browser !== true)) ||
+        (Object.hasOwn(scoped, "sources") &&
+          (!sourcesNegotiated || scoped.sources !== true)) ||
         (Object.hasOwn(scoped, "presentation") && scoped.presentation !== true))
     )
       return null;
@@ -571,14 +688,7 @@ export class NativeEditorSurfaceEndpoints {
       message,
       timeoutMs,
       expiresAtMs,
-      scope: scoped as
-        | Readonly<{
-            svgTargetId?: string;
-            presentation?: true;
-            contextId?: string;
-            browser?: true;
-          }>
-        | undefined,
+      scope: scoped as ToolScope | undefined,
     };
   }
 
@@ -658,6 +768,7 @@ export class NativeEditorSurfaceEndpoints {
     const endpoint = this.endpoints.get(endpointId);
     this.endpoints.delete(endpointId);
     endpoint?.lifetime.abort();
+    endpoint?.sources.close();
     endpoint?.browser?.close();
   }
 

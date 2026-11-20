@@ -744,6 +744,7 @@ struct PreparedInput {
     host_tools: Vec<Arc<host_tools::HostTools>>,
     desktop_context: bool,
     workbench_tools: bool,
+    desktop_tool_sources: Option<discovery::Sources>,
     image_generation: Option<image_generation::Prepared>,
     guidance: Option<Message>,
     skills: Option<crate::skills::SkillListing>,
@@ -2264,6 +2265,7 @@ impl Host {
                 prepared.skills.as_ref().filter(|_| skill_reader.is_some()),
                 claim.lease.binding(),
                 prepared.workbench_tools,
+                prepared.desktop_tool_sources.as_ref(),
             )?
         } else {
             None
@@ -2750,6 +2752,8 @@ impl Host {
             self.capture_host_tools(!child_work && allow_host_tools && operating_regime.is_act())?;
         let desktop_context = !child_work && self.editor_surfaces.desktop_tools_negotiated();
         let browser_mcp = editor_browser_tools && self.editor_surfaces.browser_mcp_negotiated();
+        let tool_sources = self.editor_surfaces.tool_sources_negotiated()
+            && (!editor_browser_tools || browser_mcp);
         let editor_tool_catalog = match &editor_endpoint {
             Some(endpoint) => self
                 .editor_surfaces
@@ -2761,6 +2765,7 @@ impl Host {
                         svg_target_id: editor_svg_target.clone(),
                         context_id: editor_tool_context_id.clone(),
                         browser: browser_mcp,
+                        sources: tool_sources,
                     },
                 )
                 .await
@@ -2973,6 +2978,7 @@ impl Host {
         let mut host_tools = Vec::new();
         let desktop_context;
         let workbench_tools;
+        let desktop_tool_sources;
         let mut image_generation = None;
         let subagent;
         let effort;
@@ -3002,6 +3008,19 @@ impl Host {
                 }
                 desktop_context = stored.desktop_context || stored.editor_tool_catalog.is_some();
                 workbench_tools = stored.workbench_tools;
+                desktop_tool_sources = stored
+                    .editor_tool_catalog
+                    .as_ref()
+                    .filter(|catalog| catalog.uses_tool_sources())
+                    .map(|catalog| {
+                        catalog
+                            .source_summaries(workbench_tools)
+                            .into_iter()
+                            .map(|(tool, (name, summary))| {
+                                (tool, (name.to_owned(), summary.to_owned()))
+                            })
+                            .collect()
+                    });
                 config.instructions = stored
                     .initial_instructions
                     .clone()
@@ -3255,9 +3274,13 @@ impl Host {
                             "invalid_editor_surface_scope",
                         ));
                     }
-                    let browser_capture = if stored.editor_browser_tools && image_tool_results {
+                    let captures_images = stored.editor_browser_tools
+                        || stored.editor_tool_catalog.as_ref().is_some_and(
+                            crate::editor_surfaces::DesktopToolCatalog::has_image_results,
+                        );
+                    let tool_image_capture = if captures_images && image_tool_results {
                         execution.retained_inputs.as_ref().map(|images| {
-                            images.browser_image_capture(session.clone(), cwd.to_owned())
+                            images.desktop_tool_image_capture(session.clone(), cwd.to_owned())
                         })
                     } else {
                         None
@@ -3271,7 +3294,7 @@ impl Host {
                                 catalog,
                                 kind,
                                 workbench_tools,
-                                browser_capture.clone(),
+                                tool_image_capture.clone(),
                             )? {
                                 host_tools.push(Arc::new(host_tools::HostTools::desktop(
                                     host,
@@ -3302,7 +3325,7 @@ impl Host {
                                 session.clone(),
                                 endpoint.clone(),
                                 &scope,
-                                browser_capture,
+                                tool_image_capture,
                             )?,
                             endpoint.clone(),
                             &scope,
@@ -3524,6 +3547,7 @@ impl Host {
             host_tools,
             desktop_context,
             workbench_tools,
+            desktop_tool_sources,
             image_generation,
             guidance,
             skills,

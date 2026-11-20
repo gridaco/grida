@@ -221,6 +221,7 @@ export class NativeAgentProcess {
   private editorBrowserTools = false;
   private editorBrowserMcp = false;
   private editorTools = false;
+  private editorToolSources = false;
   private editorContext = false;
   private editorToolContext = false;
   private messageContext = false;
@@ -738,6 +739,7 @@ export class NativeAgentProcess {
                   [NativeEditorSurfaceEndpoints.browserCapability]: 1,
                   [NativeDesktopTools.capability]: 1,
                   [NativeDesktopTools.browserCapability]: 1,
+                  [NativeDesktopTools.sourcesCapability]: 1,
                   [NativeEditorSurfaceEndpoints.toolContextCapability]: 1,
                 }),
                 [NativeAgentArtifacts.capability]: 1,
@@ -908,6 +910,9 @@ export class NativeAgentProcess {
       processOwner.editorBrowserMcp =
         processOwner.editorTools &&
         advertised?.[NativeDesktopTools.browserCapability] === 1;
+      processOwner.editorToolSources =
+        processOwner.editorTools &&
+        advertised?.[NativeDesktopTools.sourcesCapability] === 1;
       processOwner.editorToolContext =
         processOwner.editorTools &&
         advertised?.[NativeEditorSurfaceEndpoints.toolContextCapability] === 1;
@@ -1196,10 +1201,8 @@ export class NativeAgentProcess {
     reply: NonNullable<EditorRequest["reply"]>
   ): boolean {
     const revoked = reply.ifRevoked?.();
-    if (revoked) {
-      reply.bytes = revoked;
-      reply.ifRevoked = undefined;
-    }
+    // An independently owned catalog can lose another source while queued.
+    if (revoked) reply.bytes = revoked;
     return this.tryWrite(reply.bytes);
   }
 
@@ -1434,18 +1437,21 @@ export class NativeAgentProcess {
               this.editorEndpoints.desktopTools(
                 message.params,
                 signal,
-                this.editorBrowserMcp
+                this.editorBrowserMcp,
+                this.editorToolSources
               ),
             () =>
               this.editorEndpoints.desktopToolsBusy(
                 message.params,
-                this.editorBrowserMcp
+                this.editorBrowserMcp,
+                this.editorToolSources
               ),
             (reply) =>
               this.editorEndpoints.desktopToolsReplyGuard(
                 reply,
                 message.params,
-                this.editorBrowserMcp
+                this.editorBrowserMcp,
+                this.editorToolSources
               )
           );
           return;

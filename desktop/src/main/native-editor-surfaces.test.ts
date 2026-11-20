@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { expect, it, vi } from "vitest";
 import type { DesktopBrowserToolLease } from "./desktop-browser-tools";
+import { NativeDesktopTools } from "./native-desktop-tools";
 import {
   NativeEditorSurfaceEndpoints,
   type NativeEditorSvgSelectionDelivery,
@@ -175,6 +176,21 @@ it("lists and invokes the negotiated Browser catalog only within the admitted sc
     browser
   );
   const { editorEndpointId: endpointId } = lease.selection();
+  lease.registerToolSource({
+    id: "inspector",
+    description: "Check workspace status.",
+    tools: [
+      {
+        definition: {
+          name: "status",
+          description: "Check status.",
+          inputSchema: { type: "object" },
+        },
+        revision: 1,
+        invoke: () => ({ content: [] }),
+      },
+    ],
+  });
   const params = (message: object, scope: object = { browser: true }) => ({
     sessionId,
     endpointId,
@@ -300,7 +316,48 @@ it("lists and invokes the negotiated Browser catalog only within the admitted sc
       },
     },
   });
+  const modernList = params(list, {
+    browser: true,
+    sources: true,
+    presentation: true,
+  });
+  const modernRun = () =>
+    endpoints.desktopTools(
+      modernList,
+      new AbortController().signal,
+      true,
+      true
+    );
+  const modernReply = (await modernRun())!;
+  const queuedCatalog = endpoints.desktopToolsReplyGuard(
+    modernReply,
+    modernList,
+    true,
+    true
+  );
+  expect(
+    NativeDesktopTools.listedSources(modernReply.message).map(({ id }) => id)
+  ).toContain("browser");
   ready = false;
+  expect(
+    NativeDesktopTools.listedSources(queuedCatalog()!.message).map(
+      ({ id }) => id
+    )
+  ).toEqual(["inspector"]);
+  const unavailableBrowserCatalog = (await modernRun())!;
+  expect(
+    NativeDesktopTools.listedSources(unavailableBrowserCatalog.message).map(
+      ({ id }) => id
+    )
+  ).toEqual(["inspector"]);
+  expect(
+    endpoints.desktopToolsReplyGuard(
+      unavailableBrowserCatalog,
+      modernList,
+      true,
+      true
+    )()
+  ).toBeUndefined();
   expect(
     endpoints.desktopToolsReplyGuard(reply!, capture, true)()
   ).toMatchObject({
@@ -328,4 +385,256 @@ it("lists and invokes the negotiated Browser catalog only within the admitted sc
   );
   expect(invoke).toHaveBeenCalledTimes(2);
   lease.close();
+});
+
+it("keeps same-named tools isolated to the exact registered source generation", async () => {
+  const endpoints = new NativeEditorSurfaceEndpoints();
+  const sessionId = "chat";
+  const lease = endpoints.register(
+    sessionId,
+    { active: null, open: [], truncated: false },
+    () => {}
+  );
+  const { editorEndpointId: endpointId } = lease.selection();
+  const held = Promise.withResolvers<void>();
+  const entered = Promise.withResolvers<AbortSignal>();
+  const runFirst = vi.fn<NativeDesktopTools.Tool["invoke"]>(async (_, call) => {
+    entered.resolve(call.signal);
+    await held.promise;
+    return { content: [{ type: "text", text: "first source" }] };
+  });
+  const runSecond = vi.fn<NativeDesktopTools.Tool["invoke"]>(() => ({
+    content: [{ type: "text", text: "second source" }],
+  }));
+  const definition = {
+    name: "lookup",
+    description: "Find a record.",
+    inputSchema: { type: "object" },
+  };
+  const first = {
+    id: "fixture-first",
+    description: "Find images.",
+    tools: [{ definition, revision: 3, invoke: runFirst }],
+  };
+  const second = {
+    id: "fixture-second",
+    description: "Find sources.",
+    tools: [{ definition, revision: 3, invoke: runSecond }],
+  };
+  const firstLease = lease.registerToolSource(first);
+  lease.registerToolSource({
+    id: "too-many-tools",
+    description: "Example with too many tools for remaining catalog slots.",
+    tools: Array.from({ length: NativeDesktopTools.maxTools }, (_, index) => ({
+      definition: { ...definition, name: `lookup_${index}` },
+      revision: 1,
+      invoke: runSecond,
+    })),
+  });
+  lease.registerToolSource({
+    id: "too-many-bytes",
+    description: "Example with a catalog exceeding the transfer budget.",
+    tools: [
+      {
+        definition: {
+          ...definition,
+          inputSchema: { type: "object", description: "x".repeat(48 * 1024) },
+        },
+        revision: 1,
+        invoke: runSecond,
+      },
+    ],
+  });
+  const secondLease = lease.registerToolSource(second);
+  expect(() => lease.registerToolSource(first)).toThrow(
+    "native_desktop_tool_source_invalid"
+  );
+  expect(() =>
+    lease.registerToolSource({
+      id: "image-without-receipt",
+      description: "Inspect an image.",
+      tools: [
+        {
+          definition: { ...definition, annotations: { readOnlyHint: true } },
+          revision: 1,
+          transfer: {
+            maxInputBytes: 1024,
+            maxOutputBytes: 1024,
+            resultMimeType: "image/jpeg",
+          },
+          invoke: runSecond,
+        },
+      ],
+    })
+  ).toThrow("native_desktop_tool_source_invalid");
+
+  const request = (message: object, scope: object = { sources: true }) => ({
+    sessionId,
+    endpointId,
+    message: { jsonrpc: "2.0", id: randomUUID(), ...message },
+    expiresAtMs: Date.now() + 10_000,
+    timeoutMs: 10_000,
+    scope,
+  });
+  const run = (value: ReturnType<typeof request>, negotiated = true) =>
+    endpoints.desktopTools(
+      value,
+      new AbortController().signal,
+      false,
+      negotiated
+    );
+  const list = request({ method: "tools/list" });
+  await expect(run(list, false)).resolves.toBeNull();
+  const legacy = await run(request({ method: "tools/list" }, {}));
+  expect(legacy?.message).toMatchObject({
+    result: { tools: [{ name: "surface_list_open" }] },
+  });
+  const listed = (await run(list))!;
+  const bindings = NativeDesktopTools.listedSources(listed.message);
+  const firstBinding = bindings.find(({ id }) => id === first.id)!;
+  const secondBinding = bindings.find(({ id }) => id === second.id)!;
+  const firstName = "desktop_fixture_first__lookup";
+  const secondName = "desktop_fixture_second__lookup";
+  expect(listed.message).toMatchObject({
+    result: {
+      tools: [
+        {
+          name: "workbench_list_tabs",
+          _meta: { "co.grida/source": { id: "workbench" } },
+        },
+        {
+          name: firstName,
+          _meta: {
+            "co.grida/source": {
+              ...firstBinding,
+              description: first.description,
+            },
+          },
+        },
+        {
+          name: secondName,
+          _meta: {
+            "co.grida/source": {
+              ...secondBinding,
+              description: second.description,
+            },
+          },
+        },
+      ],
+    },
+  });
+  expect((await run(list))?.message).toMatchObject({
+    result: {
+      tools: expect.arrayContaining([
+        {
+          ...definition,
+          name: secondName,
+          _meta: {
+            "co.grida/source": {
+              ...secondBinding,
+              description: second.description,
+            },
+            "co.grida/definitionRevision": 3,
+          },
+        },
+      ]),
+    },
+  });
+
+  const call = (
+    name: string,
+    binding?: NativeDesktopTools.SourceBinding,
+    revision = 3
+  ) =>
+    request({
+      method: "tools/call",
+      params: {
+        name,
+        _meta: {
+          "co.grida/source": binding,
+          "co.grida/definitionRevision": revision,
+        },
+      },
+    });
+  await expect(run(call(firstName))).resolves.toMatchObject({
+    message: { error: { code: -32602 } },
+  });
+  await expect(run(call(firstName, secondBinding))).resolves.toMatchObject({
+    message: { error: { code: -32602 } },
+  });
+  await expect(run(call(firstName, firstBinding, 2))).resolves.toMatchObject({
+    message: { error: { code: -32002 } },
+  });
+  expect(runFirst).not.toHaveBeenCalled();
+  expect(runSecond).not.toHaveBeenCalled();
+
+  const firstCall = call(firstName, firstBinding);
+  runFirst.mockResolvedValueOnce({
+    content: [{ type: "text", text: "first source" }],
+  });
+  const firstReply = (await run(firstCall))!;
+  const queuedFirst = endpoints.desktopToolsReplyGuard(
+    firstReply,
+    firstCall,
+    false,
+    true
+  );
+  const pending = run(firstCall);
+  const signal = await entered.promise;
+  const secondCall = call(secondName, secondBinding);
+  const secondReply = (await run(secondCall))!;
+  expect(secondReply.message).toMatchObject({
+    result: { content: [{ type: "text", text: "second source" }] },
+  });
+  const queuedList = endpoints.desktopToolsReplyGuard(
+    listed,
+    list,
+    false,
+    true
+  );
+  const queuedSecond = endpoints.desktopToolsReplyGuard(
+    secondReply,
+    secondCall,
+    false,
+    true
+  );
+  firstLease.close();
+  expect(signal.aborted).toBe(true);
+  lease.registerToolSource({
+    ...first,
+    tools: [{ definition, revision: 3, invoke: runSecond }],
+  });
+  held.resolve();
+  await expect(pending).resolves.toMatchObject({
+    message: { error: { code: -32603 } },
+  });
+  expect(NativeDesktopTools.listedSources(queuedList()!.message)).toEqual([
+    expect.objectContaining({ id: "workbench" }),
+    secondBinding,
+  ]);
+  expect(queuedFirst()).toMatchObject({ message: { error: { code: -32603 } } });
+  expect(queuedSecond()).toBeUndefined();
+  await expect(run(firstCall)).resolves.toMatchObject({
+    message: {
+      error: { code: -32001, message: "editor_surface_endpoint_unavailable" },
+    },
+  });
+  expect(runSecond).toHaveBeenCalledTimes(1);
+  const refreshed = NativeDesktopTools.listedSources(
+    (await run(list))!.message
+  );
+  const replaced = refreshed.find(({ id }) => id === first.id)!;
+  expect(replaced.generation).not.toBe(firstBinding.generation);
+  await expect(run(call(firstName, replaced))).resolves.toMatchObject({
+    message: { result: { content: [{ type: "text", text: "second source" }] } },
+  });
+  expect(runSecond).toHaveBeenCalledTimes(2);
+  secondLease.close();
+  expect(NativeDesktopTools.listedSources(queuedList()!.message)).toEqual([
+    expect.objectContaining({ id: "workbench" }),
+  ]);
+  lease.close();
+  expect(() => lease.registerToolSource(first)).toThrow(
+    "editor_surface_endpoint_unavailable"
+  );
 });

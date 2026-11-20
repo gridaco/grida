@@ -152,7 +152,7 @@ impl RetainedInputs {
         self.workspace_png_capture(session, cwd, WORKSPACE_VIEW)
     }
 
-    pub(super) fn browser_image_capture(
+    pub(super) fn desktop_tool_image_capture(
         self: &Arc<Self>,
         session: SessionId,
         cwd: PathBuf,

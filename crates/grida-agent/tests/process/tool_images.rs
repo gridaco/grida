@@ -7,6 +7,7 @@ use std::os::unix::fs::PermissionsExt;
 const CAPABILITY: &str = "co.grida/session/tool-images";
 const WINDOW: &str = "co.grida/session/transcript-window";
 const READ: &str = "_co.grida/session/read-tool-image-chunk";
+const FIXTURE_CAPTURE: &str = "desktop_fixture_pixels__capture";
 
 fn initialize() -> Value {
     let mut request = extension_initialize();
@@ -273,20 +274,26 @@ async fn retained_tool_images_read_exact_prepared_pixels_after_source_deletion_a
 
 #[tokio::test]
 async fn native_browser_capture_requires_act_and_projects_correlated_pixels() {
-    browser_capture(false).await;
+    browser_capture(false, false).await;
 }
 
 #[tokio::test]
 async fn shared_desktop_carrier_delivers_bounded_browser_pixels_and_presentation() {
-    browser_capture(true).await;
+    browser_capture(true, false).await;
 }
 
-async fn browser_capture(shared: bool) {
+#[tokio::test]
+async fn qualified_desktop_carrier_retains_images_without_browser_grants() {
+    browser_capture(true, true).await;
+}
+
+async fn browser_capture(shared: bool, qualified: bool) {
     const EDITOR: &str = "co.grida/session/editor-surfaces";
     const PRESENTATION: &str = "co.grida/session/editor-surface-open";
     const BROWSER: &str = "co.grida/session/browser-tools";
     const DESKTOP: &str = "co.grida/session/desktop-tools";
     const SHARED_BROWSER: &str = "co.grida/session/desktop-browser-mcp";
+    const TOOL_SOURCES: &str = "co.grida/session/desktop-tool-sources";
     const DESKTOP_METHOD: &str = "_co.grida/editor/desktop-tools";
     const EDITOR_CONTEXT: &str = "co.grida/session/editor-context";
     const ENDPOINT: &str = "6f9619ff-8b86-4011-b42d-00c04fc964ff";
@@ -309,23 +316,36 @@ async fn browser_capture(shared: bool) {
     let mut client = StdioClient::from_child(child);
     let mut offer = initialize();
     offer["clientCapabilities"]["_meta"][EDITOR] = 1.into();
-    offer["clientCapabilities"]["_meta"][PRESENTATION] = 1.into();
-    offer["clientCapabilities"]["_meta"][BROWSER] = 1.into();
+    if !qualified {
+        offer["clientCapabilities"]["_meta"][PRESENTATION] = 1.into();
+        offer["clientCapabilities"]["_meta"][BROWSER] = 1.into();
+    }
     if shared {
         offer["clientCapabilities"]["_meta"][DESKTOP] = 1.into();
-        offer["clientCapabilities"]["_meta"][SHARED_BROWSER] = 1.into();
+        if !qualified {
+            offer["clientCapabilities"]["_meta"][SHARED_BROWSER] = 1.into();
+        }
+    }
+    if qualified {
+        offer["clientCapabilities"]["_meta"][TOOL_SOURCES] = 1.into();
     }
     offer["clientCapabilities"]["_meta"][EDITOR_CONTEXT] = 1.into();
     offer["clientCapabilities"]["_meta"]["co.grida/provider/egress"] = 1.into();
     offer["clientCapabilities"]["_meta"]["co.grida/session/updates"] = 1.into();
     let ready = client.request("initialize", offer).await;
     assert_eq!(
-        ready["result"]["agentCapabilities"]["_meta"][BROWSER], 1,
+        ready["result"]["agentCapabilities"]["_meta"][BROWSER].as_u64(),
+        (!qualified).then_some(1),
         "{ready}"
     );
     assert_eq!(
         ready["result"]["agentCapabilities"]["_meta"][SHARED_BROWSER].as_u64(),
-        shared.then_some(1),
+        (shared && !qualified).then_some(1),
+        "{ready}"
+    );
+    assert_eq!(
+        ready["result"]["agentCapabilities"]["_meta"][TOOL_SOURCES].as_u64(),
+        qualified.then_some(1),
         "{ready}"
     );
     let created = client
@@ -341,8 +361,8 @@ async fn browser_capture(shared: bool) {
                 "payload":{"selection":"selected-step"}},
             "operatingRegime": regime,
             "editorEndpointId": ENDPOINT,
-            "editorPresentation": true,
-            "editorBrowserTools": true
+            "editorPresentation": !qualified,
+            "editorBrowserTools": !qualified
         })
     };
     let refused = client
@@ -382,25 +402,36 @@ async fn browser_capture(shared: bool) {
         "surface_open"
     };
     let mut replies = Vec::new();
-    if shared {
+    if shared && !qualified {
         replies.push(Reply::Tool(
             "tool_search",
             r#"{"query":"workbench_show","source":"workbench"}"#,
         ));
     }
-    replies.push(Reply::Tool(
-        show,
-        r#"{"target":{"kind":"file","path":"/poster.canvas"}}"#,
-    ));
+    if !qualified {
+        replies.push(Reply::Tool(
+            show,
+            r#"{"target":{"kind":"file","path":"/poster.canvas"}}"#,
+        ));
+    }
     if shared {
         replies.push(Reply::Tool(
             "tool_search",
-            r#"{"query":"browser_capture","source":"browser"}"#,
+            if qualified {
+                r#"{"query":"desktop_fixture_pixels__capture","source":"fixture-pixels"}"#
+            } else {
+                r#"{"query":"browser_capture","source":"browser"}"#
+            },
         ));
     }
+    let capture = if qualified {
+        FIXTURE_CAPTURE
+    } else {
+        "browser_capture"
+    };
     replies.extend([
         Reply::Tool(
-            "browser_capture",
+            capture,
             r#"{"target":{"kind":"background","pageId":"page"},"documentId":"document"}"#,
         ),
         Reply::Finished("Captured the fixture."),
@@ -448,13 +479,24 @@ async fn browser_capture(shared: bool) {
             Some(DESKTOP_METHOD) if shared => {
                 assert_eq!(params["sessionId"], session);
                 assert_eq!(params["endpointId"], ENDPOINT);
-                assert_eq!(params["scope"], json!({"browser":true,"presentation":true}));
+                let expected_scope = if qualified {
+                    json!({"sources":true})
+                } else {
+                    json!({"browser":true,"presentation":true})
+                };
+                assert_eq!(params["scope"], expected_scope);
                 let message = &params["message"];
+                if qualified && message["method"] == "tools/call" {
+                    assert_eq!(
+                        message["params"]["_meta"]["co.grida/source"],
+                        json!({"id":"fixture-pixels","generation":"fixture-capture"})
+                    );
+                }
                 let result = match message["method"].as_str() {
                     Some("tools/list") => {
                         assert!(!listed);
                         listed = true;
-                        json!({"resultType":"complete","tools":browser_desktop_catalog()})
+                        json!({"resultType":"complete","tools":browser_desktop_catalog(qualified)})
                     }
                     Some("tools/call") if message["params"]["name"] == show => {
                         assert_eq!(
@@ -468,7 +510,7 @@ async fn browser_capture(shared: bool) {
                             "structuredContent":{"disposition":"unknown"}})
                     }
                     Some("tools/call") => {
-                        assert_eq!(message["params"]["name"], "browser_capture");
+                        assert_eq!(message["params"]["name"], capture);
                         assert_eq!(message["params"]["arguments"]["documentId"], "document");
                         assert!(
                             params["timeoutMs"]
@@ -538,7 +580,7 @@ async fn browser_capture(shared: bool) {
             image_update = Some(params.clone());
         }
     }
-    assert!(file_revealed);
+    assert_eq!(file_revealed, !qualified);
     assert_eq!(listed, shared);
     assert_eq!(requests.len(), total);
     let offered = |request: &Value, name: &str| {
@@ -547,33 +589,38 @@ async fn browser_capture(shared: bool) {
             .is_some_and(|tools| tools.iter().any(|tool| tool["name"] == name))
     };
     let instructions = requests[0]["instructions"].as_str().unwrap();
-    assert!(instructions.contains("first meaningful renderable checkpoint"));
+    assert_eq!(
+        instructions.contains("first meaningful renderable checkpoint"),
+        !qualified
+    );
     if shared {
         assert!(offered(&requests[0], "tool_search"));
-        assert!(!offered(&requests[0], "browser_capture"));
+        assert!(!offered(&requests[0], capture));
         assert!(!offered(&requests[0], show));
     } else {
         assert!(instructions.contains("For new browser work, use browser_open"));
     }
     assert!(requests[0]["input"].to_string().contains("selected-step"));
-    assert!(offered(&requests[total - 2], "browser_capture"));
-    let inputs = requests[1 + usize::from(shared)]["input"]
-        .as_array()
-        .unwrap();
-    let reveal_call = inputs
-        .iter()
-        .find(|item| item["type"] == "function_call" && item["name"] == show)
-        .expect("recorded file reveal");
-    let reveal_output = inputs
-        .iter()
-        .find(|item| {
-            item["type"] == "function_call_output" && item["call_id"] == reveal_call["call_id"]
-        })
-        .expect("correlated file reveal result");
-    let reveal_result: Value =
-        serde_json::from_str(reveal_output["output"].as_str().unwrap()).unwrap();
-    assert_eq!(reveal_result["status"], "uncertain");
-    assert_eq!(reveal_result["structured"]["disposition"], "unknown");
+    assert!(offered(&requests[total - 2], capture));
+    if !qualified {
+        let inputs = requests[1 + usize::from(shared)]["input"]
+            .as_array()
+            .unwrap();
+        let reveal_call = inputs
+            .iter()
+            .find(|item| item["type"] == "function_call" && item["name"] == show)
+            .expect("recorded file reveal");
+        let reveal_output = inputs
+            .iter()
+            .find(|item| {
+                item["type"] == "function_call_output" && item["call_id"] == reveal_call["call_id"]
+            })
+            .expect("correlated file reveal result");
+        let reveal_result: Value =
+            serde_json::from_str(reveal_output["output"].as_str().unwrap()).unwrap();
+        assert_eq!(reveal_result["status"], "uncertain");
+        assert_eq!(reveal_result["structured"]["disposition"], "unknown");
+    }
     let pixels = requests[total - 1]["input"]
         .as_array()
         .unwrap()
@@ -622,36 +669,45 @@ async fn browser_capture(shared: bool) {
         let retained = client.request(method, exact.clone()).await;
         assert_eq!(retained["result"]["turnId"], turn, "{retained}");
         assert_eq!(retained["result"]["disposition"], "completed", "{retained}");
-        let mut changed = exact;
-        changed["editorBrowserTools"] = false.into();
-        let rejected = client.request(method, changed).await;
-        assert_eq!(
-            rejected["error"]["data"], "submission_browser_tools_changed",
-            "{rejected}"
-        );
+        if !qualified {
+            let mut changed = exact;
+            changed["editorBrowserTools"] = false.into();
+            let rejected = client.request(method, changed).await;
+            assert_eq!(
+                rejected["error"]["data"], "submission_browser_tools_changed",
+                "{rejected}"
+            );
+        }
     }
     assert!(client.finish().await.status.success());
 }
 
-fn browser_desktop_catalog() -> Vec<Value> {
+fn browser_desktop_catalog(qualified: bool) -> Vec<Value> {
     let descriptors: Vec<Value> = serde_json::from_str(include_str!(
         "../../../../desktop/src/main/browser-tool-catalog.json"
     ))
     .unwrap();
-    [
-        ("surface_open", "workbench_show"),
-        ("browser_capture", "browser_capture"),
-    ]
-    .into_iter()
-    .map(|(stored, name)| {
+    let names = if qualified {
+        vec![("browser_capture", FIXTURE_CAPTURE)]
+    } else {
+        vec![
+            ("surface_open", "workbench_show"),
+            ("browser_capture", "browser_capture"),
+        ]
+    };
+    names.into_iter().map(|(stored, name)| {
         let descriptor = descriptors
             .iter()
             .find(|entry| entry["name"] == stored)
             .unwrap();
         let mut meta = json!({"co.grida/definitionRevision":descriptor["version"],
                 "co.grida/maxInputBytes":40960,"co.grida/maxOutputBytes":458752});
-        if name == "browser_capture" {
+        if stored == "browser_capture" {
             meta["co.grida/resultMimeType"] = "image/jpeg".into();
+        }
+        if qualified {
+            meta["co.grida/source"] = json!({"id":"fixture-pixels","generation":"fixture-capture", "description":"Capture bounded pixels from a fixture."});
+            meta["co.grida/resultDisposition"] = true.into();
         }
             let description = if name == "workbench_show" {
                 "Ask the attached workbench to show a workspace file, HTTP(S) URL, or exact tab. The workbench chooses the viewer. Window focus requires an explicit request. Use browser_open for background browser work."

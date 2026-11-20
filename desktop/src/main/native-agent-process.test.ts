@@ -2275,18 +2275,21 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
     { carrier: "legacy", revoked: true },
     { carrier: "mcp", revoked: false },
     { carrier: "mcp", revoked: true },
+    { carrier: "registered MCP", revoked: false },
+    { carrier: "registered MCP", revoked: true },
   ])(
     "delivers a $carrier browser capture through stdin pressure (owner revoked: $revoked)",
     async ({ carrier, revoked }) => {
       const callId = "00000000-0000-4000-8000-000000000001";
-      const shared = carrier === "mcp";
+      const shared = carrier !== "legacy";
+      const sources = carrier === "registered MCP";
       const methodName = shared
         ? NativeDesktopTools.method
         : NativeEditorSurfaceEndpoints.browserMethod;
       const params = shared
-        ? `scope:{browser:true},expiresAtMs:Date.now()+5000,message:{
+        ? `scope:{browser:true${sources ? ",sources:true" : ""}},expiresAtMs:Date.now()+5000,message:{
             jsonrpc:'2.0',id:'${callId}',method:'tools/call',params:{
-              name:'browser_capture',arguments:{},_meta:{'co.grida/definitionRevision':1}
+              name:'browser_capture',arguments:{},_meta:{'co.grida/definitionRevision':1${sources ? ", 'co.grida/source': request.params.source" : ""}}
             }
           }`
         : `callId:'${callId}',operation:'browser_capture',arguments:{}`;
@@ -2294,6 +2297,16 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
         `
       if (request.method === 'fixture/ping') {
         globalThis.ping = request.id;
+      } else if (request.method === 'fixture/list') {
+        if (requested['${NativeDesktopTools.sourcesCapability}'] !== 1) throw Error('missing source capability');
+        globalThis.list = request.id;
+        send({id:'list',method:'${NativeDesktopTools.method}',params:{
+          sessionId:'session',endpointId:request.params.endpointId,
+          timeoutMs:5000,expiresAtMs:Date.now()+5000,scope:{sources:true,browser:true},
+          message:{jsonrpc:'2.0',id:'list',method:'tools/list'}
+        }});
+      } else if (request.method === undefined && request.id === 'list') {
+        send({id:globalThis.list,result:request.result.message});
       } else if (request.method === 'fixture/capture') {
         globalThis.capture = request.id;
         send({id:'capture',method:'${methodName}',params:{
@@ -2349,9 +2362,50 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
           }
         );
         const { editorEndpointId: endpointId } = lease!.selection();
+        const catalog = sources
+          ? ((await agent.request("fixture/list", {
+              endpointId,
+            })) as NativeDesktopTools.Reply)
+          : undefined;
+        const source =
+          catalog &&
+          NativeDesktopTools.listedSources(catalog).find(
+            ({ id }) => id === "browser"
+          );
+        const descriptors =
+          catalog && "result" in catalog && Array.isArray(catalog.result.tools)
+            ? catalog.result.tools.filter(({ name }) =>
+                ["workbench_list_tabs", "browser_capture"].includes(name)
+              )
+            : [];
+        const expectedDescriptors = [
+          {
+            name: "workbench_list_tabs",
+            _meta: {
+              "co.grida/source": {
+                id: "workbench",
+                generation: expect.any(String),
+              },
+              "co.grida/resultDisposition": true,
+            },
+          },
+          {
+            name: "browser_capture",
+            _meta: {
+              "co.grida/source": {
+                ...source,
+                id: "browser",
+                generation: expect.any(String),
+              },
+              "co.grida/resultDisposition": true,
+              "co.grida/resultMimeType": "image/jpeg",
+            },
+          },
+        ];
+        expect(descriptors).toMatchObject(sources ? expectedDescriptors : []);
         const replies = Promise.all([
           agent.request("fixture/ping", {}, 3000),
-          agent.request("fixture/capture", { endpointId }, 3000),
+          agent.request("fixture/capture", { endpointId, source }, 3000),
         ]);
         await Promise.race([entered.promise, replies]);
         complete.resolve();
@@ -2690,6 +2744,192 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
 
 const packaged = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
 
+function packagedToolResponse(
+  index: number,
+  call: { name: string; arguments: object } | undefined
+): Response {
+  const item = call
+    ? {
+        type: "function_call",
+        id: `fc_tool_fixture_${index}`,
+        call_id: `call_tool_fixture_${index}`,
+        name: call.name,
+        arguments: JSON.stringify(call.arguments),
+        status: "completed",
+      }
+    : {
+        type: "message",
+        id: "tool_fixture_message",
+        role: "assistant",
+        status: "completed",
+        content: [
+          {
+            type: "output_text",
+            text: "Finished tool fixture.",
+            annotations: [],
+          },
+        ],
+      };
+  const frames = [
+    { type: "response.output_item.done", output_index: 0, item },
+    {
+      type: "response.completed",
+      response: {
+        status: "completed",
+        usage: { input_tokens: 5, output_tokens: 3 },
+      },
+    },
+  ];
+  return new Response(
+    frames.map((frame) => `data: ${JSON.stringify(frame)}\n\n`).join(""),
+    { headers: { "content-type": "text/event-stream" } }
+  );
+}
+
+it.runIf(Boolean(packaged) && process.platform !== "win32")(
+  "keeps same-named Main sources isolated through the packaged MCP carrier",
+  async () => {
+    const directory = state();
+    const root = fs.realpathSync(directory.root);
+    const cwd = path.join(root, "workspace");
+    fs.mkdirSync(cwd, { mode: 0o700 });
+    const firstName = "desktop_fixture_first__status";
+    const secondName = "desktop_fixture_second__status";
+    const calls = [
+      {
+        name: "tool_search",
+        arguments: { query: firstName, source: "fixture-first" },
+      },
+      { name: firstName, arguments: {} },
+      {
+        name: "tool_search",
+        arguments: { query: secondName, source: "fixture-second" },
+      },
+      { name: secondName, arguments: {} },
+      { name: firstName, arguments: {} },
+      { name: secondName, arguments: {} },
+    ];
+    const offers: string[][] = [];
+    const results: { call_id: string; output: string }[] = [];
+    const operation = (text: string) =>
+      vi.fn<NativeDesktopTools.Tool["invoke"]>(() => ({
+        content: [{ type: "text", text }],
+      }));
+    const oldFirst = operation("first source, original registration");
+    const newFirst = operation("first source, replacement registration");
+    const second = operation("second source");
+    const definition = {
+      name: "status",
+      description: "Look up status.",
+      inputSchema: { type: "object" },
+    };
+    const source = (
+      id: string,
+      description: string,
+      invoke: NativeDesktopTools.Tool["invoke"]
+    ) => ({
+      id,
+      description,
+      tools: [{ definition, revision: 1, invoke }],
+    });
+    let replace: (() => void) | undefined;
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        ...launch(packaged!, path.join(root, "state")),
+        cwd,
+        provider: "responses",
+        providerNetwork: {
+          prepare: () => async (body) => {
+            const request = JSON.parse(body.toString());
+            const call = calls[offers.length];
+            offers.push(
+              (request.tools ?? []).map((tool: { name: string }) => tool.name)
+            );
+            if (offers.length === 5) replace?.();
+            if (!call)
+              results.push(
+                ...request.input.filter(
+                  (item: { type: string }) =>
+                    item.type === "function_call_output"
+                )
+              );
+            return packagedToolResponse(offers.length, call);
+          },
+        },
+      });
+      const session = await chat.create();
+      const lease = chat.registerEditorSurfaces(
+        session,
+        { active: null, open: [], truncated: false },
+        () => {},
+        undefined
+      )!;
+      const first = lease.registerToolSource(
+        source("fixture-first", "First local device status.", oldFirst)
+      );
+      lease.registerToolSource(
+        source("fixture-second", "Second local device status.", second)
+      );
+      replace = () => {
+        first.close();
+        lease.registerToolSource(
+          source("fixture-first", "First local device status.", newFirst)
+        );
+      };
+      await chat.submit(
+        session,
+        "source-collision",
+        "Check both devices",
+        "act",
+        lease.selection()
+      );
+      const active = chat;
+      await vi.waitFor(
+        async () => {
+          expect((await active.observe(session)).latest?.status).toBe(
+            "succeeded"
+          );
+        },
+        { timeout: 8000 }
+      );
+      expect(offers).toHaveLength(7);
+      expect(offers[0]).not.toContain(firstName);
+      expect(offers[0]).not.toContain(secondName);
+      expect(offers[1]).toContain(firstName);
+      expect(offers[1]).not.toContain(secondName);
+      expect(offers[3]).toContain(secondName);
+      expect(oldFirst).toHaveBeenCalledTimes(1);
+      expect(newFirst).not.toHaveBeenCalled();
+      expect(second).toHaveBeenCalledTimes(2);
+      const outcomes = results.map(({ output }) => JSON.parse(output));
+      expect(outcomes[1]).toMatchObject({
+        status: "succeeded",
+        content: ["first source, original registration"],
+      });
+      expect(outcomes[3]).toMatchObject({
+        status: "succeeded",
+        content: ["second source"],
+      });
+      expect(outcomes[4]).toMatchObject({
+        status: "failed",
+        content: ["editor_surface_endpoint_unavailable"],
+      });
+      expect(outcomes[5]).toMatchObject({
+        status: "succeeded",
+        content: ["second source"],
+      });
+    } finally {
+      try {
+        await chat?.close();
+      } finally {
+        directory.close();
+      }
+    }
+  },
+  15_000
+);
+
 it.runIf(Boolean(packaged) && process.platform !== "win32")(
   "discovers Browser, presents a tab, and retains a capture through the packaged MCP carrier",
   async () => {
@@ -2766,44 +3006,7 @@ it.runIf(Boolean(packaged) && process.platform !== "win32")(
             const call = calls[offers.length];
             bodies.push(text);
             offers.push(names);
-            const item = call
-              ? {
-                  type: "function_call",
-                  id: `fc_browser_fixture_${offers.length}`,
-                  call_id: `call_browser_fixture_${offers.length}`,
-                  name: call.name,
-                  arguments: JSON.stringify(call.arguments),
-                  status: "completed",
-                }
-              : {
-                  type: "message",
-                  id: "browser_fixture_message",
-                  role: "assistant",
-                  status: "completed",
-                  content: [
-                    {
-                      type: "output_text",
-                      text: "Finished browser fixture.",
-                      annotations: [],
-                    },
-                  ],
-                };
-            const frames = [
-              { type: "response.output_item.done", output_index: 0, item },
-              {
-                type: "response.completed",
-                response: {
-                  status: "completed",
-                  usage: { input_tokens: 5, output_tokens: 3 },
-                },
-              },
-            ];
-            return new Response(
-              frames
-                .map((frame) => `data: ${JSON.stringify(frame)}\n\n`)
-                .join(""),
-              { headers: { "content-type": "text/event-stream" } }
-            );
+            return packagedToolResponse(offers.length, call);
           },
         },
       });
@@ -2874,7 +3077,7 @@ it.runIf(Boolean(packaged) && process.platform !== "win32")(
       const captureResult = JSON.parse(bodies[7]).input.find(
         (item: { call_id?: string; type: string }) =>
           item.type === "function_call_output" &&
-          item.call_id === "call_browser_fixture_7"
+          item.call_id === "call_tool_fixture_7"
       );
       expect(JSON.parse(captureResult.output[0].text)).toMatchObject({
         status: "succeeded",

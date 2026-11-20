@@ -18,8 +18,8 @@ const MAX_SOURCE_DESCRIPTION: usize = 240;
 /// trusted host registration. Tool descriptions remain attributed results.
 #[derive(Clone, Serialize)]
 pub struct ToolSource {
-    pub name: &'static str,
-    pub description: &'static str,
+    pub name: String,
+    pub description: String,
     pub offers: Vec<ToolOffer>,
 }
 
@@ -112,10 +112,10 @@ impl Catalog {
         let query = words(&request.query);
         let mut matches = Vec::new();
         for source in &self.tools {
-            if !request.includes(source.name) {
+            if !request.includes(&source.name) {
                 continue;
             }
-            let source_score = score(&query, &[source.name, source.description]);
+            let source_score = score(&query, &[&source.name, &source.description]);
             for tool in &source.offers {
                 let name = tool.id.as_str();
                 let exact = request.matches_name(name);
@@ -125,7 +125,7 @@ impl Catalog {
                         (exact, relevance),
                         name,
                         Match::Tool {
-                            source: source.name.into(),
+                            source: source.name.clone(),
                             name: tool.id.clone(),
                             revision: tool.version,
                             description: tool
@@ -202,7 +202,7 @@ impl Catalog {
 
     pub(crate) fn instructions(&self) -> String {
         let mut instructions = String::from(
-            "Use tool_search to discover operations for the task. If the search lists extensions, choose the best match for the task and search again with its name in source. Wait for the next model request before calling a discovered tool. Call only tools offered on the current request, even if you know another tool's name. Use the named skill when its workflow is relevant.",
+            "Use tool_search to discover operations for the task. If the user names an available extension, search with its name in source. If the search lists extensions, choose the best match for the task and search again with its name in source. Wait for the next model request before calling a discovered tool. Call only tools offered on the current request, even if you know another tool's name. Use the named skill when its workflow is relevant.",
         );
         let summaries = self.summaries();
         if !summaries.is_empty() {
@@ -222,7 +222,7 @@ impl Catalog {
             .chain(
                 self.tools
                     .iter()
-                    .map(|source| (source.name, source.description)),
+                    .map(|source| (source.name.as_str(), source.description.as_str())),
             )
             .collect()
     }
@@ -352,8 +352,8 @@ mod tests {
     fn catalog() -> Catalog {
         Catalog::new(
             vec![ToolSource {
-                name: "workbench",
-                description: "Inspect open workbench tabs.",
+                name: "workbench".into(),
+                description: "Inspect open workbench tabs.".into(),
                 offers: vec![offer(
                     "surface_list_open",
                     "Read the active file and open files.",
@@ -370,8 +370,8 @@ mod tests {
     fn initial_extension_summaries_share_order_and_budget() {
         let catalog = Catalog::new(
             vec![ToolSource {
-                name: "browser",
-                description: "Inspect pages.",
+                name: "browser".into(),
+                description: "Inspect pages.".into(),
                 offers: vec![offer("browser_snapshot", "Read the loaded page.")],
             }],
             vec![
@@ -401,8 +401,8 @@ mod tests {
         for count in [1, 12] {
             let catalog = Catalog::new(
                 vec![ToolSource {
-                    name: "zeta",
-                    description: "Inspect status.",
+                    name: "zeta".into(),
+                    description: "Inspect status.".into(),
                     offers: (0..count)
                         .map(|index| offer(&format!("inspect_status_{index}"), "Inspect status."))
                         .collect(),
@@ -447,8 +447,8 @@ mod tests {
     fn an_exact_name_only_activates_that_definition() {
         let catalog = Catalog::new(
             vec![ToolSource {
-                name: "workbench",
-                description: "Inspect pages and files.",
+                name: "workbench".into(),
+                description: "Inspect pages and files.".into(),
                 offers: vec![
                     offer(
                         "browser_action",
@@ -472,8 +472,8 @@ mod tests {
     fn ordinary_screenshot_wording_finds_browser_capture() {
         let catalog = Catalog::new(
             vec![ToolSource {
-                name: "workbench",
-                description: "Inspect pages and files.",
+                name: "workbench".into(),
+                description: "Inspect pages and files.".into(),
                 offers: vec![
                     offer(
                         "browser_action",

@@ -99,14 +99,19 @@ workbench returns an empty view. A detached or replaced workbench is unavailable
 An unverified reply supplies no editor data. The binding grants no filesystem
 access or document mutation.
 
-The negotiated Desktop catalog supplies the definition and handler for each
-eligible operation. The host retains that catalog, its source generation,
-and the endpoint with accepted input. Native discovery first presents one
-bounded summary per extension. A query spanning several extensions returns
+Desktop Main registers eligible operations with their source identity,
+definition and handler. A registration generation belongs to that source
+and endpoint. The host retains the captured endpoint, registrations and tool
+definitions with accepted input. Source replacement retires the previous
+generation even when the replacement has identical definitions. Revoking
+one source leaves other grants available on the same endpoint. Main checks
+the captured source, generation and definition revision before invocation.
+Native discovery first presents one bounded summary per extension. A query
+spanning several extensions returns
 their summaries so the model can choose a source. A source-specific query or
 an exact tool lookup can reveal captured definitions, which become available
-on the model request after search. A
-concurrent invocation from the request that performed the lookup still uses
+on the model request after search. A concurrent invocation from the request
+that performed the lookup still uses
 that request's original inventory. A continued turn keeps the recorded
 definitions even after the source disconnects. Calls to that source report
 unavailable before dispatch. Execution requires the exact captured source

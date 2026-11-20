@@ -22,7 +22,7 @@ use rmcp::model::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
@@ -30,9 +30,12 @@ use uuid::Uuid;
 pub(crate) const CAPABILITY: &str = "co.grida/session/desktop-tools";
 pub(crate) const TOOL_CONTEXT_CAPABILITY: &str = "co.grida/session/editor-tool-context";
 pub(crate) const BROWSER_CAPABILITY: &str = "co.grida/session/desktop-browser-mcp";
+pub(crate) const TOOL_SOURCES_CAPABILITY: &str = "co.grida/session/desktop-tool-sources";
 const REVISION: &str = "co.grida/definitionRevision";
+const TOOL_SOURCE: &str = "co.grida/source";
 const TRUNCATED: &str = "co.grida/truncated";
 const DISPOSITION: &str = "co.grida/disposition";
+const RESULT_DISPOSITION: &str = "co.grida/resultDisposition";
 const INPUT_BYTES: &str = "co.grida/maxInputBytes";
 const OUTPUT_BYTES: &str = "co.grida/maxOutputBytes";
 const RESULT_MIME: &str = "co.grida/resultMimeType";
@@ -40,6 +43,7 @@ const JPEG: &str = "image/jpeg";
 const MAX_TOOLS: usize = 16;
 const MAX_CATALOG_BYTES: usize = 32 * 1024;
 const MAX_EXTENDED_TOOLS: usize = 24;
+const MAX_SOURCES: usize = 16;
 const MAX_EXTENDED_CATALOG_BYTES: usize = 48 * 1024;
 const MAX_TOOL_BYTES: usize = 32 * 1024;
 const MAX_EXTENDED_INPUT_BYTES: usize = 40 * 1024;
@@ -58,6 +62,8 @@ pub(crate) struct Scope {
     pub(crate) context_id: Option<BindingId>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub(crate) browser: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub(crate) sources: bool,
 }
 
 impl Scope {
@@ -66,6 +72,7 @@ impl Scope {
             && self.svg_target_id.is_none()
             && self.context_id.is_none()
             && !self.browser
+            && !self.sources
     }
 }
 
@@ -80,6 +87,11 @@ struct Target {
     session: SessionId,
     endpoint: BindingId,
     scope: Scope,
+}
+
+struct CallMeta<'a> {
+    revision: u32,
+    source: Option<&'a ToolSource>,
 }
 
 #[derive(Clone)]
@@ -131,14 +143,15 @@ impl Source {
                 None,
             )
             .await;
-        let (definitions, jpeg_results) = reply
+        let registered = reply
             .and_then(|message| Catalog::definitions(message, &target.scope))
             .unwrap_or_default();
         Catalog {
             source: self.id.clone(),
-            definitions,
+            definitions: registered.definitions,
             scope: target.scope,
-            jpeg_results,
+            jpeg_results: registered.jpeg_results,
+            qualified_tools: registered.qualified_tools,
         }
     }
 
@@ -149,7 +162,7 @@ impl Source {
         mut request: ClientRequest,
         cancellation: &CancellationToken,
         deadline: Instant,
-        revision: Option<u32>,
+        call: Option<CallMeta<'_>>,
     ) -> Option<ServerJsonRpcMessage> {
         let timeout = deadline.checked_duration_since(Instant::now())?;
         let expires_at_ms = SystemTime::now()
@@ -165,8 +178,17 @@ impl Source {
             Implementation::new("grida-agent", env!("CARGO_PKG_VERSION")),
             ClientCapabilities::default(),
         );
-        if let Some(revision) = revision {
-            metadata.insert(REVISION.to_owned(), revision.into());
+        if let Some(call) = call {
+            metadata.insert(REVISION.to_owned(), call.revision.into());
+            if let Some(source) = call.source {
+                metadata.insert(
+                    TOOL_SOURCE.to_owned(),
+                    serde_json::json!({
+                        "id": source.id,
+                        "generation": source.generation,
+                    }),
+                );
+            }
         }
         let request = Request {
             session_id: target.session.clone(),
@@ -208,6 +230,68 @@ pub(crate) struct Catalog {
     scope: Scope,
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     jpeg_results: BTreeSet<ToolId>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    qualified_tools: BTreeMap<ToolId, QualifiedTool>,
+}
+
+#[derive(Default)]
+struct RegisteredTools {
+    definitions: Vec<CapabilityDefinition>,
+    jpeg_results: BTreeSet<ToolId>,
+    qualified_tools: BTreeMap<ToolId, QualifiedTool>,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct QualifiedTool {
+    source: ToolSource,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    result_disposition: bool,
+}
+
+#[derive(Clone, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct ToolSource {
+    id: String,
+    generation: String,
+    description: String,
+}
+
+impl QualifiedTool {
+    fn from_wire(tool: &Tool) -> Option<Self> {
+        let meta = tool.meta.as_ref()?;
+        let source: ToolSource = serde_json::from_value(meta.get(TOOL_SOURCE)?.clone()).ok()?;
+        let result_disposition = match meta.get(RESULT_DISPOSITION) {
+            None => false,
+            Some(value) if value.as_bool() == Some(true) => true,
+            _ => return None,
+        };
+        if source.id.len() > 64
+            || source.id.split('-').any(|segment| {
+                segment.is_empty()
+                    || !segment
+                        .bytes()
+                        .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
+            })
+            || source.generation.is_empty()
+            || source.generation.len() > 128
+            || !source.generation.bytes().all(|byte| {
+                byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'/' | b':' | b'-')
+            })
+            || source.description.trim().is_empty()
+            || source.description.len() > 160
+            || source
+                .description
+                .chars()
+                .any(|value| value.is_control() || matches!(value, '\u{2028}' | '\u{2029}'))
+        {
+            return None;
+        }
+        Some(Self {
+            source,
+            result_disposition,
+        })
+    }
 }
 
 impl Catalog {
@@ -217,6 +301,7 @@ impl Catalog {
             definitions: Vec::new(),
             scope,
             jpeg_results: BTreeSet::new(),
+            qualified_tools: BTreeMap::new(),
         }
     }
 
@@ -240,12 +325,37 @@ impl Catalog {
         self.scope.browser
     }
 
+    pub(crate) fn uses_tool_sources(&self) -> bool {
+        self.scope.sources
+    }
+
+    pub(crate) fn has_image_results(&self) -> bool {
+        !self.jpeg_results.is_empty()
+    }
+
+    pub(crate) fn source_summaries(&self, workbench: bool) -> BTreeMap<ToolId, (&str, &str)> {
+        self.definitions
+            .iter()
+            .filter_map(|definition| {
+                let id = &definition.tool.id;
+                let source = &self.qualified_tools.get(id)?.source;
+                let exposed = ToolId::new(exposed_name(id.as_str(), workbench)).ok()?;
+                Some((exposed, (source.id.as_str(), source.description.as_str())))
+            })
+            .collect()
+    }
+
     pub(crate) fn has_browser_tools(&self) -> bool {
         self.uses_browser_mcp()
-            && self
-                .definitions
-                .iter()
-                .any(|definition| definition.tool.id.as_str().starts_with("browser_"))
+            && if self.uses_tool_sources() {
+                self.qualified_tools
+                    .values()
+                    .any(|tool| tool.source.id == "browser")
+            } else {
+                self.definitions
+                    .iter()
+                    .any(|definition| definition.tool.id.as_str().starts_with("browser_"))
+            }
     }
 
     pub(crate) fn without_workbench_compatibility(mut self) -> Self {
@@ -266,6 +376,7 @@ impl Catalog {
         self.definitions.iter().filter(move |definition| {
             let reserved = workbench
                 && !self.scope.browser
+                && !self.scope.sources
                 && matches!(
                     definition.tool.id.as_str(),
                     super::WORKBENCH_LIST_TABS
@@ -278,17 +389,15 @@ impl Catalog {
         })
     }
 
-    fn definitions(
-        message: ServerJsonRpcMessage,
-        scope: &Scope,
-    ) -> Option<(Vec<CapabilityDefinition>, BTreeSet<ToolId>)> {
+    fn definitions(message: ServerJsonRpcMessage, scope: &Scope) -> Option<RegisteredTools> {
         let ServerJsonRpcMessage::Response(reply) = message else {
             return None;
         };
         let ServerResult::ListToolsResult(list) = reply.result else {
             return None;
         };
-        let (max_tools, max_bytes) = if scope.browser {
+        let extended = scope.browser || scope.sources;
+        let (max_tools, max_bytes) = if extended {
             (MAX_EXTENDED_TOOLS, MAX_EXTENDED_CATALOG_BYTES)
         } else {
             (MAX_TOOLS, MAX_CATALOG_BYTES)
@@ -306,23 +415,45 @@ impl Catalog {
             .then(presentation::definition)
             .transpose()
             .ok()?;
+        let mut file_presentation = presentation.clone();
+        if let Some(file) = &mut file_presentation {
+            file.id = ToolId::new(presentation::WORKBENCH_SHOW).ok()?;
+        }
         let targeted_presentation = (scope.presentation && scope.browser)
             .then(|| crate::browser_tools::definition(presentation::WORKBENCH_SHOW, true))
             .transpose()
             .ok()?;
-        let mut definitions = Vec::with_capacity(list.tools.len());
-        let mut jpeg_results = BTreeSet::new();
+        let mut registered = RegisteredTools::default();
         for tool in list.tools {
-            let (mut definition, jpeg) = desktop_definition(tool, scope.browser)?;
+            let qualified = if scope.sources {
+                Some(QualifiedTool::from_wire(&tool)?)
+            } else {
+                None
+            };
+            let (mut definition, jpeg) = desktop_definition(tool, extended)?;
+            if jpeg
+                && qualified
+                    .as_ref()
+                    .is_some_and(|tool| !tool.result_disposition)
+            {
+                return None;
+            }
+            let workbench_source = qualified
+                .as_ref()
+                .is_none_or(|tool| tool.source.id == "workbench");
             match definition.tool.id.as_str() {
                 presentation::OPEN => {
-                    if scope.browser || presentation.as_ref() != Some(&definition.tool) {
+                    if scope.browser
+                        || scope.sources
+                        || presentation.as_ref() != Some(&definition.tool)
+                    {
                         continue;
                     }
                     definition.effect = CapabilityEffect::Presentation;
                 }
                 presentation::WORKBENCH_SHOW if scope.browser => {
-                    if definition.effect != CapabilityEffect::Mutation || jpeg {
+                    if !workbench_source || definition.effect != CapabilityEffect::Mutation || jpeg
+                    {
                         continue;
                     }
                     definition.effect = CapabilityEffect::Presentation;
@@ -330,18 +461,47 @@ impl Catalog {
                         continue;
                     }
                 }
+                presentation::WORKBENCH_SHOW if scope.sources => {
+                    if !workbench_source
+                        || definition.effect != CapabilityEffect::Mutation
+                        || file_presentation.as_ref() != Some(&definition.tool)
+                        || jpeg
+                    {
+                        continue;
+                    }
+                    definition.effect = CapabilityEffect::Presentation;
+                }
                 _ => {}
             }
             if jpeg {
-                jpeg_results.insert(definition.tool.id.clone());
+                registered.jpeg_results.insert(definition.tool.id.clone());
             }
-            definitions.push(definition);
+            if let Some(qualified) = qualified {
+                registered
+                    .qualified_tools
+                    .insert(definition.tool.id.clone(), qualified);
+            }
+            registered.definitions.push(definition);
         }
-        definitions.sort_by(|left, right| left.tool.id.cmp(&right.tool.id));
-        definitions
+        registered
+            .definitions
+            .sort_by(|left, right| left.tool.id.cmp(&right.tool.id));
+        let mut sources = BTreeMap::new();
+        for qualified in registered.qualified_tools.values() {
+            let source = &qualified.source;
+            let first = sources.entry(&source.id).or_insert(source);
+            if *first != source {
+                return None;
+            }
+        }
+        if sources.len() > MAX_SOURCES {
+            return None;
+        }
+        registered
+            .definitions
             .windows(2)
             .all(|pair| pair[0].tool.id != pair[1].tool.id)
-            .then_some((definitions, jpeg_results))
+            .then_some(registered)
     }
 
     pub(super) fn tool_host(
@@ -381,12 +541,17 @@ impl Catalog {
                         "List file tabs in the attached workbench and report its active file. Paths are relative to the workspace root and have a leading slash.".into();
                 }
                 let jpeg_result = self.jpeg_results.contains(&wire_name);
+                let qualified = self.qualified_tools.get(&wire_name).cloned();
+                if self.scope.sources && qualified.is_none() {
+                    return Err(Error::new(ErrorKind::InvalidState, "desktop_tool_source_missing"));
+                }
                 let executor = Arc::new(Execute {
                     source: source.clone(),
                     target: target.clone(),
                     wire_name,
                     reveal_file,
                     jpeg_result,
+                    qualified,
                     max_wire_result_bytes: definition.tool.max_output_bytes,
                     capture: jpeg_result.then(|| capture.clone()).flatten(),
                 }) as Arc<dyn CapabilityExecutor>;
@@ -475,6 +640,7 @@ struct Execute {
     wire_name: ToolId,
     reveal_file: bool,
     jpeg_result: bool,
+    qualified: Option<QualifiedTool>,
     max_wire_result_bytes: usize,
     capture: Option<Arc<ImageCapture>>,
 }
@@ -533,7 +699,7 @@ impl Execute {
         if self.jpeg_result && self.capture.is_none() {
             return ToolOutcome::failed("desktop_tool_media_unavailable");
         }
-        let timeout = if self.target.scope.browser && self.max_wire_result_bytes > MAX_TOOL_BYTES {
+        let timeout = if self.max_wire_result_bytes > MAX_TOOL_BYTES {
             EXTENDED_REPLY_TIMEOUT
         } else {
             REPLY_TIMEOUT
@@ -549,7 +715,10 @@ impl Execute {
                 request.into(),
                 &call.cancellation,
                 call.deadline.min(Instant::now() + timeout),
-                Some(call.version),
+                Some(CallMeta {
+                    revision: call.version,
+                    source: self.qualified.as_ref().map(|tool| &tool.source),
+                }),
             )
             .await;
         match message {
@@ -569,13 +738,18 @@ impl Execute {
             return ToolOutcome::uncertain();
         }
         let disposition = result.meta.as_ref().and_then(|meta| meta.get(DISPOSITION));
-        let browser_result = self.target.scope.browser
-            && (self.wire_name.as_str().starts_with("browser_")
-                || self.wire_name.as_str().starts_with("workbench_"));
+        let legacy_browser_result = !self.target.scope.sources && self.target.scope.browser;
+        let requires_disposition = self
+            .qualified
+            .as_ref()
+            .is_some_and(|tool| tool.result_disposition)
+            || legacy_browser_result
+                && (self.wire_name.as_str().starts_with("browser_")
+                    || self.wire_name.as_str().starts_with("workbench_"));
         let verified = match disposition {
-            None if !browser_result => false,
+            None if !requires_disposition => false,
             Some(value)
-                if self.target.scope.browser
+                if (requires_disposition || legacy_browser_result)
                     && result
                         .structured_content
                         .as_ref()
@@ -746,14 +920,71 @@ mod tests {
             ..Scope::default()
         };
         assert!(Catalog::definitions(list_reply(tools.clone()), &Scope::default()).is_none());
-        let (definitions, _) = Catalog::definitions(list_reply(tools), &scope).unwrap();
-        assert_eq!(definitions.len(), 17);
+        let registered = Catalog::definitions(list_reply(tools), &scope).unwrap();
+        assert_eq!(registered.definitions.len(), 17);
 
         let unavailable = Catalog::unavailable(BindingId::new("retired-editor").unwrap(), scope);
         let restored: Catalog =
             serde_json::from_value(serde_json::to_value(unavailable).unwrap()).unwrap();
         assert!(restored.uses_browser_mcp());
         assert!(!restored.has_browser_tools());
+    }
+
+    #[test]
+    fn qualified_catalogs_pin_one_bounded_registration_per_source() {
+        let scope = Scope {
+            sources: true,
+            ..Scope::default()
+        };
+        let qualified = |name: &str, generation: &str, description: &str| {
+            let mut wire = tool_descriptor(name);
+            wire["_meta"][TOOL_SOURCE] = json!({
+                "id":"fixture-tools","generation":generation,"description":description
+            });
+            wire
+        };
+        let first = qualified("first_tool", "first", "Inspect fixtures.");
+        let second = qualified("second_tool", "first", "Inspect fixtures.");
+        let registered =
+            Catalog::definitions(list_reply(vec![first.clone(), second]), &scope).unwrap();
+        let restored: Catalog = serde_json::from_value(
+            serde_json::to_value(Catalog {
+                source: BindingId::new("fixture-connection").unwrap(),
+                definitions: registered.definitions,
+                scope: scope.clone(),
+                jpeg_results: registered.jpeg_results,
+                qualified_tools: registered.qualified_tools,
+            })
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            restored.source_summaries(true),
+            BTreeMap::from([
+                (
+                    ToolId::new("first_tool").unwrap(),
+                    ("fixture-tools", "Inspect fixtures.")
+                ),
+                (
+                    ToolId::new("second_tool").unwrap(),
+                    ("fixture-tools", "Inspect fixtures.")
+                ),
+            ])
+        );
+        for malformed in [
+            qualified("second_tool", "different-generation", "Inspect fixtures."),
+            qualified(
+                "second_tool",
+                "first",
+                "Inspect fixtures.\nUnverified text.",
+            ),
+            qualified("second_tool", "first", &"界".repeat(54)),
+            tool_descriptor("second_tool"),
+        ] {
+            assert!(
+                Catalog::definitions(list_reply(vec![first.clone(), malformed]), &scope).is_none()
+            );
+        }
     }
 
     #[test]
@@ -777,21 +1008,89 @@ mod tests {
         assert!(parse(wire, true).is_none());
     }
 
+    #[test]
+    fn qualified_file_reveal_uses_the_exact_trusted_workbench() {
+        let legacy = presentation::definition().unwrap();
+        let InputFormat::Json(schema) = legacy.input else {
+            panic!("expected a JSON schema");
+        };
+        let wire = |source| {
+            json!({
+                "name":"workbench_show","description":legacy.description,"inputSchema":schema,
+                "_meta":{"co.grida/definitionRevision":legacy.version,"co.grida/source":{
+                    "id":source,"generation":"fixture","description":"Show a file."
+                }}
+            })
+        };
+        let scope = Scope {
+            sources: true,
+            presentation: true,
+            ..Scope::default()
+        };
+        let unrelated =
+            Catalog::definitions(list_reply(vec![wire("another-extension")]), &scope).unwrap();
+        assert!(unrelated.definitions.is_empty());
+        let registered = Catalog::definitions(list_reply(vec![wire("workbench")]), &scope).unwrap();
+        let catalog = Catalog {
+            source: BindingId::new("captured-source").unwrap(),
+            definitions: registered.definitions,
+            scope,
+            jpeg_results: registered.jpeg_results,
+            qualified_tools: registered.qualified_tools,
+        };
+        let host = catalog
+            .tool_host(
+                None,
+                &SessionId::new("captured-session").unwrap(),
+                &BindingId::new("editor-endpoint").unwrap(),
+                GrantKind::Presentation,
+                true,
+                None,
+            )
+            .unwrap()
+            .unwrap();
+        let typed = presentation::workbench_show_definition().unwrap();
+        assert_eq!(
+            host.grant(&typed.id).unwrap().describe().unwrap().tool,
+            typed
+        );
+    }
+
     #[tokio::test]
-    async fn browser_result_requires_correlated_dispatch_evidence() {
+    async fn declared_result_disposition_requires_correlated_dispatch_evidence() {
+        for qualified in [false, true] {
+            check_disposition(qualified).await;
+        }
+    }
+
+    async fn check_disposition(qualified: bool) {
         let execute = Execute {
             source: None,
             target: Target {
                 session: SessionId::new("captured-session").unwrap(),
                 endpoint: BindingId::new("editor-endpoint").unwrap(),
                 scope: Scope {
-                    browser: true,
+                    browser: !qualified,
+                    sources: qualified,
                     ..Scope::default()
                 },
             },
-            wire_name: ToolId::new("browser_action").unwrap(),
+            wire_name: ToolId::new(if qualified {
+                "fixture_tool"
+            } else {
+                "browser_action"
+            })
+            .unwrap(),
             reveal_file: false,
             jpeg_result: false,
+            qualified: qualified.then(|| QualifiedTool {
+                source: ToolSource {
+                    id: "fixture-tools".into(),
+                    generation: "captured".into(),
+                    description: "Inspect fixtures.".into(),
+                },
+                result_disposition: true,
+            }),
             max_wire_result_bytes: MAX_EXTENDED_OUTPUT_BYTES,
             capture: None,
         };
@@ -853,6 +1152,7 @@ mod tests {
                 ..Scope::default()
             },
             jpeg_results: BTreeSet::new(),
+            qualified_tools: BTreeMap::new(),
         };
         let captured = serde_json::to_value(&catalog).unwrap();
         let session = SessionId::new("captured-session").unwrap();
@@ -916,6 +1216,7 @@ mod tests {
             wire_name: ToolId::new(presentation::OPEN).unwrap(),
             reveal_file: true,
             jpeg_result: false,
+            qualified: None,
             max_wire_result_bytes: MAX_TOOL_BYTES,
             capture: None,
         };

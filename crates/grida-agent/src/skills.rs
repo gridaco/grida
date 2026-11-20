@@ -287,11 +287,6 @@ impl SkillListing {
             .map(|skill| (skill.name.as_str(), skill.description.as_str()))
     }
 
-    #[cfg(test)]
-    pub(crate) fn instructions(&self) -> String {
-        self.instructions_with_discovery(false)
-    }
-
     pub(crate) fn instructions_with_discovery(&self, discovery: bool) -> String {
         let mut entries = String::new();
         let mut omitted = 0;
@@ -826,7 +821,7 @@ mod tests {
             listing.bundled().collect::<Vec<_>>(),
             ["dotcanvas", "slides", "svg"]
         );
-        let text = listing.instructions();
+        let text = listing.instructions_with_discovery(false);
         let bundled = text.find("- dotcanvas:").unwrap();
         let workspace = text
             .find("- aaa-notes: A small project workflow. (workspace; read `.claude/skills/aaa-notes/SKILL.md`)")
@@ -846,7 +841,7 @@ mod tests {
             description: "d".repeat(MAX_DESCRIPTION),
             source: SkillSource::ProjectAgents,
         }));
-        let text = many.instructions();
+        let text = many.instructions_with_discovery(false);
         assert!(text.len() < MAX_LISTING_BYTES + 4 * 1024);
         assert!(text.contains("- slides:"));
         assert!(text.contains("more workspace skills are not listed here."));
@@ -888,13 +883,17 @@ mod tests {
             let listing = SkillListing::capture(Some(&project)).unwrap();
             assert_eq!(listing.bundled().collect::<Vec<_>>(), bundled);
             assert_eq!(listing.skills.len(), bundled.len(), "{code}");
-            let text = listing.instructions();
+            let text = listing.instructions_with_discovery(false);
             assert!(text.contains(WORKSPACE_UNAVAILABLE), "{code}");
             assert!(text.contains("- slides:"), "{code}");
         }
         fs::set_permissions(&locked, fs::Permissions::from_mode(0o700)).unwrap();
         let listing = SkillListing::capture(Some(&ProjectRoot::open(&root).unwrap())).unwrap();
-        assert!(!listing.instructions().contains(WORKSPACE_UNAVAILABLE));
+        assert!(
+            !listing
+                .instructions_with_discovery(false)
+                .contains(WORKSPACE_UNAVAILABLE)
+        );
         // A listing recorded before this field existed reads as available.
         let restored: SkillListing = serde_json::from_str(r#"{"skills":[]}"#).unwrap();
         assert!(!restored.workspace_unavailable);

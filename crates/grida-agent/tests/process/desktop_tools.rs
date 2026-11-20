@@ -6,6 +6,7 @@ use base64::{Engine, engine::general_purpose::STANDARD};
 
 const CAPABILITY: &str = "co.grida/session/desktop-tools";
 const TOOL_CONTEXT: &str = "co.grida/session/editor-tool-context";
+const TOOL_SOURCES: &str = "co.grida/session/desktop-tool-sources";
 const METHOD: &str = "_co.grida/editor/desktop-tools";
 const LEGACY_READ: &str = "_co.grida/editor/surface-list-open";
 const BROWSER: &str = "co.grida/session/browser-tools";
@@ -291,7 +292,219 @@ fn assert_counter(outcome: Value) {
     assert_eq!(outcome["structured"], json!({"count":11}));
 }
 
+#[tokio::test]
+async fn queued_tool_calls_keep_their_source_generation_despite_identical_replacement() {
+    const RED: &str = "desktop_red_lens__inspect";
+    const BLUE: &str = "desktop_blue_lens__inspect";
+    const RED_GENERATION: &str = "red-first-generation";
+    const BLUE_GENERATION: &str = "blue-first-generation";
+    let state = TempDir::new().unwrap();
+    let workspace = TempDir::new().unwrap();
+    let (mut client, session) = start_with_sources(&state, &workspace, Peer::Desktop, true).await;
+    let blocking = client
+        .send(
+            "_co.grida/session/submit",
+            json!({
+                "sessionId":session,"inputId":"blocking","operatingRegime":"act",
+                "prompt":[{"type":"text","text":"Finish this first."}]
+            }),
+        )
+        .await;
+    let descriptor = |name: &str, source: &str, generation: &str| {
+        json!({"name":name,"description":"Inspect a fixture.","inputSchema":{"type":"object"},
+            "annotations":{"readOnlyHint":true},"_meta":{"co.grida/definitionRevision":7,
+                "co.grida/resultDisposition":true,
+                "co.grida/source":{"id":source,"generation":generation,"description":"Inspect fixture documents."}}})
+    };
+    let mut queued = None;
+    let mut held_read = None;
+    let mut accepted = false;
+    let mut listed = false;
+    let mut chunk = None;
+    let mut next_model_request = 0;
+    let mut red_generation = RED_GENERATION;
+    let mut calls = Vec::new();
+    loop {
+        let frame = client.read_frame().await;
+        if frame["id"] == blocking {
+            assert!(frame["result"].is_object(), "{frame}");
+        }
+        if queued.is_some_and(|id| frame["id"] == id) {
+            assert!(listed, "queue must capture its catalog before admission");
+            assert_eq!(frame["result"]["disposition"], "queued", "{frame}");
+            accepted = true;
+            // Only the registration generation changes. The alias, schema,
+            // and revision of the newly installed provider are identical.
+            red_generation = "red-replacement-generation";
+            client
+                .respond(
+                    &held_read.take().unwrap(),
+                    json!({"status":"chunk","data":chunk.take().unwrap()}),
+                )
+                .await;
+        }
+        let params = &frame["params"];
+        match frame["method"].as_str() {
+            Some(METHOD) => {
+                assert_eq!(params["sessionId"], session);
+                assert_eq!(params["endpointId"], ENDPOINT);
+                assert_eq!(params["scope"], json!({"sources":true}));
+                let message = &params["message"];
+                let id = &message["id"];
+                let reply = match message["method"].as_str() {
+                    Some("tools/list") => {
+                        assert!(!listed && !accepted, "{frame}");
+                        listed = true;
+                        json!({"jsonrpc":"2.0","id":id,"result":{"resultType":"complete","tools":[
+                            descriptor(RED,"red-lens",red_generation),
+                            descriptor(BLUE,"blue-lens",BLUE_GENERATION)
+                        ]}})
+                    }
+                    Some("tools/call") => {
+                        assert!(accepted, "{frame}");
+                        let name = message["params"]["name"].as_str().unwrap();
+                        let metadata = &message["params"]["_meta"];
+                        assert_eq!(metadata["co.grida/definitionRevision"], 7);
+                        assert_eq!(message["params"]["arguments"], json!({}));
+                        calls.push(name.to_owned());
+                        match name {
+                            RED => {
+                                assert_eq!(
+                                    metadata["co.grida/source"],
+                                    json!({"id":"red-lens","generation":RED_GENERATION})
+                                );
+                                assert_ne!(
+                                    metadata["co.grida/source"]["generation"],
+                                    red_generation
+                                );
+                                unavailable(id)
+                            }
+                            BLUE => {
+                                assert_eq!(
+                                    metadata["co.grida/source"],
+                                    json!({"id":"blue-lens","generation":BLUE_GENERATION})
+                                );
+                                json!({"jsonrpc":"2.0","id":id,"result":{"resultType":"complete","content":[],
+                                    "_meta":{"co.grida/disposition":"not_dispatched"},
+                                    "structuredContent":{"disposition":"not_dispatched","owner":"blue-lens"}}})
+                            }
+                            _ => panic!("unexpected wire name: {frame}"),
+                        }
+                    }
+                    _ => panic!("unexpected MCP request: {frame}"),
+                };
+                client
+                    .respond(
+                        &frame["id"],
+                        json!({"sessionId":session,"endpointId":ENDPOINT,"message":reply}),
+                    )
+                    .await;
+            }
+            Some("_co.grida/provider/exchange") => {
+                let result = match params["action"].as_str() {
+                    Some("open") => {
+                        let body = provider_body(params);
+                        let response = if queued.is_none() {
+                            Reply::Finished("The first turn finished.")
+                        } else {
+                            let response = match next_model_request {
+                                0 => {
+                                    assert!(offered_tool(&body, RED).is_none());
+                                    assert!(offered_tool(&body, BLUE).is_none());
+                                    Reply::Tool("tool_search", r#"{"query":"inspect fixture"}"#)
+                                }
+                                1 => {
+                                    let found = tool_outcome(&body, "tool_search");
+                                    let matches =
+                                        found["structured"]["matches"].as_array().unwrap();
+                                    assert_eq!(matches.len(), 2);
+                                    assert_eq!(matches[0]["kind"], "extension");
+                                    assert_eq!(matches[0]["name"], "blue-lens");
+                                    assert_eq!(matches[1]["name"], "red-lens");
+                                    assert!(offered_tool(&body, RED).is_none());
+                                    assert!(offered_tool(&body, BLUE).is_none());
+                                    Reply::Tool(
+                                        "tool_search",
+                                        r#"{"query":"inspect","source":"red-lens"}"#,
+                                    )
+                                }
+                                2 => {
+                                    assert!(offered_tool(&body, RED).is_some());
+                                    assert!(offered_tool(&body, BLUE).is_none());
+                                    Reply::Tool(RED, "{}")
+                                }
+                                3 => {
+                                    let outcome = tool_outcome(&body, RED);
+                                    assert_eq!(outcome["status"], "failed");
+                                    assert!(
+                                        outcome
+                                            .to_string()
+                                            .contains("editor_surface_endpoint_unavailable")
+                                    );
+                                    Reply::Tool(
+                                        "tool_search",
+                                        r#"{"query":"inspect","source":"blue-lens"}"#,
+                                    )
+                                }
+                                4 => {
+                                    assert!(offered_tool(&body, BLUE).is_some());
+                                    Reply::Tool(BLUE, "{}")
+                                }
+                                5 => {
+                                    let outcome = tool_outcome(&body, BLUE);
+                                    assert_eq!(outcome["status"], "succeeded");
+                                    assert_eq!(outcome["structured"]["owner"], "blue-lens");
+                                    Reply::Finished("Only blue could inspect the fixture.")
+                                }
+                                _ => panic!("unexpected inference: {body}"),
+                            };
+                            next_model_request += 1;
+                            response
+                        };
+                        chunk = Some(
+                            STANDARD.encode(fixture_body(response, ProviderProtocol::Responses)),
+                        );
+                        json!({"status":"accepted"})
+                    }
+                    Some("dispatch") => json!({"status":"ready","httpStatus":200}),
+                    Some("read") if queued.is_none() => {
+                        held_read = Some(frame["id"].clone());
+                        queued = Some(client.send("_co.grida/session/enqueue", json!({
+                            "sessionId":session,"inputId":"inspect-queued","operatingRegime":"act",
+                            "editorEndpointId":ENDPOINT,
+                            "prompt":[{"type":"text","text":"Inspect both sources."}]
+                        })).await);
+                        continue;
+                    }
+                    Some("read") => match chunk.take() {
+                        Some(data) => json!({"status":"chunk","data":data}),
+                        None => json!({"status":"end"}),
+                    },
+                    _ => panic!("unexpected provider exchange: {frame}"),
+                };
+                client.respond(&frame["id"], result).await;
+            }
+            Some("_co.grida/provider/cancel") if next_model_request == 6 => break,
+            Some(method) if method.starts_with("_co.grida/editor/") => {
+                panic!("unexpected fallback: {frame}");
+            }
+            _ => {}
+        }
+    }
+    assert_eq!(calls, [RED, BLUE]);
+    client.close().await;
+}
+
 async fn start(state: &TempDir, workspace: &TempDir, peer: Peer) -> (StdioClient, String) {
+    start_with_sources(state, workspace, peer, false).await
+}
+
+async fn start_with_sources(
+    state: &TempDir,
+    workspace: &TempDir,
+    peer: Peer,
+    tool_sources: bool,
+) -> (StdioClient, String) {
     let mut command = executable();
     command.args([
         "serve",
@@ -318,6 +531,9 @@ async fn start(state: &TempDir, workspace: &TempDir, peer: Peer) -> (StdioClient
     if peer != Peer::Legacy {
         initialize["clientCapabilities"]["_meta"][CAPABILITY] = 1.into();
     }
+    if tool_sources {
+        initialize["clientCapabilities"]["_meta"][TOOL_SOURCES] = 1.into();
+    }
     if peer.has_selection() || peer == Peer::Legacy {
         initialize["clientCapabilities"]["_meta"][TOOL_CONTEXT] = 1.into();
     }
@@ -343,6 +559,10 @@ async fn start(state: &TempDir, workspace: &TempDir, peer: Peer) -> (StdioClient
     assert_eq!(
         capabilities[CAPABILITY].as_u64(),
         (peer != Peer::Legacy).then_some(1)
+    );
+    assert_eq!(
+        capabilities[TOOL_SOURCES].as_u64(),
+        tool_sources.then_some(1)
     );
     assert_eq!(
         capabilities[TOOL_CONTEXT].as_u64(),

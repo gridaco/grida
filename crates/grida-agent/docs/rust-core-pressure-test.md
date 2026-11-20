@@ -960,6 +960,10 @@ source-choice step when several extensions match. The
 shared carrier, model image eligibility, and legacy compatibility. The
 [Main process cases](../../../desktop/src/main/native-agent-process.test.ts)
 exercise Browser replies under backpressure and against the packaged host.
+The private source registration tests cover colliding local operation names
+and replacement with an identical definition after accepted input. The
+retired generation must refuse its call while the sibling source on the same
+workbench remains usable.
 The authenticated export and actual guest interaction have separate
 [loopback](../../../desktop/src/main/native-editor-mcp-export.test.ts) and
 [Electron](../../../desktop/src/main/browser-automation.electron.test.ts)

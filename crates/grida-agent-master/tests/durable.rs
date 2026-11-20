@@ -1567,8 +1567,8 @@ async fn search_activates_only_the_next_request_even_after_interrupted_publicati
     let mut fixture = Fixture::new(Script::DiscoverThenCall);
     let catalog = Catalog::new(
         vec![ToolSource {
-            name: "fixture",
-            description: "A fixture that echoes a supplied value.",
+            name: "fixture".into(),
+            description: "A fixture that echoes a supplied value.".into(),
             offers: fixture.inventory.offers().unwrap(),
         }],
         Vec::new(),
