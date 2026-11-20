@@ -38,10 +38,17 @@ relative `route`. Resolve it against the running service URL returned by
 When the user wants the viewer started, run `grida-fx start --json` in the
 project with Full access and retain its foreground process.
 
-Open the resulting URL with `surface_open`. Use `browser_snapshot` to identify
-the tab and current document, then `browser_evaluate` with that document ID to
-read the viewer's context. Verify the subject and selection before using its
-presentation API or telling the user what appeared.
+When the workbench offers URL presentation, use `workbench_show` with
+`{"target":{"kind":"url","url":"<viewer URL>"}}`. Discover deferred workbench
+and browser tools with `tool_search` before invoking them. On an older host,
+use `surface_open` if its offered schema accepts a URL.
+
+Pass the returned tab ID to `browser_snapshot` as a workbench target. If the
+tab ID is missing, find it with `workbench_list_tabs`, or with
+`surface_list_open` if an older host offers browser tab inventory. Use
+`browser_evaluate` with the current document ID to read the viewer's context.
+Verify the subject and selection before using its presentation API or telling
+the user what appeared.
 
 ## Single image
 

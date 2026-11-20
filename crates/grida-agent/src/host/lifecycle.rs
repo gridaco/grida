@@ -1163,6 +1163,7 @@ impl Host {
                             editor_presentation: false,
                             editor_browser_tools: false,
                             editor_svg_target: None,
+                            editor_tool_context_id: None,
                             operating_regime,
                             subagent: None,
                             effort,

@@ -78,6 +78,7 @@ its chat. Ask about files inside the deck by name while you work in the slide
 editor. A deck opened from inside a project has its own saved chats and can
 reach only the files within the deck.
 [Edit selected text](#edit-selected-text-in-an-svg-or-slide)
+[Work with an SVG selection](#work-with-an-svg-selection)
 
 ## Attach an image
 
@@ -148,13 +149,28 @@ is not a saved copy, so moving or deleting the folder can make it unavailable.
 If your installed Desktop build cannot accept folder references, the drop
 shows an update message and keeps the draft and current attachment.
 
+## Work with an SVG selection
+
+Open an SVG or a slide in Desktop, then select objects or points on a path.
+Send an **Act** message that refers to the selection, such as “Set these two
+shapes to 50% opacity.” The marker above the composer shows when the selection
+will go with your message. The sent message keeps a marker for that capture.
+
+The agent can inspect the selected objects or path points in the live editor.
+Opacity edits apply to the selected objects in one Undo step. Use **Save** in
+the editor to write the change to disk.
+
+A queued message keeps the selection you sent. Switching tabs or slides,
+changing the selection, or editing the document can make that capture stale.
+Select the targets again and send a new message. **Plan** messages omit the
+selection.
+
 ## Edit selected text in an SVG or slide
 
 Open an SVG or a slide in Desktop and select one plain text element. Without
 the **Plan** badge, send a message asking the agent to read or replace it, for
-example “Make this heading shorter.” The composer shows **SVG text selection**
-when the selection can go with your message. Look above the sent message to
-see whether it carried the selection. The change appears in the editor and can
+example “Make this heading shorter.” Look for the selection marker above the
+composer and the sent message. The change appears in the editor and can
 be undone there; use the editor's **Save** command to write it to disk. If
 another program has changed the file, the save dialog handles the conflict.
 

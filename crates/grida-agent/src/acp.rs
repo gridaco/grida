@@ -303,14 +303,40 @@ async fn serve_connection(
                         let svg = offered(svg_text);
                         let browser = crate::browser_tools::CAPABILITY;
                         let browser_offered = offered(browser);
-                        initialized_host.editor_surfaces.attach(
+                        let desktop_tools = crate::editor_surfaces::DESKTOP_TOOLS_CAPABILITY;
+                        let desktop_tools_offered = offered(desktop_tools);
+                        let browser_mcp = crate::editor_surfaces::mcp::BROWSER_CAPABILITY;
+                        let browser_mcp_offered = desktop_tools_offered && browser_offered && offered(browser_mcp);
+                        let tool_sources = crate::editor_surfaces::mcp::TOOL_SOURCES_CAPABILITY;
+                        let tool_sources_offered = desktop_tools_offered && offered(tool_sources);
+                        if let Err(error) = initialized_host.editor_surfaces.attach(
                             connection.clone(),
-                            presentation,
-                            svg,
-                            browser_offered,
-                        );
+                            crate::editor_surfaces::DesktopCapabilities {
+                                presentation,
+                                svg_text: svg,
+                                browser: browser_offered,
+                                tools: desktop_tools_offered,
+                                browser_mcp: browser_mcp_offered,
+                                tool_sources: tool_sources_offered,
+                            },
+                        ) {
+                            return responder.respond_with_error(host_error(error));
+                        }
+                        if desktop_tools_offered {
+                            advertised.insert(desktop_tools.into(), 1.into());
+                            let context = crate::editor_surfaces::mcp::TOOL_CONTEXT_CAPABILITY;
+                            if offered(context) {
+                                advertised.insert(context.into(), 1.into());
+                            }
+                        }
                         if browser_offered {
                             advertised.insert(browser.into(), 1.into());
+                        }
+                        if browser_mcp_offered {
+                            advertised.insert(browser_mcp.into(), 1.into());
+                        }
+                        if tool_sources_offered {
+                            advertised.insert(tool_sources.into(), 1.into());
                         }
                         advertised.insert(capability.into(), 1.into());
                         if presentation {
@@ -338,6 +364,10 @@ async fn serve_connection(
                             crate::editor_surfaces::CAPABILITY,
                             crate::editor_surfaces::OPEN_CAPABILITY,
                             crate::editor_surfaces::SVG_TEXT_CAPABILITY,
+                            crate::editor_surfaces::DESKTOP_TOOLS_CAPABILITY,
+                            crate::editor_surfaces::mcp::TOOL_CONTEXT_CAPABILITY,
+                            crate::editor_surfaces::mcp::BROWSER_CAPABILITY,
+                            crate::editor_surfaces::mcp::TOOL_SOURCES_CAPABILITY,
                             crate::browser_tools::CAPABILITY,
                             extensions::gateway_billing::CAPABILITY,
                             extensions::gateway_billing::CHILD_CAPABILITY,
@@ -471,10 +501,13 @@ async fn serve_connection(
                             load_sessions.lock().unwrap().ensure_attached(&id)?;
                             let window = load_host.transcript_window(id.clone(), before, projection::visible_record_bytes).await.map_err(host_error)?;
                             let turn_ids = window.turns.iter().map(|turn| turn.id.clone()).collect::<Vec<_>>();
-                            let input_facts = load_host
+                            let mut input_facts = load_host
                                 .transcript_input_facts(id, &turn_ids)
                                 .await
                                 .map_err(host_error)?;
+                            if !load_sessions.lock().unwrap().negotiated.contains(crate::editor_surfaces::mcp::TOOL_CONTEXT_CAPABILITY) {
+                                input_facts.editor_tool_contexts.clear();
+                            }
                             let mut projection = Projection::new(request.session_id).with_tool_images(
                                 { let state = load_sessions.lock().unwrap(); state.negotiated.contains(extensions::tool_images::CAPABILITY) }
                             ).with_activity_order(

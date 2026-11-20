@@ -62,26 +62,25 @@ deck stays uniform. Start each from this shape:
 
 ## Show the result
 
-- Treat presentation as the first production milestone, not the final
-  "validate and open" step. For a new deck, create a meaningful valid first
-  slide and a manifest that references it, then call `surface_open` immediately
-  with the workspace-rooted `.canvas` bundle directory (for example,
-  `/Q3 Report.canvas`). Continue adding and refining slides while the user can
-  watch. Do not wait for the full deck, all assets, polish, preview generation,
-  exhaustive validation, or task completion.
+- When the workbench offers presentation, use `workbench_show` with a file
+  target for the workspace-rooted bundle directory such as
+  `{"target":{"kind":"file","path":"/Q3 Report.canvas"}}`. Discover deferred
+  workbench tools with `tool_search` before invoking them. On an older host that
+  offers `surface_open`, follow that tool's schema.
+- For a new deck, show the first renderable checkpoint once a meaningful valid
+  first slide exists and the manifest references it. Continue adding and
+  refining slides while the user can watch.
 - Never open an empty bundle, a broken manifest, or a manifest whose first
   slide is missing. Pass the bundle directory, never its `.canvas.json`
   manifest.
 - For an existing primary deck, open it after reading its manifest and before
   substantial edits.
-- If the `.canvas` bundle itself is mounted as `/` in a dedicated file
-  surface, it is already presented; do not call `surface_open` just to reopen
-  it.
-- Treat presentation as auxiliary: continue regardless of the result, never
-  retry based on presentation status, and do not call `surface_open` after
-  every write.
-- Use `surface_list_open` only when the current host surface state is materially
-  useful. It is not required before `surface_open`.
+- If the `.canvas` bundle is already mounted as `/` in a dedicated file
+  surface, keep the current view open.
+- Continue artifact work after the reveal request. Show it again only when the
+  user asks or the primary artifact changes.
+- Use `workbench_list_tabs` only when the current tabs matter to the task. On
+  an older host, use `surface_list_open` for this read when offered.
 
 ## Starting from a template
 

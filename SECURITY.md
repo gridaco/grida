@@ -940,12 +940,15 @@ pixels through this reader, with no additional filesystem or model grant.
   Build output custody stays with the packaging owner. Launch-time trust and
   helper identity remain enforced by the native host.
 - [Bundled command staging](desktop/scripts/bundled-programs.mjs) checks the
-  exact platform package and copies the executable into app resources before
-  signing. [Command runtime projection](desktop/src/main/native-command-runtime.ts)
+  exact platform package in the [FX declaration](desktop/src/fx-extension.json)
+  and copies the executable into app resources before signing. The
+  [Desktop FX owner](desktop/src/main/fx-extension.ts) verifies that installed
+  resource before using it. [Command runtime projection](desktop/src/main/native-command-runtime.ts)
   checks the copy against the app resource, places it outside the installation
   and command write grants, and keeps the installation exclusion in effect.
   The command profile exposes the fixed program directory and verifies the
-  projected launcher helper. Host-owned lookups use the installed resource.
+  projected launcher helper. The bundled FX skill is enabled with the verified
+  command projection.
 - [Native agent process owner](desktop/src/main/native-agent-process.ts) and
   [its fixtures](desktop/src/main/native-agent-process.test.ts) start the fixed
   resource executable without a shell. They select the child environment,
@@ -1181,7 +1184,7 @@ pixels through this reader, with no additional filesystem or model grant.
   rechecks its physical identity before requests and delivery. Its chat worker
   uses private storage and a private working directory, without a project grant
   or external tool host. The attached editor can publish only `/canvas.svg`
-  and provide a captured plain text selection. The editor still owns Save.
+  and provide a captured SVG selection. The editor still owns Save.
   Document window retirement drains its worker. Workbench presentation and
   external-agent commands remain scoped to the workbench route.
   Attachments and observed control revisions are issued in Main. A copied
@@ -1261,15 +1264,35 @@ pixels through this reader, with no additional filesystem or model grant.
 - [Live editor observations](crates/grida-agent/src/editor_surfaces.rs)
   require the negotiated private Desktop stdio capability. Main issues the
   binding for an exact authorized [chat attachment](desktop/src/main/native-editor-surfaces.ts).
+  The [private MCP binding](desktop/src/main/native-desktop-tools.ts) correlates
+  each request with this endpoint and limits discovery and calls to its
+  accepted tool scope. It checks the tool definition revision and preserves
+  the original request deadline through dispatch.
+  The [source registry](desktop/src/main/native-desktop-tool-sources.ts)
+  keeps a distinct Main-issued generation and lifetime for each registered
+  source on the endpoint. The carrier checks the captured registration before
+  dispatch and discards a late result if that registration retires. Copying a
+  tool name and revision cannot redirect a call to a different registration.
+  Native workbench and browser grants distinguish visible tab closure from
+  background page cleanup. Both operations retain the exact bound page and
+  workbench validation at the Main receiver.
+  The [Browser MCP adapter](desktop/src/main/desktop-browser-mcp.ts) uses the
+  captured Browser lease and discards replies after revocation.
+  [Native tool image validation](crates/grida-agent/src/file_tools/tool_image.rs)
+  bounds and verifies the JPEG before placing prepared media under the
+  owning tool-result scope.
   Each observation revalidates the current frame and chat. Navigation or
   replacement revokes the binding. Rust retains it with the accepted input,
   checks the reply's chat and endpoint identity, and bounds the projected
   workspace-relative paths. The read supplies editor context only and confers
   no file, network, or document-edit authority.
-- The separately negotiated [SVG text tools](crates/grida-agent/src/editor_surfaces/svg_text.rs)
+- The separately scoped [SVG text tools](desktop/src/main/desktop-selected-svg-text.ts)
   capture one exact workbench, standalone SVG, or slide selection for an
-  immediate Act text input. Main dispatches to the admitted frame and validates the bounded
-  [correlated response](desktop/src/main/native-editor-svg-text-replies.ts).
+  accepted Act text input, including queued input. Main dispatches to the
+  admitted frame and validates the bounded
+  [correlated response](desktop/src/main/native-editor-svg-replies.ts).
+  Canceling the private request releases that pending reply and discards late
+  renderer results. It supplies no evidence of reversing a dispatched edit.
   A deck may publish one bundle-relative slide and must reply for the same
   observed slide. Main rechecks the deck's directory generation before sending
   the call and accepting its reply.
@@ -1278,7 +1301,18 @@ pixels through this reader, with no additional filesystem or model grant.
   existing SVG text command can run. Its result is a live edit. The normal
   editor save remains a separate operation. An unverified mutation reply
   stays uncertain and is never replayed.
-- Live presentation requires a separately negotiated capability and a
+- The [SVG selection tools](desktop/src/main/desktop-selected-svg-selection.ts)
+  use an additional negotiated editor-tool context for an eligible Act text
+  input. The scope resolves through the exact input and owning attachment.
+  The renderer captures the live document and selection at Send and rechecks
+  them before dispatch. Inspection supplies bounded pages of locators under
+  the attached file scope. The opacity operation verifies the capture revision
+  and invokes the editor command once. It leaves disk writes to Save. Main
+  validates the correlated reply, bound path, and original deadline before
+  accepting it. The transcript marker carries no token and the external
+  inventory has no grant.
+- [Live presentation](desktop/src/main/desktop-artifact-presentation.ts)
+  requires a separately issued grant and a
   subscription from the exact attached workbench. Main dispatches a bounded
   workspace-relative path to the authorized frame. Its receipt identifies the
   chat, endpoint, and call. The editor validates the target and the original
@@ -4647,9 +4681,13 @@ outside that tool surface. Users can open DevTools for an actual owned page.
   `desktop/src/main/browser-automation-guest.ts`, and
   `desktop/src/main/desktop-browser-tools.ts` — fixed background shell,
   admitted target and document checks, typed operations and bounded captures.
+- `desktop/src/main/desktop-browser-mcp.ts` — dispatch scoped to the captured
+  lease, bounded image results and reply revocation on the private MCP carrier.
 - `desktop/src/main/fx-viewer.ts` and its tests — exact project service and
   document correlation, bounded FX observations, independent file authorization
   and workspace-relative resolution results.
+- `desktop/src/main/fx-extension.ts` — admitted workspace lookup, protected-root
+  checks and Desktop-owned FX executable and viewer registration.
 - `desktop/src/main/fx-workspace-files.ts` and its tests — workbench-only file
   preparation, workspace containment, and immutable verified raster snapshots.
 - `desktop/src/main/browser-favicon.ts` and its tests — bounded, isolated

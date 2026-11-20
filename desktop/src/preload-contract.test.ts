@@ -25,6 +25,9 @@ describe("Desktop preload agent seam", () => {
     );
     expect(native).toMatch(/onEditorSurfaceOpen: \(attachmentId, open\) => \{/);
     expect(native).toMatch(/onEditorSvgText: \(attachmentId, invoke\) => \{/);
+    expect(native).toMatch(
+      /onEditorSvgSelection: \(attachmentId, invoke\) => \{/
+    );
     expect(preloadSource).toContain("contextBridge.exposeInMainWorld");
     expect(preloadSource).not.toContain("new Proxy(");
   });
@@ -181,7 +184,10 @@ describe("Desktop preload agent seam", () => {
       /submitInRegime:\s*\(([^)]*)\)\s*=>\s*nativeChatInvoke\(([\s\S]*?)\),/
     );
     expect(submission?.[1]).toMatch(
-      /\beffort,\s*editorSvgTargetId,\s*selectionRevision,\s*editorContextId\s*$/
+      /\beffort,\s*editorSvgTargetId,\s*selectionRevision,\s*editorContextId,\s*editorToolContextId\s*$/
+    );
+    expect(submission?.[2]).toMatch(
+      /editorToolContextId !== undefined\s*\?\s*\[\s*effort,\s*editorSvgTargetId,\s*selectionRevision,\s*editorContextId,\s*editorToolContextId,?\s*\]/
     );
     expect(submission?.[2]).toMatch(
       /editorContextId !== undefined\s*\?\s*\[effort, editorSvgTargetId, selectionRevision, editorContextId\]/

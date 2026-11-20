@@ -16,7 +16,12 @@ export namespace native_message_parts {
         type: chat_vocabulary.CONTEXT_PARTS.questionReply,
         data: message.questionReply.question,
       });
-    if (message.role === "user" && message.svgTextSelection)
+    if (message.role === "user" && message.svgSelection)
+      parts.push({
+        type: chat_vocabulary.CONTEXT_PARTS.svgSelection,
+        data: true,
+      });
+    else if (message.role === "user" && message.svgTextSelection)
       parts.push({
         type: chat_vocabulary.CONTEXT_PARTS.svgTextSelection,
         data: true,

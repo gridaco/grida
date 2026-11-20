@@ -1266,6 +1266,89 @@ retains that binding, including while it waits in the queue, and the turn's
 editor tools target only that endpoint. Both operations require Act, a text
 prompt with optional editor context, and the negotiated capabilities.
 
+When both peers also negotiate `co.grida/session/desktop-tools` version 1,
+new accepted input carries the Desktop product context, including when no
+workbench is attached. For an eligible editor binding, the agent requests
+its catalog at input acceptance, including for queued input.
+`_co.grida/editor/desktop-tools` is a reverse ACP request with
+`sessionId`, `endpointId`, `timeoutMs`, `expiresAtMs` in Unix milliseconds,
+and `message`, an MCP JSON-RPC `tools/list` or `tools/call` request. An
+optional `scope` object can include `svgTargetId`, `contextId`, or
+`presentation: true`. Main bounds the operation by the original absolute
+deadline and its local relative timeout. The reply echoes the session and
+endpoint and carries the correlated MCP reply in `message`.
+Each listed definition gives `co.grida/definitionRevision` in `_meta` and a
+call repeats that revision in `params._meta`. The agent captures at most 16
+definitions and 32 KiB of catalog data. Main rejects an expired request,
+unavailable endpoint, or changed definition before dispatch. ACP
+cancellation applies to the individual outstanding call. A lost or
+uncorrelated reply after an execution request leaves the outcome uncertain.
+Accepted input cannot switch to a replacement source or retry its call
+through a legacy route.
+
+Peers can also negotiate `co.grida/session/desktop-browser-mcp` version 1.
+The modern Browser and browser-enabled Workbench tools use the same reverse
+request with `scope.browser: true` for the captured Browser lease. The
+Browser-scoped catalog is limited to 24 definitions and 48 KiB. Its
+definitions may declare `co.grida/maxInputBytes` (at most 40 KiB) and
+`co.grida/maxOutputBytes` (at most 448 KiB) in `_meta`. Definitions without
+an override use 32 KiB per direction. A capture with
+`co.grida/resultMimeType: "image/jpeg"` can return one standard MCP image
+alongside bounded structured metadata. The image is capped at 256 KiB decoded,
+with a longest edge of at most 1,024 pixels. Browser call results carry
+`co.grida/disposition` in result `_meta`, matching the structured disposition.
+Revocation and cancellation discard late replies. If the host cannot verify a
+dispatched effect, the result remains uncertain.
+
+Peers can negotiate `co.grida/session/desktop-tool-sources` version 1 to
+capture independent source registrations over the same carrier. These requests
+set `scope.sources: true`. Every listed definition carries
+`_meta["co.grida/source"]` with an `id`, a Main-issued `generation`, and a
+task-oriented `description` of up to 160 UTF-8 bytes. A call echoes that
+source's `id` and `generation` in the same metadata field along with the
+captured definition revision. Main assigns distinct private tool names when sources contribute
+operations with the same local name. Existing built-in model-facing names
+remain stable. Replacing a source assigns a new generation even when it lists
+the same definitions. Calls on the retired generation fail before invocation.
+A separate source on the same endpoint can continue to serve its grants.
+
+The source-qualified catalog uses the 24-definition and 48 KiB ceilings.
+Main admits source groups to the list in registration order, skipping any
+group that cannot fit. A source that retires while the response is queued
+is removed without discarding the other listed sources.
+The input and result size overrides and optional JPEG result type apply to
+qualified definitions under the same per-tool limits. A definition with
+`_meta["co.grida/resultDisposition"]: true` requires a matching disposition
+in the result metadata and structured content. Source descriptions and these
+result declarations convey no execution authority. Retained catalogs keep
+their chosen dialect. A peer without source negotiation continues to serve
+the earlier catalog and call format.
+
+On private Desktop stdio, peers can additionally negotiate
+`co.grida/session/editor-tool-context` version 1. An eligible Act text Submit
+or Enqueue can include `editorToolContextId` alongside the editor endpoint.
+The host retains the opaque ID with the accepted input. An exact retry keeps
+the same capture and receipt. A retry that changes the ID fails. The catalog
+and invocation requests carry it as `scope.contextId`. Main authorizes that
+reference against the capture's owning attachment, session and endpoint.
+Inherited work receives no live editor-tool context. The local accepted
+user message may carry `editorToolContext: true` in the transcript metadata
+to indicate a capture was attached. The marker contains no capture identity
+or payload. Unsupported peers omit the new fields.
+
+The modern catalog supplies the file inventory, selected SVG operations and
+the exact file presentation operation where granted. New accepted inputs
+record the model-facing workbench contract. `workbench_list_tabs` lists the
+attached workbench and `workbench_show` accepts a typed target. The file-only
+binding maps a `file` target to the existing private path request. The browser
+binding also accepts `url` and `tab` targets and supplies
+`workbench_close_browser_tab` for a visible web tab. The model-facing
+`browser_close` handles background pages. The external MCP catalogs retain
+their existing schemas. Older accepted inputs retain their original names,
+schema revisions and grants. Peers without the Browser companion capability
+use the existing Browser route below for newly accepted Browser-enabled
+inputs.
+
 | Direction      | Method                               | Parameters and result                                                                                                                                                                   |
 | -------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Agent → client | `_co.grida/editor/surface-list-open` | `sessionId`, `endpointId`. Returns the same identities with `available`, the `active` path or null, up to 50 `open` paths relative to the workspace root, and `truncated`.              |

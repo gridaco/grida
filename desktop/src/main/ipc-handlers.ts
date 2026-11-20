@@ -11,14 +11,11 @@ import {
 import path from "node:path";
 import { DesktopBrowserHost } from "./browser-host";
 import { DesktopBrowserTools } from "./desktop-browser-tools";
-import { BundledPrograms } from "./bundled-programs";
-import { FxViewer } from "./fx-viewer";
-import { FxWorkspaceFiles } from "./fx-workspace-files";
-import { NativeDesktopProfile } from "./native-desktop-profile";
+import { FxExtension } from "./fx-extension";
 import type { BrowserHistory } from "./browser-history";
 import type { BrowserDownloads } from "./browser-downloads";
 import { URL } from "node:url";
-import { ProtectedRoots, type RecentStore } from "@grida/daemon/server";
+import type { RecentStore } from "@grida/daemon/server";
 import {
   IPC_CHANNELS,
   type ConfirmOptions,
@@ -175,49 +172,9 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     workspaceExists: async (id) =>
       !!(await servicesSidecarClient.findWorkspace(id)),
   });
-  let fxProgram: ReturnType<typeof BundledPrograms.resolve> | undefined;
-  let fxProtected: ProtectedRoots | undefined;
-  const fxViewer = new FxViewer(
-    async (workspaceId) => {
-      const workspace = await servicesSidecarClient.findWorkspace(workspaceId);
-      if (workspace?.id !== workspaceId) return undefined;
-      fxProtected ??= NativeDesktopProfile.selected()
-        ? NativeDesktopProfile.protectedRoots(app)
-        : new ProtectedRoots(
-            NativeDesktopProfile.ordinaryChatProtectedPaths(app)
-          );
-      return fxProtected.overlaps(workspace.root)
-        ? undefined
-        : FxViewer.projectDirectory(workspace.root);
-    },
-    async (args, signal) => {
-      fxProgram ??= BundledPrograms.resolve(
-        NativeDesktopProfile.resourcesPath(app),
-        "grida-fx"
-      ).catch(() => {
-        fxProgram = undefined;
-        return undefined;
-      });
-      const program = await fxProgram;
-      return program && !signal.aborted
-        ? FxViewer.run(program.path, args, signal)
-        : null;
-    }
-  );
-  const browserTools = new DesktopBrowserTools(browserHost, fxViewer);
-  const fxFiles = new FxWorkspaceFiles(browserTools, {
-    list: servicesSidecarClient.readWorkspaceDirectory,
-    bytes: async (workspaceId, relativePath, signal) => {
-      const result = await servicesSidecarClient.readWorkspaceFile(
-        workspaceId,
-        relativePath,
-        "bytes",
-        signal
-      );
-      if (!("base64" in result)) throw new Error("workspace_file_unavailable");
-      return result;
-    },
-  });
+  const fx = new FxExtension(() => app, servicesSidecarClient);
+  const browserTools = new DesktopBrowserTools(browserHost, fx.viewer);
+  const fxFiles = fx.files(browserTools);
   options.on_browser_tools?.(browserTools);
   const nativeChat = new NativeChatIpc(
     EDITOR_ORIGIN,
@@ -824,7 +781,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       effort?: unknown,
       svgTargetId?: unknown,
       selectionRevision?: unknown,
-      editorContextId?: unknown
+      editorContextId?: unknown,
+      editorToolContextId?: unknown
     ) =>
       nativeChat.submit(
         event,
@@ -835,13 +793,19 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         effort,
         svgTargetId,
         selectionRevision,
-        editorContextId
+        editorContextId,
+        editorToolContextId
       )
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT_RESULT,
     (event, attachmentId: string, callId: unknown, result: unknown) =>
       nativeChat.replyEditorSvgText(event, attachmentId, callId, result)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_SELECTION_RESULT,
+    (event, attachmentId: string, callId: unknown, result: unknown) =>
+      nativeChat.replyEditorSvgSelection(event, attachmentId, callId, result)
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_ENQUEUE,
@@ -854,7 +818,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       effort?: unknown,
       svgTargetId?: unknown,
       selectionRevision?: unknown,
-      editorContextId?: unknown
+      editorContextId?: unknown,
+      editorToolContextId?: unknown
     ) =>
       nativeChat.enqueue(
         event,
@@ -865,7 +830,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         effort,
         svgTargetId,
         selectionRevision,
-        editorContextId
+        editorContextId,
+        editorToolContextId
       )
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_EFFORT, (event) =>

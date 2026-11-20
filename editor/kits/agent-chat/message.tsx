@@ -48,6 +48,7 @@ import {
   ImagesIcon,
   ListTodoIcon,
   MessageCircleQuestionIcon,
+  MonitorIcon,
   PaperclipIcon,
   PanelsTopLeftIcon,
   PencilIcon,
@@ -193,6 +194,11 @@ export function ChatMessageView({
         part.type === chat_vocabulary.CONTEXT_PARTS.svgTextSelection &&
         part.data === true
     );
+    const svgSelection = message.parts.some(
+      (part) =>
+        part.type === chat_vocabulary.CONTEXT_PARTS.svgSelection &&
+        part.data === true
+    );
     const messageContext = message.parts.find(
       (part) => part.type === chat_vocabulary.CONTEXT_PARTS.messageContext
     );
@@ -209,8 +215,11 @@ export function ChatMessageView({
     );
     return (
       <Message from="user" ref={ref}>
-        {svgTextSelection && !edit && (
-          <EditorSelectionIndicator kind="svg-text" className="self-end" />
+        {(svgSelection || svgTextSelection) && !edit && (
+          <EditorSelectionIndicator
+            kind={svgSelection ? "svg-selection" : "svg-text"}
+            className="self-end"
+          />
         )}
         {messageContext &&
           "data" in messageContext &&
@@ -1029,6 +1038,8 @@ function iconForAction(action: ToolDisplayDescription["action"]): LucideIcon {
       return AppWindowIcon;
     case "list_tabs":
       return PanelsTopLeftIcon;
+    case "desktop_tool":
+      return MonitorIcon;
     case "tool":
       return WrenchIcon;
   }

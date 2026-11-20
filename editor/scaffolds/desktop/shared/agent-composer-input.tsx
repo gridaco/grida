@@ -157,7 +157,7 @@ export type AgentComposerInputProps = {
   /** Attachments the host stages itself, shown above the editor. */
   attachments?: ReactNode;
   /** A live editor selection eligible to go with the next message. */
-  selectionContext?: "svg-text";
+  selectionContext?: "svg-text" | "svg-selection";
   /** Footer content at the start of the toolbar. */
   toolbarStart?: ReactNode;
   /** Footer content right-aligned before the submit/stop button. */

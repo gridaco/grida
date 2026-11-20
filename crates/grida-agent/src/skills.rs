@@ -36,6 +36,19 @@ const OPTIONAL_BUNDLED: [(&str, &str); 1] = [(
     include_str!("../../../skills/desktop-fx/SKILL.md"),
 )];
 
+pub(crate) const BROWSER_SKILL: &str = "browser";
+
+// This skill enters the listing through the accepted Browser tool grant.
+// Command launch profiles can select only OPTIONAL_BUNDLED.
+const GRANT_BUNDLED: [(&str, &str); 1] = [(
+    BROWSER_SKILL,
+    include_str!("../../../skills/browser/SKILL.md"),
+)];
+
+fn extension_bundled() -> impl Iterator<Item = &'static (&'static str, &'static str)> {
+    OPTIONAL_BUNDLED.iter().chain(&GRANT_BUNDLED)
+}
+
 pub(crate) fn validate_optional_bundled(names: &[String]) -> Result<()> {
     let mut seen = BTreeSet::new();
     if names
@@ -54,9 +67,7 @@ fn bundled_names(optional: &[String]) -> impl Iterator<Item = &str> {
     BUILTIN
         .iter()
         .chain(
-            OPTIONAL_BUNDLED
-                .iter()
-                .filter(|(name, _)| optional.iter().any(|enabled| enabled == name)),
+            extension_bundled().filter(|(name, _)| optional.iter().any(|enabled| enabled == name)),
         )
         .map(|(name, _)| *name)
 }
@@ -269,10 +280,20 @@ impl SkillListing {
             .map(|skill| skill.name.as_str())
     }
 
-    pub(crate) fn instructions(&self) -> String {
+    pub(crate) fn extension_skills(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.skills
+            .iter()
+            .filter(|skill| skill.is_extension())
+            .map(|skill| (skill.name.as_str(), skill.description.as_str()))
+    }
+
+    pub(crate) fn instructions_with_discovery(&self, discovery: bool) -> String {
         let mut entries = String::new();
         let mut omitted = 0;
         for skill in &self.skills {
+            if discovery && skill.is_extension() {
+                continue;
+            }
             let locator = match skill.source {
                 SkillSource::Bundled => format!("bundled; read with `{READ_SKILL}`"),
                 SkillSource::ProjectAgents => {
@@ -300,6 +321,13 @@ impl SkillListing {
         format!(
             "## Skills\n{LISTING_INTRO}\n### Available skills\n{entries}### How to use skills\n{LISTING_USE}"
         )
+    }
+}
+
+impl ListedSkill {
+    fn is_extension(&self) -> bool {
+        self.source == SkillSource::Bundled
+            && extension_bundled().any(|(name, _)| *name == self.name)
     }
 }
 
@@ -444,7 +472,7 @@ pub(crate) fn capture_with(
 fn builtin(name: &str) -> Result<Option<CapturedSkill>> {
     let Some((_, document)) = BUILTIN
         .iter()
-        .chain(OPTIONAL_BUNDLED.iter())
+        .chain(extension_bundled())
         .find(|(known, _)| *known == name)
     else {
         return Ok(None);
@@ -624,6 +652,31 @@ mod tests {
     }
 
     #[test]
+    fn a_browser_grant_adds_the_skill_to_discovery_and_its_reader() {
+        let optional = vec![BROWSER_SKILL.to_owned(), "desktop-fx".into()];
+        assert!(validate_optional_bundled(&optional).is_err());
+        let absent = SkillListing::capture_with(None, &[]).unwrap();
+        assert!(!absent.bundled().any(|name| name == BROWSER_SKILL));
+        let admitted = SkillListing::capture_with(None, &optional).unwrap();
+        assert!(admitted.bundled().any(|name| name == BROWSER_SKILL));
+        assert!(
+            admitted
+                .extension_skills()
+                .any(|(name, _)| name == BROWSER_SKILL)
+        );
+        let discovery_instructions = admitted.instructions_with_discovery(true);
+        assert!(discovery_instructions.contains("- svg:"));
+        assert!(!discovery_instructions.contains("- browser:"));
+        assert!(!discovery_instructions.contains("- desktop-fx:"));
+        assert!(
+            bundled_instructions(BROWSER_SKILL)
+                .unwrap()
+                .unwrap()
+                .contains("browser_snapshot")
+        );
+    }
+
+    #[test]
     fn selection_prefers_project_and_retains_its_authored_text() {
         let temporary = tempfile::tempdir().unwrap();
         let root = temporary.path().canonicalize().unwrap();
@@ -768,7 +821,7 @@ mod tests {
             listing.bundled().collect::<Vec<_>>(),
             ["dotcanvas", "slides", "svg"]
         );
-        let text = listing.instructions();
+        let text = listing.instructions_with_discovery(false);
         let bundled = text.find("- dotcanvas:").unwrap();
         let workspace = text
             .find("- aaa-notes: A small project workflow. (workspace; read `.claude/skills/aaa-notes/SKILL.md`)")
@@ -788,7 +841,7 @@ mod tests {
             description: "d".repeat(MAX_DESCRIPTION),
             source: SkillSource::ProjectAgents,
         }));
-        let text = many.instructions();
+        let text = many.instructions_with_discovery(false);
         assert!(text.len() < MAX_LISTING_BYTES + 4 * 1024);
         assert!(text.contains("- slides:"));
         assert!(text.contains("more workspace skills are not listed here."));
@@ -830,13 +883,17 @@ mod tests {
             let listing = SkillListing::capture(Some(&project)).unwrap();
             assert_eq!(listing.bundled().collect::<Vec<_>>(), bundled);
             assert_eq!(listing.skills.len(), bundled.len(), "{code}");
-            let text = listing.instructions();
+            let text = listing.instructions_with_discovery(false);
             assert!(text.contains(WORKSPACE_UNAVAILABLE), "{code}");
             assert!(text.contains("- slides:"), "{code}");
         }
         fs::set_permissions(&locked, fs::Permissions::from_mode(0o700)).unwrap();
         let listing = SkillListing::capture(Some(&ProjectRoot::open(&root).unwrap())).unwrap();
-        assert!(!listing.instructions().contains(WORKSPACE_UNAVAILABLE));
+        assert!(
+            !listing
+                .instructions_with_discovery(false)
+                .contains(WORKSPACE_UNAVAILABLE)
+        );
         // A listing recorded before this field existed reads as available.
         let restored: SkillListing = serde_json::from_str(r#"{"skills":[]}"#).unwrap();
         assert!(!restored.workspace_unavailable);

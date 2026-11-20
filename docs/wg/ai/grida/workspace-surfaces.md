@@ -51,37 +51,41 @@ tool's type system. The surface capability remains artifact-agnostic:
 - the workspace may continue to contain supporting files and other
   artifact kinds.
 
-The tool does not accept an artifact kind, renderer, window, or workspace
-identifier. The artifact's workspace-rooted agent-filesystem path is the
-grounded reference. Its leading `/` denotes the current workspace root, not
-the host filesystem root.
+The workspace-rooted path identifies the artifact and the workbench chooses
+its viewer. The leading `/` denotes the current workspace root. The agent
+chooses the target within the current workbench and can ask to show it or
+inspect it through the relevant tools.
 
-## Surface tool family
+## Workbench tools
 
-The tool identifiers use underscores because model-facing tool names are
-flat. Together, they form the `surface` product capability.
+The workbench owns visible tabs and selection. Browser tools operate on
+explicit authorized web pages and own the background pages they create.
 
-### `surface_open`
+### `workbench_show`
 
-`surface_open` emits a best-effort request for the current host to open an
-existing workspace artifact and make it the active surface.
+`workbench_show` requests a visible target in the attached workbench. A
+`file` target identifies an existing workspace artifact. A browser-enabled
+workbench also accepts an HTTP(S) `url` to open a browser tab and a `tab` ID
+to show an existing tab. The hosted router resolves registered Grida `/_/`
+links in the browser. Window focus is an explicit choice when available.
 
-An interactive host acts on the request only when the target:
+The workbench resolves a file target only when it:
 
 - already exists;
 - is inside the current workspace;
 - is a file or a recognized bundle directory;
 - is identified by its workspace-rooted `path`, such as `/poster.canvas`.
 
-The operation is idempotent. Opening an artifact that is already open
+Opening an artifact that is already open
 activates the existing surface instead of creating a duplicate.
 
 The host acknowledges dispatch without waiting for the editor to render the
 artifact. The result records dispatch, known unavailability, or an unconfirmed
-request. Presentation uncertainty remains visible in the turn's account while
-the model can continue artifact work.
+request. A trusted file reveal can remain unconfirmed while the agent
+continues artifact work. URL opens, tab selection and explicit focus retain
+their normal outcome requirements.
 
-`surface_open` does not:
+Showing a target does not:
 
 - create or modify content;
 - switch or expand the workspace;
@@ -90,46 +94,44 @@ the model can continue artifact work.
 - create a branch;
 - enter slideshow or fullscreen presentation mode.
 
-### `surface_list_open`
+### `workbench_list_tabs`
 
-`surface_list_open` reports the open artifacts and active path within the
-captured editor. A live capability reads the current view at invocation. An
-integration with a turn-start snapshot identifies that behavior in its tool
-definition. Both report presentation state. Access to file contents follows
-separate permissions. Opening is idempotent and requires no prior listing.
+`workbench_list_tabs` reads the current open tabs and selection within the
+captured workbench. A file-only workbench reports the active and open paths.
+A browser-enabled workbench also reports exact tab IDs for visible browser
+operations. Access to contents follows separate permissions. A file can be
+shown by path without a prior listing.
+
+### `workbench_close_browser_tab`
+
+This requests closure of one user-visible browser tab by ID. `browser_close`
+manages pages created for background work. Existing MCP profiles and
+previously accepted native input retain their recorded definitions.
 
 ## Interactive and non-interactive hosts
 
 Interactivity is host-provided context, not an argument chosen by the
 agent.
 
-In an interactive host:
+An interactive input captures the workbench that can fulfill its requests.
+The standalone `surface_open` compatibility tool can report a non-interactive
+result when there is no editor.
 
-- the run captures the editor that can fulfill its surface requests;
-- `surface_open` is a best-effort, idempotent request to that editor;
-- `surface_list_open` reports the view available through that binding.
-
-In a non-interactive host:
-
-- `surface_open` resolves successfully as an honest no-op;
-- its result says that the host is non-interactive and no surface opened;
-- `surface_list_open` returns an empty open set and no active surface.
-
-Presentation is auxiliary. Artifact creation, editing, verification, and
+Trusted file presentation is auxiliary. Artifact creation, editing, verification, and
 task completion never depend on an artifact being opened. The renderer
 never owns completion of either tool call, and no later success
 reconciliation is required. A missed request or non-interactive result does
 not change the underlying work, trigger a retry, or turn successful artifact
 work into a failure.
 
-The same guidance can therefore use the surface tools in interactive and
-non-interactive environments without changing the model's artifact
-behavior.
-
 ## Agent presentation policy
 
-The agent opens the primary user-facing artifact at its first meaningful
-renderable checkpoint so the user can watch the remaining work develop.
+The [product agent](../agent/master.md#product-instructions-and-extension-guidance)
+knows when it is working in Grida Desktop from the host context. When the
+current mode and editor binding permit presentation, it requests a view of
+the primary user-facing artifact at its first meaningful renderable
+checkpoint so the user can watch the remaining work develop. It describes
+what the user can see only when it has evidence of the visible outcome.
 
 A meaningful renderable checkpoint is the earliest non-empty state the host
 can show without a structural or parse error. It communicates the intended
@@ -142,7 +144,7 @@ For canvas work:
 
 1. choose the basic direction;
 2. create a minimal but meaningful valid document and bundle manifest;
-3. call `surface_open` with the bundle path;
+3. call `workbench_show` with the bundle as a file target;
 4. continue production, refinement, and validation while the surface remains
    visible;
 5. finish without reopening the same surface.
@@ -160,7 +162,7 @@ satisfies this policy because its artifact is visible from the start.
 
 The agent opens an artifact again only when intentionally switching the
 primary view or when the user asks to see it. It does not call
-`surface_open` after every write and does not repeatedly call it to force
+`workbench_show` after every write and does not repeatedly call it to force
 focus.
 
 Supporting artifacts and references remain in the background unless the

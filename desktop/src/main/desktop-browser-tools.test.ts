@@ -128,6 +128,66 @@ it("projects the current workbench and binds requests to their exact publication
   expect(operations.closeScope).toHaveBeenCalledWith(expect.any(String));
 });
 
+it("routes a workspace file and a hosted universal link through their own openers", async () => {
+  const host = {
+    openWorkbenchAutomationPage: vi.fn<() => { snapshot(): { id: string } }>(
+      () => ({
+        snapshot: () => ({ id: pageId }),
+      })
+    ),
+  };
+  const tools = new DesktopBrowserTools(host as unknown as DesktopBrowserHost);
+  const view = workbench();
+  expect(tools.publish(view.event, snapshot, null)).toBe(true);
+  const lease = tools.lease(
+    view.event.sender,
+    view.event.senderFrame!,
+    () => {}
+  );
+  operations.registerOpen.mockReturnValueOnce({
+    kind: "navigation",
+    navigationId: pageId,
+  });
+
+  await expect(
+    lease.invoke(
+      "surface_open",
+      { target: { kind: "file", path: file } },
+      signal
+    )
+  ).resolves.toMatchObject({ data: { presentation: "requested" } });
+  expect(view.frame.send).toHaveBeenCalledExactlyOnceWith(expect.any(String), {
+    path: file,
+    expiresAtMs: expect.any(Number),
+  });
+
+  const url = "https://grida.co/_/canvas";
+  await expect(
+    lease.invoke("surface_open", { target: { kind: "url", url } }, signal)
+  ).resolves.toMatchObject({
+    data: { tabId: pageId, presentation: "requested" },
+  });
+  expect(host.openWorkbenchAutomationPage).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({ sender: view.sender }),
+    url
+  );
+
+  for (const target of [
+    { kind: "url", url: "file:///workspace/design.grida" },
+    { kind: "file", path: "file:///workspace/design.grida" },
+  ]) {
+    await expect(
+      lease.invoke("surface_open", { target }, signal)
+    ).resolves.toEqual({
+      disposition: "not_dispatched",
+      error: "invalid_arguments",
+    });
+  }
+  expect(view.frame.send).toHaveBeenCalledTimes(1);
+  expect(host.openWorkbenchAutomationPage).toHaveBeenCalledTimes(1);
+  lease.close();
+});
+
 it("discards the selected FX sample when selection leaves and returns to the same tab", async () => {
   const project = "a".repeat(64);
   const entry = "b".repeat(64);

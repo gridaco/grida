@@ -52,6 +52,7 @@ import type {
   NativeChatTurnSummary,
   NativeChatUpdate,
   NativeEditorSurfaceSnapshot,
+  NativeEditorSvgSelection,
   NativeEditorSvgText,
   NativeSubagentClient,
 } from "@grida/desktop-bridge";
@@ -91,6 +92,14 @@ export type NativeChatEditorSurfaces = {
     subscribe(listener: () => void): () => void;
     capture(): string | undefined;
     invoke(request: NativeEditorSvgText.Request): NativeEditorSvgText.Result;
+  };
+  svgSelection?: {
+    hasSelection(): boolean;
+    subscribe(listener: () => void): () => void;
+    capture(): string | undefined;
+    invoke(
+      request: NativeEditorSvgSelection.Request
+    ): NativeEditorSvgSelection.Result;
   };
 };
 
@@ -345,6 +354,7 @@ type Scope = {
   stopEditorSurfaceUpdates?: () => void;
   stopEditorSurfaceOpen?: () => void;
   stopEditorSvgText?: () => void;
+  stopEditorSvgSelection?: () => void;
   editorPresentationRevision?: number;
   /** Open side chats, in the order they opened. */
   sides: SideChatScope[];
@@ -432,6 +442,7 @@ type Scope = {
     allowLibrarySelection: boolean;
     editorSvgTargetId?: string;
     editorContextId?: string;
+    editorToolContextId?: string;
     messageContext?: NativeChatMessageContext;
   };
   awaitingTurn?: string;
@@ -2410,8 +2421,29 @@ export class NativeChatController {
     );
   }
 
-  readonly subscribeToComposerSvgText = (listener: () => void): (() => void) =>
-    this.editorSurfaces?.svgText?.subscribe(listener) ?? (() => {});
+  readonly subscribeToComposerEditorSelection = (listener: () => void) => {
+    const text = this.editorSurfaces?.svgText?.subscribe(listener);
+    const selection = this.editorSurfaces?.svgSelection?.subscribe(listener);
+    return () => {
+      text?.();
+      selection?.();
+    };
+  };
+
+  readonly readComposerEditorSelection = ():
+    | "svg-selection"
+    | "svg-text"
+    | undefined => {
+    const scope = this.scope;
+    if (
+      scope &&
+      !scope.pending &&
+      (!scope.attachment || scope.stopEditorSvgSelection) &&
+      this.svgSelectionForSend(scope, this.view.operatingRegime)?.hasSelection()
+    )
+      return "svg-selection";
+    if (this.readComposerSvgText()) return "svg-text";
+  };
 
   readonly readComposerSvgText = (): boolean => {
     const scope = this.scope;
@@ -2429,16 +2461,36 @@ export class NativeChatController {
     operatingRegime: NativeChatOperatingRegime | undefined
   ) {
     if (
+      this.canCaptureSvgSelection(scope, operatingRegime) &&
+      this.bridge.onEditorSvgText
+    )
+      return this.editorSurfaces?.svgText;
+  }
+
+  private svgSelectionForSend(
+    scope: Scope,
+    operatingRegime: NativeChatOperatingRegime | undefined
+  ) {
+    if (
+      this.canCaptureSvgSelection(scope, operatingRegime) &&
+      this.bridge.onEditorSvgSelection
+    )
+      return this.editorSurfaces?.svgSelection;
+  }
+
+  private canCaptureSvgSelection(
+    scope: Scope,
+    operatingRegime: NativeChatOperatingRegime | undefined
+  ): boolean {
+    return (
       operatingRegime === "act" &&
-      this.bridge.submitInRegime &&
-      this.bridge.publishEditorSurfaces &&
-      this.bridge.onEditorSvgText &&
+      !!this.bridge.submitInRegime &&
+      !!this.bridge.publishEditorSurfaces &&
       !scope.messageContext &&
       !scope.selectedAttachment &&
       !this.view.goalIntent &&
       !this.view.steering
-    )
-      return this.editorSurfaces?.svgText;
+    );
   }
 
   canAttach(kind: AttachmentKind): boolean {
@@ -4439,6 +4491,25 @@ export class NativeChatController {
     const scope = this.scope;
     if (!scope || scope.id !== scopeId)
       throw new Error("native_chat_not_ready");
+    // Freeze the selection before awaits for draft recovery, provider checks,
+    // or attaching a new chat. A retry carries the original pending capture.
+    const prompt = text.trim();
+    const command =
+      /^\/(?:plan|goal|side)(?:\s|$)/.test(prompt) ||
+      ["/compact", "/fork", "/stop"].includes(prompt);
+    const editorCapture =
+      prompt && !command && !this.retainedSend(scope, text)
+        ? {
+            text: this.svgTextForSend(
+              scope,
+              this.view.operatingRegime
+            )?.capture(),
+            selection: this.svgSelectionForSend(
+              scope,
+              this.view.operatingRegime
+            )?.capture(),
+          }
+        : {};
     const submission = {};
     scope.submission = submission;
     this.update({ submitting: true });
@@ -4451,10 +4522,16 @@ export class NativeChatController {
       }
     };
     try {
-      await this.submitInScope(text, scopeId, editorContextId, () => {
-        finishSubmitting();
-        onAccepted?.();
-      });
+      await this.submitInScope(
+        text,
+        scopeId,
+        editorContextId,
+        editorCapture,
+        () => {
+          finishSubmitting();
+          onAccepted?.();
+        }
+      );
     } catch (error) {
       const current = this.scope;
       if (
@@ -4473,6 +4550,7 @@ export class NativeChatController {
     text: string,
     scopeId: number,
     editorContextId: string | undefined,
+    editorCapture: Readonly<{ text?: string; selection?: string }>,
     onAccepted: () => void
   ): Promise<void> {
     let scope = this.scope;
@@ -4640,11 +4718,6 @@ export class NativeChatController {
     // Medium leaves the model's default in place. Ultra has already required
     // the negotiated harness; never silently replace it with ordinary work.
     const effort = this.view.effort === "medium" ? undefined : this.view.effort;
-    // A queued request keeps the editor binding a sent one has.
-    const svgTarget =
-      !retained && !messageContext
-        ? this.svgTextForSend(scope, operatingRegime)?.capture()
-        : undefined;
     this.update({ acting: true, error: null });
     try {
       scope = await this.activateSelection(scope);
@@ -4655,6 +4728,15 @@ export class NativeChatController {
         throw new Error("native_chat_pending_regime_changed");
       if (retained && retained.effort !== effort)
         throw new Error("native_chat_pending_effort_changed");
+      const svgTextTarget =
+        scope.stopEditorSvgText && this.svgTextForSend(scope, operatingRegime)
+          ? editorCapture.text
+          : undefined;
+      const svgSelectionTarget =
+        scope.stopEditorSvgSelection &&
+        this.svgSelectionForSend(scope, operatingRegime)
+          ? editorCapture.selection
+          : undefined;
       if (
         !retained &&
         this.libraryPicker &&
@@ -4679,9 +4761,11 @@ export class NativeChatController {
           scope.librarySelectionAvailable === true &&
           !selectedAttachment &&
           !messageContext &&
-          !(scope.stopEditorSvgText && svgTarget),
-        editorSvgTargetId: scope.stopEditorSvgText ? svgTarget : undefined,
+          !svgTextTarget &&
+          !svgSelectionTarget,
+        editorSvgTargetId: svgTextTarget,
         editorContextId,
+        ...(svgSelectionTarget && { editorToolContextId: svgSelectionTarget }),
         ...(messageContext && { messageContext }),
       };
       let accepted;
@@ -4715,7 +4799,10 @@ export class NativeChatController {
         this.attachment(scope);
         if (scope.pending !== pending)
           throw new Error("native_chat_scope_changed");
-        if (pending.editorContextId && !this.bridge.captureEditorContext)
+        if (
+          (pending.editorContextId && !this.bridge.captureEditorContext) ||
+          (pending.editorToolContextId && !this.bridge.onEditorSvgSelection)
+        )
           throw new Error("native_chat_editor_context_unavailable");
         if (next) await this.endPausedTurn(scope);
         const context = pending.messageContext && {
@@ -4836,25 +4923,15 @@ export class NativeChatController {
             svgTargetId?: string,
             selectionRevision?: number,
             editorContextId?: string,
-          ] =
-            pending.editorContextId !== undefined
-              ? [
-                  pending.effort,
-                  pending.editorSvgTargetId,
-                  pending.selectionRevision,
-                  pending.editorContextId,
-                ]
-              : pending.selectionRevision !== undefined
-                ? [
-                    pending.effort,
-                    pending.editorSvgTargetId,
-                    pending.selectionRevision,
-                  ]
-                : pending.editorSvgTargetId
-                  ? [pending.effort, pending.editorSvgTargetId]
-                  : pending.effort
-                    ? [pending.effort]
-                    : [];
+            editorToolContextId?: string,
+          ] = [
+            pending.effort,
+            pending.editorSvgTargetId || undefined,
+            pending.selectionRevision,
+            pending.editorContextId,
+            pending.editorToolContextId,
+          ];
+          while (options.length && options.at(-1) === undefined) options.pop();
           accepted = await this.bridge.submitInRegime(
             pending.mode,
             attachment.attachmentId,
@@ -6564,6 +6641,20 @@ export class NativeChatController {
             // This attachment can still supply the ordinary editor context.
           }
         }
+        const svgSelection = this.editorSurfaces.svgSelection;
+        if (svgSelection && this.bridge.onEditorSvgSelection) {
+          try {
+            scope.stopEditorSvgSelection = this.bridge.onEditorSvgSelection(
+              attachment.attachmentId,
+              (request) =>
+                this.owns(scope) && scope.attachment === attachment
+                  ? svgSelection.invoke(request)
+                  : { kind: "unavailable" }
+            );
+          } catch {
+            // An older bridge can still serve its existing editor context.
+          }
+        }
         const publish = () => this.publishEditorSurfaces(scope, attachment);
         scope.stopEditorSurfaceUpdates =
           this.editorSurfaces.subscribeToEditorSurfaces(() => void publish());
@@ -6616,6 +6707,7 @@ export class NativeChatController {
     clearTimeout(scope.titleCheck);
     scope.stopEditorSurfaceOpen?.();
     scope.stopEditorSvgText?.();
+    scope.stopEditorSvgSelection?.();
     scope.stopEditorSurfaceUpdates?.();
     for (const side of scope.sides.splice(0))
       void this.releaseSide(side).catch(() => {});

@@ -15,6 +15,11 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Semaphore;
 
+mod tool_image;
+pub(crate) use tool_image::{
+    MAX_TOOL_JPEG_BASE64_BYTES, ToolImageError, prepare_tool_jpeg, verify_tool_jpeg,
+};
+
 const MAX_PATH_BYTES: usize = 4096;
 const MAX_REFERENCE_PATH_BYTES: usize = 1024;
 const MAX_QUERY_BYTES: usize = 128;

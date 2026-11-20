@@ -69,6 +69,7 @@ export * from "./native-chat-message-context";
 export type * from "./native-external-agent";
 export type * from "./native-subagents";
 export { NativeEditorSurfaces } from "./native-editor-surfaces";
+export { NativeEditorSvgSelection } from "./native-editor-svg-selection";
 export { NativeEditorSvgText } from "./native-editor-svg-text";
 export type {
   NativeEditorSurfaceOpen,

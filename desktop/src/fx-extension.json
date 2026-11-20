@@ -1,0 +1,14 @@
+{
+  "package": "@grida/fx",
+  "command": "grida-fx",
+  "skill": "desktop-fx",
+  "resourceDirectory": "bundled-programs",
+  "licenseFile": "FX-LICENSE",
+  "versionFile": "fx-version",
+  "platformPackages": {
+    "darwin-arm64": "@grida/fx-darwin-arm64",
+    "darwin-x64": "@grida/fx-darwin-x64",
+    "linux-arm64": "@grida/fx-linux-arm64-gnu",
+    "linux-x64": "@grida/fx-linux-x64-gnu"
+  }
+}

@@ -152,6 +152,9 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_EDITOR_SVG_TEXT: "grida:native-chat:editor-svg-text",
   NATIVE_CHAT_EDITOR_SVG_TEXT_RESULT:
     "grida:native-chat:editor-svg-text-result",
+  NATIVE_CHAT_EDITOR_SVG_SELECTION: "grida:native-chat:editor-svg-selection",
+  NATIVE_CHAT_EDITOR_SVG_SELECTION_RESULT:
+    "grida:native-chat:editor-svg-selection-result",
   NATIVE_CHAT_CAPTURE_EDITOR_CONTEXT:
     "grida:native-chat:capture-editor-context",
   NATIVE_CHAT_SUBMIT: "grida:native-chat:submit",
