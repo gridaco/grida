@@ -247,8 +247,12 @@ async fn serve_connection(
                     let routes = crate::supervised_provider::ROUTES;
                     let prediction_route = crate::supervised_provider::PREDICTION_ROUTE;
                     let predictions = reviewer && offered(prediction_route);
+                    let turn_capabilities = routed && offered(crate::supervised_provider::TURN_CAPABILITIES);
+                    if turn_capabilities {
+                        advertised.insert(crate::supervised_provider::TURN_CAPABILITIES.into(), 1.into());
+                    }
                     if (routed || predictions)
-                        && let Err(error) = initialized_host.attach_routes(provider.clone(), routed, predictions) {
+                        && let Err(error) = initialized_host.attach_routes(provider.clone(), routed, predictions, turn_capabilities) {
                         return responder.respond_with_error(host_error(error));
                     }
                     if routed {
@@ -367,6 +371,7 @@ async fn serve_connection(
                     }
                     sessions.negotiated.extend(
                         [
+                            crate::supervised_provider::TURN_CAPABILITIES,
                             crate::editor_surfaces::CAPABILITY,
                             crate::editor_surfaces::OPEN_CAPABILITY,
                             crate::editor_surfaces::SVG_TEXT_CAPABILITY,

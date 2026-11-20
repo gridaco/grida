@@ -28,6 +28,7 @@ import {
   NativeEditorSvgSelection,
   NativeEditorSvgText,
   type DesktopComposerPredictionSettings,
+  type DesktopPersonalizationSettings,
   type NativeEditorSurfaceOpen,
 } from "@grida/desktop-bridge";
 import {
@@ -636,6 +637,22 @@ const bridge: DesktopBridge = {
     },
   },
 
+  personalization: {
+    get: () => ipcRenderer.invoke(IPC_CHANNELS.PERSONALIZATION_GET),
+    set: (change) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PERSONALIZATION_SET, change),
+    onChange: (listener) => {
+      const receive = (
+        _event: Electron.IpcRendererEvent,
+        value: DesktopPersonalizationSettings
+      ) => listener(value);
+      ipcRenderer.on(IPC_CHANNELS.PERSONALIZATION_CHANGED, receive);
+      return () => {
+        ipcRenderer.off(IPC_CHANNELS.PERSONALIZATION_CHANGED, receive);
+      };
+    },
+  },
+
   composerPredictions: {
     get: () => ipcRenderer.invoke(IPC_CHANNELS.COMPOSER_PREDICTIONS_GET),
     set: (enabled) =>
@@ -710,6 +727,8 @@ const bridge: DesktopBridge = {
         mode,
         review
       ),
+    turnCapabilities: (target) =>
+      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_TURN_CAPABILITIES, target),
     selection: (target) =>
       nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_SELECTION, target),
     updateSelection: (target, revision, operationId, choice) =>
@@ -948,18 +967,7 @@ const bridge: DesktopBridge = {
         attachmentId,
         input
       ),
-    submitInRegime: (
-      action,
-      attachmentId,
-      inputId,
-      text,
-      operatingRegime,
-      effort,
-      editorSvgTargetId,
-      selectionRevision,
-      editorContextId,
-      editorToolContextId
-    ) =>
+    submitInRegime: (action, attachmentId, inputId, text, regime, ...options) =>
       nativeChatInvoke(
         action === "enqueue"
           ? IPC_CHANNELS.NATIVE_CHAT_ENQUEUE
@@ -967,24 +975,8 @@ const bridge: DesktopBridge = {
         attachmentId,
         inputId,
         text,
-        operatingRegime,
-        ...(editorToolContextId !== undefined
-          ? [
-              effort,
-              editorSvgTargetId,
-              selectionRevision,
-              editorContextId,
-              editorToolContextId,
-            ]
-          : editorContextId !== undefined
-            ? [effort, editorSvgTargetId, selectionRevision, editorContextId]
-            : selectionRevision !== undefined
-              ? [effort, editorSvgTargetId, selectionRevision]
-              : editorSvgTargetId !== undefined
-                ? [effort, editorSvgTargetId]
-                : effort === undefined
-                  ? []
-                  : [effort])
+        regime,
+        ...trailingOptions(options)
       ),
     enqueue: (attachmentId, inputId, text) =>
       nativeChatInvoke(
@@ -1032,23 +1024,18 @@ const bridge: DesktopBridge = {
       attachmentId,
       inputId,
       text,
-      operatingRegime,
+      regime,
       effort,
-      selectionRevision,
-      editorContextId
+      ...options
     ) =>
       nativeChatInvoke(
         IPC_CHANNELS.NATIVE_CHAT_SUBMIT_LIBRARY_SELECTION,
         attachmentId,
         inputId,
         text,
-        operatingRegime,
+        regime,
         effort,
-        ...(editorContextId !== undefined
-          ? [selectionRevision, editorContextId]
-          : selectionRevision === undefined
-            ? []
-            : [selectionRevision])
+        ...trailingOptions(options)
       ),
     acceptsFile: () => nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_FILE),
     ...(!selectedDocumentChatRoute() && {
@@ -1664,4 +1651,10 @@ const bridge: DesktopBridge = {
 if (isDesktopPath(window.location.pathname)) {
   installDesktopNavigationGuard();
   contextBridge.exposeInMainWorld("grida", bridge);
+}
+
+// Preserve the positional arguments understood by previously released hosts.
+function trailingOptions(options: unknown[]): unknown[] {
+  while (options.length && options.at(-1) === undefined) options.pop();
+  return options;
 }

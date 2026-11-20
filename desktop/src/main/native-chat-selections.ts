@@ -3,7 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { NativeChatEffort } from "@grida/desktop-bridge";
+import type { NativeChatEffort, NativeChatSpeed } from "@grida/desktop-bridge";
 
 const MAX_BYTES = 2 * 1024 * 1024;
 const MAX_DRAFTS = 128;
@@ -20,6 +20,7 @@ export namespace NativeChatSelections {
     connectionId: string | null;
     model: string;
     effort: NativeChatEffort;
+    speed?: NativeChatSpeed;
   }>;
   export type Target = Readonly<{ sessionId: string } | { draftId: string }>;
   export type View = Readonly<{
@@ -29,6 +30,7 @@ export namespace NativeChatSelections {
       profileId: string | null;
       modelId: string;
       effort: NativeChatEffort;
+      speed?: NativeChatSpeed;
     }> | null;
     available: boolean;
   }>;
@@ -88,6 +90,7 @@ type Draft = {
   welcome?: true;
 };
 type Intent = {
+  preserveDefault?: true;
   workspaceId: string;
   sessionId: string;
   expectedRevision: number;
@@ -238,7 +241,11 @@ export class NativeChatSelections {
     target: NativeChatSelections.Target,
     expectedRevision: number,
     operationId: string,
-    choice: { profileId: string | null; effort: NativeChatEffort },
+    choice: {
+      profileId: string | null;
+      effort: NativeChatEffort;
+      speed?: NativeChatSpeed;
+    },
     check: () => void = () => {}
   ): Promise<NativeChatSelections.View> {
     return this.exclusive(async () => {
@@ -252,17 +259,23 @@ export class NativeChatSelections {
         choice.effort === "standard" ? "medium" : choice.effort;
       effort(chosenEffort);
       await this.recoverPending();
-      const selected = {
+      const pair = {
         ...(await this.options.choice(workspaceId, choice.profileId)),
         effort: chosenEffort,
       };
-      selection(selected);
+      if (choice.speed !== undefined) validateSpeed(choice.speed);
+      const selectedWithSpeed = (previous: Selection | null): Selection => {
+        const speed = choice.speed ?? previous?.speed;
+        return { ...pair, ...(speed && speed !== "standard" && { speed }) };
+      };
       check();
-      if (selected.connectionId !== choice.profileId) throw invalid();
+      if (pair.connectionId !== choice.profileId) throw invalid();
       if ("draftId" in target) {
         identity(target.draftId);
         const old = this.state.drafts[target.draftId];
         if (!old || old.workspaceId !== workspaceId) throw invalid();
+        const selected = selectedWithSpeed(old.selection);
+        selection(selected);
         if (old.promotion)
           throw new Error("native_chat_draft_creation_pending");
         if (old.operationId === operationId) {
@@ -282,19 +295,14 @@ export class NativeChatSelections {
         };
         await this.save({
           ...this.state,
-          defaults: selected,
+          defaults: speedOnly(old.selection, selected)
+            ? this.state.defaults
+            : pair,
           drafts: { ...this.state.drafts, [target.draftId]: next },
         });
         return this.view(workspaceId, target, next.revision, selected);
       }
       sessionIdentity(target.sessionId);
-      const pending: Intent = {
-        workspaceId,
-        sessionId: target.sessionId,
-        expectedRevision,
-        operationId,
-        selection: selected,
-      };
       // An operation already committed before this invocation is an observation,
       // not another explicit edit. It must not become the newest app default.
       const old = record(
@@ -304,12 +312,23 @@ export class NativeChatSelections {
       );
       if (old.status === "retired")
         throw new Error("native_chat_selection_retired");
+      const head = readSnapshot(
+        await this.options.query(workspaceId, target.sessionId, "inspect"),
+        target.sessionId
+      );
+      const selected = selectedWithSpeed(head.selection);
+      selection(selected);
+      const pending: Intent = {
+        workspaceId,
+        sessionId: target.sessionId,
+        expectedRevision,
+        operationId,
+        selection: selected,
+        ...(head.selection &&
+          speedOnly(head.selection, selected) && { preserveDefault: true }),
+      };
       if (old.status === "committed") {
         const receipt = readReceipt(old.receipt, pending);
-        const head = readSnapshot(
-          await this.options.query(workspaceId, target.sessionId, "inspect"),
-          target.sessionId
-        );
         if (
           head.revision !== receipt.revision ||
           !head.selection ||
@@ -557,7 +576,9 @@ export class NativeChatSelections {
       }
       await this.save({
         ...this.state,
-        defaults: committed.selection,
+        defaults: pending.preserveDefault
+          ? this.state.defaults
+          : defaultPair(committed.selection),
         pending: null,
         acknowledgments: addAcknowledgment(this.state.acknowledgments, {
           workspaceId,
@@ -637,6 +658,7 @@ export class NativeChatSelections {
         profileId: selected.connectionId,
         modelId: selected.model,
         effort: selected.effort,
+        ...(selected.speed && { speed: selected.speed }),
       },
       available,
     };
@@ -743,14 +765,30 @@ function selection(value: unknown): asserts value is Selection {
   const v = record(value);
   profile(v.connectionId);
   effort(v.effort);
+  if (v.speed !== undefined) validateSpeed(v.speed);
   if (
     typeof v.model !== "string" ||
     !MODEL.test(v.model) ||
-    Object.keys(v).length !== 3
+    Object.keys(v).length !== 3 + Number(v.speed !== undefined)
   )
     throw invalid();
 }
+export function validateSpeed(
+  value: unknown
+): asserts value is NativeChatSpeed {
+  if (value !== "standard" && value !== "fast" && value !== "ultrafast")
+    throw invalid();
+}
+function defaultPair({ connectionId, model, effort }: Selection): Selection {
+  return { connectionId, model, effort };
+}
+function speedOnly(a: Selection, b: Selection): boolean {
+  return samePair(a, b) && (a.speed ?? "standard") !== (b.speed ?? "standard");
+}
 function same(a: Selection, b: Selection): boolean {
+  return samePair(a, b) && (a.speed ?? "standard") === (b.speed ?? "standard");
+}
+function samePair(a: Selection, b: Selection): boolean {
   return (
     a.connectionId === b.connectionId &&
     a.model === b.model &&
@@ -866,13 +904,19 @@ function parseState(value: unknown): State {
     identity(p.operationId);
     advancingRevision(p.expectedRevision);
     selection(p.selection);
-    keys(p, [
-      "workspaceId",
-      "sessionId",
-      "expectedRevision",
-      "operationId",
-      "selection",
-    ]);
+    if (p.preserveDefault !== undefined && p.preserveDefault !== true)
+      throw invalid();
+    keys(
+      p,
+      [
+        "workspaceId",
+        "sessionId",
+        "expectedRevision",
+        "operationId",
+        "selection",
+      ],
+      ["preserveDefault"]
+    );
   }
   if (
     !Array.isArray(v.acknowledgments) ||

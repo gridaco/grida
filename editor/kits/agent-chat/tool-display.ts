@@ -11,6 +11,7 @@ export type ToolDisplayAction =
   | "edit"
   | "write"
   | "list"
+  | "web_search"
   | "search"
   | "pick_references"
   | "view_image"
@@ -99,6 +100,29 @@ export namespace toolDisplay {
           tone,
         };
 
+      case "web_search": {
+        const queries = Array.isArray(args.queries)
+          ? args.queries
+              .filter((q): q is string => typeof q === "string")
+              .join(", ")
+          : undefined;
+        const label: [string, string, string] =
+          args.type === "open_page"
+            ? ["Opening web page", "Opened web page", "Couldn't open web page"]
+            : args.type === "find_in_page"
+              ? ["Searching page", "Searched page", "Couldn't search page"]
+              : ["Searching the web", "Searched the web", "Web search failed"];
+        return {
+          action: "web_search",
+          title: describeTitle(tone, ...label),
+          detail:
+            stringValue(args.query) ||
+            queries ||
+            stringValue(args.pattern) ||
+            stringValue(args.url),
+          tone,
+        };
+      }
       case chat_vocabulary.TOOL_NAMES.grep_files:
         return {
           action: "search",
@@ -360,6 +384,7 @@ const GROUP_VERBS: Record<
   view_image: ["viewed", "viewing", "view"],
   pick_references: ["picked", "picking", "pick"],
   search: ["searched", "searching", "search"],
+  web_search: ["searched", "searching", "search"],
   list: ["listed", "listing", "list"],
   command: ["ran", "running", "run"],
   process: ["used", "using", "use"],
@@ -378,7 +403,13 @@ function pushGroupClause(
   action: ToolDisplayAction,
   verb: string
 ) {
-  if (action === "pick_references")
+  if (action === "web_search") {
+    const count = counts.get(action);
+    if (count)
+      clauses.push(
+        count === 1 ? `${verb} the web` : `${verb} the web ${count} times`
+      );
+  } else if (action === "pick_references")
     pushReferencePickerClause(clauses, counts, verb);
   else if (action === "list_tabs") pushTabsCheckClause(clauses, counts, verb);
   else pushClause(clauses, counts, action, verb);
@@ -447,6 +478,8 @@ function nounForAction(action: ToolDisplayAction): string {
     case "edit":
     case "write":
       return "file";
+    case "web_search":
+      return "web search";
     case "search":
       return "search";
     case "pick_references":

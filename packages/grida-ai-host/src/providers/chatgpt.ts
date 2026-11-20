@@ -14,6 +14,7 @@ import {
   CHATGPT_SUBSCRIPTION_WIRE_MODEL_BY_ID,
   isChatGptSubscriptionModelId,
   type ChatGptSubscriptionModelId,
+  type ChatGptTurnCapabilities,
 } from "../protocol/chatgpt";
 import {
   ChatGptCredentialError,
@@ -21,6 +22,7 @@ import {
   type ChatGptCredentialManager,
   type ChatGptOAuthConfig,
 } from "./chatgpt-credentials";
+import { ChatGptModels, noSubscriptionFeatures } from "./chatgpt-models";
 import type { ProviderHttp } from "./http";
 
 const RESPONSES_SUFFIX = "/responses";
@@ -30,6 +32,7 @@ const NATIVE_FIELDS = new Set([
   "input",
   "instructions",
   "tools",
+  "service_tier",
   "reasoning",
   "stream",
   "store",
@@ -40,6 +43,8 @@ export type ChatGptProviderConfig = Readonly<{
   oauth: ChatGptOAuthConfig;
   /** Exact configured Responses endpoint, including the `/responses` suffix. */
   responses_url: string;
+  /** Host-owned discovery compatibility version. Absent disables optional features. */
+  catalog_client_version?: string;
   /** Host-configured product identity; the host owns the service contract. */
   originator: string;
   default_model_id: ChatGptSubscriptionModelId;
@@ -48,12 +53,22 @@ export type ChatGptProviderConfig = Readonly<{
 export type ChatGptProviderRuntime = Readonly<{
   config: ChatGptProviderConfig;
   credentials: ChatGptCredentialManager;
+  catalog?: ChatGptModels;
+  /** The host owns the preference and rereads it at dispatch, including authentication retries. */
+  turnPreferences?: () => Promise<
+    Readonly<{
+      fastMode: boolean;
+      webSearch: "disabled" | "onDemand" | "cached" | "indexed" | "live";
+    }>
+  >;
 }>;
 
 export type NativeChatGptConnection = Readonly<{
   scope: string;
   target: string;
   model: ChatGptSubscriptionModelId;
+  capabilities(): Promise<ChatGptTurnCapabilities>;
+  isCurrent(): Promise<boolean>;
   request(body: Uint8Array, signal: AbortSignal): Promise<Response | null>;
 }>;
 
@@ -68,7 +83,19 @@ export class ChatGptProviderError extends Error {
 }
 
 export namespace ChatGptProvider {
+  export function modelsUrl(config: ChatGptProviderConfig): string | undefined {
+    if (config.catalog_client_version === undefined) return;
+    if (!/^\d{1,4}\.\d{1,4}\.\d{1,4}$/.test(config.catalog_client_version))
+      throw new TypeError(
+        "invalid subscription catalogue compatibility version"
+      );
+    const url = new URL("models", config.responses_url);
+    url.searchParams.set("client_version", config.catalog_client_version);
+    return url.href;
+  }
+
   export function validate(config: ChatGptProviderConfig): void {
+    modelsUrl(config);
     const responseUrl = new URL(config.responses_url);
     if (
       responseUrl.protocol !== "https:" ||
@@ -118,10 +145,83 @@ export namespace ChatGptProvider {
       )
       .digest("hex");
     const wireModel = CHATGPT_SUBSCRIPTION_WIRE_MODEL_BY_ID[model];
+    const catalogUrl = modelsUrl(runtime.config);
+    const catalogOffer = async (): Promise<ChatGptTurnCapabilities> => {
+      try {
+        await connection.validate();
+        if (!runtime.catalog || !catalogUrl)
+          return noSubscriptionFeatures("unavailable");
+        const result = await runtime.catalog.capabilities(
+          scope,
+          model,
+          (signal) =>
+            requestWithRetry(
+              runtime.credentials,
+              connection.access,
+              async (credential) => {
+                await connection.validate();
+                signal.throwIfAborted();
+                return requestWithCredential(
+                  providerHttp,
+                  catalogUrl,
+                  {
+                    method: "GET",
+                    headers: { accept: "application/json" },
+                    signal,
+                    redirect: "manual",
+                  },
+                  originator,
+                  credential
+                );
+              }
+            ).catch((error: unknown) => {
+              if (
+                error instanceof ChatGptCredentialError &&
+                error.code !== "chatgpt_token_refresh_failed"
+              )
+                return new Response(null, { status: 401 });
+              throw error;
+            })
+        );
+        await connection.validate();
+        return result;
+      } catch (error) {
+        return noSubscriptionFeatures(
+          error instanceof ChatGptCredentialError &&
+            error.code !== "chatgpt_token_refresh_failed"
+            ? "reauthenticationRequired"
+            : "unavailable"
+        );
+      }
+    };
+    const capabilities = async (): Promise<ChatGptTurnCapabilities> => {
+      const prefs = await runtime.turnPreferences?.();
+      if (!prefs) return catalogOffer();
+      if (!prefs.fastMode && prefs.webSearch === "disabled")
+        return {
+          ...noSubscriptionFeatures("unsupported"),
+          fastModeDisabled: true,
+        };
+      const offer = await catalogOffer();
+      return {
+        ...offer,
+        ...(!prefs.fastMode && { speeds: [], fastModeDisabled: true as const }),
+        webSearch: offer.webSearch && prefs.webSearch !== "disabled",
+        ...((prefs.webSearch === "cached" || prefs.webSearch === "indexed") && {
+          webSearchMode: prefs.webSearch,
+        }),
+      };
+    };
     return Object.freeze({
       scope,
       target,
       model,
+      capabilities,
+      isCurrent: () =>
+        connection.validate().then(
+          () => true,
+          () => false
+        ),
       async request(body: Uint8Array, signal: AbortSignal) {
         if (
           signal.aborted ||
@@ -130,7 +230,17 @@ export namespace ChatGptProvider {
         )
           return null;
         const bytes = Uint8Array.from(body);
-        if (!validNativeRequest(bytes, wireModel)) return null;
+        const options = nativeOptions(bytes, wireModel);
+        if (!options) return null;
+        if (options.speed || options.webSearch) {
+          const offer = await capabilities();
+          if (
+            offer.status !== "available" ||
+            (options.speed && !offer.speeds.includes(options.speed)) ||
+            (options.webSearch && !offer.webSearch)
+          )
+            return null;
+        }
         const init: RequestInit = {
           method: "POST",
           headers: {
@@ -146,6 +256,23 @@ export namespace ChatGptProvider {
             runtime.credentials,
             connection.access,
             async (credential) => {
+              signal.throwIfAborted();
+              if (
+                runtime.turnPreferences &&
+                (options.speed || options.webSearch)
+              ) {
+                const prefs = await runtime.turnPreferences();
+                if (
+                  (options.speed && !prefs.fastMode) ||
+                  (options.webSearch &&
+                    (prefs.webSearch === "disabled" ||
+                      (prefs.webSearch === "cached" &&
+                        options.webSearch !== "cached") ||
+                      (prefs.webSearch === "indexed" &&
+                        options.webSearch === "live")))
+                )
+                  throw new Error("chat_turn_preference_changed");
+              }
               await connection.validate();
               signal.throwIfAborted();
               return await requestWithCredential(
@@ -188,36 +315,83 @@ async function requestWithRetry(
   throw new ChatGptCredentialError("chatgpt_reauthentication_required");
 }
 
-function validNativeRequest(bytes: Uint8Array, model: string): boolean {
+function nativeOptions(
+  bytes: Uint8Array,
+  model: string
+):
+  | {
+      speed?: "fast" | "ultrafast";
+      webSearch?: "cached" | "indexed" | "live";
+    }
+  | undefined {
   let body: Record<string, unknown>;
   try {
-    body = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+    const json = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    // The original bytes are forwarded. JSON.parse keeps the last duplicate
+    // member; another decoder could select the first instead. Count parsed
+    // members against structural colons, preserving whitespace and escapes.
+    let parsedMembers = 0;
+    body = JSON.parse(json, function (_key, value: unknown) {
+      if (!Array.isArray(this)) parsedMembers++;
+      return value;
+    });
+    let wireMembers = 0;
+    let inString = false;
+    for (let i = 0; i < json.length; i++) {
+      const ch = json[i];
+      if (ch === '"') inString = !inString;
+      else if (inString && ch === "\\") i++;
+      else if (!inString && ch === ":") wireMembers++;
+    }
+    // The reviver also receives the synthetic root member.
+    if (wireMembers !== parsedMembers - 1) return;
   } catch {
-    return false;
+    return;
   }
-  return (
-    !!body &&
-    typeof body === "object" &&
-    !Array.isArray(body) &&
-    Object.keys(body).every((key) => NATIVE_FIELDS.has(key)) &&
-    body.model === model &&
-    body.stream === true &&
-    body.store === false &&
-    typeof body.instructions === "string" &&
-    Array.isArray(body.input) &&
-    (body.tools === undefined ||
-      (Array.isArray(body.tools) &&
-        body.tools.every(
-          (tool: unknown) =>
-            typeof tool === "object" &&
-            tool !== null &&
-            "type" in tool &&
-            tool.type === "function"
-        ))) &&
-    Array.isArray(body.include) &&
-    body.include.length === 1 &&
-    body.include[0] === "reasoning.encrypted_content"
-  );
+  if (
+    !(
+      !!body &&
+      typeof body === "object" &&
+      !Array.isArray(body) &&
+      Object.keys(body).every((key) => NATIVE_FIELDS.has(key)) &&
+      body.model === model &&
+      body.stream === true &&
+      body.store === false &&
+      typeof body.instructions === "string" &&
+      Array.isArray(body.input) &&
+      (body.tools === undefined || Array.isArray(body.tools)) &&
+      (body.service_tier === undefined ||
+        body.service_tier === "priority" ||
+        body.service_tier === "ultrafast") &&
+      Array.isArray(body.include) &&
+      body.include.length === 1 &&
+      body.include[0] === "reasoning.encrypted_content"
+    )
+  )
+    return;
+  let webSearch: "cached" | "indexed" | "live" | undefined;
+  for (const tool of body.tools ?? []) {
+    if (!tool || typeof tool !== "object" || Array.isArray(tool)) return;
+    if (tool.type === "function") continue;
+    if (
+      tool.type !== "web_search" ||
+      typeof tool.external_web_access !== "boolean" ||
+      (tool.indexed_web_access !== undefined &&
+        (tool.indexed_web_access !== true || !tool.external_web_access)) ||
+      Object.keys(tool).length !== (tool.indexed_web_access === true ? 3 : 2) ||
+      webSearch
+    )
+      return;
+    webSearch = !tool.external_web_access
+      ? "cached"
+      : tool.indexed_web_access
+        ? "indexed"
+        : "live";
+  }
+  return {
+    speed: body.service_tier === "priority" ? "fast" : body.service_tier,
+    webSearch,
+  };
 }
 
 function nativeErrorResponse(response: Response): Response {

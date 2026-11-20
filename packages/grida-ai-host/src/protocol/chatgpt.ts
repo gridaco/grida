@@ -125,6 +125,20 @@ export function isChatGptProviderId(
   return id === CHATGPT_PROVIDER_ID;
 }
 
+/** Current optional turn features on one captured subscription model. Standard
+ * inference works independently of discovery. No account identity is exposed. */
+export type ChatGptTurnCapabilities = Readonly<{
+  status:
+    | "available"
+    | "unsupported"
+    | "unavailable"
+    | "reauthenticationRequired";
+  speeds: readonly ("fast" | "ultrafast")[];
+  webSearch: boolean;
+  fastModeDisabled?: true;
+  webSearchMode?: "cached" | "indexed";
+}>;
+
 export type ChatGptSubscriptionAccount = {
   id?: string;
   email?: string;

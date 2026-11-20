@@ -1,4 +1,5 @@
 // GRIDA-SEC-004 / GRIDA-SEC-008 — only Main can resolve a catalog selection to provider authority.
+import type { ChatGptTurnCapabilities } from "@grida/ai-host";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import type { NativeAgentLaunch } from "./native-agent-process";
@@ -20,6 +21,7 @@ export type NativeProviderRouteLaunch = Pick<
   | "gatewayScope"
   | "gatewayJobBilling"
   | "subscriptionScope"
+  | "subscriptionCapabilities"
   | "imageGeneration"
 >;
 export type PreparedProviderRoute = {
@@ -35,6 +37,8 @@ const MAX_ROUTES = 256;
 export class NativeProviderRoutes {
   static readonly capability = "co.grida/provider/routes";
   static readonly predictionCapability = "co.grida/provider/prediction-route";
+  static readonly turnCapability = "co.grida/provider/turn-capabilities";
+  static readonly turnMethod = "_co.grida/provider/turnCapabilities";
   static readonly resolveMethod = "_co.grida/provider/resolve";
   private readonly lifetime = new AbortController();
   private readonly launchId = randomUUID();
@@ -50,7 +54,8 @@ export class NativeProviderRoutes {
     private readonly connectionId: string | null,
     private readonly launch: NativeProviderRouteLaunch,
     private readonly lookup?: NativeProviderRoutes.Lookup,
-    private readonly predict?: NativeProviderRoutes.PredictionLookup
+    private readonly predict?: NativeProviderRoutes.PredictionLookup,
+    private readonly fastModeEnabled?: () => Promise<boolean>
   ) {}
 
   /** Exactly the same custody and limits apply at process launch and per-input selection. */
@@ -181,6 +186,41 @@ export class NativeProviderRoutes {
       return { kind: "launch", model, routeId: this.launchId };
 
     return this.describe(await this.acquire(key, model, profile));
+  }
+
+  /** Preview/admission on the exact private foreground handle. A prediction
+   * handle or a renderer-supplied account or endpoint cannot supply this offer. */
+  async turnCapabilities(value: unknown): Promise<ChatGptTurnCapabilities> {
+    const params = record(value);
+    const id = params?.routeId;
+    if (
+      !params ||
+      this.lifetime.signal.aborted ||
+      typeof params.model !== "string" ||
+      (id !== undefined && (typeof id !== "string" || id.length !== 36)) ||
+      Object.keys(params).length !== (id === undefined ? 1 : 2)
+    )
+      throw new Error("native_chat_profile_unavailable");
+    const launch =
+      id === undefined || id === this.launchId
+        ? this.launch
+        : this.resolved.get(id)?.launch;
+    if (!launch || launch.model !== params.model)
+      throw new Error("native_chat_profile_unavailable");
+    if (!launch.subscriptionScope) {
+      const enabled = await this.fastModeEnabled?.();
+      return {
+        status: "unsupported",
+        speeds: [],
+        webSearch: false,
+        ...(enabled === false && { fastModeDisabled: true }),
+      };
+    }
+    if (!launch.subscriptionCapabilities)
+      return { status: "unavailable", speeds: [], webSearch: false };
+    const result = await launch.subscriptionCapabilities();
+    this.lifetime.signal.throwIfAborted();
+    return result;
   }
 
   private async prediction(

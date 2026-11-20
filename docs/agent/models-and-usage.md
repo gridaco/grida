@@ -125,6 +125,21 @@ limits; use a new message for the expanded image workflow.
 [Attach an image](./getting-started.md#attach-an-image)
 [Choose how much effort to use](./effort-and-goals.md#choose-how-much-effort-to-use)
 
+### Choose a response speed
+
+In a regular workspace chat using **ChatGPT Subscription**, open the model
+picker and choose a **Speed**. Each chat starts at **Standard**. **Fast** and
+**Ultrafast** appear when the selected model and your account offer them.
+Faster speeds use more of your ChatGPT allowance. You can set effort separately.
+Turn **Fast mode** off in **Settings → Personalization** to use Standard across
+chats while keeping their saved speed choices.
+
+Grida remembers the speed for that chat, including an unsent draft. A message
+already in the queue keeps the speed and model it had when you sent it.
+If Grida can’t check available speeds, choose **Retry availability** in the
+picker or switch to **Standard**. If your subscription needs a new sign-in,
+reconnect it in Settings.
+
 ## Known limits
 
 - A reply on a Grida Gateway model is limited to at most 4,096 output tokens.

@@ -258,6 +258,7 @@ impl Fixture {
         };
         Master::new(
             MasterConfig {
+                request_options: Default::default(),
                 model: model(),
                 instructions: "Complete the task and incorporate user answers.".into(),
                 max_steps: 5,

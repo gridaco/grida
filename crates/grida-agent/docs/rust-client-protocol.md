@@ -362,10 +362,10 @@ required for metadata inspection or mutation.
   in a providerless metadata host and is not an independent execution grant.
 - `_co.grida/session/selection/update` takes `{cwd, sessionId,
 expectedRevision, operationId, selection}`. A selection is `{connectionId,
-model, effort}`: connection ID is a stable 64-character lowercase hex host
+model, effort, speed?}`: connection ID is a stable 64-character lowercase hex host
   reference or null for the workspace default; model is the wire model ID;
   effort is `low`, `medium`, `high`, `xhigh`, or `ultra`. Legacy `standard`
-  normalizes to `medium`. The supervisor validates configured connection and
+  normalizes to `medium`. Speed is `standard` (default), `fast`, or `ultrafast`. The supervisor validates configured connection and
   model availability separately from worker readiness. A successful response
   is `{sessionId, operationId, revision, selection}`. An invalid selection or
   stale expected revision changes no metadata. Exact outstanding operation
@@ -397,6 +397,29 @@ selected pair as provenance. The supervisor separately matches its active
 connection to `connectionId`. An exact accepted-input retry observes its
 original receipt before consulting newer chat settings. Historical inputs,
 Goals, reviews and retries keep their original execution captures.
+
+On private routed stdio, `co.grida/provider/turn-capabilities: 1` enables
+selected-turn offer discovery. The worker calls
+`_co.grida/provider/turnCapabilities` with the captured `routeId` (when routed)
+and namespaced `model`. The supervisor replies with `status`, offered accelerated
+`speeds`, and a `webSearch` boolean. Status is `available`, `unsupported`,
+`unavailable`, or `reauthenticationRequired`. The credential owner checks the
+selected subscription identity and its authenticated model listing. An optional
+`fastModeDisabled: true` selects Standard without editing the chat ledger.
+An optional `webSearchMode` of `cached` or `indexed` narrows hosted search
+for an enabled input. Older captures with search enabled use live access.
+
+For regular `session/submit` and `session/enqueue`, a client can send
+`_meta["co.grida/webSearch"] = true` with the selection revision to permit
+provider-hosted search for that input. Speed comes from the revisioned chat
+selection. An accelerated or search-enabled input requires a positive offer
+at admission. Ordinary Standard inputs bypass offer discovery. The durable
+input retains the model, connection, speed and search permission for execution.
+An accepted-input retry with a different search permission conflicts. Private
+`_co.grida/session/input` inspection returns `settings.webSearch` when enabled.
+An omitted setting means search was off, including for older records and
+workers. The public acceptance receipt contains only submission data. Goals
+and auxiliary operations use their own request settings.
 
 The native host persists versioned private selection records adjacent to its
 database under the same exclusive process owner. This adds no SQLite schema

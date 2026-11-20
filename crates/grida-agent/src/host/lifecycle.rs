@@ -768,6 +768,9 @@ pub struct InputSettings {
     pub allow_wakeups: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub allow_library_selection: bool,
+    /// Permission captured when this input was accepted, including on receipt-only retries.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub web_search: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub goal_start: Option<GoalRequest>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -839,6 +842,7 @@ impl InputSettings {
                     questions: stored.questions,
                     allow_wakeups: stored.allow_wakeups,
                     allow_library_selection: stored.allow_library_selection,
+                    web_search: stored.request_options.web_search,
                     goal_start: match stored.goal {
                         Some(goals::GoalInput::Start(goal)) => Some(goal),
                         _ => None,
@@ -949,9 +953,7 @@ impl Host {
         if let Some(accepted) = self.existing_submission(&request, &context).await? {
             return Ok(accepted);
         }
-        let host = self
-            .for_selection(&request.session, context.selection_revision)
-            .await?;
+        let (host, options) = self.for_foreground(&request.session, &context).await?;
         let admission = self.configuration_admission.lock().await;
         if let Some(accepted) = self.existing_submission(&request, &context).await? {
             return Ok(accepted);
@@ -966,6 +968,7 @@ impl Host {
         }
         let mut policy = host.submission_policy(&request, context.allow_wakeups)?;
         policy.selection_revision = context.selection_revision;
+        policy.request_options = options;
         host.bind_editor(&mut policy, &request, &context)?;
         let title = host.title_candidate(&view, &request.parts, context.initial_title)?;
         let input = host
@@ -1145,12 +1148,17 @@ impl Host {
                         .is_some_and(|input| input.allow_image_placement);
                     let spending = stored.as_ref().and_then(|input| input.spending.clone());
                     let reasoning = stored.as_ref().and_then(|input| input.reasoning);
+                    let options = stored
+                        .as_ref()
+                        .map(|input| input.request_options)
+                        .unwrap_or_default();
                     let effort = stored.and_then(|input| input.effort);
                     host.capture_input(
                         &view,
                         replacement,
                         parts,
                         SubmissionPolicy {
+                            request_options: options,
                             selection_revision: None,
                             selection_goal: false,
                             questions,

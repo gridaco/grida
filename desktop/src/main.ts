@@ -52,7 +52,6 @@ import { open_handoff } from "./main/open-handoff";
 import { startup_window } from "./main/startup-window-policy";
 import { DesktopAccountSession } from "./main/account-session";
 import { DesktopEntryWindow } from "./main/desktop-entry-window";
-import { DesktopComposerPredictions } from "./main/desktop-composer-predictions";
 import { DesktopPreferences } from "./main/desktop-preferences";
 import { NativeChatSelections } from "./main/native-chat-selections";
 import { NativeDesktopAgent } from "./main/native-desktop-agent";
@@ -1073,9 +1072,7 @@ app.on("ready", async () => {
     open_restored_chat: (workspaceId, sessionId) =>
       focusNativeChat(workspaceId, { sessionId }, windowAdmission),
     global_hooks: native?.globalHooks,
-    composer_predictions: native
-      ? new DesktopComposerPredictions(native.globalHooks.configPath)
-      : undefined,
+    personalization: native?.personalization,
     recent_files: recentFiles,
     native_chat_disabled: !native,
     native_chat_selections: chatSelections,
@@ -1121,6 +1118,8 @@ app.on("ready", async () => {
       native_chat_profiles: native.selectableProfiles
         ? {
             list: (workspaceId) => native.profiles(workspaceId),
+            turnCapabilities: (workspaceId, profileId, model) =>
+              native.turnCapabilities(workspaceId, profileId, model),
             select: (workspaceId, selection, requireCurrent) =>
               native.selectProfile(workspaceId, selection, requireCurrent),
             fallback: () => native.fallbackProfile(),

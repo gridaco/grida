@@ -1,6 +1,7 @@
 // GRIDA-SEC-004 / GRIDA-SEC-008 — ordinary model selection keeps subscription custody and chat funding bound.
 import { AuthStore } from "@grida/daemon/server";
 import { TIER_MODEL_IDS } from "@grida/ai/catalogue";
+import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -65,6 +66,49 @@ const supportedModels = [
 beforeEach(() => {
   vi.resetModules();
   vi.resetAllMocks();
+});
+
+it("discovers features only on the selected live subscription receipt without starting a worker", async () => {
+  const f = await subscriptionDesktop();
+  try {
+    const offers = await f.agent.welcomeProfiles();
+    const sol = offers.choices.find(({ model }) => model === "GPT-6.2 Sol")!;
+    const model = "openai/gpt-6.2-sol";
+    const view = (profileId: string | null) =>
+      f.agent.turnCapabilities(f.workspace.id, profileId, model);
+    expect(await view(null)).toEqual({
+      status: "unsupported",
+      speeds: [],
+      webSearch: false,
+    });
+    expect(await view("f".repeat(64))).toEqual({
+      status: "unsupported",
+      speeds: [],
+      webSearch: false,
+    });
+    expect(f.getModels).not.toHaveBeenCalled();
+    expect(await view(sol.id)).toEqual({
+      status: "available",
+      speeds: ["fast", "ultrafast"],
+      webSearch: true,
+    });
+    expect(f.getModels).toHaveBeenCalledTimes(1);
+    expect(f.getModels.mock.calls[0]![0].get("chatgpt-account-id")).toBe(
+      "subscription-fixture-account"
+    );
+    expect(f.agent.current(f.workspace.id)).toBeNull();
+    expect(f.prepare).not.toHaveBeenCalled();
+    expect(f.dispatch).not.toHaveBeenCalled();
+    await f.seed({ lineage: "replacement", access: "another-access" });
+    expect(await view(sol.id)).toEqual({
+      status: "unsupported",
+      speeds: [],
+      webSearch: false,
+    });
+    expect(f.getModels).toHaveBeenCalledTimes(1);
+  } finally {
+    await f.close();
+  }
 });
 
 it.runIf(Boolean(resources) && process.platform !== "win32")(
@@ -233,9 +277,29 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         fixture.workspace.id,
         foreground.id
       )!.chat;
-      const session = await chat.create();
-      const send = async (id: string, prompt: string) => {
-        await chat.submit(session, id, prompt, undefined, undefined, "high");
+      if (!chat.createSelected) throw new Error("selection not negotiated");
+      const session = await chat.createSelected({
+        sessionId: randomUUID(),
+        requestId: randomUUID(),
+        selection: {
+          connectionId: foreground.id,
+          model: "openai/gpt-6.2-sol",
+          effort: "high",
+          speed: "fast",
+        },
+      });
+      const send = async (id: string, prompt: string, webSearch?: true) => {
+        await chat.submit(
+          session,
+          id,
+          prompt,
+          undefined,
+          undefined,
+          "high",
+          1,
+          undefined,
+          webSearch
+        );
         return vi.waitFor(
           async () => {
             expect(await chat.inputReceipt(session, id)).toMatchObject({
@@ -248,7 +312,8 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       };
       const reply = await send(
         "outline",
-        "Outline the slide. The speaker notes come next."
+        "Outline the slide. The speaker notes come next.",
+        true
       );
       fixture.dispatch.mockResolvedValueOnce(
         subscriptionResponse("Write the speaker notes.", "suggestion")
@@ -267,6 +332,15 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         TIER_MODEL_IDS.nano.replace(/^openai\//, ""),
         "gpt-6.2-sol",
       ]);
+      expect(requests[0].service_tier).toBe("priority");
+      expect(requests[0].tools).toContainEqual({
+        type: "web_search",
+        external_web_access: true,
+      });
+      expect(requests[2].service_tier).toBe("priority");
+      expect(requests[2].tools).not.toContainEqual(
+        expect.objectContaining({ type: "web_search" })
+      );
       expect(requests[2].reasoning?.effort).toBe("high");
       expect(requests[1].tools ?? []).toEqual([]);
       expect(requests[1]).not.toHaveProperty("service_tier");
@@ -288,6 +362,393 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
     }
   },
   30_000
+);
+
+it.runIf(Boolean(resources) && process.platform !== "win32")(
+  "captures a queued accelerated search, restores its sources and sends the next turn on the edited selection",
+  async () => {
+    const f = await subscriptionDesktop();
+    let release: (() => void) | undefined;
+    try {
+      const { choices } = await f.agent.welcomeProfiles();
+      const sol = choices.find(
+        (p) =>
+          p.connection === "ChatGPT Subscription" && p.model === "GPT-6.2 Sol"
+      )!;
+      const terra = choices.find(
+        (p) =>
+          p.connection === "ChatGPT Subscription" && p.model === "GPT-5.6 Terra"
+      )!;
+      await f.agent.selectProfile(
+        f.workspace.id,
+        { kind: "new", id: sol.id },
+        () => {}
+      );
+      const chat = f.agent.current(f.workspace.id, sol.id)!.chat;
+      if (!chat.createSelected || !chat.selectionRequest)
+        throw new Error("missing chat selection");
+      const selected = {
+        connectionId: sol.id,
+        model: "openai/gpt-6.2-sol",
+        effort: "high" as const,
+        speed: "ultrafast" as const,
+      };
+      const session = await chat.createSelected({
+        sessionId: randomUUID(),
+        requestId: randomUUID(),
+        selection: selected,
+      });
+      const edit = (revision: number, selection: Record<string, unknown>) =>
+        chat.selectionRequest!("update", session.id, {
+          operationId: randomUUID(),
+          expectedRevision: revision,
+          selection,
+        });
+      const waitInput = (id: string) =>
+        vi.waitFor(
+          async () => {
+            expect((await chat.inputReceipt(session, id)).disposition).toBe(
+              "completed"
+            );
+          },
+          { timeout: 10000 }
+        );
+      // Hold the first dispatch until the queued input and later model edit are durable.
+      const gate = new Promise<void>((done) => {
+        release = done;
+      });
+      f.dispatch.mockImplementationOnce(async () => {
+        await gate;
+        return subscriptionResponse("Ready.", "first-answer");
+      });
+      await chat.submit(
+        session,
+        "first",
+        "Start here",
+        "act",
+        undefined,
+        "high",
+        1
+      );
+      await vi.waitFor(() => expect(f.dispatch).toHaveBeenCalledTimes(1), {
+        timeout: 5000,
+      });
+      await edit(1, { ...selected, speed: "fast" });
+      await chat.enqueue(
+        session,
+        "queued-search",
+        "Find the specification",
+        "act",
+        undefined,
+        "high",
+        2,
+        undefined,
+        true
+      );
+      await edit(2, {
+        connectionId: terra.id,
+        model: "openai/gpt-5.6-terra",
+        effort: "low",
+      });
+      const search = {
+        type: "web_search_call",
+        id: "ws_1",
+        status: "completed",
+        action: { type: "search", query: "RFC 9110" },
+      };
+      const answer = {
+        type: "message",
+        id: "cited-answer",
+        role: "assistant",
+        status: "completed",
+        content: [
+          {
+            type: "output_text",
+            text: "RFC 9110",
+            annotations: [
+              {
+                type: "url_citation",
+                title: "HTTP Semantics",
+                url: "https://www.rfc-editor.org/rfc/rfc9110",
+                start_index: 0,
+                end_index: 8,
+              },
+            ],
+          },
+        ],
+      };
+      const events = [
+        {
+          type: "response.output_item.added",
+          item: { ...search, status: "in_progress" },
+        },
+        { type: "response.output_item.done", output_index: 0, item: search },
+        {
+          type: "response.output_text.delta",
+          item_id: answer.id,
+          delta: "RFC 9110",
+        },
+        { type: "response.output_item.done", output_index: 1, item: answer },
+        {
+          type: "response.completed",
+          response: {
+            status: "completed",
+            service_tier: "default",
+            output: [search, answer],
+            usage: { input_tokens: 5, output_tokens: 3 },
+          },
+        },
+      ];
+      f.dispatch.mockResolvedValueOnce(
+        new Response(
+          events.map((e) => "data: " + JSON.stringify(e) + "\n\n").join(""),
+          { headers: { "content-type": "text/event-stream" } }
+        )
+      );
+      release?.();
+      await waitInput("queued-search");
+      const requests = () =>
+        f.dispatch.mock.calls.map(([body]) => JSON.parse(body.toString()));
+      expect(requests()).toHaveLength(2);
+      expect(requests()[0].service_tier).toBe("ultrafast");
+      expect(
+        requests()[0].tools.every(
+          (tool: { type: string }) => tool.type === "function"
+        )
+      ).toBe(true);
+      expect(requests()[1]).toMatchObject({
+        model: "gpt-6.2-sol",
+        service_tier: "priority",
+        reasoning: { effort: "high" },
+      });
+      expect(requests()[1].tools).toEqual(
+        expect.arrayContaining([
+          { type: "web_search", external_web_access: true },
+          expect.objectContaining({ type: "function" }),
+        ])
+      );
+      const checkEvidence = (
+        messages: Awaited<ReturnType<typeof chat.transcript>>
+      ) => {
+        expect(messages.find((m) => m.text === "RFC 9110")?.citations).toEqual([
+          {
+            url: "https://www.rfc-editor.org/rfc/rfc9110",
+            title: "HTTP Semantics",
+            startIndex: 0,
+            endIndex: 8,
+          },
+        ]);
+        expect(
+          messages
+            .flatMap((m) => m.activity ?? [])
+            .filter((a) => a.source === "provider")
+        ).toMatchObject([{ kind: "search", title: "web_search" }]);
+      };
+      expect(chat.transcriptPage).toBeDefined();
+      checkEvidence((await chat.transcriptPage!(session)).messages);
+      await chat.submit(
+        session,
+        "next",
+        "Continue",
+        "act",
+        undefined,
+        "low",
+        3
+      );
+      await waitInput("next");
+      expect(requests()[2]).toMatchObject({
+        model: "gpt-5.6-terra",
+        reasoning: { effort: "low" },
+      });
+      expect(requests()[2]).not.toHaveProperty("service_tier");
+      expect(
+        requests()[2].tools.every(
+          (tool: { type: string }) => tool.type === "function"
+        )
+      ).toBe(true);
+      await f.reopen();
+      await f.agent.selectProfile(
+        f.workspace.id,
+        { kind: "saved", id: sol.id },
+        () => {}
+      );
+      const restored = f.agent.current(f.workspace.id, sol.id)!.chat;
+      checkEvidence(
+        (await restored.transcriptPage!(await restored.load(session.id)))
+          .messages
+      );
+      expect(f.dispatch).toHaveBeenCalledTimes(3);
+    } finally {
+      release?.();
+      await f.close();
+    }
+  },
+  30000
+);
+
+it.runIf(Boolean(resources) && process.platform !== "win32")(
+  "refuses a search before admission when discovery fails and still sends Standard",
+  async () => {
+    const f = await subscriptionDesktop();
+    try {
+      f.getModels.mockImplementation(
+        async () => new Response(null, { status: 503 })
+      );
+      const choice = (await f.agent.welcomeProfiles()).choices.find(
+        (p) =>
+          p.connection === "ChatGPT Subscription" && p.model === "GPT-6.2 Sol"
+      )!;
+      await f.agent.selectProfile(
+        f.workspace.id,
+        { kind: "new", id: choice.id },
+        () => {}
+      );
+      const chat = f.agent.current(f.workspace.id, choice.id)!.chat;
+      if (!chat.createSelected) throw new Error("missing chat selection");
+      const session = await chat.createSelected({
+        sessionId: randomUUID(),
+        requestId: randomUUID(),
+        selection: {
+          connectionId: choice.id,
+          model: "openai/gpt-6.2-sol",
+          effort: "high",
+        },
+      });
+      expect(f.getModels).not.toHaveBeenCalled();
+      const inputId = randomUUID();
+      await expect(
+        chat.submit(
+          session,
+          inputId,
+          "Search",
+          "act",
+          undefined,
+          "high",
+          1,
+          undefined,
+          true
+        )
+      ).rejects.toThrow(/chat_turn_capabilities_unavailable/);
+      await expect(chat.inputReceipt(session, inputId)).rejects.toThrow(
+        "input_unavailable"
+      );
+      expect(f.dispatch).not.toHaveBeenCalled();
+      // The rejected send never took ownership of the input identity.
+      await chat.submit(
+        session,
+        inputId,
+        "Search",
+        "act",
+        undefined,
+        "high",
+        1
+      );
+      await vi.waitFor(
+        async () =>
+          expect((await chat.inputReceipt(session, inputId)).disposition).toBe(
+            "completed"
+          ),
+        { timeout: 5000 }
+      );
+      expect(f.getModels).toHaveBeenCalledTimes(1);
+      expect(f.dispatch).toHaveBeenCalledTimes(1);
+      const body = JSON.parse(f.dispatch.mock.calls[0][0].toString());
+      expect(body).not.toHaveProperty("service_tier");
+      expect(
+        body.tools.every((tool: { type: string }) => tool.type === "function")
+      ).toBe(true);
+    } finally {
+      await f.close();
+    }
+  },
+  30000
+);
+
+it.runIf(Boolean(resources) && process.platform !== "win32")(
+  "applies TOML search access to native requests and preserves a chat’s speed through a global opt-out",
+  async () => {
+    const f = await subscriptionDesktop();
+    try {
+      const filename = f.agent.globalHooks.configPath;
+      const edit = (mode: string, fast: boolean) =>
+        fs.writeFile(
+          filename,
+          `schema_version = 1\nweb_search = "${mode}"\n[features]\nfast_mode = ${fast}\n`,
+          { mode: 0o600 }
+        );
+      await edit("cached", false);
+      const choice = (await f.agent.welcomeProfiles()).choices.find(
+        (p) =>
+          p.connection === "ChatGPT Subscription" && p.model === "GPT-6.2 Sol"
+      )!;
+      await f.agent.selectProfile(
+        f.workspace.id,
+        { kind: "new", id: choice.id },
+        () => {}
+      );
+      const chat = f.agent.current(f.workspace.id, choice.id)!.chat;
+      if (!chat.createSelected) throw new Error("missing chat selection");
+      const session = await chat.createSelected({
+        sessionId: randomUUID(),
+        requestId: randomUUID(),
+        selection: {
+          connectionId: choice.id,
+          model: "openai/gpt-6.2-sol",
+          effort: "medium",
+          speed: "fast",
+        },
+      });
+      const send = async (search?: true) => {
+        const id = randomUUID();
+        await chat.submit(
+          session,
+          id,
+          "Summarize",
+          "act",
+          undefined,
+          "medium",
+          1,
+          undefined,
+          search
+        );
+        await vi.waitFor(
+          async () =>
+            expect((await chat.inputReceipt(session, id)).disposition).toBe(
+              "completed"
+            ),
+          { timeout: 5000 }
+        );
+        return JSON.parse(f.dispatch.mock.calls.at(-1)![0].toString());
+      };
+      let body = await send(true);
+      expect(body).not.toHaveProperty("service_tier");
+      expect(body.tools).toContainEqual({
+        type: "web_search",
+        external_web_access: false,
+      });
+      await edit("indexed", true);
+      body = await send(true);
+      expect(body.service_tier).toBe("priority");
+      expect(body.tools).toContainEqual({
+        type: "web_search",
+        external_web_access: true,
+        indexed_web_access: true,
+      });
+      await edit("disabled", false);
+      await expect(send(true)).rejects.toThrow(
+        /chat_turn_options_unsupported|chat_web_search_unavailable/
+      );
+      body = await send();
+      expect(body).not.toHaveProperty("service_tier");
+      expect(
+        body.tools.every((t: { type: string }) => t.type === "function")
+      ).toBe(true);
+      expect(f.dispatch).toHaveBeenCalledTimes(3);
+    } finally {
+      await f.close();
+    }
+  },
+  30000
 );
 
 it.runIf(Boolean(resources) && process.platform !== "win32")(
@@ -724,6 +1185,20 @@ async function subscriptionDesktop() {
   const prepare = vi.fn<NativeProviderNetwork["prepare"]>((target) =>
     target === CHATGPT_RESPONSES_URL ? dispatch : null
   );
+  const getModels = vi.fn<
+    NonNullable<NativeProviderNetwork["getSubscriptionModels"]>
+  >(async () =>
+    Response.json({
+      models: [
+        {
+          slug: "gpt-6.2-sol",
+          visibility: "list",
+          use_responses_lite: true,
+          service_tiers: [{ id: "priority" }, { id: "ultrafast" }],
+        },
+      ],
+    })
+  );
   const browser = vi.fn<(url: string) => Promise<void>>();
   const accountHttp = vi.fn<typeof fetch>(async () => {
     throw new Error("fixture forbids account network requests");
@@ -731,7 +1206,7 @@ async function subscriptionDesktop() {
   sidecar.selectNativeChat.mockReturnValue(source);
   sidecar.nativeAgentSubscriptionSettings.mockResolvedValue({
     userDataPath: source.userDataPath,
-    network: { prepare },
+    network: { prepare, getSubscriptionModels: getModels },
   });
   sidecar.listProviderEndpoints.mockResolvedValue([]);
   sidecar.nativeBuiltInByok.mockRejectedValue(new Error("fixture key absent"));
@@ -771,6 +1246,7 @@ async function subscriptionDesktop() {
     base,
     workspace,
     seed,
+    getModels,
     dispatch,
     prepare,
     browser,

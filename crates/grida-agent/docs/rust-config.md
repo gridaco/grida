@@ -83,11 +83,15 @@ mandatory. User-owned programs require a separate custody contract.
 Desktop reads ordered `[[hooks]]` definitions only from the user-owned global
 `$GRIDA_HOME/config.toml` (default `~/.grida/config.toml`). This global source is
 separate from the per-host context-defaults file described above. The current
-global schema requires `schema_version = 1` and accepts hook definitions alongside
-Desktop's `[desktop]` preference table. Electron Main owns the optional
-`composer-predictions-enabled` boolean, which defaults to false. The Settings
-switch edits that value in place and preserves hook definitions and trust.
-[Desktop settings and older-build compatibility](../../../docs/agent/desktop-settings.md#suggest-the-next-prompt). Workspace
+global schema requires `schema_version = 1`. Settings → Personalization and
+hand edits use the same global file. Top-level `web_search` accepts
+`"disabled"`, `"cached"`, `"indexed"`, or `"live"`. An omitted key leaves
+web search on demand. The boolean `[features].fast_mode` defaults to true.
+The boolean `[desktop].composer-predictions-enabled` defaults to false.
+Edits from Settings preserve unrelated fields, comments and hook trust.
+[Desktop settings](../../../docs/agent/desktop-settings.md).
+
+Workspace
 `hooks.json` registries are ignored, preserved on disk, and never promoted to
 global authority. Settings > Hooks inspects the source and reviews new or changed
 definitions through native confirmation. Private receipts retain approved

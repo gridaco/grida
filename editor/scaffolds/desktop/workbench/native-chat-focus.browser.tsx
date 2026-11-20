@@ -4,8 +4,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { toast } from "sonner";
 import { Toaster } from "@app/ui/components/sonner";
+import { DESKTOP_BRIDGE_PROTOCOL } from "@grida/desktop-bridge";
 import type {
   DesktopNativeChat,
+  DesktopPersonalizationSettings,
   NativeChatCatalogEntry,
   NativeChatMessage,
   NativeChatPage,
@@ -416,7 +418,9 @@ it("clears a manual unread mark on an empty chat only after its retained history
 it("keeps a plain Welcome message available through workspace startup retries", async () => {
   const f = await setup();
   const open = vi.fn<NonNullable<DesktopNativeChat["startWorkspaceChat"]>>(
-    async () => ({ readiness: "native-unavailable" })
+    async () => ({
+      readiness: "native-unavailable",
+    })
   );
   const take = vi.fn<() => { text: string }>(() => ({ text: "Make a poster" }));
   await act(async () =>
@@ -832,7 +836,414 @@ it("shows review progress and its decision in the open chat while the turn keeps
     .toBeVisible();
 });
 
+it("selects ChatGPT speed, authorizes one search, and reopens the answer’s sources", async () => {
+  let speed: "standard" | "fast" | "ultrafast" = "standard";
+  let revision = 1;
+  let receive: (update: NativeChatUpdate) => void = () => {};
+  let firstSession: string | undefined;
+  let running = false;
+  let restored = false;
+  const turn = {
+    turnId: "turn",
+    epoch: 1,
+    historyPosition: 1,
+    journalPosition: 1,
+    controlRevision: 1,
+    paused: false,
+    cancelled: false,
+  };
+  const search = {
+    callId: "search",
+    kind: "search",
+    source: "provider",
+    title: "web_search",
+    input: { type: "search", query: "forecast" },
+  } as const;
+  const citation = {
+    url: "https://example.org/forecast",
+    title: "Forecast",
+    startIndex: 0,
+    endIndex: 5,
+  };
+  const update = vi.fn<NonNullable<DesktopNativeChat["updateSelection"]>>(
+    async (target, expected, _operation, choice) => {
+      expect(expected).toBe(revision);
+      speed = choice.speed ?? speed;
+      return {
+        target,
+        revision: ++revision,
+        available: true,
+        selection: {
+          profileId: null,
+          modelId: "chatgpt",
+          effort: choice.effort,
+          speed,
+        },
+      };
+    }
+  );
+  const submit = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(
+    async (_action, sessionId, inputId) => {
+      running = true;
+      return {
+        sessionId,
+        inputId,
+        disposition: "claimed",
+        inputPosition: 1,
+        turnId: "turn",
+      };
+    }
+  );
+  const f = await setup({
+    profiles: async () => ({ active: null, saved: [], choices: [] }),
+    selection: async (target) => ({
+      target,
+      revision,
+      available: true,
+      selection: {
+        profileId: null,
+        modelId: "chatgpt",
+        effort: "medium",
+        speed,
+      },
+    }),
+    updateSelection: update,
+    turnCapabilities: async () => ({
+      status: "available",
+      speeds: ["fast", "ultrafast"],
+      webSearch: true,
+    }),
+    submitInRegime: submit,
+    subscribe: async (_id, listener) => {
+      receive = listener;
+      return "subscription";
+    },
+    observe: async (id) => ({
+      observationId: "observing-" + id,
+      snapshot: {
+        sessionId: id,
+        sessionRevision: 0,
+        queuedInputs: 0,
+        admissionPaused: false,
+        current:
+          running && firstSession === id
+            ? { ...turn, disposition: "running", status: null }
+            : null,
+        latest:
+          restored && firstSession === id
+            ? { ...turn, disposition: "settled", status: "succeeded" }
+            : null,
+      },
+    }),
+    transcriptPage: async (id) => {
+      firstSession ??= id;
+      if (firstSession !== id)
+        return {
+          view: 0,
+          older: null,
+          messages: [
+            { messageId: "other", role: "user", text: "Second saved request" },
+          ],
+        };
+      return {
+        view: 0,
+        older: null,
+        turns: [
+          {
+            turnId: "turn",
+            startedAtMs: 1000,
+            ...(restored
+              ? { status: "succeeded" as const, settledAtMs: 2000 }
+              : { status: null }),
+          },
+        ],
+        messages: [
+          {
+            messageId: "request",
+            role: "user",
+            turnId: "turn",
+            text: "First saved request",
+          },
+          ...(restored
+            ? [
+                {
+                  messageId: "search-message",
+                  role: "assistant" as const,
+                  turnId: "turn",
+                  text: "",
+                  activity: [{ ...search, outcome: "succeeded" as const }],
+                },
+                {
+                  messageId: "answer",
+                  turnId: "turn",
+                  role: "assistant" as const,
+                  phase: "answer" as const,
+                  text: "Sunny tomorrow.",
+                  citations: [citation],
+                },
+              ]
+            : []),
+        ],
+      };
+    },
+  });
+  await act(async () =>
+    page.getByRole("combobox", { name: "Model connection" }).click()
+  );
+  await expect
+    .element(page.getByRole("button", { name: "Standard", exact: true }))
+    .toHaveAttribute("aria-pressed", "true");
+  await click("Fast");
+  await expect.poll(() => speed).toBe("fast");
+  await expect
+    .element(
+      page.getByText("Faster speeds use more of your ChatGPT allowance.")
+    )
+    .toBeVisible();
+  await act(async () => userEvent.keyboard("{Escape}"));
+  await click("Add to message");
+  await act(async () =>
+    page.getByRole("option", { name: /Web search/ }).click()
+  );
+  await expect
+    .element(page.getByRole("button", { name: "Remove web search" }))
+    .toBeVisible();
+  await act(async () => {
+    await userEvent.fill(f.composer, "Find the forecast");
+    f.composer.focus();
+    await userEvent.keyboard("{Enter}");
+  });
+  await expect.poll(() => submit.mock.calls.length).toBe(1);
+  expect(submit.mock.calls[0]?.[10]).toBe(true);
+  await expect
+    .element(page.getByRole("button", { name: "Remove web search" }))
+    .not.toBeInTheDocument();
+  const emitSearch = (outcome: "running" | "succeeded") =>
+    act(async () =>
+      receive({
+        kind: "activity",
+        messageId: "search-message",
+        turnId: "turn",
+        activity: { ...search, outcome },
+      })
+    );
+  await emitSearch("running");
+  await expect.element(page.getByText(/searching the web/i)).toBeVisible();
+  await emitSearch("succeeded");
+  await expect.element(page.getByText(/searched the web/i)).toBeVisible();
+  await act(async () =>
+    receive({
+      kind: "text",
+      role: "assistant",
+      turnId: "turn",
+      messageId: "answer",
+      offsetBytes: 0,
+      replace: true,
+      text: "Sunny tomorrow.",
+      citations: [citation],
+    })
+  );
+  const source = page.getByRole("link", { name: "Forecast" });
+  await expect.element(source).toHaveAttribute("href", citation.url);
+  restored = true;
+  running = false;
+  await f.render(f.second);
+  await expect.element(page.getByText("Second saved request")).toBeVisible();
+  await f.render(f.first);
+  await expect.element(source).toHaveAttribute("href", citation.url);
+  await click("Worked for 1s");
+  await expect.element(page.getByText(/searched the web/i)).toBeVisible();
+  await act(async () => {
+    await userEvent.fill(f.composer, "Thank you");
+    f.composer.focus();
+    await userEvent.keyboard("{Enter}");
+  });
+  await expect.poll(() => submit.mock.calls.length).toBe(2);
+  expect(submit.mock.calls[1]?.[10]).toBeUndefined();
+});
+
+it("applies Personalization changes to the composer and skips automatic search for one message", async () => {
+  let receive: (next: DesktopPersonalizationSettings) => void = () => {};
+  const prefs = {
+    fastMode: false,
+    webSearch: "live",
+    suggestedPrompts: false,
+    revision: 1,
+  } as const;
+  vi.stubGlobal("grida", {
+    protocol: DESKTOP_BRIDGE_PROTOCOL,
+    personalization: {
+      get: async () => prefs,
+      onChange(listener: typeof receive) {
+        receive = listener;
+        return () => {};
+      },
+    },
+  });
+  try {
+    const submit = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(
+      async (_mode, sessionId, inputId) => ({
+        sessionId,
+        inputId,
+        disposition: "claimed",
+        inputPosition: 1,
+        turnId: "turn",
+      })
+    );
+    const f = await setup({
+      selection: async (target) => ({
+        target,
+        revision: 1,
+        available: true,
+        selection: {
+          profileId: null,
+          modelId: "gpt-6.2-sol",
+          effort: "medium",
+          speed: "fast",
+        },
+      }),
+      turnCapabilities: async () => ({
+        status: "available",
+        speeds: ["fast"],
+        webSearch: true,
+      }),
+      submitInRegime: submit,
+    });
+    const remove = page.getByRole("button", { name: "Remove web search" });
+    await expect.element(remove).toBeVisible();
+    await act(async () => remove.click());
+    await act(async () => {
+      await userEvent.fill(f.composer, "Use the conversation");
+      f.composer.focus();
+      await userEvent.keyboard("{Enter}");
+    });
+    await expect.poll(() => submit.mock.calls.length).toBe(1);
+    expect(submit.mock.calls[0][10]).toBeUndefined();
+    await expect.element(remove).toBeVisible();
+    await act(async () =>
+      receive({ ...prefs, revision: 2, webSearch: "disabled", fastMode: true })
+    );
+    await expect.element(remove).not.toBeInTheDocument();
+    await act(async () =>
+      page.getByRole("combobox", { name: "Model connection" }).click()
+    );
+    await expect
+      .element(page.getByRole("button", { name: "Fast", exact: true }))
+      .toHaveAttribute("aria-pressed", "true");
+    await act(async () =>
+      receive({ ...prefs, revision: 3, webSearch: "disabled", fastMode: false })
+    );
+    await expect
+      .element(page.getByRole("button", { name: "Fast", exact: true }))
+      .not.toBeInTheDocument();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 describe("Composer control loading", () => {
+  it("retries search discovery with fast mode off without opting the message in", async () => {
+    vi.stubGlobal("grida", {
+      protocol: DESKTOP_BRIDGE_PROTOCOL,
+      personalization: {
+        get: async () => ({
+          fastMode: false,
+          webSearch: "onDemand",
+          suggestedPrompts: false,
+          revision: 1,
+        }),
+        onChange: () => () => {},
+      },
+    });
+    try {
+      let available = false;
+      await setup({
+        turnCapabilities: async () => ({
+          status: available ? "available" : "unavailable",
+          speeds: [],
+          webSearch: available,
+        }),
+      });
+      await click("Add to message");
+      const retry = page.getByRole("option", {
+        name: /Web search.*Check availability again/,
+      });
+      await expect.element(retry).toBeVisible();
+      available = true;
+      await act(async () => retry.click());
+      const chip = page.getByRole("button", { name: "Remove web search" });
+      await expect.element(chip).not.toBeInTheDocument();
+      await click("Add to message");
+      await act(async () =>
+        page.getByRole("option", { name: /Web search.*Search the web/ }).click()
+      );
+      await expect.element(chip).toBeVisible();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("retries unavailable ChatGPT options, ignores a stale discovery response, and hides empty offers", async () => {
+    const pending = Promise.withResolvers<void>();
+    let mode: "unavailable" | "pending" | "offered" | "empty" = "unavailable";
+    const read = vi.fn<NonNullable<DesktopNativeChat["turnCapabilities"]>>(
+      async () => {
+        if (mode === "unavailable")
+          return { status: "unavailable", speeds: [], webSearch: false };
+        if (mode === "offered")
+          return { status: "available", speeds: ["fast"], webSearch: true };
+        if (mode === "pending") await pending.promise;
+        return { status: "available", speeds: [], webSearch: false };
+      }
+    );
+    await setup({
+      profiles: async () => ({ active: null, saved: [], choices: [] }),
+      turnCapabilities: read,
+      submitInRegime: vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(),
+    });
+    await expect.poll(() => read.mock.calls.length).toBeGreaterThan(0);
+    const open = () =>
+      act(async () =>
+        page.getByRole("combobox", { name: "Model connection" }).click()
+      );
+    const close = () => act(async () => userEvent.keyboard("{Escape}"));
+    mode = "pending";
+    const initial = read.mock.calls.length;
+    await open();
+    await expect.poll(() => read.mock.calls.length).toBeGreaterThan(initial);
+    const retry = page.getByRole("button", { name: "Retry availability" });
+    await expect.element(retry).toBeVisible();
+    const fast = page.getByRole("button", { name: "Fast", exact: true });
+    await expect.element(fast).not.toBeInTheDocument();
+    mode = "offered";
+    await act(async () => retry.click());
+    await expect.element(fast).toBeEnabled();
+    await act(async () => pending.resolve());
+    await expect.element(fast).toBeEnabled();
+    await expect
+      .element(page.getByRole("button", { name: "Ultrafast", exact: true }))
+      .not.toBeInTheDocument();
+    await close();
+    await click("Add to message");
+    const search = page.getByRole("option", { name: /Web search/ });
+    await expect.element(search).toBeVisible();
+    await close();
+
+    mode = "empty";
+    await open();
+    await expect.element(page.getByTestId("native-effort-panel")).toBeVisible();
+    await expect
+      .element(page.getByRole("group", { name: "Speed" }))
+      .not.toBeInTheDocument();
+    await expect.element(fast).not.toBeInTheDocument();
+    await close();
+    await click("Add to message");
+    await expect
+      .element(page.getByRole("option", { name: /Plan mode/ }))
+      .toBeVisible();
+    await expect.element(search).not.toBeInTheDocument();
+  });
+
   it("waits for the saved selection even when the catalog has already loaded empty", async () => {
     const initial = Promise.withResolvers<void>();
     const retry = Promise.withResolvers<void>();

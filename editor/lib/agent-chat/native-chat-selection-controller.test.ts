@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type {
   DesktopNativeChat,
+  DesktopPersonalizationSettings,
   NativeChatPermissionMode,
   NativeChatSelectionState,
   NativeChatSelectionTarget,
@@ -180,6 +181,296 @@ async function ready(controller: NativeChatController) {
 }
 
 describe("durable chat selection controller", () => {
+  it.each(["cached", "indexed", "live"] as const)(
+    "automatically offers %s search, clears a one-message opt-out, and respects changed settings",
+    async (mode) => {
+      const f = fixture();
+      const saved = f.states.get("chat-a")!;
+      f.states.set("chat-a", {
+        ...saved,
+        selection: { ...saved.selection!, speed: "fast" },
+      });
+      let offered = true;
+      f.bridge.turnCapabilities = async () => ({
+        status: "available",
+        speeds: ["fast"],
+        webSearch: offered,
+      });
+      const controller = f.make();
+      const initial = {
+        fastMode: false,
+        webSearch: mode,
+        suggestedPrompts: false,
+        revision: 1,
+      };
+      let receive: (next: DesktopPersonalizationSettings) => void = () => {};
+      const get = Promise.withResolvers<DesktopPersonalizationSettings>();
+      const stop = controller.connectPersonalization({
+        get: () => get.promise,
+        onChange: (cb) => {
+          receive = cb;
+          return () => {};
+        },
+      });
+      try {
+        controller.connect("chat-a");
+        await ready(controller);
+        receive({ ...initial, revision: 2 });
+        get.resolve({ ...initial, webSearch: "disabled" });
+        await vi.waitFor(() => expect(controller.read().webSearch).toBe(true));
+        expect(controller.read().speed).toBe("standard");
+        controller.selectSpeed("fast");
+        expect(f.bridge.updateSelection).not.toHaveBeenCalled();
+        controller.selectWebSearch(false);
+        await controller.submit("Use the chat");
+        const send = vi.mocked(f.bridge.submitInRegime!);
+        expect(send.mock.calls[0][10]).toBeUndefined();
+        expect(controller.read().webSearch).toBe(true);
+        await controller.submit("Look it up");
+        expect(send.mock.calls[1][10]).toBe(true);
+        receive({
+          ...initial,
+          fastMode: true,
+          webSearch: "disabled",
+          revision: 3,
+        });
+        expect(controller.read().speed).toBe("fast");
+        expect(controller.read().webSearch).toBe(false);
+        controller.selectWebSearch(true);
+        expect(controller.read().webSearch).toBe(false);
+        await controller.submit("No search");
+        expect(send.mock.calls[2][10]).toBeUndefined();
+        offered = false;
+        receive({ ...initial, revision: 4 });
+        await controller.refreshTurnCapabilities();
+        expect(controller.read().webSearch).toBe(false);
+        await controller.submit("No compatible tool");
+        expect(send.mock.calls[3][10]).toBeUndefined();
+      } finally {
+        stop();
+        controller.disconnect();
+      }
+    }
+  );
+
+  it("sends ordinary chat if an automatic search offer is lost during preflight", async () => {
+    const f = fixture();
+    let offered = true;
+    f.bridge.turnCapabilities = async () => ({
+      status: offered ? "available" : "unavailable",
+      speeds: [],
+      webSearch: offered,
+    });
+    const controller = f.make();
+    const stop = controller.connectPersonalization({
+      get: async () => ({
+        fastMode: true,
+        suggestedPrompts: false,
+        webSearch: "live",
+        revision: 1,
+      }),
+      onChange: () => () => {},
+    });
+    try {
+      controller.connect("chat-a");
+      await ready(controller);
+      expect(controller.read().webSearch).toBe(true);
+      offered = false;
+      await controller.submit("Ordinary fallback");
+      const send = vi.mocked(f.bridge.submitInRegime!);
+      expect(send).toHaveBeenCalledOnce();
+      expect(send.mock.calls[0][10]).toBeUndefined();
+      offered = true;
+      await controller.submit("Search after discovery recovers");
+      expect(send.mock.calls[1][10]).toBe(true);
+    } finally {
+      stop();
+      controller.disconnect();
+    }
+  });
+
+  it.each([true, false])(
+    "checks the original search receipt after opting out before sending again (accepted: %s)",
+    async (accepted) => {
+      const f = fixture();
+      f.bridge.turnCapabilities = async () => ({
+        status: "available",
+        speeds: [],
+        webSearch: true,
+      });
+      const send = vi.mocked(f.bridge.submitInRegime!);
+      send.mockRejectedValueOnce(new Error("timeout"));
+      let receive: (next: DesktopPersonalizationSettings) => void = () => {};
+      const prefs = {
+        fastMode: true,
+        suggestedPrompts: false,
+        webSearch: "live",
+        revision: 1,
+      } as const;
+      const controller = f.make();
+      const stop = controller.connectPersonalization({
+        get: async () => prefs,
+        onChange: (cb) => {
+          receive = cb;
+          return () => {};
+        },
+      });
+      try {
+        controller.connect("chat-a");
+        await ready(controller);
+        await expect(controller.submit("Question")).rejects.toThrow("timeout");
+        const [, sessionId, inputId] = send.mock.calls[0];
+        receive({ ...prefs, webSearch: "disabled", revision: 2 });
+        if (accepted)
+          vi.mocked(f.bridge.inputReceipt).mockResolvedValueOnce({
+            sessionId,
+            inputId,
+            disposition: "completed",
+            inputPosition: 1,
+            turnId: "turn",
+          });
+        const error = await controller.submit("Question").then(
+          () => null,
+          (err: Error) => err.message
+        );
+        expect(error).toBe(
+          accepted ? null : "Web search is disabled in Personalization."
+        );
+        expect(send).toHaveBeenCalledTimes(1);
+        await controller.submit("Question");
+        expect(send.mock.calls[1][10]).toBeUndefined();
+      } finally {
+        stop();
+        controller.disconnect();
+      }
+    }
+  );
+
+  it("keeps an unavailable speed for the chat until Standard is selected", async () => {
+    const f = fixture();
+    const saved = f.states.get("chat-a")!;
+    f.states.set("chat-a", {
+      ...saved,
+      selection: { ...saved.selection!, speed: "fast" },
+    });
+    f.bridge.turnCapabilities = async () => ({
+      status: "reauthenticationRequired",
+      speeds: [],
+      webSearch: false,
+    });
+    const controller = f.make();
+    try {
+      controller.connect("chat-a");
+      await ready(controller);
+      expect(controller.read().speed).toBe("fast");
+      expect(controller.turnOptionsError).toContain("Sign in");
+      expect(controller.canSubmit).toBe(false);
+      controller.selectSpeed("standard");
+      await vi.waitFor(() => expect(controller.canSubmit).toBe(true));
+      expect(f.bridge.updateSelection).toHaveBeenCalledWith(
+        { sessionId: "chat-a" },
+        1,
+        expect.any(String),
+        { profileId: f.a, effort: "low", speed: "standard" }
+      );
+      expect(controller.read().speed).toBe("standard");
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("requires a new search choice after switching the selected model", async () => {
+    const f = fixture();
+    f.bridge.turnCapabilities = async () => ({
+      status: "available",
+      speeds: [],
+      webSearch: true,
+    });
+    const controller = f.make();
+    try {
+      controller.connect("chat-a");
+      await ready(controller);
+      controller.selectWebSearch(true);
+      await controller.selectProfile({ kind: "new", id: f.b });
+      expect(controller.read().webSearch).toBe(true);
+      expect(controller.turnOptionsError).toContain("different model");
+      expect(controller.canSubmit).toBe(false);
+      controller.selectWebSearch(false);
+      controller.selectWebSearch(true);
+      expect(controller.turnOptionsError).toBeNull();
+      expect(controller.canSubmit).toBe(true);
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("lets the author remove unavailable search once a retry proves the previous send was absent", async () => {
+    const f = fixture();
+    let available = true;
+    f.bridge.turnCapabilities = async () => ({
+      status: available ? "available" : "unsupported",
+      speeds: [],
+      webSearch: available,
+    });
+    const send = vi.mocked(f.bridge.submitInRegime!);
+    send.mockRejectedValueOnce(new Error("timeout"));
+    const controller = f.make();
+    try {
+      controller.connect("chat-a");
+      await ready(controller);
+      controller.selectWebSearch(true);
+      await expect(controller.submit("Forecast")).rejects.toThrow("timeout");
+      available = false;
+      await expect(controller.submit("Forecast")).rejects.toThrow(
+        "Web search is unavailable"
+      );
+      expect(send).toHaveBeenCalledTimes(1);
+      controller.selectWebSearch(false);
+      expect(controller.read().webSearch).toBe(false);
+      await controller.submit("Forecast");
+      expect(send.mock.calls[1][10]).toBeUndefined();
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("keeps search on a failed message, recovers its receipt, and clears the next message", async () => {
+    const f = fixture();
+    f.bridge.turnCapabilities = async () => ({
+      status: "available",
+      speeds: ["fast"],
+      webSearch: true,
+    });
+    const send = vi.mocked(f.bridge.submitInRegime!);
+    send.mockRejectedValueOnce(new Error("timeout"));
+    const controller = f.make();
+    try {
+      controller.connect("chat-a");
+      await ready(controller);
+      controller.selectWebSearch(true);
+      await expect(controller.submit("Search again")).rejects.toThrow(
+        "timeout"
+      );
+      expect(controller.read().webSearch).toBe(true);
+      const [, sessionId, inputId] = send.mock.calls[0];
+      expect(send.mock.calls[0][10]).toBe(true);
+      vi.mocked(f.bridge.inputReceipt).mockResolvedValueOnce({
+        sessionId,
+        inputId,
+        disposition: "claimed",
+        inputPosition: 1,
+        turnId: "turn-a",
+      });
+      await controller.submit("Search again");
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(controller.read().webSearch).toBe(false);
+      await controller.submit("Continue");
+      expect(send.mock.calls[1][10]).toBeUndefined();
+    } finally {
+      controller.disconnect();
+    }
+  });
+
   it.each([false, true])(
     "keeps pending Send feedback through initial route activation (switch chat: %s)",
     async (switchChat) => {

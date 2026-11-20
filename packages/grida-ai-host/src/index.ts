@@ -23,6 +23,7 @@ export {
   isChatGptSubscriptionModelId,
   type ChatGptAuthStart,
   type ChatGptSubscriptionAccount,
+  type ChatGptTurnCapabilities,
   type ChatGptSubscriptionStatus,
 } from "./protocol/chatgpt";
 // GRIDA-SEC-006 — hosted-session wire shapes (types only; the store is

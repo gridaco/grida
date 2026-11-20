@@ -6,6 +6,9 @@ describe("SettingsNavigation", () => {
     "opens media providers for existing setup link %s",
     (hash) => expect(SettingsNavigation.fromHash(hash)).toBe("media")
   );
+  it("opens Personalization for existing Chat settings links", () => {
+    expect(SettingsNavigation.fromHash("#chat")).toBe("personalization");
+  });
   it.each(SettingsNavigation.sections)(
     "opens the $label category",
     ({ id }) => {

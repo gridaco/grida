@@ -1,3 +1,4 @@
+import type { ChatGptTurnCapabilities } from "@grida/ai-host";
 // GRIDA-SEC-004 / GRIDA-SEC-008 — main-owned ACP connection to the packaged agent.
 import {
   execFile,
@@ -108,9 +109,11 @@ export type NativeAgentLaunch = {
   inputRouteConnectionId?: string | null;
   lookupProviderRoute?: NativeProviderRoutes.Lookup;
   lookupPredictionRoute?: NativeProviderRoutes.PredictionLookup;
+  fastModeEnabled?: () => Promise<boolean>;
   gatewayScope?: string;
   gatewayJobBilling?: NativeGatewayConnection["readJobBilling"];
   subscriptionScope?: string;
+  subscriptionCapabilities?: () => Promise<ChatGptTurnCapabilities>;
   /** Trusted Main opt-in for child work on the selected provider connection. */
   subagents?: true;
   /** Title an untitled chat from its first request (one extra model request). */
@@ -212,6 +215,10 @@ export class NativeAgentProcess {
   private catalogQuery = false;
   private modelChange = false;
   private inputRoutes = false;
+  private turnCapabilities = false;
+  get acceptsTurnCapabilities() {
+    return this.connected && this.turnCapabilities;
+  }
   private predictionRoutes = false;
   get acceptsInputRoutes() {
     return this.connected && this.inputRoutes;
@@ -675,12 +682,13 @@ export class NativeAgentProcess {
       !providerEgress &&
       NativeProviderSelection.isLoopbackEndpoint(options.endpoint);
     const providerRoutes =
-      inputRoutes || predictionRoutes
+      inputRoutes || predictionRoutes || options.subscriptionCapabilities
         ? new NativeProviderRoutes(
             options.inputRouteConnectionId ?? null,
             options,
             options.lookupProviderRoute,
-            options.lookupPredictionRoute
+            options.lookupPredictionRoute,
+            options.fastModeEnabled
           )
         : undefined;
     const capabilities: Record<string, 1> = {
@@ -866,6 +874,9 @@ export class NativeAgentProcess {
                 [NativeActivityOrder.capability]: 1,
                 [MODEL_CHANGE]: 1,
                 ...(inputRoutes && { [NativeProviderRoutes.capability]: 1 }),
+                ...((inputRoutes || options.subscriptionCapabilities) && {
+                  [NativeProviderRoutes.turnCapability]: 1,
+                }),
                 ...(predictionRoutes && {
                   [NativeProviderRoutes.predictionCapability]: 1,
                 }),
@@ -898,6 +909,9 @@ export class NativeAgentProcess {
       processOwner.modelChange = advertised?.[MODEL_CHANGE] === 1;
       processOwner.inputRoutes =
         inputRoutes && advertised?.[NativeProviderRoutes.capability] === 1;
+      processOwner.turnCapabilities =
+        !!providerRoutes &&
+        advertised?.[NativeProviderRoutes.turnCapability] === 1;
       processOwner.predictionRoutes =
         predictionRoutes &&
         advertised?.[NativeProviderRoutes.predictionCapability] === 1;
@@ -1454,11 +1468,13 @@ export class NativeAgentProcess {
         if (typeof message.id !== "string" && typeof message.id !== "number")
           throw new Error("native_agent_invalid_message");
         if (
-          message.method === NativeProviderRoutes.resolveMethod &&
           this.connected &&
-          (object(message.params)?.purpose === "composerPrediction"
-            ? this.predictionRoutes
-            : this.inputRoutes)
+          ((message.method === NativeProviderRoutes.turnMethod &&
+            this.turnCapabilities) ||
+            (message.method === NativeProviderRoutes.resolveMethod &&
+              (object(message.params)?.purpose === "composerPrediction"
+                ? this.predictionRoutes
+                : this.inputRoutes)))
         ) {
           const id = message.id;
           if (this.providerRequests.has(id))
@@ -1472,10 +1488,14 @@ export class NativeAgentProcess {
             return;
           }
           this.providerRequests.add(id);
-          void this.providerRoutes!.resolve(
-            message.params,
-            this.predictionPermission
-          )
+          const resolving =
+            message.method === NativeProviderRoutes.turnMethod
+              ? this.providerRoutes!.turnCapabilities(message.params)
+              : this.providerRoutes!.resolve(
+                  message.params,
+                  this.predictionPermission
+                );
+          void resolving
             .then(
               (result) => {
                 if (this.connected) this.write({ jsonrpc: "2.0", id, result });

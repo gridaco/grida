@@ -139,6 +139,79 @@ describe("NativeChatSelections", () => {
     expect(providerCalls).toBe(0);
   });
 
+  it("keeps speed with its chat across restart and a lost edit reply", async () => {
+    let owner = await open();
+    const id = session();
+    const target = { sessionId: id };
+    await owner.update("workspace", target, 0, randomUUID(), {
+      profileId: a,
+      effort: "low",
+    });
+    const draft = await owner.read("workspace", null, randomUUID());
+    await owner.update(
+      "workspace",
+      draft.target,
+      draft.revision,
+      randomUUID(),
+      { profileId: b, effort: "high" }
+    );
+    failAfterCommit = true;
+    await expect(
+      owner.update("workspace", target, 1, randomUUID(), {
+        profileId: a,
+        effort: "low",
+        speed: "fast",
+      })
+    ).rejects.toThrow("lost reply");
+    owner = await open();
+    const restored = await owner.read("workspace", id);
+    expect(restored.selection).toMatchObject({
+      profileId: a,
+      effort: "low",
+      speed: "fast",
+    });
+    expect(
+      (await owner.read("workspace", null, randomUUID())).selection
+    ).toEqual({ profileId: b, modelId: "model-b", effort: "high" });
+    const updated = await owner.update(
+      "workspace",
+      target,
+      restored.revision,
+      randomUUID(),
+      { profileId: a, effort: "high" }
+    );
+    expect(updated.selection?.speed).toBe("fast");
+    const standard = await owner.update(
+      "workspace",
+      target,
+      updated.revision,
+      randomUUID(),
+      { profileId: a, effort: "high", speed: "standard" }
+    );
+    expect(standard.selection?.speed ?? "standard").toBe("standard");
+  });
+
+  it("restores an unsent draft's speed while new drafts start at Standard", async () => {
+    const owner = await open();
+    const id = randomUUID();
+    const draft = await owner.read("workspace", null, id);
+    await owner.update(
+      "workspace",
+      draft.target,
+      draft.revision,
+      randomUUID(),
+      { profileId: a, effort: "medium", speed: "ultrafast" }
+    );
+    const restored = await open();
+    expect((await restored.read("workspace", null, id)).selection?.speed).toBe(
+      "ultrafast"
+    );
+    expect(
+      (await restored.read("workspace", null, randomUUID())).selection?.speed ??
+        "standard"
+    ).toBe("standard");
+  });
+
   it("restoring a chat never replaces a newer explicit default", async () => {
     const owner = await open();
     const one = session(),
@@ -611,21 +684,39 @@ describe("NativeChatSelections", () => {
     await owner.read("workspace", null, firstId);
     const first = await owner.prepareCreation("workspace", firstId);
     await owner.finishCreation("workspace", firstId);
-    for (let n = 0; n < 132; n++) {
+    // Start at capacity so the test exercises eviction and retry with real
+    // durable writes, independently of disk throughput.
+    const filename = path.join(directory, "chat-selections.json");
+    const atCapacity = JSON.parse(await fs.readFile(filename, "utf8"));
+    while (atCapacity.completed.length < 128) {
       const id = randomUUID();
-      await owner.read("workspace", null, id);
-      await owner.prepareCreation("workspace", id);
-      await owner.finishCreation("workspace", id);
+      atCapacity.completed.push(id);
+      atCapacity.drafts[id] = {
+        ...atCapacity.drafts[firstId],
+        promotion: {
+          sessionId: randomUUID(),
+          requestId: randomUUID(),
+          firstInputId: randomUUID(),
+        },
+      };
     }
-    const stored = JSON.parse(
-      await fs.readFile(path.join(directory, "chat-selections.json"), "utf8")
-    );
-    expect(stored.completed.length).toBeLessThanOrEqual(128);
-    expect(Object.keys(stored.drafts).length).toBeLessThanOrEqual(128);
+    await fs.writeFile(filename, JSON.stringify(atCapacity));
+    owner = await open();
+    const nextId = randomUUID();
+    await owner.read("workspace", null, nextId);
+    await owner.prepareCreation("workspace", nextId);
+    await owner.finishCreation("workspace", nextId);
+    const stored = JSON.parse(await fs.readFile(filename, "utf8"));
+    expect(stored.completed).toEqual([
+      ...atCapacity.completed.slice(1),
+      nextId,
+    ]);
+    expect(Object.keys(stored.drafts)).toHaveLength(128);
+    expect(stored.drafts[firstId]).toBeUndefined();
     owner = await open();
     await owner.read("workspace", null, firstId);
     expect(await owner.prepareCreation("workspace", firstId)).toEqual(first);
-  }, 20_000);
+  });
 
   it("acknowledges creation only after the completed promotion is durable", async () => {
     const configured = options(),

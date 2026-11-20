@@ -71,9 +71,20 @@ export namespace ipc_admission {
   }): boolean {
     switch (role) {
       case "main":
-        if (channel === IPC_CHANNELS.COMPOSER_PREDICTIONS_SET)
+        if (channel === IPC_CHANNELS.NATIVE_CHAT_TURN_CAPABILITIES)
+          return (
+            pathname === "/desktop/workspace" &&
+            !nestedDeck &&
+            !selectedDocument
+          );
+        if (
+          channel === IPC_CHANNELS.COMPOSER_PREDICTIONS_SET ||
+          channel === IPC_CHANNELS.PERSONALIZATION_SET
+        )
           return pathname === "/desktop/settings";
         if (
+          channel === IPC_CHANNELS.PERSONALIZATION_GET ||
+          channel === IPC_CHANNELS.PERSONALIZATION_CHANGED ||
           channel === IPC_CHANNELS.COMPOSER_PREDICTIONS_GET ||
           channel === IPC_CHANNELS.COMPOSER_PREDICTIONS_CHANGED
         )

@@ -1592,6 +1592,7 @@ pub(super) mod tests {
                     text: "Private parent context".into(),
                 }],
                 SubmissionPolicy {
+                    request_options: Default::default(),
                     selection_revision: None,
                     selection_goal: false,
                     questions: true,

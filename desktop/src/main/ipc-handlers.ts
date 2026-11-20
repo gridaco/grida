@@ -58,7 +58,10 @@ import {
   unavailableChatGptOAuth,
   type ChatGptOAuthCoordinator,
 } from "./chatgpt-oauth";
-import type { DesktopComposerPredictions } from "./desktop-composer-predictions";
+import {
+  isPersonalizationChange,
+  type DesktopPersonalization,
+} from "./desktop-personalization";
 import type { NativeAgentHooks } from "./native-agent-hooks";
 import { ipc_admission, type DesktopIpcRole } from "./ipc-admission";
 import { ipc_sender } from "./ipc-sender";
@@ -103,7 +106,7 @@ type RegisterIpcHandlersOptions = {
   chat_catalog?: DesktopChatCatalog;
   open_restored_chat?: (workspaceId: string, sessionId: string) => boolean;
   global_hooks?: NativeAgentHooks;
-  composer_predictions?: DesktopComposerPredictions;
+  personalization?: DesktopPersonalization;
   recent_files?: Pick<RecentStore, "list" | "touch" | "pin" | "forget">;
   document_files?: NativeDocumentFiles;
   resolve_document_window?: (id: string) => BrowserWindow | undefined;
@@ -262,7 +265,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     options.native_chat_selections,
     browserTools,
     options.resolve_welcome_chat_workspace,
-    options.composer_predictions
+    options.personalization
   );
   options.on_native_chat?.(nativeChat);
   const externalAgent = new NativeExternalRunIpc(
@@ -683,6 +686,10 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         review
       )
   );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_TURN_CAPABILITIES,
+    (event, target: unknown) => nativeChat.turnCapabilities(event, target)
+  );
   guarded(IPC_CHANNELS.NATIVE_CHAT_SELECTION, (event, target: unknown) =>
     nativeChat.selection(event, target)
   );
@@ -807,7 +814,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       svgTargetId?: unknown,
       selectionRevision?: unknown,
       editorContextId?: unknown,
-      editorToolContextId?: unknown
+      editorToolContextId?: unknown,
+      webSearch?: unknown
     ) =>
       nativeChat.submit(
         event,
@@ -819,7 +827,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         svgTargetId,
         selectionRevision,
         editorContextId,
-        editorToolContextId
+        editorToolContextId,
+        webSearch
       )
   );
   guarded(
@@ -844,7 +853,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       svgTargetId?: unknown,
       selectionRevision?: unknown,
       editorContextId?: unknown,
-      editorToolContextId?: unknown
+      editorToolContextId?: unknown,
+      webSearch?: unknown
     ) =>
       nativeChat.enqueue(
         event,
@@ -856,7 +866,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         svgTargetId,
         selectionRevision,
         editorContextId,
-        editorToolContextId
+        editorToolContextId,
+        webSearch
       )
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_EFFORT, (event) =>
@@ -892,7 +903,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       regime?: unknown,
       effort?: unknown,
       selectionRevision?: unknown,
-      editorContextId?: unknown
+      editorContextId?: unknown,
+      webSearch?: unknown
     ) =>
       nativeChat.submitWithLibrarySelection(
         event,
@@ -902,7 +914,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         regime,
         effort,
         selectionRevision,
-        editorContextId
+        editorContextId,
+        webSearch
       )
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_FILE, (event) =>
@@ -1404,8 +1417,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     if (!options.global_hooks) throw new Error("native_hooks_unavailable");
     return options.global_hooks;
   };
-  const predictions = options.composer_predictions;
-  predictions?.onChange((state) => {
+  const personalization = options.personalization;
+  const broadcastSettings = (channel: IpcChannel, state: unknown) => {
     for (const window of BrowserWindow.getAllWindows()) {
       try {
         if (window.isDestroyed() || window.webContents.isDestroyed()) continue;
@@ -1419,26 +1432,48 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
           ipc_admission.allows({
             role,
             pathname,
-            channel: IPC_CHANNELS.COMPOSER_PREDICTIONS_CHANGED,
+            channel,
           })
         ) {
-          window.webContents.send(
-            IPC_CHANNELS.COMPOSER_PREDICTIONS_CHANGED,
-            state
-          );
+          window.webContents.send(channel, state);
         }
       } catch {
         // A closing renderer cannot block the update in other workspaces.
       }
     }
+  };
+  personalization?.onChange((state) =>
+    broadcastSettings(IPC_CHANNELS.COMPOSER_PREDICTIONS_CHANGED, state)
+  );
+  personalization?.onPersonalizationChange((state) =>
+    broadcastSettings(IPC_CHANNELS.PERSONALIZATION_CHANGED, state)
+  );
+  guarded(IPC_CHANNELS.PERSONALIZATION_GET, (_event, ...args: unknown[]) => {
+    if (args.length) throw new Error("personalization_preference_invalid");
+    if (!personalization) throw new Error("personalization_unavailable");
+    return personalization.getPersonalization();
   });
+  guarded(
+    IPC_CHANNELS.PERSONALIZATION_SET,
+    (event, change: unknown, ...args: unknown[]) => {
+      if (args.length || !isPersonalizationChange(change))
+        throw new Error("personalization_preference_invalid");
+      if (!personalization) throw new Error("personalization_unavailable");
+      return windowRequest(
+        event,
+        "personalization settings denied",
+        (_signal, check) => personalization.setPersonalization(change, check),
+        (_window, url) => ipc_sender.pathname(url) === "/desktop/settings"
+      );
+    }
+  );
   guarded(
     IPC_CHANNELS.COMPOSER_PREDICTIONS_GET,
     (_event, ...args: unknown[]) => {
       if (args.length)
         throw new Error("composer_predictions_preference_invalid");
-      if (!predictions) throw new Error("composer_predictions_unavailable");
-      return predictions.get();
+      if (!personalization) throw new Error("composer_predictions_unavailable");
+      return personalization.get();
     }
   );
   guarded(
@@ -1446,11 +1481,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     (event, enabled: unknown, ...args: unknown[]) => {
       if (typeof enabled !== "boolean" || args.length)
         throw new Error("composer_predictions_preference_invalid");
-      if (!predictions) throw new Error("composer_predictions_unavailable");
+      if (!personalization) throw new Error("composer_predictions_unavailable");
       return windowRequest(
         event,
         "composer predictions settings denied",
-        (_signal, check) => predictions.set(enabled, check),
+        (_signal, check) => personalization.set(enabled, check),
         (_window, url) => ipc_sender.pathname(url) === "/desktop/settings"
       );
     }

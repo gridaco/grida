@@ -599,7 +599,13 @@ function NativeChatPane({
   const [libraryScope, setLibraryScope] = useState<number | null>(null);
   const activityOpen = !subagentsInTabs && !!subagentActivity?.open;
   const panelPresented = useContext(PanelIsPresented);
-  const preferences = useDesktopBridge()?.composerPredictions;
+  const desktop = useDesktopBridge();
+  const preferences = desktop?.composerPredictions;
+  const personalization = desktop?.personalization;
+  useEffect(
+    () => controller.connectPersonalization(personalization),
+    [controller, personalization]
+  );
   const prediction = controller.composerPrediction;
   useEffect(() => prediction.connect(preferences), [prediction, preferences]);
   useLayoutEffect(() => {
@@ -668,7 +674,11 @@ function NativeChatPane({
   );
   const queued = snapshot?.queuedInputs ?? 0;
   const streamingControlsOnly = running && !bridge.enqueue;
-  const error = state.error ?? state.approvalError ?? state.questionError;
+  const error =
+    state.error ??
+    state.approvalError ??
+    state.questionError ??
+    controller.turnOptionsError;
 
   const selectedProfile =
     state.profiles?.saved.find((p) => p.id === state.profiles?.active) ??
@@ -1369,6 +1379,27 @@ function NativeChatPane({
                       onSelect: () => setLibraryScope(state.scope),
                     }
                   : undefined,
+              webSearch: {
+                active: state.webSearch,
+                offered:
+                  controller.webSearchAllowed &&
+                  state.turnCapabilities?.webSearch === true,
+                unavailable:
+                  controller.webSearchAllowed &&
+                  (state.turnCapabilities?.status === "unavailable" ||
+                    state.turnCapabilities?.status ===
+                      "reauthenticationRequired")
+                    ? state.turnCapabilities.status
+                    : undefined,
+                refresh: () => void controller.refreshTurnCapabilities(),
+                disabled:
+                  state.acting ||
+                  state.submitting ||
+                  state.goalIntent ||
+                  state.steering,
+                removeDisabled: state.acting || state.submitting,
+                onChange: (active) => controller.selectWebSearch(active),
+              },
               goal: {
                 active: state.goalIntent,
                 offered: !!bridge.startGoal && controller.offers("goals"),
@@ -1408,6 +1439,18 @@ function NativeChatPane({
               },
               refreshError: state.profileReadError,
               effort: state.effort,
+              speed:
+                controller.fastModeEnabled &&
+                bridge.turnCapabilities &&
+                !controller.fixedSession &&
+                !state.goalIntent
+                  ? {
+                      value: state.speed,
+                      capabilities: state.turnCapabilities,
+                      onChange: (speed) => controller.selectSpeed(speed),
+                      refresh: () => void controller.refreshTurnCapabilities(),
+                    }
+                  : undefined,
               ultraAvailable: controller.ultraAvailability,
               ultraOffered: controller.offers("delegation"),
               goal: state.goalIntent,

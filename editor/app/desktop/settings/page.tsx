@@ -89,7 +89,7 @@ import { DesktopPageShell } from "@/scaffolds/desktop/chrome/page-shell";
 import { DesktopMediaTool } from "@/scaffolds/desktop/tools/media-tool-registry";
 import * as chatgptSubscription from "@/lib/desktop/chatgpt-subscription";
 import { useChatGptSubscription } from "@/lib/desktop/chatgpt-subscription-react";
-import { ComposerSettings } from "./_components/composer-settings";
+import { PersonalizationSettings } from "./_components/personalization-settings";
 import { HooksSettings } from "./_components/hooks-settings";
 import { AppearanceSettings } from "./_components/appearance-settings";
 import { BrowserSettings } from "./_components/browser-settings";
@@ -118,7 +118,7 @@ export default function DesktopSettingsPage() {
     SettingsNavigation.getSnapshot,
     SettingsNavigation.getServerSnapshot
   );
-  const composerPredictions = getDesktopBridge()?.composerPredictions;
+  const bridge = getDesktopBridge();
   const [providerKeysRevision, setProviderKeysRevision] = useState(0);
   // Keep the archive request alive while its tab mounts or unmounts.
   const [archives] = useState(
@@ -162,14 +162,11 @@ export default function DesktopSettingsPage() {
           <TabsContent value="appearance" className="m-0">
             <AppearanceSettings />
           </TabsContent>
-          <TabsContent value="chat" className="m-0">
-            {composerPredictions ? (
-              <ComposerSettings api={composerPredictions} />
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Update Desktop to configure prompt suggestions.
-              </p>
-            )}
+          <TabsContent value="personalization" className="m-0">
+            <PersonalizationSettings
+              api={bridge?.personalization}
+              legacyPredictions={bridge?.composerPredictions}
+            />
           </TabsContent>
           <TabsContent value="browser" className="m-0">
             <BrowserSettings />

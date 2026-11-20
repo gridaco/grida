@@ -33,6 +33,7 @@ export type NativeChatMessageInput = Readonly<{
   operatingRegime: NativeChatOperatingRegime;
   effort?: NativeChatEffort;
   selectionRevision?: number;
+  webSearch?: true;
   messageContext: NativeChatMessageContext;
 }>;
 
@@ -81,12 +82,19 @@ export type NativeChatEffort =
   | "ultra"
   | "standard";
 
+export type NativeChatSpeed = "standard" | "fast" | "ultrafast";
+
+/** Optional features under the selected account and model, observed by Main. */
+export type NativeChatTurnCapabilities =
+  import("@grida/ai-host").ChatGptTurnCapabilities;
+
 /** Saved choices contain public identities only; never credentials or paths. */
 export type NativeChatSelection = Readonly<{
   profileId: string | null;
   /** The exact wire model identity, not its display label. */
   modelId: string;
   effort: NativeChatEffort;
+  speed?: NativeChatSpeed;
 }>;
 
 /** Exactly one logical chat or stable unsent draft, scoped by native Main. */
@@ -194,6 +202,7 @@ export type NativeChatImageInput = Readonly<{
   operatingRegime: NativeChatOperatingRegime;
   effort?: NativeChatEffort;
   selectionRevision?: number;
+  webSearch?: true;
   messageContext?: NativeChatMessageContext;
 }>;
 
@@ -211,6 +220,7 @@ export type NativeChatSelectedImageInput = Readonly<{
   operatingRegime: NativeChatOperatingRegime;
   effort?: NativeChatEffort;
   selectionRevision?: number;
+  webSearch?: true;
   messageContext?: NativeChatMessageContext;
 }>;
 
@@ -223,6 +233,7 @@ export type NativeChatFileInput = Readonly<{
   operatingRegime: NativeChatOperatingRegime;
   effort?: NativeChatEffort;
   selectionRevision?: number;
+  webSearch?: true;
   messageContext?: NativeChatMessageContext;
 }>;
 
@@ -253,6 +264,7 @@ export type NativeChatFileReferenceInput = Readonly<{
   operatingRegime: NativeChatOperatingRegime;
   effort?: NativeChatEffort;
   selectionRevision?: number;
+  webSearch?: true;
   messageContext?: NativeChatMessageContext;
 }>;
 
@@ -604,7 +616,7 @@ export type NativeChatActivity = Readonly<{
   /** The tool's identifier. */
   title: string;
   kind: NativeChatActivityKind;
-  /** The configured integration name for an integration tool. */
+  /** The configured integration name, or "provider" for a hosted search. */
   source?: string;
   outcome: NativeChatActivityOutcome;
   /** The call's arguments for display; long values are shortened. */
@@ -623,6 +635,15 @@ export type NativeChatActivity = Readonly<{
   }>;
 }>;
 
+/** A provider-attributed link. Offsets count Unicode characters in the
+ * complete assistant message and the end is exclusive. */
+export type NativeChatUrlCitation = Readonly<{
+  url: string;
+  title?: string;
+  startIndex: number;
+  endIndex: number;
+}>;
+
 export type NativeChatMessage = Readonly<{
   messageId: string;
   /** First nonempty public publication, compared only within the same turn. */
@@ -639,6 +660,7 @@ export type NativeChatMessage = Readonly<{
    */
   phase?: "answer" | "progress";
   activity?: readonly NativeChatActivity[];
+  citations?: readonly NativeChatUrlCitation[];
   /** Files the person attached to this message. Their bytes stay with the host. */
   attachments?: readonly NativeChatMessageAttachment[];
   /** Passive display parts retained with this accepted message. */
@@ -978,6 +1000,7 @@ export type NativeChatTextUpdate = Readonly<{
   turnId: string;
   offsetBytes: number;
   replace: boolean;
+  citations?: readonly NativeChatUrlCitation[];
   /** The same first-publication coordinate retained by replayed messages. */
   activityOrder?: number;
   activityOrderIncomplete?: true;
@@ -1113,6 +1136,9 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     mode: NativeChatPermissionMode,
     review?: Readonly<{ reviewId: string; confirmed: boolean }>
   ): Promise<NativeChatPermissionState | null>;
+  turnCapabilities?(
+    target: NativeChatSelectionTarget
+  ): Promise<NativeChatTurnCapabilities>;
   selection?(
     target: NativeChatSelectionTarget
   ): Promise<NativeChatSelectionState>;
@@ -1129,6 +1155,7 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     choice: Readonly<{
       profileId: string | null;
       effort: NativeChatEffort;
+      speed?: NativeChatSpeed;
     }>
   ): Promise<NativeChatSelectionState>;
   observeCatalog?(onChanged: () => void): Promise<(() => void) | null>;
@@ -1216,7 +1243,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     editorSvgTargetId?: string,
     selectionRevision?: number,
     editorContextId?: string,
-    editorToolContextId?: string
+    editorToolContextId?: string,
+    webSearch?: true
   ): Promise<NativeChatAcceptance>;
   submitMessage?(
     attachmentId: string,
@@ -1245,7 +1273,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     operatingRegime?: NativeChatOperatingRegime,
     effort?: NativeChatEffort,
     selectionRevision?: number,
-    editorContextId?: string
+    editorContextId?: string,
+    webSearch?: true
   ): Promise<NativeChatAcceptance>;
   acceptsFile?(): Promise<boolean>;
   submitImage?(

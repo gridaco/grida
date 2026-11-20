@@ -1,3 +1,4 @@
+use super::search;
 use super::{ItemStatus, ReplayScope, Summary, WireContent, WireItem};
 use crate::wire::{
     Incoming, RateRejectionEvidence, Usage, WireError, WireStream, classify_error, json_arguments,
@@ -11,7 +12,9 @@ use agent_kit_core::inference::{
     FailureKind, InferenceControl, InferenceFailure, InferenceOutcome, InferenceStatus,
     InferenceUpdate, ProviderEvent,
 };
-use agent_kit_core::messages::{Content, Message, Provenance, ProvenanceKind, Role, ToolCall};
+use agent_kit_core::messages::{
+    Content, Message, Provenance, ProvenanceKind, ProviderEvidence, Role, ToolCall,
+};
 use agent_kit_core::{AttemptId, MessageId, ToolCallId, ToolId};
 use futures_core::stream::BoxStream;
 use futures_util::stream;
@@ -26,7 +29,7 @@ pub(super) fn events(
     control: InferenceControl,
     limits: StreamLimits,
     scope: ReplayScope,
-    names: BTreeMap<String, ToolId>,
+    offered: (BTreeMap<String, ToolId>, bool),
     rate_rejection_evidence: RateRejectionEvidence,
 ) -> BoxStream<'static, ProviderEvent> {
     let state = Response {
@@ -35,7 +38,8 @@ pub(super) fn events(
         attempt: control.attempt,
         limits,
         scope,
-        names,
+        names: offered.0,
+        search: offered.1,
         updates: VecDeque::new(),
         items: BTreeMap::new(),
         partial: BTreeMap::new(),
@@ -55,6 +59,7 @@ struct Response {
     limits: StreamLimits,
     scope: ReplayScope,
     names: BTreeMap<String, ToolId>,
+    search: bool,
     updates: VecDeque<ProviderEvent>,
     items: BTreeMap<usize, WireItem>,
     partial: BTreeMap<String, PartialItem>,
@@ -68,6 +73,8 @@ struct PartialItem {
     message: Message,
     ordinal: usize,
     visible: Visible,
+    annotations: BTreeMap<(usize, usize), Value>,
+    search: Option<Box<search::Call>>,
 }
 
 #[derive(Default)]
@@ -122,6 +129,17 @@ enum Event {
     Reasoning { item_id: String, delta: String },
     #[serde(rename = "response.refusal.delta")]
     Refusal { item_id: String, delta: String },
+    #[serde(rename = "response.output_item.added")]
+    ItemAdded { item: Value },
+    #[serde(
+        rename = "response.web_search_call.in_progress",
+        alias = "response.web_search_call.searching"
+    )]
+    SearchStarted { item_id: String },
+    #[serde(rename = "response.web_search_call.completed")]
+    SearchCompleted { item_id: String },
+    #[serde(rename = "response.output_text.annotation.added")]
+    Annotation(Value),
     #[serde(rename = "response.output_item.done")]
     ItemDone { output_index: usize, item: WireItem },
     #[serde(rename = "response.completed")]
@@ -146,19 +164,20 @@ struct Terminal {
     usage: Option<TokenUsage>,
     error: Option<WireError>,
     incomplete_details: Option<Incomplete>,
-    output: Option<Vec<TerminalItem>>,
-}
-
-#[derive(Deserialize)]
-struct TerminalItem {
-    id: String,
-    #[serde(rename = "type")]
-    kind: String,
+    output: Option<Vec<Value>>,
 }
 
 #[derive(Deserialize)]
 struct Incomplete {
     reason: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct OutputAnnotation {
+    item_id: String,
+    content_index: usize,
+    annotation_index: usize,
+    annotation: Value,
 }
 
 #[derive(Deserialize)]
@@ -205,6 +224,50 @@ impl Response {
                 self.delta(&item_id, Channel::Reasoning, &delta)?;
             }
             Event::Refusal { item_id, delta } => self.delta(&item_id, Channel::Refusal, &delta)?,
+            Event::ItemAdded { item } if item["type"] == "web_search_call" => {
+                let id = item["id"]
+                    .as_str()
+                    .ok_or("invalid_output_item_identity")?
+                    .to_owned();
+                let mut call = search::Call::progress("in_progress");
+                call.merge(serde_json::from_value(item).map_err(|_| "invalid_responses_event")?);
+                self.search_update(&id, call)?;
+            }
+            Event::ItemAdded { .. } => {}
+            Event::SearchStarted { item_id } => {
+                self.search_update(&item_id, search::Call::progress("in_progress"))?
+            }
+            Event::SearchCompleted { item_id } => {
+                self.search_update(&item_id, search::Call::progress("completed"))?
+            }
+            Event::Annotation(fields) => {
+                // Optional source metadata must not invalidate the assistant's answer.
+                if self.search
+                    && let Ok(OutputAnnotation {
+                        item_id,
+                        content_index,
+                        annotation_index,
+                        annotation,
+                    }) = serde_json::from_value(fields)
+                    && valid_item_id(&item_id)
+                    && !self.done_ids.contains(&item_id)
+                    && annotation["type"] == "url_citation"
+                {
+                    let part = self.partial_item(&item_id)?;
+                    if part.annotations.len() < search::MAX_CITATIONS {
+                        if content_index == 0 {
+                            let citation =
+                                search::citation(&annotation, part.visible.text.chars().count(), 0);
+                            if let Some(citation) = citation {
+                                self.evidence(&item_id, citation)?;
+                            }
+                        }
+                        self.partial_item(&item_id)?
+                            .annotations
+                            .insert((content_index, annotation_index), annotation);
+                    }
+                }
+            }
             Event::ItemDone { output_index, item } => self.complete_item(output_index, item)?,
             Event::Completed { response } => {
                 if response
@@ -218,6 +281,9 @@ impl Response {
                 }
                 let output = response.output;
                 self.terminal_metadata(response.id, response.usage)?;
+                if let Some(output) = output.as_deref() {
+                    self.terminal_search_evidence(output)?;
+                }
                 self.validate_completion(output.as_deref())?;
                 if self
                     .partial
@@ -247,6 +313,9 @@ impl Response {
                     ),
                 };
                 self.terminal_metadata(response.id, response.usage)?;
+                if let Some(output) = response.output.as_deref() {
+                    self.terminal_search_evidence(output)?;
+                }
                 self.finish(status, failure, None);
             }
             Event::Failed { response } => {
@@ -260,6 +329,9 @@ impl Response {
                 let (status, failure) =
                     provider_error(response.error.as_ref().and_then(WireError::code));
                 self.terminal_metadata(response.id, response.usage)?;
+                if let Some(output) = response.output.as_deref() {
+                    self.terminal_search_evidence(output)?;
+                }
                 let status = if self.response_id.is_some() {
                     status
                 } else {
@@ -285,6 +357,91 @@ impl Response {
             // Finalized items contain the full arguments and encrypted state.
             // Raw reasoning and provider-specific telemetry are outside this profile.
             Event::Other => {}
+        }
+        Ok(())
+    }
+
+    fn evidence(&mut self, id: &str, evidence: ProviderEvidence) -> Result<(), &'static str> {
+        let message = &mut self.partial_item(id)?.message;
+        if matches!(&evidence, ProviderEvidence::UrlCitation(_))
+            && message.content.len() >= search::MAX_CITATIONS
+        {
+            return Ok(());
+        }
+        if evidence.record(&mut message.content) {
+            let update = InferenceUpdate::ProviderEvidence {
+                message: message.id.clone(),
+                evidence,
+            };
+            self.updates.push_back(ProviderEvent::Update(update));
+        }
+        Ok(())
+    }
+
+    fn search_update(&mut self, id: &str, report: search::Call) -> Result<(), &'static str> {
+        if !self.search {
+            return Err("unoffered_hosted_search");
+        }
+        if self.done_ids.contains(id) {
+            return Ok(());
+        }
+        let part = self.partial_item(id)?;
+        if !part.visible.text.is_empty()
+            || !part.visible.reasoning.is_empty()
+            || !part.visible.refusal.is_empty()
+        {
+            return Err("output_item_type_changed");
+        }
+        let call = part.search.get_or_insert_default();
+        call.merge(report);
+        let next = call.evidence();
+        self.evidence(id, next)
+    }
+
+    /// Some endpoints supply the complete action or annotations only in the terminal
+    /// response. Reconcile with the exact streamed item and visible text.
+    fn terminal_search_evidence(&mut self, output: &[Value]) -> Result<(), &'static str> {
+        if !self.search {
+            return Ok(());
+        }
+        for (index, value) in output.iter().enumerate() {
+            let Some(item) = self.items.get_mut(&index) else {
+                if value["type"] == "web_search_call"
+                    || value["type"] == "message" && value["content"].is_array()
+                {
+                    self.complete_item(
+                        index,
+                        serde_json::from_value(value.clone())
+                            .map_err(|_| "invalid_responses_event")?,
+                    )?;
+                }
+                continue;
+            };
+            if value["id"] != item.id() || value["type"] != item.kind() {
+                return Err("terminal_output_changed");
+            }
+            let id = item.id().to_owned();
+            match item {
+                WireItem::WebSearchCall { call, .. } => {
+                    call.merge(
+                        serde_json::from_value(value.clone())
+                            .map_err(|_| "invalid_responses_event")?,
+                    );
+                    let observation = call.evidence();
+                    self.evidence(&id, observation)?;
+                }
+                WireItem::Message {
+                    content: Some(original),
+                    ..
+                } => {
+                    if let Some(parts) = value["content"].as_array() {
+                        for citation in search::terminal_citations(original, parts)? {
+                            self.evidence(&id, citation)?;
+                        }
+                    }
+                }
+                _ => {}
+            }
         }
         Ok(())
     }
@@ -358,6 +515,8 @@ impl Response {
                     },
                     ordinal,
                     visible: Visible::default(),
+                    annotations: BTreeMap::new(),
+                    search: None,
                 }))
             }
         }
@@ -392,6 +551,18 @@ impl Response {
             return Err("output_item_identity_reused");
         }
         match &mut item {
+            WireItem::Message { .. } | WireItem::Reasoning { .. }
+                if self.partial.get(&id).is_some_and(|part| {
+                    part.message.content.iter().any(|content| {
+                        matches!(
+                            content,
+                            Content::ProviderEvidence(ProviderEvidence::WebSearch { .. })
+                        )
+                    })
+                }) =>
+            {
+                return Err("output_item_type_changed");
+            }
             WireItem::Message {
                 role,
                 phase,
@@ -421,14 +592,42 @@ impl Response {
                     });
                     let mut final_text = String::new();
                     let mut refusal = String::new();
-                    for part in content {
+                    let pending = std::mem::take(&mut partial.annotations);
+                    let mut offset = 0;
+                    let mut citations = Vec::new();
+                    for (part_index, part) in content.iter_mut().enumerate() {
                         match part {
-                            WireContent::OutputText { text, .. } => final_text.push_str(text),
+                            WireContent::OutputText { text, annotations } => {
+                                let count = text.chars().count();
+                                if self.search {
+                                    for annotation in annotations
+                                        .iter()
+                                        .chain(
+                                            pending
+                                                .range((part_index, 0)..=(part_index, usize::MAX))
+                                                .map(|(_, v)| v),
+                                        )
+                                        .take(search::MAX_CITATIONS)
+                                    {
+                                        if let Some(citation) =
+                                            search::citation(annotation, count, offset)
+                                        {
+                                            citations.push(citation);
+                                        }
+                                    }
+                                }
+                                annotations.clear();
+                                final_text.push_str(text);
+                                offset += count;
+                            }
                             WireContent::Refusal { refusal: text } => refusal.push_str(text),
                         }
                     }
                     self.sync_text(&id, Channel::Text, &final_text)?;
                     self.sync_text(&id, Channel::Refusal, &refusal)?;
+                    for citation in citations {
+                        self.evidence(&id, citation)?;
+                    }
                     *role = Some("assistant".into());
                 } else {
                     return Err("output_item_type_changed");
@@ -444,6 +643,14 @@ impl Response {
                     .map(|Summary::SummaryText { text }| text.as_str())
                     .collect();
                 self.sync_text(&id, Channel::Reasoning, &text)?;
+            }
+            WireItem::WebSearchCall { call, .. } => {
+                self.search_update(&id, std::mem::take(call))?;
+                *call = *self
+                    .partial_item(&id)?
+                    .search
+                    .take()
+                    .ok_or("output_items_incomplete")?;
             }
             WireItem::FunctionCall { .. } if self.partial.contains_key(&id) => {
                 return Err("output_item_type_changed");
@@ -466,7 +673,7 @@ impl Response {
         self.delta(id, channel, suffix)
     }
 
-    fn validate_completion(&self, output: Option<&[TerminalItem]>) -> Result<(), &'static str> {
+    fn validate_completion(&self, output: Option<&[Value]>) -> Result<(), &'static str> {
         if self.items.is_empty() || self.partial.len() != self.items.len() {
             return Err("output_items_incomplete");
         }
@@ -478,9 +685,12 @@ impl Response {
                 .items
                 .values()
                 .map(|item| (item.id(), item.kind()))
-                .eq(output
-                    .iter()
-                    .map(|item| (item.id.as_str(), item.kind.as_str())))
+                .eq(output.iter().map(|item| {
+                    (
+                        item["id"].as_str().unwrap_or_default(),
+                        item["type"].as_str().unwrap_or_default(),
+                    )
+                }))
         {
             return Err("terminal_output_changed");
         }
@@ -514,6 +724,7 @@ impl Response {
                     .iter()
                     .map(|Summary::SummaryText { text }| Content::Reasoning(text.clone()))
                     .collect(),
+                WireItem::WebSearchCall { .. } => Vec::new(),
                 WireItem::FunctionCall {
                     call_id,
                     name,
@@ -550,6 +761,9 @@ impl Response {
                     })]
                 }
             };
+            message
+                .content
+                .extend(self.partial[item.id()].message.content.iter().cloned());
             let state = self
                 .scope
                 .state(&message, item)
@@ -584,7 +798,9 @@ impl Response {
             partial
                 .into_iter()
                 .filter_map(|mut item| {
-                    item.message.content = item.visible.projection();
+                    let mut visible = item.visible.projection();
+                    visible.append(&mut item.message.content);
+                    item.message.content = visible;
                     (!item.message.content.is_empty()).then_some(item.message)
                 })
                 .collect()

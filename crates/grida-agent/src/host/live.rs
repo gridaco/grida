@@ -3,7 +3,10 @@
 use super::RunResult;
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::inference::InferenceUpdate;
-use agent_kit_core::messages::{Content, OutcomeStatus, Role, ToolCall, ToolResult};
+use agent_kit_core::messages::{
+    Content, OutcomeStatus, ProviderEvidence, Role, SearchAction, SearchStatus, ToolCall,
+    ToolResult, UrlCitation,
+};
 use agent_kit_core::turn::{OperationOutcome, TurnBinding, TurnState};
 use agent_kit_core::{MessageId, SessionId, ToolCallId, TurnId, WaitId};
 use agent_kit_runtime::TurnUpdate;
@@ -15,6 +18,14 @@ use tokio::sync::broadcast;
 pub(crate) enum LiveUpdate {
     Text(LiveText),
     Activity(LiveActivity),
+    HostedSearch {
+        session: SessionId,
+        turn: TurnId,
+        message: MessageId,
+        status: SearchStatus,
+        action: Option<SearchAction>,
+        settled: bool,
+    },
     Lifecycle(Lifecycle),
     Processes(LiveProcesses),
 }
@@ -86,6 +97,7 @@ pub(crate) struct LiveText {
     pub offset: usize,
     pub replace: bool,
     pub text: Arc<str>,
+    pub citations: Vec<UrlCitation>,
 }
 
 pub(super) struct Publisher {
@@ -125,7 +137,17 @@ impl Publisher {
                 let offset = self.offsets.entry(message.clone()).or_default();
                 let start = *offset;
                 *offset += text.len();
-                self.publish(message, start, false, text);
+                self.publish(message, start, false, text, Vec::new());
+            }
+            TurnUpdate::Inference {
+                update:
+                    InferenceUpdate::ProviderEvidence {
+                        message,
+                        evidence: ProviderEvidence::WebSearch { status, action },
+                    },
+                ..
+            } => {
+                self.hosted(message, *status, action.clone(), false);
             }
             TurnUpdate::Operation {
                 outcome: OperationOutcome::Inference(outcome),
@@ -145,9 +167,26 @@ impl Publisher {
                         })
                         .collect();
                     if !text.is_empty() {
-                        self.publish(&message.id, 0, true, &text);
+                        let citations = message
+                            .content
+                            .iter()
+                            .filter_map(|part| match part {
+                                Content::ProviderEvidence(ProviderEvidence::UrlCitation(
+                                    citation,
+                                )) => Some(citation.clone()),
+                                _ => None,
+                            })
+                            .collect();
+                        self.publish(&message.id, 0, true, &text, citations);
                     }
                     for item in &message.content {
+                        if let Content::ProviderEvidence(ProviderEvidence::WebSearch {
+                            status,
+                            action,
+                        }) = item
+                        {
+                            self.hosted(&message.id, *status, action.clone(), true);
+                        }
                         if let Content::ToolCall(call) = item
                             && !self.calls.contains_key(&call.id)
                         {
@@ -194,6 +233,23 @@ impl Publisher {
         }
     }
 
+    fn hosted(
+        &self,
+        message: &MessageId,
+        status: SearchStatus,
+        action: Option<SearchAction>,
+        settled: bool,
+    ) {
+        let _ = self.sender.send(LiveUpdate::HostedSearch {
+            session: self.binding.session.clone(),
+            turn: self.binding.turn.clone(),
+            message: message.clone(),
+            status,
+            action,
+            settled,
+        });
+    }
+
     fn activity(&self, message: &MessageId, call: &ToolCall, result: Option<Box<ToolResult>>) {
         if self.sender.receiver_count() == 0 {
             return;
@@ -207,7 +263,14 @@ impl Publisher {
         }));
     }
 
-    fn publish(&self, message: &MessageId, offset: usize, replace: bool, text: &str) {
+    fn publish(
+        &self,
+        message: &MessageId,
+        offset: usize,
+        replace: bool,
+        text: &str,
+        citations: Vec<UrlCitation>,
+    ) {
         if self.sender.receiver_count() == 0 || text.is_empty() {
             return;
         }
@@ -218,6 +281,7 @@ impl Publisher {
             offset,
             replace,
             text: Arc::from(text),
+            citations,
         }));
     }
 }

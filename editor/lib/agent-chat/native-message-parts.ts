@@ -60,6 +60,24 @@ export namespace native_message_parts {
         },
       });
     parts.push({ type: "text", text: message.text });
+    if (message.role === "assistant") {
+      for (const [index, citation] of (message.citations ?? []).entries()) {
+        const url = URL.parse(citation.url);
+        if (
+          !url ||
+          (url.protocol !== "https:" && url.protocol !== "http:") ||
+          url.username ||
+          url.password
+        )
+          continue;
+        parts.push({
+          type: "source-url",
+          sourceId: String(index + 1),
+          url: url.href,
+          title: citation.title || url.hostname,
+        });
+      }
+    }
     return parts;
   }
 }

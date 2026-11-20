@@ -120,7 +120,11 @@ attempt.
   images require PNG. The resolver reads bounded bytes only
   during authorized counting or generation. Both operations send the same
   image content, while the prepared request keeps just the references. The
-  adapter provides protocol fixtures for every profile.
+  adapter provides protocol fixtures for every profile. Restricted Responses
+  accepts a selected processing tier and an explicit live web search offer.
+  The provider executes searches within the inference. Search activity and
+  cited HTTP(S) sources survive streaming and history replay. A completed
+  search creates no local tool invocation or function result.
   [Responses migration](https://developers.openai.com/api/docs/guides/migrate-to-responses)
 - `Anthropic` requires an explicit output-token limit and lowers leading
   instructions to the system field. It emits a call after its complete

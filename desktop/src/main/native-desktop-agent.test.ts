@@ -567,7 +567,7 @@ it.runIf(Boolean(resources) && process.platform === "darwin")(
         sessionId,
         revision: 1,
         mode: "full_access",
-        available: ["restricted", "full_access"],
+        available: ["restricted", "approve_for_me", "full_access"],
       });
       expect(await ipc.transcript(event, attachmentId)).toEqual([]);
       expect((await ipc.selection(event, { sessionId })).selection).toEqual({

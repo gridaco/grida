@@ -9,6 +9,7 @@ import {
   CHATGPT_PROVIDER_ID,
   GG_PROVIDER_ID,
   isChatGptSubscriptionModelId,
+  type ChatGptTurnCapabilities,
 } from "@grida/ai-host";
 import { AGENT_DEFAULT_TIER, TIER_MODEL_IDS } from "@grida/ai/catalogue";
 import type { Workspace } from "@grida/daemon";
@@ -37,6 +38,7 @@ import type { NativeImagePlacement } from "./native-image-placement";
 import type { ImageReferenceReview } from "./native-image-generation";
 import type { NativeMcpLaunch } from "./native-mcp-launch";
 import { NativeProviderSelection } from "./native-provider-selection";
+import { DesktopPersonalization } from "./desktop-personalization";
 import { NativePredictionRoute } from "./native-prediction-route";
 import {
   NativeDeckGrant,
@@ -135,6 +137,7 @@ export class NativeDesktopAgent {
     private readonly store: NativeChatStore,
     private readonly account: DesktopAccountSession,
     private readonly resourcesPath: string,
+    readonly personalization: DesktopPersonalization,
     private readonly subscription?: Subscription,
     private readonly workspaceCatalogRoot?: string,
     private readonly workspaceGrant?: LaunchOptions["workspaceGrant"],
@@ -225,11 +228,18 @@ export class NativeDesktopAgent {
     options?: LaunchOptions,
     ordinaryWorkspaceChat = false
   ) {
+    const personalization = new DesktopPersonalization(
+      path.join(store.hooksHome, "config.toml")
+    );
     let subscription: Subscription | undefined;
     if (options && (options.provider === "chatgpt" || ordinaryWorkspaceChat)) {
       const { userDataPath, network } = await nativeAgentSubscriptionSettings();
       const { NativeChatGptHost } = await import("./native-chatgpt-host");
-      const host = new NativeChatGptHost(userDataPath, network);
+      const host = new NativeChatGptHost(userDataPath, network, () =>
+        personalization
+          .getPersonalization()
+          .catch(() => ({ fastMode: false, webSearch: "disabled" as const }))
+      );
       const oauth = createChatGptOAuthCoordinator({
         ceremony: host,
         open_external: options.openExternal,
@@ -240,6 +250,7 @@ export class NativeDesktopAgent {
       store,
       account,
       resourcesPath,
+      personalization,
       subscription,
       options?.workspaceCatalogRoot,
       options?.workspaceGrant,
@@ -509,6 +520,43 @@ export class NativeDesktopAgent {
       builtIn[0]?.id ??
       null
     );
+  }
+
+  async turnCapabilities(
+    workspaceId: string,
+    profileId: string | null,
+    model: string
+  ): Promise<ChatGptTurnCapabilities> {
+    const unsupported = {
+      status: "unsupported",
+      speeds: [],
+      webSearch: false,
+    } as const;
+    if (
+      !profileId ||
+      !isChatGptSubscriptionModelId(model) ||
+      !this.subscription
+    )
+      return unsupported;
+    return this.withWorkspace(workspaceId, async (_workspace, check) => {
+      const binding = await this.subscription!.host.launch(model).catch(
+        () => undefined
+      );
+      check();
+      // Built-in and custom accounts can select the same model. Only an exact
+      // subscription receipt can trigger an authenticated catalog read.
+      if (
+        !binding?.subscriptionScope ||
+        NativeChatProfiles.subscriptionBinding(
+          binding.subscriptionScope,
+          model
+        ) !== profileId
+      )
+        return unsupported;
+      const offer = await binding.subscriptionCapabilities!();
+      check();
+      return offer;
+    });
   }
 
   async profiles(workspaceId: string) {
@@ -1291,6 +1339,11 @@ export class NativeDesktopAgent {
       ),
       ...(workspaceConfiguration && {
         lookupProviderRoute: this.inputRouteLookup(workspace),
+        fastModeEnabled: () =>
+          this.personalization.getPersonalization().then(
+            (p) => p.fastMode,
+            () => false
+          ),
       }),
       hooks: workspaceConfiguration
         ? await NativeAgentHooks.open(this.store.hooksHome, root)

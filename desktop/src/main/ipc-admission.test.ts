@@ -74,6 +74,7 @@ describe("ipc_admission", () => {
           !channel.startsWith("grida:provider:endpoint:") &&
           !channel.startsWith("grida:hooks:") &&
           !channel.startsWith("grida:composer-predictions:") &&
+          !channel.startsWith("grida:personalization:") &&
           !channel.startsWith("grida:archives:") &&
           !channel.startsWith("grida:chat-catalog:") &&
           !nativeChat.includes(channel) &&
@@ -205,6 +206,20 @@ describe("ipc_admission", () => {
       "/desktop/welcome",
     ])
       expect(allowedFor("main", route)).not.toContain(channel);
+  });
+
+  it("admits subscription feature discovery only for ordinary workspace chat", () => {
+    const channel = IPC_CHANNELS.NATIVE_CHAT_TURN_CAPABILITIES;
+    expect(allowedFor("main", "/desktop/workspace")).toContain(channel);
+    for (const route of [
+      "/desktop/welcome",
+      "/desktop/settings",
+      "/desktop/file",
+    ])
+      expect(allowedFor("main", route)).not.toContain(channel);
+    expect(allowedFor("onboarding", "/desktop/onboarding")).not.toContain(
+      channel
+    );
   });
 
   it("admits exact selected-file SVG chat without project settings or presentation", () => {

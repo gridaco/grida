@@ -2,6 +2,7 @@
 import { ChatGptSubscriptionHost } from "@grida/ai-host/chatgpt-host";
 import {
   CHATGPT_RESPONSES_URL,
+  CHATGPT_MODELS_URL,
   CHATGPT_SUBSCRIPTION_CONFIG,
   CHATGPT_TOKEN_URL,
 } from "../chatgpt-configuration";
@@ -11,10 +12,21 @@ import type { NativeProviderNetwork } from "./native-provider-egress";
 export class NativeChatGptHost {
   private readonly owner: ChatGptSubscriptionHost;
 
-  constructor(userDataPath: string, network: NativeProviderNetwork) {
+  constructor(
+    userDataPath: string,
+    network: NativeProviderNetwork,
+    turnPreferences?: ConstructorParameters<
+      typeof ChatGptSubscriptionHost
+    >[0]["turnPreferences"]
+  ) {
     this.owner = new ChatGptSubscriptionHost({
       userDataPath,
+      turnPreferences,
       configuration: CHATGPT_SUBSCRIPTION_CONFIG,
+      getModels: async (target, headers, signal) =>
+        target === CHATGPT_MODELS_URL && !signal.aborted
+          ? ((await network.getSubscriptionModels?.(headers, signal)) ?? null)
+          : null,
       post: async (target, headers, body, signal) => {
         if (
           signal.aborted ||
@@ -66,6 +78,7 @@ export class NativeChatGptHost {
       | "model"
       | "providerNetwork"
       | "subscriptionScope"
+      | "subscriptionCapabilities"
     >
   > {
     const connection = await this.owner.capture(modelId);
@@ -74,7 +87,9 @@ export class NativeChatGptHost {
       endpoint: CHATGPT_RESPONSES_URL.slice(0, -"/responses".length),
       model: connection.model,
       subscriptionScope: connection.scope,
+      subscriptionCapabilities: connection.capabilities,
       providerNetwork: {
+        isCurrent: connection.isCurrent,
         prepare: (target, headers) =>
           target === connection.target &&
           headers.get("content-type") === "application/json" &&

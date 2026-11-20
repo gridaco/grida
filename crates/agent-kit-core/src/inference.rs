@@ -1,11 +1,11 @@
 use crate::authority::AuthorityBinding;
 use crate::messages::{
-    Content, Message, Provenance, ProvenanceKind, ProviderState, ResultContent, Role,
-    ToolArguments, ToolCall,
+    Content, Message, Provenance, ProvenanceKind, ProviderEvidence, ProviderState, ResultContent,
+    Role, ToolArguments, ToolCall,
 };
 use crate::{
     AttemptId, BindingId, BoxFuture, CancellationToken, Envelope, Error, ErrorKind, Fingerprint,
-    MessageId, ModelId, ProviderId, Result, ToolId,
+    MessageId, ModelId, ProviderId, Result, SchemaId, ToolId,
 };
 use futures_core::stream::BoxStream;
 use futures_util::{FutureExt, StreamExt};
@@ -75,6 +75,80 @@ impl ReasoningEffort {
             Self::High => "high",
             Self::XHigh => "xhigh",
         }
+    }
+}
+
+/// Requested processing speed on the selected provider connection.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ResponseSpeed {
+    #[default]
+    Standard,
+    Fast,
+    Ultrafast,
+}
+
+impl ResponseSpeed {
+    pub fn is_standard(&self) -> bool {
+        *self == Self::Standard
+    }
+}
+
+/// Access permitted to a provider-hosted search. Earlier enabled turns used live access.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum WebSearchMode {
+    Cached,
+    Indexed,
+    #[default]
+    Live,
+}
+
+impl WebSearchMode {
+    pub fn is_live(&self) -> bool {
+        *self == Self::Live
+    }
+}
+
+/// Optional facets of a single foreground inference. The default request has
+/// no extension, preserving prepared identities for previously accepted work.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct RequestOptions {
+    pub speed: ResponseSpeed,
+    pub web_search: bool,
+    #[serde(skip_serializing_if = "WebSearchMode::is_live")]
+    pub web_search_mode: WebSearchMode,
+}
+
+impl RequestOptions {
+    const SCHEMA: &str = "inference.request-options";
+
+    pub fn is_default(&self) -> bool {
+        *self == Self::default()
+    }
+
+    pub fn extension(self) -> Result<Option<Envelope>> {
+        if self == Self::default() {
+            return Ok(None);
+        }
+        let bytes = serde_json::to_vec(&self)
+            .map_err(|_| Error::new(ErrorKind::InvalidInput, "invalid_request_options"))?;
+        Envelope::new(SchemaId::new(Self::SCHEMA)?, 1, bytes).map(Some)
+    }
+
+    pub fn from_extension(extension: Option<&Envelope>) -> Result<Self> {
+        let Some(value) = extension else {
+            return Ok(Self::default());
+        };
+        if value.schema().as_str() != Self::SCHEMA || value.version() != 1 {
+            return Err(Error::new(
+                ErrorKind::Unsupported,
+                "unsupported_request_extension",
+            ));
+        }
+        serde_json::from_slice(value.bytes())
+            .map_err(|_| Error::new(ErrorKind::InvalidInput, "invalid_request_options"))
     }
 }
 
@@ -356,6 +430,10 @@ pub enum InferenceUpdate {
         text: String,
     },
     ToolCall(ToolCall),
+    ProviderEvidence {
+        message: MessageId,
+        evidence: ProviderEvidence,
+    },
     Usage(UsageObservation),
     /// Opaque provider state that belongs to `message`, in stream order with
     /// that message's other content.
@@ -801,6 +879,16 @@ impl InferenceRun {
                 let id = MessageId::new(call.id.as_str())
                     .expect("tool call identity is a validated message identity");
                 self.capture_content(id, Content::ToolCall(call.clone()));
+            }
+            InferenceUpdate::ProviderEvidence { message, evidence } => {
+                if let Some(existing) = self.partial.iter_mut().find(|item| &item.id == message) {
+                    evidence.record(&mut existing.content);
+                } else {
+                    self.capture_content(
+                        message.clone(),
+                        Content::ProviderEvidence(evidence.clone()),
+                    );
+                }
             }
             InferenceUpdate::ProviderState { message, state } => {
                 self.capture_content(message.clone(), Content::ProviderState(state.clone()))

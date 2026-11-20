@@ -10,6 +10,7 @@ import {
   type IncomingMessage,
   type Session,
 } from "electron";
+import { CHATGPT_MODELS_URL } from "../chatgpt-configuration";
 import { ProviderNetworkPolicy } from "../provider-network-policy";
 import { ServicesSidecarChannel } from "../services-sidecar-channel";
 import { ProviderNetworkAuthority } from "./provider-network-authority";
@@ -131,6 +132,25 @@ export class ProviderNetworkHost {
   ): Promise<NativeProviderNetwork> {
     const networkSession = await ProviderNetworkHost.networkSession();
     return {
+      ...(grantId === ProviderNetworkPolicy.CHATGPT_SUBSCRIPTION_GRANT_ID && {
+        getSubscriptionModels: (headers: Headers, signal: AbortSignal) => {
+          const approved = ProviderNetworkPolicy.authorize(
+            authority.nativeGrants(),
+            {
+              grant_id: grantId,
+              method: "GET",
+              url: CHATGPT_MODELS_URL,
+              headers: [...headers],
+            }
+          );
+          return requestThroughSession(networkSession, approved.url.href, {
+            method: "GET",
+            headers: approved.headers,
+            signal,
+            redirect: "manual",
+          });
+        },
+      }),
       isCurrent: () =>
         authority.nativeGrants().some((grant) => grant.id === grantId),
       prepare: (target, headers) => {

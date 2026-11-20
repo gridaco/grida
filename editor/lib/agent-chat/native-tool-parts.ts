@@ -17,7 +17,10 @@ export namespace native_tool_parts {
   };
 
   export function entry(call: NativeChatActivity): ToolCallEntry {
-    const name = NAMES[call.title] ?? call.title;
+    const name =
+      call.source === "provider" && call.kind === "search"
+        ? "web_search"
+        : (NAMES[call.title] ?? call.title);
     const input = normalizeInput(call.title, record(call.input));
     const base = {
       type: `tool-${name}`,

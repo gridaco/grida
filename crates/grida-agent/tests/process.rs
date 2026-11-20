@@ -182,6 +182,8 @@ enum Reply {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     ResponsesSigned(&'static str),
     #[cfg(unix)]
+    ResponsesEvents(Vec<Value>),
+    #[cfg(unix)]
     Release(&'static str, tokio::sync::oneshot::Receiver<()>),
     /// Hold a selected fixture response until an independent observation ends.
     #[cfg(unix)]
@@ -587,6 +589,14 @@ fn fixture_body(reply: Reply, protocol: ProviderProtocol) -> String {
     let (text, finish) = match reply {
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         Reply::Credential(_, _) => unreachable!("credential override is handled before the body"),
+        #[cfg(unix)]
+        Reply::ResponsesEvents(events) => {
+            assert_eq!(protocol, ProviderProtocol::Responses);
+            return events
+                .into_iter()
+                .map(|event| format!("data: {event}\n\n"))
+                .collect();
+        }
         Reply::Finished(text) => (text, Some("stop")),
         Reply::Hold(text) => (text, None),
         Reply::Stop(reason) => ("", Some(reason)),
