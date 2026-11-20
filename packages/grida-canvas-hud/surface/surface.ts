@@ -54,7 +54,7 @@ import {
   type TextEditChromeInput,
 } from "../classes/text-edit";
 import type { OverlayElement } from "../event/overlay";
-import type { VectorSubSelection } from "../event/state";
+import type { VectorHover, VectorSubSelection } from "../event/state";
 
 export interface SurfaceVisibilityContext {
   gesture: SurfaceGesture;
@@ -747,6 +747,17 @@ export class Surface {
    */
   hover(): NodeId | null {
     return this.state.getEffectiveHover();
+  }
+
+  /**
+   * The vector control under the pointer while a vector sub-selection is
+   * shown (vertex / tangent / segment / ghost / region), or `null`. The same
+   * value the vector chrome reads for its hover affordances, so a host
+   * overlay keyed on it (e.g. point measurement) agrees with what the next
+   * click would select.
+   */
+  vectorHover(): VectorHover | null {
+    return this.state.getVectorHover();
   }
 
   cursor(): CursorIcon {

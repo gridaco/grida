@@ -43,3 +43,13 @@ export {
   subset_translation_delta,
 } from "./transform";
 export type { TransformVectorOutcome } from "./transform";
+
+export {
+  vector_measurement_operands,
+  project_onto_segment,
+} from "./measurement";
+export type {
+  VectorMeasurementOperands,
+  VectorMeasurementSource,
+  VectorMeasurementTarget,
+} from "./measurement";

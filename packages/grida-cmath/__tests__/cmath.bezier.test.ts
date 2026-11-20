@@ -277,6 +277,18 @@ describe("cmath.bezier.project", () => {
     expect(cmath.bezier.project(a, b, ta, tb, [15, 0])).toBeCloseTo(1, 6);
   });
 
+  test("zero tangents resolve a cursor near but not at an endpoint", () => {
+    const a: cmath.Vector2 = [0, 0];
+    const b: cmath.Vector2 = [10000, 0];
+    const zero: cmath.Vector2 = [0, 0];
+
+    for (const x of [20, 5000, 9980]) {
+      const t = cmath.bezier.project(a, b, zero, zero, [x, 30]);
+      const [px] = cmath.bezier.evaluate(a, b, zero, zero, t);
+      expect(px).toBeCloseTo(x, 3);
+    }
+  });
+
   test("zero tangents should project onto cubic curve, not straight line", () => {
     const a: cmath.Vector2 = [0, 0];
     const b: cmath.Vector2 = [100, 0]; // Horizontal line for clearer test
