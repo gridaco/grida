@@ -33,13 +33,17 @@ let changed = false;
 // bytes still participate in drift checks, and newly generated files use LF.
 const lf = (text) => text.replaceAll("\r\n", "\n");
 function write(name, text) {
-  text = lf(
+  writeGenerated(
+    name,
     execFileSync(process.execPath, [formatter, "--stdin-filepath", name], {
       cwd: root,
       input: text,
       encoding: "utf8",
     })
   );
+}
+function writeGenerated(name, text) {
+  text = lf(text);
   const existing = fs.existsSync(name) ? fs.readFileSync(name, "utf8") : "";
   if (lf(existing) === text) return;
   if (check) {
@@ -53,6 +57,10 @@ function write(name, text) {
 const json = (value) => JSON.stringify(value, null, 2) + "\n";
 const service = JSON.parse(
   fs.readFileSync(path.join(authored, "presets.json"), "utf8")
+);
+writeGenerated(
+  path.join(root, "crates/grida-agent-master/data/economy-model.txt"),
+  service.tiers.nano + "\n"
 );
 const data = {
   service,

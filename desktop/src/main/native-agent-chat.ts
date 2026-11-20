@@ -96,6 +96,7 @@ import {
 } from "./native-agent-side-chats";
 import {
   NativeAgentProcess,
+  PREDICT_PROMPT,
   TRANSCRIPT_WINDOW,
   type NativeAgentLaunch,
 } from "./native-agent-process";
@@ -1619,6 +1620,42 @@ export class NativeAgentChat {
       queue,
     });
     return snapshot;
+  }
+
+  async predictPrompt(
+    session: NativeChatSession,
+    snapshot: NativeChatSnapshot,
+    permission?: AbortSignal
+  ): Promise<string | null> {
+    const sessionId = this.requireObservation(session, snapshot);
+    const latest = snapshot.latest;
+    if (
+      !this.process.acceptsPromptPrediction ||
+      snapshot.side ||
+      snapshot.current ||
+      snapshot.queuedInputs ||
+      latest?.disposition !== "settled" ||
+      latest.status !== "succeeded"
+    )
+      return null;
+    const result = object(
+      await this.process.request(
+        `_${PREDICT_PROMPT}`,
+        { sessionId, turnId: latest.turnId },
+        20_000,
+        permission
+      )
+    );
+    this.requireAttached(session);
+    if (result.text === null) return null;
+    if (
+      typeof result.text !== "string" ||
+      !result.text.trim() ||
+      Buffer.byteLength(result.text) > 4096 ||
+      /[\p{Cc}\p{Zl}\p{Zp}]/u.test(result.text)
+    )
+      throw invalidResponse();
+    return result.text;
   }
 
   async turnSummary(

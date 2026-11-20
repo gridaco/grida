@@ -133,6 +133,7 @@ test("public release, product presets and generated native input copies cannot d
     "packages/grida-ai/schemas/inputs.generated.json",
     "packages/grida-ai-host/src/protocol/chatgpt.ts",
     "crates/grida-agent/data/chatgpt-subscription-models.json",
+    "crates/grida-agent-master/data/economy-model.txt",
     "scripts/ai-catalogue/generate.mjs",
     "scripts/ai-catalogue/projection.mjs",
   ]) {
@@ -177,6 +178,7 @@ test("public release, product presets and generated native input copies cannot d
     "packages/grida-ai/schemas/inputs.generated.json",
     "packages/grida-ai-host/src/protocol/chatgpt.ts",
     "crates/grida-agent/data/chatgpt-subscription-models.json",
+    "crates/grida-agent-master/data/economy-model.txt",
     ...[
       "models.ts",
       "grida/catalog.ts",
@@ -195,6 +197,13 @@ test("public release, product presets and generated native input copies cannot d
     crlf
   );
   for (const [name, edit, stale] of [
+    [
+      "data/ai/presets.json",
+      (data) => {
+        data.tiers.nano = data.tiers.mini;
+      },
+      "economy-model.txt",
+    ],
     [
       "packages/grida-ai/node_modules/@grida/ai-models/models.json",
       (data) => {

@@ -16,6 +16,7 @@ import { NativeEditorSvgReplies } from "./native-editor-svg-replies";
 import { NativeDocumentIdentityBusy } from "./native-document-files";
 import { NativeToolImages } from "./native-tool-images";
 import type {
+  DesktopComposerPredictionSettings,
   NativeChatAcceptance,
   NativeChatAttachment,
   NativeChatApproval,
@@ -173,6 +174,7 @@ export type ActiveNativeChat = Readonly<{
     Partial<
       Pick<
         NativeAgentChat,
+        | "predictPrompt"
         | "messageActivityCatalog"
         | "archiveCatalog"
         | "unarchiveCatalog"
@@ -466,7 +468,11 @@ export class NativeChatIpc {
     private readonly browserTools?: DesktopBrowserTools,
     private readonly resolveWelcomeWorkspace?: (
       workspaceId: string
-    ) => Promise<NativeWelcomeWorkspace>
+    ) => Promise<NativeWelcomeWorkspace>,
+    private readonly composerPredictions?: {
+      get(): Promise<DesktopComposerPredictionSettings>;
+      capture(revision: number): AbortSignal | undefined;
+    }
   ) {}
 
   async documentRequest<T>(
@@ -3098,6 +3104,42 @@ export class NativeChatIpc {
     const observationId = randomUUID();
     attachment.observations.set(observationId, snapshot);
     return { observationId, snapshot };
+  }
+
+  async predictPrompt(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    observationId: string
+  ): Promise<string | null> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const observed = requireObservation(attachment, observationId);
+    const preferences = this.composerPredictions;
+    const chat = owner.active.chat;
+    if (!preferences || !chat.predictPrompt) return null;
+
+    const current = () => {
+      this.revalidate(owner, attachment);
+      return (
+        attachment.presented === true &&
+        !observed.side &&
+        !observed.current &&
+        observed.queuedInputs === 0 &&
+        observed.latest?.disposition === "settled" &&
+        observed.latest.status === "succeeded" &&
+        !!attachment.latestObservation &&
+        sameBasis(observed, attachment.latestObservation)
+      );
+    };
+    if (!current()) return null;
+    const settings = await preferences.get();
+    const permission = preferences.capture(settings.revision);
+    if (!permission || !current()) return null;
+    const text = await chat.predictPrompt(
+      attachment.session,
+      observed,
+      permission
+    );
+    return permission.aborted || !current() ? null : text;
   }
 
   async turnSummary(

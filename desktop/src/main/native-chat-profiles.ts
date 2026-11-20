@@ -104,12 +104,18 @@ export namespace NativeChatProfiles {
   }
 
   export function gatewayOutputLimit(model: GatewayModel | undefined) {
+    return model?.capabilities.tools === true
+      ? gatewayChatOutputLimit(model)
+      : undefined;
+  }
+
+  /** A text-only completion does not require a tool-capable foreground model. */
+  export function gatewayChatOutputLimit(model: GatewayModel | undefined) {
     if (
       !model ||
       !/^[A-Za-z0-9_.:/@-]{1,128}$/.test(model.id) ||
       model.kind !== "text" ||
-      !model.interfaces.includes("chat.completions") ||
-      model.capabilities.tools !== true
+      !model.interfaces.includes("chat.completions")
     )
       return undefined;
     const { max_output_tokens: limit } = model.limits;

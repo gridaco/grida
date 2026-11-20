@@ -71,6 +71,17 @@ export namespace ipc_admission {
   }): boolean {
     switch (role) {
       case "main":
+        if (channel === IPC_CHANNELS.COMPOSER_PREDICTIONS_SET)
+          return pathname === "/desktop/settings";
+        if (
+          channel === IPC_CHANNELS.COMPOSER_PREDICTIONS_GET ||
+          channel === IPC_CHANNELS.COMPOSER_PREDICTIONS_CHANGED
+        )
+          return (
+            pathname === "/desktop/settings" ||
+            pathname === "/desktop/workspace" ||
+            pathname === "/desktop/file"
+          );
         if (channel === IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_AUTOMATIC_REVIEW)
           return (
             pathname === "/desktop/welcome" || pathname === "/desktop/workspace"

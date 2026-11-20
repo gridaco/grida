@@ -88,6 +88,9 @@ export const IPC_CHANNELS = {
   ARCHIVES_LIST: "grida:archives:list",
   ARCHIVES_UNARCHIVE: "grida:archives:unarchive",
   ARCHIVES_OPEN_RESTORED: "grida:archives:open-restored",
+  COMPOSER_PREDICTIONS_GET: "grida:composer-predictions:get",
+  COMPOSER_PREDICTIONS_SET: "grida:composer-predictions:set",
+  COMPOSER_PREDICTIONS_CHANGED: "grida:composer-predictions:changed",
   GLOBAL_HOOKS_INSPECT: "grida:hooks:inspect",
   GLOBAL_HOOKS_RELOAD: "grida:hooks:reload",
   GLOBAL_HOOKS_REVIEW: "grida:hooks:review",
@@ -191,6 +194,7 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_INPUT_RECEIPT: "grida:native-chat:input-receipt",
   NATIVE_CHAT_OBSERVE: "grida:native-chat:observe",
   NATIVE_CHAT_SET_PRESENTED: "grida:native-chat:set-presented",
+  NATIVE_CHAT_PREDICT_PROMPT: "grida:native-chat:predict-prompt",
   NATIVE_CHAT_TURN_SUMMARY: "grida:native-chat:turn-summary",
   NATIVE_CHAT_READ_ARTIFACT: "grida:native-chat:read-artifact",
   NATIVE_CHAT_READ_ATTACHMENT_PREVIEW:

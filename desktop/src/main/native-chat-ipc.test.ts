@@ -22,7 +22,8 @@ import {
   type NativeWelcomeWorkspace,
 } from "./native-chat-ipc";
 import { NativeChatSelections } from "./native-chat-selections";
-import type { NativeAgentChat, NativeChatSession } from "./native-agent-chat";
+import { NativeAgentChat, type NativeChatSession } from "./native-agent-chat";
+import { DesktopComposerPredictions } from "./desktop-composer-predictions";
 import { NativeWorkspaceAgents } from "./native-workspace-agents";
 import type { NativeSavedChatDeletionPreview } from "./native-agent-deletion";
 import { NativeEditorSurfaceEndpoints } from "./native-editor-surfaces";
@@ -661,7 +662,8 @@ function setup(
   hookReview?: ConstructorParameters<typeof NativeChatIpc>[10],
   profiles?: ConstructorParameters<typeof NativeChatIpc>[5],
   selections?: ConstructorParameters<typeof NativeChatIpc>[11],
-  browserTools?: ConstructorParameters<typeof NativeChatIpc>[12]
+  browserTools?: ConstructorParameters<typeof NativeChatIpc>[12],
+  predictions?: ConstructorParameters<typeof NativeChatIpc>[14]
 ) {
   const first = windowAt();
   const second = windowAt();
@@ -893,7 +895,9 @@ function setup(
       undefined,
       hookReview,
       selections,
-      browserTools
+      browserTools,
+      undefined,
+      predictions
     ),
     emit: (sessionId: string, update: NativeChatStreamUpdate) => {
       for (const listener of listeners.get(sessionId) ?? []) listener(update);
@@ -2079,6 +2083,85 @@ describe("native chat IPC", () => {
       archived: true,
     });
     expect(result.archiveUndo).toBeUndefined();
+  });
+
+  it("admits predictions only for the opted-in presented reply and discards a result after disabling and re-enabling", async () => {
+    let permission = new AbortController();
+    const preferences = {
+      snapshot: { enabled: false, revision: 0 },
+      async get() {
+        return this.snapshot;
+      },
+      capture(revision: number) {
+        if (this.snapshot.enabled && revision === this.snapshot.revision)
+          return permission.signal;
+      },
+    };
+    const { ipc, chat, first, second } = setup(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      preferences
+    );
+    const parent = await ipc.create(first.event);
+    const other = await ipc.load(second.event, parent.sessionId);
+    const running = await ipc.observe(first.event, parent.attachmentId);
+    const observe = vi.spyOn(chat, "observe").mockResolvedValue({
+      ...running.snapshot,
+      current: null,
+      latest: {
+        ...running.snapshot.current!,
+        disposition: "settled",
+        status: "succeeded",
+      },
+    });
+    const settled = await ipc.observe(first.event, parent.attachmentId);
+    const predict = vi
+      .fn<NonNullable<typeof chat.predictPrompt>>()
+      .mockResolvedValue("Compare the two samples.");
+    chat.predictPrompt = predict;
+    const request = () =>
+      ipc.predictPrompt(
+        first.event,
+        parent.attachmentId,
+        settled.observationId
+      );
+    await expect(
+      ipc.predictPrompt(second.event, other.attachmentId, settled.observationId)
+    ).rejects.toThrow("observation_unavailable");
+    ipc.setPresented(first.event, parent.attachmentId, true);
+    expect(await request()).toBeNull();
+    preferences.snapshot = { enabled: true, revision: 1 };
+    ipc.setPresented(first.event, parent.attachmentId, false);
+    expect(await request()).toBeNull();
+    expect(predict).not.toHaveBeenCalled();
+
+    ipc.setPresented(first.event, parent.attachmentId, true);
+    expect(await request()).toBe("Compare the two samples.");
+    const late = Promise.withResolvers<string | null>();
+    const started = Promise.withResolvers<void>();
+    predict.mockImplementationOnce(() => {
+      started.resolve();
+      return late.promise;
+    });
+    const pending = request();
+    await started.promise;
+    preferences.snapshot = { enabled: false, revision: 2 };
+    permission.abort();
+    permission = new AbortController();
+    preferences.snapshot = { enabled: true, revision: 3 };
+    late.resolve("Old suggestion");
+    expect(await pending).toBeNull();
+    observe.mockResolvedValue({
+      ...running.snapshot,
+      sessionRevision: running.snapshot.sessionRevision + 1,
+    });
+    await ipc.observe(first.event, parent.attachmentId);
+    expect(await request()).toBeNull();
+    expect(predict).toHaveBeenCalledTimes(2);
   });
 
   it("reads only the current attached terminal basis and drops a superseded reply", async () => {
@@ -4685,3 +4768,126 @@ describe("Full access selection IPC", () => {
     ).rejects.toThrow("invalid");
   });
 });
+
+it
+  .runIf(
+    process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES &&
+      process.platform !== "win32"
+  )
+  .each(["model lookup", "provider authorization"] as const)(
+  "revokes a native prediction during %s, even after re-enabling",
+  async (stage) => {
+    const directory = await fs.promises.mkdtemp(
+      path.join(await fs.promises.realpath(os.tmpdir()), "grida-prediction-")
+    );
+    const preference = new DesktopComposerPredictions(
+      path.join(directory, "config.toml")
+    );
+    const waiting = Promise.withResolvers<void>();
+    const resume = Promise.withResolvers<void>();
+    let pendingPrediction = false;
+    const hold = async () => {
+      waiting.resolve();
+      await resume.promise;
+    };
+    const dispatch = vi.fn<() => Response>(() => {
+      const response = {
+        id: "fixture",
+        choices: [
+          {
+            index: 0,
+            delta: { content: "Write the speaker notes." },
+            finish_reason: "stop",
+          },
+        ],
+      };
+      return new Response(
+        `data: ${JSON.stringify(response)}\n\ndata: [DONE]\n\n`,
+        {
+          headers: { "content-type": "text/event-stream" },
+        }
+      );
+    });
+    let chat: NativeAgentChat | undefined;
+    try {
+      await preference.set(true);
+      chat = await NativeAgentChat.start({
+        resourcesPath: process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES!,
+        stateDirectory: path.join(directory, "state"),
+        cwd: directory,
+        processCwd: directory,
+        provider: "openai-compatible",
+        endpoint: "http://127.0.0.1:11434/v1",
+        model: "fixture-model",
+        providerNetwork: {
+          prepare: () => async (_body, signal) => {
+            if (pendingPrediction && stage === "provider authorization")
+              await hold();
+            return signal.aborted ? null : dispatch();
+          },
+        },
+        lookupPredictionRoute: async (source) => {
+          if (pendingPrediction && stage === "model lookup") await hold();
+          return source;
+        },
+      });
+      const { ipc, first, scopes } = setup(
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        preference
+      );
+      scopes.set(first.sender, { workspaceId: WORKSPACE, chat });
+      const { attachmentId } = await ipc.create(first.event);
+      ipc.setPresented(first.event, attachmentId, true);
+      const send = async (input: string) => {
+        const inputId = randomUUID();
+        await ipc.submit(first.event, attachmentId, inputId, input, "act");
+        return vi.waitFor(
+          async () => {
+            const receipt = await ipc.inputReceipt(
+              first.event,
+              attachmentId,
+              inputId
+            );
+            expect(receipt.disposition).toBe("completed");
+            return ipc.observe(first.event, attachmentId);
+          },
+          { timeout: 5000 }
+        );
+      };
+      const firstReply = await send("Outline the slide.");
+      pendingPrediction = true;
+      const pending = ipc.predictPrompt(
+        first.event,
+        attachmentId,
+        firstReply.observationId
+      );
+      await waiting.promise;
+      await preference.set(false);
+      await preference.set(true);
+      resume.resolve();
+      expect(await pending).toBeNull();
+      expect(dispatch).toHaveBeenCalledTimes(1);
+
+      pendingPrediction = false;
+      const nextReply = await send("Revise the outline.");
+      expect(
+        await ipc.predictPrompt(
+          first.event,
+          attachmentId,
+          nextReply.observationId
+        )
+      ).toBe("Write the speaker notes.");
+      expect(dispatch).toHaveBeenCalledTimes(3);
+    } finally {
+      resume.resolve();
+      await chat?.close();
+      await fs.promises.rm(directory, { recursive: true, force: true });
+    }
+  },
+  15_000
+);

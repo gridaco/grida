@@ -210,6 +210,13 @@ impl Stdio {
             .await;
     }
 
+    pub(super) async fn reject(&mut self, id: &Value, message: &str) {
+        self.write_frame(
+            json!({"jsonrpc":"2.0","id":id,"error":{"code":-32603,"message":message}}),
+        )
+        .await;
+    }
+
     async fn write_frame(&mut self, frame: Value) {
         timeout(WAIT, self.stdin.write_all(format!("{frame}\n").as_bytes()))
             .await

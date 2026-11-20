@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::gg::{GatewayBillingRead, GatewayChildBillingRef};
+use agent_client_protocol::v1::ConnectionTo;
 use agent_kit_core::{AttemptId, OperationId};
 use std::time::Duration;
 
@@ -34,6 +35,27 @@ impl std::fmt::Debug for ReadJob {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str("GatewayBillingReadJob")
     }
+}
+
+pub(super) async fn read_job(
+    client: &ConnectionTo<Client>,
+    route_id: Option<uuid::Uuid>,
+    request_id: String,
+    timeout: Duration,
+) -> GatewayBillingRead {
+    tokio::time::timeout(timeout, async {
+        client
+            .send_request(ReadJob {
+                request_id,
+                route_id,
+            })
+            .block_task()
+            .await
+    })
+    .await
+    .ok()
+    .and_then(std::result::Result::ok)
+    .map_or(GatewayBillingRead::Unavailable, GatewayBillingRead::checked)
 }
 
 pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>) -> RequestRoutes {
@@ -69,24 +91,17 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                     let Some(request_id) = request_id else {
                         return Ok(GatewayBillingRead::Unavailable);
                     };
-                    let reply = tokio::time::timeout(LOOKUP_TIMEOUT, async {
-                        client
-                            .send_request(ReadJob {
-                                request_id,
-                                route_id: host.supervised_route_id(),
-                            })
-                            .block_task()
-                            .await
-                    })
+                    let billing = read_job(
+                        &client,
+                        host.supervised_route_id(),
+                        request_id,
+                        LOOKUP_TIMEOUT,
+                    )
                     .await;
                     require(&sessions, CAPABILITY, Some(&request.session_id))?;
                     if has_child {
                         require(&sessions, CHILD_CAPABILITY, Some(&request.session_id))?;
                     }
-                    let billing = reply
-                        .ok()
-                        .and_then(std::result::Result::ok)
-                        .map_or(GatewayBillingRead::Unavailable, GatewayBillingRead::checked);
                     host.retain_spending_settlement(
                         request.session_id,
                         request.turn_id,

@@ -1,5 +1,6 @@
 // GRIDA-SEC-004 / GRIDA-SEC-008 — ordinary model selection keeps subscription custody and chat funding bound.
 import { AuthStore } from "@grida/daemon/server";
+import { TIER_MODEL_IDS } from "@grida/ai/catalogue";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -191,6 +192,96 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       expect(fixture.prepare).not.toHaveBeenCalled();
       expect(fixture.dispatch).not.toHaveBeenCalled();
       expect(fixture.accountHttp).not.toHaveBeenCalled();
+      expect(sidecar.nativeAgentGatewayConnection).not.toHaveBeenCalled();
+    } finally {
+      await fixture.close();
+    }
+  },
+  30_000
+);
+
+it.runIf(Boolean(resources) && process.platform !== "win32")(
+  "uses the subscription economy model for a prediction with OpenRouter also connected",
+  async () => {
+    const fixture = await subscriptionDesktop();
+    const openrouter = vi.fn<NativeProviderNetwork["prepare"]>(() => null);
+    sidecar.nativeBuiltInByok.mockImplementation(async (provider, model) => {
+      if (provider !== "openrouter") throw new Error("fixture key absent");
+      return {
+        provider: "openai-compatible",
+        endpoint: "https://openrouter.ai/api/v1",
+        credentialHome: path.join(fixture.base, "providers"),
+        providerNetwork: { prepare: openrouter },
+        model,
+      };
+    });
+    try {
+      const profiles = await fixture.agent.welcomeProfiles();
+      expect(profiles.choices.some((p) => p.connection === "OpenRouter")).toBe(
+        true
+      );
+      const foreground = profiles.choices.find(
+        (p) =>
+          p.connection === "ChatGPT Subscription" && p.model === "GPT-6.2 Sol"
+      )!;
+      await fixture.agent.selectProfile(
+        fixture.workspace.id,
+        { kind: "new", id: foreground.id },
+        () => {}
+      );
+      const chat = fixture.agent.current(
+        fixture.workspace.id,
+        foreground.id
+      )!.chat;
+      const session = await chat.create();
+      const send = async (id: string, prompt: string) => {
+        await chat.submit(session, id, prompt, undefined, undefined, "high");
+        return vi.waitFor(
+          async () => {
+            expect(await chat.inputReceipt(session, id)).toMatchObject({
+              disposition: "completed",
+            });
+            return chat.observe(session);
+          },
+          { timeout: 5000 }
+        );
+      };
+      const reply = await send(
+        "outline",
+        "Outline the slide. The speaker notes come next."
+      );
+      fixture.dispatch.mockResolvedValueOnce(
+        subscriptionResponse("Write the speaker notes.", "suggestion")
+      );
+      if (!chat.predictPrompt) throw new Error("prediction not negotiated");
+      expect(await chat.predictPrompt(session, reply)).toBe(
+        "Write the speaker notes."
+      );
+      expect(await chat.predictPrompt(session, reply)).toBeNull();
+      await send("notes", "Write the speaker notes.");
+      const requests = fixture.dispatch.mock.calls.map(([body]) =>
+        JSON.parse(body.toString())
+      );
+      expect(requests.map((r) => r.model)).toEqual([
+        "gpt-6.2-sol",
+        TIER_MODEL_IDS.nano.replace(/^openai\//, ""),
+        "gpt-6.2-sol",
+      ]);
+      expect(requests[2].reasoning?.effort).toBe("high");
+      expect(requests[1].tools ?? []).toEqual([]);
+      expect(requests[1]).not.toHaveProperty("service_tier");
+      for (const [url, headers] of fixture.prepare.mock.calls) {
+        expect(url).toBe(CHATGPT_RESPONSES_URL);
+        expect(headers.get("chatgpt-account-id")).toBe(
+          "subscription-fixture-account"
+        );
+      }
+      expect(
+        (await fixture.agent.profiles(fixture.workspace.id)).saved.map(
+          (p) => p.id
+        )
+      ).toEqual([foreground.id]);
+      expect(openrouter).not.toHaveBeenCalled();
       expect(sidecar.nativeAgentGatewayConnection).not.toHaveBeenCalled();
     } finally {
       await fixture.close();

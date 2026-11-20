@@ -981,6 +981,49 @@ it("reads and refreshes only the exact ordinary child assignment on the requeste
 });
 
 it.runIf(Boolean(packaged))(
+  "requests one prediction through the negotiated Desktop host for the observed reply",
+  async () => {
+    const test = fixture();
+    const provider = await scriptedProvider([
+      finishReply("The moth exhibit title is ready."),
+      finishReply("Write the audio guide for young visitors."),
+    ]);
+    let client: NativeAgentChat | undefined;
+    try {
+      client = await NativeAgentChat.start({
+        resourcesPath: packaged!,
+        stateDirectory: test.stateDirectory,
+        cwd: test.cwd,
+        endpoint: provider.endpoint,
+        provider: "openai-compatible",
+        model: "fixture",
+      });
+      const session = await client.create();
+      await client.submit(
+        session,
+        "exhibit",
+        "Write a title first. We need an audio guide for young visitors next."
+      );
+      const snapshot = await vi.waitFor(async () => {
+        const observed = await client!.observe(session);
+        expect(observed.latest?.status).toBe("succeeded");
+        return observed;
+      });
+      expect(await client.predictPrompt(session, snapshot)).toBe(
+        "Write the audio guide for young visitors."
+      );
+      expect(await client.predictPrompt(session, snapshot)).toBeNull();
+      expect(provider.requests).toHaveLength(2);
+      expect(await client.observe(session)).toEqual(snapshot);
+    } finally {
+      await client?.close();
+      await provider.close();
+      test.close();
+    }
+  }
+);
+
+it.runIf(Boolean(packaged))(
   "observes and stops the built host's pending retry without another provider request",
   async () => {
     const test = fixture();

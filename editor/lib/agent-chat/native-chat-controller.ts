@@ -62,6 +62,7 @@ import { ComposerDrafts, type ComposerDraftPending } from "./composer-drafts";
 import { isSupportedImageType } from "./image-attachment";
 import { video_attachment } from "./video-attachment";
 import { image_attachment_preview } from "./image-attachment-preview";
+import { NativeComposerPrediction } from "./native-composer-prediction";
 import { NativeSubagentController } from "./native-subagent-controller";
 import { NativeBackgroundProcessController } from "./native-background-process-controller";
 
@@ -599,6 +600,7 @@ function pickSessionIndependent(
 
 /** Renderer-owned observation and text projection. Work stays in the native host. */
 export class NativeChatController {
+  readonly composerPrediction: NativeComposerPrediction;
   private view = EMPTY;
   private readonly listeners = new Set<() => void>();
   private scope?: Scope;
@@ -638,6 +640,7 @@ export class NativeChatController {
     /** Bind this chat to one session it does not choose. */
     private readonly fixed?: NativeChatController.FixedSession
   ) {
+    this.composerPrediction = new NativeComposerPrediction(bridge);
     if (fixed)
       this.view = {
         ...this.view,
@@ -7033,6 +7036,8 @@ export class NativeChatController {
           lifecycleBasis(scope.observation) !== lifecycleBasis(next) ||
           (scope.gaps.size > 0 &&
             historyPosition(scope.observation) !== historyPosition(next));
+        const previous = scope.observation;
+        const acceptedTurn = scope.awaitingTurn;
         scope.observation = next;
         if (
           next.snapshot.subagentsAvailable &&
@@ -7078,6 +7083,12 @@ export class NativeChatController {
             librarySelectionRetry: false,
           }),
         });
+        this.composerPrediction.settled(
+          attachment.attachmentId,
+          this.view,
+          previous,
+          acceptedTurn
+        );
         this.refreshTurnSummary(scope, attachment, next);
         void this.refreshQueue(scope, offset);
         await Promise.all([
@@ -7468,6 +7479,11 @@ export class NativeChatController {
   }
 
   private receive(scope: Scope, update: NativeChatUpdate): void {
+    if (
+      (update.kind === "text" || update.kind === "activity") &&
+      update.turnId !== scope.observation?.snapshot.latest?.turnId
+    )
+      this.composerPrediction.dismiss();
     if (update.kind === "closed" && update.reason === "session_deleted") {
       this.forgetDeletedChat(scope);
       return;
@@ -7639,6 +7655,7 @@ export class NativeChatController {
     const focus = this.pendingFocus;
     const wasBlocked = focus && this.focusBlocked();
     this.view = { ...this.view, ...change };
+    this.composerPrediction.viewChanged(this.presentedAttachmentId, this.view);
     for (const listener of this.listeners) listener();
     if (focus && wasBlocked && !this.focusBlocked())
       queueMicrotask(() => void this.applyFocus(focus));

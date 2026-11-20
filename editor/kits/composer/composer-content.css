@@ -48,6 +48,28 @@
   color: color-mix(in oklab, var(--muted-foreground) 50%, transparent);
 }
 
+/* Reserve room for the acceptance key even when the suggestion is ellipsized. */
+.composer-content[data-composer-suggestion] {
+  position: relative;
+}
+.composer-content[data-composer-suggestion]
+  [data-composer-editor]
+  .is-editor-empty:first-child::before {
+  inset-inline-end: 2.5rem;
+}
+.composer-suggestion-key {
+  position: absolute;
+  inset-inline-end: var(--composer-content-padding-inline);
+  top: var(--composer-content-padding-block);
+  pointer-events: none;
+  color: var(--muted-foreground);
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  padding: 0 0.25rem;
+  font: inherit;
+  font-size: 0.7rem;
+}
+
 .composer-content [data-composer-editor] .composer-text-node {
   margin-block: var(--composer-paragraph-margin-block);
 }

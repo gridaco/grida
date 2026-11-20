@@ -899,6 +899,15 @@ pixels through this reader, with no additional filesystem or model grant.
 
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-004 .` to enumerate.
 
+- [Composer preference](desktop/src/main/desktop-composer-predictions.ts),
+  [physical config reads](desktop/src/main/native-agent-files.ts) and
+  [prediction route resolution](desktop/src/main/native-prediction-route.ts)
+  keep the user opt-in, config integrity and the authorized connection in Main.
+  Turning predictions off revokes pending model lookup and provider dispatch
+  for that opt-in across all Desktop windows.
+  The [native prediction host](crates/grida-agent/src/host/prediction.rs)
+  verifies the completed turn's authority before tool-free inference.
+
 - Retained tool images: [native result authorization](crates/grida-agent/src/host/tool_images.rs),
   [private ACP reader](crates/grida-agent/src/acp/extensions/tool_images.rs),
   [native process regression](crates/grida-agent/tests/process/tool_images.rs),
@@ -3007,6 +3016,11 @@ platform credential store is a separate hardening step.
 
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-008 .` to enumerate.
 
+- [Prediction route resolution](desktop/src/main/native-prediction-route.ts)
+  captures the economy model through the same subscription owner and verifies
+  its sign-in scope. [Desktop subscription tests](desktop/src/main/native-subscription-profiles.test.ts)
+  exercise this binding with a second provider configured.
+
 - [Windows credential compatibility tests](packages/grida-daemon/src/secrets-windows.test.ts) — platform-selected host-local custody and preserved OAuth records, with strict failures. These simulate platform selection with disposable files; they do not certify native Windows ACLs.
   The load-bearing groups are:
 
@@ -4243,6 +4257,10 @@ proof was removed with its obsolete archive/preload assumptions; the current
 TypeScript custody owner, protocol fixtures and cross-language tests remain.
 
 **Files bound by this id.**
+
+- [Native file validation](desktop/src/main/native-agent-files.ts) supplies
+  the physical-file checks for hook configuration, trusted receipts and
+  pinned executables when Desktop shares its global config with Settings.
 
 - [General worker composition](crates/grida-agent/src/host/delegation.rs) and
   [its authority tests](crates/grida-agent/src/host/delegation/tests.rs) —

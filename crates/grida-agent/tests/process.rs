@@ -78,6 +78,9 @@ mod operating_regime;
 #[path = "process/outbound_mcp.rs"]
 mod outbound_mcp;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
+#[path = "process/prediction.rs"]
+mod prediction;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 #[path = "process/processes.rs"]
 mod processes;
 #[cfg(unix)]
