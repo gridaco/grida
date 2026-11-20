@@ -1,6 +1,6 @@
 ---
 title: Understand agent permissions
-description: Choose Default or Full access for a Desktop chat and understand what the agent can read, change and run.
+description: Choose who reviews file and command requests in Desktop chat, and understand the access each choice grants.
 keywords:
   [agent permissions, approvals, Grida Desktop, sandbox, automatic review]
 format: md
@@ -23,7 +23,7 @@ sandbox without asking. For example, ask “Run the tests and fix what fails.”
   its own environment and opens chat.
 - Commands can read elsewhere on your computer, except Grida's own data and
   saved credentials. They can write only in the project and the system's
-  temporary folder, and they cannot reach the internet.
+  temporary folder. Ordinary commands have no direct internet access.
 - Existing version-control and agent settings folders, such as `.git`, stay
   read-only. The agent can start a new repository but cannot commit to an
   existing one, so run commits yourself.
@@ -32,6 +32,39 @@ sandbox without asking. For example, ask “Run the tests and fix what fails.”
 - The agent's own settings file is the exception to working without asking:
   it can read the file, but every change to it asks for your approval, and
   commands cannot reach it. [Change agent settings](./settings.md#ask-the-agent)
+
+## Choose who reviews extra access
+
+In a project chat, open **Default** in the composer. Leave **Default** selected
+to review requests yourself, or choose **Approve for me** to let the chat's
+model review eligible actions on your behalf. You can also select it on Home
+for a new project chat. The choice applies to messages accepted after the
+change. Reopen a chat to see its saved choice. If the host stops offering
+**Approve for me**, the chat returns to **Default** when you open it or send
+another message. You can select **Approve for me** again when it becomes available.
+
+For example, ask the agent to read a particular text file outside the project
+and include its absolute path. The file tool can request one read of that
+file and may return its contents to the chat’s model. A replacement file needs
+a fresh decision. Protected locations,
+symbolic links and hard-linked files cannot use this route. Editing the
+agent's settings still requires your own approval.
+
+On supported macOS and Linux builds a finite command may also request a connection to
+one public hostname and port. For example, name the HTTPS URL when asking
+the agent to check a resource. The command needs a client that supports
+the supplied SOCKS proxy. Review includes the whole command and the files it can read or write. Desktop commands may read outside the project, so approving a destination can allow a command to send data there. Interactive terminals and background sessions
+cannot keep this network permission.
+
+The reviewer considers the proposed action and instructions from your chat,
+including earlier limits such as “keep this project offline.” Each new action
+needs its own decision. If a confined command fails and the agent requests
+network access to retry it, you can see both reviews in the turn’s activity
+when both attempts required review.
+When it needs your decision, the composer shows the target with **Allow once**
+and **Decline**. The turn's activity records automatic decisions. Pause or
+stop a turn to interrupt review. Older Desktop builds show their available
+access choices.
 
 ## Choose Full access
 
@@ -58,7 +91,7 @@ you also want to stop. A new Default turn cannot send input to an existing
 Full-access terminal.
 
 Choose **Default** again to restore restricted access for subsequent work.
-**Plan** continues to withhold commands and file changes in either mode.
+**Plan** continues to withhold commands and file changes in every mode.
 Process output, cancellation and cleanup reporting remain available in Full
 access, but an unconfined program can escape normal process-group cleanup;
 Grida does not promise isolation from hostile same-user code.
@@ -73,16 +106,12 @@ resets access to Default.
 Full access needs a compatible native Desktop build. Earlier builds that offer
 the picker can require the chat and its processes to finish before changing access.
 Builds without the picker use Default.
-Automatic approval review, sometimes called **Approve for me**, is not offered
-by Desktop.
 
 ## What the agent cannot reach
 
-With Default access, the agent's file tools work only inside the project, and
-its commands cannot reach the internet. Desktop does not ask to extend this
-for one action. To
-use a file from elsewhere, copy it into the project or attach it to your
-message. [Attach an image or a file](./getting-started.md#attach-an-image)
+With Default access, changes outside the project still require an existing
+write grant. A one-file read grants no access to neighboring files. Confined commands need a separate grant for each network destination. You can also attach a file to a message.
+[Attach an image or a file](./getting-started.md#attach-an-image)
 
 A question the agent asks about what you want is separate from access: answer
 it in its card, and it grants nothing.

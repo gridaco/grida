@@ -17,7 +17,7 @@ import {
   type WelcomeTemplate,
 } from "@/lib/desktop/welcome-message";
 
-/** Unsent intent and the review required before opening a Full access chat. */
+/** Unsent intent and the exact workspace chat reserved for its selected access. */
 export class HomeComposer {
   static readonly key = "desktop-home";
   private static readonly drafts = new ComposerDrafts();
@@ -28,7 +28,8 @@ export class HomeComposer {
   private effortInitialized = false;
   private permissionDecision?: PromiseWithResolvers<boolean>;
   private approvedAccess?: Readonly<{
-    host: HomeComposer.FullAccess;
+    mode: "full_access" | "approve_for_me";
+    host: HomeComposer.AccessHost;
     reviewId: string;
     workspaceId: string;
     request?: HomeComposer.AccessRequest;
@@ -103,25 +104,34 @@ export class HomeComposer {
   selectPermissionMode = (
     mode: NativeChatPermissionMode,
     destination: HomeComposer.Destination,
-    host: HomeComposer.FullAccess | undefined
+    host: HomeComposer.AccessHost | undefined
   ): void => {
     if (this.view.busy || this.view.permissionBusy) return;
     if (mode === "restricted") {
       this.resetPermissionMode();
       return;
     }
-    if (!host || this.approvedAccess) return;
+    if (!host || mode === this.view.permissionMode) return;
+    const prepare =
+      mode === "approve_for_me" ? host.prepareAutomatic : host.prepare;
+    if (!prepare) return;
+    this.resetPermissionMode();
     const decision = Promise.withResolvers<boolean>();
     this.permissionDecision = decision;
     this.update({
-      permissionReview: {
-        workspaceName: destination.workspace?.name ?? "your default project",
-        workspaceId: destination.workspace?.id,
-      },
+      permissionReview:
+        mode === "full_access"
+          ? {
+              workspaceName:
+                destination.workspace?.name ?? "your default project",
+              workspaceId: destination.workspace?.id,
+            }
+          : null,
       permissionBusy: true,
       permissionError: null,
     });
-    void this.reviewFullAccess(destination, host, decision);
+    if (mode === "approve_for_me") decision.resolve(true);
+    void this.prepareAccess(destination, host, decision, mode, prepare);
   };
 
   answerPermissionReview = (confirmed: boolean): void => {
@@ -223,10 +233,12 @@ export class HomeComposer {
     void this.drafts.writeAttachment(HomeComposer.key, null);
   }
 
-  private async reviewFullAccess(
+  private async prepareAccess(
     destination: HomeComposer.Destination,
-    host: HomeComposer.FullAccess,
-    decision: PromiseWithResolvers<boolean>
+    host: HomeComposer.AccessHost,
+    decision: PromiseWithResolvers<boolean>,
+    mode: "full_access" | "approve_for_me",
+    prepare: HomeComposer.AccessHost["prepare"]
   ): Promise<void> {
     let review: NativeChatPermissionReview | undefined;
     try {
@@ -234,7 +246,7 @@ export class HomeComposer {
         destination.workspace ?? (await destination.defaultWorkspace());
       if (this.permissionDecision !== decision) return;
       if (!workspace) throw new Error("No default workspace available.");
-      review = await host.prepare(workspace.id);
+      review = await prepare(workspace.id);
       if (this.permissionDecision === decision && this.view.permissionReview)
         this.update({
           permissionReview: {
@@ -247,15 +259,19 @@ export class HomeComposer {
       await host.answer(review.reviewId, true);
       if (this.permissionDecision !== decision) return;
       this.approvedAccess = {
+        mode,
         host,
         reviewId: review.reviewId,
         workspaceId: workspace.id,
       };
-      this.update({ permissionMode: "full_access" });
+      this.update({ permissionMode: mode });
     } catch {
       if (this.permissionDecision === decision)
         this.update({
-          permissionError: "Couldn't enable Full access for this project.",
+          permissionError:
+            mode === "full_access"
+              ? "Couldn't enable Full access for this project."
+              : "Couldn't enable automatic approval review for this project.",
         });
     } finally {
       if (review && this.approvedAccess?.reviewId !== review.reviewId)
@@ -270,8 +286,12 @@ export class HomeComposer {
   private requireApprovedAccess(request: HomeComposer.AccessRequest) {
     const approval = this.approvedAccess;
     if (!approval || request.workspaceId !== approval.workspaceId) {
+      const name =
+        this.view.permissionMode === "approve_for_me"
+          ? "Approve for me"
+          : "Full access";
       this.resetPermissionMode();
-      throw new Error("Choose Full access again for this project.");
+      throw new Error(`Choose ${name} again for this project.`);
     }
     const previous = approval.request;
     if (
@@ -280,7 +300,7 @@ export class HomeComposer {
         (this.effortChosen && previous.effort !== request.effort))
     )
       throw new Error(
-        "Restore the model and effort used to prepare this Full access chat, or choose Default to start a different chat."
+        "Restore the model and effort used to prepare this chat, or choose Default to start a different chat."
       );
     return approval;
   }
@@ -292,6 +312,8 @@ export class HomeComposer {
     if (approval.prepared) return approval.prepared;
     const original = approval.request ?? request;
     const attempt = { ...approval, request: original };
+    const mode =
+      approval.mode === "approve_for_me" ? "Approve for me" : "Full access";
     this.approvedAccess = attempt;
     let chat: HomeComposer.PreparedChat;
     try {
@@ -303,19 +325,17 @@ export class HomeComposer {
         cause.message === "native_chat_permission_mode_unverified"
       )
         throw new Error(
-          "Couldn't confirm Full access yet. Send again to check the same chat.",
+          `Couldn't confirm ${mode} yet. Send again to check the same chat.`,
           { cause }
         );
       if (this.approvedAccess === attempt) this.resetPermissionMode();
       throw new Error(
-        "Couldn't start the Full access chat. Your draft is still here.",
+        `Couldn't start the ${mode} chat. Your draft is still here.`,
         { cause }
       );
     }
     if (this.approvedAccess !== attempt)
-      throw new Error(
-        "Full access approval changed. Your draft is still here."
-      );
+      throw new Error(`${mode} approval changed. Your draft is still here.`);
     this.approvedAccess = { ...attempt, prepared: chat };
     return chat;
   }
@@ -339,7 +359,7 @@ export class HomeComposer {
   ): Promise<void> {
     if (this.view.busy) throw new Error("A workspace is already opening.");
     if (this.view.permissionBusy)
-      throw new Error("Full access is still being reviewed.");
+      throw new Error("Your access selection is still being prepared.");
     this.update({ busy: true, permissionError: null });
     let opened = false;
     try {
@@ -380,7 +400,7 @@ export class HomeComposer {
             ? intent.effort
             : undefined;
         const accessRequest =
-          intent.permissionMode === "full_access"
+          intent.permissionMode !== "restricted"
             ? {
                 workspaceId: workspace.id,
                 profileId: input.profileId,
@@ -408,7 +428,12 @@ export class HomeComposer {
             ...(messageContext && { messageContext }),
             profileId: prepared ? prepared.profileId : input.profileId,
             ...(prepared
-              ? { preparedSessionId: prepared.sessionId }
+              ? {
+                  preparedSessionId: prepared.sessionId,
+                  ...(intent.permissionMode === "approve_for_me" && {
+                    preparedMode: intent.permissionMode,
+                  }),
+                }
               : effort && { effort }),
             operatingRegime: intent.plan ? "plan" : "act",
             goal: intent.goal,
@@ -448,13 +473,14 @@ export class HomeComposer {
 
 export namespace HomeComposer {
   export type Attachment = Readonly<{ kind: "file" | "directory"; file: File }>;
-  export type FullAccess = Readonly<{
+  export type AccessHost = Readonly<{
     prepare: NonNullable<DesktopNativeChat["prepareWelcomeFullAccess"]>;
+    prepareAutomatic?: DesktopNativeChat["prepareWelcomeAutomaticReview"];
     answer: NonNullable<DesktopNativeChat["answerWelcomeFullAccess"]>;
     start: NonNullable<DesktopNativeChat["startWelcomeFullAccess"]>;
   }>;
-  export type AccessRequest = Parameters<FullAccess["start"]>[1];
-  export type PreparedChat = Awaited<ReturnType<FullAccess["start"]>>;
+  export type AccessRequest = Parameters<AccessHost["start"]>[1];
+  export type PreparedChat = Awaited<ReturnType<AccessHost["start"]>>;
   export type Destination = Readonly<{
     workspace: Workspace | null;
     defaultWorkspace(): Promise<Workspace | null>;

@@ -199,16 +199,86 @@ async fn permission_choice_is_per_chat_durable_exact_and_requires_launch_authori
     endpoint.done().await;
 }
 
-struct ResourceServer {
-    url: String,
-    paths: Arc<Mutex<Vec<String>>>,
+#[tokio::test]
+async fn withdrawing_automatic_review_returns_the_chat_to_manual_approval() {
+    let fixture = Fixture::new(false);
+    let original = fs::read(&fixture.profile).unwrap();
+    let mut profile: Value = serde_json::from_slice(&original).unwrap();
+    profile["allowApproveForMe"] = json!(true);
+    let enabled = serde_json::to_vec(&profile).unwrap();
+    fs::write(&fixture.profile, &enabled).unwrap();
+    let endpoint = Endpoint::start(vec![Reply::Finished("Ready.")]).await;
+    let mut client = start(&fixture, &endpoint.url, true).await;
+    let chat = session(&mut client, &fixture).await;
+    let select = change(&fixture, &chat, 0, "select-reviewer", "approve_for_me");
+    let chosen = client.request(UPDATE, select.clone()).await;
+    assert_eq!(chosen["result"]["revision"], 1, "{chosen}");
+    client.close().await;
+
+    fs::write(&fixture.profile, original).unwrap();
+    let mut client = start(&fixture, &endpoint.url, true).await;
+    attach(&mut client, &fixture, &chat).await;
+    // New work can be admitted even if the client has not read the setting yet.
+    prompt(&mut client, &chat).await;
+    let current = client.request(INSPECT, target(&fixture, &chat)).await;
+    assert_eq!(current["result"]["mode"], "restricted", "{current}");
+    assert_eq!(current["result"]["available"], json!(["restricted"]));
+    assert_eq!(current["result"]["revision"], 2);
+    assert_eq!(
+        client.request(UPDATE, select).await["result"],
+        chosen["result"]
+    );
+    assert_eq!(
+        client.request(INSPECT, target(&fixture, &chat)).await["result"],
+        current["result"]
+    );
+    client.close().await;
+
+    fs::write(&fixture.profile, enabled).unwrap();
+    let mut client = start(&fixture, &endpoint.url, true).await;
+    attach(&mut client, &fixture, &chat).await;
+    let restored = client.request(INSPECT, target(&fixture, &chat)).await;
+    assert_eq!(restored["result"]["mode"], "restricted", "{restored}");
+    assert_eq!(
+        restored["result"]["available"],
+        json!(["restricted", "approve_for_me"])
+    );
+    let stale = client
+        .request(
+            UPDATE,
+            change(&fixture, &chat, 1, "stale", "approve_for_me"),
+        )
+        .await;
+    assert_eq!(
+        stale["error"]["data"], "permission_mode_revision_changed",
+        "{stale}"
+    );
+    let selected = client
+        .request(
+            UPDATE,
+            change(&fixture, &chat, 2, "select-again", "approve_for_me"),
+        )
+        .await;
+    assert_eq!(selected["result"]["mode"], "approve_for_me", "{selected}");
+    assert_eq!(selected["result"]["revision"], 3);
+    client.close().await;
+    endpoint.done().await;
+}
+
+pub(super) struct ResourceServer {
+    pub(super) url: String,
+    pub(super) paths: Arc<Mutex<Vec<String>>>,
     task: tokio::task::JoinHandle<()>,
 }
 
 impl ResourceServer {
     async fn start(body: Vec<u8>) -> Self {
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let url = format!("http://{}", listener.local_addr().unwrap());
+        Self::bind("127.0.0.1", body).await
+    }
+
+    pub(super) async fn bind(host: &str, body: Vec<u8>) -> Self {
+        let listener = TcpListener::bind((host, 0)).await.unwrap();
+        let url = format!("http://{host}:{}", listener.local_addr().unwrap().port());
         let paths = Arc::new(Mutex::new(Vec::new()));
         let observed = paths.clone();
         let task = tokio::spawn(async move {

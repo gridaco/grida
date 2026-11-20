@@ -71,6 +71,10 @@ export namespace ipc_admission {
   }): boolean {
     switch (role) {
       case "main":
+        if (channel === IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_AUTOMATIC_REVIEW)
+          return (
+            pathname === "/desktop/welcome" || pathname === "/desktop/workspace"
+          );
         if (channel === IPC_CHANNELS.CHAT_CATALOG_READ)
           return pathname === "/desktop/workspace";
         if (
@@ -139,6 +143,7 @@ export namespace ipc_admission {
         if (
           channel === IPC_CHANNELS.WELCOME_CHAT_PROFILES ||
           channel === IPC_CHANNELS.WELCOME_CHAT_PREPARE_FULL_ACCESS ||
+          channel === IPC_CHANNELS.WELCOME_CHAT_PREPARE_AUTOMATIC_REVIEW ||
           channel === IPC_CHANNELS.WELCOME_CHAT_ANSWER_FULL_ACCESS ||
           channel === IPC_CHANNELS.WELCOME_CHAT_START_FULL_ACCESS
         ) {

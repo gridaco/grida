@@ -48,6 +48,7 @@ describe("welcome_message", () => {
       operatingRegime: "plan" as const,
       goal: false,
       preparedSessionId: "abf7864b-6bd5-4d77-9159-7d17ddbed879",
+      preparedMode: "approve_for_me" as const,
       attachment: { kind: "file" as const, file },
     };
     expect(welcome_message.stash("settings", message, storage)).toBe(true);
@@ -114,6 +115,11 @@ describe("welcome_message", () => {
       operatingRegime: "unknown",
     }),
     JSON.stringify({ text: "Ask", profileId: null, goal: "yes" }),
+    JSON.stringify({
+      text: "Ask",
+      profileId: null,
+      preparedMode: "approve_for_me",
+    }),
     JSON.stringify({
       text: "Ask",
       profileId: null,

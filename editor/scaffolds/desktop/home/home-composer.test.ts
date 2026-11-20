@@ -38,9 +38,9 @@ function fullAccess() {
     profileId: "a".repeat(64),
   };
   const access = {
-    prepare: vi.fn<HomeComposer.FullAccess["prepare"]>(async () => review),
-    answer: vi.fn<HomeComposer.FullAccess["answer"]>(async () => {}),
-    start: vi.fn<HomeComposer.FullAccess["start"]>(async () => prepared),
+    prepare: vi.fn<HomeComposer.AccessHost["prepare"]>(async () => review),
+    answer: vi.fn<HomeComposer.AccessHost["answer"]>(async () => {}),
+    start: vi.fn<HomeComposer.AccessHost["start"]>(async () => prepared),
   };
   return { access, review, prepared };
 }
@@ -132,6 +132,29 @@ describe("HomeComposer", () => {
       expect(composer.read().busy).toBe(false);
     }
   );
+
+  it("carries automatic review into the exact prepared workspace chat", async () => {
+    const { composer, host } = setup();
+    const { access, review, prepared } = fullAccess();
+    const prepareAutomatic = vi.fn<
+      NonNullable<HomeComposer.AccessHost["prepareAutomatic"]>
+    >(async () => review);
+    composer.selectPermissionMode(
+      "approve_for_me",
+      { workspace, defaultWorkspace: host.defaultWorkspace },
+      { ...access, prepareAutomatic }
+    );
+    await vi.waitFor(() =>
+      expect(composer.read().permissionMode).toBe("approve_for_me")
+    );
+    expect(access.prepare).not.toHaveBeenCalled();
+    expect(composer.read().permissionReview).toBeNull();
+    await composer.submit({ ...input, profileId: prepared.profileId }, host);
+    expect(vi.mocked(host.stash).mock.calls[0][1]).toMatchObject({
+      preparedSessionId: prepared.sessionId,
+      preparedMode: "approve_for_me",
+    });
+  });
 
   it("opens the review immediately and uses the current model and effort on Send", async () => {
     const { composer, host } = setup();

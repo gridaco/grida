@@ -1,5 +1,10 @@
 // GRIDA-SEC-004 / GRIDA-SEC-014 — main-owned native workspace approval.
 import { createHash } from "node:crypto";
+import type {
+  NativeChatApprovalAction,
+  NativeChatCommandScope,
+  NativeApprovalReviewFailure,
+} from "@grida/desktop-bridge";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { NativeHookLaunchProfile } from "./native-agent-hooks";
@@ -20,6 +25,8 @@ const SETTINGS_DIRECTORY = "agent-settings";
 const SETTINGS_PATH = "config.toml";
 const MAX_PATH_BYTES = 4096;
 const MAX_QUERY_BYTES = 128;
+// The native exec_command tool accepts up to 64 KiB of encoded arguments.
+const MAX_COMMAND_BYTES = 64 * 1024;
 type ReadTool = (typeof READ_TOOLS)[number];
 type WriteTool = (typeof WRITE_TOOLS)[number];
 
@@ -35,11 +42,13 @@ export type NativeWorkspaceSelection = Readonly<{
   id: string;
   primary: Directory;
   additionalReadRoots: readonly Directory[];
+  /** The full workspace chat may request per-action access. */
+  allowScopedAccess?: true;
   /** Desktop-owned state, credentials, media, or other protected locations. */
   protectedPaths: readonly string[];
 }>;
 
-export type NativeApprovalReview = Readonly<{
+type ApprovalBasis = Readonly<{
   sessionId: string;
   turnId: string;
   waitId: string;
@@ -47,10 +56,15 @@ export type NativeApprovalReview = Readonly<{
   controlRevision: number;
   directory: string;
   root: string;
-  /** A write is asked only for the agent settings file. */
-  tool: ReadTool | WriteTool;
-  relativePath: string;
-  query?: string;
+  reviewFailure?: NativeApprovalReviewFailure;
+}>;
+
+export type NativeApprovalReview = ApprovalBasis & NativeChatApprovalAction;
+
+type ScopedAccess = Readonly<{
+  project: { id: string; path: string };
+  protectedPaths: readonly string[];
+  workspaceId: string;
 }>;
 
 export type NativeApprovalDecision = "approve_once" | "decline";
@@ -63,9 +77,13 @@ export type NativeApprovalReceipt = Readonly<{
 }>;
 
 type Request = (method: string, params: unknown) => Promise<unknown>;
-const issuedReviews = new WeakSet<NativeApprovalReview>();
+
+// A lost native response can be retried after the same workspace host reopens.
+const issuedReviews = new WeakMap<NativeApprovalReview, string>();
 
 export class NativeAgentPermissions {
+  private readonly authority: string;
+
   static readonly capabilities = Object.freeze({
     [SNAPSHOT]: 1,
     [APPROVALS]: 1,
@@ -80,8 +98,17 @@ export class NativeAgentPermissions {
   constructor(
     private readonly request: Request,
     private readonly askRoots: ReadonlyMap<string, string>,
-    private readonly settingsRoot?: string
-  ) {}
+    private readonly settingsRoot?: string,
+    private readonly scopedAccess?: ScopedAccess
+  ) {
+    this.authority = digest(
+      JSON.stringify([
+        settingsRoot,
+        [...askRoots].sort(([a], [b]) => a.localeCompare(b)),
+        scopedAccess,
+      ])
+    );
+  }
 
   /** Publish a Rust v1 launch profile. The path is stable across exact restarts. */
   static async stage(
@@ -93,8 +120,13 @@ export class NativeAgentPermissions {
     stateDirectory: string;
     profile: string;
     askRoots: ReadonlyMap<string, string>;
+    scopedAccess?: ScopedAccess;
   }> {
-    const { data, askRoots } = await this.capture(workspace, hooks, command);
+    const { data, askRoots, scopedAccess } = await this.capture(
+      workspace,
+      hooks,
+      command
+    );
     // Use a content-derived filename so competing launches with different
     // trusted selections cannot exchange profile files before either starts.
     const base = await fs.realpath(path.dirname(stateDirectory));
@@ -118,6 +150,7 @@ export class NativeAgentPermissions {
       stateDirectory: directory,
       profile,
       askRoots,
+      scopedAccess,
     };
   }
 
@@ -133,7 +166,11 @@ export class NativeAgentPermissions {
     workspace: NativeWorkspaceSelection,
     hooks?: NativeHookLaunchProfile,
     command?: NativeCommandProfile
-  ): Promise<{ data: string; askRoots: ReadonlyMap<string, string> }> {
+  ): Promise<{
+    data: string;
+    askRoots: ReadonlyMap<string, string>;
+    scopedAccess?: ScopedAccess;
+  }> {
     if (process.platform !== "darwin" && process.platform !== "linux")
       throw new Error("native_agent_permissions_platform_unsupported");
     if (!identity(workspace.id) || workspace.additionalReadRoots.length > 31)
@@ -168,6 +205,10 @@ export class NativeAgentPermissions {
     const protectedPaths = [...new Set(workspace.protectedPaths)].sort();
     if (protectedPaths.some((entry) => !path.isAbsolute(entry)))
       throw invalidProfile();
+    const scopedAccess =
+      command && workspace.allowScopedAccess
+        ? { workspaceId: workspace.id, project: primary, protectedPaths }
+        : undefined;
     const data = JSON.stringify({
       version: 1,
       workspace: workspace.id,
@@ -182,6 +223,7 @@ export class NativeAgentPermissions {
     if (Buffer.byteLength(data) > 64 * 1024) throw invalidProfile();
     return {
       data,
+      scopedAccess,
       askRoots: new Map(additional.map((entry) => [entry.id, entry.path])),
     };
   }
@@ -221,11 +263,13 @@ export class NativeAgentPermissions {
         sessionRevision,
         controlRevision,
         this.askRoots,
-        this.settingsRoot
+        this.settingsRoot,
+        this.scopedAccess
       )
     );
     if (new Set(reviews.map(({ waitId }) => waitId)).size !== reviews.length)
       throw invalidApproval();
+    for (const review of reviews) issuedReviews.set(review, this.authority);
     return Object.freeze(reviews);
   }
 
@@ -237,9 +281,10 @@ export class NativeAgentPermissions {
     const { sessionId, turnId, waitId, sessionRevision, controlRevision } =
       review;
     if (
-      !issuedReviews.has(review) ||
-      reviewRoot(review.directory, this.askRoots, this.settingsRoot) !==
-        review.root ||
+      issuedReviews.get(review) !== this.authority ||
+      (decision === "approve_once" &&
+        review.tool === "exec_command" &&
+        !review.scope) ||
       (decision !== "approve_once" && decision !== "decline")
     )
       throw invalidApproval();
@@ -317,55 +362,204 @@ function readReview(
   sessionRevision: number,
   controlRevision: number,
   askRoots: ReadonlyMap<string, string>,
-  settingsRoot: string | undefined
+  settingsRoot: string | undefined,
+  scoped: ScopedAccess | undefined
 ): NativeApprovalReview {
   const row = object(entry);
   const request = object(row?.request);
   const effect = object(request?.effect);
-  const settings = request?.directory === SETTINGS_DIRECTORY;
-  // Only the settings file is ever asked for a write.
-  const tool: ReadTool | WriteTool | undefined = settings
-    ? effect?.kind === "write" &&
-      writeTool(effect.tool) &&
-      effect.relative_path === SETTINGS_PATH
-      ? effect.tool
-      : undefined
-    : effect?.kind === "read" && readTool(effect.tool)
-      ? effect.tool
-      : undefined;
   if (
     !effect ||
-    !tool ||
     !identity(row?.waitId) ||
     request?.session !== sessionId ||
     request.turn !== turnId ||
     !identity(request.directory) ||
     typeof request.root !== "string" ||
-    Buffer.byteLength(request.root) > MAX_PATH_BYTES ||
-    reviewRoot(request.directory, askRoots, settingsRoot) !== request.root ||
-    typeof effect.relative_path !== "string" ||
-    Buffer.byteLength(effect.relative_path) > MAX_PATH_BYTES ||
-    path.isAbsolute(effect.relative_path) ||
-    effect.relative_path.split("/").includes("..") ||
-    (effect.query !== undefined &&
-      (typeof effect.query !== "string" ||
-        Buffer.byteLength(effect.query) > MAX_QUERY_BYTES))
+    Buffer.byteLength(request.root) > MAX_PATH_BYTES
   )
     throw invalidApproval();
-  const review = Object.freeze({
+  const { directory, root } = request;
+  const failure = row.reviewFailure;
+  if (
+    failure !== undefined &&
+    failure !== null &&
+    failure !== "timed_out" &&
+    failure !== "interrupted" &&
+    failure !== "unavailable" &&
+    failure !== "invalid_reply" &&
+    failure !== "needs_human"
+  )
+    throw invalidApproval();
+  const basis: ApprovalBasis = {
     sessionId,
     turnId,
     waitId: row.waitId,
     sessionRevision,
     controlRevision,
-    directory: request.directory,
-    root: request.root,
+    directory,
+    root,
+    ...(failure && { reviewFailure: failure }),
+  };
+  if (effect.kind === "command") {
+    const network = object(effect.network);
+    if (
+      !scoped ||
+      directory !== scoped.project.id ||
+      root !== scoped.project.path ||
+      effect.finite !== true ||
+      effect.terminal !== false ||
+      (effect.access !== "read" && effect.access !== "read_write") ||
+      !boundedText(effect.command, MAX_COMMAND_BYTES) ||
+      !boundedText(effect.cwd, MAX_PATH_BYTES) ||
+      !within(root, effect.cwd) ||
+      !boundedText(effect.executable, MAX_PATH_BYTES) ||
+      !path.isAbsolute(effect.executable)
+    )
+      throw invalidApproval();
+    const scope = commandScope(effect);
+    const command: Extract<NativeApprovalReview, { tool: "exec_command" }> = {
+      ...basis,
+      tool: "exec_command" as const,
+      command: effect.command,
+      cwd: effect.cwd,
+      executable: effect.executable,
+      access: effect.access,
+      ...(scope && { scope }),
+    };
+    if (effect.network === undefined || effect.network === null)
+      return Object.freeze(command);
+    if (
+      !network ||
+      !boundedText(network.host, 253) ||
+      !/^[a-z0-9.-]+$/.test(network.host) ||
+      typeof network.port !== "number" ||
+      !Number.isSafeInteger(network.port) ||
+      network.port < 1 ||
+      network.port > 65535
+    )
+      throw invalidApproval();
+    return Object.freeze({
+      ...command,
+      network: Object.freeze({ host: network.host, port: network.port }),
+    });
+  }
+  const relative = effect.relative_path;
+  if (
+    typeof relative !== "string" ||
+    Buffer.byteLength(relative) > MAX_PATH_BYTES ||
+    path.isAbsolute(relative) ||
+    relative.includes("\0") ||
+    relative.split("/").includes("..")
+  )
+    throw invalidApproval();
+  const external = directory === "external-file" && root === "/";
+  const settings = directory === SETTINGS_DIRECTORY;
+  if (external) {
+    const target = path.join("/", relative);
+    if (
+      !scoped ||
+      effect.kind !== "read" ||
+      effect.tool !== "read_file" ||
+      effect.query !== undefined ||
+      !relative ||
+      relative.split("/").some((part) => !part || part === ".") ||
+      [
+        scoped.project.path,
+        ...askRoots.values(),
+        ...scoped.protectedPaths,
+        ...(settingsRoot ? [settingsRoot] : []),
+      ].some((p) => within(p, target))
+    )
+      throw invalidApproval();
+  } else if (reviewRoot(directory, askRoots, settingsRoot) !== root)
+    throw invalidApproval();
+  const tool = settings
+    ? effect.kind === "write" &&
+      writeTool(effect.tool) &&
+      relative === SETTINGS_PATH
+      ? effect.tool
+      : undefined
+    : effect.kind === "read" && readTool(effect.tool)
+      ? effect.tool
+      : undefined;
+  if (
+    !tool ||
+    (effect.query !== undefined &&
+      (typeof effect.query !== "string" ||
+        Buffer.byteLength(effect.query) > MAX_QUERY_BYTES))
+  )
+    throw invalidApproval();
+  return Object.freeze({
+    ...basis,
     tool,
-    relativePath: effect.relative_path,
-    ...(typeof effect.query === "string" ? { query: effect.query } : {}),
+    relativePath: relative,
+    ...(typeof effect.query === "string" && { query: effect.query }),
   });
-  issuedReviews.add(review);
-  return review;
+}
+
+function commandScope(
+  effect: Record<string, unknown>
+): NativeChatCommandScope | undefined {
+  if (effect.filesystem == null) return undefined;
+  const fs = object(effect.filesystem);
+  if (
+    !fs ||
+    !boundedText(fs.resolved_executable, MAX_PATH_BYTES) ||
+    !path.isAbsolute(fs.resolved_executable) ||
+    !boundedText(fs.resolved_cwd, MAX_PATH_BYTES) ||
+    !path.isAbsolute(fs.resolved_cwd) ||
+    typeof fs.disk_read !== "boolean" ||
+    typeof fs.private_temp_write !== "boolean"
+  )
+    throw invalidApproval();
+  const roots = (value: unknown): readonly string[] => {
+    if (
+      !Array.isArray(value) ||
+      value.length > 64 ||
+      !value.every(
+        (item): item is string =>
+          boundedText(item, MAX_PATH_BYTES) && path.isAbsolute(item)
+      )
+    )
+      throw invalidApproval();
+    return Object.freeze([...value]);
+  };
+  const names = effect.environment_names;
+  if (
+    !Array.isArray(names) ||
+    names.length > 512 ||
+    !names.every(
+      (name): name is string =>
+        boundedText(name, 24 * 1024) && !name.includes("=")
+    )
+  )
+    throw invalidApproval();
+  return Object.freeze({
+    diskRead: fs.disk_read,
+    resolvedExecutable: fs.resolved_executable,
+    resolvedCwd: fs.resolved_cwd,
+    readRoots: roots(fs.read_roots),
+    writeRoots: roots(fs.write_roots),
+    runtimeRoots: roots(fs.runtime_roots),
+    privateTempWrite: fs.private_temp_write,
+    environmentNames: Object.freeze([...names]),
+  });
+}
+
+function within(root: string, target: string): boolean {
+  const relative = path.relative(root, target);
+  return (
+    path.isAbsolute(target) && relative !== ".." && !relative.startsWith("../")
+  );
+}
+
+function boundedText(value: unknown, maximum: number): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    !value.includes("\0") &&
+    Buffer.byteLength(value) <= maximum
+  );
 }
 
 function object(value: unknown): Record<string, unknown> | undefined {

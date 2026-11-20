@@ -669,6 +669,11 @@ const bridge: DesktopBridge = {
       return location.href === href ? target : null;
     },
     list: (cursor) => nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_LIST, cursor),
+    ...((location.pathname === "/desktop/workspace" ||
+      location.pathname === "/desktop/welcome") && {
+      acceptsAutomaticApprovalReview: () =>
+        nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_AUTOMATIC_REVIEW),
+    }),
     acceptsPermissionMode: () =>
       nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PERMISSION_MODE),
     permissionMode: (attachmentId) =>
@@ -706,6 +711,11 @@ const bridge: DesktopBridge = {
       welcomeProfiles: () =>
         nativeChatInvoke(IPC_CHANNELS.WELCOME_CHAT_PROFILES),
       welcomeFullAccessAcrossPresets: true as const,
+      prepareWelcomeAutomaticReview: (workspaceId) =>
+        nativeChatInvoke(
+          IPC_CHANNELS.WELCOME_CHAT_PREPARE_AUTOMATIC_REVIEW,
+          workspaceId
+        ),
       prepareWelcomeFullAccess: (workspaceId) =>
         nativeChatInvoke(
           IPC_CHANNELS.WELCOME_CHAT_PREPARE_FULL_ACCESS,

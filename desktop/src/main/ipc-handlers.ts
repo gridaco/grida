@@ -119,6 +119,7 @@ type RegisterIpcHandlersOptions = {
     workspaceId: string
   ) => Promise<NativeWelcomeWorkspace>;
   native_chat_disabled?: boolean;
+  supports_automatic_approval_review?: () => Promise<boolean>;
   native_chat_selections?: NativeChatSelections;
   forget_native_workspace?: (workspaceId: string) => Promise<void>;
   resolve_native_deck?: (workspaceId: string) => Promise<WorkspaceMediaGrant>;
@@ -556,10 +557,31 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   guarded(IPC_CHANNELS.NATIVE_CHAT_PROFILES, (event) =>
     nativeChat.profiles(event)
   );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_AUTOMATIC_REVIEW,
+    (_event, ...args: unknown[]) => {
+      if (args.length) throw new Error("native_chat_permission_mode_invalid");
+      return options.supports_automatic_approval_review?.() ?? false;
+    }
+  );
   guarded(IPC_CHANNELS.WELCOME_CHAT_PROFILES, (event, ...args: unknown[]) => {
     if (args.length) throw new Error("native_chat_profiles_invalid");
     return nativeChat.welcomeProfiles(event);
   });
+  guarded(
+    IPC_CHANNELS.WELCOME_CHAT_PREPARE_AUTOMATIC_REVIEW,
+    async (event, ...args: unknown[]) => {
+      if (args.length !== 1)
+        throw new Error("native_chat_permission_mode_invalid");
+      if (!(await options.supports_automatic_approval_review?.()))
+        throw new Error("native_chat_permission_mode_unavailable");
+      return nativeChat.prepareWelcomePermission(
+        event,
+        args[0],
+        "approve_for_me"
+      );
+    }
+  );
   guarded(
     IPC_CHANNELS.WELCOME_CHAT_PREPARE_FULL_ACCESS,
     (event, ...args: unknown[]) => {

@@ -321,6 +321,19 @@ pub struct PreparedProcess {
     native: native::Prepared,
 }
 
+/// The filesystem reach of one prepared confined command before mandatory
+/// protected-path exclusions. The launch also has its own private temporary
+/// directory, whose random name is intentionally excluded from these facts.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FilesystemGrants {
+    pub disk_read: bool,
+    pub read_roots: Vec<PathBuf>,
+    pub write_roots: Vec<PathBuf>,
+    pub runtime_roots: Vec<PathBuf>,
+    pub resolved_executable: PathBuf,
+    pub resolved_cwd: PathBuf,
+}
+
 /// A launched process under supervision.
 ///
 /// Supervision continues after this handle is dropped, but dropping it
@@ -456,6 +469,14 @@ impl PreparedProcess {
         }
     }
 
+    /// Inspect the bound command and roots, including runtime mount aliases.
+    pub fn filesystem_grants(&self) -> Result<FilesystemGrants> {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        return self.native.filesystem_grants();
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        Err(unavailable())
+    }
+
     /// Identity of the process input and the exact native paths captured in
     /// this preparation. Output limits, deadlines and private temporary
     /// directories are execution bounds rather than part of this identity.
@@ -502,6 +523,29 @@ impl PreparedProcess {
             let _ = cancellation;
             Err(unavailable())
         }
+    }
+
+    /// Run one finite, confined command with access to the host's
+    /// SOCKS5 broker. The socket's real location must be under a mandatory
+    /// read/write denial. Seatbelt grants only that socket. Bubblewrap exposes
+    /// a single bridge in a private network namespace. In both cases
+    /// the caller owns destination policy, credentials and broker shutdown.
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    pub fn spawn_with_socks_proxy(
+        self,
+        socket: &std::path::Path,
+        expected_socket: &std::path::Path,
+        password: &str,
+        cancellation: CancellationToken,
+    ) -> Result<RunningProcess> {
+        Ok(RunningProcess {
+            native: self.native.spawn_with_proxy(
+                socket,
+                expected_socket,
+                password,
+                cancellation,
+            )?,
+        })
     }
 
     /// Open bounded, bidirectional stdio to a reviewed system executable.

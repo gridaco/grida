@@ -218,12 +218,24 @@ semantics differ from the native ones.
 
 ## Network and filesystem limits
 
-The adapter provides denied raw networking. Provider calls, downloads, and
-other structured network operations use their separately authorized host
-capabilities. Commands needing network remain unavailable under this profile.
-A `ProxyOnly` profile is deferred; it needs an attributable per-execution mediator,
-destination checks, OS-enforced reachability, and a Linux namespace bridge.
-Proxy environment variables alone cannot establish the boundary.
+A trusted launcher can offer one TCP destination to a finite, noninteractive
+command. On macOS, Seatbelt permits the connection to the supervisor’s Unix
+socket. On Linux, bubblewrap isolates the network namespace. A private
+loopback SOCKS listener forwards over a single preconnected broker socket,
+and seccomp restricts the payload’s socket families. Direct host networking
+remains denied on both platforms.
+
+The broker authenticates the client, checks the exact approved hostname and
+port, resolves the name and connects to one validated public IPv4 address.
+The broker forwards opaque bytes to that TCP peer. It does not inspect HTTP paths, HTTP host headers or TLS contents.
+A compatible client uses the supplied SOCKS proxy. The grant permits one
+connection, up to 8 MiB in each direction, within the 30-second process
+deadline. Exceeding either byte limit fails the tool call, including when the
+program accepts a partial stream and exits successfully. Finite commands have
+no interactive process number. The host tracks their native cleanup through
+cancellation, chat retirement and shutdown.
+
+Provider HTTP and structured downloads use separately authorized host services.
 
 ## Explicit unconfined execution
 

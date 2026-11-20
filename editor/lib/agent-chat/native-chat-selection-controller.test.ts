@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type {
   DesktopNativeChat,
+  NativeChatPermissionMode,
   NativeChatSelectionState,
   NativeChatSelectionTarget,
 } from "@grida/desktop-bridge";
@@ -1114,11 +1115,16 @@ describe("incomplete draft creation settings recovery", () => {
 });
 
 describe("per-chat permission selection controller", () => {
-  function permissions() {
+  function permissions(
+    available: readonly NativeChatPermissionMode[] = [
+      "restricted",
+      "full_access",
+    ]
+  ) {
     const f = fixture();
     const modes = new Map<
       string,
-      { revision: number; mode: "restricted" | "full_access" }
+      { revision: number; mode: NativeChatPermissionMode }
     >();
     f.bridge.reviewPermissionMode = vi.fn<
       NonNullable<DesktopNativeChat["reviewPermissionMode"]>
@@ -1135,7 +1141,7 @@ describe("per-chat permission selection controller", () => {
     >(async (id) => ({
       sessionId: id,
       ...(modes.get(id) ?? { revision: 0, mode: "restricted" as const }),
-      available: ["restricted", "full_access"],
+      available,
     }));
     f.bridge.setPermissionMode = vi.fn<
       NonNullable<DesktopNativeChat["setPermissionMode"]>
@@ -1145,7 +1151,7 @@ describe("per-chat permission selection controller", () => {
       return {
         sessionId: id,
         ...next,
-        available: ["restricted", "full_access"],
+        available,
       };
     });
     return { ...f, modes };
@@ -1160,43 +1166,47 @@ describe("per-chat permission selection controller", () => {
     await changing;
   }
 
-  it("sends Home's first message through the prepared session's saved route and grant", async () => {
-    const f = permissions();
-    f.modes.set("chat-b", { revision: 1, mode: "full_access" });
-    const controller = f.make();
-    const take = vi.fn<() => { text: string } | null>(() => null);
-    take.mockReturnValueOnce({ text: "First Home message" });
-    try {
-      const composer = {
-        preparedSessionId: "chat-b",
-        operatingRegime: "plan" as const,
-      };
-      expect(await controller.startChat(f.b, take, composer)).toBeNull();
-      expect(await controller.startChat(f.b, take, composer)).toBeNull();
-      expect(f.bridge.selectProfile).toHaveBeenCalledWith({
-        kind: "saved",
-        id: f.b,
-      });
-      expect(f.bridge.load).toHaveBeenCalledWith("chat-b");
-      expect(f.bridge.submitInRegime).toHaveBeenCalledExactlyOnceWith(
-        "submit",
-        "chat-b",
-        expect.any(String),
-        "First Home message",
-        "plan",
-        "high",
-        undefined,
-        2
-      );
-      expect(f.bridge.updateSelection).not.toHaveBeenCalled();
-      expect(f.bridge.reviewPermissionMode).not.toHaveBeenCalled();
-      expect(f.bridge.setPermissionMode).not.toHaveBeenCalled();
-      expect(f.bridge.createFromDraft).not.toHaveBeenCalled();
-      expect(controller.read().selected).toBe("chat-b");
-    } finally {
-      controller.disconnect();
+  it.each(["approve_for_me", "full_access"] as const)(
+    "sends Home's first message through the prepared session's saved route and %s grant",
+    async (mode) => {
+      const f = permissions(["restricted", "approve_for_me", "full_access"]);
+      f.modes.set("chat-b", { revision: 1, mode });
+      const controller = f.make();
+      const take = vi.fn<() => { text: string } | null>(() => null);
+      take.mockReturnValueOnce({ text: "First Home message" });
+      try {
+        const composer = {
+          preparedSessionId: "chat-b",
+          ...(mode === "approve_for_me" && { preparedMode: mode }),
+          operatingRegime: "plan" as const,
+        };
+        expect(await controller.startChat(f.b, take, composer)).toBeNull();
+        expect(await controller.startChat(f.b, take, composer)).toBeNull();
+        expect(f.bridge.selectProfile).toHaveBeenCalledWith({
+          kind: "saved",
+          id: f.b,
+        });
+        expect(f.bridge.load).toHaveBeenCalledWith("chat-b");
+        expect(f.bridge.submitInRegime).toHaveBeenCalledExactlyOnceWith(
+          "submit",
+          "chat-b",
+          expect.any(String),
+          "First Home message",
+          "plan",
+          "high",
+          undefined,
+          2
+        );
+        expect(f.bridge.updateSelection).not.toHaveBeenCalled();
+        expect(f.bridge.reviewPermissionMode).not.toHaveBeenCalled();
+        expect(f.bridge.setPermissionMode).not.toHaveBeenCalled();
+        expect(f.bridge.createFromDraft).not.toHaveBeenCalled();
+        expect(controller.read().selected).toBe("chat-b");
+      } finally {
+        controller.disconnect();
+      }
     }
-  });
+  );
 
   it("sends context with the identity of the prepared Full access chat", async () => {
     const f = permissions();
@@ -1274,7 +1284,7 @@ describe("per-chat permission selection controller", () => {
         expect(f.bridge.setPermissionMode).not.toHaveBeenCalled();
         expect(f.bridge.createFromDraft).not.toHaveBeenCalled();
         expect(controller.read().selected).toBe("chat-b");
-        expect(controller.read().error).toContain("Full access");
+        expect(controller.read().error).toContain("chat’s access");
       } finally {
         controller.disconnect();
       }
@@ -1313,6 +1323,28 @@ describe("per-chat permission selection controller", () => {
       controller.disconnect();
     }
   });
+
+  it.each([false, true])(
+    "uses the installed host’s automatic review support (%s) for an empty workspace chat",
+    async (supported) => {
+      const f = permissions();
+      f.bridge.acceptsAutomaticApprovalReview = vi.fn<
+        NonNullable<DesktopNativeChat["acceptsAutomaticApprovalReview"]>
+      >(async () => supported);
+      const controller = f.make();
+      try {
+        controller.connect(null);
+        await ready(controller);
+        await vi.waitFor(() =>
+          expect(controller.read().permissionModeAvailable).toBe(true)
+        );
+        expect(controller.read().draftAutomaticReviewAvailable).toBe(supported);
+        expect(f.bridge.createFromDraft).not.toHaveBeenCalled();
+      } finally {
+        controller.disconnect();
+      }
+    }
+  );
 
   it("opens an exact blank chat without inference before choosing Full access and keeps new chats restricted", async () => {
     const f = permissions();

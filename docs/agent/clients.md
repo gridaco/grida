@@ -437,10 +437,11 @@ the **Default** preset. [Understand agent permissions](./permissions.md)
 Headless hosts can run commands on macOS and Linux when the launcher supplies
 a reviewed permission profile and native helper. Each command runs through
 the user's shell (`sh`, `bash`, `zsh` or `dash`, otherwise `/bin/sh`) with the
-selected directory access and a separate temporary scope. Network access is
-denied under Default. An explicitly authorized Full access chat instead runs
-commands without filesystem/network confinement; Plan keeps the command tools
-unavailable in either mode. [Choose Full access](./permissions.md#choose-full-access)
+selected directory access and a separate temporary scope. Direct networking is
+denied under Default. A launcher that enables scoped approvals can admit one
+brokered destination for a finite command after a per-action decision. Explicit
+Full access runs commands with ordinary-user filesystem and network access.
+Plan withholds command tools in every mode. [Choose Full access](./permissions.md#choose-full-access)
 
 A command that is still running after its short wait, such as a development
 server or a watcher, stays with the chat as a numbered process. Later turns of

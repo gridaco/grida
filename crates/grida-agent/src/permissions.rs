@@ -3,9 +3,9 @@
 use crate::command::{CommandAccess, CommandLimits, CommandSupervisor, ReviewedCommand};
 use crate::configuration::Configuration;
 use crate::file_tools::{
-    CAPTURE_IMAGE_REFERENCE, FileAuthority, FileTools, ImageCapture, PROTECTED_METADATA,
-    PROTECTED_WHEN_MISSING, SETTINGS_DIRECTORY, SETTINGS_PATH, SettingsAccess, VIEW_IMAGE,
-    read_request, write_request,
+    CAPTURE_IMAGE_REFERENCE, EXTERNAL_FILE_DIRECTORY, FileAuthority, FileTools, ImageCapture,
+    PROTECTED_METADATA, PROTECTED_WHEN_MISSING, SETTINGS_DIRECTORY, SETTINGS_PATH, SettingsAccess,
+    VIEW_IMAGE, read_request, write_request,
 };
 use crate::goal_verification::ReadVerification;
 use crate::processes::{
@@ -126,6 +126,9 @@ pub struct PermissionProfile {
     identity: Fingerprint,
     context: String,
     allow_full_access: bool,
+    command_network_home: Option<PathBuf>,
+    allow_approve_for_me: bool,
+    allow_external_file_read: bool,
     initial_mode: PermissionMode,
     unconfined: bool,
 }
@@ -136,6 +139,7 @@ pub struct PermissionProfile {
 pub enum PermissionMode {
     #[default]
     Restricted,
+    ApproveForMe,
     FullAccess,
 }
 
@@ -155,9 +159,21 @@ pub struct PermissionCapture {
     context: String,
     #[serde(default, skip_serializing_if = "PermissionMode::is_restricted")]
     mode: PermissionMode,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    external_file_read: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    command_network: bool,
 }
 
 impl PermissionCapture {
+    pub(crate) fn external_file_read(&self) -> bool {
+        self.external_file_read
+    }
+
+    pub(crate) fn mode(&self) -> PermissionMode {
+        self.mode
+    }
+
     pub(crate) fn context(&self) -> &str {
         &self.context
     }
@@ -306,6 +322,9 @@ impl PermissionProfile {
             identity,
             context,
             allow_full_access: false,
+            command_network_home: None,
+            allow_approve_for_me: false,
+            allow_external_file_read: false,
             initial_mode: PermissionMode::Restricted,
             unconfined: false,
         })
@@ -321,6 +340,42 @@ impl PermissionProfile {
         &self.bundled_skills
     }
 
+    pub(crate) fn with_external_file_read(mut self, allowed: bool) -> Result<Self> {
+        if allowed
+            && self
+                .directories
+                .keys()
+                .any(|id| id.as_str() == crate::file_tools::EXTERNAL_FILE_DIRECTORY)
+        {
+            return Err(problem(
+                ErrorKind::InvalidInput,
+                "permission_directory_reserved",
+            ));
+        }
+        self.allow_external_file_read = allowed;
+        Ok(self)
+    }
+
+    pub(crate) fn with_command_network(mut self, enabled: bool, state: &Path) -> Self {
+        if enabled && cfg!(any(target_os = "macos", target_os = "linux")) {
+            self.command_network_home = Some(state.to_owned());
+        }
+        self
+    }
+
+    pub(crate) fn with_approve_for_me(mut self, allowed: bool) -> Self {
+        self.allow_approve_for_me = allowed;
+        self
+    }
+
+    pub(crate) fn supports_mode(&self, mode: PermissionMode) -> bool {
+        match mode {
+            PermissionMode::Restricted => true,
+            PermissionMode::ApproveForMe => self.allow_approve_for_me,
+            PermissionMode::FullAccess => self.allow_full_access,
+        }
+    }
+
     pub(crate) fn with_full_access(
         mut self,
         allowed: bool,
@@ -334,21 +389,28 @@ impl PermissionProfile {
                 "full_access_launch_invalid",
             ));
         }
+        if initial == PermissionMode::ApproveForMe && !self.allow_approve_for_me {
+            return Err(problem(
+                ErrorKind::InvalidInput,
+                "permission_mode_unavailable",
+            ));
+        }
         self.allow_full_access = allowed;
         self.initial_mode = initial;
         Ok(self)
     }
 
-    pub(crate) fn supports_full_access(&self) -> bool {
-        self.allow_full_access
-    }
     pub(crate) fn initial_mode(&self) -> PermissionMode {
         self.initial_mode
     }
 
-    fn mode_context(&self, mode: PermissionMode) -> String {
-        if mode == PermissionMode::Restricted {
-            return self.context.clone();
+    fn mode_context(&self, mode: PermissionMode, external_file_read: bool) -> String {
+        if mode != PermissionMode::FullAccess {
+            let mut context = self.context.clone();
+            if external_file_read {
+                context.push_str("\nTo request a text file outside the project, use read_file with directory ID \"external-file\" and its absolute path without the leading slash. Each read requires its own approval. Other file operations cannot use this directory.\n");
+            }
+            return context;
         }
         let directories = self.workspace.directories().map(|directory| serde_json::json!({
             "id": directory.spec().id, "root": directory.root(), "primary": Some(&directory.spec().id) == self.workspace.primary(),
@@ -630,8 +692,10 @@ impl PermissionProfile {
         PermissionCapture {
             scope,
             profile: self.identity,
-            context: self.context.clone(),
+            context: self.mode_context(PermissionMode::Restricted, self.allow_external_file_read),
             mode: PermissionMode::Restricted,
+            external_file_read: self.allow_external_file_read,
+            command_network: self.command_network_home.is_some(),
         }
     }
 
@@ -640,7 +704,7 @@ impl PermissionProfile {
         scope: ScopeId,
         mode: PermissionMode,
     ) -> Result<PermissionCapture> {
-        if mode == PermissionMode::FullAccess && !self.allow_full_access {
+        if !self.supports_mode(mode) {
             return Err(problem(
                 ErrorKind::Unavailable,
                 "permission_mode_unavailable",
@@ -649,8 +713,11 @@ impl PermissionProfile {
         Ok(PermissionCapture {
             scope,
             profile: self.identity,
-            context: self.mode_context(mode),
+            context: self.mode_context(mode, self.allow_external_file_read),
             mode,
+            external_file_read: self.allow_external_file_read && mode != PermissionMode::FullAccess,
+            command_network: self.command_network_home.is_some()
+                && mode != PermissionMode::FullAccess,
         })
     }
 
@@ -660,14 +727,25 @@ impl PermissionProfile {
         scope: ScopeId,
     ) -> Result<PermissionCapture> {
         self.validate_capture(capture)?;
-        self.capture_mode(scope, capture.mode)
+        Ok(PermissionCapture {
+            scope,
+            ..capture.clone()
+        })
     }
 
     pub(crate) fn validate_capture(&self, capture: &PermissionCapture) -> Result<Fingerprint> {
-        if capture.profile != self.identity || capture.context != self.mode_context(capture.mode) {
+        if capture.profile != self.identity
+            || capture.context != self.mode_context(capture.mode, capture.external_file_read)
+        {
             return Err(problem(ErrorKind::Conflict, "permission_profile_changed"));
         }
-        if capture.mode == PermissionMode::FullAccess && !self.allow_full_access {
+        if !self.supports_mode(capture.mode)
+            || (capture.command_network
+                && (self.command_network_home.is_none()
+                    || capture.mode == PermissionMode::FullAccess))
+            || (capture.external_file_read
+                && (!self.allow_external_file_read || capture.mode == PermissionMode::FullAccess))
+        {
             return Err(problem(
                 ErrorKind::Unavailable,
                 "permission_mode_unavailable",
@@ -698,6 +776,8 @@ impl PermissionProfile {
             profile: self.identity,
             context: PRIMARY_REVIEW_CONTEXT.into(),
             mode: PermissionMode::Restricted,
+            external_file_read: false,
+            command_network: false,
         })
     }
 
@@ -708,6 +788,8 @@ impl PermissionProfile {
         if capture.profile != self.identity
             || capture.context != PRIMARY_REVIEW_CONTEXT
             || capture.mode != PermissionMode::Restricted
+            || capture.external_file_read
+            || capture.command_network
             || !self.allows_primary_review()
         {
             return Err(problem(ErrorKind::Conflict, "permission_profile_changed"));
@@ -799,6 +881,22 @@ impl PermissionProfile {
                     turn,
                     if capture.mode == PermissionMode::FullAccess {
                         Fingerprint::of(&(capture.profile, "full-access-v1"))?
+                    } else if capture.command_network {
+                        Fingerprint::of(&(
+                            capture.profile,
+                            "command-network-socks-v1",
+                            capture.mode,
+                            capture.external_file_read,
+                        ))?
+                    } else if capture.mode == PermissionMode::ApproveForMe
+                        || capture.external_file_read
+                    {
+                        Fingerprint::of(&(
+                            capture.profile,
+                            "reviewable-actions-v1",
+                            capture.mode,
+                            capture.external_file_read,
+                        ))?
                     } else {
                         capture.profile
                     },
@@ -818,9 +916,14 @@ impl PermissionProfile {
             binding: Arc::default(),
             store,
             allow_review,
+            approve_for_me: allow_review
+                && !primary_review
+                && capture.mode == PermissionMode::ApproveForMe,
+            allow_command_network: allow_review && !primary_review && capture.command_network,
+            allow_external_file_read: allow_review && !primary_review && capture.external_file_read,
             primary_review,
             settings: settings
-                .filter(|_| !primary_review && capture.mode == PermissionMode::Restricted),
+                .filter(|_| !primary_review && capture.mode != PermissionMode::FullAccess),
             files: GrantSelection {
                 authority: authority.clone(),
                 grants: vec![GrantId::new("workspace-file-read")?],
@@ -919,6 +1022,34 @@ impl PermissionProfile {
     }
 }
 
+/// Retain only displayable scope facts. Manual resolution can still use the
+/// original opaque authority fingerprint when these facts are unavailable.
+fn command_filesystem(
+    captured: agent_kit_sandbox::FilesystemGrants,
+) -> Option<grida_agent_master::approval_review::CommandFilesystem> {
+    fn strings(paths: Vec<PathBuf>) -> Option<Vec<String>> {
+        paths
+            .into_iter()
+            .map(|path| path.into_os_string().into_string().ok())
+            .collect()
+    }
+    let facts = grida_agent_master::approval_review::CommandFilesystem {
+        disk_read: captured.disk_read,
+        read_roots: strings(captured.read_roots)?,
+        write_roots: strings(captured.write_roots)?,
+        runtime_roots: strings(captured.runtime_roots)?,
+        private_temp_write: true,
+        resolved_executable: captured
+            .resolved_executable
+            .into_os_string()
+            .into_string()
+            .ok()?,
+        resolved_cwd: captured.resolved_cwd.into_os_string().into_string().ok()?,
+    };
+    // Bound the extra display data so it cannot exhaust the approval envelope.
+    (serde_json::to_vec(&facts).ok()?.len() <= 16 * 1024).then_some(facts)
+}
+
 /// The system's shared temporary directory, resolved through links.
 fn shared_temporary_directory() -> Option<PathBuf> {
     Path::new("/tmp")
@@ -940,6 +1071,33 @@ pub struct ApprovalRequest {
     pub effect: ApprovalEffect,
 }
 
+impl ApprovalRequest {
+    fn bind_retained(&mut self, retained: &Self) -> Result<()> {
+        // Earlier waits still bind the original tool and native scope
+        // fingerprints. They may complete manually but cannot gain review
+        // evidence by being reopened on a newer host.
+        if let (
+            ApprovalEffect::Command {
+                filesystem: None,
+                finite: true,
+                ..
+            },
+            ApprovalEffect::Command {
+                filesystem,
+                finite: true,
+                ..
+            },
+        ) = (&retained.effect, &mut self.effect)
+        {
+            *filesystem = None;
+        }
+        if self != retained {
+            return Err(problem(ErrorKind::Conflict, "permission_action_changed"));
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ApprovalEffect {
@@ -955,11 +1113,17 @@ pub enum ApprovalEffect {
         command: String,
         /// Whether the command gets a pseudo-terminal.
         terminal: bool,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        finite: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        filesystem: Option<grida_agent_master::approval_review::CommandFilesystem>,
         cwd: PathBuf,
         /// The shell that runs the command line.
         executable: PathBuf,
         /// Names of the environment the process starts with.
         environment_names: Vec<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        network: Option<crate::processes::CommandNetworkDestination>,
     },
     Write {
         tool: ToolId,
@@ -982,6 +1146,9 @@ struct ApprovalAnswer {
     decision: ApprovalDecision,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     review: Option<OperationId>,
+    /// The person answered after this exact reviewer had already deferred.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    deferred_review: Option<OperationId>,
 }
 
 pub(crate) fn is_approval(wait: &WaitRecord) -> bool {
@@ -1008,6 +1175,29 @@ pub(crate) fn reviewed_approval_answer(
     decision: ApprovalDecision,
     review: Option<OperationId>,
 ) -> Result<Envelope> {
+    encode_approval_answer(wait, decision, review, None)
+}
+
+pub(crate) fn manual_approval_answer(
+    wait: &WaitRecord,
+    decision: ApprovalDecision,
+    deferred_review: Option<OperationId>,
+) -> Result<Envelope> {
+    // A repeated control must reconstruct the original receipt even if an
+    // in-flight reviewer finished after the person's answer committed.
+    let deferred_review = match &wait.answer {
+        Some(answer) => decode::<ApprovalAnswer>(ANSWER, answer)?.deferred_review,
+        None => deferred_review,
+    };
+    encode_approval_answer(wait, decision, None, deferred_review)
+}
+
+fn encode_approval_answer(
+    wait: &WaitRecord,
+    decision: ApprovalDecision,
+    review: Option<OperationId>,
+    deferred_review: Option<OperationId>,
+) -> Result<Envelope> {
     let request = read_approval(wait)?;
     encode(
         ANSWER,
@@ -1016,6 +1206,7 @@ pub(crate) fn reviewed_approval_answer(
             scope: request.scope,
             decision,
             review,
+            deferred_review,
         },
     )
 }
@@ -1024,11 +1215,14 @@ pub(crate) fn reviewed_approval_answer(
 /// cleanup. Model commands run as the chat's processes in the host's store.
 #[derive(Clone)]
 pub struct TurnPermissions {
+    allow_command_network: bool,
     profile: Arc<PermissionProfile>,
     selection: (SessionId, TurnId),
     binding: Arc<OnceLock<TurnBinding>>,
     store: Arc<SqliteStore>,
     allow_review: bool,
+    approve_for_me: bool,
+    allow_external_file_read: bool,
     primary_review: bool,
     /// The agent settings file this turn may read and, with approval, change.
     settings: Option<Arc<Configuration>>,
@@ -1216,6 +1410,12 @@ impl TurnPermissions {
                     owner.settings_authority(invocation)
                 }));
             }
+            if self.allow_external_file_read {
+                let owner = self.clone();
+                files = files.with_external_file(Arc::new(move |invocation| {
+                    owner.external_file_authority(invocation)
+                }));
+            }
             let files = Arc::new(files);
             let writes = !self.primary_review
                 && !self.state()?.read_only
@@ -1296,6 +1496,7 @@ impl TurnPermissions {
                 processes.clone(),
                 self.selection.0.clone(),
                 self.profile.unconfined,
+                self.allow_command_network,
                 Arc::new(move |invocation| owner.process_authority(invocation)),
             )?;
             let [exec, write] = tools.tools();
@@ -1314,7 +1515,9 @@ impl TurnPermissions {
     /// This live fence is process-local. Before acknowledging durable
     /// revocation, the host also commits Stop or persists a changed profile.
     pub fn revoke(&self, directory: &BindingId) -> Result<()> {
-        if !self.profile.directories.contains_key(directory) {
+        let external =
+            self.allow_external_file_read && directory.as_str() == EXTERNAL_FILE_DIRECTORY;
+        if !external && !self.profile.directories.contains_key(directory) {
             return Err(denied());
         }
         let mut state = self.state()?;
@@ -1391,20 +1594,24 @@ impl TurnPermissions {
                 if rule == AccessRule::Deny {
                     return Err(denied());
                 }
-                let spec = input.spec(directory.root(), &command.environment);
+                let rule = if input.network.is_some() {
+                    if !self.allow_command_network || self.profile.unconfined {
+                        return Err(denied());
+                    }
+                    AccessRule::Ask
+                } else {
+                    rule
+                };
+                let finite = input.network.is_some()
+                    || (self.approve_for_me && rule == AccessRule::Ask && input.supports_finite());
+                let spec = input.spec(directory.root(), &command.environment, finite);
+                let cwd = spec.cwd.clone();
+                let executable = spec.executable.clone();
                 #[cfg(unix)]
                 let unconfined_cwd = if self.profile.unconfined {
                     Some(std::fs::File::open(&spec.cwd).map_err(|_| command_unavailable())?)
                 } else {
                     None
-                };
-                let effect = ApprovalEffect::Command {
-                    access,
-                    command: input.cmd.clone(),
-                    terminal: input.tty,
-                    cwd: spec.cwd.clone(),
-                    executable: spec.executable.clone(),
-                    environment_names: command.environment.keys().cloned().collect(),
                 };
                 let scope = self.profile.process_scope(
                     self.commands.clone(),
@@ -1422,6 +1629,24 @@ impl TurnPermissions {
                 }
                 #[cfg(not(unix))]
                 validate_working_root(&process, directory)?;
+                let effect = ApprovalEffect::Command {
+                    access,
+                    command: input.cmd.clone(),
+                    terminal: input.tty,
+                    finite,
+                    filesystem: if finite {
+                        process
+                            .filesystem_grants()
+                            .ok()
+                            .and_then(command_filesystem)
+                    } else {
+                        None
+                    },
+                    cwd,
+                    executable,
+                    environment_names: command.environment.keys().cloned().collect(),
+                    network: input.network.clone(),
+                };
                 let capture = process.capture_fingerprint()?;
                 (directory, effect, Some(capture), rule)
             }
@@ -1429,6 +1654,44 @@ impl TurnPermissions {
                 if admission.grants == self.files =>
             {
                 let request = read_request(invocation)?;
+                if self.allow_external_file_read
+                    && let Some(directory) = &request.directory
+                    && directory.as_str() == EXTERNAL_FILE_DIRECTORY
+                {
+                    if self.state()?.revoked.contains(directory) {
+                        return Err(revoked());
+                    }
+                    if self.primary_review
+                        || !self.allow_review
+                        || invocation.definition().id.as_str() != "read_file"
+                    {
+                        return Err(denied());
+                    }
+                    let path = request.path.ok_or_else(denied)?;
+                    let (_, scope) = self.open_external_file(&path)?;
+                    return Ok((
+                        Ready {
+                            request: ApprovalRequest {
+                                session: self.selection.0.clone(),
+                                turn: self.selection.1.clone(),
+                                operation: admission.operation.clone(),
+                                action: invocation.fingerprint(),
+                                scope,
+                                directory: directory.clone(),
+                                root: PathBuf::from("/"),
+                                effect: ApprovalEffect::Read {
+                                    tool: invocation.definition().id.clone(),
+                                    relative_path: path,
+                                    query: None,
+                                },
+                            },
+                            command_capture: None,
+                            approval: None,
+                            active: None,
+                        },
+                        AccessRule::Ask,
+                    ));
+                }
                 let directory = self.captured_directory(request.directory.as_ref())?;
                 if self.primary_review
                     && Some(&directory.spec().id) != self.profile.workspace.primary()
@@ -1474,6 +1737,14 @@ impl TurnPermissions {
             directory.permission_identity()?,
             command_capture,
         ))?;
+        let scope = match &effect {
+            ApprovalEffect::Command {
+                finite: true,
+                network,
+                ..
+            } => Fingerprint::of(&(scope, "finite-command-v1", network))?,
+            _ => scope,
+        };
         Ok((
             Ready {
                 request: ApprovalRequest {
@@ -1605,6 +1876,59 @@ impl TurnPermissions {
         Ok(())
     }
 
+    fn open_external_file(&self, path: &Path) -> Result<(std::fs::File, Fingerprint)> {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        {
+            let (file, target) = crate::file_tools::open_external_file(
+                path,
+                &self.profile.protected,
+                &self.profile.workspace,
+            )?;
+            let scope =
+                Fingerprint::of(&(self.profile.identity, EXTERNAL_FILE_DIRECTORY, path, target))?;
+            Ok((file, scope))
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        {
+            let _ = path;
+            Err(problem(
+                ErrorKind::Unsupported,
+                "file_tools_platform_unsupported",
+            ))
+        }
+    }
+
+    fn external_file_authority(&self, invocation: &Invocation) -> Result<std::fs::File> {
+        let (path, approved) = {
+            let state = self.state()?;
+            let ready = current(&state, invocation.id(), invocation.fingerprint())?;
+            let ApprovalEffect::Read {
+                tool,
+                relative_path,
+                query: None,
+            } = &ready.request.effect
+            else {
+                return Err(denied());
+            };
+            if !self.allow_external_file_read
+                || self.primary_review
+                || tool.as_str() != "read_file"
+                || ready.request.directory.as_str() != EXTERNAL_FILE_DIRECTORY
+                || ready.approval.is_none()
+            {
+                return Err(denied());
+            }
+            (relative_path.clone(), ready.request.scope)
+        };
+        let (file, current_scope) = self.open_external_file(&path)?;
+        if approved != current_scope {
+            return Err(problem(ErrorKind::Conflict, "permission_action_changed"));
+        }
+        let state = self.state()?;
+        current(&state, invocation.id(), invocation.fingerprint())?;
+        Ok(file)
+    }
+
     fn file_authority(&self, invocation: &Invocation) -> Result<FileAuthority> {
         let state = self.state()?;
         let ready = current(&state, invocation.id(), invocation.fingerprint())?;
@@ -1638,7 +1962,7 @@ impl TurnPermissions {
         let operation = invocation.id().clone();
         let action = invocation.fingerprint();
         let ready = current(&state, &operation, action)?;
-        let ApprovalEffect::Command { access, .. } = ready.request.effect else {
+        let ApprovalEffect::Command { access, finite, .. } = ready.request.effect else {
             return Err(denied());
         };
         let scope = self.profile.process_scope(
@@ -1654,7 +1978,50 @@ impl TurnPermissions {
             .map(|command| Arc::clone(&command.environment))
             .unwrap_or_default();
         let owner = self.clone();
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        let network_home = self.profile.command_network_home.clone();
+        let finite_owner = self.clone();
+        let finite_operation = operation.clone();
+        let spawn_finite: Arc<crate::processes::SpawnFiniteCommand> =
+            Arc::new(move |prepared, launch, stop| {
+                use crate::processes::{FiniteCommand, FiniteLaunch};
+                let mut state = finite_owner.state()?;
+                current(&state, &finite_operation, action)?;
+                let ready = state.ready.get_mut(&finite_operation).ok_or_else(denied)?;
+                if ready.active.is_some() || ready.approval.is_none() {
+                    return Err(denied());
+                }
+                let running = match (&ready.request.effect, launch) {
+                    (
+                        ApprovalEffect::Command {
+                            network: None,
+                            terminal: false,
+                            finite: true,
+                            ..
+                        },
+                        FiniteLaunch::Confined,
+                    ) => FiniteCommand::Confined(prepared.spawn(stop.clone())?),
+                    #[cfg(any(target_os = "macos", target_os = "linux"))]
+                    (
+                        ApprovalEffect::Command {
+                            network: Some(destination),
+                            terminal: false,
+                            finite: true,
+                            ..
+                        },
+                        FiniteLaunch::Network(mediator),
+                    ) if destination == mediator.destination() => {
+                        FiniteCommand::Network(mediator.spawn(prepared, stop.clone())?)
+                    }
+                    _ => return Err(denied()),
+                };
+                ready.active = Some(stop);
+                Ok(running)
+            });
         Ok(AuthorizedProcess {
+            #[cfg(any(target_os = "macos", target_os = "linux"))]
+            network_home,
+            spawn_finite: finite.then_some(spawn_finite),
             scope,
             expected,
             environment,
@@ -1663,7 +2030,7 @@ impl TurnPermissions {
                 let mut state = owner.state()?;
                 current(&state, &operation, action)?;
                 let ready = state.ready.get_mut(&operation).ok_or_else(denied)?;
-                if ready.active.is_some() {
+                if finite || ready.active.is_some() {
                     return Err(problem(ErrorKind::Conflict, "permission_action_dispatched"));
                 }
                 let running = prepared.spawn_session(options, stop.clone())?;
@@ -1712,9 +2079,8 @@ impl ToolGate for TurnPermissions {
                     return Err(denied());
                 }
             } else if let Some(wait) = view.state.waits().get(&wait_id) {
-                if read_approval(wait)? != ready.request {
-                    return Err(problem(ErrorKind::Conflict, "permission_action_changed"));
-                }
+                let retained = read_approval(wait)?;
+                ready.request.bind_retained(&retained)?;
                 if wait.is_pending() {
                     return Ok(ToolDecision::Defer(wait_id));
                 }
@@ -1827,6 +2193,33 @@ fn validate_working_root(
     _: &DirectoryBinding,
 ) -> Result<()> {
     Err(command_unavailable())
+}
+
+pub(crate) enum ReviewResolution {
+    Applied(ApprovalDecision),
+    Deferred,
+}
+
+/// Display reviewer activity only when the committed answer identifies it.
+pub(crate) fn review_resolution(
+    wait: &WaitRecord,
+    request: &ApprovalRequest,
+    review: &OperationId,
+) -> Result<Option<ReviewResolution>> {
+    let Some(envelope) = &wait.answer else {
+        return Ok(None);
+    };
+    let answer: ApprovalAnswer = decode(ANSWER, envelope)?;
+    if wait.withdrawn || answer.action != request.action || answer.scope != request.scope {
+        return Ok(None);
+    }
+    Ok(if answer.review.as_ref() == Some(review) {
+        Some(ReviewResolution::Applied(answer.decision))
+    } else if answer.deferred_review.as_ref() == Some(review) && answer.review.is_none() {
+        Some(ReviewResolution::Deferred)
+    } else {
+        None
+    })
 }
 
 fn approved(wait: &WaitRecord, request: &ApprovalRequest) -> Result<bool> {
@@ -1962,6 +2355,81 @@ mod full_access_tests {
             "permission_mode_unavailable"
         );
         profile.validate_capture(&restricted).unwrap();
+    }
+
+    #[test]
+    fn old_finite_command_receipts_retain_their_scope_without_gaining_review_evidence() {
+        let scope = Fingerprint::of(&"original native scope").unwrap();
+        let old: ApprovalRequest = serde_json::from_value(serde_json::json!({
+            "session":"chat", "turn":"turn", "operation":"tool", "action":Fingerprint::of(&"command").unwrap(),
+            "scope":scope, "directory":"project", "root":"/project",
+            "effect":{"kind":"command","access":"read","command":"pwd","terminal":false,"finite":true,
+                "cwd":"/project","executable":"/bin/sh","environment_names":[]}
+        })).unwrap();
+        let mut enriched = serde_json::to_value(&old).unwrap();
+        enriched["effect"]["filesystem"] = serde_json::json!({
+            "disk_read":true, "read_roots":["/project"], "write_roots":[], "runtime_roots":["/bin"],
+            "private_temp_write":true, "resolved_cwd":"/project", "resolved_executable":"/bin/sh"
+        });
+        let mut current: ApprovalRequest = serde_json::from_value(enriched).unwrap();
+        let mut changed = current.clone();
+        changed.scope = Fingerprint::of(&"changed native scope").unwrap();
+        assert!(changed.bind_retained(&old).is_err());
+        current.bind_retained(&old).unwrap();
+        assert_eq!(current, old);
+        let mut wait = WaitRecord {
+            id: wait_id(&old.operation).unwrap(),
+            request: encode(REQUEST, &old).unwrap(),
+            response: response_contract().unwrap(),
+            answer: None,
+            withdrawn: false,
+        };
+        wait.answer = Some(approval_answer(&wait, ApprovalDecision::ApproveOnce).unwrap());
+        assert!(approved(&wait, &current).unwrap());
+    }
+
+    #[test]
+    fn approved_review_mode_and_external_files_require_their_captured_authorities() {
+        let root = tempfile::tempdir().unwrap();
+        let initial = profile(&root.path().canonicalize().unwrap());
+        let scope = ScopeId::new("input").unwrap();
+        let old = initial.capture(scope.clone());
+        assert!(
+            initial
+                .capture_mode(scope.clone(), PermissionMode::ApproveForMe)
+                .is_err()
+        );
+        let available = initial
+            .clone()
+            .with_approve_for_me(true)
+            .with_external_file_read(true)
+            .unwrap();
+        let auto = available
+            .capture_mode(scope.clone(), PermissionMode::ApproveForMe)
+            .unwrap();
+        assert!(auto.external_file_read());
+        assert_eq!(auto.mode(), PermissionMode::ApproveForMe);
+        assert!(initial.validate_capture(&auto).is_err());
+        let no_external = available.clone().with_external_file_read(false).unwrap();
+        assert!(no_external.validate_capture(&auto).is_err());
+        assert!(
+            !no_external
+                .capture_mode(scope.clone(), PermissionMode::ApproveForMe)
+                .unwrap()
+                .external_file_read()
+        );
+        let replay = available
+            .recapture(&old, ScopeId::new("next").unwrap())
+            .unwrap();
+        assert_eq!(replay.mode(), PermissionMode::Restricted);
+        assert!(!replay.external_file_read());
+        assert!(!replay.context().contains("external-file"));
+        assert!(
+            available
+                .capture_mode(scope, PermissionMode::Restricted)
+                .unwrap()
+                .external_file_read()
+        );
     }
 
     #[test]

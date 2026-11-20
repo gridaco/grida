@@ -519,7 +519,7 @@ async fn serve_connection(
                             let turns: Vec<_> = window
                                 .turns
                                 .iter()
-                                .map(|turn| projection::turn_facts(turn, input_facts.goal_starts.contains(&turn.id)))
+                                .map(|turn| projection::turn_facts(turn, input_facts.goal_starts.contains(&turn.id), input_facts.approval_reviews.get(&turn.id).map(Vec::as_slice).unwrap_or_default()))
                                 .collect();
                             return Ok(LoadSessionResponse::new().meta(serde_json::Map::from_iter([(
                                 projection::TRANSCRIPT_WINDOW.into(),

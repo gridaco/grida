@@ -10,6 +10,7 @@ import type {
   NativeChatMessage,
   NativeChatPage,
   NativeChatProfileCatalog,
+  NativeChatTurnRecord,
   NativeChatUpdate,
 } from "@grida/desktop-bridge";
 import {
@@ -743,6 +744,93 @@ it.each(["main", "side"])(
       .toBeVisible();
   }
 );
+
+it("shows review progress and its decision in the open chat while the turn keeps running", async () => {
+  const turnId = "review-turn";
+  const action = "/outside/schedule.txt";
+  let journalPosition = 1;
+  let controlRevision = 1;
+  let inputNeeded = false;
+  let approvalReviews: NativeChatTurnRecord["approvalReviews"] = [];
+  const transcript = vi.fn<NonNullable<DesktopNativeChat["transcriptPage"]>>(
+    async () => ({
+      view: 0,
+      older: null,
+      messages: [
+        {
+          messageId: "request",
+          turnId,
+          role: "user",
+          text: "First saved request",
+        },
+      ],
+      turns: [{ turnId, startedAtMs: 1000, status: null, approvalReviews }],
+    })
+  );
+  await setup({
+    observe: async (id) => ({
+      observationId: `review-${journalPosition}`,
+      snapshot: {
+        sessionId: id,
+        sessionRevision: 0,
+        queuedInputs: 0,
+        admissionPaused: false,
+        latest: null,
+        current: {
+          turnId,
+          epoch: 1,
+          journalPosition,
+          controlRevision,
+          inputNeeded,
+          historyPosition: 1,
+          paused: false,
+          cancelled: false,
+          disposition: "running",
+          status: null,
+        },
+      },
+    }),
+    transcriptPage: transcript,
+  });
+  const waitForReplay = () => {
+    const reads = transcript.mock.calls.length;
+    return act(async () => {
+      await expect
+        .poll(() => transcript.mock.calls.length)
+        .toBeGreaterThan(reads);
+    });
+  };
+  // A wait may exist for a poll before the reviewer has started.
+  inputNeeded = true;
+  controlRevision++;
+  journalPosition++;
+  await waitForReplay();
+  approvalReviews = [{ decision: "reviewing", action }];
+  journalPosition++;
+  await waitForReplay();
+  const reviewing = page.getByText(`Reviewing access for "${action}"`);
+  await expect.element(reviewing).toBeVisible();
+  approvalReviews = [{ decision: "approved", action }];
+  inputNeeded = false;
+  controlRevision++;
+  journalPosition++;
+  await waitForReplay();
+  await expect
+    .element(page.getByText(`Automatically approved "${action}"`))
+    .toBeVisible();
+  await expect.element(reviewing).not.toBeInTheDocument();
+  // A second review opens and resolves entirely between two observations.
+  approvalReviews = [
+    ...approvalReviews,
+    { decision: "declined", action: "second.txt" },
+  ];
+  controlRevision += 2;
+  journalPosition += 4;
+  await waitForReplay();
+  await expect
+    .element(page.getByText('Automatically declined "second.txt"'))
+    .toBeVisible();
+});
 
 describe("Composer control loading", () => {
   it("waits for the saved selection even when the catalog has already loaded empty", async () => {

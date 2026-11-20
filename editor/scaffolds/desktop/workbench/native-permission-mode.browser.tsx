@@ -4,6 +4,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import type {
   DesktopNativeChat,
+  NativeChatApprovalDecision,
   NativeChatPermissionMode,
 } from "@grida/desktop-bridge";
 import { NativeChatController } from "@/lib/agent-chat/native-chat-controller";
@@ -13,6 +14,7 @@ import { ComposerProvider } from "@/kits/composer";
 import { HomeComposer } from "../home/home-composer";
 import { AgentComposerInput } from "../shared/agent-composer-input";
 import { AgentComposerTools } from "../shared/agent-composer-tools";
+import { AgentApprovalPrompt } from "../shared/agent-approval";
 import { AgentPermissionConfirmation } from "../shared/agent-permission-confirmation";
 import "@/app/ui.css";
 
@@ -43,6 +45,9 @@ function Fixture({ controller }: { controller: NativeChatController }) {
           access={{
             mode: state.permissionMode?.mode ?? "restricted",
             available: state.permissionModeAvailable,
+            automaticReview:
+              state.permissionMode?.available.includes("approve_for_me") ??
+              state.draftAutomaticReviewAvailable,
             uncertain: state.permissionModeUncertain,
             busy: state.permissionModeBusy,
             error: state.permissionModeError,
@@ -64,6 +69,7 @@ function Fixture({ controller }: { controller: NativeChatController }) {
 async function setup(
   older = false,
   options: {
+    automaticReview?: boolean;
     width?: number;
     height?: number;
     workspaceName?: string;
@@ -75,6 +81,9 @@ async function setup(
     globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
   ).IS_REACT_ACT_ENVIRONMENT = true;
   await page.viewport(options.width ?? 720, options.height ?? 720);
+  const available: NativeChatPermissionMode[] = options.automaticReview
+    ? ["restricted", "approve_for_me", "full_access"]
+    : ["restricted", "full_access"];
   const modes = new Map<string, NativeChatPermissionMode>();
   const setPermissionMode = vi.fn<
     NonNullable<DesktopNativeChat["setPermissionMode"]>
@@ -85,7 +94,7 @@ async function setup(
       sessionId: id,
       revision: revision + 1,
       mode,
-      available: ["restricted", "full_access"],
+      available,
     };
   });
   const bridge: DesktopNativeChat = {
@@ -122,7 +131,7 @@ async function setup(
             sessionId: id,
             revision: 0,
             mode: modes.get(id) ?? ("restricted" as const),
-            available: ["restricted", "full_access"] as const,
+            available,
           }),
           reviewPermissionMode: vi.fn<
             NonNullable<DesktopNativeChat["reviewPermissionMode"]>
@@ -184,16 +193,16 @@ it("opens the Home dialog on selection before Desktop answers and sends without 
   const workspace = { id: "studio", name: "Studio project" } as Workspace;
   const pending =
     Promise.withResolvers<
-      Awaited<ReturnType<HomeComposer.FullAccess["prepare"]>>
+      Awaited<ReturnType<HomeComposer.AccessHost["prepare"]>>
     >();
   const access = {
     prepare: () => pending.promise,
-    answer: vi.fn<HomeComposer.FullAccess["answer"]>(async () => {}),
-    start: vi.fn<HomeComposer.FullAccess["start"]>(async () => ({
+    answer: vi.fn<HomeComposer.AccessHost["answer"]>(async () => {}),
+    start: vi.fn<HomeComposer.AccessHost["start"]>(async () => ({
       sessionId: CHAT,
       profileId: null,
     })),
-  } satisfies HomeComposer.FullAccess;
+  } satisfies HomeComposer.AccessHost;
   const host = {
     defaultWorkspace: async () => workspace,
     stash: vi.fn<HomeComposer.Host["stash"]>(() => true),
@@ -452,6 +461,33 @@ it("closes pending confirmation when another chat takes the view", async () => {
   expect(f.modes.has(CHAT)).toBe(false);
 });
 
+it("selects automatic review for this chat when the host advertises it", async () => {
+  const { bridge, setPermissionMode } = await setup(false, {
+    automaticReview: true,
+  });
+  await click("Access: Default");
+  await click(/^Approve for me/);
+  await expect
+    .element(page.getByRole("button", { name: "Access: Approve for me" }))
+    .toBeVisible();
+  expect(setPermissionMode).toHaveBeenCalledWith(
+    CHAT,
+    0,
+    expect.any(String),
+    "approve_for_me",
+    undefined
+  );
+  expect(bridge.reviewPermissionMode).not.toHaveBeenCalled();
+});
+
+it("omits automatic review on a two-mode host", async () => {
+  await setup();
+  await click("Access: Default");
+  expect(
+    page.getByRole("button", { name: /^Approve for me/ }).elements()
+  ).toHaveLength(0);
+});
+
 it("keeps Full access disabled on older hosts", async () => {
   await setup(true);
   await page
@@ -467,4 +503,58 @@ it("keeps Full access disabled on older hosts", async () => {
       )
     )
     .toBeVisible();
+});
+
+it("shows the exact command and network scope when review times out and accepts a manual decline", async () => {
+  const element = document.createElement("div");
+  document.body.append(element);
+  const root = createRoot(element);
+  resources.push({ root });
+  const answer = vi.fn<(decision: NativeChatApprovalDecision) => void>();
+  await act(async () =>
+    root.render(
+      <AgentApprovalPrompt
+        approval={{
+          reviewId: "review",
+          root: "/project",
+          tool: "exec_command",
+          command: "curl https://example.org",
+          cwd: "/project",
+          executable: "/bin/sh",
+          access: "read",
+          network: { host: "example.org", port: 443 },
+          scope: {
+            diskRead: true,
+            resolvedExecutable: "/bin/sh",
+            resolvedCwd: "/project",
+            readRoots: ["/project"],
+            writeRoots: [],
+            runtimeRoots: ["/usr/bin"],
+            privateTempWrite: true,
+            environmentNames: ["PATH"],
+          },
+          reviewFailure: "timed_out",
+        }}
+        onDecision={answer}
+      />
+    )
+  );
+  await expect
+    .element(page.getByText("Automatic review timed out."))
+    .toBeVisible();
+  await expect
+    .element(page.getByText('Destination "example.org" port 443'))
+    .toBeVisible();
+  await expect
+    .element(page.getByText('Command "curl https://example.org"'))
+    .toBeVisible();
+  await expect
+    .element(
+      page.getByText(
+        "Can read files outside the project, except protected locations."
+      )
+    )
+    .toBeVisible();
+  await page.getByRole("button", { name: "Decline" }).click();
+  expect(answer).toHaveBeenCalledExactlyOnceWith("decline");
 });

@@ -37,6 +37,8 @@ pub(crate) const PROTECTED_WHEN_MISSING: [&str; 2] = [".grida", ".codex"];
 /// [`SETTINGS_PATH`] is reachable under it, by reads and approved writes.
 pub(crate) const SETTINGS_DIRECTORY: &str = "agent-settings";
 pub(crate) const SETTINGS_PATH: &str = "config.toml";
+/// Virtual directory for one individually approved, descriptor-bound text read.
+pub(crate) const EXTERNAL_FILE_DIRECTORY: &str = "external-file";
 const SETTINGS_NOTE: &str = " Directory \"agent-settings\" holds only config.toml, the agent settings file. Every change to it asks the person, and a saved change applies to messages accepted afterwards.";
 const MAX_OUTPUT_BYTES: usize = 64 * 1024;
 const WORKERS: usize = 2;
@@ -72,6 +74,7 @@ pub type CurrentFileAuthority = dyn Fn() -> Result<FileAuthority> + Send + Sync;
 type InvocationAuthority = dyn Fn(&Invocation) -> Result<FileAuthority> + Send + Sync;
 pub(crate) type ImageCapture = dyn Fn(Vec<u8>) -> Result<MediaRef> + Send + Sync;
 type SettingsAuthority = dyn Fn(&Invocation) -> Result<SettingsAccess> + Send + Sync;
+type ExternalFileAuthority = dyn Fn(&Invocation) -> Result<std::fs::File> + Send + Sync;
 
 /// Current authority over the agent settings file for one admitted action.
 #[cfg_attr(not(any(target_os = "macos", target_os = "linux")), allow(dead_code))]
@@ -92,6 +95,7 @@ pub struct FileTools {
     image_view: ImageView,
     full_access: bool,
     settings: Option<Arc<SettingsAuthority>>,
+    external_file: Option<Arc<ExternalFileAuthority>>,
     workers: Arc<Semaphore>,
     /// Mutations are serialized so an edit always reads what it replaces.
     #[cfg_attr(not(any(target_os = "macos", target_os = "linux")), allow(dead_code))]
@@ -128,6 +132,7 @@ impl FileTools {
             image_view: ImageView::LegacyPng,
             full_access: false,
             settings: None,
+            external_file: None,
             workers: Arc::new(Semaphore::new(WORKERS)),
             mutations: std::sync::Mutex::new(()),
         })
@@ -137,6 +142,11 @@ impl FileTools {
     /// authority decides each action; writes need an approved action.
     pub(crate) fn with_settings(mut self, settings: Arc<SettingsAuthority>) -> Self {
         self.settings = Some(settings);
+        self
+    }
+
+    pub(crate) fn with_external_file(mut self, open: Arc<ExternalFileAuthority>) -> Self {
+        self.external_file = Some(open);
         self
     }
 
@@ -568,6 +578,7 @@ impl FileTools {
             &self.capture_image,
             &self.capture_reference,
             &self.settings,
+            &self.external_file,
             request.directory,
             &budget.invocation,
         );
@@ -581,11 +592,64 @@ impl FileTools {
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 mod native;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
-pub(crate) use native::{open_root_directory, open_root_file, verify_open_path};
+pub(crate) use native::{
+    open_external_file, open_root_directory, open_root_file, verify_open_path,
+};
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    #[test]
+    fn external_file_read_checks_protected_locations_links_and_metadata() {
+        use crate::workspace::DirectorySpec;
+        use std::{fs, os::unix::fs::symlink};
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().canonicalize().unwrap();
+        let project = base.join("project");
+        let state = base.join("private");
+        let ssh = base.join(".ssh");
+        for directory in [&project, &state, &ssh] {
+            fs::create_dir(directory).unwrap();
+            fs::write(directory.join("record"), "inside").unwrap();
+        }
+        let protected = ProtectedRoots::new(vec![state.clone()]).unwrap();
+        let primary = BindingId::new("primary").unwrap();
+        let workspace = WorkspaceSnapshot::capture(
+            BindingId::new("workspace").unwrap(),
+            1,
+            vec![DirectorySpec {
+                id: primary.clone(),
+                name: "Primary".into(),
+                generation: BindingId::new("one").unwrap(),
+                path: project.clone(),
+            }],
+            Some(primary),
+            &protected,
+        )
+        .unwrap();
+        let open = |path: &Path| {
+            open_external_file(path.strip_prefix("/").unwrap(), &protected, &workspace)
+        };
+        let reference = base.join("reference");
+        fs::write(&reference, "outside").unwrap();
+        assert!(open(&reference).is_ok());
+        symlink(&state, base.join("alias")).unwrap();
+        symlink(&reference, base.join("link")).unwrap();
+        fs::hard_link(state.join("record"), base.join("hardlink")).unwrap();
+        for path in [
+            project.join("record"),
+            state.join("record"),
+            ssh.join("record"),
+            base.join("alias/record"),
+            base.join("link"),
+            base.join("hardlink"),
+            ssh,
+        ] {
+            assert!(open(&path).is_err(), "{}", path.display());
+        }
+    }
 
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     #[tokio::test]

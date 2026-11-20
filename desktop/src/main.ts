@@ -55,6 +55,7 @@ import { DesktopEntryWindow } from "./main/desktop-entry-window";
 import { DesktopPreferences } from "./main/desktop-preferences";
 import { NativeChatSelections } from "./main/native-chat-selections";
 import { NativeDesktopAgent } from "./main/native-desktop-agent";
+import { NativeAgentProcess } from "./main/native-agent-process";
 import { NativeDesktopProfile } from "./main/native-desktop-profile";
 import { NativeMcpLaunch } from "./main/native-mcp-launch";
 import { NativeEditorMcpExport } from "./main/native-editor-mcp-export";
@@ -1084,6 +1085,8 @@ app.on("ready", async () => {
         native.currentForWindow(workspaceId, profileId),
       ensure_native_chat: (workspaceId, requireCurrent) =>
         native.ensure(workspaceId, requireCurrent),
+      supports_automatic_approval_review: () =>
+        NativeAgentProcess.supportsScopedApprovals(nativeResources),
       resolve_welcome_chat_workspace: (workspaceId) =>
         native.welcomeWorkspace(workspaceId),
       forget_native_workspace: (workspaceId) =>

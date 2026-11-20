@@ -7,6 +7,7 @@ import path from "node:path";
 import type { IpcMainInvokeEvent, WebContents } from "electron";
 import type {
   DesktopNativeChat,
+  NativeChatPermissionMode,
   NativeChatReadiness,
   NativeChatSnapshot,
   NativeChatProfileSelection,
@@ -3577,6 +3578,38 @@ describe("Welcome Full access review", () => {
     };
   }
 
+  it("binds the Welcome automatic review choice to the reserved chat", async () => {
+    const f = await welcomePermissionSetup();
+    try {
+      f.permissionMode.mockImplementation(async (session) => ({
+        sessionId: session.id,
+        revision: 0,
+        mode: "restricted",
+        available: ["restricted", "approve_for_me", "full_access"],
+      }));
+      const review = await f.ipc.prepareWelcomePermission(
+        f.event,
+        WORKSPACE,
+        "approve_for_me"
+      );
+      await f.ipc.answerWelcomeFullAccess(f.event, review.reviewId, true);
+      const { sessionId } = await f.ipc.startWelcomeFullAccess(
+        f.event,
+        review.reviewId,
+        CHOICE
+      );
+      expect(f.setPermission).toHaveBeenCalledExactlyOnceWith(
+        { id: sessionId },
+        0,
+        review.reviewId,
+        "approve_for_me"
+      );
+      expect(f.submit).not.toHaveBeenCalled();
+    } finally {
+      fs.rmSync(f.directory, { recursive: true, force: true });
+    }
+  });
+
   async function confirmedReview(
     f: Awaited<ReturnType<typeof welcomePermissionSetup>>
   ) {
@@ -4353,7 +4386,7 @@ describe("Full access selection IPC", () => {
     const f = setup();
     const modes = new Map<
       string,
-      { revision: number; mode: "restricted" | "full_access" }
+      { revision: number; mode: NativeChatPermissionMode }
     >();
     const receipts = new Map<
       string,

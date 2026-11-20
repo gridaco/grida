@@ -568,13 +568,20 @@ pub(super) fn visible_record_bytes(record: &HistoryRecord) -> usize {
 
 /// Recorded outcome and wall-clock interval for a replayed turn.
 /// `goal_start` marks a turn whose input started a goal.
-pub(super) fn turn_facts(turn: &ReplayTurn, goal_start: bool) -> Value {
+pub(super) fn turn_facts(
+    turn: &ReplayTurn,
+    goal_start: bool,
+    reviews: &[crate::host::ApprovalReview],
+) -> Value {
     let mut facts = json!({
         "turnId": turn.id,
         "status": turn.status,
         "startedAtMs": turn.started_ms,
         "settledAtMs": turn.settled_ms,
     });
+    if !reviews.is_empty() {
+        facts["approvalReviews"] = json!(reviews);
+    }
     if goal_start {
         facts["goalStart"] = json!(true);
     }
@@ -884,24 +891,25 @@ mod compaction_fact_tests {
                 Some(account(Some("Earlier cart work."))),
             ),
             false,
+            &[],
         );
         assert_eq!(
             facts["compaction"],
             json!({"summary": "Earlier cart work.", "automatic": true})
         );
-        let manual = turn_facts(&turn("manual", Some(account(Some("Summary.")))), false);
+        let manual = turn_facts(&turn("manual", Some(account(Some("Summary.")))), false, &[]);
         assert_eq!(manual["compaction"]["automatic"], false);
     }
 
     #[test]
     fn other_turns_carry_no_compaction() {
         assert!(
-            turn_facts(&turn("t", None), false)
+            turn_facts(&turn("t", None), false, &[])
                 .get("compaction")
                 .is_none()
         );
         assert!(
-            turn_facts(&turn("t", Some(account(None))), false)
+            turn_facts(&turn("t", Some(account(None))), false, &[])
                 .get("compaction")
                 .is_none(),
             "a failed compaction has no summary to show"

@@ -3379,6 +3379,7 @@ function turnRecords(value: unknown): NativeChatTurnRecord[] | undefined {
       throw invalidResponse();
     const contextTokens = time(record.contextTokens);
     const compaction = compactionFact(record.compaction);
+    const approvalReviews = approvalReviewFacts(record.approvalReviews);
     return Object.freeze({
       turnId: identity(record.turnId),
       status: status as NativeChatTurnRecord["status"],
@@ -3387,7 +3388,29 @@ function turnRecords(value: unknown): NativeChatTurnRecord[] | undefined {
       ...(record.goalStart === true && { goalStart: true as const }),
       ...(contextTokens !== undefined && { contextTokens }),
       ...(compaction && { compaction }),
+      ...(approvalReviews && { approvalReviews }),
     });
+  });
+}
+
+function approvalReviewFacts(
+  value: unknown
+): NativeChatTurnRecord["approvalReviews"] {
+  if (value == null) return undefined;
+  if (!Array.isArray(value) || value.length > 64) throw invalidResponse();
+  return value.map((item) => {
+    const { decision, action } = object(item);
+    if (
+      (decision !== "reviewing" &&
+        decision !== "approved" &&
+        decision !== "declined" &&
+        decision !== "needs_human") ||
+      typeof action !== "string" ||
+      !action ||
+      Buffer.byteLength(action) > 4096
+    )
+      throw invalidResponse();
+    return { decision, action };
   });
 }
 

@@ -62,6 +62,7 @@ pub use images::{ImageSource, ImageUpload, RetainedRaster, SelectedImage};
 pub(crate) use images::{is_retained_image, retained_image_size, retained_raster};
 pub use lifecycle::{InputInspection, InputSettings, QueueEdit, TurnControl};
 pub use lifecycle_hooks::HookInspection;
+pub(crate) use permissions::ApprovalReview;
 pub use permissions::{Approvals, PendingApproval};
 pub use questions::{PendingQuestion, Questions};
 pub use retained_file::FileUpload;
@@ -2455,14 +2456,26 @@ impl Host {
             && prepared.goal.is_none()
             && !prepared.subagent
             && permission_scope.is_some()
-            && let Some(profile) = self
-                .permissions
-                .as_ref()
-                .and_then(|profile| profile.automatic_read_review())
         {
-            master = master.with_approval_reviewer(Arc::new(
-                approval_review::AutomaticReadReview::new(self, profile, execution, provider),
-            ));
+            let policy = match prepared.permission_capture.as_ref() {
+                Some(capture)
+                    if capture.mode() == crate::permissions::PermissionMode::ApproveForMe =>
+                {
+                    Some(approval_review::ReviewPolicy::ApproveForMe {
+                        external_file_read: capture.external_file_read(),
+                    })
+                }
+                _ => self
+                    .permissions
+                    .as_ref()
+                    .and_then(|profile| profile.automatic_read_review().cloned())
+                    .map(approval_review::ReviewPolicy::ConfiguredRead),
+            };
+            if let Some(policy) = policy {
+                master = master.with_approval_reviewer(Arc::new(
+                    approval_review::AutomaticReview::new(self, policy, execution, provider),
+                ));
+            }
         }
         if let Some(effort) = prepared.effort {
             master = master
@@ -4551,12 +4564,19 @@ async fn drive(
         activity_order::Publisher::new(ordering, binding.clone(), parent, &initial.state);
     let mut live = live.map(|sender| live::Publisher::new(sender, &initial.state));
     drop(initial);
-    let review = turn
-        .operations()
-        .operation_id(&grida_agent_master::approval_review::operation_key())?;
+    let operations = turn.operations();
+    let mut private_reviews = BTreeSet::from([
+        operations.operation_id(&grida_agent_master::approval_review::operation_key())?
+    ]);
+    for slot in 0..grida_agent_master::approval_review::MAX_SCOPED_REVIEWS {
+        private_reviews.insert(operations.operation_id(
+            &grida_agent_master::approval_review::scoped_operation_key(slot)?,
+        )?);
+    }
+    drop(operations);
     let mut publish = |update| {
         if matches!(&update, TurnUpdate::Inference { operation, .. } | TurnUpdate::Operation { operation, .. }
-            if operation == &review)
+            if private_reviews.contains(operation))
         {
             return;
         }

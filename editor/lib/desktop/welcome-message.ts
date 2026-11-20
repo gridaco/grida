@@ -184,6 +184,7 @@ function parse(raw: string | null): WelcomeMessage | null {
     operatingRegime,
     goal,
     preparedSessionId,
+    preparedMode,
     attachment,
     missingAttachment: missing,
   } = value as Record<string, unknown>;
@@ -205,6 +206,11 @@ function parse(raw: string | null): WelcomeMessage | null {
     preparedSessionId !== undefined &&
     (typeof preparedSessionId !== "string" ||
       !SESSION_ID.test(preparedSessionId))
+  )
+    return null;
+  if (
+    preparedMode !== undefined &&
+    (preparedMode !== "approve_for_me" || !preparedSessionId)
   )
     return null;
   let resource: NativeChatInitialComposer["attachment"];
@@ -245,6 +251,7 @@ function parse(raw: string | null): WelcomeMessage | null {
     ...(operatingRegime !== undefined && { operatingRegime }),
     ...(goal !== undefined && { goal }),
     ...(preparedSessionId !== undefined && { preparedSessionId }),
+    ...(preparedMode === "approve_for_me" && { preparedMode }),
     ...(resource && { attachment: resource }),
     ...(missingAttachment && { missingAttachment }),
   };

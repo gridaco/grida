@@ -52,7 +52,10 @@ export type NativeEditorObservation = Readonly<{
   payload: Readonly<Record<string, EditorObservationValue | undefined>>;
 }>;
 /** Full access deliberately removes command filesystem and network confinement. */
-export type NativeChatPermissionMode = "restricted" | "full_access";
+export type NativeChatPermissionMode =
+  | "restricted"
+  | "approve_for_me"
+  | "full_access";
 export type NativeChatPermissionReview = Readonly<{
   reviewId: string;
   chatTitle: string;
@@ -671,6 +674,10 @@ export type NativeChatTurnRecord = Readonly<{
   startedAtMs: number;
   /** UTC milliseconds at which the turn first settled; absent until then. */
   settledAtMs?: number;
+  approvalReviews?: readonly Readonly<{
+    decision: "reviewing" | "approved" | "declined" | "needs_human";
+    action: string;
+  }>[];
   /** The turn's input started a goal. */
   goalStart?: true;
   /**
@@ -885,14 +892,52 @@ export type NativeChatControlReceipt = Readonly<{
   journalPosition: number;
 }>;
 
+/** Captured filesystem and environment reach of a single finite command. */
+export type NativeChatCommandScope = Readonly<{
+  diskRead: boolean;
+  resolvedExecutable: string;
+  resolvedCwd: string;
+  readRoots: readonly string[];
+  writeRoots: readonly string[];
+  runtimeRoots: readonly string[];
+  privateTempWrite: boolean;
+  environmentNames: readonly string[];
+}>;
+
+export type NativeChatApprovalAction =
+  | Readonly<{
+      tool:
+        | "read_file"
+        | "list_files"
+        | "search_text"
+        | "write_file"
+        | "edit_file";
+      relativePath: string;
+      query?: string;
+    }>
+  | Readonly<{
+      tool: "exec_command";
+      command: string;
+      executable: string;
+      cwd: string;
+      access: "read" | "read_write";
+      network?: Readonly<{ host: string; port: number }>;
+      scope?: NativeChatCommandScope;
+    }>;
+
+export type NativeApprovalReviewFailure =
+  | "timed_out"
+  | "interrupted"
+  | "unavailable"
+  | "invalid_reply"
+  | "needs_human";
+
 export type NativeChatApproval = Readonly<{
   reviewId: string;
-  /** Writes are asked only for the workspace's agent settings file. */
-  tool: "read_file" | "list_files" | "search_text" | "write_file" | "edit_file";
   root: string;
-  relativePath: string;
-  query?: string;
-}>;
+  reviewFailure?: NativeApprovalReviewFailure;
+}> &
+  NativeChatApprovalAction;
 
 export type NativeChatApprovalDecision = "approve_once" | "decline";
 
@@ -1024,7 +1069,11 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   welcomeProfiles?(): Promise<NativeChatProfileCatalog | null>;
   /** The review survives same-document Welcome navigation changing only the preset. */
   readonly welcomeFullAccessAcrossPresets?: true;
-  /** Review Full access for one reserved new chat. Available only on Welcome. */
+  /** Reserve automatic review for a new project chat on Welcome. */
+  prepareWelcomeAutomaticReview?(
+    workspaceId: string
+  ): Promise<NativeChatPermissionReview>;
+  /** Review Full access for one reserved new chat on Welcome. */
   prepareWelcomeFullAccess?(
     workspaceId: string
   ): Promise<NativeChatPermissionReview>;
@@ -1045,8 +1094,9 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   importHook?(): Promise<NativeHookInspection | null>;
   removeHook?(id: string, revision: string): Promise<NativeHookInspection>;
   selectProfile?(selection: NativeChatProfileSelection): Promise<void>;
-  /** Read saved identity, initializing a new draft from defaults, without a worker. */
-  /** Negotiated native permission selection; absent/false keeps Default. */
+  /** This native build can select a bounded automatic reviewer for workspace chat. */
+  acceptsAutomaticApprovalReview?(): Promise<boolean>;
+  /** Whether this workspace supports native permission selection. */
   acceptsPermissionMode?(): Promise<boolean>;
   permissionMode?(attachmentId: string): Promise<NativeChatPermissionState>;
   /** Main issues a short-lived intent bound to this exact chat and revision. */

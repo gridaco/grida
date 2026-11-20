@@ -297,6 +297,14 @@ fn confined_command(prepared: &Prepared, status: i32) -> Command {
     // the system's top-level links such as /tmp. None grants file contents or
     // network access.
     profile.push_str(PLATFORM_DEFAULTS);
+    if let Some(socket) = &prepared.broker_socket {
+        command
+            .arg("-D")
+            .arg(format!("BROKER={}", socket.display()));
+        profile.push_str(
+            "(allow network-outbound (remote unix-socket (literal (param \"BROKER\"))))\n",
+        );
+    }
     let mut locations: Vec<_> = prepared
         .locations
         .iter()
@@ -444,6 +452,14 @@ fn confined_command(prepared: &Prepared, status: i32) -> Command {
                 command.arg("--ro-bind").arg(path).arg(path);
             }
         }
+    }
+    if let Some(socket) = &prepared.broker_socket {
+        // Only trusted setup can open this mount. The payload inherits the
+        // filter denying AF_UNIX sockets and no open broker descriptor.
+        command
+            .arg("--ro-bind")
+            .arg(socket)
+            .arg(prepared.temporary.path().join("broker.sock"));
     }
     // The helper runs from its own path. Under disk read every other path
     // is read-only, so no new mount point could be created for it.

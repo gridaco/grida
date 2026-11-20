@@ -64,9 +64,11 @@ guidance as context.
 
 Open a folder in Grida Desktop and open its chat pane. The **Default** access
 shown in the composer lets the agent read and edit files in this project and
-run commands in a sandbox without asking; other folders and the internet are
-off. To let this chat use user-accessible files and the internet, open
-**Default**, choose **Full access**, and confirm the in-app dialog. New chats
+run commands in a sandbox. You review requests to read an outside file or
+connect a finite command to a specific network destination. Open **Default**
+and choose **Approve for me** to delegate eligible decisions to the chat’s
+model. Choose **Full access** and confirm the dialog to allow ordinary-user
+filesystem and network access for commands. New chats
 still begin with Default. Type `@` to mention a file, for example “Summarize @README.md and list
 the open TODOs.” A mention gives the agent the file's path; it reads the
 file's current contents when it needs them. To investigate without changing

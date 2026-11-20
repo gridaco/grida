@@ -1934,3 +1934,84 @@ async fn unconfined_processes_end_when_their_owner_disappears() {
     }
     let _ = fs::remove_dir_all(workspace.parent().unwrap());
 }
+
+#[tokio::test]
+#[cfg_attr(target_os = "linux", ignore = "requires bubblewrap")]
+async fn finite_proxy_grant_reaches_only_the_protected_socket() {
+    use std::os::unix::fs::symlink;
+    use tokio::net::{TcpListener, UnixListener};
+
+    let fixture = Fixture::new();
+    let alias = tempfile::tempdir_in(fs::canonicalize("/tmp").unwrap()).unwrap();
+    symlink(&fixture.outside, alias.path().join("p")).unwrap();
+    let socket = alias.path().join("p/s");
+    let listener = UnixListener::bind(&socket).unwrap();
+    let local = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let sibling_socket = fixture.workspace.join("unrelated.sock");
+    let sibling = UnixListener::bind(&sibling_socket).unwrap();
+    let secret = "0123456789abcdef0123456789abcdef";
+    let script = format!(
+        "if /usr/bin/curl --noproxy '*' --max-time 1 -sf http://{}/; then exit 22; fi\nif /usr/bin/curl --noproxy '*' --unix-socket '{}' --max-time 1 -sf http://localhost/; then exit 23; fi\nexec /usr/bin/curl --max-time 3 -sS http://feed.example/manifest",
+        local.local_addr().unwrap(),
+        sibling_socket.display()
+    );
+    let mut scope = fixture.scope();
+    scope.disk_read = true;
+    let run = fixture
+        .sandbox()
+        .prepare(fixture.command(&script), scope)
+        .unwrap()
+        .spawn_with_socks_proxy(
+            &socket,
+            &fixture.outside.join("s"),
+            secret,
+            CancellationToken::new(),
+        )
+        .unwrap();
+    let peer = tokio::spawn(async move {
+        let (mut client, _) = listener.accept().await.unwrap();
+        assert_eq!(client.read_u8().await.unwrap(), 5);
+        let len = client.read_u8().await.unwrap();
+        let mut methods = vec![0; len as usize];
+        client.read_exact(&mut methods).await.unwrap();
+        assert!(methods.contains(&2));
+        client.write_all(&[5, 2]).await.unwrap();
+        let mut auth = vec![0; 2 + 5 + 1 + secret.len()];
+        client.read_exact(&mut auth).await.unwrap();
+        assert_eq!(&auth[..8], b"\x01\x05grida\x20");
+        assert_eq!(&auth[8..], secret.as_bytes());
+        client.write_all(&[1, 0]).await.unwrap();
+        let mut connection = vec![0; 5 + "feed.example".len() + 2];
+        client.read_exact(&mut connection).await.unwrap();
+        assert_eq!(&connection[5..connection.len() - 2], b"feed.example");
+        client
+            .write_all(&[5, 0, 0, 1, 0, 0, 0, 0, 0, 0])
+            .await
+            .unwrap();
+        let mut bytes = [0; 1024];
+        assert!(client.read(&mut bytes).await.unwrap() > 0);
+        client
+            .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 7\r\nConnection: close\r\n\r\nfixture")
+            .await
+            .unwrap();
+    });
+    let result = run.finish().await.unwrap();
+    assert_eq!(
+        result.completion,
+        Completion::Exited(0),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert_eq!(&result.stdout, b"fixture");
+    peer.await.unwrap();
+    assert!(
+        tokio::time::timeout(Duration::from_millis(25), sibling.accept())
+            .await
+            .is_err()
+    );
+    assert!(
+        tokio::time::timeout(Duration::from_millis(25), local.accept())
+            .await
+            .is_err()
+    );
+}
