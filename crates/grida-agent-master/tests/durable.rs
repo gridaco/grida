@@ -3378,6 +3378,8 @@ impl ToolGate for PauseSecondTool {
 
 #[tokio::test]
 async fn a_paused_gate_preserves_the_step_and_its_completed_sibling() {
+    // This fixture waits for durable SQLite writes, whose latency varies on CI.
+    let watchdog = Duration::from_secs(10);
     for stop in [false, true] {
         let fixture = Fixture::new(Script::ToolAndDeferred);
         let gate = Arc::new(PauseSecondTool::default());
@@ -3390,7 +3392,7 @@ async fn a_paused_gate_preserves_the_step_and_its_completed_sibling() {
             .unwrap();
         let master = fixture.master(3, "Use both tools");
         let task = tokio::spawn(async move { master.run(opened.turn, input()).await });
-        tokio::time::timeout(Duration::from_secs(2), async {
+        tokio::time::timeout(watchdog, async {
             gate.entered.notified().await;
             loop {
                 if opened.observer.snapshot().state.operations().values().any(|record| {
@@ -3400,7 +3402,9 @@ async fn a_paused_gate_preserves_the_step_and_its_completed_sibling() {
                 }
                 opened.observer.next().await.expect("sibling remains observable");
             }
-        }).await.unwrap();
+        })
+        .await
+        .expect("the second gate is pending and its sibling has committed a result");
         let view = store.inspect(session_id()).await.unwrap();
         store
             .control(ControlRequest {
@@ -3415,12 +3419,11 @@ async fn a_paused_gate_preserves_the_step_and_its_completed_sibling() {
             })
             .await
             .unwrap();
-        let MasterOutcome::Suspended(suspended) =
-            tokio::time::timeout(Duration::from_secs(2), task)
-                .await
-                .unwrap()
-                .unwrap()
-                .unwrap()
+        let MasterOutcome::Suspended(suspended) = tokio::time::timeout(watchdog, task)
+            .await
+            .expect("the turn suspends after Pause")
+            .unwrap()
+            .unwrap()
         else {
             panic!("expected a paused step")
         };
