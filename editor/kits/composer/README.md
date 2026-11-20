@@ -188,7 +188,9 @@ pending confirmation. The Desktop `AgentComposerInput` uses these capabilities
 for caller-owned `editing` sessions: it temporarily shows another message in the
 same input, preserves the ordinary rich draft, and restores it on Save or
 Cancel. The caller supplies the edit identity, text, label and save/cancel
-callbacks; the kit owns no queue or native state.
+callbacks. Use `editing.saveDisabled` while refreshing the queue or reopening
+the connection so the person can continue editing before Save becomes
+available. The kit owns no queue or native state.
 The caller can set `editing.allowEmpty` when a retained message has other
 content, so clearing its text remains a valid save. Without it, saving requires
 nonblank text. This does not add or remove attachments in the kit.

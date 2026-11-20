@@ -438,8 +438,7 @@ impl SqliteStore {
             )?;
             require_basis(&history.basis, &request.expected_history)?;
             let seed = make_seed(history)?;
-            let receipt =
-                insert_session(&transaction, &request.create, inner.catalog, Some(&seed))?;
+            let receipt = insert_session(&transaction, &request.create, inner, Some(&seed))?;
             save_request(
                 &transaction,
                 destination,
@@ -499,6 +498,22 @@ impl SqliteStore {
                 |row| row.get(0),
             ).map_err(database_error)?;
             let seed = make_seed(history)?;
+            if let Some(projection) = inner.conversations {
+                let previous: Option<String> = transaction.query_row(
+                    "SELECT reply_id FROM sessions WHERE id=?1", [id.as_str()], |row| row.get(0),
+                ).map_err(database_error)?;
+                if let Some(previous) = previous {
+                    let retained = (projection.revised_reply)(&seed, &previous)?;
+                    let reply_id = retained.as_ref().map(|id| id.as_str());
+                    if reply_id != Some(previous.as_str()) {
+                        transaction.execute(
+                            "UPDATE sessions SET reply_id=?2, unread=(?2 IS NOT NULL AND unread),
+                             read_revision=read_revision+1 WHERE id=?1",
+                            params![id.as_str(), reply_id],
+                        ).map_err(database_error)?;
+                    }
+                }
+            }
             let closed = transaction.execute(
                 "UPDATE history_views SET end_ordinal=?2 WHERE session=?1 AND end_ordinal IS NULL",
                 params![id.as_str(), end],

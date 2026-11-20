@@ -42,6 +42,7 @@ function SlidesTemplateCard({
   onPick: (template: SlidesTemplate) => void;
 }) {
   const [previewOpen, setPreviewOpen] = useState(false);
+  const { pages, openingPageIndex } = template;
   return (
     <div
       className={cn(
@@ -62,16 +63,20 @@ function SlidesTemplateCard({
         className="absolute inset-0 disabled:pointer-events-none disabled:opacity-50"
       >
         <SlideScrubPreview
-          count={template.pages.length}
-          renderFrame={(i) => (
-            // eslint-disable-next-line @next/next/no-img-element -- blob object URL; next/image can't optimize it
-            <img
-              src={template.pages[i].url}
-              alt={template.pages[i].name}
-              draggable={false}
-              className="size-full object-cover"
-            />
-          )}
+          count={pages.length}
+          renderFrame={(index) => {
+            // Start at the opening slide and wrap to include earlier pages.
+            const page = pages[(openingPageIndex + index) % pages.length];
+            return (
+              // eslint-disable-next-line @next/next/no-img-element -- blob object URL; next/image can't optimize it
+              <img
+                src={page.url}
+                alt={page.name}
+                draggable={false}
+                className="size-full object-cover"
+              />
+            );
+          }}
           className="size-full"
         />
       </button>

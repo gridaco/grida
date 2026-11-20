@@ -22,9 +22,11 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
+  type KeyboardEvent,
   type ReactNode,
   type Ref,
 } from "react";
@@ -58,6 +60,8 @@ import {
   type AgentComposerQueueSubmitLease,
 } from "./agent-composer-queue-submit";
 
+const ESCAPE_CONFIRM_MS = 2000;
+
 /**
  * A `/`-command that runs an action (e.g. `/compact`) instead of being
  * lowered into the prompt. Shown in the trigger menu; intercepted on
@@ -78,6 +82,8 @@ export type AgentComposerInputProps = {
     text: string;
     label: string;
     busy?: boolean;
+    /** Save needs fresh host state, while the local draft stays editable. */
+    saveDisabled?: boolean;
     /** The edited message has retained non-text content even with empty text. */
     allowEmpty?: boolean;
     /** True only after confirmation. The caller then clears `editing`. */
@@ -115,12 +121,19 @@ export type AgentComposerInputProps = {
    */
   submissionScope?: string | number;
   draftRef?: Ref<Pick<ComposerController, "appendText" | "focus">>;
+  /** An Escape confirmation applies only to the turn visible on the first press. */
+  activeTurnId?: string;
   onStop: () => void;
   /**
    * What the single primary button does while the draft is empty, such as
-   * Stop for a running turn. Typing turns it back into Send.
+   * Pause for a running turn. Typing turns it back into Send.
    */
-  emptyAction?: { label: string; icon: ReactNode; onClick: () => void };
+  emptyAction?: {
+    label: string;
+    icon: ReactNode;
+    onClick: () => void;
+    confirmWithEscape?: boolean;
+  };
   /**
    * Where unsent text is kept, keyed by chat. The draft survives remounting,
    * reconnection and restarts; only deleting it or an accepted send clears it.
@@ -200,6 +213,7 @@ function AgentComposerInner({
   canSubmit = true,
   submissionScope,
   draftRef,
+  activeTurnId,
   onStop,
   emptyAction,
   draft,
@@ -288,6 +302,7 @@ function AgentComposerInner({
   const isQueueing =
     queueingLease !== null &&
     queueSubmitGuard.owns(queueingLease, submissionScope);
+  const readOnly = !!editing && (!!editing.busy || isQueueing);
   useEffect(() => {
     queueSubmitGuard.mount();
     return () => queueSubmitGuard.unmount();
@@ -325,16 +340,12 @@ function AgentComposerInner({
 
   const submit = async () => {
     if (editing) {
+      if (readOnly || editing.saveDisabled) return;
       const text = composer.submit({
         submitted_at: Date.now(),
         allow_empty: editing.allowEmpty,
       })?.meta.text;
-      if (
-        text === undefined ||
-        (!editing.allowEmpty && !text.trim()) ||
-        editing.busy
-      )
-        return;
+      if (text === undefined || (!editing.allowEmpty && !text.trim())) return;
       const lease = queueSubmitGuard.begin(submissionScope);
       if (!lease) return;
       setQueueingLease(lease);
@@ -483,8 +494,89 @@ function AgentComposerInner({
     void onSubmit(text);
   };
 
+  const primaryAction = isStreaming
+    ? {
+        label: "Stop",
+        icon: <SquareIcon className="size-3.5" />,
+        onClick: onStop,
+        confirmWithEscape: true,
+      }
+    : !composer.snapshot.text.trim()
+      ? emptyAction
+      : undefined;
+  const escapeAction =
+    !editing && !isQueueing && !submitting && primaryAction?.confirmWithEscape
+      ? primaryAction
+      : undefined;
+  const [confirmUntil, setConfirmUntil] = useState(0);
+  useLayoutEffect(() => {
+    setConfirmUntil(0);
+  }, [editOwner, activeTurnId, escapeAction?.label]);
+  useEffect(() => {
+    if (!confirmUntil) return;
+    const timer = setTimeout(
+      () =>
+        setConfirmUntil((current) => (current === confirmUntil ? 0 : current)),
+      Math.max(0, confirmUntil - Date.now())
+    );
+    return () => clearTimeout(timer);
+  }, [confirmUntil]);
+
+  const confirmEscape = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (
+      !escapeAction ||
+      composer.trigger ||
+      event.defaultPrevented ||
+      event.repeat ||
+      event.nativeEvent.isComposing ||
+      event.nativeEvent.keyCode === 229 ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      !event.currentTarget.contains(event.target as Node)
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    const now = Date.now();
+    if (now < confirmUntil) {
+      setConfirmUntil(0);
+      escapeAction.onClick();
+    } else {
+      setConfirmUntil(now + ESCAPE_CONFIRM_MS);
+    }
+  };
+
   return (
     <ComposerMenuAnchor
+      onClick={(event) => {
+        const { currentTarget, target } = event;
+        if (
+          readOnly ||
+          event.defaultPrevented ||
+          !(target instanceof Element) ||
+          !currentTarget.contains(target) ||
+          currentTarget.ownerDocument.getSelection()?.isCollapsed === false
+        ) {
+          return;
+        }
+        const control = target.closest(
+          "button, a[href], input, select, textarea, label, summary, [tabindex], [contenteditable], [data-composer-action-menu], [data-composer-trigger-menu]"
+        );
+        if (!control || !currentTarget.contains(control)) composer.focus();
+      }}
+      onPointerDown={() => setConfirmUntil(0)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          setConfirmUntil(0);
+        }
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") confirmEscape(event);
+        else if (confirmUntil) setConfirmUntil(0);
+      }}
       onKeyDownCapture={(event) => {
         if (editing && event.key === "Escape" && !editing.busy && !isQueueing) {
           event.preventDefault();
@@ -493,7 +585,7 @@ function AgentComposerInner({
         }
       }}
       className={cn(
-        "relative rounded-xl border bg-accent transition-colors [&_button:focus-visible]:ring-1! [&_button:focus-visible]:ring-inset",
+        "relative select-none rounded-xl border bg-accent transition-colors [&_button:focus-visible]:ring-1! [&_button:focus-visible]:ring-inset",
         className
       )}
     >
@@ -516,13 +608,17 @@ function AgentComposerInner({
         </div>
       )}
       <ComposerContent
+        onKeyDownCapture={(event) => {
+          // ProseMirror prevents Escape even when there is no completion open.
+          if (event.key === "Escape") confirmEscape(event);
+        }}
         autofocus={autofocus}
         onSubmitRequest={submit}
-        readOnly={!!editing && (!!editing.busy || isQueueing)}
+        readOnly={readOnly}
         onTransfer={editing ? () => {} : onAttachmentTransfer}
         placeholder={placeholder}
         className="px-3 pt-2"
-        editorClassName="min-h-9 max-h-48 overflow-y-auto text-[14px] leading-[23px] font-[375] text-[color:color-mix(in_srgb,var(--foreground)_90%,var(--background))]"
+        editorClassName="min-h-9 max-h-48 overflow-y-auto select-text text-[14px] leading-[23px] font-[375] text-[color:color-mix(in_srgb,var(--foreground)_90%,var(--background))]"
       />
       {notice && (
         <p className="px-3 pb-1 text-xs text-muted-foreground">{notice}</p>
@@ -555,14 +651,14 @@ function AgentComposerInner({
                 size="sm"
                 className="rounded-xl"
                 disabled={
-                  editing.busy ||
-                  isQueueing ||
+                  readOnly ||
+                  editing.saveDisabled ||
                   (!editing.allowEmpty && !composer.snapshot.text.trim())
                 }
                 onClick={submit}
-                aria-busy={!!editing.busy || isQueueing}
+                aria-busy={readOnly}
               >
-                {editing.busy || isQueueing ? (
+                {readOnly ? (
                   <LoaderCircleIcon
                     aria-hidden="true"
                     className="size-3.5 animate-spin motion-reduce:animate-none"
@@ -587,25 +683,27 @@ function AgentComposerInner({
                 className="size-4 animate-spin motion-reduce:animate-none"
               />
             </Button>
-          ) : emptyAction && !isStreaming && !composer.snapshot.text.trim() ? (
+          ) : primaryAction ? (
             <Button
               type="button"
               size="icon-xs"
               className="size-7 rounded-full"
-              onClick={emptyAction.onClick}
-              aria-label={emptyAction.label}
+              onClick={() => {
+                setConfirmUntil(0);
+                primaryAction.onClick();
+              }}
+              aria-label={primaryAction.label}
             >
-              {emptyAction.icon}
-            </Button>
-          ) : isStreaming ? (
-            <Button
-              type="button"
-              size="icon-xs"
-              className="size-7 rounded-full"
-              onClick={onStop}
-              aria-label="Stop"
-            >
-              <SquareIcon className="size-3.5" />
+              {escapeAction && confirmUntil ? (
+                <kbd
+                  aria-hidden="true"
+                  className="font-sans text-[10px] leading-none font-semibold"
+                >
+                  Esc
+                </kbd>
+              ) : (
+                primaryAction.icon
+              )}
             </Button>
           ) : (
             <Button
@@ -625,6 +723,11 @@ function AgentComposerInner({
               <ArrowUpIcon className="size-4" />
             </Button>
           )}
+          <span role="status" className="sr-only">
+            {escapeAction && confirmUntil
+              ? `Press Escape again to ${escapeAction.label.toLowerCase()}.`
+              : ""}
+          </span>
         </div>
       </div>
     </ComposerMenuAnchor>

@@ -4,9 +4,308 @@ mod support;
 use agent_kit_core::messages::OutcomeStatus;
 use agent_kit_core::turn::{JournalAction, JournalChange, TurnOutcome};
 use agent_kit_core::{Envelope, ErrorKind, Fingerprint, SessionId, TurnId};
-use agent_kit_sessions::{ClaimOutcome, ClaimRequest, CreateSession, SessionStore, TurnSelection};
-use agent_kit_store_sqlite::{SqliteStore, catalog::CatalogPage};
+use agent_kit_sessions::{
+    ClaimOutcome, ClaimRequest, CreateSession, RecoveryRequest, SessionStore, TurnDisposition,
+    TurnSelection,
+};
+use agent_kit_store_sqlite::{
+    SqliteStore,
+    catalog::{CatalogPage, InitialLabel},
+};
 use support::{change, payload, private_directory, submission};
+
+fn conversation_store(filename: &std::path::Path) -> SqliteStore {
+    use agent_kit_core::history::HistoryRecord;
+    use agent_kit_core::messages::Role;
+    use agent_kit_store_sqlite::catalog::ConversationProjection;
+    SqliteStore::open_with_conversations(
+        filename,
+        project,
+        None,
+        ConversationProjection {
+            group: |env| {
+                matches!(env.bytes(), b"a" | b"b")
+                    .then(|| String::from_utf8(env.bytes().to_vec()).unwrap())
+            },
+            input: |input| input.payload.bytes() == b"message",
+            message: |message| message.role == Role::Assistant,
+            final_reply: |turn| {
+                turn.history()
+                    .records()
+                    .last()
+                    .map(|HistoryRecord::Message(message)| message.id.clone())
+            },
+            revised_reply: |_, _| Ok(None),
+        },
+    )
+    .unwrap()
+}
+
+#[tokio::test]
+async fn catalog_wakes_on_public_activity_and_skips_private_turns_and_checkpoints() {
+    use agent_kit_core::turn::{ResponseContract, WaitRecord};
+    use agent_kit_core::{SchemaId, WaitId};
+    use agent_kit_store_sqlite::catalog_reader::{CHANGE_FILE, LEASE_PREFIX};
+    use std::time::{Duration, UNIX_EPOCH};
+
+    let directory = private_directory();
+    let store = conversation_store(&directory.path().join("sessions.sqlite"));
+    let marker = std::fs::OpenOptions::new()
+        .write(true)
+        .open(directory.path().join(CHANGE_FILE))
+        .unwrap();
+    let baseline = UNIX_EPOCH + Duration::from_secs(1_600_000_000);
+    let reset = || marker.set_modified(baseline).unwrap();
+    let changed = || marker.metadata().unwrap().modified().unwrap() != baseline;
+    let lease_count = || {
+        std::fs::read_dir(directory.path())
+            .unwrap()
+            .filter(|entry| {
+                entry
+                    .as_ref()
+                    .unwrap()
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(LEASE_PREFIX)
+            })
+            .count()
+    };
+
+    for (name, public) in [("private", false), ("a", true)] {
+        reset();
+        let session = create(name, name);
+        let id = session.id.clone();
+        store.create(session).await.unwrap();
+        assert_eq!(changed(), public);
+        reset();
+        store
+            .submit(id.clone(), submission("input", "message"))
+            .await
+            .unwrap();
+        assert_eq!(changed(), public);
+        reset();
+        let request = ClaimRequest {
+            id: change("claim"),
+            session: id.clone(),
+            expected_revision: store.inspect(id).await.unwrap().revision,
+            selection: TurnSelection::New {
+                turn: support::turn(),
+                inputs: vec![change("input")],
+            },
+        };
+        let ClaimOutcome::Acquired(claim) = store.claim(request).await.unwrap() else {
+            panic!("expected a new owner")
+        };
+        assert_eq!(changed(), public);
+        assert_eq!(lease_count(), usize::from(public));
+        reset();
+        support::commit(
+            &claim,
+            "checkpoint",
+            vec![JournalAction::SetCheckpoint(payload("progress"))],
+        )
+        .await;
+        assert!(!changed());
+        let wait = WaitId::new("question").unwrap();
+        support::commit(
+            &claim,
+            "question",
+            vec![JournalAction::OpenWait(WaitRecord {
+                id: wait.clone(),
+                request: payload("choose"),
+                response: ResponseContract {
+                    schema: SchemaId::new("test.text").unwrap(),
+                    version: 1,
+                },
+                answer: None,
+                withdrawn: false,
+            })],
+        )
+        .await;
+        assert_eq!(changed(), public);
+        reset();
+        support::commit(&claim, "withdraw", vec![JournalAction::WithdrawWait(wait)]).await;
+        assert_eq!(changed(), public);
+        reset();
+        support::commit(
+            &claim,
+            "settle",
+            vec![JournalAction::Settle(TurnOutcome {
+                status: OutcomeStatus::Succeeded,
+                account: None,
+                evidence: vec![],
+            })],
+        )
+        .await;
+        assert_eq!(changed(), public);
+    }
+}
+
+#[tokio::test]
+async fn conversation_pages_seek_past_a_moved_anchor_and_date_only_new_messages() {
+    use agent_kit_core::MessageId;
+    use agent_kit_core::history::HistoryRecord;
+    use agent_kit_core::messages::{Content, Message, Provenance, ProvenanceKind, Role};
+    use agent_kit_store_sqlite::catalog::ConversationOrder::Recent;
+
+    let directory = private_directory();
+    let filename = directory.path().join("sessions.sqlite");
+    let open = || conversation_store(&filename);
+    let store = open();
+    let a = create("first", "a").id;
+    let b = create("second", "b").id;
+    for (id, group) in [
+        ("first", "a"),
+        ("second", "b"),
+        ("empty", "a"),
+        ("private", "private"),
+    ] {
+        store.create(create(id, group)).await.unwrap();
+    }
+    let message = submission("input", "message");
+    for id in [a.clone(), b.clone(), SessionId::new("private").unwrap()] {
+        store.submit(id, message.clone()).await.unwrap();
+    }
+    // Pin an old timestamp tie in the closed fixture instead of sleeping to
+    // arrange clock ticks. All observations and subsequent writes use the store.
+    drop(store);
+    let db = rusqlite::Connection::open(&filename).unwrap();
+    assert_eq!(
+        db.execute(
+            "UPDATE sessions SET last_message_ms=7 WHERE last_message_ms IS NOT NULL",
+            []
+        )
+        .unwrap(),
+        2
+    );
+    drop(db);
+    let store = open();
+    let first = store
+        .list_conversations(None, 0, Recent, None, 1)
+        .await
+        .unwrap();
+    assert_eq!(first.entries[0].record.entry.session, a);
+    let after = first.next_after.unwrap();
+    let claim_request = ClaimRequest {
+        id: change("claim"),
+        session: b.clone(),
+        expected_revision: store.inspect(b.clone()).await.unwrap().revision,
+        selection: TurnSelection::New {
+            turn: TurnId::new("turn").unwrap(),
+            inputs: vec![message.id.clone()],
+        },
+    };
+    let ClaimOutcome::Acquired(claim) = store.claim(claim_request).await.unwrap() else {
+        panic!("expected lease")
+    };
+    let mut renamed = store.catalog_entry(a.clone()).await.unwrap();
+    renamed.label = Some("renamed".into());
+    store.replace_catalog_entry(renamed).await.unwrap();
+    store.submit(a.clone(), message).await.unwrap(); // accepted retry
+    store
+        .submit(a.clone(), submission("internal", "internal"))
+        .await
+        .unwrap();
+    let before = store
+        .list_conversations(None, 0, Recent, None, 32)
+        .await
+        .unwrap()
+        .entries;
+    assert_eq!(
+        before
+            .iter()
+            .map(|r| r.record.last_message_ms)
+            .collect::<Vec<_>>(),
+        [Some(7), Some(7), None]
+    );
+    assert_eq!(
+        before[1].record.current_turn_disposition,
+        Some(TurnDisposition::Running)
+    );
+    store
+        .submit(a.clone(), submission("later", "message"))
+        .await
+        .unwrap();
+    let tail = store
+        .list_conversations(None, 0, Recent, Some(after), 1)
+        .await
+        .unwrap();
+    assert_eq!(tail.entries[0].record.entry.session, b);
+
+    let reply = HistoryRecord::Message(Message {
+        id: MessageId::new("reply").unwrap(),
+        role: Role::Assistant,
+        phase: None,
+        content: vec![Content::Text("reply".into())],
+        provenance: Provenance {
+            source: "fixture".into(),
+            kind: ProvenanceKind::Generated,
+            fingerprint: None,
+        },
+    });
+    support::commit(
+        &claim,
+        "publish",
+        vec![JournalAction::AppendHistory(vec![reply])],
+    )
+    .await;
+    let page = store
+        .list_conversations(Some("b".into()), 0, Recent, None, 32)
+        .await
+        .unwrap();
+    assert_eq!(page.entries.len(), 1);
+    assert_eq!(page.entries[0].group, "b");
+    assert_eq!(page.entries[0].record.entry.session, b);
+    assert!(page.entries[0].record.last_message_ms.unwrap() > 7);
+    // Publishing an intermediate message has not yet committed a final answer.
+    assert!(!page.entries[0].record.read_state.unread);
+    support::commit(
+        &claim,
+        "settle",
+        vec![JournalAction::Settle(TurnOutcome {
+            status: OutcomeStatus::Succeeded,
+            account: None,
+            evidence: vec![],
+        })],
+    )
+    .await;
+    let settled = store.catalog_record(b.clone()).await.unwrap();
+    assert!(settled.read_state.unread);
+    assert_eq!(settled.read_state.reply_id.as_deref(), Some("reply"));
+    use agent_kit_store_sqlite::catalog::ReadStateUpdate;
+    let acknowledge = ReadStateUpdate::Acknowledge {
+        revision: settled.read_state.revision,
+        reply_id: Some(MessageId::new("reply").unwrap()),
+    };
+    let seen = store
+        .update_read_state("b".into(), 0, b.clone(), acknowledge.clone())
+        .await
+        .unwrap();
+    assert!(!seen.unread);
+    let marked = store
+        .update_read_state("b".into(), 0, b.clone(), ReadStateUpdate::MarkUnread)
+        .await
+        .unwrap();
+    assert!(marked.unread);
+    assert_eq!(
+        store
+            .update_read_state("b".into(), 0, b.clone(), acknowledge)
+            .await
+            .unwrap(),
+        marked
+    );
+    assert!(
+        store
+            .update_read_state("a".into(), 0, b.clone(), ReadStateUpdate::MarkUnread)
+            .await
+            .is_err()
+    );
+    drop(claim);
+    drop(store);
+    let reopened = open().catalog_record(b).await.unwrap();
+    assert_eq!(reopened.read_state, marked);
+    assert_eq!(reopened.last_message_ms, settled.last_message_ms);
+}
 
 fn project(config: &Envelope) -> Option<Fingerprint> {
     match config.bytes() {
@@ -192,6 +491,240 @@ async fn catalog_organization_fences_edits() {
 }
 
 #[tokio::test]
+async fn the_first_input_and_its_label_commit_and_replay_together() {
+    let directory = private_directory();
+    let filename = directory.path().join("sessions.sqlite");
+    let store = SqliteStore::open_cataloged(&filename, project).unwrap();
+    let chat = create("first-label", "a");
+    let id = chat.id.clone();
+    store.create(chat).await.unwrap();
+    let first = submission("first", "request");
+    let rejected = store
+        .submit_with_initial_label(
+            id.clone(),
+            first.clone(),
+            None,
+            Some(InitialLabel::Display("x".repeat(257))),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(rejected.code, "session_catalog_label_too_large");
+    assert!(store.inspect(id.clone()).await.unwrap().queued.is_empty());
+    assert!(
+        store
+            .catalog_entry(id.clone())
+            .await
+            .unwrap()
+            .label
+            .is_none()
+    );
+
+    let (receipt, basis) = store
+        .submit_with_initial_label(
+            id.clone(),
+            first.clone(),
+            None,
+            Some(InitialLabel::Display("Excerpt".into())),
+        )
+        .await
+        .unwrap();
+    assert_eq!(receipt.position, 0);
+    let provisional = store.catalog_entry(id.clone()).await.unwrap();
+    assert_eq!(basis, Some(provisional.revision));
+    assert_eq!(provisional.label.as_deref(), Some("Excerpt"));
+    // Legacy submitters accepted inputs without a catalog suggestion receipt.
+    let legacy = create("legacy", "a");
+    let legacy_id = legacy.id.clone();
+    store.create(legacy).await.unwrap();
+    store
+        .submit(legacy_id.clone(), submission("old", "existing input"))
+        .await
+        .unwrap();
+    drop(store);
+
+    let store = SqliteStore::open_cataloged(&filename, project).unwrap();
+    let retry = store
+        .submit_with_initial_label(
+            id.clone(),
+            first,
+            None,
+            Some(InitialLabel::Display("Retry".into())),
+        )
+        .await
+        .unwrap();
+    assert_eq!(retry, (receipt, None));
+    let (later, basis) = store
+        .submit_with_initial_label(
+            id.clone(),
+            submission("later", "second request"),
+            None,
+            Some(InitialLabel::Display("Later".into())),
+        )
+        .await
+        .unwrap();
+    assert_eq!(later.position, 1);
+    assert!(basis.is_none());
+    assert_eq!(store.catalog_entry(id).await.unwrap(), provisional);
+    let (_, late) = store
+        .submit_with_initial_label(
+            legacy_id.clone(),
+            submission("new", "new input"),
+            None,
+            Some(InitialLabel::Display("Too late".into())),
+        )
+        .await
+        .unwrap();
+    assert!(late.is_none());
+    assert!(
+        store
+            .catalog_entry(legacy_id)
+            .await
+            .unwrap()
+            .label
+            .is_none()
+    );
+}
+
+#[tokio::test]
+async fn confirming_or_clearing_a_provisional_label_revokes_the_generation_revision() {
+    let store = SqliteStore::open_in_memory().unwrap();
+    for (name, initial, explicit) in [
+        (
+            "confirm",
+            InitialLabel::Display("Excerpt".into()),
+            Some("Excerpt".into()),
+        ),
+        ("clear", InitialLabel::Display("Excerpt".into()), None),
+        ("keep-untitled", InitialLabel::AwaitSuggestion, None),
+    ] {
+        let chat = create(name, "a");
+        let id = chat.id.clone();
+        store.create(chat).await.unwrap();
+        let (_, basis) = store
+            .submit_with_initial_label(
+                id.clone(),
+                submission("first", "request"),
+                None,
+                Some(initial),
+            )
+            .await
+            .unwrap();
+        let mut manual = store.catalog_entry(id.clone()).await.unwrap();
+        manual.label = explicit;
+        let confirmed = store.replace_catalog_entry(manual.clone()).await.unwrap();
+        assert!(confirmed.revision > basis.unwrap());
+        assert_eq!(
+            store.replace_catalog_entry(manual).await.unwrap(),
+            confirmed
+        );
+        store
+            .finish_label_suggestion(id.clone(), basis.unwrap(), "Generated".into())
+            .await
+            .unwrap();
+        assert_eq!(store.catalog_entry(id).await.unwrap(), confirmed);
+    }
+}
+
+#[tokio::test]
+async fn a_rename_can_cross_only_the_automatic_catalog_revisions() {
+    let directory = private_directory();
+    let filename = directory.path().join("sessions.sqlite");
+    let store = SqliteStore::open_cataloged(&filename, project).unwrap();
+    let chat = create("no-hint", "a");
+    let id = chat.id.clone();
+    store.create(chat).await.unwrap();
+    let (_, basis) = store
+        .submit_with_initial_label(
+            id.clone(),
+            submission("first", "request"),
+            None,
+            Some(InitialLabel::AwaitSuggestion),
+        )
+        .await
+        .unwrap();
+    let before = store.catalog_entry(id.clone()).await.unwrap();
+    store
+        .finish_label_suggestion(id.clone(), basis.unwrap(), "Generated".into())
+        .await
+        .unwrap();
+    drop(store);
+    let store = SqliteStore::open_cataloged(&filename, project).unwrap();
+    let generated = store.catalog_entry(id.clone()).await.unwrap();
+    assert_eq!(generated.label.as_deref(), Some("Generated"));
+    let mut stale_move = before.clone();
+    stale_move.bucket = 1;
+    assert_eq!(
+        store
+            .replace_catalog_entry(stale_move)
+            .await
+            .unwrap_err()
+            .code,
+        "session_catalog_revision_changed"
+    );
+    let cleared = store.replace_catalog_entry(before).await.unwrap();
+    assert!(cleared.revision > generated.revision && cleared.label.is_none());
+    let mut stale_rename = generated;
+    stale_rename.label = Some("Competing human rename".into());
+    assert_eq!(
+        store
+            .replace_catalog_entry(stale_rename)
+            .await
+            .unwrap_err()
+            .code,
+        "session_catalog_revision_changed"
+    );
+}
+
+#[tokio::test]
+async fn moving_a_chat_before_or_during_its_first_submission_preserves_title_ownership() {
+    let store = SqliteStore::open_in_memory().unwrap();
+    let chat = create("moved", "a");
+    let id = chat.id.clone();
+    store.create(chat).await.unwrap();
+    let mut entry = store.catalog_entry(id.clone()).await.unwrap();
+    entry.bucket = 1;
+    let mut archived = store.replace_catalog_entry(entry).await.unwrap();
+    archived.bucket = 0;
+    store.replace_catalog_entry(archived).await.unwrap();
+    let (_, basis) = store
+        .submit_with_initial_label(
+            id.clone(),
+            submission("first", "request"),
+            None,
+            Some(InitialLabel::Display("Excerpt".into())),
+        )
+        .await
+        .unwrap();
+    let provisional = store.catalog_entry(id.clone()).await.unwrap();
+    assert_eq!(provisional.label.as_deref(), Some("Excerpt"));
+    let mut archive = provisional.clone();
+    archive.bucket = 1;
+    let archived = store.replace_catalog_entry(archive.clone()).await.unwrap();
+    assert_eq!(
+        store.replace_catalog_entry(archive).await.unwrap(),
+        archived
+    );
+    store
+        .finish_label_suggestion(id.clone(), basis.unwrap(), "Generated".into())
+        .await
+        .unwrap();
+    let finished = store.catalog_entry(id.clone()).await.unwrap();
+    assert_eq!(finished.bucket, 1);
+    assert_eq!(finished.label.as_deref(), Some("Generated"));
+    let mut stale = provisional;
+    stale.label = Some("Stale".into());
+    assert_eq!(
+        store.replace_catalog_entry(stale).await.unwrap_err().code,
+        "session_catalog_revision_changed"
+    );
+    let mut human = archived;
+    human.label = Some("Owner".into());
+    let saved = store.replace_catalog_entry(human).await.unwrap();
+    assert_eq!(saved.bucket, 1);
+    assert_eq!(saved.label.as_deref(), Some("Owner"));
+}
+
+#[tokio::test]
 async fn a_catalog_profile_is_kept_by_the_database() {
     let directory = private_directory();
     let cataloged = directory.path().join("cataloged.sqlite");
@@ -224,6 +757,7 @@ async fn catalog_records_retain_turn_timing_across_settlement_retries_and_reopen
         .await
         .unwrap();
     assert_eq!(empty.latest_turn_activity_ms, None);
+    assert_eq!(empty.current_turn_disposition, None);
     assert_eq!(store.catalog_record(id.clone()).await.unwrap(), empty);
     for session in [id.clone(), SessionId::new("missing").unwrap()] {
         let error = store
@@ -279,6 +813,10 @@ async fn catalog_records_retain_turn_timing_across_settlement_retries_and_reopen
     assert_eq!(running.entry, empty.entry);
     assert_eq!(running.latest_turn_activity_ms, Some(started));
     assert_eq!(
+        running.current_turn_disposition,
+        Some(TurnDisposition::Running)
+    );
+    assert_eq!(
         store
             .list_catalog_records(scope, 0, None)
             .await
@@ -287,6 +825,29 @@ async fn catalog_records_retain_turn_timing_across_settlement_retries_and_reopen
         [running]
     );
 
+    let binding = claim.lease.binding().clone();
+    drop(claim);
+    assert_eq!(
+        store
+            .list_catalog_records(scope, 0, None)
+            .await
+            .unwrap()
+            .entries[0]
+            .current_turn_disposition,
+        Some(TurnDisposition::Interrupted)
+    );
+    let ClaimOutcome::Acquired(claim) = store
+        .recover(RecoveryRequest {
+            id: change("recover"),
+            session: id.clone(),
+            turn: binding.turn,
+            expected_epoch: binding.epoch,
+        })
+        .await
+        .unwrap()
+    else {
+        panic!("expected a recovery lease")
+    };
     let state = claim.lease.journal().load().await.unwrap();
     let finish = JournalChange::new(
         change("finish"),
@@ -308,6 +869,7 @@ async fn catalog_records_retain_turn_timing_across_settlement_retries_and_reopen
     let finished = store.catalog_record(id.clone()).await.unwrap();
     assert_eq!(finished.entry, empty.entry);
     assert_eq!(finished.latest_turn_activity_ms, Some(settled));
+    assert_eq!(finished.current_turn_disposition, None);
     assert_eq!(claim.lease.journal().commit(finish).await.unwrap(), receipt);
     assert!(matches!(
         store.claim(request).await.unwrap(),

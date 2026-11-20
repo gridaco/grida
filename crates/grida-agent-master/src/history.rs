@@ -45,6 +45,12 @@ pub fn model_context(state: &TurnState) -> Vec<HistoryRecord> {
     let mut previous_dropped = false;
     for record in records {
         let item = message(&record);
+        // A required answer already reaches the model through its tool result.
+        // Keep its attributed reply in the transcript exactly once.
+        if item.role == Role::User && item.provenance.source == crate::questions::TOOL_ANSWER_SOURCE
+        {
+            continue;
+        }
         if item.role == Role::Assistant && interrupted.contains(&item.id) {
             if !previous_dropped
                 && let Some(note) = interruption_note(state, output.len(), RESUMED_GUIDANCE)
@@ -122,6 +128,19 @@ pub fn project(state: &TurnState) -> Vec<HistoryRecord> {
             (&user.id, (index + 1, user))
         })
         .collect();
+    // An awaited answer is supplied to the model through the tool result.
+    // Its transcript bubble must precede every response based on that result.
+    let tool_answers: BTreeMap<_, _> = users
+        .iter()
+        .enumerate()
+        .filter_map(|(index, record)| {
+            let user = message(record);
+            if user.provenance.source != crate::questions::TOOL_ANSWER_SOURCE {
+                return None;
+            }
+            Some((user.id.as_str(), index + 1))
+        })
+        .collect();
     let mut responses = BTreeMap::new();
     for operation in state.operations().values() {
         let (OperationInput::Inference(request), Some(OperationOutcome::Inference(outcome))) =
@@ -136,6 +155,16 @@ pub fn project(state: &TurnState) -> Vec<HistoryRecord> {
             .try_fold(0, |basis, input| match user_positions.get(&input.id) {
                 Some(&(position, user)) if user == input => Some(basis.max(position)),
                 Some(_) => None,
+                None if input.role == Role::Tool => {
+                    Some(input.content.iter().fold(basis, |position, part| {
+                        match part {
+                            Content::ToolResult(result) => crate::questions::answered_wait(result)
+                                .and_then(|wait| tool_answers.get(wait))
+                                .map_or(position, |answer| position.max(*answer)),
+                            _ => position,
+                        }
+                    }))
+                }
                 None => Some(basis),
             });
         for response in outcome

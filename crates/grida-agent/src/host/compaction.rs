@@ -73,6 +73,8 @@ impl CompactionReport {
 
 #[derive(Serialize, Deserialize)]
 pub(super) struct CompactionPlan {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) route: Option<super::execution_routes::Selection>,
     source: HistoryBasis,
     request: PreparedRequest,
     coverage: Coverage,
@@ -177,8 +179,17 @@ impl Host {
                         }
                     }
                 }
-                Err(error) if error.code == "turn_missing" && !recover => Launch::Compact(request),
+                Err(error) if error.code == "turn_missing" && !recover => {
+                    Launch::Compact(request, None)
+                }
                 Err(error) => return Err(error),
+            };
+            let (host, launch) = match launch {
+                Launch::Compact(request, _) => {
+                    let (host, revision) = host.for_derived_session(&session).await?;
+                    (host, Launch::Compact(request, revision))
+                }
+                existing => (host, existing),
             };
             let ticket = {
                 let mut work = host.settled_work(&session).await?;
@@ -257,11 +268,15 @@ impl Host {
         session: &SessionId,
         turn: &TurnId,
         request: ChangeId,
+        revision: Option<u64>,
     ) -> Result<Option<Admitted>> {
         let _admission = self.configuration_admission.lock().await;
         let execution = self.execution()?;
         let view = self.store.inspect(session.clone()).await?;
-        self.check_execution(&view).await?;
+        if let Some(revision) = revision {
+            self.selection_at_revision(&view, revision)?;
+        }
+        self.check_new_submission(&view).await?;
         require_idle(&view)?;
         if !view.queued.is_empty() {
             return Err(problem(ErrorKind::Conflict, "session_queue_waiting"));
@@ -273,6 +288,7 @@ impl Host {
         let expected_revision = prefix.history.session_revision;
         let defaults = self.with_configuration(Configuration::snapshot).await?;
         let mut plan = compaction_plan_for(
+            self.selected_route.clone(),
             execution,
             &execution.config,
             defaults.defaults.context.max_input_tokens,
@@ -398,6 +414,7 @@ impl Host {
                 return Ok(None);
             }
             let Some(plan) = compaction_plan_for(
+                self.selected_route.clone(),
                 execution,
                 &input.config,
                 input.limit,
@@ -427,6 +444,7 @@ impl Host {
                 .await
                 .unwrap_or(false);
         let Some(plan) = compaction_plan_for(
+            self.selected_route.clone(),
             execution,
             &input.config,
             input.limit,
@@ -861,6 +879,7 @@ pub(super) fn ordinary_text(ultra: bool, parts: &[PromptPart]) -> bool {
 }
 
 fn compaction_plan_for(
+    route: Option<super::execution_routes::Selection>,
     execution: &Execution,
     configuration: &MasterConfig,
     limit: Option<NonZeroU64>,
@@ -934,6 +953,7 @@ fn compaction_plan_for(
         request = request.with_input_limit(limit)?;
     }
     Ok(Some(CompactionPlan {
+        route,
         source,
         request,
         coverage,

@@ -1,5 +1,6 @@
 //! Authenticated loopback WebSocket binding for independent ACP clients.
 
+use super::catalog_service::Catalog;
 use super::serve_connection;
 use super::transport::{Delivery, MAX_FRAME_BYTES, WRITE_TIMEOUT, wire_error};
 use crate::host::Host;
@@ -43,6 +44,16 @@ pub async fn serve_websocket(host: Arc<Host>, options: ListenOptions) -> Result<
     if host.sweep_side_chats().await.is_err() {
         eprintln!("grida-agent: side chat cleanup is pending");
     }
+    listen(Service::Agent(host), options).await
+}
+
+#[derive(Clone)]
+pub(super) enum Service {
+    Agent(Arc<Host>),
+    Catalog(Catalog),
+}
+
+pub(super) async fn listen(service: Service, options: ListenOptions) -> Result<()> {
     let listener = TcpListener::bind(options.address)
         .await
         .map_err(|_| Error::new(ErrorKind::Unavailable, "acp_listener_unavailable"))?;
@@ -64,13 +75,13 @@ pub async fn serve_websocket(host: Arc<Host>, options: ListenOptions) -> Result<
                 if clients.len() >= MAX_CLIENTS {
                     continue;
                 }
-                let host = host.clone();
+                let service = service.clone();
                 let host_header = host_header.clone();
                 let authorization = authorization.clone();
                 clients.spawn(async move {
                     // The listener owns the Host. A failed or disconnected
                     // client drops its own transport and observers only.
-                    let _ = serve_client(stream, host, host_header, authorization).await;
+                    let _ = serve_client(stream, service, host_header, authorization).await;
                 });
             }
         }
@@ -79,7 +90,7 @@ pub async fn serve_websocket(host: Arc<Host>, options: ListenOptions) -> Result<
 
 async fn serve_client(
     stream: TcpStream,
-    host: Arc<Host>,
+    service: Service,
     host_header: Arc<String>,
     authorization: Arc<Zeroizing<Vec<u8>>>,
 ) -> AcpResult<()> {
@@ -150,7 +161,16 @@ async fn serve_client(
         Ok(())
     };
     tokio::try_join!(
-        serve_connection(host, sdk, delivery.clone(), None, None),
+        async {
+            match service {
+                Service::Agent(host) => {
+                    serve_connection(host, sdk, delivery.clone(), None, None).await
+                }
+                Service::Catalog(catalog) => {
+                    super::catalog_service::connect(catalog, sdk, delivery.clone()).await
+                }
+            }
+        },
         read,
         write
     )?;

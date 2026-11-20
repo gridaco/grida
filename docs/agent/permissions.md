@@ -18,8 +18,9 @@ Desktop chat in a project uses the **Default** access, shown in the composer.
 The agent reads and edits files in the project and runs commands there in a
 sandbox without asking. For example, ask “Run the tests and fix what fails.”
 
-- Commands start from your login shell's environment, so your usual tools
-  work.
+- Desktop reads your login shell's environment from your home folder so
+  commands can find your usual tools. If shell startup stalls, Desktop uses
+  its own environment and opens chat.
 - Commands can read elsewhere on your computer, except Grida's own data and
   saved credentials. They can write only in the project and the system's
   temporary folder, and they cannot reach the internet.
@@ -46,10 +47,15 @@ administrator privileges, supply missing service credentials or automatically
 configure a program's proxy support.
 
 The choice belongs to that chat and survives reopening. Other chats keep their
-own choice, and new chats begin with Default. Change access while the chat is
-idle, its queue is empty and it has no running command processes. Use the
-Processes controls to stop those processes before changing access. Accepted
-work and subagents keep the permissions captured for their assignment.
+own choice, and new chats begin with Default. You can change access while a
+turn is running or messages are queued. The new access applies to messages
+you send after the change. A running turn, an earlier queued message and a
+subagent keep the access granted for their work.
+
+To end earlier Full-access work immediately, stop the running turn and remove
+any Full-access messages still in the queue. Check **Processes** for commands
+you also want to stop. A new Default turn cannot send input to an existing
+Full-access terminal.
 
 Choose **Default** again to restore restricted access for subsequent work.
 **Plan** continues to withhold commands and file changes in either mode.
@@ -59,10 +65,14 @@ Grida does not promise isolation from hostile same-user code.
 
 On Home, choosing **Full access** opens the same confirmation immediately.
 Confirm to select Full access for the new chat in your chosen project. You can
-keep drafting and change the model or effort before sending. Cancel keeps the
-draft and Default access. Changing the project resets access to Default.
+keep drafting and change the model or effort before sending. On supported
+Desktop builds, switching Home presets keeps that approval for the same
+project. Cancel keeps the draft and Default access. Changing the project
+resets access to Default.
 
-Full access needs a compatible native Desktop build. Older builds keep Default.
+Full access needs a compatible native Desktop build. Earlier builds that offer
+the picker can require the chat and its processes to finish before changing access.
+Builds without the picker use Default.
 Automatic approval review, sometimes called **Approve for me**, is not offered
 by Desktop.
 

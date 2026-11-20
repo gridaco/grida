@@ -1,4 +1,4 @@
-// GRIDA-SEC-004 / GRIDA-SEC-008 / GRIDA-SEC-014 — each chat worker binds one approved model route; chats belong to the workspace.
+// GRIDA-SEC-004 / GRIDA-SEC-008 / GRIDA-SEC-014 — Main binds a catalog choice to an approved provider and model.
 import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import fs from "node:fs/promises";

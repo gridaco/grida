@@ -52,6 +52,18 @@ describe("agent_notifications.decideNative — when to notify (RFC events §when
     expect(agent_notifications.decideNative(settled("cancelled"))).toBeNull();
   });
 
+  it("bounds the notification excerpt without splitting a Unicode character", () => {
+    const text = "🌱".repeat(181);
+    const decision = agent_notifications.decideNative(settled("succeeded"), {
+      title: "Garden",
+      text,
+    });
+    expect(decision).toEqual({
+      title: "Garden",
+      body: "🌱".repeat(179) + "…",
+    });
+  });
+
   it("is silent on a status this build does not know (skew fail-quiet)", () => {
     expect(
       agent_notifications.decideNative(settled("timed_out" as never))

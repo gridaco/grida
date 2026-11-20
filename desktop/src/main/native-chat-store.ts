@@ -44,6 +44,10 @@ export class NativeChatStore {
     readonly hooksHome: string
   ) {}
 
+  get catalogRegistryDirectory() {
+    return this.stateDirectory;
+  }
+
   /** Main-owned identity receipts for selected standalone documents. */
   get documentIdentitiesDirectory(): string {
     return path.join(this.stateDirectory, "document-identities");
@@ -147,7 +151,7 @@ export class NativeChatStore {
   }
 
   /** Existing private store only; catalog inspection must never initialize a chat. */
-  async archiveDirectory(
+  async existingWorkspaceDirectory(
     workspaceId: string,
     root: string
   ): Promise<string | null> {
@@ -209,7 +213,7 @@ export class NativeChatStore {
     return await this.startAt({ ...launch, cwd, processCwd: cwd }, state);
   }
 
-  private async requireProviderIsolation(
+  async requireProviderIsolation(
     launch: Pick<Launch, "credentialHome">
   ): Promise<void> {
     if (

@@ -17,7 +17,7 @@
 
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SvgEditor } from "@grida/svg-editor";
 import { cn } from "@app/ui/lib/utils";
 import {
@@ -25,7 +25,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@app/ui/components/resizable";
-import { useDesktopBridge } from "@/lib/desktop/bridge";
+import { getDesktopBridge, useDesktopBridge } from "@/lib/desktop/bridge";
 import { TitleBar } from "../chrome/title-bar";
 import { DesktopCanvasBundleShell } from "../canvas/canvas-bundle-shell";
 import { WorkspaceChangesProvider } from "../workbench/workspace-changes";
@@ -84,13 +84,18 @@ export function DesktopFileShell({
     (editor: SvgEditor | null) => fileSurface.setEditor(editor),
     [fileSurface]
   );
-  // The deck auto-persists (no dirty) and has no filename — its title is the
-  // bundle dir's basename, falling back to a generic label for a directly-opened
-  // `.canvas` (whose workspace name we'd need a bridge call to resolve; the
-  // deck's own "Slides" header carries the affordance anyway). A single-file's
-  // title arrives later via `onMeta` once the doc loads, so it starts blank.
-  // `mode`/`basePath` are fixed per mount (the page keys the shell), so a lazy
-  // initializer is enough — no effect needed.
+  const reportDeckDirty = useCallback((dirty: boolean) => {
+    void getDesktopBridge()
+      ?.window.set_document_edited(dirty)
+      .catch(() => {});
+  }, []);
+  useEffect(() => {
+    // Deck windows can report clean even while opening or when showing a board.
+    if (mode === "deck") reportDeckDirty(false);
+  }, [mode, reportDeckDirty]);
+
+  // A deck uses its bundle name and shows unsaved slide edits on the slide
+  // itself. A single-file title arrives via `onMeta` once the document loads.
   const [meta, setMeta] = useState<FileMeta>(() =>
     mode === "deck"
       ? {
@@ -185,6 +190,7 @@ export function DesktopFileShell({
                 <DesktopCanvasBundleShell
                   workspaceId={workspaceId!}
                   basePath={basePath}
+                  onDirtyChange={reportDeckDirty}
                   slideSurfaceHost={
                     nativeChat?.deckSvgText && fileChatAvailable
                       ? fileSurface

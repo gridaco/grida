@@ -80,6 +80,52 @@ describe("EditorGroup — open / activate", () => {
   });
 });
 
+describe("EditorGroup — move", () => {
+  it("publishes the new order while preserving the selected tab and close history", () => {
+    const g = new EditorGroup();
+    g.open("closed");
+    g.close("closed");
+    g.open("a");
+    g.open("b");
+    g.open("c");
+    g.activate("b");
+    const previous = g.getSnapshot();
+    const listener = vi.fn<() => void>();
+    g.subscribe(listener);
+
+    g.move("b", "c");
+    expect(snap(g)).toEqual({ tabs: ["a", "c", "b"], active: "b" });
+    expect(previous.tabs).toEqual(["a", "b", "c"]);
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    g.move("c", "a");
+    expect(snap(g)).toEqual({ tabs: ["c", "a", "b"], active: "b" });
+    g.close("b");
+    expect(g.getSnapshot().active).toBe("a");
+    g.reopenClosed();
+    g.reopenClosed();
+    expect(snap(g)).toEqual({
+      tabs: ["c", "a", "b", "closed"],
+      active: "closed",
+    });
+  });
+
+  it("ignores an unchanged position or a tab closed during the gesture", () => {
+    const g = new EditorGroup();
+    g.restore({ tabs: ["a", "b"], active: "a" });
+    const previous = g.getSnapshot();
+    const listener = vi.fn<() => void>();
+    g.subscribe(listener);
+
+    g.move("a", "a");
+    g.move("a", "closed");
+    g.move("closed", "b");
+
+    expect(g.getSnapshot()).toBe(previous);
+    expect(listener).not.toHaveBeenCalled();
+  });
+});
+
 describe("EditorGroup — replace", () => {
   it("replaces the active tab at its index with one atomic publication", () => {
     const g = new EditorGroup();

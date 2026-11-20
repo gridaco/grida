@@ -61,7 +61,7 @@ import {
   DESKTOP_WINDOW_CONTROLS_RIGHT_INSET,
   TitleBar,
 } from "@/scaffolds/desktop/chrome/title-bar";
-import { LastWorkspaceMarker } from "@/scaffolds/desktop/shared/last-workspace-marker";
+import { WindowContentMarker } from "@/scaffolds/desktop/shared/window-content-marker";
 import {
   getDesktopBridge,
   terminal as bridgeTerminal,
@@ -118,7 +118,9 @@ const FLOATING_BOTTOM_SURFACE_GUTTER_CLASS =
 const FLOATING_UTILITY_SURFACE_CLASS =
   "relative h-full min-h-0 overflow-hidden rounded-lg border border-border/60 bg-background shadow-[0_1px_2px_rgb(0_0_0/0.04),0_8px_24px_-8px_rgb(0_0_0/0.12)]";
 const RESIZE_HANDLE_HIGHLIGHT_CLASS =
-  "before:pointer-events-none before:absolute before:z-10 before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-linear-to-b before:from-transparent before:via-muted-foreground/55 before:to-transparent before:opacity-0 before:transition-opacity hover:before:opacity-100 active:before:via-foreground/70 active:before:opacity-100 focus-visible:before:opacity-100 aria-[orientation=horizontal]:before:inset-x-0 aria-[orientation=horizontal]:before:inset-y-auto aria-[orientation=horizontal]:before:left-0 aria-[orientation=horizontal]:before:top-1/2 aria-[orientation=horizontal]:before:h-px aria-[orientation=horizontal]:before:w-full aria-[orientation=horizontal]:before:-translate-y-1/2 aria-[orientation=horizontal]:before:translate-x-0 aria-[orientation=horizontal]:before:bg-linear-to-r";
+  "before:pointer-events-none before:absolute before:z-10 before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-linear-to-b before:from-transparent before:via-muted-foreground/55 before:to-transparent before:opacity-0 before:transition-opacity hover:before:opacity-100 data-[separator=hover]:before:opacity-100 data-[separator=active]:before:via-foreground/70 data-[separator=active]:before:opacity-100 focus-visible:before:opacity-100 aria-[orientation=horizontal]:before:inset-x-0 aria-[orientation=horizontal]:before:inset-y-auto aria-[orientation=horizontal]:before:left-0 aria-[orientation=horizontal]:before:top-1/2 aria-[orientation=horizontal]:before:h-px aria-[orientation=horizontal]:before:w-full aria-[orientation=horizontal]:before:-translate-y-1/2 aria-[orientation=horizontal]:before:translate-x-0 aria-[orientation=horizontal]:before:bg-linear-to-r";
+// The hit box overlaps each pane by 8px and occupies the original 6px gap.
+const CHAT_PANE_RESIZE_HANDLE_CLASS = `desktop-no-drag z-20 -mx-2 w-[22px] cursor-col-resize bg-transparent after:pointer-events-none ${RESIZE_HANDLE_HIGHLIGHT_CLASS}`;
 const RESIZE_GUTTER_CLASS = `z-20 w-1.5 cursor-col-resize bg-transparent after:w-3 aria-[orientation=horizontal]:h-1.5 aria-[orientation=horizontal]:cursor-row-resize aria-[orientation=horizontal]:after:h-3 ${RESIZE_HANDLE_HIGHLIGHT_CLASS}`;
 const DOCKED_PANE_RESIZE_HANDLE_CLASS = `desktop-no-drag z-20 -mx-1.5 w-3 cursor-col-resize bg-transparent after:w-3 ${RESIZE_HANDLE_HIGHLIGHT_CLASS}`;
 // Bottom utility panel (VSCode-style). Collapsible: dragging it under
@@ -127,13 +129,22 @@ const DOCKED_PANE_RESIZE_HANDLE_CLASS = `desktop-no-drag z-20 -mx-1.5 w-3 cursor
 const UTILITY_PANE_DEFAULT = "30%";
 const UTILITY_PANE_MIN = "120px";
 
+function captureResizeHandlePointer(event: ReactPointerEvent<HTMLDivElement>) {
+  if (event.isPrimary && event.button === 0) {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    // Electron can route moves into a webview despite shell pointer capture.
+    // Suspend guest hit-testing before the first move, without hiding the page.
+    event.currentTarget.dataset.workbenchResizeCapture = "";
+  }
+}
+
 /**
  * Separators remain keyboard-focusable for arrow-key resizing, but pointer
  * interaction should not leave their focus ring pinned on screen afterward.
  */
-function releaseResizeHandlePointerFocus(
-  event: ReactPointerEvent<HTMLDivElement>
-) {
+function finishResizeHandlePointer(event: ReactPointerEvent<HTMLDivElement>) {
+  if (!event.isPrimary) return;
+  delete event.currentTarget.dataset.workbenchResizeCapture;
   event.currentTarget.blur();
 }
 
@@ -255,6 +266,19 @@ export function WorkspaceWorkbench({
   const [dirtyPaths, setDirtyPaths] = useState<ReadonlySet<string>>(
     () => new Set()
   );
+  const hasUnsavedChanges = dirtyPaths.size > 0;
+  useEffect(() => {
+    void getDesktopBridge()
+      ?.window.set_document_edited(hasUnsavedChanges)
+      .catch(() => {});
+  }, [hasUnsavedChanges]);
+  useEffect(() => {
+    return () => {
+      void getDesktopBridge()
+        ?.window.set_document_edited(false)
+        .catch(() => {});
+    };
+  }, []);
   const onTabDirtyChange = useCallback((relPath: string, dirty: boolean) => {
     setDirtyPaths((prev) => {
       if (prev.has(relPath) === dirty) return prev;
@@ -460,6 +484,10 @@ export function WorkspaceWorkbench({
     (tab: string) => group.activate(tab),
     [group]
   );
+  const moveTab = useCallback(
+    (tab: string, targetTab: string) => group.move(tab, targetTab),
+    [group]
+  );
   const closeTab = useCallback(
     async (tab: string): Promise<boolean> => {
       const target = WorkbenchTab.parse(tab);
@@ -488,7 +516,7 @@ export function WorkspaceWorkbench({
 
   return (
     <WorkspaceChangesProvider workspaceId={workspace.id}>
-      <LastWorkspaceMarker workspaceId={workspace.id} surface="workbench" />
+      <WindowContentMarker workspaceId={workspace.id} surface="workbench" />
       <div
         data-testid="workspace-workbench"
         className="h-screen w-screen overflow-hidden"
@@ -549,9 +577,11 @@ export function WorkspaceWorkbench({
               a divider back into the visual hierarchy. */}
           <ResizableHandle
             aria-label="Resize chat and document"
-            className={RESIZE_GUTTER_CLASS}
-            onPointerUp={releaseResizeHandlePointerFocus}
-            onPointerCancel={releaseResizeHandlePointerFocus}
+            className={CHAT_PANE_RESIZE_HANDLE_CLASS}
+            onPointerDown={captureResizeHandlePointer}
+            onPointerUp={finishResizeHandlePointer}
+            onPointerCancel={finishResizeHandlePointer}
+            onLostPointerCapture={finishResizeHandlePointer}
           />
 
           <ResizablePanel
@@ -582,6 +612,7 @@ export function WorkspaceWorkbench({
                         dirtyPaths={dirtyPaths}
                         onTabDirtyChange={onTabDirtyChange}
                         onSelectTab={activateTab}
+                        onMoveTab={moveTab}
                         onCloseTab={closeTab}
                         onReopenClosedTab={reopenClosedTab}
                         showStart={showStart}
@@ -601,8 +632,10 @@ export function WorkspaceWorkbench({
                         <ResizableHandle
                           aria-label="Resize document and workspace utilities"
                           className={RESIZE_GUTTER_CLASS}
-                          onPointerUp={releaseResizeHandlePointerFocus}
-                          onPointerCancel={releaseResizeHandlePointerFocus}
+                          onPointerDown={captureResizeHandlePointer}
+                          onPointerUp={finishResizeHandlePointer}
+                          onPointerCancel={finishResizeHandlePointer}
+                          onLostPointerCapture={finishResizeHandlePointer}
                         />
                         <ResizablePanel
                           data-workbench-decorative-overflow
@@ -635,8 +668,10 @@ export function WorkspaceWorkbench({
                     <ResizableHandle
                       aria-label="Resize document and file tree"
                       className={DOCKED_PANE_RESIZE_HANDLE_CLASS}
-                      onPointerUp={releaseResizeHandlePointerFocus}
-                      onPointerCancel={releaseResizeHandlePointerFocus}
+                      onPointerDown={captureResizeHandlePointer}
+                      onPointerUp={finishResizeHandlePointer}
+                      onPointerCancel={finishResizeHandlePointer}
+                      onLostPointerCapture={finishResizeHandlePointer}
                     />
                     <ResizablePanel
                       defaultSize={FILE_TREE_PANE_DEFAULT}

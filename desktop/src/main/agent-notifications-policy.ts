@@ -8,10 +8,14 @@
  * `agent-notifications.ts`.
  */
 
-import type { NativeChatLifecycle } from "./native-agent-chat";
+import type {
+  NativeChatCompletionPreview,
+  NativeChatLifecycle,
+} from "./native-agent-chat";
 
-/** Title shown on native chat notifications; chat content stays private. */
+/** Default title for lifecycle notifications without a chat title. */
 export const FALLBACK_TITLE = "Grida Agent";
+const MAX_PREVIEW_LENGTH = 180;
 
 export namespace agent_notifications {
   export type Decision = {
@@ -29,13 +33,24 @@ export namespace agent_notifications {
    * notify-or-silent for it. At runtime an unknown value (version skew)
    * falls through to SILENT — never to a wrong notification.
    */
-  export function decideNative(event: NativeChatLifecycle): Decision | null {
+  export function decideNative(
+    event: NativeChatLifecycle,
+    preview?: NativeChatCompletionPreview
+  ): Decision | null {
     const title = FALLBACK_TITLE;
+    if (event.kind === "question_asked")
+      return {
+        title: event.title ?? (event.side ? "Side chat" : title),
+        body: event.question,
+      };
     if (event.kind === "approval_required")
       return { title, body: "Waiting for your approval" };
     switch (event.status) {
       case "succeeded":
-        return { title, body: "Turn completed" };
+        return {
+          title: preview?.title?.trim() || title,
+          body: responsePreview(preview?.text) || "Turn completed",
+        };
       case "failed":
         return { title, body: "Run failed" };
       case "uncertain":
@@ -45,6 +60,18 @@ export namespace agent_notifications {
       default:
         return silentOnUnknown(event.status);
     }
+  }
+
+  function responsePreview(text: string | null | undefined): string {
+    const line = (text ?? "").replace(/[\s\p{Cc}]+/gu, " ").trim();
+    const characters = Array.from(line);
+    if (characters.length <= MAX_PREVIEW_LENGTH) return line;
+    return (
+      characters
+        .slice(0, MAX_PREVIEW_LENGTH - 1)
+        .join("")
+        .trimEnd() + "…"
+    );
   }
 
   /**

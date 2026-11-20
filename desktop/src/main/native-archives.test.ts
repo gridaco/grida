@@ -40,8 +40,8 @@ function fixture() {
     resourcesPath: "/resources",
     workspaces: async () => [b, a],
     resolve,
-    directory: async (id) => `/private/${id}`,
-    active,
+    withStore: async (workspace, use) =>
+      use(active(workspace.id), `/private/${workspace.id}`),
     execute,
   });
   return { owner, execute, active, resolve };

@@ -88,17 +88,25 @@ The kit never rereads the displayed source path. Missing capability or bytes
 show **Preview unavailable**, and failed calls show their failure text without
 loading pixels. Legacy inline `{ok, mime, data}` results remain displayable.
 
-## The agent's question (session-global)
+## Questions and replies
 
-The locked `question` tool **asks** — the run pauses on a human. The kit models
-this like a supervised-approval bar, NOT a tool card: the surface finds the one
-open question and pins `QuestionPrompt` above its composer.
+The surface pins pending questions above the owning chat's composer.
+A required question waits for an answer or an explicit skip. An optional
+question allows independent work to continue. Close and Skip return it to an
+**Answer question** button in the transcript. The person can reopen their
+draft until the question is answered or the turn ends. Earlier hosts keep
+their explicit skip behavior.
 
 `QuestionPrompt` owns its in-progress form selections (the same kind of
 transient UI state as the collapsibles); the **committed** answer leaves through
 `onSubmit` with the React-free `QuestionSurvey`, and the surface delivers it to
-the agent. The kit never touches the transport. `AnsweredQuestionSummary` is the
-read-only echo the transcript shows once answered.
+the agent. `submitDisabled` gates the submission while the surface refreshes
+the review. Draft controls stay editable. Enter in the custom field invokes
+Next or Submit, and Shift+Enter inserts a line break. The kit never touches the
+transport. A native reply carries the host-attributed question and displays it
+above the person's answer in one bubble. The finished turn's **Worked**
+disclosure contains the reply. Survey-shaped tool outputs keep their
+read-only `AnsweredQuestionSummary`.
 
 ## Contract (kit rules)
 

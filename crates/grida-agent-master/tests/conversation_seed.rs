@@ -188,6 +188,15 @@ fn further_derivation_preserves_origin_and_can_cut_before_inherited_user() {
     )
     .unwrap();
     let original_entry = seed.provenance().entries[0].clone();
+    let visible = original_entry.message.as_ref().unwrap();
+    assert_eq!(
+        seed.provenance().retained_message_id("request"),
+        Some(visible)
+    );
+    assert_eq!(
+        seed.provenance().retained_message_id(visible.as_str()),
+        Some(visible)
+    );
     let inherited = ConversationAnchor::Inherited {
         message: original_entry.message.clone().unwrap(),
     };
@@ -199,6 +208,11 @@ fn further_derivation_preserves_origin_and_can_cut_before_inherited_user() {
     )
     .unwrap();
     assert_eq!(fork.provenance().source.session.as_str(), "fork");
+    assert_eq!(fork.provenance().retained_message_id("request"), None);
+    assert_eq!(
+        fork.provenance().retained_message_id(visible.as_str()),
+        Some(visible)
+    );
     assert_eq!(fork.provenance().entries, vec![original_entry]);
     assert_eq!(fork.into_parts().unwrap().0.len(), 1);
 

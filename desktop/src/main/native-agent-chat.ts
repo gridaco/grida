@@ -37,10 +37,12 @@ import type {
   NativeChatPermissionMode,
   NativeChatPermissionState,
   NativeChatPage,
+  NativeChatReadState,
   NativeChatQuestion,
   NativeChatQuestionAnswer,
   NativeChatQueueChange,
   NativeChatQueuedMessage,
+  NativeChatQueueItem,
   NativeChatQueuePage,
   NativeChatQueueReceipt,
   NativeChatSideRefusal,
@@ -98,6 +100,7 @@ import {
 } from "./native-agent-process";
 import { NativeGatewayConnection } from "./native-gateway-connection";
 import type { NativeChatSelections } from "./native-chat-selections";
+import { NativeChatTitle } from "./native-chat-title";
 
 const CAPABILITIES = {
   "co.grida/session/submit": 1,
@@ -204,6 +207,7 @@ const MAX_CATALOG_SESSIONS = 32;
 const MAX_TITLE_BYTES = 256;
 const LIFECYCLE = "co.grida/session/lifecycle";
 const RECENT_LIFECYCLE = 256;
+const NOTIFICATION_PREVIEW_TIMEOUT_MS = 3_000;
 const MAX_QUEUE_INPUTS = 256;
 const QUEUE_PAGE_SIZE = 8;
 const QUEUE_PREVIEW_LENGTH = 2048;
@@ -222,14 +226,35 @@ export type NativeAgentChatLaunch = Omit<
   onLifecycle?: (event: NativeChatLifecycle, current: () => boolean) => void;
 };
 
+export type NativeChatCompletionPreview = Readonly<{
+  title: string | null;
+  text: string | null;
+}>;
+
 export type NativeChatLifecycle = Readonly<
   { sessionId: string; turnId: string } & (
-    | { kind: "settled"; status: NativeChatTurnSummary["status"] }
+    | {
+        kind: "settled";
+        status: NativeChatTurnSummary["status"];
+        readPreview?: () => Promise<NativeChatCompletionPreview>;
+      }
     | { kind: "approval_required"; waitId: string }
+    | {
+        kind: "question_asked";
+        waitId: string;
+        session: NativeChatSession;
+        side: boolean;
+        title: string | null;
+        question: string;
+      }
   )
 >;
 
-export type NativeChatSession = Readonly<{ id: string }>;
+export type NativeChatSession = Readonly<{
+  id: string;
+  /** Image capability of the fixed execution inherited by a side chat. */
+  sideImageInput?: boolean;
+}>;
 type TaskBasis = Readonly<{
   sessionId: string;
   turnId: string;
@@ -239,7 +264,10 @@ type TaskBasis = Readonly<{
 }>;
 
 export type NativeQuestionReview = Readonly<
-  Pick<NativeChatQuestion, "style" | "question" | "options"> & {
+  Pick<
+    NativeChatQuestion,
+    "style" | "question" | "options" | "expiresWithTurn"
+  > & {
     task: TaskBasis;
     waitId: string;
     expectedHistoryPosition: number;
@@ -257,6 +285,7 @@ export type NativeLibrarySelectionReview = Readonly<{
 type QueuePosition = Readonly<{
   inputId: string;
   inputPosition: number;
+  preview?: string;
   goalStart?: NativeChatGoalRequest;
   operatingRegime?: NativeChatOperatingRegime;
   effort?: "ultra";
@@ -375,6 +404,10 @@ export class NativeAgentChat {
       (method, input) => this.process.request(method, input),
       this.cwd
     ).update(session.id, revision, requestId, mode);
+  }
+
+  get acceptsInputRoutes(): boolean {
+    return this.connected && this.process.acceptsInputRoutes;
   }
 
   get acceptsSelection(): boolean {
@@ -538,52 +571,45 @@ export class NativeAgentChat {
     this.requireOpen();
     if (cursor !== null && !isCatalogCursor(cursor))
       throw new Error("native_chat_cursor_invalid");
-    const result = object(
-      await this.process.request(
-        archived ? "_co.grida/session/list-archived" : "session/list",
-        {
-          cwd: this.cwd,
-          ...(cursor === null ? {} : { cursor }),
-        }
-      )
+    const result = await this.process.request(
+      archived ? "_co.grida/session/list-archived" : "session/list",
+      { cwd: this.cwd, ...(cursor === null ? {} : { cursor }) }
     );
-    if (
-      !Array.isArray(result.sessions) ||
-      result.sessions.length > MAX_CATALOG_SESSIONS
-    )
-      throw invalidResponse();
-    const titles: NonNullable<NativeChatPage["titles"]>[number][] = [];
-    const lastActivity: NonNullable<NativeChatPage["lastActivity"]>[number][] =
-      [];
-    const sessionIds = result.sessions.map((entry: unknown) => {
-      const session = object(entry);
-      if (session.cwd !== this.cwd) throw invalidResponse();
-      const sessionId = identity(session.sessionId);
-      const title = catalogTitle(session.title ?? null);
-      if (title !== null) titles.push({ sessionId, title });
-      const atMs = catalogActivityTime(
-        session._meta == null
-          ? undefined
-          : object(session._meta)["co.grida/lastActivityAtMs"]
-      );
-      if (atMs !== undefined) lastActivity.push({ sessionId, atMs });
-      return sessionId;
-    });
-    const nextCursor = result.nextCursor ?? null;
-    if (
-      new Set(sessionIds).size !== sessionIds.length ||
-      (nextCursor !== null &&
-        (!isCatalogCursor(nextCursor) ||
-          nextCursor === cursor ||
-          sessionIds.length === 0))
-    )
-      throw invalidResponse();
+    const { sessions, ...page } = readNativeSessionList(
+      result,
+      this.cwd,
+      cursor,
+      archived
+    );
+    const titles = sessions.flatMap(({ sessionId, title }) =>
+      title === null ? [] : [{ sessionId, title }]
+    );
+    const lastActivity = sessions.flatMap(
+      ({ sessionId, lastActivityAtMs: atMs }) =>
+        atMs === undefined ? [] : [{ sessionId, atMs }]
+    );
     return {
-      sessionIds,
-      nextCursor,
+      sessionIds: sessions.map((entry) => entry.sessionId),
+      ...page,
       ...(titles.length && { titles }),
+      ...(sessions.some((row) => row.readState) && {
+        readStates: sessions.flatMap(({ sessionId, readState }) =>
+          readState ? [{ sessionId, ...readState }] : []
+        ),
+      }),
       ...(lastActivity.length && { lastActivity }),
     };
+  }
+
+  async messageActivityCatalog(cursor: string | null): Promise<unknown> {
+    this.requireOpen();
+    if (!this.process.acceptsCatalogQuery)
+      throw new Error("native_chat_catalog_query_unavailable");
+    return this.process.request("session/list", {
+      cwd: this.cwd,
+      ...(cursor !== null && { cursor }),
+      _meta: { "co.grida/catalogOrder": "messageActivity" },
+    });
   }
 
   /** Metadata-only Settings calls never attach or restore a chat. */
@@ -828,12 +854,14 @@ export class NativeAgentChat {
   }
 
   async catalogEntry(
-    session: NativeChatSession
+    session: NativeChatSession,
+    timeoutMs?: number
   ): Promise<NativeChatCatalogEntry> {
     const sessionId = this.requireAttached(session);
     const result = await this.process.request(
       "_co.grida/session/catalog-entry",
-      { sessionId }
+      { sessionId },
+      timeoutMs
     );
     this.requireAttached(session);
     return catalogEntry(result, sessionId);
@@ -966,7 +994,7 @@ export class NativeAgentChat {
       await this.sideChats.close(side.id).catch(() => {});
       throw error;
     }
-    return { session: this.attach(side.id), side };
+    return { session: this.attach(side.id, side.imageInput), side };
   }
 
   /**
@@ -1139,13 +1167,25 @@ export class NativeAgentChat {
     );
   }
 
+  private acceptsImageFor(
+    session: NativeChatSession,
+    selectionRevision: unknown
+  ) {
+    return (
+      session.sideImageInput ??
+      (this.acceptsPng ||
+        (this.acceptsInputRoutes && selectionRevision !== undefined))
+    );
+  }
+
   async submitImage(
     session: NativeChatSession,
     value: unknown
   ): Promise<NativeChatAcceptance> {
     this.requireAttached(session);
-    if (!this.acceptsPng) throw new Error("image_input_unavailable");
     const input = object(value);
+    if (!this.acceptsImageFor(session, input.selectionRevision))
+      throw new Error("image_input_unavailable");
     const effort =
       input.effort === undefined
         ? undefined
@@ -1179,9 +1219,13 @@ export class NativeAgentChat {
     value: unknown
   ): Promise<NativeChatAcceptance> {
     const sessionId = this.requireAttached(session);
-    if (!this.acceptsSelectedImage || !this.selectedImages)
-      throw new Error("image_input_unavailable");
     const input = object(value);
+    if (
+      !this.acceptsImageFor(session, input.selectionRevision) ||
+      !this.supportsSelectedImage ||
+      !this.selectedImages
+    )
+      throw new Error("image_input_unavailable");
     const known = new Set([
       "action",
       "inputId",
@@ -1396,20 +1440,25 @@ export class NativeAgentChat {
       throw new Error("native_chat_effort_unavailable");
     if (editorContext && !this.acceptsEditorContext)
       throw new Error("native_chat_editor_context_unavailable");
+    const prompt = textPrompt(
+      text,
+      !!messageContext &&
+        (!!messageContext.displayParts.length ||
+          !!image ||
+          !!selectedImage ||
+          !!file ||
+          !!reference)
+    );
+    const initialTitle = this.process.acceptsInitialTitle
+      ? NativeChatTitle.excerpt(text)
+      : undefined;
     return acceptance(
       await this.process.request(`_co.grida/session/${mode}`, {
         sessionId,
         inputId,
+        ...(initialTitle && { initialTitle }),
         prompt: [
-          ...textPrompt(
-            text,
-            !!messageContext &&
-              (!!messageContext.displayParts.length ||
-                !!image ||
-                !!selectedImage ||
-                !!file ||
-                !!reference)
-          ),
+          ...prompt,
           ...(image ? [image] : []),
           ...(reference ? [reference] : []),
         ],
@@ -1492,16 +1541,36 @@ export class NativeAgentChat {
     this.requireAttached(session);
     if (result.sessionId !== sessionId) throw invalidResponse();
     const queuedInputs = revision(result.queuedInputs);
-    const queue = queuePositions(result.queue, queuedInputs);
+    const queue = queuePositions(
+      result.queue,
+      queuedInputs,
+      this.process.acceptsQueuedMessages
+    );
     const pending = queue.filter((row) => row.goalStart);
     if (pending.length > 1) throw invalidResponse();
     const current = result.current === null ? null : turn(result.current);
     const admissionPaused = flag(result.admissionPaused);
+    // Older hosts expose only the durable queue, without scheduler ownership.
+    const canResumeIdleQueue =
+      result.idleQueueResumeAvailable === undefined ||
+      flag(result.idleQueueResumeAvailable);
     const retryAt = result.retryNotBeforeMs;
     const snapshot = Object.freeze({
       sessionId,
       sessionRevision: revision(result.sessionRevision),
       queuedInputs,
+      ...(queuedInputs > 0 && {
+        queuePreview: {
+          items: queue
+            .slice(0, QUEUE_PAGE_SIZE)
+            .map((row) =>
+              queueItem(row, row.goalStart?.objective ?? row.preview ?? null)
+            ),
+          offset: 0,
+          previousOffset: null,
+          nextOffset: queuedInputs > QUEUE_PAGE_SIZE ? QUEUE_PAGE_SIZE : null,
+        },
+      }),
       ...(pending[0] && { pendingGoalId: pending[0].inputId }),
       ...(this.process.acceptsHistoryRevision && {
         historyRevisionAvailable: true as const,
@@ -1528,7 +1597,8 @@ export class NativeAgentChat {
         Number.isSafeInteger(retryAt) &&
         retryAt > 0 && { retryNotBeforeMs: retryAt }),
       admissionPaused,
-      ...(!admissionPaused &&
+      ...(canResumeIdleQueue &&
+        !admissionPaused &&
         !current &&
         queuedInputs > 0 && { idleQueueResumeAvailable: true as const }),
       current,
@@ -1576,11 +1646,8 @@ export class NativeAgentChat {
       })
     );
     this.requireAttached(session);
+    const text = summaryText(result, latest.turnId, latest.status);
     if (
-      result.turnId !== latest.turnId ||
-      result.status !== latest.status ||
-      typeof result.text !== "string" ||
-      Buffer.byteLength(result.text) > MAX_SUMMARY_BYTES ||
       !Array.isArray(result.checks) ||
       result.checks.length > MAX_SUMMARY_CHECKS
     )
@@ -1658,7 +1725,7 @@ export class NativeAgentChat {
     return Object.freeze({
       turnId: latest.turnId,
       status: latest.status,
-      text: result.text,
+      text,
       textTruncated: flag(result.textTruncated),
       steps: result.steps === null ? null : revision(result.steps),
       unresolvedOperations:
@@ -1739,7 +1806,22 @@ export class NativeAgentChat {
       let text: string | null;
       let textOnly: boolean | undefined;
       if (this.process.acceptsQueuedMessages && !row.goalStart) {
-        display = await this.queuedMessage(session, snapshot, row.inputId);
+        try {
+          display = await this.queuedMessage(session, snapshot, row.inputId);
+        } catch (error) {
+          if (error instanceof Error) {
+            // Private message inspection also uses "unavailable" when the
+            // input has just left the queue. Only suppress a proven stale read.
+            if (
+              error.message.includes("session_revision_changed") ||
+              (error.message.includes("queued_input_image_unavailable") &&
+                (await this.observe(session)).sessionRevision !==
+                  snapshot.sessionRevision)
+            )
+              throw new Error("native_chat_queue_changed", { cause: error });
+          }
+          throw error;
+        }
         text = display.text;
         textOnly = display.textOnly;
         displayParts = display.displayParts;
@@ -1752,22 +1834,14 @@ export class NativeAgentChat {
         textOnly = row.goalStart ? undefined : input.textOnly;
         displayParts = input.displayParts;
       }
-      const preview =
-        text && text.length > QUEUE_PREVIEW_LENGTH
-          ? `${text.slice(0, QUEUE_PREVIEW_LENGTH)}…`
-          : text;
       items.push({
-        inputId: row.inputId,
-        preview,
+        ...queueItem(row, text),
         ...(textOnly !== undefined && { textOnly }),
         ...(display?.textEditable !== undefined && {
           textEditable: display.textEditable,
         }),
         ...(display?.attachments && { attachments: display.attachments }),
         ...(displayParts && { displayParts }),
-        ...(row.goalStart && { goalStart: row.goalStart }),
-        ...(row.operatingRegime && { operatingRegime: row.operatingRegime }),
-        ...(row.effort && { effort: row.effort }),
       });
     }
     return {
@@ -2032,6 +2106,7 @@ export class NativeAgentChat {
         namedChild: this.process.acceptsGoalNamedChild,
         spending: this.process.acceptsGoalSpending,
         messageContext: this.process.acceptsMessageContext,
+        initialTitle: this.process.acceptsInitialTitle,
       });
     } catch (error) {
       if (NativeAgentGoals.isUnverifiedStart(error))
@@ -2253,6 +2328,10 @@ export class NativeAgentChat {
         waitId,
         expectedHistoryPosition,
         style,
+        ...(style === "nonblocking" &&
+          this.process.acceptsOptionalQuestions && {
+            expiresWithTurn: true as const,
+          }),
         question,
         options: Object.freeze(options),
       });
@@ -2668,6 +2747,10 @@ export class NativeAgentChat {
             role === "user"
               ? this.readDisplayParts(attribution?.displayParts)
               : undefined;
+          const reply =
+            role === "user" && attribution?.questionReply !== undefined
+              ? object(attribution.questionReply)
+              : undefined;
           const order = NativeActivityOrder.notification(
             metadata,
             attribution,
@@ -2679,6 +2762,12 @@ export class NativeAgentChat {
             phase: messagePhase(attribution?.phase, role),
             ...order,
             ...(displayParts?.length && { displayParts }),
+            ...(reply && {
+              questionReply: {
+                waitId: identity(reply.waitId),
+                question: boundedText(reply.question, 2048),
+              },
+            }),
             ...(role === "user" &&
               attribution?.turnId !== undefined &&
               attribution.svgTextSelection === true && {
@@ -2748,14 +2837,18 @@ export class NativeAgentChat {
       content.text !== ""
     )
       return;
-    // A side chat is shown only in the frame that opened it; it never
-    // raises a notification that would open it elsewhere.
-    if (this.sideChats.has(session.id)) return;
     const record = object(value);
     if (Object.keys(record).length !== 3) return;
     const turnId = identity(record.turnId);
     const sessionId = session.id;
     const { kind, status } = record;
+    if (kind === "question_asked") {
+      const waitId = identity(record.waitId);
+      if (this.rememberLifecycle([sessionId, turnId, kind, waitId]))
+        void this.notifyQuestion(session, turnId, waitId).catch(() => {});
+      return;
+    }
+    if (this.sideChats.has(session.id)) return;
     let event: NativeChatLifecycle;
     if (kind === "approval_required") {
       event = { kind, sessionId, turnId, waitId: identity(record.waitId) };
@@ -2766,16 +2859,98 @@ export class NativeAgentChat {
         status === "cancelled" ||
         status === "uncertain")
     ) {
-      event = { kind, sessionId, turnId, status };
+      event = {
+        kind,
+        sessionId,
+        turnId,
+        status,
+        ...(status === "succeeded" && {
+          readPreview: () => this.completionPreview(session, turnId),
+        }),
+      };
     } else return;
-    const key = JSON.stringify(event);
-    if (this.lifecycleSeen.has(key)) return;
+    const detail = event.kind === "settled" ? event.status : event.waitId;
+    if (this.rememberLifecycle([sessionId, turnId, kind, detail]))
+      this.onLifecycle?.(event, () => this.ownsSession(session));
+  }
+
+  private rememberLifecycle(identity: unknown): boolean {
+    const key = JSON.stringify(identity);
+    if (this.lifecycleSeen.has(key)) return false;
     this.lifecycleSeen.add(key);
     if (this.lifecycleSeen.size > RECENT_LIFECYCLE) {
       const oldest = this.lifecycleSeen.values().next().value;
       if (oldest !== undefined) this.lifecycleSeen.delete(oldest);
     }
-    this.onLifecycle?.(event, () => this.ownsSession(session));
+    return true;
+  }
+
+  private async completionPreview(
+    session: NativeChatSession,
+    turnId: string
+  ): Promise<NativeChatCompletionPreview> {
+    const sessionId = this.requireAttached(session);
+    const [title, text] = await Promise.all([
+      this.catalogEntry(session, NOTIFICATION_PREVIEW_TIMEOUT_MS)
+        .then((entry) => entry.title)
+        .catch(() => null),
+      this.process
+        .request(
+          "_co.grida/session/turn-summary",
+          { sessionId, turnId },
+          NOTIFICATION_PREVIEW_TIMEOUT_MS
+        )
+        .then((result) => summaryText(object(result), turnId, "succeeded"))
+        .catch(() => null),
+    ]);
+    this.requireAttached(session);
+    return { title, text };
+  }
+
+  /** A lifecycle fact carries identity only. Read the text from the authorized pending wait. */
+  private async notifyQuestion(
+    session: NativeChatSession,
+    turnId: string,
+    waitId: string
+  ) {
+    const sessionId = this.requireAttached(session);
+    const side = this.sideChats.has(sessionId);
+    const title = await (
+      side
+        ? this.observe(session).then((snapshot) => snapshot.side?.title ?? null)
+        : this.catalogEntry(session).then((entry) => entry.title)
+    ).catch(() => null);
+    const pending = object(
+      await this.process.request("_co.grida/session/questions", {
+        sessionId,
+        turnId,
+      })
+    );
+    if (
+      pending.sessionId !== sessionId ||
+      pending.turnId !== turnId ||
+      !Array.isArray(pending.questions) ||
+      !this.ownsSession(session)
+    )
+      return;
+    const match = pending.questions.find(
+      (entry: unknown) => object(entry).waitId === waitId
+    );
+    if (!match) return;
+    const question = boundedText(object(match).question, 2048);
+    this.onLifecycle?.(
+      {
+        kind: "question_asked",
+        sessionId,
+        turnId,
+        waitId,
+        session,
+        side,
+        title,
+        question,
+      },
+      () => this.ownsSession(session)
+    );
   }
 
   private async control(
@@ -2861,11 +3036,14 @@ export class NativeAgentChat {
     if (parts?.length) return parts;
   }
 
-  private attach(id: string): NativeChatSession {
+  private attach(id: string, sideImageInput?: boolean): NativeChatSession {
     this.requireOpen();
     const existing = this.attached.get(id);
     if (existing) return existing;
-    const session = Object.freeze({ id });
+    const session = Object.freeze({
+      id,
+      ...(sideImageInput !== undefined && { sideImageInput }),
+    });
     this.attached.set(id, session);
     return session;
   }
@@ -2929,11 +3107,14 @@ function captureText(
     | "activityOrderIncomplete"
     | "svgTextSelection"
     | "displayParts"
+    | "questionReply"
   >
 ): void {
   if (capture.overflow) return;
   const previous = capture.messages.get(messageId);
   capture.bytes += Buffer.byteLength(text);
+  if (attribution?.questionReply)
+    capture.bytes += Buffer.byteLength(attribution.questionReply.question);
   if (attribution?.displayParts)
     capture.bytes += Buffer.byteLength(
       JSON.stringify(attribution.displayParts)
@@ -2955,6 +3136,9 @@ function captureText(
     ...kept,
     ...(attribution?.turnId && { turnId: attribution.turnId }),
     ...(attribution?.phase && { phase: attribution.phase }),
+    ...(attribution?.questionReply && {
+      questionReply: attribution.questionReply,
+    }),
     ...(attribution?.svgTextSelection && { svgTextSelection: true }),
     ...(attribution?.displayParts && {
       displayParts: attribution.displayParts,
@@ -3239,6 +3423,9 @@ function turn(value: unknown): NativeChatTurn {
     paused: flag(result.paused),
     cancelled: flag(result.cancelled),
     disposition: choice(result.disposition, TURN_DISPOSITIONS),
+    ...(result.inputNeeded !== undefined && {
+      inputNeeded: flag(result.inputNeeded),
+    }),
     status:
       result.status === null ? null : choice(result.status, TURN_STATUSES),
   });
@@ -3273,6 +3460,21 @@ function boundedText(value: unknown, bytes: number): string {
   )
     throw invalidResponse();
   return value;
+}
+
+function summaryText(
+  result: Record<string, unknown>,
+  turnId: string,
+  status: NativeChatTurnSummary["status"]
+): string {
+  if (
+    result.turnId !== turnId ||
+    result.status !== status ||
+    typeof result.text !== "string" ||
+    Buffer.byteLength(result.text) > MAX_SUMMARY_BYTES
+  )
+    throw invalidResponse();
+  return result.text;
 }
 
 function textPrompt(text: string, allowEmpty = false) {
@@ -3347,7 +3549,8 @@ function selectedFile(name: unknown, value: unknown) {
 
 function queuePositions(
   value: unknown,
-  count: number
+  count: number,
+  includePreviews: boolean
 ): readonly QueuePosition[] {
   if (
     !Array.isArray(value) ||
@@ -3355,12 +3558,18 @@ function queuePositions(
     count > MAX_QUEUE_INPUTS
   )
     throw invalidResponse();
-  const queue = value.map((entry: unknown) => {
+  const queue = value.map((entry: unknown, index: number) => {
     const row = object(entry);
     const settings = object(row.settings);
     return {
       inputId: identity(row.inputId),
       inputPosition: revision(row.inputPosition),
+      ...(includePreviews &&
+        index < QUEUE_PAGE_SIZE &&
+        typeof row.preview === "string" &&
+        Buffer.byteLength(row.preview) <= QUEUE_PREVIEW_LENGTH && {
+          preview: row.preview,
+        }),
       ...(settings.operatingRegime === "plan" && {
         operatingRegime: "plan" as const,
       }),
@@ -3380,6 +3589,22 @@ function queuePositions(
   if (new Set(queue.map((row) => row.inputId)).size !== count)
     throw invalidResponse();
   return queue;
+}
+
+function queueItem(
+  row: QueuePosition,
+  text: string | null
+): NativeChatQueueItem {
+  return {
+    inputId: row.inputId,
+    preview:
+      text && text.length > QUEUE_PREVIEW_LENGTH
+        ? `${text.slice(0, QUEUE_PREVIEW_LENGTH)}…`
+        : text,
+    ...(row.goalStart && { goalStart: row.goalStart }),
+    ...(row.operatingRegime && { operatingRegime: row.operatingRegime }),
+    ...(row.effort && { effort: row.effort }),
+  };
 }
 
 function identity(value: unknown): string {
@@ -3425,6 +3650,9 @@ function sideSnapshot(value: unknown, opened: boolean): NativeChatSideSnapshot {
       )
     ),
     ...(title !== null && { title }),
+    ...(titleGenerationPending(side.titleGenerationPending) && {
+      titleGenerationPending: true as const,
+    }),
   });
 }
 
@@ -3440,6 +3668,86 @@ function revision(value: unknown): number {
   return value;
 }
 
+/** Shared projection for the worker and offline catalog command. Both return ACP session/list. */
+export function readNativeSessionList(
+  value: unknown,
+  cwd: string | ReadonlySet<string>,
+  cursor: string | null,
+  archived = false
+) {
+  const result = object(value);
+  if (
+    !Array.isArray(result.sessions) ||
+    result.sessions.length > MAX_CATALOG_SESSIONS
+  )
+    throw invalidResponse();
+  const sessions = result.sessions.map((entry: unknown) => {
+    const session = object(entry);
+    if (
+      typeof session.cwd !== "string" ||
+      (typeof cwd === "string" ? session.cwd !== cwd : !cwd.has(session.cwd))
+    )
+      throw invalidResponse();
+    const meta = session._meta == null ? {} : object(session._meta);
+    return {
+      cwd: session.cwd,
+      sessionId: identity(session.sessionId),
+      readState: catalogReadState(meta["co.grida/readState"]),
+      running:
+        meta["co.grida/running"] === undefined
+          ? undefined
+          : flag(meta["co.grida/running"]),
+      inputNeeded:
+        meta["co.grida/inputNeeded"] === undefined
+          ? undefined
+          : flag(meta["co.grida/inputNeeded"]),
+      title: catalogTitle(session.title ?? null),
+      lastActivityAtMs: catalogActivityTime(meta["co.grida/lastActivityAtMs"]),
+      lastMessageAtMs: catalogActivityTime(
+        meta["co.grida/lastMessageAtMs"] ?? undefined
+      ),
+    };
+  });
+  const listed = new Set(sessions.map((entry) => entry.sessionId));
+  const meta = archived || result._meta == null ? {} : object(result._meta);
+  const runningSessionIds = catalogIds(
+    meta["co.grida/runningSessionIds"],
+    listed
+  );
+  const inputNeededSessionIds = catalogIds(
+    meta["co.grida/inputNeededSessionIds"],
+    listed
+  );
+  const nextCursor = result.nextCursor ?? null;
+  if (
+    (typeof cwd === "string"
+      ? listed.size
+      : new Set(sessions.map((row) => JSON.stringify([row.cwd, row.sessionId])))
+          .size) !== sessions.length ||
+    (nextCursor !== null &&
+      (!isCatalogCursor(nextCursor) ||
+        nextCursor === cursor ||
+        sessions.length === 0))
+  )
+    throw invalidResponse();
+  return {
+    sessions,
+    nextCursor,
+    ...(runningSessionIds !== undefined && { runningSessionIds }),
+    ...(inputNeededSessionIds !== undefined && { inputNeededSessionIds }),
+  };
+}
+
+function catalogReadState(value: unknown): NativeChatReadState | undefined {
+  if (value === undefined) return undefined;
+  const state = object(value);
+  return {
+    unread: flag(state.unread),
+    revision: revision(state.revision),
+    replyId: state.replyId === null ? null : identity(state.replyId),
+  };
+}
+
 function catalogTitle(value: unknown): string | null {
   if (value === null) return null;
   if (
@@ -3452,6 +3760,10 @@ function catalogTitle(value: unknown): string | null {
   return value;
 }
 
+function titleGenerationPending(value: unknown): boolean {
+  return value !== undefined && flag(value);
+}
+
 function catalogEntry(
   value: unknown,
   sessionId: string
@@ -3462,10 +3774,31 @@ function catalogEntry(
   return Object.freeze({
     sessionId,
     revision: revision(entry.revision),
+    ...(entry.readState !== undefined && {
+      readState: catalogReadState(entry.readState),
+    }),
     title: catalogTitle(entry.title),
     archived: flag(entry.archived),
+    ...(titleGenerationPending(entry.titleGenerationPending) && {
+      titleGenerationPending: true as const,
+    }),
     ...(lastActivityAtMs !== undefined && { lastActivityAtMs }),
   });
+}
+
+function catalogIds(
+  value: unknown,
+  listed: ReadonlySet<string>
+): string[] | undefined {
+  if (value === undefined) return undefined;
+  if (
+    !Array.isArray(value) ||
+    value.length > listed.size ||
+    value.some((id) => !listed.has(id)) ||
+    new Set(value).size !== value.length
+  )
+    throw invalidResponse();
+  return value;
 }
 
 function catalogActivityTime(value: unknown): number | undefined {

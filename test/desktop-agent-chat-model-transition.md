@@ -7,10 +7,11 @@ tags: [agent-chat, models, providers, history, queue, recovery]
 status: untested
 severity: high
 date: 2026-11-15
-updated: 2026-11-16
+updated: 2026-11-19
 automatable: false
 covered_by:
   - editor/lib/agent-chat/native-chat-controller.test.ts
+  - editor/lib/agent-chat/native-chat-selection-controller.test.ts
   - desktop/src/main/native-desktop-agent.test.ts
   - desktop/src/main/native-workspace-agents.test.ts
   - crates/grida-agent/tests/process.rs
@@ -18,15 +19,15 @@ covered_by:
 
 ## Behavior
 
-An idle chat can use an explicitly selected model connection for its next
+An open chat can use an explicitly selected model connection for its next
 message, including a different provider or account. Its visible conversation
 stays in the same chat. The new connection receives portable conversation
 context; accepted work keeps its original model, account and funding.
 
-Desktop saves the future selection independently of activating its connection.
-If sending needs a shared-worker replacement, a refusal explains the work to
-resolve and preserves the requested choice and unsent message. A change in one chat cannot silently stop another
-chat's work, discard a side chat or end its background commands. Refreshing
+Desktop saves the future selection independently of starting new work.
+On a host that supports a connection per input, a message sent after the
+change can join the queue immediately. A change in one chat preserves another
+chat's work, its open side chats and its background commands. Refreshing
 the model catalogue after a change still lists the other available connections.
 
 Human interaction verification is pending. The adjacent automated cases cover
@@ -49,14 +50,12 @@ rendering, focus or interaction behavior.
    uses that connection through continuation. While work is running, paused,
    queued or attached to an unfinished Goal, try selecting another
    connection. Confirm the future choice is remembered while accepted work
-   keeps its captured route. Try sending on that choice: any required worker
-   replacement explains the actual blocker and preserves the draft. Resolve
-   the work and confirm the saved choice then executes.
+   keeps its captured route. Send another message immediately. Confirm it
+   joins the queue and executes on the new connection, after the previously
+   queued message finishes on the original one.
 3. Leave another chat in the workspace working, with a side chat open or a
    background command running. From an idle chat, try changing connections.
-   Try sending on the new choice. Confirm any required worker replacement is
-   refused without interrupting
-   the other chat, closing the side chat or stopping the command. Also try a
-   connection that fails to start, and, using a controlled host fixture, an
-   unsupported older host. Confirm a clear error and preserved selection and
-   draft. Restore the connection and retry successfully.
+   Send on the new choice. Confirm the other chat, its side chat and its
+   command continue. Try an unavailable connection and confirm the draft
+   stays available for retry. On an older host that requires replacing its
+   worker, confirm the refusal identifies the blocking work and keeps the draft.

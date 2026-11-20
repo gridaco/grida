@@ -114,9 +114,13 @@ impl Host {
     ) -> Result<SessionId> {
         self.owned_control(move |host| async move {
             host.require_subagents()?;
+            let (host, revision) = host.for_derived_session(&parent).await?;
             let _admission = host.configuration_admission.lock().await;
             let view = host.store.inspect(parent.clone()).await?;
-            host.check_execution(&view).await?;
+            if let Some(revision) = revision {
+                host.selection_at_revision(&view, revision)?;
+            }
+            host.check_new_submission(&view).await?;
             let mut configuration = session_configuration(&view)?;
             if configuration.side.is_some() {
                 return Err(side_chats::Refusal::Subagents.error());
@@ -136,6 +140,7 @@ impl Host {
             )?;
             let child = profile.identity(&request)?;
             configuration.execution = execution.configuration;
+            configuration.inherited_route = host.selected_route.clone();
             configuration.subagent = Some(profile);
             host.store
                 .create(CreateSession {
@@ -150,8 +155,13 @@ impl Host {
     }
 
     pub async fn assign_subagent(&self, assignment: SubagentAssignment) -> Result<SubagentWork> {
-        self.owned_control(move |host| async move { host.accept_assignment(assignment).await })
-            .await
+        self.owned_control(move |host| async move {
+            host.for_selection(&assignment.child, None)
+                .await?
+                .accept_assignment(assignment)
+                .await
+        })
+        .await
     }
 
     async fn accept_assignment(&self, assignment: SubagentAssignment) -> Result<SubagentWork> {
@@ -283,8 +293,13 @@ impl Host {
         &self,
         message: SubagentMessage,
     ) -> Result<SubagentMessageReceipt> {
-        self.owned_control(move |host| async move { host.accept_subagent_message(message).await })
-            .await
+        self.owned_control(move |host| async move {
+            host.for_selection(&message.child, None)
+                .await?
+                .accept_subagent_message(message)
+                .await
+        })
+        .await
     }
 
     async fn accept_subagent_message(
@@ -519,9 +534,10 @@ impl Host {
         epoch: u64,
         position: JournalPosition,
     ) -> Result<TurnView> {
-        self.child_for_control(&parent, &control.session)
+        let host = self.for_selection(&control.session, None).await?;
+        host.child_for_control(&parent, &control.session)
             .await?
-            .require_authority(&self.execution()?.authority.inference.authority)?;
+            .require_authority(&host.execution()?.authority.inference.authority)?;
         self.resume(control, epoch, position).await
     }
 
@@ -533,9 +549,10 @@ impl Host {
         instructions: String,
     ) -> Result<ControlReceipt> {
         subagents::validate_assignment(&instructions)?;
-        self.child_for_control(&parent, &control.session)
+        let host = self.for_selection(&control.session, None).await?;
+        host.child_for_control(&parent, &control.session)
             .await?
-            .require_authority(&self.execution()?.authority.inference.authority)?;
+            .require_authority(&host.execution()?.authority.inference.authority)?;
         self.steer(
             control,
             expected_history,
@@ -568,9 +585,10 @@ impl Host {
         request: ChangeId,
         expected: SessionRevision,
     ) -> Result<ControlReceipt> {
-        self.child_for_control(&parent, &child)
+        let host = self.for_selection(&child, None).await?;
+        host.child_for_control(&parent, &child)
             .await?
-            .require_authority(&self.execution()?.authority.inference.authority)?;
+            .require_authority(&host.execution()?.authority.inference.authority)?;
         self.resume_queue(child, request, expected).await
     }
 
@@ -817,6 +835,7 @@ mod tests {
                 SESSION_SCHEMA,
                 SESSION_VERSION,
                 &SessionConfiguration {
+                    inherited_route: None,
                     cwd: PathBuf::from("/workspace"),
                     execution: Fingerprint::of(&"execution").unwrap(),
                     owner: Fingerprint::of(&"owner").unwrap(),

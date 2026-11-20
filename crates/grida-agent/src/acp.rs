@@ -1,5 +1,6 @@
 //! Stable ACP v1 over a supervised, bounded stdio connection.
 
+pub mod catalog_service;
 mod extensions;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 pub mod external;
@@ -11,7 +12,9 @@ mod websocket;
 
 pub use websocket::{ListenOptions, serve_websocket};
 
-use crate::host::{AcceptedRun, Host, PromptPart, PromptRequest, RunResult, SessionCatalog};
+use crate::host::{
+    AcceptedRun, CatalogListing, CatalogOrder, Host, PromptPart, PromptRequest, RunResult,
+};
 use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::v1::schema::{
     AgentCapabilities, CancelNotification, ContentBlock, EmbeddedResourceResource, Implementation,
@@ -82,11 +85,10 @@ async fn serve(
     let (sdk, wire) = Channel::duplex();
     let (incoming, outgoing) = wire.into_parts();
     let editor_surfaces = host.editor_surfaces.clone();
-    let desktop_image_generation = host.desktop_image_generation.clone();
     let read = async {
         let result = transport::read(input, outgoing, delivery.clone()).await;
         editor_surfaces.detach();
-        if let Some(generation) = &desktop_image_generation {
+        if let Some(generation) = host.image_connection() {
             generation.detach();
         }
         if let Some(provider) = &provider {
@@ -107,7 +109,7 @@ async fn serve(
         transport::write(output, incoming, delivery.clone()),
     );
     editor_surfaces.detach();
-    if let Some(generation) = &desktop_image_generation {
+    if let Some(generation) = host.image_connection() {
         generation.detach();
     }
     if let Some(provider) = &provider {
@@ -216,8 +218,9 @@ async fn serve_connection(
                 let goal_effort = initialized_host.goal_sponsorship_available();
                 let mut advertised =
                     extensions::advertised(reviewer, subagents, deletion, effort, goal_effort, files);
-                let library_selection = reviewer && initialized_host.accepts_library_selection();
-                let spending = reviewer && initialized_host.supports_goal_spending();
+                let routed = reviewer && provider.is_some() && offered(crate::supervised_provider::ROUTES);
+                let library_selection = reviewer && (routed || initialized_host.accepts_library_selection());
+                let spending = reviewer && (routed || initialized_host.supports_goal_spending());
                 let spending_negotiated = spending && offered(extensions::GOAL_SPENDING);
                 if spending {
                     advertised.insert(extensions::GOAL_SPENDING.into(), 1.into());
@@ -241,9 +244,16 @@ async fn serve_connection(
                         return responder.respond_with_error(host_error(error));
                     }
                     advertised.insert(capability.into(), 1.into());
+                    let routes = crate::supervised_provider::ROUTES;
+                    if routed {
+                        if let Err(error) = initialized_host.attach_routes(provider.clone()) {
+                            return responder.respond_with_error(host_error(error));
+                        }
+                        advertised.insert(routes.into(), 1.into());
+                    }
                     let billing = extensions::gateway_billing::CAPABILITY;
                     if reviewer
-                        && initialized_host.supports_gateway_billing_status()
+                        && (routed || initialized_host.supports_gateway_billing_status())
                         && offered(billing)
                     {
                         advertised.insert(billing.into(), 1.into());
@@ -254,7 +264,7 @@ async fn serve_connection(
                     }
                     let capability = crate::host::image_generation::CAPABILITY;
                     if reviewer
-                        && let Some(generation) = &initialized_host.desktop_image_generation
+                        && let Some(generation) = initialized_host.image_connection()
                         && offered(capability)
                     {
                         let reference = crate::host::image_generation::REFERENCE_CAPABILITY;
@@ -262,10 +272,10 @@ async fn serve_connection(
                         let placement = crate::host::image_generation::PLACE_CAPABILITY;
                         let place = offered(placement);
                         let attachment = crate::host::image_generation::ATTACHMENT_CAPABILITY;
-                        let attachments = initialized_host.supports_attachment_reference()
+                        let attachments = (routed || initialized_host.supports_attachment_reference())
                             && offered(attachment);
                         let workspace_reference = crate::host::image_generation::WORKSPACE_CAPABILITY;
-                        let workspace_references = initialized_host.supports_workspace_image_reference()
+                        let workspace_references = (routed || initialized_host.supports_workspace_image_reference())
                             && offered(workspace_reference);
                         generation.attach(connection.clone(), references, place, attachments, workspace_references);
                         advertised.insert(capability.into(), 1.into());
@@ -394,15 +404,9 @@ async fn serve_connection(
                     if !list_sessions.lock().unwrap().initialized {
                         return Err(unavailable("initialize_required"));
                     }
-                    let cwd = request.cwd.ok_or_else(|| {
-                        Error::invalid_params().data("session_list_workspace_required")
-                    })?;
-                    let after = request.cursor.as_deref().map(catalog_anchor).transpose()?;
-                    let catalog = list_host
-                        .list_sessions(cwd, false, after)
-                        .await
-                        .map_err(host_error)?;
-                    catalog_response(catalog)
+                    let order = extensions::catalog_order(&list_sessions, &request)?;
+                    list_chats(&list_host, request.cwd, order, request.cursor.as_deref())
+                        .await.map_err(host_error)
                 }
                 .await;
                 responder.respond_with_result(result)
@@ -568,16 +572,21 @@ async fn serve_connection(
                     // ACP JSON-RPC IDs correlate requests on one connection. A
                     // distinct host-generated ID identifies each durable input.
                     let id = ChangeId::new(uuid::Uuid::new_v4().to_string()).map_err(host_error)?;
+                    let initial_title = extensions::prompt_initial_title(
+                        &prompt_sessions,
+                        request.meta.as_ref(),
+                    )?;
+                    let prompt = PromptRequest {
+                        id,
+                        session,
+                        parts,
+                        questions: false,
+                        operating_regime: None,
+                        effort: None,
+                        reasoning: Default::default(),
+                    };
                     prompt_host
-                        .start_prompt(PromptRequest {
-                            id,
-                            session,
-                            parts,
-                            questions: false,
-                            operating_regime: None,
-                            effort: None,
-                            reasoning: Default::default(),
-                        })
+                        .start_prompt_with_initial_title(prompt, initial_title)
                         .await
                         .map_err(host_error)
                 }
@@ -861,47 +870,171 @@ fn host_error(error: agent_kit_core::Error) -> Error {
     wire_error.data(error.code)
 }
 
-fn catalog_anchor(cursor: &str) -> Result<SessionId> {
-    cursor
-        .strip_prefix("v1/")
-        .and_then(|id| SessionId::new(id).ok())
-        .ok_or_else(|| Error::invalid_params().data("invalid_session_cursor"))
+/// The native CLI and ACP project the same host-owned public catalog page.
+pub async fn list_chats(
+    host: &Host,
+    cwd: Option<std::path::PathBuf>,
+    order: CatalogOrder,
+    cursor: Option<&str>,
+) -> agent_kit_core::Result<ListSessionsResponse> {
+    let page = host.discover_chats(cwd, order, cursor).await?;
+    catalog_response(page, true)
 }
 
-fn catalog_response(mut catalog: SessionCatalog) -> Result<ListSessionsResponse> {
-    let cwd_bytes = serde_json::to_vec(&catalog.cwd)
-        .map_err(|_| unavailable("session_catalog_projection_failed"))?
-        .len();
-    // Each standard record repeats the workspace path. Leave frame room for
-    // the maximum escaped ID, keys, cursor, and the JSON-RPC envelope.
-    let page_limit = (transport::MAX_FRAME_BYTES / 2) / (cwd_bytes + 3072);
-    if page_limit == 0 {
-        return Err(Error::invalid_params().data("session_catalog_workspace_too_large"));
+fn catalog_response(
+    mut catalog: CatalogListing,
+    include_activity: bool,
+) -> agent_kit_core::Result<ListSessionsResponse> {
+    // Reserve room for titles, cursor and activity arrays, including when
+    // different rows in an all-workspaces page have different path lengths.
+    let mut bytes = 0;
+    let mut count = 0;
+    for row in &catalog.entries {
+        bytes += serde_json::to_vec(&row.cwd)
+            .map_err(|_| {
+                agent_kit_core::Error::new(
+                    ErrorKind::InvalidState,
+                    "session_catalog_projection_failed",
+                )
+            })?
+            .len()
+            + 4096;
+        if bytes > transport::MAX_FRAME_BYTES / 2 {
+            break;
+        }
+        count += 1;
     }
-    if catalog.entries.len() > page_limit {
-        catalog.entries.truncate(page_limit);
-        catalog.next_after = catalog
-            .entries
-            .last()
-            .map(|record| record.entry.session.clone());
+    if count == 0 && !catalog.entries.is_empty() {
+        return Err(agent_kit_core::Error::new(
+            ErrorKind::InvalidInput,
+            "session_catalog_workspace_too_large",
+        ));
     }
-    Ok(ListSessionsResponse::new(
-        catalog
-            .entries
-            .into_iter()
-            .map(|record| {
-                let meta = record.latest_turn_activity_ms.map(|timestamp| {
-                    serde_json::Map::from_iter([(
-                        "co.grida/lastActivityAtMs".to_owned(),
-                        timestamp.into(),
-                    )])
-                });
-                let entry = record.entry;
-                SessionInfo::new(entry.session.as_str().to_owned(), catalog.cwd.clone())
-                    .title(entry.label)
-                    .meta(meta)
+    if count < catalog.entries.len() {
+        catalog.entries.truncate(count);
+        catalog.has_more = true;
+    }
+    let cursor = catalog
+        .has_more
+        .then(|| catalog.entries.last().map(|row| row.cursor.clone()))
+        .flatten();
+    let mut sessions = Vec::with_capacity(catalog.entries.len());
+    let mut ids = BTreeSet::new();
+    let mut running = Vec::new();
+    let mut input_needed = Vec::new();
+    for row in catalog.entries {
+        let record = row.record;
+        let entry = record.entry;
+        let id = entry.session.as_str();
+        let mut meta = serde_json::Map::new();
+        if include_activity {
+            let is_running = record.current_turn_disposition
+                == Some(agent_kit_sessions::TurnDisposition::Running);
+            let needs_input = crate::host::needs_user_input(&record.pending_request_schemas);
+            meta.insert("co.grida/running".into(), is_running.into());
+            meta.insert("co.grida/inputNeeded".into(), needs_input.into());
+            if is_running {
+                running.push(serde_json::Value::from(id));
+            }
+            if needs_input {
+                input_needed.push(serde_json::Value::from(id));
+            }
+            ids.insert(entry.session.clone());
+        }
+        meta.insert(
+            "co.grida/readState".into(),
+            serde_json::json!(record.read_state),
+        );
+        if let Some(value) = record.latest_turn_activity_ms {
+            meta.insert("co.grida/lastActivityAtMs".into(), value.into());
+        }
+        if let Some(value) = record.last_message_ms {
+            meta.insert("co.grida/lastMessageAtMs".into(), value.into());
+        }
+        sessions.push(
+            SessionInfo::new(id.to_owned(), row.cwd)
+                .title(entry.label)
+                .meta(meta),
+        );
+    }
+    // Legacy arrays identify a session only by ID. A combined page can contain
+    // independently stored chats with the same ID in different workspaces.
+    let meta = (include_activity && ids.len() == sessions.len()).then(|| {
+        serde_json::Map::from_iter([
+            (
+                "co.grida/runningSessionIds".to_owned(),
+                serde_json::Value::Array(running),
+            ),
+            (
+                "co.grida/inputNeededSessionIds".to_owned(),
+                serde_json::Value::Array(input_needed),
+            ),
+        ])
+    });
+    Ok(ListSessionsResponse::new(sessions)
+        .next_cursor(cursor)
+        .meta(meta))
+}
+
+#[cfg(test)]
+mod catalog_tests {
+    use super::*;
+    use crate::host::ListedSession;
+    use agent_kit_store_sqlite::catalog::{CatalogEntry, CatalogRecord};
+
+    #[test]
+    fn equal_session_ids_in_different_workspaces_keep_their_own_activity() {
+        let row = |cwd: &str, is_running: bool, needs_input: bool| ListedSession {
+            cwd: cwd.into(),
+            record: CatalogRecord {
+                entry: CatalogEntry {
+                    session: SessionId::new("same-id").unwrap(),
+                    bucket: 0,
+                    label: None,
+                    revision: 0,
+                },
+                last_message_ms: None,
+                read_state: Default::default(),
+                latest_turn_activity_ms: None,
+                current_turn_disposition: is_running
+                    .then_some(agent_kit_sessions::TurnDisposition::Running),
+                pending_request_schemas: needs_input
+                    .then(|| {
+                        agent_kit_core::SchemaId::new(grida_agent_master::questions::REQUEST_SCHEMA)
+                            .unwrap()
+                    })
+                    .into_iter()
+                    .collect(),
+            },
+            cursor: cwd.into(),
+        };
+        let page = catalog_response(
+            CatalogListing {
+                entries: vec![row("/first", true, false), row("/second", false, true)],
+                has_more: false,
+            },
+            true,
+        )
+        .unwrap();
+        assert!(
+            page.meta.is_none(),
+            "bare IDs would give both rows the same status"
+        );
+        let activity: Vec<_> = page
+            .sessions
+            .iter()
+            .map(|row| {
+                let meta = row.meta.as_ref().unwrap();
+                (
+                    row.cwd.to_str().unwrap(),
+                    meta["co.grida/running"].as_bool().unwrap(),
+                    meta["co.grida/inputNeeded"].as_bool().unwrap(),
+                )
             })
-            .collect(),
-    )
-    .next_cursor(catalog.next_after.map(|id| format!("v1/{}", id.as_str()))))
+            .collect();
+        assert_eq!(
+            activity,
+            [("/first", true, false), ("/second", false, true)]
+        );
+    }
 }

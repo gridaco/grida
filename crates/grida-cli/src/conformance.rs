@@ -2,8 +2,8 @@
 use serde_json::{Map, Value, json};
 
 use crate::{
-    AgentAction, Command, GenerationSource, Invocation, MeshOperation, MeshSource, ModelSelection,
-    Request, RiggingSource, Selector,
+    AgentAction, AgentRunArgs, Command, GenerationSource, Invocation, MeshOperation, MeshSource,
+    ModelSelection, Request, RiggingSource, Selector,
 };
 
 type Object = Map<String, Value>;
@@ -78,16 +78,18 @@ pub fn project(invocation: &Invocation) -> Value {
             put(&mut object, "maxOutputTokens", agent.max_output_tokens);
             selector(&mut object, &agent.selector);
             match &agent.action {
-                AgentAction::Run {
-                    cwd,
-                    session,
-                    prompt,
-                    input_png,
-                    input_file,
-                    skills,
-                    questions,
-                    deadline_ms,
-                } => {
+                AgentAction::Run(args) => {
+                    let AgentRunArgs {
+                        cwd,
+                        session,
+                        prompt,
+                        initial_title,
+                        input_png,
+                        input_file,
+                        skills,
+                        questions,
+                        deadline_ms,
+                    } = args.as_ref();
                     put(&mut object, "cwd", json!(cwd));
                     optional(
                         &mut object,
@@ -95,6 +97,7 @@ pub fn project(invocation: &Invocation) -> Value {
                         session.as_ref().map(|id| id.as_str()),
                     );
                     optional(&mut object, "prompt", prompt.as_deref());
+                    optional(&mut object, "initialTitle", initial_title.as_deref());
                     if let Some(path) = input_png {
                         put(&mut object, "inputPng", json!(path));
                     }

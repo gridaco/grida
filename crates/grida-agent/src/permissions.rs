@@ -39,7 +39,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::time::{Duration, Instant};
 
-const REQUEST: &str = "grida.agent.approval";
+pub(crate) const REQUEST: &str = "grida.agent.approval";
 const ANSWER: &str = "grida.agent.approval.answer";
 const MAX_APPROVAL_BYTES: usize = 128 * 1024;
 const MAX_ACTIONS: usize = 32;
@@ -588,6 +588,13 @@ impl PermissionProfile {
         self.workspace
             .permission_directory(None, &self.protected)
             .map(DirectoryBinding::root)
+    }
+
+    pub(crate) fn catalog_workspace(&self) -> Result<Option<&Path>> {
+        self.workspace
+            .primary()
+            .map(|_| self.primary_directory())
+            .transpose()
     }
 
     pub fn matches_primary(&self, cwd: &Path) -> bool {

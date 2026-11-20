@@ -284,10 +284,56 @@ as the command and the arguments from the example above. Start a chat from
 the Agent Panel's new-thread menu; Grida's replies appear in that thread.
 [Zed custom agents](https://zed.dev/docs/ai/external-agents#custom-agents)
 
-Use `session/list` to discover unarchived chats for an absolute workspace `cwd`.
-Follow `nextCursor` with the same workspace to get the next page. The list
-shows chat identities and optional titles in newest-created order. Choose a
-chat and call `session/load` to open its transcript. [ACP session listing](https://agentclientprotocol.com/protocol/v1/session-list)
+Use `session/list` to discover unarchived chats. An absolute `cwd` filters
+to one workspace. Hosts supporting `co.grida/session/catalog-query` can also
+list the visible chats across their store when you omit `cwd`. Older Grida
+hosts require the workspace. Choose a chat and call `session/load` to open
+its transcript. [ACP session listing](https://agentclientprotocol.com/protocol/v1/session-list)
+
+On an execution host the default order is newest created. To show recent conversations, negotiate
+`co.grida/session/catalog-query` version 1 and pass
+`"_meta": {"co.grida/catalogOrder": "messageActivity"}`. A new message can
+bring an old chat to the first page. Viewing or renaming a chat preserves its
+position. Each row identifies its workspace. Follow `nextCursor` with the
+same filter and order, or start a fresh first page to see new activity. A chat
+with no recorded message time follows dated chats, including a chat whose
+messages all predate message timestamping.
+
+To watch several stores, launch `grida-agent serve-catalog --stdio --catalog-registry <file>`
+with a private registry of the workspaces the client may see. The catalog
+defaults to message activity order. Negotiate `co.grida/catalog/watch` version 1
+and send `_co.grida/catalog/subscribe` with `{}` or a single `cwd`. Once it
+succeeds, list the first page. List again on `_co.grida/catalog/changed`,
+and resubscribe before listing after a disconnect. This works with Desktop
+closed and requires no model credentials. The native reference describes
+registry permissions and the WebSocket option.
+[Live cross-workspace catalog](https://github.com/gridaco/grida/blob/main/crates/grida-agent/docs/rust-client-protocol.md#live-cross-workspace-catalog)
+
+On a compatible host, a catalog row's `_meta["co.grida/readState"]` tells
+whether the latest reply is unread. To acknowledge a displayed reply,
+negotiate `co.grida/session/read-state` version 1 and send
+`_co.grida/session/read-state` with its workspace `cwd`, `sessionId`,
+`action: "acknowledge"`, and the exact `revision` and `replyId` you
+displayed. The response is the current read state. Use `action: "markUnread"`
+with the same workspace and chat to mark it unread again. Other clients see
+the same state after reopening. Either action keeps the chat's place in
+Recents.
+
+For a cross-workspace list, identify each row by its `cwd` and `sessionId`.
+Read its `co.grida/running` and `co.grida/inputNeeded` flags from the row's
+`_meta`. On pages with unique session IDs, supporting hosts also provide
+the independent page-level arrays
+`co.grida/runningSessionIds` and `co.grida/inputNeededSessionIds` in
+`_meta`. A chat can appear in both when an optional question is open during
+work. Refresh the visible page to observe changes. An attached side chat
+reports its own `current.disposition` and `current.inputNeeded` in the
+session snapshot. Clients can include the side chats they own when showing a
+parent's activity.
+
+Clients that negotiate `co.grida/session/initial-title` version 1 can send
+the optional `_meta["co.grida/initialTitle"]` string with a first
+`session/prompt`. Acceptance saves the excerpt for workspace listing.
+Successful generation can replace it, and a manual rename takes precedence.
 
 Clients can negotiate `co.grida/session/organize` to list archived chats in
 the same workspace. For an attached chat, read the current title, archive state,
@@ -565,8 +611,9 @@ and only those can be edited with a revision. The summary of a compacted copy
 does not appear in the side chat's transcript either.
 
 A side chat's snapshot includes `side`: its `parentSessionId`,
-`temporary: true`, an `unavailable` list and, once the host titles it from its
-first message, its `title`. Each listed operation is refused with its code:
+`temporary: true`, an `unavailable` list and, when available, its current
+`title`. An optional `titleGenerationPending: true` marks a title still
+being generated. Each listed operation is refused with its code:
 
 | `unavailable` | Refused operation                                                 | Code                               |
 | ------------- | ----------------------------------------------------------------- | ---------------------------------- |

@@ -3,10 +3,10 @@
 /**
  * GRIDA-SEC-004 — renderer-visible Desktop bridge protocol.
  *
- * This package carries only the `window.grida` contract that a URL-loaded
- * renderer may compile against. Electron IPC channel names and native
- * implementation details stay in the Desktop app; daemon HTTP stays in
- * `@grida/daemon/transport` + `@grida/ai-host/media-transport`.
+ * This package carries the `window.grida` contract and public Desktop version
+ * compatibility metadata. Electron IPC channel names and native implementation
+ * details stay in the Desktop app; daemon HTTP stays in `@grida/daemon/transport`
+ * + `@grida/ai-host/media-transport`.
  */
 
 import type {
@@ -52,12 +52,17 @@ import type {
   WorkspaceWriteFileResult,
 } from "@grida/daemon";
 
-import type { DesktopHooks, DesktopNativeChat } from "./native-chat";
+import type {
+  DesktopHooks,
+  DesktopNativeChat,
+  NativeChatReadState,
+} from "./native-chat";
 import type { DesktopNativeExternalAgent } from "./native-external-agent";
 import type { NativeEditorSurfaceSnapshot } from "./native-editor-surfaces";
 import type { DesktopBrowser } from "./browser";
 import type { DesktopFxViewer } from "./fx-viewer";
 export { DesktopBrowser } from "./browser";
+export { DesktopCompatibility } from "./compatibility";
 export type { DesktopFxViewer } from "./fx-viewer";
 export type * from "./native-chat";
 export * from "./native-chat-message-context";
@@ -231,6 +236,33 @@ export type DesktopMediaReadResult = {
 
 export type DesktopMediaSaveCopyResult = "saved" | "cancelled" | "failed";
 
+/** Unarchived workspace chats, ordered by their latest saved conversation message. */
+export type DesktopChatCatalogQuery = Readonly<{
+  /** Omit to include all registered workspaces visible to this client. */
+  workspaceId?: string;
+  cursor?: string | null;
+  /** From 1 to 32, default 32. */
+  limit?: number;
+}>;
+
+export type DesktopChatCatalogEntry = Readonly<{
+  workspaceId: string;
+  sessionId: string;
+  title: string | null;
+  /** Null when no message time was recorded. Undated entries follow dated entries. */
+  lastMessageAtMs: number | null;
+  lastActivityAtMs?: number;
+  readState?: NativeChatReadState;
+  running: boolean;
+  /** Present when the native host reports answerable waits independently of running status. */
+  inputNeeded?: boolean;
+}>;
+
+export type DesktopChatCatalogPage = Readonly<{
+  entries: readonly DesktopChatCatalogEntry[];
+  nextCursor: string | null;
+}>;
+
 /** Metadata-only Settings view; ids are opaque native-issued handles. */
 export type DesktopArchivedChat = Readonly<{
   id: string;
@@ -256,12 +288,22 @@ export type DesktopBridge = {
   browser?: DesktopBrowser.Bridge;
   handshake: () => Promise<HandshakeResponse>;
   nativeChat?: DesktopNativeChat;
+  /** Metadata discovery for Home and the workbench. Older hosts omit this capability. */
+  chatCatalog?: {
+    list(query?: DesktopChatCatalogQuery): Promise<DesktopChatCatalogPage>;
+    observe?(
+      scope: Pick<DesktopChatCatalogQuery, "workspaceId">,
+      onChanged: () => void
+    ): Promise<(() => void) | null>;
+  };
   /** Global config.toml hooks. Absent on older native builds. */
   hooks?: DesktopHooks;
   /** Fixed Settings archive operations, absent on older protocol-1 hosts. */
   archives?: {
     list: (cursor?: string | null) => Promise<DesktopArchivedChatPage>;
     unarchive: (id: string, revision: number) => Promise<void>;
+    /** Opens the chat restored from this Settings window using the same row id. */
+    openRestored?: (id: string) => Promise<void>;
   };
   nativeExternalAgent?: DesktopNativeExternalAgent;
   /**

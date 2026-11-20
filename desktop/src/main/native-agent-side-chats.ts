@@ -13,6 +13,7 @@ const RETRY_MAX_MS = 30_000;
 export type NativeSideChat = Readonly<{
   id: string;
   parent: string;
+  imageInput?: boolean;
   /** The parent's model context had been compacted. */
   compacted: boolean;
   /** The copy left out parent material it cannot carry. */
@@ -133,6 +134,9 @@ export class NativeAgentSideChats {
       const side = Object.freeze({
         id,
         parent,
+        ...(reply.imageInput !== undefined && {
+          imageInput: flag(reply.imageInput),
+        }),
         compacted: flag(reply.compacted),
         omitted: omissions.map(count).some((value) => value > 0),
       });

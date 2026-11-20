@@ -9,8 +9,6 @@ use grida_agent_master::questions::{
     QuestionAnswer, QuestionStyle, QuestionTool, defer_for_answer, prepare_answer, read_question,
 };
 
-const QUESTION_REQUEST_SCHEMA: &str = "grida.agent.question";
-
 pub(super) struct QuestionAccess {
     selection: GrantSelection,
 }
@@ -145,7 +143,7 @@ pub(super) fn pending(state: &TurnState) -> Result<Questions> {
     let questions = state
         .waits()
         .values()
-        .filter(|wait| wait.is_pending() && is_question(wait))
+        .filter(|wait| !state.controls().cancelled && wait.is_pending() && is_question(wait))
         .map(|wait| {
             let request = read_question(wait)?;
             Ok(PendingQuestion {
@@ -165,8 +163,8 @@ pub(super) fn pending(state: &TurnState) -> Result<Questions> {
     })
 }
 
-fn is_question(wait: &WaitRecord) -> bool {
-    wait.request.schema().as_str() == QUESTION_REQUEST_SCHEMA
+pub(super) fn is_question(wait: &WaitRecord) -> bool {
+    wait.request.schema().as_str() == grida_agent_master::questions::REQUEST_SCHEMA
 }
 
 impl Host {
@@ -195,14 +193,34 @@ impl Host {
                             .ok_or_else(|| {
                                 problem(ErrorKind::Unavailable, "question_unavailable")
                             })?;
+                        if state.controls().cancelled && wait.is_pending() {
+                            return Err(problem(
+                                ErrorKind::Conflict,
+                                "question_no_longer_answerable",
+                            ));
+                        }
+                        let mut prepared = prepare_answer(wait, answer)?;
+                        if wait.answer.is_some() {
+                            // Replay exactly the original control, including the
+                            // contribution format of a previous host version.
+                            prepared.contribution = state
+                                .history()
+                                .records()
+                                .iter()
+                                .find(|record| {
+                                    let HistoryRecord::Message(message) = record;
+                                    message.id.as_str() == wait.id.as_str()
+                                })
+                                .cloned();
+                        }
                         Ok((
-                            prepare_answer(wait, answer)?,
+                            prepared,
                             state.outcome().is_none()
                                 && state.controls().admits_work()
-                                && state
-                                    .waits()
-                                    .values()
-                                    .all(|other| other.id == wait.id || !other.is_pending()),
+                                && state.waits().values().all(|other| {
+                                    other.id == wait.id
+                                        || !grida_agent_master::questions::blocks_progress(other)
+                                }),
                         ))
                     },
                 )
@@ -262,15 +280,33 @@ impl Host {
         if can_wake {
             work.check_answer_capacity(&control.session, &control.turn)?;
         }
-        let receipt = self
-            .store
-            .control(ControlRequest {
-                id: control.request,
-                session: control.session.clone(),
-                expected_revision: control.expected_session,
-                action,
-            })
-            .await?;
+        let request = ControlRequest {
+            id: control.request,
+            session: control.session.clone(),
+            expected_revision: control.expected_session,
+            action,
+        };
+        let reply = match &request.action {
+            SessionControl::ResolveAndAppend { records, .. } => records.iter().find_map(|record| {
+                let HistoryRecord::Message(message) = record;
+                grida_agent_master::questions::visible_reply(message).map(|_| message.id.clone())
+            }),
+            _ => None,
+        };
+        let receipt = if let Some(id) = reply {
+            if let Some(existing) = self.store.control_receipt(request.clone()).await? {
+                existing
+            } else {
+                let receipt = self.store.control(request).await?;
+                // A suspended worker cannot observe this message. Record the
+                // observed acceptance before the scheduler can resume it.
+                self.activity_order
+                    .record_message(&control.session, &control.turn, &id);
+                receipt
+            }
+        } else {
+            self.store.control(request).await?
+        };
         if can_wake {
             let position = receipt
                 .turn
@@ -305,7 +341,10 @@ impl Host {
             .inspect_turn_with(session.clone(), turn.clone(), |state| {
                 let ready = state.is_suspended()
                     && state.controls().admits_work()
-                    && state.waits().values().all(|wait| !wait.is_pending())
+                    && !state
+                        .waits()
+                        .values()
+                        .any(grida_agent_master::questions::blocks_progress)
                     && state.waits().values().any(|wait| {
                         ((is_question(wait)
                             || library::is_selection(wait)

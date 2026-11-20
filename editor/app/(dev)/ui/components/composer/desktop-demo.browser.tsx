@@ -118,51 +118,89 @@ async function editQueuedMessage(container: HTMLElement, index = 0) {
     .toContain("Editing queued message");
 }
 
-function exampleTab(container: HTMLElement, title: string): HTMLElement {
-  const demo = container.querySelector<HTMLElement>(
-    '[data-testid="desktop-chat-tabs-demo"]'
-  )!;
-  return Array.from(demo.querySelectorAll<HTMLElement>('[role="tab"]')).find(
-    (tab) => tab.querySelector(`button[aria-label="Close ${title}"]`) !== null
-  )!;
-}
-
-async function hoverExampleTab(
-  container: HTMLElement,
-  title: string
-): Promise<HTMLElement> {
-  await act(async () => userEvent.hover(exampleTab(container, title)));
-  await expect
-    .poll(
-      () =>
-        document.querySelector('[data-testid="chat-tab-preview"]')?.textContent
-    )
-    .toContain(title);
-  return document.querySelector<HTMLElement>(
-    '[data-testid="chat-tab-preview"]'
-  )!;
-}
-
-async function focusExampleTab(
-  container: HTMLElement,
-  title: string
-): Promise<HTMLElement> {
-  await act(async () => exampleTab(container, title).focus());
-  await expect
-    .poll(
-      () =>
-        document.querySelector('[data-testid="chat-tab-preview"]')?.textContent
-    )
-    .toContain(title);
-  return document.querySelector<HTMLElement>(
-    '[data-testid="chat-tab-preview"]'
-  )!;
-}
-
 afterEach(() => {
   for (const root of roots.splice(0)) act(() => root.unmount());
   document.body.replaceChildren();
   vi.restoreAllMocks();
+});
+
+it("focuses the draft from composer padding and lets its controls take focus", async () => {
+  const container = await mountConversationDemo();
+  const editor = container.querySelector<HTMLElement>(
+    "[data-composer-editor]"
+  )!;
+  const padding = container.querySelector<HTMLElement>(
+    "[data-composer-content]"
+  )!;
+  const composer = padding.closest<HTMLElement>("[data-composer-menu-anchor]")!;
+  const add = composer.querySelector<HTMLButtonElement>(
+    'button[aria-label="Add to message"]'
+  )!;
+
+  for (const background of [composer, padding]) {
+    await act(async () => {
+      runningTurn(container).focus();
+      background.click();
+      await expect.poll(() => document.activeElement === editor).toBe(true);
+    });
+  }
+
+  await openAddMenu(container);
+  expect(document.activeElement).not.toBe(editor);
+  expect(add.getAttribute("aria-expanded")).toBe("true");
+});
+
+it("confirms Pause with two distinct Escape presses while the composer is focused", async () => {
+  const container = await mountConversationDemo();
+  const editor = container.querySelector<HTMLElement>(
+    "[data-composer-editor]"
+  )!;
+  const pause = container.querySelector<HTMLButtonElement>(
+    'button[aria-label="Pause"]'
+  )!;
+
+  await openAddMenu(container);
+  await act(async () => userEvent.keyboard("{Escape}"));
+  expect(container.querySelector("[data-composer-action-menu]")).toBeNull();
+  expect(pause.textContent).toBe("");
+
+  await act(async () => {
+    await userEvent.hover(editor);
+    editor.focus();
+    await userEvent.keyboard("{Escape}");
+  });
+  expect(pause.textContent).toBe("Esc");
+  expect(runningTurn(container).checked).toBe(true);
+
+  await act(async () => {
+    editor.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Escape",
+        bubbles: true,
+        repeat: true,
+      })
+    );
+  });
+  expect(runningTurn(container).checked).toBe(true);
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 2100));
+  });
+  expect(pause.textContent).toBe("");
+  expect(runningTurn(container).checked).toBe(true);
+
+  await act(async () => {
+    editor.focus();
+    await userEvent.keyboard("{Escape}");
+  });
+  expect(pause.textContent).toBe("Esc");
+  await act(async () => userEvent.keyboard("{Escape}"));
+  expect(runningTurn(container).checked).toBe(false);
+
+  await act(async () => userEvent.click(runningTurn(container)));
+  await act(async () =>
+    userEvent.click(container.querySelector('button[aria-label="Pause"]')!)
+  );
+  expect(runningTurn(container).checked).toBe(false);
 });
 
 async function editSentMessage(container: HTMLElement) {
@@ -880,7 +918,7 @@ it("keeps the shared placeholder across modes and attachments while preserving r
   await act(async () => userEvent.click(access));
   await expect
     .poll(() => document.querySelector('[role="dialog"]')?.textContent)
-    .toContain("What can the agent access?");
+    .toContain("Access for new messages");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain(
     "Reads and edits this project's files and runs sandboxed commands. Commands cannot use the internet."
   );
@@ -1197,151 +1235,6 @@ it("makes the mounted composer read-only during a pending queue save and retains
   );
   expect(container.textContent).not.toContain("Editing queued message");
   expect(normalSubmissions).toBe(0);
-});
-
-it("selects the example chat tabs with pointer or keyboard and closes and resets them", async () => {
-  const container = await mountConversationDemo();
-  const demo = container.querySelector<HTMLElement>(
-    '[data-testid="desktop-chat-tabs-demo"]'
-  )!;
-  const tablist = demo.querySelector<HTMLElement>(
-    '[role="tablist"][aria-label="Example chat tabs"]'
-  )!;
-  expect(tablist).not.toBeNull();
-  expect(tablist.querySelectorAll('[role="tab"]')).toHaveLength(4);
-  expect(
-    exampleTab(container, "Current chat").getAttribute("aria-selected")
-  ).toBe("true");
-  await act(async () =>
-    userEvent.click(exampleTab(container, "Image reference"))
-  );
-  expect(
-    exampleTab(container, "Image reference").getAttribute("aria-selected")
-  ).toBe("true");
-  expect(
-    exampleTab(container, "Current chat").getAttribute("aria-selected")
-  ).toBe("false");
-
-  const waiting = exampleTab(container, "Waiting for reply");
-  await act(async () => {
-    waiting.focus();
-    await userEvent.keyboard("{Enter}");
-  });
-  expect(waiting.getAttribute("aria-selected")).toBe("true");
-  expect(
-    exampleTab(container, "Image reference").getAttribute("aria-selected")
-  ).toBe("false");
-  await act(async () => {
-    demo
-      .querySelector<HTMLButtonElement>('button[aria-label="Close New chat"]')!
-      .focus();
-    await userEvent.keyboard("{Enter}");
-  });
-  expect(demo.querySelector('button[aria-label="Close New chat"]')).toBeNull();
-  expect(tablist.querySelectorAll('[role="tab"]')).toHaveLength(3);
-  expect(waiting.getAttribute("aria-selected")).toBe("true");
-  await act(async () =>
-    userEvent.click(
-      demo.querySelector<HTMLButtonElement>(
-        'button[aria-label="Close Image reference"]'
-      )!
-    )
-  );
-  expect(tablist.querySelectorAll('[role="tab"]')).toHaveLength(2);
-  expect(waiting.getAttribute("aria-selected")).toBe("true");
-  await act(async () => userEvent.click(textButton(demo, "Reset tabs")));
-  expect(tablist.querySelectorAll('[role="tab"]')).toHaveLength(4);
-  expect(
-    demo.querySelector('button[aria-label="Close New chat"]')
-  ).not.toBeNull();
-  expect(
-    tablist.querySelectorAll('[role="tab"][aria-selected="true"]')
-  ).toHaveLength(1);
-});
-
-it("previews shared user and assistant excerpts without selecting a tab and follows live chat messages", async () => {
-  const container = await mountConversationDemo();
-  const current = exampleTab(container, "Current chat");
-  const preview = await focusExampleTab(container, "Current chat");
-  const userExcerpt = preview.querySelector(
-    '[role="group"][aria-label="You"]'
-  )!;
-  const assistantExcerpt = preview.querySelector(
-    '[role="group"][aria-label="Grida"]'
-  )!;
-  expect(userExcerpt).not.toBeNull();
-  expect(assistantExcerpt).not.toBeNull();
-  expect(userExcerpt.textContent).toBe(
-    "Refine this composer. Keep the draft when a menu closes, and make queued messages easy to inspect."
-  );
-  const assistantText = assistantExcerpt.textContent!;
-  expect(assistantText.startsWith("Composer review ")).toBe(true);
-  expect(assistantText).toContain("Open + or type / for commands.");
-  expect(assistantText).toContain(
-    "Use Steer to submit without interrupting the model."
-  );
-  expect(assistantText).toContain(
-    'const message = { text: "Keep the draft" };'
-  );
-  expect(assistantText).not.toMatch(
-    /(^|\s)#{1,6}\s|\*\*|`|(?:^|\s)-\s|\[[^\]]+\]\([^)]+\)/
-  );
-  const visibleParagraphs = Array.from(preview.querySelectorAll("p")).map(
-    (paragraph) => paragraph.textContent
-  );
-  expect(visibleParagraphs).not.toContain("You");
-  expect(visibleParagraphs).not.toContain("Grida");
-  const waitingPreview = await focusExampleTab(container, "Waiting for reply");
-  expect(
-    waitingPreview.querySelector('[role="group"][aria-label="You"]')
-      ?.textContent
-  ).toContain("Please check the spacing between the model picker and Send.");
-  expect(
-    waitingPreview.querySelector('[role="group"][aria-label="Grida"]')
-  ).toBeNull();
-  expect(current.getAttribute("aria-selected")).toBe("true");
-  expect(
-    exampleTab(container, "Waiting for reply").getAttribute("aria-selected")
-  ).toBe("false");
-
-  const imagePreview = await focusExampleTab(container, "Image reference");
-  expect(
-    imagePreview.querySelector('[role="group"][aria-label="You"]')?.textContent
-  ).toContain("reference.jpg");
-  expect(
-    imagePreview.querySelector('[role="group"][aria-label="Grida"]')
-      ?.textContent
-  ).toContain(
-    "I’ll use the attached image to compare spacing, alignment, and rounded corners."
-  );
-  expect(current.getAttribute("aria-selected")).toBe("true");
-
-  const emptyPreview = await focusExampleTab(container, "New chat");
-  expect(emptyPreview.textContent).toContain("No messages yet");
-  expect(emptyPreview.querySelector('[role="group"]')).toBeNull();
-  expect(current.getAttribute("aria-selected")).toBe("true");
-
-  await selectConversation(container, "empty");
-  await act(async () => runningTurn(container).click());
-  const editor = container.querySelector<HTMLElement>(
-    '[contenteditable="true"]'
-  )!;
-  const text = "A newly sent message is available in the current tab preview.";
-  const markdown = `**${text}** Read [composer details](https://example.test/composer).`;
-  await act(async () => userEvent.fill(editor, markdown));
-  await act(async () =>
-    userEvent.click(
-      container.querySelector<HTMLButtonElement>('button[aria-label="Send"]')!
-    )
-  );
-  const livePreview = await hoverExampleTab(container, "Current chat");
-  expect(
-    livePreview.querySelector('[role="group"][aria-label="You"]')?.textContent
-  ).toBe(`${text} Read composer details.`);
-  expect(
-    livePreview.querySelector('[role="group"][aria-label="Grida"]')
-  ).toBeNull();
-  expect(current.getAttribute("aria-selected")).toBe("true");
 });
 
 it("edits and clears an image caption while retaining its queue icon, image and Plan settings", async () => {

@@ -158,6 +158,9 @@ it.skipIf(!resources || process.platform === "win32")(
       );
       expect(requests).toHaveLength(0);
       expect((await chat.list()).sessionIds).toEqual([promoted.sessionId]);
+      expect(
+        (await ipc.catalogEntry(event, promoted.attachmentId)).title
+      ).toBeNull();
       const saved = await ipc.selection(event, {
         sessionId: promoted.sessionId,
       });
@@ -176,6 +179,11 @@ it.skipIf(!resources || process.platform === "win32")(
         undefined,
         saved.revision
       );
+      const firstCatalog = await ipc.catalogEntry(event, promoted.attachmentId);
+      expect(firstCatalog.title).toBe("First draft request");
+      expect((await ipc.list(event)).titles).toEqual([
+        { sessionId: promoted.sessionId, title: firstCatalog.title },
+      ]);
       await vi.waitFor(
         async () => {
           expect(
@@ -197,6 +205,9 @@ it.skipIf(!resources || process.platform === "win32")(
       );
       expect(replay).toEqual({ ...accepted, disposition: "completed" });
       expect(replay.inputId).toBe(prepared.firstInputId);
+      expect(
+        (await ipc.catalogEntry(event, promoted.attachmentId)).revision
+      ).toBe(firstCatalog.revision);
       expect(requests).toHaveLength(1);
       expect(requests[0].model).toBe("gpt-6.1-sol");
       const session = await chat.load(promoted.sessionId);

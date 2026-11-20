@@ -7,12 +7,13 @@ tags: [chat, transcript, progress, history]
 status: verified
 severity: high
 date: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-20
 automatable: partial
 covered_by:
   [
     editor/lib/agent-chat/turn-activity.test.ts,
     editor/lib/agent-chat/native-chat-controller.test.ts,
+    editor/scaffolds/desktop/workbench/native-chat-focus.browser.tsx,
   ]
 ---
 
@@ -29,7 +30,9 @@ with its partial work in view and nothing to expand.
 
 Every turn with recorded work keeps its own header, including after reopening the chat and on
 earlier pages. Stopped and failed turns say so in their header. A pending
-question or approval stays actionable outside the collapsed work. Expanding,
+question or approval stays actionable outside the collapsed work. An answered
+question appears inside the turn's work as a user bubble with the original
+question quoted above the reply. Expanding,
 collapsing, paging and reopening only read recorded work: none of them repeats
 an action or requests another model response. There is no separate execution
 details panel; images the latest turn produced appear below its answer.
@@ -54,3 +57,6 @@ details panel; images the latest turn produced appear below its answer.
    header and collapsed state. Scroll up in a long chat and confirm earlier
    turns load grouped the same way.
 7. Confirm none of steps 2, 6 sent a new model request.
+8. Answer a question while the agent is working. Check that the reply quotes
+   the question. After completion, expand **Worked** to find the same bubble,
+   then collapse it and confirm the final answer stays visible.

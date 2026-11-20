@@ -29,6 +29,8 @@ type Dispatch = (body: Buffer, signal: AbortSignal) => Promise<Response | null>;
 /** Trusted main-process network authority. Preparation must verify the live
  * grant without dispatching a request. The returned closure is used once. */
 export type NativeProviderNetwork = {
+  /** Whether this captured grant still names the current authority for a fresh turn. */
+  isCurrent?(): boolean | Promise<boolean>;
   prepare(target: string, headers: Headers): Dispatch | null;
 };
 
@@ -48,6 +50,11 @@ type Exchange = {
 };
 
 export class NativeProviderEgress {
+  static readonly maxExchanges = MAX_EXCHANGES;
+  get openExchangeCount() {
+    return this.exchanges.size;
+  }
+
   static readonly capability = "co.grida/provider/egress";
   static readonly exchangeMethod = "_co.grida/provider/exchange";
   static readonly cancelMethod = "_co.grida/provider/cancel";

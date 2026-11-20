@@ -5,7 +5,10 @@ import os from "node:os";
 import path from "node:path";
 import type { IpcMainInvokeEvent, WebContents } from "electron";
 import { expect, it, vi } from "vitest";
-import { NativeAgentChat } from "./native-agent-chat";
+import {
+  NativeAgentChat,
+  type NativeAgentChatLaunch,
+} from "./native-agent-chat";
 import { NativeChatIpc } from "./native-chat-ipc";
 
 const packaged = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
@@ -17,7 +20,9 @@ function chunk(id: number, delta: unknown, finish: string | null = null) {
   })}\n\n`;
 }
 
-async function provider() {
+async function provider(
+  tool: "question" | "question_async" = "question_async"
+) {
   const requests: string[] = [];
   let held: ServerResponse | undefined;
   const server = createServer((request, response) => {
@@ -44,7 +49,7 @@ async function provider() {
                 id: "ask-edition",
                 type: "function",
                 function: {
-                  name: "question_async",
+                  name: tool,
                   arguments: JSON.stringify({
                     question: "Which edition?",
                     options: ["Screen", "Print"],
@@ -91,6 +96,60 @@ async function provider() {
 }
 
 it.runIf(Boolean(packaged))(
+  "announces a required question from its private side session",
+  async () => {
+    const root = fs.mkdtempSync(
+      path.join(fs.realpathSync(os.tmpdir()), "grida-side-question-")
+    );
+    const endpoint = await provider("question");
+    const cwd = path.join(root, "workspace");
+    fs.mkdirSync(cwd, { mode: 0o700 });
+    const onLifecycle =
+      vi.fn<NonNullable<NativeAgentChatLaunch["onLifecycle"]>>();
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        resourcesPath: packaged!,
+        stateDirectory: path.join(root, "state"),
+        cwd,
+        provider: "openai-compatible",
+        endpoint: endpoint.endpoint,
+        model: "fixture",
+        onLifecycle,
+      });
+      const parent = await chat.create();
+      const { session } = await chat.openSideChat(parent);
+      const accepted = await chat.submit(
+        session,
+        "side-question",
+        "Prepare the document."
+      );
+      await vi.waitFor(() =>
+        expect(onLifecycle).toHaveBeenCalledWith(
+          expect.objectContaining({
+            kind: "question_asked",
+            turnId: accepted.turnId,
+            session,
+            side: true,
+            question: "Which edition?",
+          }),
+          expect.any(Function)
+        )
+      );
+      expect(endpoint.requests).toHaveLength(1);
+    } finally {
+      try {
+        await chat?.close();
+      } finally {
+        await endpoint.close();
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    }
+  },
+  15000
+);
+
+it.runIf(Boolean(packaged))(
   "answers a native question during independent work and keeps a follow-up queued separately",
   async () => {
     const root = fs.mkdtempSync(
@@ -111,8 +170,11 @@ it.runIf(Boolean(packaged))(
       senderFrame: frame,
     } as unknown as IpcMainInvokeEvent;
     let chat: NativeAgentChat | undefined;
+    const onLifecycle =
+      vi.fn<NonNullable<NativeAgentChatLaunch["onLifecycle"]>>();
     try {
       chat = await NativeAgentChat.start({
+        onLifecycle,
         resourcesPath: packaged!,
         stateDirectory: path.join(root, "state"),
         cwd,
@@ -132,6 +194,18 @@ it.runIf(Boolean(packaged))(
         "Prepare the document."
       );
       await vi.waitFor(() => expect(endpoint.requests).toHaveLength(2));
+      await vi.waitFor(() =>
+        expect(onLifecycle).toHaveBeenCalledWith(
+          expect.objectContaining({
+            kind: "question_asked",
+            turnId: accepted.turnId,
+            question: "Which edition?",
+            side: false,
+            title: "Prepare the document.",
+          }),
+          expect.any(Function)
+        )
+      );
       const observation = await ipc.observe(event, attachmentId);
       expect(observation.snapshot.current?.disposition).toBe("running");
       const [old] = await ipc.questions(
@@ -142,6 +216,7 @@ it.runIf(Boolean(packaged))(
       expect(old).toEqual(
         expect.objectContaining({
           style: "nonblocking",
+          expiresWithTurn: true,
           question: "Which edition?",
           options: ["Screen", "Print"],
         })
@@ -176,6 +251,21 @@ it.runIf(Boolean(packaged))(
       );
       expect(answer.turnId).toBe(accepted.turnId);
       expect(endpoint.requests).toHaveLength(2);
+      // The committed answer is visible even while the independent inference is running.
+      const replay = await ipc.transcriptPage(event, attachmentId);
+      expect(
+        replay.messages.filter((message) => message.questionReply)
+      ).toEqual([
+        expect.objectContaining({
+          role: "user",
+          text: "Print",
+          turnId: accepted.turnId,
+          questionReply: {
+            waitId: expect.any(String),
+            question: "Which edition?",
+          },
+        }),
+      ]);
       endpoint.release();
       await vi.waitFor(() => expect(endpoint.requests).toHaveLength(4));
       await vi.waitFor(async () => {

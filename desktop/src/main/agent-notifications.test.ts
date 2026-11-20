@@ -1,8 +1,12 @@
 import { EventEmitter } from "node:events";
 import type { IpcMainInvokeEvent } from "electron";
 import { beforeEach, expect, it, vi } from "vitest";
-import type { NativeChatLifecycle } from "./native-agent-chat";
+import type {
+  NativeChatCompletionPreview,
+  NativeChatLifecycle,
+} from "./native-agent-chat";
 import {
+  focusNativeChat,
   notifyNativeChat,
   takeNativeNotificationFocus,
 } from "./agent-notifications";
@@ -106,6 +110,59 @@ it("keeps the saved model connection when reopening a workspace from a notificat
   );
 });
 
+it("focuses an existing workspace and delivers the restored chat without a notification", () => {
+  const nav = navigation();
+  const target = workspaceWindow();
+  host.windows.mockReturnValue([target.window]);
+  expect(focusNativeChat(workspaceId, { sessionId: "restored" }, nav)).toBe(
+    true
+  );
+  expect(target.window.focus).toHaveBeenCalledOnce();
+  expect(target.send).toHaveBeenCalledOnce();
+  expect(target.take()).toEqual({ sessionId: "restored" });
+  expect(host.open).not.toHaveBeenCalled();
+  expect(host.shown).not.toHaveBeenCalled();
+});
+
+it("shows the actual question on a background side tab and routes only to its owning frame", () => {
+  const owner = workspaceWindow();
+  const other = workspaceWindow();
+  owner.state.focused = true;
+  host.windows.mockReturnValue([other.window, owner.window]);
+  let presented: boolean | undefined = true;
+  const session = { id: "side/session" };
+  const question: NativeChatLifecycle = {
+    kind: "question_asked",
+    sessionId: session.id,
+    turnId: "turn",
+    session,
+    side: true,
+    waitId: "w",
+    title: "Poster",
+    question: "Which paper size?",
+  };
+  const nav = {
+    ...navigation(),
+    questionPresentation: (sender: unknown, source: unknown) =>
+      sender === owner.sender && source === session ? presented : undefined,
+  };
+  notifyNativeChat(workspaceId, question, nav, () => true);
+  expect(host.shown).not.toHaveBeenCalled();
+  presented = false;
+  notifyNativeChat(workspaceId, question, nav, () => true);
+  expect(host.shown).toHaveBeenCalledExactlyOnceWith({
+    title: "Poster",
+    body: "Which paper size?",
+  });
+  host.click!();
+  expect(owner.take()).toEqual({ sessionId: session.id, side: true });
+  expect(other.take()).toBeNull();
+  presented = undefined;
+  host.click!();
+  expect(owner.take()).toBeNull();
+  expect(host.open).not.toHaveBeenCalled();
+});
+
 it("opens the exact saved chat on notification click and withdraws a retired click", () => {
   const nav = navigation();
   const opened = {};
@@ -129,6 +186,64 @@ it("opens the exact saved chat on notification click and withdraws a retired cli
   click();
   expect(host.open).toHaveBeenCalledTimes(1);
 });
+
+it("shows the chat title and a single-line response excerpt, even if one read is unavailable", async () => {
+  const nav = navigation();
+  const readPreview = vi.fn<() => Promise<NativeChatCompletionPreview>>();
+  readPreview
+    .mockResolvedValueOnce({ title: "Poster", text: "Ready.\n\n  Print it." })
+    .mockResolvedValueOnce({ title: null, text: "Still ready." })
+    .mockResolvedValueOnce({ title: "Poster", text: "  \n" })
+    .mockRejectedValueOnce(new Error("worker unavailable"));
+  for (const expected of [
+    { title: "Poster", body: "Ready. Print it." },
+    { title: "Grida Agent", body: "Still ready." },
+    { title: "Poster", body: "Turn completed" },
+    { title: "Grida Agent", body: "Turn completed" },
+  ]) {
+    await notifyNativeChat(
+      workspaceId,
+      { ...event, readPreview },
+      nav,
+      () => true
+    );
+    expect(host.shown).toHaveBeenLastCalledWith(expected);
+  }
+  expect(host.shown).toHaveBeenCalledTimes(4);
+});
+
+it.each(["focused", "retired"] as const)(
+  "suppresses a completion that becomes %s while its preview is being read",
+  async (reason) => {
+    const target = workspaceWindow();
+    host.windows.mockReturnValue([target.window]);
+    const pending = Promise.withResolvers<NativeChatCompletionPreview>();
+    const readPreview = vi.fn<() => Promise<NativeChatCompletionPreview>>(
+      () => pending.promise
+    );
+    const nav = navigation();
+    let current = true;
+    const notify = () =>
+      notifyNativeChat(
+        workspaceId,
+        { ...event, readPreview },
+        nav,
+        () => current
+      );
+
+    target.state.focused = true;
+    await notify();
+    expect(readPreview).not.toHaveBeenCalled();
+    target.state.focused = false;
+    const showing = notify();
+    expect(readPreview).toHaveBeenCalledOnce();
+    if (reason === "focused") target.state.focused = true;
+    else current = false;
+    pending.resolve({ title: "Poster", text: "Print it." });
+    await showing;
+    expect(host.shown).not.toHaveBeenCalled();
+  }
+);
 
 it("suppresses watched work and user cancellation, and only wakes the pane when clicked", () => {
   const nav = navigation();

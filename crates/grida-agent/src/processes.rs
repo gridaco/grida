@@ -108,6 +108,8 @@ pub(crate) struct Entry {
     command: String,
     cwd: PathBuf,
     terminal: bool,
+    /// Whether the host launched this process outside the OS sandbox.
+    unconfined: bool,
     started_at: u64,
     stop: CancellationToken,
     /// Held for one interaction: a read, write or the final collection.
@@ -341,6 +343,7 @@ impl ProcessSessions {
         command: String,
         cwd: PathBuf,
         terminal: bool,
+        unconfined: bool,
         running: RunningSession,
     ) -> Arc<Entry> {
         let mut state = self.state();
@@ -354,6 +357,7 @@ impl ProcessSessions {
             command,
             cwd,
             terminal,
+            unconfined,
             started_at: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .map_or(0, |time| {
@@ -844,6 +848,7 @@ mod tests {
             command: "true".into(),
             cwd: PathBuf::from("/"),
             terminal: false,
+            unconfined: false,
             started_at: 0,
             stop: CancellationToken::new(),
             io: tokio::sync::Mutex::new(Io {

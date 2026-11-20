@@ -4,7 +4,7 @@ use super::RunResult;
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::inference::InferenceUpdate;
 use agent_kit_core::messages::{Content, OutcomeStatus, Role, ToolCall, ToolResult};
-use agent_kit_core::turn::{OperationOutcome, TurnBinding};
+use agent_kit_core::turn::{OperationOutcome, TurnBinding, TurnState};
 use agent_kit_core::{MessageId, SessionId, ToolCallId, TurnId, WaitId};
 use agent_kit_runtime::TurnUpdate;
 use std::collections::{BTreeMap, BTreeSet};
@@ -49,6 +49,7 @@ pub(crate) struct Lifecycle {
 pub(crate) enum LifecycleFact {
     Settled(OutcomeStatus),
     ApprovalRequired(WaitId),
+    QuestionAsked(WaitId),
 }
 
 pub(super) fn publish_lifecycle(
@@ -93,16 +94,25 @@ pub(super) struct Publisher {
     offsets: BTreeMap<MessageId, usize>,
     calls: BTreeMap<ToolCallId, (MessageId, ToolCall)>,
     finished: BTreeSet<ToolCallId>,
+    announced_questions: BTreeSet<WaitId>,
 }
 
 impl Publisher {
-    pub(super) fn new(sender: broadcast::Sender<LiveUpdate>, binding: TurnBinding) -> Self {
+    pub(super) fn new(sender: broadcast::Sender<LiveUpdate>, state: &TurnState) -> Self {
         Self {
             sender,
-            binding,
+            binding: state.binding().clone(),
             offsets: BTreeMap::new(),
             calls: BTreeMap::new(),
             finished: BTreeSet::new(),
+            // A resumed worker can inherit unanswered questions. Those are
+            // visible in its snapshot and have no new registration to announce.
+            announced_questions: state
+                .waits()
+                .values()
+                .filter(|wait| wait.is_pending() && super::questions::is_question(wait))
+                .map(|wait| wait.id.clone())
+                .collect(),
         }
     }
 
@@ -149,6 +159,18 @@ impl Publisher {
                 }
             }
             TurnUpdate::Snapshot(view) => {
+                for wait in view.state.waits().values() {
+                    if wait.is_pending()
+                        && super::questions::is_question(wait)
+                        && self.announced_questions.insert(wait.id.clone())
+                    {
+                        let _ = self.sender.send(LiveUpdate::Lifecycle(Lifecycle {
+                            session: self.binding.session.clone(),
+                            turn: self.binding.turn.clone(),
+                            fact: LifecycleFact::QuestionAsked(wait.id.clone()),
+                        }));
+                    }
+                }
                 for HistoryRecord::Message(message) in view.state.history().records() {
                     if message.role != Role::Tool {
                         continue;

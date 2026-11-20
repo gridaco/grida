@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * Desktop welcome window — the reference-first artwork studio front door.
+ * Desktop welcome window — a shared composer with galleries for output presets.
  *
  * Composer-first and outcome-first: describe what you want, or gather references
  * from the gallery, and the workspace opens with that request as the first turn
  * of a new native chat (see {@link welcome_message}). The composer targets the
  * DEFAULT workspace — the managed root `~/Documents/Grida Projects`, always
- * registered — unless the top-left picker aims it at an existing project.
+ * registered — unless the workspace picker aims it at an existing project.
  * "Open folder…" and the recents list stay for opening work that already
  * exists. Submitting an otherwise empty composer simply enters the
  * selected/default workspace without starting a turn.
@@ -16,17 +16,18 @@
  * and decides on turn one whether it becomes a board, a deck or a tree of
  * files (guided by its skills), writing only what it decides.
  *
- * A reference card opens related Library ideas; its Add action drops that
+ * In Images, a reference card opens related Library ideas; its Add action drops that
  * reference into the composer's tray. A slides template is selected directly
  * (references multi-select; a template is single-select, like choosing one
- * Keynote theme). Neither action starts work on its own. References fold into
- * the first message as plain URLs. A picked template is copied into the
+ * Keynote theme). Neither action starts work on its own. Image references
+ * travel with the first message as context. A picked template is copied into the
  * workspace as its own deck, and the first message names that copy so the
  * agent adapts it. The model picker offers the native connections a new chat
  * can choose before its workspace opens; the opened workspace selects it.
  */
 
 import {
+  Fragment,
   Suspense,
   useCallback,
   useEffect,
@@ -35,8 +36,10 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type ReactNode,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { XIcon } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@app/ui/lib/utils";
@@ -90,7 +93,8 @@ import {
 } from "@/scaffolds/desktop/home/application-preset";
 import { PresetRail } from "@/scaffolds/desktop/home/preset-rail";
 import type { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
-import { last_workspace } from "@/lib/desktop/last-workspace";
+import { WindowContentState } from "@/lib/desktop/window-content-state";
+import { WindowContentMarker } from "@/scaffolds/desktop/shared/window-content-marker";
 import { NativeChatController } from "@/lib/agent-chat/native-chat-controller";
 
 const NOOP = () => {};
@@ -114,34 +118,31 @@ function DesktopWelcomeRoute() {
   const params = useSearchParams();
   const shouldRestore = params.get("startup") === "restore-last-workspace";
   const onboardingWorkspaceId = params.get("onboardingWorkspace");
-  const [checking, setChecking] = useState(shouldRestore);
 
   useEffect(() => {
     if (!shouldRestore) return;
     let cancelled = false;
-    void last_workspace
-      .resolve(window.localStorage, {
-        list: workspacesNs.list,
-        openFolder: workspacesNs.openFolder,
-        readdir: workspacesNs.readdir,
-      })
+    void WindowContentState.resolve(window.localStorage, {
+      list: workspacesNs.list,
+      openFolder: workspacesNs.openFolder,
+      readdir: workspacesNs.readdir,
+    })
       .catch((err) => {
         if (!cancelled) {
-          console.warn("[welcome] couldn't restore last workspace:", err);
+          console.warn("[welcome] couldn't restore window content:", err);
         }
         return null;
       })
       .then((target) => {
         if (cancelled) return;
-        if (target) {
-          router.replace(last_workspace.href(target));
+        if (target && target.surface !== "home") {
+          router.replace(WindowContentState.href(target));
           return;
         }
         // The startup directive is spent. Back and reload should stay on Home.
         const url = new URL(window.location.href);
         url.searchParams.delete("startup");
         window.history.replaceState(null, "", url);
-        setChecking(false);
       });
     return () => {
       cancelled = true;
@@ -158,7 +159,7 @@ function DesktopWelcomeRoute() {
     window.history.pushState(null, "", url);
   }
 
-  return checking ? (
+  return shouldRestore ? (
     <StartupRestoreScreen />
   ) : (
     <WelcomeSurface
@@ -174,9 +175,60 @@ function StartupRestoreScreen() {
     <div className="flex h-svh w-full flex-col bg-background">
       <TitleBar />
       <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
-        Opening last workspace…
+        Restoring window…
       </div>
     </div>
+  );
+}
+
+function WelcomeHeading({
+  question,
+  children,
+}: {
+  question: string;
+  children: ReactNode;
+}) {
+  const reduceMotion = useReducedMotion();
+
+  return (
+    <h1 className="absolute inset-x-0 bottom-full mb-8 flex items-baseline justify-center gap-x-1.5 text-center text-lg font-normal tracking-tight whitespace-nowrap select-none sm:text-xl">
+      <span className="sr-only">{question} </span>
+      <AnimatePresence initial={false} mode="popLayout">
+        <motion.span
+          key={question}
+          aria-hidden="true"
+          className="shrink-0"
+          exit={{ opacity: 0 }}
+          transition={{ duration: reduceMotion ? 0 : 0.12 }}
+        >
+          {question.split(" ").map((word, index) => (
+            <Fragment key={index}>
+              {index > 0 && " "}
+              <motion.span
+                className="inline-block"
+                initial={reduceMotion ? false : { opacity: 0, x: -4 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{
+                  delay: reduceMotion ? 0 : 0.085 + index * 0.026,
+                  duration: reduceMotion ? 0 : 0.16,
+                  ease: "easeOut",
+                }}
+              >
+                {word}
+              </motion.span>
+            </Fragment>
+          ))}
+        </motion.span>
+      </AnimatePresence>
+      <motion.span
+        layout={reduceMotion ? false : "position"}
+        transition={{ layout: { duration: 0.32, ease: "easeInOut" } }}
+        className="inline-flex min-w-0 max-w-full items-baseline"
+      >
+        <span className="shrink-0 pr-1">in</span>
+        {children}?
+      </motion.span>
+    </h1>
   );
 }
 
@@ -218,6 +270,7 @@ function WelcomeSurface({
     prepareWelcomeFullAccess,
     answerWelcomeFullAccess,
     startWelcomeFullAccess,
+    welcomeFullAccessAcrossPresets,
   } = bridge?.nativeChat ?? {};
   const fullAccess =
     prepareWelcomeFullAccess &&
@@ -231,6 +284,8 @@ function WelcomeSurface({
       : undefined;
   const showWorkflows = preset === "workflows";
   const showImages = preset === "image";
+  const showSlides = preset === "slides";
+  const showGallery = showWorkflows || showImages || showSlides;
   const presetSpec = ApplicationPreset.byId(preset);
   const PresetIcon = presetSpec.icon;
   // Recent-projects quick switcher (⌃R, VS Code's "Open Recent"). Keeps the
@@ -239,9 +294,12 @@ function WelcomeSurface({
   // Null targets the managed default workspace; an explicit choice is honored
   // for text, references and templates alike.
   const [target, setTarget] = useState<Workspace | null>(null);
+  // Older Desktop builds revoke the approval on every preset URL change.
+  const permissionPresetScope =
+    welcomeFullAccessAcrossPresets === true ? undefined : preset;
   useEffect(
     () => composer.resetPermissionMode(),
-    [composer, preset, target?.id]
+    [composer, permissionPresetScope, target?.id]
   );
   const composerDraft = useMemo(
     () => composer.draftFor(target?.id ?? "default"),
@@ -268,8 +326,7 @@ function WelcomeSurface({
     () => ({ commands: [], mentions }),
     [mentions]
   );
-  // References the user has gathered from the gallery (multi-select). They seed
-  // ONE fresh board on submit; a click in the gallery toggles membership here.
+  // Keep the Images picks while browsing other presets.
   const [pickedRefs, setPickedRefs] = useState<
     chat_vocabulary.DesignReference[]
   >([]);
@@ -293,15 +350,13 @@ function WelcomeSurface({
   // start from ONE template, like choosing a Keynote theme). Null = none. It's
   // an attachment-style reference, NOT an instant start: the composer send seeds
   // its bundle into the session scratch and hands it to the agent (see `start`).
-  const [pickedTemplate, setPickedTemplate] = useState<SlidesTemplate | null>(
+  const [templatePick, setPickedTemplate] = useState<SlidesTemplate | null>(
     null
   );
-  // A picked template only makes sense in slides mode (the template gallery is
-  // slides-only). If the user switches the preset away, drop it so a stale
-  // template chip can't linger over the reference gallery.
+  const pickedTemplate = showSlides ? templatePick : null;
   useEffect(() => {
-    if (preset !== "slides") setPickedTemplate(null);
-  }, [preset]);
+    if (!showSlides) setPickedTemplate(null);
+  }, [showSlides]);
   // Composer docking: the composer starts as the in-flow hero, then floats as a
   // fixed bottom bar once it scrolls out of view — so you can keep writing while
   // browsing the gallery. It's the SAME element (its position toggles), so the
@@ -460,6 +515,7 @@ function WelcomeSurface({
   );
   const {
     profiles,
+    profilesLoaded,
     profileId,
     error: profileReadError,
   } = useSyncExternalStore(
@@ -467,6 +523,8 @@ function WelcomeSurface({
     modelSelection.read,
     modelSelection.read
   );
+  const awaitingProfiles =
+    !!bridge?.nativeChat?.welcomeProfiles && !profilesLoaded;
   useEffect(() => {
     composer.initializeEffort(profiles?.newChatDefault?.effort);
   }, [composer, profiles?.newChatDefault?.effort]);
@@ -490,8 +548,6 @@ function WelcomeSurface({
   const start = useCallback(
     async (text: string) => {
       const template = pickedTemplate;
-      const references =
-        template || showWorkflows || showImages ? [] : pickedRefs;
       const workflowReferences = selectedWorkflows?.map(
         ({ number, showcase }) => ({
           number,
@@ -510,7 +566,6 @@ function WelcomeSurface({
       const hasRequest =
         text.trim() ||
         template ||
-        references.length ||
         messageContext?.displayParts.length ||
         composer.read().attachment;
       if (hasRequest) {
@@ -530,7 +585,7 @@ function WelcomeSurface({
           prompt: ApplicationPreset.prompt(preset, text),
           profileId,
           target,
-          references,
+          references: [],
           messageContext,
           ...(template && {
             template: {
@@ -628,6 +683,7 @@ function WelcomeSurface({
       // writing while browsing.
       className="flex h-svh w-full flex-col bg-background"
     >
+      <WindowContentMarker surface="home" />
       <AgentPermissionConfirmation
         review={staged.permissionReview}
         onAnswer={composer.answerPermissionReview}
@@ -642,7 +698,7 @@ function WelcomeSurface({
             together (no nested scroll); the gallery virtualizes against this. */}
         <div
           ref={scrollRef}
-          className="min-h-0 flex-1 overflow-y-auto"
+          className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]"
           style={
             showWorkflows && docked
               ? {
@@ -652,20 +708,8 @@ function WelcomeSurface({
               : undefined
           }
         >
-          {/* Top-left workspace picker — where a start lands (the managed
-              ~/Documents/Grida Projects root by default, shown as "Default workspace")
-              or which existing project to aim at. Borderless + friendly;
-              replaces the old picker-above-composer + "start blank" row. */}
-          <div className="px-3 pt-3">
-            <WorkspacePicker
-              value={target}
-              onChange={setTarget}
-              workspaces={workspaces}
-              onOpenFolder={onOpen}
-            />
-          </div>
           <div
-            className="mx-auto flex w-full max-w-5xl flex-col gap-16 px-6 pb-10"
+            className="mx-auto flex w-full max-w-5xl flex-col gap-16 px-6 pt-11 pb-10"
             // Reserve room before docking so the end of the scroll range
             // already clears the composer on the scroll that docks it.
             style={
@@ -688,9 +732,18 @@ function WelcomeSurface({
               so detaching doesn't jump the gallery up. */}
               <div
                 ref={composerSlotRef}
-                className="mx-auto w-full max-w-2xl"
+                className="relative mx-auto w-full max-w-2xl"
                 style={docked ? { height: heroHeight } : undefined}
               >
+                <WelcomeHeading question={presetSpec.composerQuestion}>
+                  <WorkspacePicker
+                    inline
+                    value={target}
+                    onChange={setTarget}
+                    workspaces={workspaces}
+                    onOpenFolder={onOpen}
+                  />
+                </WelcomeHeading>
                 {/* The composer itself. In the hero it's a plain in-flow block; once
                 docked it becomes a floating card fixed to the bottom, sliding up
                 on entry. It's the SAME element in both states, so the Tiptap
@@ -719,7 +772,11 @@ function WelcomeSurface({
                       <div className="size-10 shrink-0 overflow-hidden rounded border bg-muted">
                         {/* eslint-disable-next-line @next/next/no-img-element -- blob object URL; next/image can't optimize it */}
                         <img
-                          src={pickedTemplate.pages[0]?.url}
+                          src={
+                            pickedTemplate.pages[
+                              pickedTemplate.openingPageIndex
+                            ]?.url
+                          }
                           alt=""
                           className="size-full object-cover"
                         />
@@ -748,7 +805,7 @@ function WelcomeSurface({
                   composer's own send. When docked the row floats above the input
                   in the same stack — same design language, lifted by shadow, not
                   boxed in a container. */}
-                  {!showWorkflows && pickedRefs.length > 0 && (
+                  {showImages && pickedRefs.length > 0 && (
                     <div className="flex gap-2 overflow-x-auto pb-0.5">
                       {pickedRefs.map((p) => (
                         <div
@@ -829,9 +886,7 @@ function WelcomeSurface({
                       selectedWorkflows?.length ||
                       (showImages && pickedRefs.length > 0)
                         ? "Send"
-                        : pickedTemplate ||
-                            (!showWorkflows && pickedRefs.length > 0) ||
-                            staged.attachment
+                        : pickedTemplate || staged.attachment
                           ? "Start"
                           : "Open workspace"
                     }
@@ -873,9 +928,8 @@ function WelcomeSurface({
                         disabled: busy || staged.goal,
                         onSelect: () => imagePicker.current?.click(),
                       },
-                      library: showWorkflows
-                        ? undefined
-                        : {
+                      library: showImages
+                        ? {
                             disabled: busy || staged.goal,
                             onSelect: () => {
                               galleryRef.current?.scrollIntoView({
@@ -886,7 +940,8 @@ function WelcomeSurface({
                                 preventScroll: true,
                               });
                             },
-                          },
+                          }
+                        : undefined,
                       plan: {
                         offered: !!bridge?.nativeChat?.submitInRegime,
                         active: staged.plan,
@@ -934,6 +989,8 @@ function WelcomeSurface({
                         : []
                     }
                     model={{
+                      loading: awaitingProfiles,
+                      initialError: awaitingProfiles ? profileReadError : null,
                       profiles: {
                         active: profileId,
                         choices: profiles?.choices ?? [],
@@ -989,38 +1046,40 @@ function WelcomeSurface({
               </div>
             </div>
 
-            <div ref={galleryMotionRef}>
-              {showWorkflows ? (
-                <WorkflowGallery
-                  picks={workflowPicks}
-                  disabled={busy}
-                  onToggle={toggleWorkflowReference}
-                />
-              ) : (
-                <div ref={galleryRef} tabIndex={-1}>
-                  <h2 className="mb-3 text-sm font-medium text-muted-foreground">
-                    Start from an idea
-                  </h2>
-                  {preset === "slides" ? (
-                    <SlidesTemplateGallery
-                      onPickTemplate={togglePickTemplate}
-                      selectedName={pickedTemplate?.name ?? null}
-                      disabled={busy}
-                    />
-                  ) : (
-                    <LibraryExplorerView
-                      ref={libraryRef}
-                      initialSource={WELCOME_LIBRARY_SOURCE}
-                      loadPage={resolveLibraryExplorerPage}
-                      onToggle={togglePick}
-                      selectedIds={selectedRefIds}
-                      disabled={busy}
-                      scrollContainerRef={scrollRef}
-                    />
-                  )}
-                </div>
-              )}
-            </div>
+            {showGallery && (
+              <div ref={galleryMotionRef}>
+                {showWorkflows ? (
+                  <WorkflowGallery
+                    picks={workflowPicks}
+                    disabled={busy}
+                    onToggle={toggleWorkflowReference}
+                  />
+                ) : (
+                  <div ref={galleryRef} tabIndex={-1}>
+                    <h2 className="mb-3 text-sm font-medium text-muted-foreground">
+                      Start from an idea
+                    </h2>
+                    {showSlides ? (
+                      <SlidesTemplateGallery
+                        onPickTemplate={togglePickTemplate}
+                        selectedName={pickedTemplate?.name ?? null}
+                        disabled={busy}
+                      />
+                    ) : (
+                      <LibraryExplorerView
+                        ref={libraryRef}
+                        initialSource={WELCOME_LIBRARY_SOURCE}
+                        loadPage={resolveLibraryExplorerPage}
+                        onToggle={togglePick}
+                        selectedIds={selectedRefIds}
+                        disabled={busy}
+                        scrollContainerRef={scrollRef}
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

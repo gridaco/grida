@@ -53,6 +53,7 @@ export function DesktopCanvasShell({
   workspaceId,
   basePath = "",
   active = true,
+  onDirtyChange,
   slideSurfaceHost,
 }: {
   workspaceId: string;
@@ -62,6 +63,7 @@ export function DesktopCanvasShell({
   /** False when mounted as a hidden workbench tab — gates Cmd+S so a
    *  background deck doesn't grab the save. Defaults true (standalone). */
   active?: boolean;
+  onDirtyChange: (dirty: boolean) => void;
   slideSurfaceHost?: DocumentSurfaceHost;
 }) {
   const [deck] = useState(
@@ -210,6 +212,7 @@ export function DesktopCanvasShell({
             slideSurfaceHost={slideSurfaceHost}
             editable={active}
             thumbnail={activeSlide ? thumbnails[activeSlide.src] : undefined}
+            onDirtyChange={onDirtyChange}
             onSaved={() => activeSlide && refresh(activeSlide.src)}
           />
         </main>
@@ -450,6 +453,7 @@ function ActiveSlide({
   basePath,
   editable,
   thumbnail,
+  onDirtyChange,
   onSaved,
   slideSurfaceHost,
 }: {
@@ -462,6 +466,7 @@ function ActiveSlide({
    *  the slide file loads so switching pages doesn't blink a "Loading…"
    *  placeholder — the deck strip already has these, so a revisit is instant. */
   thumbnail?: string;
+  onDirtyChange: (dirty: boolean) => void;
   onSaved: () => void;
   slideSurfaceHost?: DocumentSurfaceHost;
 }) {
@@ -596,6 +601,7 @@ function ActiveSlide({
         initialMtime={state.mtime}
         resourceRevision={resourceRevision}
         active={editable}
+        onDirtyChange={onDirtyChange}
         onSaved={onSaved}
         liveText={
           slideSurfaceHost && slidePath?.toLowerCase().endsWith(".svg")

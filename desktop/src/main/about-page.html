@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <title>About {{name}}</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        background: light-dark(#f7f7f8, #232326);
+        color: light-dark(#202124, #f3f3f4);
+        font:
+          13px system-ui,
+          sans-serif;
+      }
+
+      body {
+        display: grid;
+        min-height: 100vh;
+        margin: 0;
+        place-items: center;
+        text-align: center;
+      }
+
+      main {
+        padding: 20px;
+      }
+
+      img {
+        display: block;
+        width: 84px;
+        height: 84px;
+        margin: 0 auto 12px;
+        object-fit: contain;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 21px;
+        font-weight: 650;
+        letter-spacing: -0.02em;
+      }
+
+      p {
+        margin: 4px 0 0;
+        color: light-dark(#63636b, #b1b1ba);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="{{icon}}" alt="" />
+      <h1>{{name}}</h1>
+      <p>Version {{version}}</p>
+    </main>
+  </body>
+</html>

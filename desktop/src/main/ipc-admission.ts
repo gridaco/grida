@@ -71,6 +71,17 @@ export namespace ipc_admission {
   }): boolean {
     switch (role) {
       case "main":
+        if (channel === IPC_CHANNELS.CHAT_CATALOG_READ)
+          return pathname === "/desktop/workspace";
+        if (
+          channel === IPC_CHANNELS.CHAT_CATALOG_LIST ||
+          channel === IPC_CHANNELS.CHAT_CATALOG_OBSERVE ||
+          channel === IPC_CHANNELS.CHAT_CATALOG_UNOBSERVE ||
+          channel === IPC_CHANNELS.CHAT_CATALOG_CHANGED
+        )
+          return (
+            pathname === "/desktop/welcome" || pathname === "/desktop/workspace"
+          );
         // GRIDA-SEC-016 — confirmed app-wide clearing grants no page lease.
         if (
           channel === IPC_CHANNELS.BROWSER_CLEAR_BROWSING_DATA ||
@@ -95,7 +106,8 @@ export namespace ipc_admission {
           return pathname === "/desktop/settings";
         if (
           channel === IPC_CHANNELS.ARCHIVES_LIST ||
-          channel === IPC_CHANNELS.ARCHIVES_UNARCHIVE
+          channel === IPC_CHANNELS.ARCHIVES_UNARCHIVE ||
+          channel === IPC_CHANNELS.ARCHIVES_OPEN_RESTORED
         ) {
           return pathname === "/desktop/settings";
         }
@@ -116,6 +128,8 @@ export namespace ipc_admission {
         }
         if (
           WORKBENCH_LIBRARY_CHANNELS.has(channel) ||
+          channel === IPC_CHANNELS.NATIVE_CHAT_START_WORKSPACE ||
+          channel === IPC_CHANNELS.NATIVE_CHAT_UNDO_ARCHIVE ||
           channel === IPC_CHANNELS.NATIVE_CHAT_TAKE_NOTIFICATION_FOCUS
         ) {
           return pathname === "/desktop/workspace";

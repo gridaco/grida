@@ -1,6 +1,6 @@
 {
   "name": "desktop",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "description": "Grida Desktop App",
   "keywords": [],
@@ -48,7 +48,7 @@
     "@grida/auth": "link:../packages/grida-auth",
     "@grida/daemon": "link:../packages/grida-daemon",
     "@grida/desktop-bridge": "link:../packages/grida-desktop-bridge",
-    "@grida/fx": "0.10.0",
+    "@grida/fx": "0.11.0",
     "@grida/home": "link:../packages/grida-home",
     "@tailwindcss/vite": "^4.2.2",
     "@types/electron-squirrel-startup": "^1.0.2",
@@ -67,7 +67,6 @@
     "tailwindcss": "^4.2.2",
     "ts-node": "^10.0.0",
     "typescript": "^6",
-    "update-electron-app": "^3.2.0",
     "vite": "^8.0.13",
     "vitest": "^4"
   },

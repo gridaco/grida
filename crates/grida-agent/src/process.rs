@@ -93,11 +93,22 @@ pub async fn run_with_file(
     input_file: Option<PathBuf>,
     signal: impl Future<Output = Result<()>>,
 ) -> Result<u8> {
+    run_with_input(host, options, input_file, None, signal).await
+}
+
+/// Run with an optional file and a catalog title for the first accepted input.
+pub async fn run_with_input(
+    host: &Host,
+    options: RunOptions,
+    input_file: Option<PathBuf>,
+    initial_title: Option<String>,
+    signal: impl Future<Output = Result<()>>,
+) -> Result<u8> {
     let result = if options.timeout.is_zero() || options.timeout > MAX_RUN_TIMEOUT {
         Err(problem(ErrorKind::InvalidInput, "invalid_run_deadline"))
     } else {
         match host.clone().with_headless_guidance(&options.cwd) {
-            Ok(scoped) => run_once(&scoped, options, input_file, signal).await,
+            Ok(scoped) => run_once(&scoped, options, input_file, initial_title, signal).await,
             Err(error) => Err(error),
         }
     };
@@ -162,12 +173,13 @@ async fn run_once(
     host: &Host,
     options: RunOptions,
     input_file: Option<PathBuf>,
+    initial_title: Option<String>,
     signal: impl Future<Output = Result<()>>,
 ) -> Result<u8> {
     let deadline = tokio::time::Instant::now() + options.timeout;
     tokio::pin!(signal);
     let mut accepted = tokio::select! {
-        result = tokio::time::timeout_at(deadline, admit_run(host, options, input_file)) => result
+        result = tokio::time::timeout_at(deadline, admit_run(host, options, input_file, initial_title)) => result
             .map_err(|_| problem(ErrorKind::Unavailable, "run_deadline_reached"))??,
         result = &mut signal => {
             result?;
@@ -256,6 +268,7 @@ async fn admit_run(
     host: &Host,
     options: RunOptions,
     input_file: Option<PathBuf>,
+    initial_title: Option<String>,
 ) -> Result<AcceptedRun> {
     let prompt = match options.prompt {
         Some(prompt) => prompt,
@@ -299,15 +312,18 @@ async fn admit_run(
             .into_iter()
             .map(|reference| PromptPart::Skill { reference }),
     );
-    host.start_prompt(PromptRequest {
-        id: change_id()?,
-        session,
-        parts,
-        questions: options.questions,
-        operating_regime: None,
-        effort: None,
-        reasoning: options.reasoning,
-    })
+    host.start_prompt_with_initial_title(
+        PromptRequest {
+            id: change_id()?,
+            session,
+            parts,
+            questions: options.questions,
+            operating_regime: None,
+            effort: None,
+            reasoning: options.reasoning,
+        },
+        initial_title,
+    )
     .await
 }
 

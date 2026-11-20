@@ -44,19 +44,18 @@ Desktop settings but cannot run chat.
    you return to the window after changing a connection in Settings. Your current choice stays selected.
    If reloading fails, the previous choices stay visible with **Retry**.
 
-You can change the model or connection between turns, including choosing a
-different provider or account. The chat and its visible history stay in place.
-Your next message uses the selected connection with earlier conversation as
-context; private provider continuation and reasoning stay with their original
-connection.
+You can choose a different model, provider or account while a turn is running.
+The next message you send uses that selection, even if it joins the queue.
+A message already in the queue uses the settings it had when you sent it.
+For example, if you send two messages on Model A, switch to Model B, then
+send a third, only the third uses Model B.
 
-A selection change prepares future messages. Work already accepted keeps its
-model, account, effort and funding through queueing, Pause, Resume, retries and
-restart. If sending on your new choice needs a different shared connection,
-Desktop explains which running, paused, queued or Goal work must finish or be
-resolved first. Your saved choice and draft remain available; changing a
-selection does not silently stop another chat's work. An older Desktop build
-may require an update before using these controls.
+The chat keeps its visible history. A different connection receives the
+earlier conversation as context. Private provider continuation and reasoning
+stay with their original connection. Accepted work keeps its model, account,
+effort and funding through Pause, Resume, retries and restart, subject to
+continued access to the connection. Older Desktop builds can require accepted
+work to finish before sending on a different connection.
 
 Each chat remembers its own model connection and effort, including changes
 made before sending. Switching to another chat or restarting Desktop restores

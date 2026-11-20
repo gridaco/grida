@@ -1,9 +1,9 @@
 //! GRIDA-SEC-004 — Automatic chat titles from the first request.
 //!
-//! An untitled chat gets a short title from its first text request. A
-//! temporary, tool-free conversation writes it while the first turn runs, and
-//! it is saved only if the chat is still untitled at the same catalogue
-//! revision, so a person's rename always wins.
+//! A first accepted request can supply a provisional catalog title. A
+//! temporary, tool-free conversation can replace it until a person renames
+//! the chat. Archiving or restoring preserves its placement while generation
+//! completes. Failed generation leaves the accepted label in place.
 //!
 //! A side chat is titled the same way. Its title stays on the side session's
 //! own record, outside every workspace listing, and is discarded with it; a
@@ -11,7 +11,7 @@
 
 use super::*;
 use agent_kit_core::messages::OutcomeStatus;
-use agent_kit_store_sqlite::catalog::CatalogEntry;
+use agent_kit_store_sqlite::catalog::InitialLabel;
 use grida_agent_master::read_account;
 
 const TITLE_INSTRUCTIONS: &str = include_str!("../prompts/title.md");
@@ -20,92 +20,155 @@ const MAX_REQUEST_BYTES: usize = 960;
 const MAX_TITLE_CHARS: usize = 50;
 const TITLE_TIMEOUT: Duration = Duration::from_secs(60);
 
+#[derive(Default)]
+pub(super) struct FirstTitle {
+    initial_label: Option<String>,
+    source: Option<String>,
+}
+
+/// The first label is durable. A funded goal can finish publishing its spending
+/// authority before it starts the optional title inference.
+pub(super) struct AcceptedInput {
+    receipt: Acceptance,
+    title: Option<(PendingTitle, u64)>,
+}
+
+impl AcceptedInput {
+    pub(super) fn start_title(self) -> Acceptance {
+        if let Some((worker, revision)) = self.title {
+            worker.start(revision);
+        }
+        self.receipt
+    }
+}
+
+/// Active only from first-input admission through publication or failure.
+struct PendingTitle {
+    session: SessionId,
+    text: String,
+    host: Host,
+}
+
+impl Drop for PendingTitle {
+    fn drop(&mut self) {
+        self.host
+            .title_workers
+            .lock()
+            .unwrap()
+            .remove(&self.session);
+        self.host.changed.notify_waiters();
+    }
+}
+
 impl Host {
-    /// Title untitled chats. A client opts in at launch: the title costs one
-    /// model request, which a one-shot run or a scripted provider does not
-    /// expect. The temporary titler and subagents are never titled.
+    /// Generate a chat title from its first request. Clients opt in at launch
+    /// because generation costs one model request. Recording a client-supplied
+    /// initial title works independently.
     pub fn with_chat_titles(mut self) -> Self {
         self.chat_titles = true;
         self
     }
 
-    /// The text to title `view`'s chat from, when this request is its first.
-    /// `view` is the session before the request was submitted.
+    /// A new worker cannot register between sampling its status and reading
+    /// the label. An existing worker publishes its result before retiring.
+    pub(super) async fn read_with_title_state<T>(
+        &self,
+        session: &SessionId,
+        read: impl Future<Output = Result<T>>,
+    ) -> Result<(T, bool)> {
+        let _observation = self.title_observation.read().await;
+        let pending = self.title_workers.lock().unwrap().contains(session);
+        Ok((read.await?, pending))
+    }
+
+    async fn register_title(&self, session: &SessionId, text: String) -> Option<PendingTitle> {
+        let _registration = self.title_observation.write().await;
+        self.title_workers
+            .lock()
+            .unwrap()
+            .insert(session.clone())
+            .then(|| PendingTitle {
+                host: self.clone(),
+                session: session.clone(),
+                text,
+            })
+    }
+
+    /// Only regular and side chats take a title from an accepted first input.
     pub(super) fn title_candidate(
         &self,
         view: &SessionView,
         parts: &[PromptPart],
-    ) -> Option<(SessionId, String)> {
-        if !self.chat_titles
-            || self.inference_only
+        initial_title: Option<String>,
+    ) -> Result<FirstTitle> {
+        if self.inference_only
             || view.current.is_some()
             || view.latest.is_some()
             || !view.queued.is_empty()
-            || session_configuration(view)
-                .is_ok_and(|configuration| configuration.subagent.is_some())
+            || session_configuration(view)?.subagent.is_some()
         {
-            return None;
+            return Ok(FirstTitle::default());
         }
-        let text = parts
-            .iter()
-            .filter_map(|part| match part {
-                PromptPart::Text { text } => Some(text.as_str()),
-                _ => None,
+        let initial_label = catalog::normalize_title(initial_title)?;
+        let source = self
+            .chat_titles
+            .then(|| {
+                parts
+                    .iter()
+                    .filter_map(|part| match part {
+                        PromptPart::Text { text } => Some(text.as_str()),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n")
             })
-            .collect::<Vec<_>>()
-            .join("\n");
-        (!text.trim().is_empty()).then(|| (view.session.clone(), text))
+            .filter(|text| !text.trim().is_empty());
+        Ok(FirstTitle {
+            initial_label,
+            source,
+        })
     }
 
-    /// Title an accepted first request in the background.
-    pub(super) fn start_title(&self, candidate: Option<(SessionId, String)>) {
-        let Some((session, text)) = candidate else {
-            return;
+    pub(super) async fn accept_with_title(
+        &self,
+        session: SessionId,
+        input: Submission,
+        expected: Option<SessionRevision>,
+        title: FirstTitle,
+    ) -> Result<AcceptedInput> {
+        // Mark the candidate before the catalog write becomes visible. A reader
+        // who sees the provisional title can then follow the worker to completion.
+        let pending = if let Some(text) = title.source {
+            self.register_title(&session, text).await
+        } else {
+            None
         };
-        self.title_workers.fetch_add(1, Ordering::Relaxed);
-        let lifetime = WorkerLifetime {
-            workers: self.title_workers.clone(),
-            changed: self.changed.clone(),
-        };
-        let host = self.clone();
-        tokio::spawn(async move {
-            let _lifetime = lifetime;
-            // A title is a convenience; failure leaves the chat untitled.
-            let _ = host.write_title(session, text).await;
-        });
-    }
-
-    /// Write the generated title as the chat's own label. This is the
-    /// store's record of the chat, not a person's catalog action, so it also
-    /// titles a side chat that refuses those actions.
-    async fn write_title(&self, session: SessionId, text: String) -> Result<()> {
-        if self
+        let initial = title
+            .initial_label
+            .map(InitialLabel::Display)
+            .or_else(|| pending.as_ref().map(|_| InitialLabel::AwaitSuggestion));
+        let (acceptance, revision) = self
             .store
-            .catalog_entry(session.clone())
-            .await?
-            .label
-            .is_some()
-        {
-            return Ok(());
-        }
-        let cwd = session_configuration(&self.store.inspect(session.clone()).await?)?.cwd;
-        let Some(title) = self.generate_title(cwd, &text).await? else {
+            .submit_with_initial_label(session, input, expected, initial)
+            .await?;
+        Ok(AcceptedInput {
+            receipt: acceptance,
+            title: pending.zip(revision),
+        })
+    }
+
+    async fn write_title(&self, session: &SessionId, text: &str, revision: u64) -> Result<()> {
+        let configuration = self.store.configuration(session.clone()).await?;
+        let cwd = decode_session_configuration(&configuration)?.cwd;
+        let Some(title) = self.generate_title(cwd, text).await? else {
             return Ok(());
         };
-        let current = self.store.catalog_entry(session.clone()).await?;
-        // A host that shut down while the title was generated no longer
-        // writes to the chat.
-        if current.label.is_some() || self.work.lock().await.closed {
+        if self.work.lock().await.closed {
             return Ok(());
         }
-        // The revision check refuses the write if the person renamed meanwhile.
         self.store
-            .replace_catalog_entry(CatalogEntry {
-                label: Some(title),
-                ..current
-            })
+            .finish_label_suggestion(session.clone(), revision, title)
             .await
-            .map(|_| ())
     }
 
     async fn generate_title(&self, cwd: PathBuf, text: &str) -> Result<Option<String>> {
@@ -155,6 +218,9 @@ impl Host {
             store,
             state_dir: None,
             execution: self.execution.clone(),
+            routes: Default::default(),
+            selected_route: None,
+            route_id: None,
             gg_connection: None,
             configuration: self.configuration.clone(),
             permissions: None,
@@ -177,12 +243,24 @@ impl Host {
             work: Arc::default(),
             wake_lock: Arc::default(),
             workers: Arc::default(),
+            title_observation: Arc::default(),
             title_workers: Arc::default(),
             changed: Arc::default(),
             live_updates: broadcast::channel(UPDATE_CAPACITY).0,
             subagent_activity: Arc::default(),
             processes: Arc::default(),
         })
+    }
+}
+
+impl PendingTitle {
+    fn start(self, revision: u64) {
+        tokio::spawn(async move {
+            let _ = self
+                .host
+                .write_title(&self.session, &self.text, revision)
+                .await;
+        });
     }
 }
 
@@ -253,6 +331,42 @@ pub(crate) fn sanitize(raw: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn catalog_title_reads_cannot_miss_a_worker_that_starts_and_finishes_during_the_read() {
+        let directory = tempfile::tempdir().unwrap();
+        let state = directory.path().join("state");
+        prepare_state_dir(&state).unwrap();
+        open_store(&state.join(DATABASE_FILE)).unwrap();
+        let host = Host::open(&state, None).unwrap();
+        let session = SessionId::new("read-title").unwrap();
+        let (release, held) = oneshot::channel();
+        let mut read = std::pin::pin!(host.read_with_title_state(&session, async {
+            held.await.unwrap();
+            Ok(())
+        }));
+        assert!(futures_util::poll!(read.as_mut()).is_pending());
+        let mut register = std::pin::pin!(host.register_title(&session, "Hello".into()));
+        assert!(futures_util::poll!(register.as_mut()).is_pending());
+        release.send(()).unwrap();
+        assert_eq!(read.await.unwrap(), ((), false));
+
+        let worker = register.await.unwrap();
+        let result = host
+            .read_with_title_state(&session, async {
+                drop(worker);
+                Ok(())
+            })
+            .await
+            .unwrap();
+        assert_eq!(result, ((), true));
+        assert_eq!(
+            host.read_with_title_state(&session, async { Ok(()) })
+                .await
+                .unwrap(),
+            ((), false)
+        );
+    }
 
     #[test]
     fn titles_are_one_short_line() {

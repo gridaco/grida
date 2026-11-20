@@ -1,7 +1,7 @@
 //! Versioned product operations layered over standard ACP.
 
 pub(super) mod approvals;
-mod catalog;
+pub(super) mod catalog;
 pub(super) mod compaction;
 mod deletion;
 pub(super) mod gateway_billing;
@@ -52,6 +52,8 @@ use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
 
 const SUBMIT: &str = "co.grida/session/submit";
+const CATALOG_QUERY: &str = "co.grida/session/catalog-query";
+const INITIAL_TITLE: &str = "co.grida/session/initial-title";
 const FILE_INTAKE: &str = "co.grida/session/selected-file";
 const IMAGE_INTAKE: &str = "co.grida/session/selected-image";
 /// A prompt `resource_link` with a `file:` URI names a local file or directory by
@@ -66,8 +68,9 @@ const EFFORT: &str = "co.grida/session/effort";
 const CONFIG_INSPECT: &str = "co.grida/config/inspect";
 const CONFIG_UPDATE: &str = "co.grida/config/update";
 const CONFIG_RELOAD: &str = "co.grida/config/reload";
-const CAPABILITIES: [&str; 7] = [
+const CAPABILITIES: [&str; 8] = [
     SUBMIT,
+    INITIAL_TITLE,
     SNAPSHOT,
     STOP,
     OPERATING_REGIME,
@@ -109,6 +112,49 @@ fn operating_regime(
     Ok(selection)
 }
 
+fn initial_title(
+    sessions: &Mutex<ConnectionSessions>,
+    title: Option<String>,
+) -> Result<Option<String>> {
+    if title.is_some() {
+        require(sessions, INITIAL_TITLE, None)?;
+    }
+    Ok(title)
+}
+
+pub(super) fn prompt_initial_title(
+    sessions: &Mutex<ConnectionSessions>,
+    meta: Option<&Meta>,
+) -> Result<Option<String>> {
+    let Some(value) = meta.and_then(|meta| meta.get("co.grida/initialTitle")) else {
+        return Ok(None);
+    };
+    let title = value
+        .as_str()
+        .ok_or_else(|| Error::invalid_params().data("invalid_initial_title"))?;
+    initial_title(sessions, Some(title.to_owned()))
+}
+
+pub(super) fn catalog_order(
+    connection: &Mutex<ConnectionSessions>,
+    request: &agent_client_protocol::v1::schema::ListSessionsRequest,
+) -> Result<crate::host::CatalogOrder> {
+    use crate::host::CatalogOrder;
+    let Some(order) = request
+        .meta
+        .as_ref()
+        .and_then(|meta| meta.get("co.grida/catalogOrder"))
+    else {
+        return Ok(CatalogOrder::Created);
+    };
+    require(connection, CATALOG_QUERY, None)?;
+    match order.as_str() {
+        Some("created") => Ok(CatalogOrder::Created),
+        Some("messageActivity") => Ok(CatalogOrder::MessageActivity),
+        _ => Err(Error::invalid_params().data("invalid_catalog_order")),
+    }
+}
+
 pub(super) fn negotiated(
     meta: Option<&Meta>,
     reviewer: bool,
@@ -135,6 +181,7 @@ fn capability_keys(
         .into_iter()
         .chain(lifecycle::CAPABILITIES)
         .chain(questions::CAPABILITIES)
+        .chain([questions::OPTIONAL])
         .chain(approvals::capabilities(reviewer))
         .chain(history::CAPABILITIES)
         .chain([compaction::COMPACT])
@@ -146,7 +193,12 @@ fn capability_keys(
         .chain(input_images::chunks_capability(reviewer))
         .chain(input_images::queued_capability(reviewer))
         .chain(tool_images::capability(reviewer))
-        .chain([catalog::ORGANIZE, catalog::ARCHIVE_CATALOG])
+        .chain([
+            catalog::ORGANIZE,
+            catalog::ARCHIVE_CATALOG,
+            CATALOG_QUERY,
+            catalog::READ_STATE,
+        ])
         .chain(delete_chat.then_some(deletion::DELETE))
         .chain(delete_chat.then_some(deletion::PREVIEW))
         .chain(goals::CAPABILITIES)
@@ -178,6 +230,7 @@ struct Submit {
     meta: Option<Meta>,
     session_id: SessionId,
     input_id: ChangeId,
+    initial_title: Option<String>,
     prompt: Vec<ContentBlock>,
     selected_file: Option<SelectedFile>,
     selected_image: Option<crate::host::SelectedImage>,
@@ -453,6 +506,8 @@ struct SnapshotResponse {
     queued_inputs: usize,
     queue: Vec<QueuedInput>,
     admission_paused: bool,
+    #[serde(default)]
+    idle_queue_resume_available: bool,
     current: Option<TurnSummary>,
     latest: Option<TurnSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -468,13 +523,36 @@ struct QueuedInput {
     input_id: ChangeId,
     input_position: u64,
     settings: InputSettings,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    preview: Option<String>,
 }
 
-fn queued_input(view: &InputView) -> Result<QueuedInput> {
+// Bound the extra display text in a snapshot independently of the queue length.
+const QUEUE_PREVIEW_ROWS: usize = 8;
+const QUEUE_PREVIEW_BYTES: usize = 2048;
+
+fn queued_input(view: &InputView, include_preview: bool) -> Result<QueuedInput> {
+    let (settings, parts) = InputSettings::with_parts(&view.input).map_err(host_error)?;
+    let preview = if include_preview {
+        parts.into_iter().find_map(|part| match part {
+            PromptPart::Text { text } if !text.trim().is_empty() => {
+                if text.len() > QUEUE_PREVIEW_BYTES {
+                    let end = text.floor_char_boundary(QUEUE_PREVIEW_BYTES - '…'.len_utf8());
+                    Some(format!("{}…", &text[..end]))
+                } else {
+                    Some(text)
+                }
+            }
+            _ => None,
+        })
+    } else {
+        None
+    };
     Ok(QueuedInput {
         input_id: view.input.id.clone(),
         input_position: view.position,
-        settings: InputSettings::for_input(&view.input).map_err(host_error)?,
+        settings,
+        preview,
     })
 }
 
@@ -489,6 +567,8 @@ struct TurnSummary {
     paused: bool,
     cancelled: bool,
     disposition: TurnDisposition,
+    #[serde(default)]
+    input_needed: bool,
     status: Option<OutcomeStatus>,
 }
 
@@ -503,6 +583,8 @@ impl From<TurnView> for TurnSummary {
             paused: turn.controls.paused,
             cancelled: turn.controls.cancelled,
             disposition: turn.disposition,
+            input_needed: !turn.controls.cancelled
+                && crate::host::needs_user_input(&turn.pending_request_schemas),
             status: turn.outcome.map(|outcome| outcome.status),
         }
     }
@@ -626,7 +708,7 @@ pub(super) fn handlers(
             sessions.clone(),
             side_chats,
         ))
-        .on_receive_request(
+        .on_supervised_request(
             async move |request: Submit, responder, _| {
                 let result = async {
                     require(&submit_sessions, SUBMIT, Some(&request.session_id))?;
@@ -646,7 +728,7 @@ pub(super) fn handlers(
                     )?;
                     let mut parts = identified_prompt(
                         request.prompt,
-                        image_intake,
+                        image_intake || submit_host.has_routes(),
                         embedded_context,
                         request.selected_file,
                         request.selected_image,
@@ -670,6 +752,10 @@ pub(super) fn handlers(
                                 reasoning: request.reasoning,
                             },
                             SubmissionContext {
+                                initial_title: initial_title(
+                                    &submit_sessions,
+                                    request.initial_title,
+                                )?,
                                 selection_revision: selection::revision(
                                     request.meta.as_ref(),
                                     &submit_sessions,
@@ -695,14 +781,21 @@ pub(super) fn handlers(
             async move |request: Snapshot, responder, _| {
                 let result = async {
                     require(&snapshot_sessions, SNAPSHOT, Some(&request.session_id))?;
-                    let (snapshot, retry_not_before_ms) = snapshot_host
-                        .inspect_with_retry(request.session_id)
-                        .await
-                        .map_err(host_error)?;
+                    let (snapshot, retry_not_before_ms, idle_queue_resume_available) =
+                        snapshot_host
+                            .inspect_snapshot(request.session_id)
+                            .await
+                            .map_err(host_error)?;
                     let side = snapshot_host
                         .side_snapshot(&snapshot)
                         .await
                         .map_err(host_error)?;
+                    let previews = require(
+                        &snapshot_sessions,
+                        input_images::QUEUED,
+                        Some(&snapshot.session),
+                    )
+                    .is_ok();
                     Ok(SnapshotResponse {
                         side,
                         session_id: snapshot.session,
@@ -711,9 +804,13 @@ pub(super) fn handlers(
                         queue: snapshot
                             .queued
                             .iter()
-                            .map(queued_input)
+                            .enumerate()
+                            .map(|(index, view)| {
+                                queued_input(view, previews && index < QUEUE_PREVIEW_ROWS)
+                            })
                             .collect::<Result<_>>()?,
                         admission_paused: snapshot.admission_paused,
+                        idle_queue_resume_available,
                         current: snapshot.current.map(TurnSummary::from),
                         latest: snapshot.latest.map(TurnSummary::from),
                         retry_not_before_ms,

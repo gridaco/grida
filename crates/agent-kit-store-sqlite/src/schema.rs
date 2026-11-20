@@ -1,22 +1,18 @@
-//! The database's one schema and the gate every open passes.
-//!
-//! A database is either empty, in which case this store installs the schema
-//! in one transaction, or it carries this store's application identity and
-//! schema version. Every other file is refused, so a database written by an
-//! unrelated program or by a different schema is never read as this one.
+//! Install the current store schema, open the matching profile, or upgrade
+//! the verified version 1 schema. Unknown databases are refused unchanged.
 
-use super::{Result, commit_error, database_error, error};
+use super::{Result, catalog::ConversationProjection, commit_error, database_error, decode, error};
 use agent_kit_core::ErrorKind;
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
 
 /// The SQLite application identity of this store's databases.
-const APPLICATION_ID: i64 = 0x4752_4147;
-const VERSION: i64 = 1;
+pub(crate) const APPLICATION_ID: i64 = 0x4752_4147;
+pub(crate) const VERSION: i64 = 3;
 
 /// Encoded values are JSON. Digests and identities the store compares in SQL
 /// are raw 32-byte blobs. No CHECK enumerates an open vocabulary such as
 /// request kinds, which SQLite could not later extend in place.
-const SCHEMA: &str = "
+const SCHEMA_V1: &str = "
 -- Which owner projections this database was created with. Reopening it
 -- with different projections is refused.
 CREATE TABLE store_profile (
@@ -166,6 +162,33 @@ CREATE TABLE context_replacements (
 CREATE INDEX context_replacements_turn ON context_replacements(turn_ordinal);
 ";
 
+// Applied to both new stores and verified version 1 stores. Negative sort
+// values let both components of the seek cursor use the same index direction.
+const CONVERSATION_SCHEMA: &str = "
+ALTER TABLE store_profile ADD COLUMN conversations INTEGER NOT NULL DEFAULT 0
+    CHECK (conversations IN (0, 1) AND conversations <= catalog);
+ALTER TABLE sessions ADD COLUMN conversation_group TEXT;
+ALTER TABLE sessions ADD COLUMN last_message_ms INTEGER CHECK (last_message_ms >= 0);
+ALTER TABLE sessions ADD COLUMN message_rank INTEGER GENERATED ALWAYS AS (-coalesce(last_message_ms,-1)) VIRTUAL;
+ALTER TABLE sessions ADD COLUMN creation_rank INTEGER GENERATED ALWAYS AS (-ordinal) VIRTUAL;
+CREATE INDEX conversations_recent ON sessions(bucket, message_rank, id)
+    WHERE conversation_group IS NOT NULL;
+CREATE INDEX conversations_group_recent ON sessions(conversation_group, bucket, message_rank, id)
+    WHERE conversation_group IS NOT NULL;
+CREATE INDEX conversations_created ON sessions(bucket, creation_rank, id)
+    WHERE conversation_group IS NOT NULL;
+CREATE INDEX conversations_group_created ON sessions(conversation_group, bucket, creation_rank, id)
+    WHERE conversation_group IS NOT NULL;
+";
+
+// Old conversations begin read. Only newly published final replies establish
+// a reply identity; upgrading never scans turn history or manufactures unread mail.
+const READ_STATE_SCHEMA: &str = "
+ALTER TABLE sessions ADD COLUMN reply_id TEXT;
+ALTER TABLE sessions ADD COLUMN read_revision INTEGER NOT NULL DEFAULT 0 CHECK (read_revision >= 0);
+ALTER TABLE sessions ADD COLUMN unread INTEGER NOT NULL DEFAULT 0 CHECK (unread IN (0,1));
+";
+
 /// The owner projections a store opens with. A database keeps the profile it
 /// was created with.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -174,9 +197,12 @@ pub(crate) struct Profile {
     pub(crate) turn_links: bool,
 }
 
-/// Install the schema in an empty database, or check that this database
-/// holds it with the same profile. Every other file is refused unchanged.
-pub(crate) fn prepare(connection: &mut Connection, profile: Profile) -> Result<()> {
+/// Validate the database identity, version and owner projections before use.
+pub(crate) fn prepare(
+    connection: &mut Connection,
+    profile: Profile,
+    conversations: Option<ConversationProjection>,
+) -> Result<()> {
     let application_id: i64 = connection
         .pragma_query_value(None, "application_id", |row| row.get(0))
         .map_err(database_error)?;
@@ -184,13 +210,45 @@ pub(crate) fn prepare(connection: &mut Connection, profile: Profile) -> Result<(
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .map_err(database_error)?;
     match (application_id, version) {
-        (APPLICATION_ID, VERSION) => require_profile(connection, profile),
-        (0, 0) => install(connection, profile),
+        (APPLICATION_ID, VERSION | 2) => {
+            require_profile(connection, profile)?;
+            let enabled: bool = connection
+                .query_row(
+                    "SELECT conversations FROM store_profile WHERE singleton=1",
+                    [],
+                    |row| row.get(0),
+                )
+                .map_err(database_error)?;
+            if enabled != conversations.is_some() {
+                return Err(error(ErrorKind::Unsupported, "store_profile_mismatch"));
+            }
+            if version == 2 {
+                let tx = connection
+                    .transaction_with_behavior(TransactionBehavior::Immediate)
+                    .map_err(database_error)?;
+                let reference = Connection::open_in_memory().map_err(database_error)?;
+                reference.execute_batch(SCHEMA_V1).map_err(database_error)?;
+                reference
+                    .execute_batch(CONVERSATION_SCHEMA)
+                    .map_err(database_error)?;
+                if definitions(&tx)? != definitions(&reference)? {
+                    return Err(unsupported());
+                }
+                tx.execute_batch(READ_STATE_SCHEMA)
+                    .map_err(database_error)?;
+                tx.pragma_update(None, "user_version", VERSION)
+                    .map_err(database_error)?;
+                tx.commit().map_err(commit_error)?;
+            }
+            Ok(())
+        }
+        (APPLICATION_ID, 1) => upgrade(connection, profile, conversations),
+        (0, 0) => install(connection, profile, conversations.is_some()),
         _ => Err(unsupported()),
     }
 }
 
-fn install(connection: &mut Connection, profile: Profile) -> Result<()> {
+fn install(connection: &mut Connection, profile: Profile, conversations: bool) -> Result<()> {
     let transaction = connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(database_error)?;
@@ -204,11 +262,19 @@ fn install(connection: &mut Connection, profile: Profile) -> Result<()> {
     if !empty {
         return Err(unsupported());
     }
-    transaction.execute_batch(SCHEMA).map_err(database_error)?;
+    transaction
+        .execute_batch(SCHEMA_V1)
+        .map_err(database_error)?;
+    transaction
+        .execute_batch(CONVERSATION_SCHEMA)
+        .map_err(database_error)?;
+    transaction
+        .execute_batch(READ_STATE_SCHEMA)
+        .map_err(database_error)?;
     transaction
         .execute(
-            "INSERT INTO store_profile(singleton,catalog,turn_links) VALUES(1,?1,?2)",
-            params![profile.catalog, profile.turn_links],
+            "INSERT INTO store_profile(singleton,catalog,turn_links,conversations) VALUES(1,?1,?2,?3)",
+            params![profile.catalog, profile.turn_links, conversations],
         )
         .map_err(database_error)?;
     transaction
@@ -218,6 +284,75 @@ fn install(connection: &mut Connection, profile: Profile) -> Result<()> {
         .pragma_update(None, "user_version", VERSION)
         .map_err(database_error)?;
     transaction.commit().map_err(commit_error)
+}
+
+fn upgrade(
+    connection: &mut Connection,
+    profile: Profile,
+    conversations: Option<ConversationProjection>,
+) -> Result<()> {
+    let transaction = connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(database_error)?;
+    // Verify the actual schema before modifying anything. A matching version
+    // header alone is insufficient, particularly if there are unknown triggers.
+    let reference = Connection::open_in_memory().map_err(database_error)?;
+    reference.execute_batch(SCHEMA_V1).map_err(database_error)?;
+    if definitions(&transaction)? != definitions(&reference)? {
+        return Err(unsupported());
+    }
+    require_profile(&transaction, profile)?;
+    transaction
+        .execute_batch(CONVERSATION_SCHEMA)
+        .map_err(database_error)?;
+    transaction
+        .execute_batch(READ_STATE_SCHEMA)
+        .map_err(database_error)?;
+    if let Some(project) = conversations {
+        // Version 1 retained immutable session configuration but no message
+        // timestamps. Recover membership without opening a single transcript.
+        let mut last = 0;
+        let mut next = transaction.prepare(
+            "SELECT ordinal, configuration FROM sessions WHERE ordinal>?1 ORDER BY ordinal LIMIT 1"
+        ).map_err(database_error)?;
+        let mut update = transaction
+            .prepare("UPDATE sessions SET conversation_group=?1 WHERE ordinal=?2")
+            .map_err(database_error)?;
+        while let Some((ordinal, bytes)) = next
+            .query_row([last], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, Vec<u8>>(1)?))
+            })
+            .optional()
+            .map_err(database_error)?
+        {
+            if let Some(group) = (project.group)(&decode(&bytes)?) {
+                update
+                    .execute(params![group, ordinal])
+                    .map_err(database_error)?;
+            }
+            last = ordinal;
+        }
+        transaction
+            .execute(
+                "UPDATE store_profile SET conversations=1 WHERE singleton=1",
+                [],
+            )
+            .map_err(database_error)?;
+    }
+    transaction
+        .pragma_update(None, "user_version", VERSION)
+        .map_err(database_error)?;
+    transaction.commit().map_err(commit_error)
+}
+
+fn definitions(connection: &Connection) -> Result<Vec<String>> {
+    connection
+        .prepare("SELECT sql FROM sqlite_schema WHERE name NOT GLOB 'sqlite_*' ORDER BY name")
+        .map_err(database_error)?
+        .query_map([], |row| row.get(0))
+        .map_err(database_error)?
+        .collect::<rusqlite::Result<_>>()
+        .map_err(database_error)
 }
 
 fn require_profile(connection: &Connection, profile: Profile) -> Result<()> {
@@ -253,6 +388,193 @@ pub(crate) fn install_for_test(connection: &mut Connection) {
             catalog: false,
             turn_links: false,
         },
+        false,
     )
     .unwrap();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{SqliteStore, encode, turn_links::TurnLinkDecision};
+    use agent_kit_core::{ChangeId, Envelope, Fingerprint, SchemaId, SessionId};
+    use agent_kit_sessions::{SessionStore, Submission};
+
+    #[test]
+    fn version_two_upgrades_read_positions_without_changing_existing_recency() {
+        let mut db = Connection::open_in_memory().unwrap();
+        db.execute_batch(SCHEMA_V1).unwrap();
+        db.execute_batch(CONVERSATION_SCHEMA).unwrap();
+        db.pragma_update(None, "application_id", APPLICATION_ID)
+            .unwrap();
+        db.pragma_update(None, "user_version", 2).unwrap();
+        db.execute(
+            "INSERT INTO store_profile(singleton,catalog,turn_links,conversations)
+            VALUES(1,1,0,1)",
+            [],
+        )
+        .unwrap();
+        db.execute("INSERT INTO sessions(id,configuration,revision,paused,next_input,conversation_group,last_message_ms)
+            VALUES('old',X'00',0,0,0,'workspace',42)", []).unwrap();
+        let project = ConversationProjection {
+            group: |_| panic!("existing groups must not be recomputed"),
+            input: |_| false,
+            message: |_| false,
+            final_reply: |_| None,
+            revised_reply: |_, _| Ok(None),
+        };
+        prepare(
+            &mut db,
+            Profile {
+                catalog: true,
+                turn_links: false,
+            },
+            Some(project),
+        )
+        .unwrap();
+        let state: (bool, i64, Option<String>, i64) = db
+            .query_row(
+                "SELECT unread,read_revision,reply_id,last_message_ms FROM sessions WHERE id='old'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .unwrap();
+        assert_eq!(state, (false, 0, None, 42));
+    }
+
+    #[tokio::test]
+    async fn legacy_catalog_upgrades_once_and_dates_only_new_messages() {
+        use crate::catalog::ConversationOrder;
+        let directory = tempfile::tempdir().unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))
+                .unwrap();
+        }
+        let path = directory
+            .path()
+            .canonicalize()
+            .unwrap()
+            .join("legacy.sqlite");
+        drop(crate::open_private_file(&path).unwrap());
+        let db = Connection::open(&path).unwrap();
+        db.execute_batch(SCHEMA_V1).unwrap();
+        db.pragma_update(None, "application_id", APPLICATION_ID)
+            .unwrap();
+        db.pragma_update(None, "user_version", 1).unwrap();
+        db.execute("INSERT INTO store_profile VALUES(1,1,1)", [])
+            .unwrap();
+        let envelope = |name: &str| {
+            Envelope::new(
+                SchemaId::new("test.group").unwrap(),
+                1,
+                name.as_bytes().to_vec(),
+            )
+            .unwrap()
+        };
+        let scope = |config: &Envelope| Fingerprint::of(config).ok();
+        for name in ["public", "private"] {
+            let config = envelope(name);
+            db.execute("INSERT INTO sessions(id,configuration,revision,paused,next_input,scope) VALUES(?1,?2,0,0,0,?3)",
+                params![name,encode(&config).unwrap(),scope(&config).unwrap().bytes().as_slice()]).unwrap();
+        }
+        drop(db);
+        let links: Option<crate::turn_links::TurnLinkProjection> =
+            Some(|_, _| Ok(TurnLinkDecision::Unrelated));
+        let conversations = ConversationProjection {
+            group: |config| (config.bytes() == b"public").then(|| "public".to_owned()),
+            input: |_| true,
+            message: |_| false,
+            final_reply: |_| None,
+            revised_reply: |_, _| Ok(None),
+        };
+        let open = || SqliteStore::open_with_conversations(&path, scope, links, conversations);
+        let version = || {
+            Connection::open(&path)
+                .unwrap()
+                .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
+                .unwrap()
+        };
+        assert_eq!(
+            SqliteStore::open(&path).err().unwrap().code,
+            "store_profile_mismatch"
+        );
+        assert_eq!(version(), 1);
+        let db = Connection::open(&path).unwrap();
+        db.execute("CREATE TABLE unrecognized (id INTEGER)", [])
+            .unwrap();
+        assert_eq!(open().err().unwrap().code, "store_schema_unsupported");
+        assert_eq!(version(), 1);
+        db.execute("DROP TABLE unrecognized", []).unwrap();
+
+        // Stall a real migration after it acquired the legacy writer lock,
+        // then start the execution host while that lock is still occupied.
+        db.execute_batch("BEGIN IMMEDIATE").unwrap();
+        let store = std::thread::scope(|threads| {
+            use crate::catalog_reader::CatalogReader;
+            use std::{
+                sync::mpsc,
+                thread,
+                time::{Duration, Instant},
+            };
+            let reader = threads.spawn(|| {
+                CatalogReader::open_with_conversations(&path, false, scope, links, conversations)
+                    .unwrap()
+                    .is_some()
+            });
+            let deadline = Instant::now() + Duration::from_secs(3);
+            while std::fs::metadata(crate::lock_path(&path)).unwrap().len() == 0 {
+                assert!(
+                    Instant::now() < deadline,
+                    "catalog never acquired the migration lock"
+                );
+                thread::sleep(Duration::from_millis(2));
+            }
+            let (tx, rx) = mpsc::channel();
+            threads.spawn(move || tx.send(open()).unwrap());
+            assert!(matches!(
+                rx.recv_timeout(Duration::from_millis(100)),
+                Err(mpsc::RecvTimeoutError::Timeout)
+            ));
+            db.execute_batch("ROLLBACK").unwrap();
+            assert!(reader.join().unwrap());
+            rx.recv().unwrap().unwrap()
+        });
+        drop(db);
+        // Only startup waits; a second actual execution owner still fails.
+        assert_eq!(open().err().unwrap().code, "store_already_owned");
+        assert_eq!(version(), VERSION);
+        let list = |store: &SqliteStore| {
+            let store = store.clone();
+            async move {
+                store
+                    .list_conversations(None, 0, ConversationOrder::Recent, None, 32)
+                    .await
+                    .unwrap()
+                    .entries
+            }
+        };
+        let rows = list(&store).await;
+        assert_eq!(rows.len(), 1);
+        let id = SessionId::new("public").unwrap();
+        assert_eq!(rows[0].record.entry.session, id);
+        assert!(rows[0].record.last_message_ms.is_none());
+        store
+            .submit(
+                id,
+                Submission {
+                    id: ChangeId::new("message").unwrap(),
+                    payload: envelope("accepted"),
+                },
+            )
+            .await
+            .unwrap();
+        let time = list(&store).await[0].record.last_message_ms.unwrap();
+        drop(store);
+        assert_eq!(
+            list(&open().unwrap()).await[0].record.last_message_ms,
+            Some(time)
+        );
+    }
 }

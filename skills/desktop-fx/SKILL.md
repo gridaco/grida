@@ -1,14 +1,50 @@
 ---
 name: desktop-fx
-description: Use Grida FX in a Desktop workspace, including working from selected examples and presenting workflow evidence.
+description: Work with Grida FX in a Desktop workspace. Adapt workflow examples, plan and run asset workflows, inspect saved runs, and present results.
 ---
 
-Use this guidance with the FX project instructions and skills when present.
+Desktop puts the bundled `grida-fx` executable on the command tool's `PATH`.
+The Grida CLI exposes the same engine as `grida fx`. Where the docs say
+`grida fx plan`, run `grida-fx plan` in Desktop with the same arguments.
+Check that `command -v grida-fx` resolves in the first directory on `PATH`,
+then check `grida-fx --version`. If the bundled executable is unavailable, tell the user.
 
-- Use `grida-fx` as an ordinary command. Before relying on the bundled copy, check that `command -v grida-fx` resolves in the first directory on the command `PATH`, and read `grida-fx --version`. If the carrier is unavailable, report that state before doing work that depends on it.
-- Use `grida-fx --help` and command-specific help for the installed capabilities. FX owns workflow records, cache, execution and run limits. Use `doctor` for runtime and provider setup diagnostics.
-- Use the numbered `<reference>` entries in the Desktop-provided `<grida-desktop-context><fx><references>` section as examples for the user's request. The `showcase` attribute points to the visible result and `source` points to the implementation. Inspect and adapt whichever parts the request calls for. If the message contains only picks, infer the intended outcome when clear or ask a focused question.
-- When the request calls for an editable starter and a reference provides `template-id`, check `grida-fx init --list-templates --json` for that ID and its `workflow_entry`. Use `grida-fx add <id> <new-dir> --json` to install it in a fresh directory. Use the workflow entry and optional input preset from the receipt. Surface missing inputs and prerequisites when they matter.
-- Offline preparation, planning and record inspection can run under Default access. Template downloads through the command, provider calls and starting a local viewer require the user's Full access selection. Preserve the user's access choice and follow FX's run and spending limits. Keep provider keys in their existing FX-supported sources.
-- A workflow can finish without a viewer. When a viewer is useful, check the exact project's service status. Reuse a compatible running service. If startup is requested, run `grida-fx start --json` as an ordinary foreground command. The chat can retain the process. Use the verified service address and exact plan or run entry.
-- Open the viewer with `surface_open`. Observe the exact tab and current document with `browser_snapshot` before a page action. Use `browser_evaluate` with the observed document ID to call the viewer's own context or presentation API. Check the subject and relevant selection first. Treat the resulting viewer context as evidence of what appeared. An open dispatch alone acknowledges the request.
+Follow the project's FX instructions. Start with `grida-fx <command> --help`
+for the installed version. For details beyond the local help, consult the
+[full FX reference for agents](https://grida.co/fx/llms.txt).
+
+## Work with examples and workflows
+
+Use an authored workflow for editable, reference-image or multistep work.
+Desktop's numbered `<reference>` entries under `<grida-desktop-context><fx><references>` provide
+the visible result in `showcase` and its implementation in `source`. If the
+user sent only references, infer their intent when clear or ask a focused question.
+
+For a selected `template-id`, look it up with `grida-fx init --list-templates --json`.
+Install it with `grida-fx add <id> <new-dir> --json` and use the workflow entry
+and optional input preset from the receipt. For a private GitHub template the
+user specified, `add OWNER/REPO@REF --github-auth` uses their authenticated
+GitHub CLI. Offline planning and saved run inspection work under Default access.
+Downloads and live provider calls require Full access. Confirm the user's route
+and spending ceiling or subscription use before live generation. Use
+`grida-fx doctor` to check provider setup.
+
+## Present an authored workflow's plan or saved run
+
+When a viewer is useful, use `grida-fx plan <workflow> --check --register --json`
+or `grida-fx inspect <run> --register --json`. Registration returns the entry's
+relative `route`. Resolve it against the running service URL returned by
+`grida-fx status --project-root <project-dir> --json` for that same project.
+When the user wants the viewer started, run `grida-fx start --json` in the
+project with Full access and retain its foreground process.
+
+Open the resulting URL with `surface_open`. Use `browser_snapshot` to identify
+the tab and current document, then `browser_evaluate` with that document ID to
+read the viewer's context. Verify the subject and selection before using its
+presentation API or telling the user what appeared.
+
+## Single image
+
+FX can also generate one PNG from text with `grida-fx call image.generate`.
+Use `--dry-run` to preview the request and route. A successful call with
+`--json` reports the PNG in `output` and the saved run in `run`.

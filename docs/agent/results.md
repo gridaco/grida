@@ -127,6 +127,13 @@ If a different file is already there, Desktop leaves it intact. You can ask
 the same chat to retry placement or choose another destination. The retry
 uses the kept image, including after you reopen the chat.
 
+### Generate a workspace PNG with FX
+
+In a macOS or Linux workspace chat, you can also ask for a PNG through FX.
+The agent can preview the request using your chosen FX route. Live generation
+requires **Full access** and uses your provider budget or subscription. FX
+saves the PNG in the workspace and records the run.
+
 ## See an artifact while work continues
 
 In a Desktop project chat, ask the agent to open an existing artifact, for

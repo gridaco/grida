@@ -12,8 +12,8 @@ export function createDesktopArchives(
   return new NativeArchives({
     resourcesPath,
     workspaces: () => servicesSidecarClient.listWorkspaces(),
-    resolve: (id) => native.archiveWorkspace(id),
-    directory: (id, root) => native.archiveDirectory(id, root),
-    active: (id) => native.archiveOwner(id),
+    resolve: (id) => native.catalogWorkspace(id),
+    withStore: (workspace, use) =>
+      native.withCatalogStore(workspace.id, workspace.root, use),
   });
 }

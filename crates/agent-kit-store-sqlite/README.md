@@ -11,18 +11,34 @@ transaction. Earlier turns are retained independently.
 
 ## Schema and opening
 
-The database has one schema, declared in `src/schema.rs`, and carries this
-store's SQLite application identity and schema version 1. Opening an empty
-database installs the schema in one transaction. A database with this store's
-identity and version opens as it is. Every other file is refused unchanged
-with `store_schema_unsupported`: a database another program wrote, one without
-this store's identity whatever its version, and a non-empty file at version 0.
-There are no in-place upgrades.
+The database carries this store's SQLite application identity and schema
+version 3. Opening an empty database installs the schema in one transaction.
+Opening a version 1 database verifies the original schema and owner profile,
+then adds the conversation catalog in one transaction. The upgrade recovers
+catalog membership from session configuration. Version 1 did not record
+message timestamps, so those conversations have an unknown message time until
+new activity arrives. Version 2 upgrades add a durable read position per chat.
+Existing history starts read. A newly settled final reply records its ID in
+the same transaction as the turn outcome. Acknowledging its displayed revision
+or marking it unread updates only that position. Older binaries refuse the
+upgraded database. Unrecognized
+schemas, other applications’ files, and non-empty files at version 0 are
+refused unchanged.
 
 The database records the owner projections it was created with: whether it
-keeps a catalog and whether it links submissions to source turns. Reopening it
+keeps a catalog, tracks public conversations and links submissions to source turns. Reopening it
 with a different set is refused with `store_profile_mismatch`, so a session is
 never admitted without the catalog placement or link its owner relies on.
+
+The optional public catalog records the owner's group and projected message
+activity in the same transaction as session creation, input acceptance or
+history publication. Its creation and message-time indexes support bounded
+pages within one group and across groups. Recent pages use descending message
+time, then ascending session ID for ties; undated conversations follow the
+dated rows. A cursor retains the observed sort value, so an updated or deleted
+anchor still identifies the same boundary. Refresh the first page to see chats
+that moved ahead of that boundary. Catalog reads require no transcript,
+provider or execution ownership.
 
 Deleting a session inserts its retirement and removes the session row. Its
 turns, parts, messages, submissions, links, receipts, history views and
@@ -37,8 +53,8 @@ square of its length. A commit encodes and writes only the parts that differ
 from the store's previous write of the turn. The store keeps that previous
 state in memory: a write inside a transaction is staged and becomes the
 remembered state only after the transaction commits, so a rolled-back or
-abandoned write is never read back. The open store is the database's only
-writer, so the remembered state always equals the stored rows; edit the file
+abandoned write is never read back. The execution store is the only writer
+of turn rows, so the remembered state always equals the stored rows. Edit the file
 only while no store has it open. Reading assembles the same state, so
 recovery, identity and evidence checks are unchanged. A store keeps at most 16
 unsettled turns, within the largest assembled size of one turn, and releases
@@ -50,9 +66,11 @@ watching controls or inspecting an idle session costs the same however long
 its turns grew. Inspecting one turn assembles it and refuses malformed
 stored data.
 
-One opened database holds an exclusive operating-system lock for its lifetime.
-Store clones and bound journal handles share that owner. Another process or store
-must wait until ownership is released. Different sessions execute independently
+One execution store holds an exclusive operating-system lock for its lifetime.
+Store clones and bound journal handles share that owner. Another execution store
+must wait until ownership is released. A separate catalog client can read
+indexed metadata or update the read position for an authorized chat.
+Different sessions execute independently
 while short database transactions serialize. Database I/O runs on blocking
 workers. The host needs a Tokio runtime to poll asynchronous operations.
 

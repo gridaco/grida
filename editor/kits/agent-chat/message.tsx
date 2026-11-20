@@ -24,8 +24,9 @@ import {
   useState,
   useSyncExternalStore,
   type ReactNode,
+  type Ref,
 } from "react";
-import { isFileUIPart, isTextUIPart, type FileUIPart } from "ai";
+import { getToolName, isFileUIPart, isTextUIPart, type FileUIPart } from "ai";
 import { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
 import { cn } from "@app/ui/lib/utils";
 import { cjk } from "@streamdown/cjk";
@@ -148,6 +149,7 @@ export type ChatMessageActions = {
 };
 
 export function ChatMessageView({
+  ref,
   message,
   isStreaming,
   actions,
@@ -155,6 +157,7 @@ export function ChatMessageView({
   loadAttachmentPreview,
   loadToolImage,
 }: {
+  ref?: Ref<HTMLDivElement>;
   message: ChatMessage;
   isStreaming?: boolean;
   /** Per-turn affordances under a message. User bubbles show copy without them. */
@@ -182,6 +185,9 @@ export function ChatMessageView({
       .map((part) => part.text)
       .join("");
     const hasText = text.trim().length > 0;
+    const questionReply = message.parts.find(
+      (part) => part.type === chat_vocabulary.CONTEXT_PARTS.questionReply
+    );
     const svgTextSelection = message.parts.some(
       (part) =>
         part.type === chat_vocabulary.CONTEXT_PARTS.svgTextSelection &&
@@ -202,7 +208,7 @@ export function ChatMessageView({
         (part as { type: string }).type in chat_vocabulary.CONTEXT_MARKERS
     );
     return (
-      <Message from="user">
+      <Message from="user" ref={ref}>
         {svgTextSelection && !edit && (
           <EditorSelectionIndicator kind="svg-text" className="self-end" />
         )}
@@ -228,6 +234,13 @@ export function ChatMessageView({
               role="group"
               aria-label="Message text"
             >
+              {questionReply &&
+                "data" in questionReply &&
+                typeof questionReply.data === "string" && (
+                  <blockquote className="mb-1 border-s-2 border-muted-foreground/40 ps-2 text-xs whitespace-pre-wrap text-muted-foreground">
+                    {questionReply.data}
+                  </blockquote>
+                )}
               <CollapsibleBubbleBody>
                 <MessageResponse
                   plugins={markdown.plugins}
@@ -245,6 +258,7 @@ export function ChatMessageView({
             clipboard action, never disabled). History controls appear only
             when the host wires them. */}
         {!edit &&
+          !actions?.hidden &&
           (hasText || actions?.sentAtMs !== undefined || actions?.note) && (
             <div className="ml-auto flex items-center gap-2">
               <MessageActions className={revealOnHoverActions}>
@@ -287,7 +301,7 @@ export function ChatMessageView({
     .map((part) => part.text)
     .join("\n\n");
   return (
-    <Message from="assistant" className="w-full max-w-none">
+    <Message from="assistant" ref={ref} className="w-full max-w-none">
       <MessageContent className={`w-full max-w-full ${CHAT_TEXT}`}>
         {groups.map((group) => {
           if (group.type === "text") {
@@ -840,9 +854,7 @@ function ToolCallView({
   entry: ToolCallEntry;
   loadToolImage?: AttachmentImagePreview.Loader;
 }) {
-  // The `question` tool's INTERACTIVE prompt is session-global (pinned above the
-  // composer by the surface as `QuestionPrompt`). In the transcript it's only a
-  // passive record of what was asked / answered.
+  // A tool records what was asked. The owning chat presents the answer form.
   if (isQuestionEntry(entry)) {
     return <QuestionToolView entry={entry} />;
   }
@@ -905,18 +917,14 @@ function ToolCallView({
   );
 }
 
-// The `question` tool's PASSIVE transcript record. The interactive prompt is
-// session-global (the surface pins `QuestionPrompt` above its composer), so here
-// we only show what was asked — a one-line header — and, once answered, the
-// read-only echo of the answer. While the run is paused on the user the header
-// points them at the prompt; `input-streaming` (partial input) shows nothing.
 function QuestionToolView({ entry }: { entry: ToolCallEntry }) {
   const description = toolDisplay.describe(entry);
   const title = description.detail
     ? `${description.title} · ${description.detail}`
     : description.title;
   if (entry.state === "input-streaming") return null;
-  const pending = entry.state === "input-available";
+  const waitingForAnswer =
+    entry.state === "input-available" && getToolName(entry) === "question";
   // A `question` part can be `output-error` — a headless host's fixed refusal
   // (RFC §question), or any tool error. Surface its text rather than the empty
   // answered summary, so the refusal/error isn't silently swallowed.
@@ -927,7 +935,7 @@ function QuestionToolView({ entry }: { entry: ToolCallEntry }) {
         <MessageCircleQuestionIcon className="size-3.5 shrink-0" />
         <span className="min-w-0 flex-1 truncate">{title}</span>
       </div>
-      {pending ? (
+      {waitingForAnswer ? (
         <p className="mt-1 text-xs text-muted-foreground/80">
           Awaiting your answer below.
         </p>

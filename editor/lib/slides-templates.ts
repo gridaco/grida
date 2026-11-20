@@ -30,6 +30,8 @@ export type SlidesTemplate = {
   system?: string;
   prompt?: string;
   activeId?: string;
+  /** Index of the declared opening slide, falling back to the first page. */
+  openingPageIndex: number;
   pages: SlidesTemplatePage[];
   /** The unzipped `.canvas` bundle as flat text files. */
   files: SlidesTemplateFile[];
@@ -123,25 +125,27 @@ export namespace SlidesTemplates {
     const name = zipName.replace(/\.zip$/, "");
     const ext = canvas.manifest?.ext?.["co.grida.templates"];
     const title = ext?.title ?? name.replace(/\.canvas$/, "");
+    const pages = canvas.documents
+      .filter((d) => d.src in entries)
+      .map((d) => ({
+        id: d.id,
+        name: typeof d.meta?.name === "string" ? d.meta.name : d.id,
+        text: dec.decode(entries[d.src]),
+        url: URL.createObjectURL(
+          new Blob([entries[d.src].slice()], { type: "image/svg+xml" })
+        ),
+      }));
     return {
       name,
       title,
       system: ext?.system,
       prompt: ext?.prompt,
       activeId: ext?.activeId,
-      pages: canvas.documents
-        .filter((d) => d.src in entries)
-        .map((d) => {
-          const text = dec.decode(entries[d.src]);
-          return {
-            id: d.id,
-            name: typeof d.meta?.name === "string" ? d.meta.name : d.id,
-            text,
-            url: URL.createObjectURL(
-              new Blob([entries[d.src].slice()], { type: "image/svg+xml" })
-            ),
-          };
-        }),
+      openingPageIndex: Math.max(
+        0,
+        pages.findIndex((p) => p.id === ext?.activeId)
+      ),
+      pages,
       files: bundleFiles(entries, dec),
     };
   }

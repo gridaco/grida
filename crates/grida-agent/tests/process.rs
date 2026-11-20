@@ -75,6 +75,9 @@ mod outbound_mcp;
 #[path = "process/processes.rs"]
 mod processes;
 #[cfg(unix)]
+#[path = "process/prompt_preview.rs"]
+mod prompt_preview;
+#[cfg(unix)]
 #[path = "process/questions.rs"]
 mod questions;
 #[path = "process/responses.rs"]
@@ -112,13 +115,17 @@ const TEST_CREDENTIAL: &str = "fixture-only-bearer-token";
 #[cfg(unix)]
 #[path = "process/catalog.rs"]
 mod catalog;
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[path = "process/live_catalog.rs"]
+mod live_catalog;
 
 struct Endpoint {
     url: String,
     requests: mpsc::UnboundedReceiver<Value>,
-    /// Chat title requests, answered by the endpoint with [`FIXTURE_TITLE`]
-    /// without taking a scripted reply.
+    /// Chat title requests use a separate script from ordinary turns.
     titles: mpsc::UnboundedReceiver<Value>,
+    #[cfg_attr(not(unix), allow(dead_code))]
+    title_replies: mpsc::UnboundedSender<Reply>,
     /// Model requests that arrived after the script ran out, each answered
     /// with a server error.
     unexpected: mpsc::UnboundedReceiver<String>,
@@ -214,6 +221,7 @@ impl Endpoint {
         let url = format!("http://{}/{version}", listener.local_addr().unwrap());
         let (sent, requests) = mpsc::unbounded_channel();
         let (titled, titles) = mpsc::unbounded_channel();
+        let (title_replies, mut title_script) = mpsc::unbounded_channel();
         let (extra, unexpected) = mpsc::unbounded_channel();
         let (close, mut closed) = tokio::sync::oneshot::channel::<()>();
         let task = tokio::spawn(async move {
@@ -248,7 +256,9 @@ impl Endpoint {
                     let reply = if head.line.contains("/input_tokens") {
                         Reply::InputCount(10)
                     } else {
-                        Reply::Finished(FIXTURE_TITLE)
+                        title_script
+                            .try_recv()
+                            .unwrap_or(Reply::Finished(FIXTURE_TITLE))
                     };
                     (reply, titled.clone())
                 } else if let Some(reply) = replies.next() {
@@ -275,6 +285,7 @@ impl Endpoint {
             url,
             requests,
             titles,
+            title_replies,
             unexpected,
             close: Some(close),
             task,
@@ -878,10 +889,12 @@ async fn embedded_run_and_restart_inspect_through_built_executable() {
     let mut command = executable();
     command.arg("run");
     configured(&mut command, &state, &endpoint.url);
-    command
-        .arg("--cwd")
-        .arg(workspace.path())
-        .args(["--prompt", "Hello"]);
+    command.arg("--cwd").arg(workspace.path()).args([
+        "--prompt",
+        "Hello",
+        "--initial-title",
+        "First conversation",
+    ]);
     let output = timeout(WAIT, command.output()).await.unwrap().unwrap();
     assert!(
         output.status.success(),
@@ -921,6 +934,7 @@ async fn embedded_run_and_restart_inspect_through_built_executable() {
     );
     let inspected = records(&inspected.stdout);
     assert_eq!(inspected[0]["session_id"], session);
+    assert_eq!(inspected[0]["title"], "First conversation");
     assert_eq!(inspected[0]["latest"]["outcome"]["status"], "succeeded");
     assert!(inspected[0]["current"].is_null());
     let database = std::fs::read(state.join(grida_agent::host::DATABASE_FILE)).unwrap();

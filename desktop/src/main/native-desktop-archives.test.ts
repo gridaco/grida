@@ -142,7 +142,7 @@ describe.runIf(process.platform !== "win32")(
                     openExternal: async () => {},
                   }
                 );
-          await expect(native.archiveWorkspace(workspace.id)).resolves.toEqual({
+          await expect(native.catalogWorkspace(workspace.id)).resolves.toEqual({
             root,
           });
           const owner = createDesktopArchives(native, "/fixture/resources");

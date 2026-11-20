@@ -32,9 +32,13 @@ workspace's active picker.
 2. Open Settings → Archived chats. Confirm titles and workspace labels appear
    with Unarchive actions, and no provider connection/model work starts.
 3. Unarchive a chat. Confirm it disappears from the archive, Settings stays
-   open and the chat is not automatically opened or resumed.
-4. Return to its workspace and open the chat picker. Confirm it is listed
-   among active chats. Confirm archived browsing/restoration is absent there.
+   open and the chat stays closed. Choose **View** in the confirmation toast.
+   Confirm Desktop opens that chat in its workspace.
+4. Open the chat picker. Confirm the chat is listed among active chats.
+   Archive it again and choose **Undo** in the confirmation toast. Confirm it
+   returns to the active list and reopens. Repeat, switching to another chat
+   before choosing **Undo**. Confirm the archive is reversed and the other chat
+   stays open.
 5. Change an archive's catalog revision in another fixture client, then use
    the stale Settings action. Confirm an understandable error/refreshed state
    without changing a different chat or overwriting newer metadata.

@@ -3,7 +3,7 @@
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { DesktopFileShell } from "@/scaffolds/desktop/file/file-shell";
-import { LastWorkspaceMarker } from "@/scaffolds/desktop/shared/last-workspace-marker";
+import { WindowContentMarker } from "@/scaffolds/desktop/shared/window-content-marker";
 
 /**
  * Desktop **file window** — the single dedicated editor route for one thing:
@@ -40,7 +40,7 @@ function DesktopFilePageInner() {
   return (
     <div className="h-dvh">
       {workspaceId && !docId && (
-        <LastWorkspaceMarker
+        <WindowContentMarker
           workspaceId={workspaceId}
           surface="canvas"
           basePath={basePath}

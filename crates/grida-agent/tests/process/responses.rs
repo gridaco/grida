@@ -270,6 +270,8 @@ mod subscription_history {
     const FIRST: &str = "openai/gpt-5.6-sol";
     const SECOND: &str = "openai/gpt-5.6-terra";
     const ENDPOINT: &str = "https://chatgpt.com/backend-api/codex";
+    const LAUNCH_ROUTE: &str = "419bdebf-c5bd-4bc9-aa5b-371e578a984f";
+    const ALTERNATE_ENDPOINT: &str = "http://127.0.0.1:2/v1";
 
     struct Exchange {
         body: Vec<u8>,
@@ -284,6 +286,10 @@ mod subscription_history {
         model: String,
         protocol: ProviderProtocol,
         endpoint: &'static str,
+        alternate_route: Option<String>,
+        alternate_account: Option<char>,
+        // Saved named key and expected synthetic authorization for the alternate HTTP route.
+        alternate_key: Option<(std::path::PathBuf, &'static str)>,
         replies: VecDeque<Reply>,
         exchanges: BTreeMap<String, Exchange>,
         requests: Vec<Value>,
@@ -301,6 +307,16 @@ mod subscription_history {
             model: &str,
             owner: Option<char>,
             replies: Vec<Reply>,
+        ) -> Self {
+            Self::start(fixture, model, owner, replies, &[]).await
+        }
+
+        async fn start(
+            fixture: &Fixture,
+            model: &str,
+            owner: Option<char>,
+            replies: Vec<Reply>,
+            capabilities: &[&str],
         ) -> Self {
             let protocol = if owner.is_some() {
                 ProviderProtocol::Responses
@@ -343,6 +359,11 @@ mod subscription_history {
                 model: model.into(),
                 protocol,
                 endpoint,
+                alternate_route: capabilities
+                    .contains(&"provider/routes")
+                    .then(|| uuid::Uuid::new_v4().to_string()),
+                alternate_account: None,
+                alternate_key: None,
                 replies: replies.into(),
                 exchanges: BTreeMap::new(),
                 requests: Vec::new(),
@@ -363,7 +384,10 @@ mod subscription_history {
                 "goal/funded-review",
                 "goal/named-child",
                 "goal/confirm-completion",
-            ] {
+            ]
+            .into_iter()
+            .chain(capabilities.iter().copied())
+            {
                 initialize["clientCapabilities"]["_meta"][format!("co.grida/{capability}")] =
                     1.into();
             }
@@ -373,9 +397,17 @@ mod subscription_history {
                 ready["result"]["agentCapabilities"]["_meta"]["co.grida/session/effort"], 1,
                 "{ready}"
             );
-            assert!(
-                ready["result"]["agentCapabilities"]["_meta"]["co.grida/goal/spending"].is_null()
-            );
+            if worker.alternate_route.is_none() {
+                assert!(
+                    ready["result"]["agentCapabilities"]["_meta"]["co.grida/goal/spending"]
+                        .is_null()
+                );
+            } else {
+                assert_eq!(
+                    ready["result"]["agentCapabilities"]["_meta"]["co.grida/provider/routes"],
+                    1
+                );
+            }
             worker
         }
 
@@ -383,23 +415,69 @@ mod subscription_history {
             let id = self.client.send(method, params).await;
             loop {
                 let frame = self.client.read_frame().await;
-                match frame["method"].as_str() {
-                    Some("_co.grida/provider/exchange") => self.exchange(frame).await,
-                    Some("_co.grida/provider/cancel") => {
-                        self.cancelled += 1;
-                        self.exchanges
-                            .remove(frame["params"]["id"].as_str().unwrap());
-                    }
-                    Some("session/update") => self.updates.push(frame["params"]["update"].clone()),
-                    None if frame["id"] == id => return frame,
-                    _ => {}
+                if frame["method"].is_null() && frame["id"] == id {
+                    return frame;
                 }
+                self.on_frame(frame).await;
+            }
+        }
+
+        async fn on_frame(&mut self, frame: Value) {
+            match frame["method"].as_str() {
+                Some("_co.grida/provider/resolve") => {
+                    let model = frame["params"]["model"].as_str().unwrap();
+                    let route_id = self
+                        .alternate_route
+                        .as_ref()
+                        .expect("negotiated provider routes");
+                    let route = match model {
+                        "fixture-a" | "openai/gpt-6.1-sol" => {
+                            json!({"kind":"launch","routeId":LAUNCH_ROUTE,"model":model})
+                        }
+                        "fixture-b" => {
+                            let mut route = json!({"kind":"http","routeId":route_id,"model":model,
+                            "endpoint":ALTERNATE_ENDPOINT,"protocol":"openai-compatible"});
+                            if let Some((home, _)) = &self.alternate_key {
+                                route["credentialHome"] = json!(home);
+                                route["configuredEndpointKey"] = json!("fixture-byok");
+                            }
+                            route
+                        }
+                        SECOND => {
+                            json!({"kind":"chatgpt","routeId":route_id,"model":model,
+                            "endpoint":ENDPOINT,"scope":self.alternate_account.unwrap().to_string().repeat(64)})
+                        }
+                        _ => panic!("unexpected model resolution {frame}"),
+                    };
+                    self.client.respond(&frame["id"], route).await;
+                }
+                Some("_co.grida/provider/exchange") => self.exchange(frame).await,
+                Some("_co.grida/provider/cancel") => {
+                    self.cancelled += 1;
+                    self.exchanges
+                        .remove(frame["params"]["id"].as_str().unwrap());
+                }
+                Some("session/update") => self.updates.push(frame["params"]["update"].clone()),
+                _ => {}
             }
         }
 
         async fn exchange(&mut self, frame: Value) {
             let params = &frame["params"];
             let id = params["id"].as_str().unwrap().to_owned();
+            let (model, endpoint) = match params["routeId"].as_str() {
+                None | Some(LAUNCH_ROUTE) => (self.model.as_str(), self.endpoint),
+                Some(id)
+                    if Some(id) == self.alternate_route.as_deref()
+                        && self.alternate_account.is_some() =>
+                {
+                    (SECOND, ENDPOINT)
+                }
+                Some(id) if Some(id) == self.alternate_route.as_deref() => {
+                    ("fixture-b", ALTERNATE_ENDPOINT)
+                }
+                Some(route) => panic!("unexpected exchange route {route}"),
+            };
             let reply = match params["action"].as_str().unwrap() {
                 "open" => {
                     let path = if self.protocol == ProviderProtocol::Responses {
@@ -407,14 +485,22 @@ mod subscription_history {
                     } else {
                         "chat/completions"
                     };
-                    assert_eq!(params["target"], format!("{}/{path}", self.endpoint));
-                    assert_eq!(params["headers"].as_array().unwrap().len(), 2);
-                    for header in params["headers"].as_array().unwrap() {
-                        assert!(matches!(
-                            header[0].as_str(),
-                            Some("content-type" | "accept")
-                        ));
-                    }
+                    assert_eq!(params["target"], format!("{endpoint}/{path}"));
+                    let expected_bearer = self
+                        .alternate_key
+                        .as_ref()
+                        .filter(|_| endpoint == ALTERNATE_ENDPOINT)
+                        .map(|(_, key)| format!("Bearer {key}"));
+                    let headers = params["headers"].as_array().unwrap();
+                    assert_eq!(headers.len(), 2 + usize::from(expected_bearer.is_some()));
+                    let mut headers: BTreeMap<_, _> = headers
+                        .iter()
+                        .map(|header| (header[0].as_str().unwrap(), header[1].as_str().unwrap()))
+                        .collect();
+                    assert!(headers.remove("content-type").is_some());
+                    assert!(headers.remove("accept").is_some());
+                    assert_eq!(headers.remove("authorization"), expected_bearer.as_deref());
+                    assert!(headers.is_empty());
                     self.exchanges.insert(
                         id,
                         Exchange {
@@ -439,9 +525,9 @@ mod subscription_history {
                     let exchange = self.exchanges.get_mut(&id).unwrap();
                     let request: Value = serde_json::from_slice(&exchange.body).unwrap();
                     let model = if self.protocol == ProviderProtocol::Responses {
-                        self.model.strip_prefix("openai/").unwrap()
+                        model.strip_prefix("openai/").unwrap()
                     } else {
-                        &self.model
+                        model
                     };
                     assert_eq!(request["model"], model);
                     assert_eq!(request["stream"], true);
@@ -479,6 +565,28 @@ mod subscription_history {
             self.client.respond(&frame["id"], reply).await;
         }
 
+        async fn pause_dispatched(&mut self, session: &str, turn: &str) -> Value {
+            use super::super::lifecycle::task_basis;
+            while self.requests.is_empty() {
+                let frame = self.client.read_frame().await;
+                self.on_frame(frame).await;
+            }
+            let current = self
+                .request("_co.grida/session/snapshot", json!({"sessionId":session}))
+                .await;
+            let paused = self
+                .request(
+                    "_co.grida/session/pause",
+                    task_basis(&current["result"], session, "pause"),
+                )
+                .await;
+            assert_eq!(paused["result"]["turnId"], turn, "{paused}");
+            self.wait_for_snapshot(session, |view| {
+                view["current"]["disposition"] == "suspended"
+            })
+            .await
+        }
+
         async fn prompt(&mut self, session: &str, text: &str) {
             let result = self
                 .request(
@@ -509,13 +617,24 @@ mod subscription_history {
         }
 
         async fn idle(&mut self, session: &str) -> Value {
+            self.wait_for_snapshot(session, |view| {
+                view["current"].is_null() && view["latest"].is_object()
+            })
+            .await
+        }
+
+        async fn wait_for_snapshot(
+            &mut self,
+            session: &str,
+            ready: impl Fn(&Value) -> bool,
+        ) -> Value {
             timeout(WAIT, async {
                 loop {
                     let view = self
                         .request("_co.grida/session/snapshot", json!({"sessionId":session}))
                         .await;
                     assert!(view.get("error").is_none(), "{view}");
-                    if view["result"]["current"].is_null() && view["result"]["latest"].is_object() {
+                    if ready(&view["result"]) {
                         break view["result"].clone();
                     }
                     tokio::time::sleep(Duration::from_millis(10)).await;
@@ -524,6 +643,527 @@ mod subscription_history {
             .await
             .unwrap()
         }
+    }
+
+    #[tokio::test]
+    async fn a_side_chat_reports_the_image_capability_of_the_route_it_inherited() {
+        let fixture = Fixture::new(false);
+        let vision_model = "openai/gpt-6.1-sol";
+        let mut worker = Worker::start(
+            &fixture,
+            vision_model,
+            Some('a'),
+            vec![],
+            &[
+                "provider/routes",
+                "session/selection",
+                "side-chat/open",
+                "side-chat/close",
+            ],
+        )
+        .await;
+        let parent = "side-image-route";
+        let selection = |model: &str| json!({"connectionId":null,"model":model,"effort":"medium"});
+        let create = worker.request("_co.grida/session/selection/create", json!({
+            "cwd":fixture.primary,"sessionId":parent,"requestId":"create","selection":selection("fixture-b")
+        })).await;
+        assert_eq!(create["result"]["revision"], 1, "{create}");
+        worker.load(&fixture, parent).await;
+        let open = |id: &str| json!({"sessionId":parent,"requestId":id});
+        let text = worker
+            .request("_co.grida/side-chat/open", open("text"))
+            .await;
+        assert_eq!(text["result"]["imageInput"], false, "{text}");
+        let update = worker.request("_co.grida/session/selection/update", json!({
+            "cwd":fixture.primary,"sessionId":parent,"expectedRevision":1,"operationId":"vision","selection":selection(vision_model)
+        })).await;
+        assert_eq!(update["result"]["revision"], 2, "{update}");
+        let vision = worker
+            .request("_co.grida/side-chat/open", open("vision"))
+            .await;
+        assert_eq!(vision["result"]["imageInput"], true, "{vision}");
+        let again = worker
+            .request("_co.grida/side-chat/open", open("text"))
+            .await;
+        assert_eq!(again["result"], text["result"]);
+        assert!(worker.requests.is_empty());
+        worker.close().await;
+    }
+
+    #[tokio::test]
+    async fn revising_a_side_message_uses_its_inherited_route_after_the_parent_changes_model() {
+        let fixture = Fixture::new(false);
+        let mut worker = Worker::start(
+            &fixture,
+            "fixture-a",
+            None,
+            vec![
+                Reply::Finished("First answer"),
+                Reply::Finished("Edited answer"),
+            ],
+            &[
+                "provider/routes",
+                "session/selection",
+                "side-chat/open",
+                "side-chat/close",
+                "subagent/create",
+            ],
+        )
+        .await;
+        let parent = "side-revision-route";
+        let selection = |model: &str| json!({"connectionId":null,"model":model,"effort":"medium"});
+        let created = worker.request("_co.grida/session/selection/create", json!({
+            "cwd":fixture.primary,"sessionId":parent,"requestId":"create","selection":selection("fixture-b")
+        })).await;
+        assert_eq!(created["result"]["revision"], 1, "{created}");
+        worker.load(&fixture, parent).await;
+        let opened = worker
+            .request("_co.grida/side-chat/open", json!({"sessionId":parent}))
+            .await;
+        let side = opened["result"]["sideChatId"].as_str().unwrap();
+        let update = worker.request("_co.grida/session/selection/update", json!({
+            "cwd":fixture.primary,"sessionId":parent,"expectedRevision":1,"operationId":"switch","selection":selection("fixture-a")
+        })).await;
+        assert_eq!(update["result"]["revision"], 2, "{update}");
+        let submitted = worker
+            .request(
+                "_co.grida/session/submit",
+                super::super::lifecycle::prompt_request(side, "original", "Side question"),
+            )
+            .await;
+        assert_eq!(submitted["result"]["inputId"], "original", "{submitted}");
+        let before = worker.idle(side).await;
+        let history = worker
+            .request("_co.grida/session/history", json!({"sessionId":side}))
+            .await;
+        let history = &history["result"];
+        let revised = worker.request("_co.grida/session/revise", json!({
+            "sessionId":side,"requestId":"edit","replacementInputId":"edited",
+            "expectedSessionRevision":history["sessionRevision"],"expectedHistory":history["basis"],
+            "anchor":history["messages"][0]["anchor"],"prompt":[{"type":"text","text":"Edited question"}]
+        })).await;
+        assert_eq!(revised["result"]["sessionId"], side, "{revised}");
+        let edited = worker
+            .wait_for_snapshot(side, |view| {
+                view["current"].is_null()
+                    && view["latest"]["status"].is_string()
+                    && view["latest"]["turnId"] != before["latest"]["turnId"]
+            })
+            .await;
+        assert_eq!(edited["latest"]["status"], "succeeded", "{edited}");
+        assert_eq!(worker.requests.len(), 2);
+        assert!(
+            worker
+                .requests
+                .iter()
+                .all(|request| request["model"] == "fixture-b")
+        );
+        let nested = worker
+            .request("_co.grida/side-chat/open", json!({"sessionId":side}))
+            .await;
+        assert_eq!(
+            nested["error"]["data"], "side_chat_nested_unavailable",
+            "{nested}"
+        );
+        let child = worker
+            .request(
+                "_co.grida/subagent/create",
+                json!({
+                    "parentSessionId":side,"requestId":"child","name":"Reader","workTurns":1
+                }),
+            )
+            .await;
+        assert_eq!(
+            child["error"]["data"], "side_chat_subagents_unavailable",
+            "{child}"
+        );
+        worker.close().await;
+    }
+
+    #[tokio::test]
+    async fn optional_library_selection_on_a_text_route_accepts_and_replays_the_prompt() {
+        use super::super::lifecycle::prompt_request;
+
+        let fixture = Fixture::new(false);
+        let mut worker = Worker::start(
+            &fixture,
+            "fixture-a",
+            None,
+            vec![Reply::Finished("Text answer")],
+            &[
+                "provider/routes",
+                "session/selection",
+                "session/library-selections",
+                "session/answer-library-selection",
+            ],
+        )
+        .await;
+        let session = "text-route-library";
+        let created = worker
+            .request(
+                "_co.grida/session/selection/create",
+                json!({
+                    "cwd":fixture.primary,"sessionId":session,"requestId":"create",
+                    "selection":{"connectionId":null,"model":"fixture-b","effort":"medium"}
+                }),
+            )
+            .await;
+        assert_eq!(created["result"]["revision"], 1, "{created}");
+        worker.load(&fixture, session).await;
+
+        let mut prompt = prompt_request(session, "text", "Hello");
+        prompt["_meta"] = json!({"co.grida/selectionRevision":1});
+        prompt["allowLibrarySelection"] = true.into();
+        let accepted = worker
+            .request("_co.grida/session/submit", prompt.clone())
+            .await;
+        assert_eq!(accepted["result"]["inputId"], "text", "{accepted}");
+        let settled = worker.idle(session).await;
+        assert_eq!(settled["latest"]["status"], "succeeded", "{settled}");
+        let replay = worker
+            .request("_co.grida/session/submit", prompt.clone())
+            .await;
+        assert_eq!(replay["result"]["inputId"], "text", "{replay}");
+        assert_eq!(worker.requests.len(), 1);
+        let request = &worker.requests[0];
+        assert_eq!(request["model"], "fixture-b");
+        assert!(
+            !request["tools"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|tool| tool["function"]["name"] == "design_search")
+        );
+        prompt["allowLibrarySelection"] = false.into();
+        let changed = worker.request("_co.grida/session/submit", prompt).await;
+        assert_eq!(
+            changed["error"]["data"], "submission_library_selection_changed",
+            "{changed}"
+        );
+        worker.close().await;
+    }
+
+    #[tokio::test]
+    #[ignore = "requires the current native helper and working Seatbelt or bubblewrap"]
+    async fn running_and_queued_turns_keep_the_model_and_permissions_they_were_accepted_with() {
+        use super::super::{full_access, lifecycle::prompt_request};
+
+        let fixture = full_access::fixture(true);
+        let mut worker = Worker::start(
+            &fixture,
+            "fixture-a",
+            None,
+            vec![
+                Reply::Tool(
+                    "exec_command",
+                    r#"{"cmd":"printf captured","access":"read_write"}"#,
+                ),
+                Reply::Finished("First answer"),
+                Reply::Finished("Second answer"),
+                Reply::Finished("Third answer"),
+            ],
+            &[
+                "provider/routes",
+                "session/selection",
+                "session/permission-mode",
+            ],
+        )
+        .await;
+        let session = "live-settings";
+        let select = |model: &str| json!({"connectionId":null,"model":model,"effort":"medium"});
+        let input = |id: &str, text: &str, revision: u64| {
+            let mut input = prompt_request(session, id, text);
+            input["_meta"] = json!({"co.grida/selectionRevision":revision});
+            input
+        };
+        let created = worker.request("_co.grida/session/selection/create", json!({
+            "cwd":fixture.primary,"sessionId":session,"requestId":"create","selection":select("fixture-a")
+        })).await;
+        assert_eq!(created["result"]["revision"], 1, "{created}");
+        worker.load(&fixture, session).await;
+
+        // Keep the first response on the supervisor's side until both changes
+        // are acknowledged. The provider may open before the submit receipt arrives.
+        let id = worker
+            .client
+            .send("_co.grida/session/submit", input("first", "First input", 1))
+            .await;
+        let mut accepted = false;
+        let mut first_read = None;
+        while !accepted || first_read.is_none() {
+            let frame = worker.client.read_frame().await;
+            if frame["method"].is_null() && frame["id"] == id {
+                assert_eq!(frame["result"]["inputId"], "first", "{frame}");
+                accepted = true;
+            } else if frame["method"] == "_co.grida/provider/exchange"
+                && frame["params"]["action"] == "read"
+            {
+                first_read = Some(frame);
+            } else {
+                worker.on_frame(frame).await;
+            }
+        }
+        let queued = worker
+            .request(
+                "_co.grida/session/enqueue",
+                input("second", "Second input", 1),
+            )
+            .await;
+        assert_eq!(queued["result"]["disposition"], "queued", "{queued}");
+        let model = worker.request("_co.grida/session/selection/update", json!({
+            "cwd":fixture.primary,"sessionId":session,"expectedRevision":1,"operationId":"model-b","selection":select("fixture-b")
+        })).await;
+        assert_eq!(model["result"]["revision"], 2, "{model}");
+        let permissions = worker.request("_co.grida/session/permission-mode/update", json!({
+            "cwd":fixture.primary,"sessionId":session,"expectedRevision":0,"requestId":"allow-full","mode":"full_access"
+        })).await;
+        assert_eq!(
+            permissions["result"]["mode"], "full_access",
+            "{permissions}"
+        );
+        let queued = worker
+            .request(
+                "_co.grida/session/enqueue",
+                input("third", "Third input", 2),
+            )
+            .await;
+        assert_eq!(queued["result"]["disposition"], "queued", "{queued}");
+
+        worker.exchange(first_read.unwrap()).await;
+        let settled = worker
+            .wait_for_snapshot(session, |view| {
+                view["current"].is_null() && view["queuedInputs"] == 0 && view["latest"].is_object()
+            })
+            .await;
+        assert_eq!(settled["latest"]["status"], "succeeded", "{settled}");
+        let attempts: Vec<_> = worker
+            .requests
+            .iter()
+            .map(|request| {
+                let command = request["tools"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|tool| &tool["function"])
+                    .find(|tool| tool["name"] == "exec_command")
+                    .unwrap();
+                let full = command["description"]
+                    .as_str()
+                    .unwrap()
+                    .contains("Full access was explicitly selected");
+                (request["model"].as_str().unwrap(), full)
+            })
+            .collect();
+        assert_eq!(
+            attempts,
+            [
+                ("fixture-a", false),
+                ("fixture-a", false),
+                ("fixture-a", false),
+                ("fixture-b", true)
+            ]
+        );
+        let observed = full_access::last_tool(&worker.requests[1]);
+        assert_eq!(
+            observed["structured"]["completion"]["code"], 0,
+            "{observed}"
+        );
+        assert!(
+            matches!(
+                observed["structured"]["backend"].as_str(),
+                Some("seatbelt" | "bubblewrap")
+            ),
+            "{observed}"
+        );
+
+        worker.updates.clear();
+        worker.load(&fixture, session).await;
+        let transcript: Vec<_> = worker
+            .updates
+            .iter()
+            .filter(|update| {
+                matches!(
+                    update["sessionUpdate"].as_str(),
+                    Some("user_message_chunk" | "agent_message_chunk")
+                )
+            })
+            .filter_map(|update| update["content"]["text"].as_str())
+            .collect();
+        assert_eq!(
+            transcript,
+            [
+                "First input",
+                "First answer",
+                "Second input",
+                "Second answer",
+                "Third input",
+                "Third answer"
+            ]
+        );
+        worker.close().await;
+    }
+
+    #[tokio::test]
+    async fn resuming_a_captured_model_after_restart_requires_its_original_subscription_account() {
+        use super::super::lifecycle::{prompt_request, task_basis};
+        let fixture = Fixture::new(false);
+        let session = "captured-subscription";
+        let capabilities = &["provider/routes", "session/selection"];
+        let mut first = Worker::start(
+            &fixture,
+            FIRST,
+            Some('a'),
+            vec![Reply::Hold("Before pause")],
+            capabilities,
+        )
+        .await;
+        first.alternate_account = Some('b');
+        let created = first
+            .request(
+                "_co.grida/session/selection/create",
+                json!({
+                    "cwd":fixture.primary,"sessionId":session,"requestId":"create",
+                    "selection":{"connectionId":"b".repeat(64),"model":SECOND,"effort":"medium"}
+                }),
+            )
+            .await;
+        assert_eq!(created["result"]["revision"], 1, "{created}");
+        first.load(&fixture, session).await;
+        let mut input = prompt_request(session, "held", "Hold this turn.");
+        input["_meta"] = json!({"co.grida/selectionRevision":1});
+        let accepted = first.request("_co.grida/session/submit", input).await;
+        let turn = accepted["result"]["turnId"]
+            .as_str()
+            .unwrap_or_else(|| panic!("{accepted}"));
+        let retained = first.pause_dispatched(session, turn).await;
+        first.close().await;
+
+        let mut reopened = Worker::start(
+            &fixture,
+            FIRST,
+            Some('a'),
+            vec![Reply::Finished("Resumed original turn")],
+            capabilities,
+        )
+        .await;
+        reopened.alternate_account = Some('c');
+        reopened.load(&fixture, session).await;
+        let resume = json!({
+            "task":task_basis(&retained,session,"resume"),
+            "expectedEpoch":retained["current"]["epoch"],
+            "expectedJournalPosition":retained["current"]["journalPosition"]
+        });
+        let refused = reopened
+            .request("_co.grida/session/resume", resume.clone())
+            .await;
+        assert_eq!(
+            refused["error"]["data"], "session_active_route_changed",
+            "{refused}"
+        );
+        assert!(reopened.requests.is_empty());
+        let unchanged = reopened
+            .request("_co.grida/session/snapshot", json!({"sessionId":session}))
+            .await;
+        assert_eq!(unchanged["result"]["current"], retained["current"]);
+
+        reopened.alternate_account = Some('b');
+        let resumed = reopened.request("_co.grida/session/resume", resume).await;
+        assert_eq!(resumed["result"]["turn"]["turnId"], turn, "{resumed}");
+        assert_eq!(
+            reopened.idle(session).await["latest"]["status"],
+            "succeeded"
+        );
+        assert_eq!(reopened.requests.len(), 1);
+        assert_eq!(
+            reopened.requests[0]["model"],
+            SECOND.strip_prefix("openai/").unwrap()
+        );
+        reopened.close().await;
+    }
+
+    #[tokio::test]
+    async fn a_rotated_named_key_dispatches_new_inputs_but_cannot_resume_the_old_turn() {
+        use super::super::lifecycle::{prompt_request, task_basis};
+        let fixture = Fixture::new(false);
+        let credentials = tempfile::tempdir().unwrap();
+        let home = credentials.path().canonicalize().unwrap();
+        let store = grida_auth::ProviderStore::new(home.clone()).unwrap();
+        let session = "old-byok";
+        let capabilities = &["provider/routes", "session/selection"];
+        let selection = |session: &str| {
+            json!({
+                "cwd":fixture.primary,"sessionId":session,"requestId":"create",
+                "selection":{"connectionId":"b".repeat(64),"model":"fixture-b","effort":"medium"}
+            })
+        };
+        let input = |session: &str| {
+            let mut input = prompt_request(session, "input", "Run the selected model.");
+            input["_meta"] = json!({"co.grida/selectionRevision":1});
+            input
+        };
+        store.set("fixture-byok", "fixture-old-key").unwrap();
+        let mut worker = Worker::start(
+            &fixture,
+            "fixture-a",
+            None,
+            vec![Reply::Hold("Before pause")],
+            capabilities,
+        )
+        .await;
+        worker.alternate_key = Some((home.clone(), "fixture-old-key"));
+        let created = worker
+            .request("_co.grida/session/selection/create", selection(session))
+            .await;
+        assert_eq!(created["result"]["revision"], 1, "{created}");
+        worker.load(&fixture, session).await;
+        let accepted = worker
+            .request("_co.grida/session/submit", input(session))
+            .await;
+        let turn = accepted["result"]["turnId"]
+            .as_str()
+            .unwrap_or_else(|| panic!("{accepted}"));
+        let paused = worker.pause_dispatched(session, turn).await;
+        worker.close().await;
+
+        store.set("fixture-byok", "fixture-new-key").unwrap();
+        let mut worker = Worker::start(
+            &fixture,
+            "fixture-a",
+            None,
+            vec![Reply::Finished("New key accepted.")],
+            capabilities,
+        )
+        .await;
+        worker.alternate_key = Some((home, "fixture-new-key"));
+        worker.load(&fixture, session).await;
+        let refuse = worker
+            .request(
+                "_co.grida/session/resume",
+                json!({
+                    "task":task_basis(&paused,session,"resume"),
+                    "expectedEpoch":paused["current"]["epoch"],
+                    "expectedJournalPosition":paused["current"]["journalPosition"]
+                }),
+            )
+            .await;
+        assert_eq!(
+            refuse["error"]["data"], "session_active_route_changed",
+            "{refuse}"
+        );
+        assert!(worker.requests.is_empty());
+        let fresh = "fresh-byok";
+        let created = worker
+            .request("_co.grida/session/selection/create", selection(fresh))
+            .await;
+        assert_eq!(created["result"]["revision"], 1, "{created}");
+        worker.load(&fixture, fresh).await;
+        let accepted = worker
+            .request("_co.grida/session/submit", input(fresh))
+            .await;
+        assert!(accepted["result"]["turnId"].is_string(), "{accepted}");
+        assert_eq!(worker.idle(fresh).await["latest"]["status"], "succeeded");
+        assert_eq!(worker.requests.len(), 1);
+        worker.close().await;
     }
 
     #[tokio::test]

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { SettingsIcon, WrenchIcon } from "lucide-react";
+import { WrenchIcon } from "lucide-react";
 import { Button } from "@app/ui/components/button";
 import { cn } from "@app/ui/lib/utils";
 import {
@@ -20,10 +20,11 @@ import {
   type ApplicationPresetId,
   type ApplicationPresetSpec,
 } from "./application-preset";
+import { HomeAccountMenu } from "./home-account-menu";
 
 /**
  * The home-scoped, icon-only sidebar. Its tabs share the Welcome surface.
- * The rail also links to Tools and Settings.
+ * The rail also provides access to Tools and the account menu.
  */
 export function PresetRail({
   value,
@@ -157,27 +158,7 @@ export function PresetRail({
           <TooltipContent side="right">Tools</TooltipContent>
         </Tooltip>
 
-        {/* Footer — pinned to the bottom of the rail. Settings used to live in
-            the title bar; the rail gives it a natural home now. */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              asChild
-              variant="ghost"
-              size="icon-sm"
-              className="mt-auto text-muted-foreground"
-            >
-              <Link
-                href="/desktop/settings"
-                prefetch={false}
-                aria-label="Settings"
-              >
-                <SettingsIcon className="size-4" />
-              </Link>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="right">Settings</TooltipContent>
-        </Tooltip>
+        <HomeAccountMenu />
       </nav>
     </TooltipProvider>
   );

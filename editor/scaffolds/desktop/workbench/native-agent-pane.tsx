@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -12,6 +14,7 @@ import {
 import type {
   DesktopNativeChat,
   NativeChatMessage,
+  NativeChatProfileSelection,
   NativeChatReadiness,
 } from "@grida/desktop-bridge";
 import { Button } from "@app/ui/components/button";
@@ -38,6 +41,7 @@ import {
   type NativeChatInitialComposer,
   type NativeChatFirstInput,
 } from "@/lib/agent-chat/native-chat-controller";
+import { PanelIsPresented } from "./workbench-panel-content";
 import { subscribeToNativeNotificationFocus } from "@/lib/desktop/agent-focus-session";
 import {
   ComposerDropArea,
@@ -61,6 +65,7 @@ import {
 import { NativeTurnArtifacts } from "./native-turn-summary";
 import { NativeAttachmentCard } from "./native-attachment-card";
 import { NativeEarlierMessages } from "./native-earlier-messages";
+import { NativeDisplayedReply } from "./native-displayed-reply";
 import { NativeTurnActivity } from "./native-turn-activity";
 import { turn_activity } from "@/lib/agent-chat/turn-activity";
 import { native_message_parts } from "@/lib/agent-chat/native-message-parts";
@@ -70,6 +75,8 @@ import { SubagentPlacement } from "./subagent-placement";
 import type { NativeBackgroundProcessController } from "@/lib/agent-chat/native-background-process-controller";
 
 import { NativeChatHeader } from "./native-chat-controls";
+import { attachedChatActivity } from "@/lib/agent-chat/native-chat-activity";
+import { ChatActivityIndicators } from "./chat-activity-indicators";
 
 const NO_COMMANDS: ComposerCatalog["commands"] = [];
 const MAX_DRAFT_BYTES = 512 * 1024;
@@ -114,6 +121,12 @@ type NativeChatPresentation = {
   ) => void;
 };
 
+type ConnectionRecovery = {
+  note: string;
+  retry(): void;
+  connected(selection: NativeChatProfileSelection): void;
+};
+
 export function NativeAgentPaneGate({
   bridge,
   selectionKey,
@@ -137,12 +150,12 @@ export function NativeAgentPaneGate({
   firstMessage?: NativeFirstMessage;
 } & NativeChatPresentation) {
   const [attempt, setAttempt] = useState(0);
-  const [messageDropped, setMessageDropped] = useState(false);
   const [selection, setSelection] = useState<{
     bridge: DesktopNativeChat;
     attempt: number;
     readiness: NativeChatReadiness | null;
     recommendedProfileId?: string;
+    recovered?: NativeChatProfileSelection;
   }>();
   useEffect(() => {
     // A first message starts on the connection chosen with it, not on the
@@ -171,9 +184,17 @@ export function NativeAgentPaneGate({
             memory: selectionMemory,
             key: selectionKey && `grida.nativeChat.${selectionKey}`,
             initialSession,
-          }
+          },
+      workspaceId ? "workspace" : "file"
     );
-  }, [bridge, attempt, selectionKey, firstMessage, initialSession]);
+  }, [
+    bridge,
+    attempt,
+    selectionKey,
+    firstMessage,
+    initialSession,
+    workspaceId,
+  ]);
   const readiness =
     selection?.bridge === bridge && selection.attempt === attempt
       ? selection.readiness
@@ -194,17 +215,6 @@ export function NativeAgentPaneGate({
     !!bridge.selectProfile;
   const unavailable =
     !starting && readiness !== "native-ready" && !connectionRequired;
-  // A prepared chat has a durable destination. Keep its first message for
-  // retry if the bridge itself is temporarily unavailable.
-  const retainedWaiting =
-    !!(
-      firstMessage?.composer?.preparedSessionId ||
-      firstMessage?.composer?.messageContext
-    ) && firstMessage.waiting();
-  useEffect(() => {
-    if (unavailable && !retainedWaiting && firstMessage?.take())
-      setMessageDropped(true);
-  }, [unavailable, retainedWaiting, firstMessage]);
   if (unavailable)
     return (
       <div className="flex flex-col gap-2 px-3 py-2 text-xs">
@@ -213,8 +223,7 @@ export function NativeAgentPaneGate({
             ? "Couldn't check chat availability."
             : (nativeChatConnectionNote[readiness] ??
               "Native chat is unavailable.")}
-          {messageDropped && " Your message from Welcome wasn't sent."}
-          {retainedWaiting &&
+          {firstMessage?.waiting() &&
             " Your message from Home is still waiting to send."}
         </span>
         <Button
@@ -232,11 +241,25 @@ export function NativeAgentPaneGate({
       key={initialSession}
       bridge={bridge}
       starting={starting}
-      connectionRequired={connectionRequired}
-      connectionNote={
+      recovery={
         connectionRequired && readiness
-          ? nativeChatConnectionNote[readiness]
+          ? {
+              note:
+                nativeChatConnectionNote[readiness] ??
+                "Choose a model to start chat.",
+              retry: () => setAttempt((current) => current + 1),
+              connected: (recovered) =>
+                setSelection({
+                  bridge,
+                  attempt,
+                  readiness: "native-ready",
+                  recovered,
+                }),
+            }
           : undefined
+      }
+      recovered={
+        readiness === "native-ready" ? selection?.recovered : undefined
       }
       selectionKey={selectionKey}
       workspaceId={workspaceId}
@@ -256,8 +279,10 @@ export function NativeAgentPaneGate({
   );
 }
 
-/** Shown only when the person must act outside the chat before choosing. */
+/** Startup results a person can act on from the workspace. */
 const nativeChatConnectionNote: Partial<Record<NativeChatReadiness, string>> = {
+  "native-gateway-unavailable":
+    "Grida Gateway is unavailable. Retry the connection or choose another model.",
   "native-hooks-review-required":
     "A configured hook needs review before chat can start. Open Settings → Hooks to review it, or disable it in config.toml.",
   "native-hooks-configuration-invalid":
@@ -277,8 +302,8 @@ const nativeChatConnectionNote: Partial<Record<NativeChatReadiness, string>> = {
 export function NativeAgentPane({
   bridge,
   starting = false,
-  connectionRequired = false,
-  connectionNote,
+  recovery,
+  recovered,
   selectionKey,
   workspaceId,
   projectFolderId,
@@ -294,8 +319,8 @@ export function NativeAgentPane({
   /** The agent is still starting; the pane shows but does not connect yet. */
   starting?: boolean;
   /** No connection can run yet; the composer's model picker starts the chat. */
-  connectionRequired?: boolean;
-  connectionNote?: string;
+  recovery?: ConnectionRecovery;
+  recovered?: NativeChatProfileSelection;
   selectionKey?: string;
   workspaceId?: string;
   initialSession: string | null;
@@ -307,6 +332,7 @@ export function NativeAgentPane({
   /** Sent once as a new chat's first turn; see {@link NativeAgentPaneGate}. */
   firstMessage?: NativeFirstMessage;
 } & NativeChatPresentation) {
+  const connectionRequired = !!recovery;
   const controller = useMemo(() => {
     const created = new NativeChatController(
       bridge,
@@ -315,7 +341,11 @@ export function NativeAgentPane({
       editorSurfaces,
       !!workspaceId
     );
-    created.keepDrafts(COMPOSER_DRAFTS, workspaceId ?? "standalone");
+    created.keepDrafts(COMPOSER_DRAFTS, workspaceId ?? "standalone", {
+      sessionId:
+        initialSession ?? firstMessage?.composer?.preparedSessionId ?? null,
+      fromHome: firstMessage?.waiting() === true,
+    });
     return created;
   }, [bridge, selectionKey, editorSurfaces, workspaceId]);
   useEffect(() => {
@@ -355,20 +385,30 @@ export function NativeAgentPane({
     const keep = (text: string | null) => {
       if (active && text) draft.current?.appendText(text, MAX_DRAFT_BYTES);
     };
+    if (connectionRequired) {
+      controller.connectForSelection();
+      return () => controller.disconnect();
+    }
     const message = firstMessage?.waiting() ? firstMessage : undefined;
     if (message && !initialSession)
       void controller
-        .startChat(message.profileId, message.take, message.composer)
+        .startChat(message.profileId, message.take, message.composer, recovered)
         .then(keep);
-    else if (connectionRequired) controller.connectForSelection();
-    else controller.connect(initialSession, profile ?? startupProfileId);
+    else
+      controller.connect(
+        initialSession,
+        profile ?? startupProfileId,
+        recovered
+      );
     const stopFocus =
       workspaceId &&
       subscribeToNativeNotificationFocus(
         bridge,
         workspaceId,
-        (sessionId, profileId) =>
-          void controller.focusChat(sessionId, profileId)
+        (sessionId, profileId, side) =>
+          side
+            ? void controller.showSideChat(sessionId)
+            : void controller.focusChat(sessionId, profileId)
       );
     return () => {
       active = false;
@@ -380,6 +420,7 @@ export function NativeAgentPane({
     controller,
     initialSession,
     startupProfileId,
+    recovered,
     firstMessage,
     workspaceId,
     connectionRequired,
@@ -393,17 +434,19 @@ export function NativeAgentPane({
     <NativeChatPane
       controller={controller}
       bridge={bridge}
+      initialSession={initialSession}
       workspaceId={workspaceId}
       projectFolderId={projectFolderId}
       editorSurfaces={editorSurfaces}
-      connectionRequired={connectionRequired}
-      connectionNote={connectionNote}
+      recovery={recovery}
+      waitingForHome={!!recovery && firstMessage?.waiting()}
       draftRef={draft}
       subagentsInTabs={!!subagentPlacement}
       header={(state) => (
         <NativeChatHeader
           controller={controller}
           state={state}
+          disabled={starting || connectionRequired}
           onChatSelected={() => draft.current?.focus()}
         />
       )}
@@ -439,11 +482,12 @@ export function NativeSideChatPane({
       draftRef={draft}
       autofocus
       testId="native-side-chat"
-      header={() => (
+      header={(state) => (
         <header className="flex h-10 shrink-0 items-center gap-2 px-3 text-xs font-medium">
           <span className="min-w-0 flex-1 truncate text-muted-foreground">
             {chat.sideChatTitle()}
           </span>
+          <ChatActivityIndicators {...attachedChatActivity(state)} />
           <Button
             type="button"
             variant="ghost"
@@ -470,11 +514,12 @@ export function NativeSideChatPane({
 function NativeChatPane({
   controller,
   bridge,
+  initialSession,
   workspaceId,
   projectFolderId = workspaceId,
   editorSurfaces,
-  connectionRequired = false,
-  connectionNote,
+  recovery,
+  waitingForHome,
   draftRef: draft,
   header,
   autofocus = true,
@@ -483,12 +528,13 @@ function NativeChatPane({
 }: {
   controller: NativeChatController;
   bridge: DesktopNativeChat;
+  initialSession?: string | null;
   workspaceId?: string;
   projectFolderId?: string;
   editorSurfaces?: NativeChatEditorSurfaces;
   /** No connection can run yet; the composer's model picker starts the chat. */
-  connectionRequired?: boolean;
-  connectionNote?: string;
+  recovery?: ConnectionRecovery;
+  waitingForHome?: boolean;
   draftRef: RefObject<NativeChatComposer | null>;
   header: (state: NativeChatView) => ReactNode;
   autofocus?: boolean;
@@ -512,6 +558,13 @@ function NativeChatPane({
     controller.read,
     controller.read
   );
+  const awaitingProfiles =
+    !!bridge.profiles && !controller.fixedSession && !state.profilesLoaded;
+  const selectionRead = controller.modelSelectionRead;
+  const modelReadError =
+    (awaitingProfiles && state.profileReadError) ||
+    (selectionRead === "failed" && state.profileError) ||
+    null;
   const svgTextSelected = useSyncExternalStore(
     controller.subscribeToComposerSvgText,
     controller.readComposerSvgText,
@@ -546,8 +599,21 @@ function NativeChatPane({
   );
   const pngPicker = useRef<HTMLInputElement>(null);
   const filePicker = useRef<HTMLInputElement>(null);
+  const [questionTranscript, setQuestionTranscript] =
+    useState<HTMLDivElement | null>(null);
   const [libraryScope, setLibraryScope] = useState<number | null>(null);
   const activityOpen = !subagentsInTabs && !!subagentActivity?.open;
+  const panelPresented = useContext(PanelIsPresented);
+  const conversationPane = useRef<HTMLDivElement>(null);
+  const attachmentId = controller.presentedAttachmentId;
+  useEffect(() => {
+    if (!attachmentId || !bridge.setPresented) return;
+    const report = (visible: boolean) => {
+      void bridge.setPresented?.(attachmentId, visible).catch(() => {});
+    };
+    report(panelPresented && !activityOpen);
+    return () => report(false);
+  }, [attachmentId, bridge, panelPresented, activityOpen]);
   const [libraryRequest, setLibraryRequest] = useState<{
     scope: number;
     selectionId: string;
@@ -574,9 +640,13 @@ function NativeChatPane({
     turn?.disposition === "suspended" && !turn.paused && !turn.cancelled
       ? state.approvals[0]
       : undefined;
-  const question = turn && !turn.cancelled ? state.questions[0] : undefined;
+  const questions = turn && !turn.cancelled ? state.questions : [];
   const librarySelection = state.librarySelection;
-  const stillWorking = running && !pausing && !approval && !question;
+  const stillWorking =
+    running &&
+    !pausing &&
+    !approval &&
+    !questions.some((question) => question.style === "answer_dependent");
   const outputStarted = state.messages.some(
     (message) =>
       message.turnId === turn?.turnId &&
@@ -622,6 +692,7 @@ function NativeChatPane({
       finalAnswer.set(message.turnId, message.messageId);
     else if (
       message.role === "user" &&
+      !message.questionReply &&
       message.turnId &&
       !firstRequest.has(message.turnId)
     )
@@ -638,6 +709,24 @@ function NativeChatPane({
       onSubmit={() => void controller.submitRevision()}
     />
   );
+  const readState = state.selected
+    ? controller.chatReadState(state.selected)
+    : undefined;
+  const replyId = readState?.replyId;
+  const sessionId = state.selected;
+  const [drawnReply, setDrawnReply] = useState<{
+    node: HTMLDivElement;
+    replyId: string;
+    sessionId: string;
+  } | null>(null);
+  const bindReply = useCallback(
+    (node: HTMLDivElement | null) => {
+      setDrawnReply(
+        node && replyId && sessionId ? { node, replyId, sessionId } : null
+      );
+    },
+    [replyId, sessionId]
+  );
   const renderMessage = (message: NativeChatMessage) => {
     if (message.messageId === state.revisionDraft?.messageId)
       return revisionEditor;
@@ -649,6 +738,7 @@ function NativeChatPane({
     return (
       <ChatMessageView
         key={message.messageId}
+        ref={replyId === message.messageId ? bindReply : undefined}
         loadAttachmentPreview={controller.readAttachmentPreview}
         loadToolImage={controller.readToolImage}
         actions={
@@ -656,6 +746,7 @@ function NativeChatPane({
             ? {
                 // Inline revision is for plain-text requests.
                 ...(editHistory &&
+                  !message.questionReply &&
                   !message.attachments?.length &&
                   !message.displayParts?.length &&
                   !goalStart && {
@@ -712,7 +803,11 @@ function NativeChatPane({
           controller.answerPermissionModeReview(confirmed)
         }
       />
-      <div inert={activityOpen} className="flex min-h-0 flex-1 flex-col">
+      <div
+        ref={conversationPane}
+        inert={activityOpen}
+        className="flex min-h-0 flex-1 flex-col"
+      >
         <div className="min-w-0 shrink-0">{header(state)}</div>
         {(state.profileError ||
           state.catalogEntryError ||
@@ -723,9 +818,12 @@ function NativeChatPane({
               state.permissionModeError}
           </p>
         )}
-        {connectionRequired && !state.scope && (
+        {recovery && (
           <div className="text-muted-foreground px-3 py-1 text-xs">
-            {connectionNote && <p>{connectionNote}</p>}
+            <p role="status">{recovery.note}</p>
+            {waitingForHome && (
+              <p>Your message from Home is still waiting to send.</p>
+            )}
             {state.profiles &&
               state.profiles.choices.length + state.profiles.saved.length ===
                 0 && (
@@ -734,6 +832,15 @@ function NativeChatPane({
                   a model.
                 </p>
               )}
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              disabled={state.profileBusy}
+              onClick={recovery.retry}
+            >
+              Retry
+            </Button>
           </div>
         )}
         <workspace_links.Opener.Provider value={openWorkspaceLink}>
@@ -748,6 +855,24 @@ function NativeChatPane({
               className="gap-4 px-[max(0.75rem,calc((100%_-_48rem)/2))] py-4"
               scrollClassName="desktop-native-drag-scroll-viewport scroll-fade-y scroll-fade-4"
             >
+              {sessionId && readState && (
+                <NativeDisplayedReply
+                  controller={controller}
+                  sessionId={sessionId}
+                  readState={readState}
+                  pane={conversationPane}
+                  message={
+                    drawnReply?.sessionId === sessionId &&
+                    drawnReply.replyId === replyId
+                      ? drawnReply.node
+                      : null
+                  }
+                  historyLoaded={controller.hasOpenedHistory}
+                  presented={
+                    panelPresented && !activityOpen && !state.connectionRecovery
+                  }
+                />
+              )}
               <NativeEarlierMessages
                 canLoad={state.canReadEarlier}
                 loading={state.readingEarlier}
@@ -807,6 +932,7 @@ function NativeChatPane({
                   immediate={!outputStarted}
                 />
               )}
+              <div ref={setQuestionTranscript} className="contents" />
               {/* See test/desktop-agent-chat-transcript-history.md. */}
               {!turn &&
                 !state.loading &&
@@ -929,26 +1055,36 @@ function NativeChatPane({
             }
           />
         )}
-        {question && (
-          <div className="shrink-0 px-3 py-2">
-            <QuestionPrompt
-              key={question.questionId}
-              input={{
-                questions: [
-                  {
-                    question: question.question,
-                    options: question.options.map((label) => ({ label })),
-                  },
-                ],
-              }}
-              onSubmit={async (survey) => {
-                const answer = survey.singleAnswer();
-                return answer
-                  ? controller.answerQuestion(question.questionId, answer)
-                  : false;
-              }}
-              disabled={!state.questionReady || state.acting}
-            />
+        {questions.length > 0 && (
+          <div className="max-h-[50%] shrink-0 space-y-2 overflow-y-auto px-3 py-2 empty:hidden">
+            {questions.map((question, index) => (
+              <QuestionPrompt
+                key={JSON.stringify([state.scope, question.questionId])}
+                dismissal={
+                  question.expiresWithTurn
+                    ? {
+                        transcript: questionTranscript,
+                        initiallyClosed: index > 0,
+                      }
+                    : undefined
+                }
+                input={{
+                  questions: [
+                    {
+                      question: question.question,
+                      options: question.options.map((label) => ({ label })),
+                    },
+                  ],
+                }}
+                onSubmit={async (survey) => {
+                  const answer = survey.singleAnswer();
+                  return answer
+                    ? controller.answerQuestion(question.questionId, answer)
+                    : false;
+                }}
+                submitDisabled={!state.questionReady || state.acting}
+              />
+            ))}
           </div>
         )}
         {librarySelection && (
@@ -1075,6 +1211,12 @@ function NativeChatPane({
           <AgentComposer
             access={{
               mode: state.permissionMode?.mode ?? "restricted",
+              loading:
+                state.permissionModeLoading ||
+                (!state.scope &&
+                  !!initialSession &&
+                  !recovery &&
+                  controller.supportsPermissionModeRead),
               available: state.permissionModeAvailable,
               uncertain: state.permissionModeUncertain,
               onRetry: () => void controller.checkPermissionMode(),
@@ -1094,10 +1236,9 @@ function NativeChatPane({
                     id: `${state.selected}:${state.queueDraft.inputId}`,
                     text: state.queueDraft.text,
                     label: "Editing queued message",
-                    busy:
-                      state.acting ||
-                      state.queueLoading ||
-                      !!state.connectionRecovery,
+                    busy: state.acting,
+                    saveDisabled:
+                      state.queueLoading || !!state.connectionRecovery,
                     allowEmpty: state.queueDraft.allowEmpty,
                     onSave: (text) => controller.saveQueueDraft(text),
                     onCancel: () => controller.closeQueueDraft(),
@@ -1184,6 +1325,7 @@ function NativeChatPane({
                         label: "Pause",
                         icon: <SquareIcon className="size-3.5" />,
                         onClick: () => void controller.control("pause"),
+                        confirmWithEscape: true,
                       }
                     : controller.canResumeQueue && queued > 0 && !state.acting
                       ? {
@@ -1194,9 +1336,12 @@ function NativeChatPane({
                         }
                       : undefined
             }
+            activeTurnId={turn?.turnId}
             submissionScope={state.scope}
             draftRef={draft}
-            onSubmit={(text) => controller.submit(text, state.scope)}
+            onSubmit={(text) =>
+              controller.submitFromComposer(text, state.scope)
+            }
             onStop={() => void controller.control("stop")}
             actions={{
               files:
@@ -1242,20 +1387,33 @@ function NativeChatPane({
             modelLeading={<ContextMeter usage={contextUsage} />}
             model={{
               profiles: state.profiles,
-              defaultUnavailable: connectionRequired,
+              loading: awaitingProfiles || selectionRead === "loading",
+              initialError: modelReadError,
+              defaultUnavailable: !!recovery || selectionRead === "unavailable",
               busy:
                 state.profileBusy || state.acting || state.permissionModeBusy,
               onSelect:
                 bridge.selectProfile && !controller.fixedSession
-                  ? (selection) => void controller.selectProfile(selection)
+                  ? async (selection) => {
+                      if (recovery) {
+                        if (await controller.selectConnection(selection))
+                          recovery.connected(selection);
+                      } else await controller.selectProfile(selection);
+                    }
                   : undefined,
-              onRefresh: () => void controller.readProfiles(),
+              onRefresh: () => {
+                if (selectionRead === "failed")
+                  void controller.select(state.selected);
+                void controller.readProfiles();
+              },
               refreshError: state.profileReadError,
               effort: state.effort,
               ultraAvailable: controller.ultraAvailability,
               ultraOffered: controller.offers("delegation"),
               goal: state.goalIntent,
-              onEffort: (effort) => controller.selectEffort(effort),
+              onEffort: recovery
+                ? undefined
+                : (effort) => controller.selectEffort(effort),
             }}
           />
           {workspaceId && state.imageInput && libraryScope === state.scope && (

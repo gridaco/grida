@@ -39,6 +39,7 @@ for the minimal schema, supported events, trust and activation behavior.
 
 ```text
 Electron main/preload (desktop)
+  -> checks Desktop compatibility and owns updates
   -> owns the live Grida-account projection and versioned Desktop preferences
   -> derives the one sign-in / onboarding / main entry-window role
   -> owns the exact 127.0.0.1 ephemeral listener and per-spawn auth
@@ -55,7 +56,8 @@ Desktop sidecar composition
      requests and credential-free provider-asset downloads
 
 editor /desktop/*
-  -> owns UX only, through typed bridge clients
+  -> publishes the Desktop version used to build the hosted editor
+  -> owns the hosted UI, through typed bridge clients
 ```
 
 On macOS and Linux, ordinary Stable, Insiders and development launches use
@@ -486,6 +488,23 @@ We support macOS, Windows, and Linux distributions.
 | `Grida Insiders` | `darwin` |     |       | ✓         | `zip`, `dmg`     | ✓      | Insiders version is only available for MacOS  |
 
 > Insiders app is a contributor version of the app, which requires additional setup to run.
+
+## Updating Desktop
+
+In the production app, choose **Check for Updates…** from the **Grida**
+menu on macOS or the **Help** menu on Windows and Linux. Patch releases
+within a major and minor line are optional. Desktop builds on an older
+major or minor line need an update to open the hosted editor.
+
+Electron Main checks the hosted editor's Desktop version before opening
+it in packaged production builds. When an update is required, Desktop
+can show its bundled update page even if the hosted UI is unavailable.
+Restart when Desktop says the update is ready. If automatic installation
+is unavailable, including on Linux, open the release from the update page
+and install the package for your platform.
+
+The release runbook explains how to publish Desktop installers before
+promoting the matching hosted editor. [Desktop release runbook](https://grida.co/docs/contributing/desktop-release)
 
 # Building locally
 

@@ -21,6 +21,7 @@ import { getServicesSidecarInfo } from "./main/services-sidecar-supervisor";
 import { servicesSidecarClient } from "./main/services-sidecar-client";
 import type { NativeWorkspaceCatalog } from "./main/native-workspace-catalog";
 import { focusWindowByUrl } from "./main/window-focus";
+import { openAboutWindow } from "./main/about-window";
 import { IPC_CHANNELS } from "./bridge/contract";
 
 export type DesktopWindowAdmission = {
@@ -310,13 +311,15 @@ async function list_recent_workspaces(admission?: DesktopWindowAdmission) {
 // skips re-setting the native menu when the recents are unchanged, so frequent
 // triggers (window focus) don't thrash it.
 let last_recent_signature: string | null = null;
+type DesktopMenuOptions = {
+  onOpenFile?: (filePath: string) => void;
+  windowAdmission?: DesktopWindowAdmission;
+  onCheckForUpdates?: () => void;
+};
 type MenuRebuildRequest = {
   app: App;
   shell: Shell;
-  opts?: {
-    onOpenFile?: (filePath: string) => void;
-    windowAdmission?: DesktopWindowAdmission;
-  };
+  opts?: DesktopMenuOptions;
 };
 // Coalesce overlapping triggers without dropping the latest role. A sign-out
 // arriving during a slow recents fetch always gets a trailing gated rebuild.
@@ -332,10 +335,7 @@ let rebuild_task: Promise<void> | null = null;
 export async function rebuild_application_menu(
   app: App,
   shell: Shell,
-  opts?: {
-    onOpenFile?: (filePath: string) => void;
-    windowAdmission?: DesktopWindowAdmission;
-  }
+  opts?: DesktopMenuOptions
 ): Promise<void> {
   pending_rebuild = { app, shell, opts };
   rebuild_task ??= drain_menu_rebuilds();
@@ -361,10 +361,7 @@ async function drain_menu_rebuilds(): Promise<void> {
 async function rebuild_application_menu_locked(
   app: App,
   shell: Shell,
-  opts?: {
-    onOpenFile?: (filePath: string) => void;
-    windowAdmission?: DesktopWindowAdmission;
-  }
+  opts?: DesktopMenuOptions
 ): Promise<void> {
   const readyAtStart = opts?.windowAdmission?.can_open() ?? true;
   let recents = readyAtStart
@@ -474,8 +471,12 @@ export function merge_templates(
 export function create_default_menu(
   app: App,
   shell: Shell,
-  admission?: DesktopWindowAdmission
+  admission?: DesktopWindowAdmission,
+  onCheckForUpdates?: () => void
 ): MenuItemConstructorOptions[] {
+  const checkForUpdates: MenuItemConstructorOptions[] = onCheckForUpdates
+    ? [{ label: "Check for Updates…", click: onCheckForUpdates }]
+    : [];
   const template: MenuItemConstructorOptions[] = [
     {
       label: "File",
@@ -541,6 +542,7 @@ export function create_default_menu(
       label: "Help",
       role: "help",
       submenu: [
+        ...(process.platform === "darwin" ? [] : checkForUpdates),
         {
           label: "Slack Community",
           click: () => shell.openExternal("https://grida.co/join-slack"),
@@ -565,7 +567,8 @@ export function create_default_menu(
     template.unshift({
       label: appName,
       submenu: [
-        { role: "about", label: "About " + appName },
+        { label: "About " + appName, click: () => void openAboutWindow(app) },
+        ...checkForUpdates,
         { type: "separator" },
         {
           label: "Settings…",
@@ -613,16 +616,19 @@ export function create_default_menu(
 export default function create_menu(
   app: App,
   shell: Shell,
-  opts?: {
-    onOpenFile?: (filePath: string) => void;
-    windowAdmission?: DesktopWindowAdmission;
+  opts?: DesktopMenuOptions & {
     /** Pre-fetched File ▸ Open Recent items (built by {@link rebuild_application_menu}).
      *  Omitted on the initial synchronous build (sidecar not up yet) → the menu
      *  shows a disabled "No Recent Projects" placeholder until the first rebuild. */
     recent?: MenuItemConstructorOptions[];
   }
 ) {
-  const default_menu = create_default_menu(app, shell, opts?.windowAdmission);
+  const default_menu = create_default_menu(
+    app,
+    shell,
+    opts?.windowAdmission,
+    opts?.onCheckForUpdates
+  );
   // Minimal File menu. An extension-keyed registry (one entry per
   // openable file type) is the next iteration when modules other than
   // `.svg` / `.grida` land.

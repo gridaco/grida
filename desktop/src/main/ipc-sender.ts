@@ -6,7 +6,10 @@
  * pathname.
  */
 import { URL } from "node:url";
-import type { WebContents } from "electron";
+import type {
+  WebContents,
+  WebContentsDidStartNavigationEventParams,
+} from "electron";
 
 export namespace ipc_sender {
   export function isAllowed(
@@ -82,16 +85,22 @@ export namespace ipc_sender {
    * GRIDA-SEC-016 — pending browser data management loses authority on
    * navigation or teardown, including while its native confirmation is open.
    * Revoke a retained main-frame capability on navigation or teardown.
+   * An owner may explicitly recognize its own same-document continuations.
    */
   export function watchNavigation(
     sender: WebContents,
-    revoke: () => void
+    revoke: () => void,
+    permitSameDocument?: (url: string, stage: "start" | "commit") => boolean
   ): () => void {
-    const navigating = (details: { isMainFrame: boolean }) => {
-      if (details.isMainFrame) revoke();
+    const navigating = (details: WebContentsDidStartNavigationEventParams) => {
+      if (
+        details.isMainFrame &&
+        !(details.isSameDocument && permitSameDocument?.(details.url, "start"))
+      )
+        revoke();
     };
-    const inPage = (_event: unknown, _url: string, isMainFrame: boolean) => {
-      if (isMainFrame) revoke();
+    const inPage = (_event: unknown, url: string, isMainFrame: boolean) => {
+      if (isMainFrame && !permitSameDocument?.(url, "commit")) revoke();
     };
     sender.on("did-start-navigation", navigating);
     sender.on("did-navigate-in-page", inPage);

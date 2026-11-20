@@ -18,7 +18,7 @@ export const DESKTOP_AGENT_FOCUS_SESSION_EVENT = "grida:agent:focus-session";
 export function subscribeToNativeNotificationFocus(
   bridge: Pick<DesktopNativeChat, "takeNotificationFocus">,
   workspaceId: string,
-  focus: (sessionId: string, profileId?: string) => void
+  focus: (sessionId: string, profileId?: string, side?: true) => void
 ): () => void {
   let active = true;
   let requested = false;
@@ -47,8 +47,10 @@ export function subscribeToNativeNotificationFocus(
       }
     }
     reading = false;
-    if (active && latest && ownsWorkspace())
-      focus(latest.sessionId, latest.profileId);
+    if (active && latest && ownsWorkspace()) {
+      if (latest.side) focus(latest.sessionId, latest.profileId, true);
+      else focus(latest.sessionId, latest.profileId);
+    }
   };
   const request = () => {
     requested = true;

@@ -109,6 +109,17 @@ pub struct SeedOmissions {
 }
 
 impl SeedProvenance {
+    /// The visible ID of a source-view message after this history cut.
+    pub fn retained_message_id(&self, previous: &str) -> Option<&MessageId> {
+        self.entries.iter().find_map(|entry| {
+            entry.message.as_ref().filter(|id| {
+                id.as_str() == previous
+                    || (entry.origin.session == self.source.session
+                        && entry.origin.message.as_str() == previous)
+            })
+        })
+    }
+
     /// Interpret the product provenance retained beside a seed's records.
     pub fn decode(envelope: &Envelope) -> Result<Self> {
         decode(SCHEMA, envelope)
@@ -379,7 +390,10 @@ impl ConversationSeed {
 pub fn is_editable_user(message: &Message) -> bool {
     message.role == Role::User
         && message.provenance.kind != ProvenanceKind::Observed
-        && message.provenance.source != questions::ANSWER_SOURCE
+        && !matches!(
+            message.provenance.source.as_str(),
+            questions::ANSWER_SOURCE | questions::TOOL_ANSWER_SOURCE
+        )
         && message
             .content
             .iter()
@@ -392,6 +406,7 @@ fn lower_message(
 ) -> Result<(SeedEntry, Option<HistoryRecord>)> {
     let role = message.role;
     let editable = is_editable_user(&message);
+    let question_reply = questions::visible_reply(&message).is_some();
     let (content, omissions) = portable_parts(role, message.content);
     let projected = if content.is_empty() {
         None
@@ -407,8 +422,13 @@ fn lower_message(
             },
             phase: message.phase,
             content,
-            provenance: if role == Role::User && message.provenance.kind == ProvenanceKind::Observed
-            {
+            provenance: if question_reply {
+                Provenance {
+                    source: questions::ANSWER_SOURCE.into(),
+                    kind: ProvenanceKind::Transformed,
+                    fingerprint: Some(fingerprint),
+                }
+            } else if role == Role::User && message.provenance.kind == ProvenanceKind::Observed {
                 // Host observations remain attributed as data, including in derived chats.
                 message.provenance
             } else {

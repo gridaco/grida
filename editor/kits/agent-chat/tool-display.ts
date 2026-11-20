@@ -179,6 +179,7 @@ export namespace toolDisplay {
         };
 
       case "question":
+      case "question_async":
         return {
           action: "question",
           title: describeTitle(
@@ -534,7 +535,10 @@ function describeTodosDetail(entry: ToolCallEntry): string | undefined {
 }
 
 function describeQuestionDetail(entry: ToolCallEntry): string | undefined {
-  const questions = asArray(asRecord(readToolInput(entry)).questions);
+  const input = asRecord(readToolInput(entry));
+  const prompt = stringValue(input.question);
+  if (prompt) return prompt;
+  const questions = asArray(input.questions);
   if (!questions || questions.length === 0) return undefined;
   if (questions.length === 1) {
     return stringValue(asRecord(questions[0]).question);

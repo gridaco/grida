@@ -83,9 +83,7 @@ describe("OAuthLoopbackCallback", () => {
     expect(response.status).toBe(200);
     expect(response.body).toContain("Signed in with ChatGPT");
     expect(response.body).toContain('data-outcome="success"');
-    expect(response.body).toContain(
-      'class="provider-mark" role="img" aria-label="OpenAI"'
-    );
+    expect(response.body).toContain("Close this tab and return to Grida.");
     expect(response.body).toContain("@media (prefers-color-scheme: dark)");
     expect(response.body).not.toContain("<script");
     expect(response.body).not.toContain("real-code");
@@ -231,8 +229,10 @@ describe("OAuthLoopbackCallback", () => {
       target: `/auth/callback?state=${state}&error=access_denied&error_description=sensitive-upstream-detail`,
     });
     expect(denied.status).toBe(400);
-    expect(denied.body).toContain('data-outcome="error"');
-    expect(denied.body).toContain('aria-label="OpenAI"');
+    const result = denied.body.match(/<section\b[^>]*>/)?.[0];
+    expect(result).toContain('data-outcome="error"');
+    expect(result).toContain('role="alert"');
+    expect(denied.body).toContain("Return to Grida and try again.");
     expect(denied.body).not.toContain("sensitive-upstream-detail");
     expect(complete).not.toHaveBeenCalled();
     await expect(providerAttempt.result).rejects.toThrow(/not granted/);

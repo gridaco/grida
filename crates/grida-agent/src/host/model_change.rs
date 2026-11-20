@@ -82,7 +82,7 @@ impl Host {
         }
         if session.is_none()
             && (self.workers.load(Ordering::Acquire) != 0
-                || self.title_workers.load(Ordering::Acquire) != 0
+                || !self.title_workers.lock().unwrap().is_empty()
                 || !work.retiring.is_empty())
         {
             return Ok(blocked(ModelChangeBlocker::PendingWork));
@@ -191,13 +191,14 @@ mod tests {
         );
         assert!(!host.work.lock().await.closed);
         drop(permit);
-        host.title_workers.fetch_add(1, Ordering::Relaxed);
+        let session = SessionId::new("titling").unwrap();
+        host.title_workers.lock().unwrap().insert(session.clone());
         assert_eq!(
             host.inspect_model_change(None, true).await.unwrap().blocker,
             Some(ModelChangeBlocker::PendingWork)
         );
         assert!(!host.work.lock().await.closed);
-        host.title_workers.fetch_sub(1, Ordering::Release);
+        host.title_workers.lock().unwrap().remove(&session);
         assert!(
             host.inspect_model_change(None, true)
                 .await

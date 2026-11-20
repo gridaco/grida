@@ -1,0 +1,1 @@
+Plan is active. Investigate permitted material and ask useful questions. End with a reviewable proposal describing the intended outcome, important decisions, and how to verify the work. Leave execution for an explicitly authorized Act turn.

@@ -15,6 +15,7 @@ use std::time::{Duration, Instant};
 use uuid::Uuid;
 
 pub(crate) const CAPABILITY: &str = "co.grida/provider/egress";
+pub(crate) const ROUTES: &str = "co.grida/provider/routes";
 const UPLOAD_CHUNK: usize = 64 * 1024;
 const READ_CHUNK: usize = 32 * 1024;
 const REQUEST_LIMIT: usize = 8 * 1024 * 1024;
@@ -25,6 +26,7 @@ const TIMEOUT: Duration = Duration::from_secs(120);
 pub struct SupervisedProvider {
     connection: Arc<Mutex<Connection>>,
     configured_endpoint_key: Option<String>,
+    route_id: Option<Uuid>,
 }
 
 #[derive(Default)]
@@ -65,6 +67,40 @@ impl SupervisedProvider {
             configured_endpoint_key: Some(key.to_owned()),
             ..Self::default()
         })
+    }
+
+    pub(crate) fn routed(&self, route_id: Uuid, key: Option<&str>) -> Result<Self> {
+        let mut routed = key
+            .map(Self::for_configured_endpoint)
+            .transpose()?
+            .unwrap_or_default();
+        routed.connection = self.connection.clone();
+        routed.route_id = Some(route_id);
+        Ok(routed)
+    }
+
+    pub(crate) async fn resolve(
+        &self,
+        connection_id: Option<String>,
+        model: agent_kit_core::ModelId,
+    ) -> Result<ProviderRoute> {
+        let unavailable = || Error::new(ErrorKind::Unavailable, "chat_selection_route_unavailable");
+        let client = match &*self.connection.lock().unwrap() {
+            Connection::Attached(client) => client.clone(),
+            _ => return Err(unavailable()),
+        };
+        tokio::time::timeout(Duration::from_secs(15), async {
+            client
+                .send_request(Resolve {
+                    connection_id,
+                    model,
+                })
+                .block_task()
+                .await
+        })
+        .await
+        .map_err(|_| unavailable())?
+        .map_err(|_| unavailable())
     }
 
     pub(crate) fn configured_endpoint_key(&self) -> Option<&str> {
@@ -137,6 +173,7 @@ impl SupervisedProvider {
         }
         let stream = Exchange {
             id: Uuid::new_v4().to_string(),
+            route_id: self.route_id,
             connection,
             control,
             deadline,
@@ -226,6 +263,7 @@ impl SupervisedProvider {
 }
 
 struct Exchange {
+    route_id: Option<Uuid>,
     id: String,
     connection: ConnectionTo<Client>,
     control: RequestControl,
@@ -239,7 +277,7 @@ impl Exchange {
             _ = self.control.cancellation.cancelled() => None,
             _ = tokio::time::sleep_until(self.deadline.into()) => None,
             reply = async {
-                self.connection.send_request(Request { id: self.id.clone(), action })
+                self.connection.send_request(Request { id: self.id.clone(), route_id: self.route_id, action })
                     .block_task().await
             } => reply.ok(),
         }
@@ -250,6 +288,7 @@ impl Drop for Exchange {
     fn drop(&mut self) {
         let _ = self.connection.send_notification(Cancel {
             id: self.id.clone(),
+            route_id: self.route_id,
         });
     }
 }
@@ -257,6 +296,8 @@ impl Drop for Exchange {
 #[derive(Clone, Serialize, Deserialize, JsonRpcRequest)]
 #[request(method = "_co.grida/provider/exchange", response = Reply)]
 struct Request {
+    #[serde(rename = "routeId", default, skip_serializing_if = "Option::is_none")]
+    route_id: Option<Uuid>,
     id: String,
     #[serde(flatten)]
     action: Action,
@@ -319,5 +360,60 @@ impl std::fmt::Debug for Reply {
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcNotification)]
 #[notification(method = "_co.grida/provider/cancel")]
 struct Cancel {
+    #[serde(rename = "routeId", default, skip_serializing_if = "Option::is_none")]
+    route_id: Option<Uuid>,
     id: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
+#[request(method = "_co.grida/provider/resolve", response = ProviderRoute)]
+#[serde(rename_all = "camelCase")]
+struct Resolve {
+    connection_id: Option<String>,
+    model: agent_kit_core::ModelId,
+}
+
+/// Private supervisor descriptor. Endpoints and credential custody are supplied by
+/// the same owner that supplied the launch configuration, never by a prompt.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
+#[serde(
+    tag = "kind",
+    rename_all = "lowercase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum ProviderRoute {
+    Launch {
+        route_id: Uuid,
+        model: agent_kit_core::ModelId,
+    },
+    Http {
+        route_id: Uuid,
+        model: agent_kit_core::ModelId,
+        endpoint: String,
+        protocol: crate::ProviderProtocol,
+        max_output_tokens: Option<u64>,
+        credential_home: Option<std::path::PathBuf>,
+        configured_endpoint_key: Option<String>,
+        compatible_output_limit_field: Option<crate::CompatibleOutputLimitField>,
+        #[serde(default)]
+        llama_cpp_input_count: bool,
+        #[serde(default)]
+        reasoning: bool,
+        image_generation_binding: Option<String>,
+    },
+    Gateway {
+        route_id: Uuid,
+        model: agent_kit_core::ModelId,
+        endpoint: String,
+        scope: String,
+        max_output_tokens: Option<u64>,
+        #[serde(default)]
+        gateway_billing: bool,
+    },
+    Chatgpt {
+        route_id: Uuid,
+        model: agent_kit_core::ModelId,
+        endpoint: String,
+        scope: String,
+    },
 }

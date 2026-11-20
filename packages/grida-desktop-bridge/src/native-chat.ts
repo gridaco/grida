@@ -252,11 +252,28 @@ export type NativeChatFileReferenceInput = Readonly<{
   messageContext?: NativeChatMessageContext;
 }>;
 
+export type NativeChatReadState = Readonly<{
+  unread: boolean;
+  revision: number;
+  replyId: string | null;
+}>;
+
+export type NativeChatReadChange =
+  | Readonly<{ kind: "acknowledge"; revision: number; replyId: string | null }>
+  | Readonly<{ kind: "markUnread" }>;
+
 export type NativeChatPage = Readonly<{
   sessionIds: readonly string[];
+  readStates?: readonly (NativeChatReadState & { sessionId: string })[];
   titles?: readonly Readonly<{ sessionId: string; title: string }>[];
+  /** Message recency on capable catalog hosts, including empty when all rows predate tracking. */
+  lastMessage?: readonly Readonly<{ sessionId: string; atMs: number }>[];
   /** Latest local turn's settlement or start time; absent on older hosts. */
   lastActivity?: readonly Readonly<{ sessionId: string; atMs: number }>[];
+  /** Listed chats running when the page was read. Older hosts omit this field. */
+  runningSessionIds?: readonly string[];
+  /** Listed chats with an unanswered question, approval or Library selection. */
+  inputNeededSessionIds?: readonly string[];
   nextCursor: string | null;
 }>;
 
@@ -270,20 +287,27 @@ export type NativeChatProfileChoice = Readonly<{
   reasoning?: true;
   /** The connection can run Ultra's extended work and independent review. */
   ultra?: true;
+  /** New Goals on this connection can enforce a USD spending limit. */
+  goalSpending?: true;
   /** The model's context window in tokens, when known. */
   contextWindow?: number;
 }>;
 
 export type NativeChatProfileCatalog = Readonly<{
+  /** Live named connection. The default connection and a cold workspace both have no named owner. */
   active: string | null;
   /** Last explicitly saved app default, even when its connection is unavailable. */
   newChatDefault?: NativeChatSelection;
   /** Main guards worker replacement and preserves accepted work across chats. */
   modelChanges?: true;
+  /** The live host can resolve each accepted input's saved connection independently. */
+  inputRoutes?: true;
   /** A currently offered choice recommended only for an untouched new chat. */
   recommendedProfileId?: string;
   /** Context window of the default model, when known. */
   defaultContextWindow?: number;
+  /** New Goals on the default connection can enforce a USD spending limit. */
+  defaultGoalSpending?: true;
   choices: readonly NativeChatProfileChoice[];
   saved: readonly (NativeChatProfileChoice & { available: boolean })[];
 }>;
@@ -293,12 +317,15 @@ export type NativeChatProfileSelection =
   | Readonly<{ kind: "new" | "saved"; id: string }>;
 
 export type NativeChatCatalogEntry = Readonly<{
+  readState?: NativeChatReadState;
   sessionId: string;
   revision: number;
   title: string | null;
   archived: boolean;
   /** Latest local turn activity, not archive time or exact message time. */
   lastActivityAtMs?: number;
+  /** A native titler for this chat is still running. */
+  titleGenerationPending?: true;
   deletionAvailable?: true;
 }>;
 
@@ -336,11 +363,9 @@ export type NativeChatSideSnapshot = Readonly<{
   parentSessionId: string;
   temporary: true;
   unavailable: readonly NativeChatSideRefusal[];
-  /**
-   * The title generated from the side chat's first message, once written.
-   * It lives and ends with the side chat and is never listed.
-   */
+  /** The current title lives and ends with the side chat. */
   title?: string;
+  titleGenerationPending?: true;
 }>;
 
 export type NativeChatReadiness =
@@ -356,6 +381,12 @@ export type NativeChatReadiness =
   | "native-provider-endpoint-approval-required"
   | "native-workspace-capacity";
 
+export type NativeChatStartupResult = Readonly<{
+  readiness: NativeChatReadiness;
+  /** The active worker’s connection when it has a named profile. */
+  selectedProfileId?: string;
+}>;
+
 export type NativeChatTurn = Readonly<{
   turnId: string;
   epoch: number;
@@ -365,6 +396,8 @@ export type NativeChatTurn = Readonly<{
   paused: boolean;
   cancelled: boolean;
   disposition: "running" | "suspended" | "interrupted" | "settled";
+  /** Whether this turn currently has an outstanding request for the person. */
+  inputNeeded?: boolean;
   status: "succeeded" | "failed" | "cancelled" | "uncertain" | null;
 }>;
 
@@ -372,6 +405,8 @@ export type NativeChatSnapshot = Readonly<{
   sessionId: string;
   sessionRevision: number;
   queuedInputs: number;
+  /** First page of waiting rows from this observation. Richer details can load separately. */
+  queuePreview?: NativeChatQueuePage;
   pendingGoalId?: string;
   historyRevisionAvailable?: true;
   subagentsAvailable?: true;
@@ -606,6 +641,8 @@ export type NativeChatMessage = Readonly<{
   displayParts?: readonly NativeChatDisplayPart[];
   /** This user message carried a live SVG text binding when accepted. */
   svgTextSelection?: true;
+  /** A host-attributed question reply. The message text is the person's answer. */
+  questionReply?: Readonly<{ waitId: string; question: string }>;
 }>;
 
 /** A file attached to a person's message, named for display. */
@@ -860,6 +897,8 @@ export type NativeChatQuestion = Readonly<{
   questionId: string;
   reviewId: string;
   style: "answer_dependent" | "nonblocking";
+  /** This optional question can be dismissed until its turn finishes. */
+  expiresWithTurn?: true;
   question: string;
   options: readonly string[];
 }>;
@@ -946,6 +985,8 @@ export type NativeChatUpdate =
 export type NativeChatNotificationFocus = Readonly<{
   sessionId: string;
   profileId?: string;
+  /** A temporary side session in the frame which opened it. */
+  side?: true;
 }>;
 
 /** Available for a native chat in the exact scope selected by Main. */
@@ -965,6 +1006,10 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
    * readiness values. Treat an unrecognized value as unavailable.
    */
   status(start?: boolean): Promise<NativeChatReadiness>;
+  /** Open this workspace on its preferred connection. Main coordinates startup and fallback. */
+  startWorkspaceChat?(
+    preferred?: NativeChatProfileSelection
+  ): Promise<NativeChatStartupResult>;
   /** Take the latest notification click for this workbench once, if still current. */
   takeNotificationFocus(): Promise<NativeChatNotificationFocus | null>;
   list(cursor?: string | null): Promise<NativeChatPage>;
@@ -974,6 +1019,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
    * workspace opens, with nothing active or saved. Listing starts nothing.
    */
   welcomeProfiles?(): Promise<NativeChatProfileCatalog | null>;
+  /** The review survives same-document Welcome navigation changing only the preset. */
+  readonly welcomeFullAccessAcrossPresets?: true;
   /** Review Full access for one reserved new chat. Available only on Welcome. */
   prepareWelcomeFullAccess?(
     workspaceId: string
@@ -1031,12 +1078,18 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
       effort: NativeChatEffort;
     }>
   ): Promise<NativeChatSelectionState>;
+  observeCatalog?(onChanged: () => void): Promise<(() => void) | null>;
+  /** Whether the current Desktop page can update a catalog row's read state. */
+  canSetReadState?(): boolean;
+  setReadState?(sessionId: string, change: NativeChatReadChange): Promise<void>;
   listArchived?(cursor?: string | null): Promise<NativeChatPage>;
   catalogEntry?(attachmentId: string): Promise<NativeChatCatalogEntry>;
   organize?(
     attachmentId: string,
     change: NativeChatCatalogChange
-  ): Promise<NativeChatCatalogEntry>;
+  ): Promise<NativeChatCatalogEntry & Readonly<{ archiveUndo?: string }>>;
+  /** Restores a recently archived chat from this workspace without opening it. */
+  undoArchive?(receipt: string): Promise<void>;
   deleteSavedChat?(
     attachmentId: string,
     observationId: string,
@@ -1122,7 +1175,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     attachmentId: string,
     processIds?: readonly number[]
   ): Promise<readonly number[]>;
-  acceptsPng?(): Promise<boolean>;
+  /** Uses the composer's selected model or the attached side chat's inherited model. */
+  acceptsPng?(attachmentId?: string): Promise<boolean>;
   acceptsLibrarySelection?(): Promise<boolean>;
   submitWithLibrarySelection?(
     attachmentId: string,
@@ -1142,7 +1196,7 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
    * Whether the selected model and host accept selected raster image Files.
    * False for text-only models; independent of legacy bounded inline PNG intake.
    */
-  acceptsSelectedImage?(): Promise<boolean>;
+  acceptsSelectedImage?(attachmentId?: string): Promise<boolean>;
   submitSelectedImage?(
     attachmentId: string,
     input: NativeChatSelectedImageInput
@@ -1166,6 +1220,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     inputId: string
   ): Promise<NativeChatAcceptance>;
   observe(attachmentId: string): Promise<NativeChatObservation>;
+  /** Whether this attached chat is actually on screen for notification gating. */
+  setPresented?(attachmentId: string, visible: boolean): Promise<void>;
   turnSummary?(
     attachmentId: string,
     observationId: string,

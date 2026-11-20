@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -17,6 +18,7 @@ import { NativeSelectedImages } from "./native-selected-images";
 import { NativeSubagentActivity } from "./native-subagent-activity";
 import { NativeActivityOrder } from "./native-activity-order";
 import { NativeEditorSurfaceEndpoints } from "./native-editor-surfaces";
+import { NativeChatTitle } from "./native-chat-title";
 
 function state() {
   const root = fs.mkdtempSync(
@@ -329,7 +331,9 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
       modelText: "<sample><reference /></sample>",
       displayParts,
     };
-    const literal = "<sample>My own words</sample>";
+    const userText = "<sample>My own words</sample>";
+    const literal = `  ${userText}\n${"🌱".repeat(60)}  `;
+    const expectedTitle = `${userText} ${"🌱".repeat(48 - userText.length)}…`;
     const test = fixture(
       `
       if (request.method === 'session/new') { send({id:request.id,result:{sessionId:'chat'}}); return; }
@@ -338,8 +342,10 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
       if (request.method === '_co.grida/session/submit' || request.method === '_co.grida/session/enqueue') {
         const empty = request.method.endsWith('/submit');
         const expected = empty ? [] : [{type:'text',text:${JSON.stringify(literal)}}];
+        const expectedTitle = empty ? undefined : ${JSON.stringify(expectedTitle)};
         if (!requested['${capability}'] || JSON.stringify(messageContext) !== JSON.stringify(expectContext)
-            || JSON.stringify(prompt) !== JSON.stringify(expected)) throw Error('incorrect separation');
+            || JSON.stringify(prompt) !== JSON.stringify(expected) || request.params.initialTitle !== expectedTitle)
+          throw Error('incorrect separation');
         send({id:request.id,result:{sessionId:'chat',inputId,inputPosition:1,turnId:empty?'turn':null,disposition:empty?'claimed':'queued'}}); return;
       }
       if (request.method !== 'session/load') throw Error('unexpected fixture method');
@@ -403,12 +409,19 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
     }
   });
 
-  it("refuses supplied message context when the host lacks the capability", async () => {
+  it("sends plain messages to older hosts without optional title or message context support", async () => {
     const test = fixture(
       `if (request.method === 'session/new') { send({id:request.id,result:{sessionId:'chat'}}); return; }
+      if (request.method === '_co.grida/session/submit' && !('initialTitle' in request.params)) {
+        send({id:request.id,result:{sessionId:'chat',inputId:'plain',inputPosition:0,turnId:'turn',disposition:'claimed'}}); return;
+      }
       throw Error('unexpected fixture method');`,
       1,
-      { [TRANSCRIPT_WINDOW]: 1, "co.grida/session/message-context": null }
+      {
+        [TRANSCRIPT_WINDOW]: 1,
+        "co.grida/session/message-context": null,
+        [NativeChatTitle.capability]: null,
+      }
     );
     let chat: NativeAgentChat | undefined;
     try {
@@ -425,6 +438,9 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
           messageContext: { modelText: "Extra context", displayParts: [] },
         })
       ).rejects.toThrow("native_chat_message_context_unavailable");
+      await expect(
+        chat.submit(session, "plain", "My own words")
+      ).resolves.toMatchObject({ inputId: "plain" });
     } finally {
       await chat?.close();
       test.close();
@@ -1324,6 +1340,158 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
       }
     }
   );
+
+  it("retains an open launch exchange while the next model uses its own revocable network authority", async () => {
+    const test = fixture(
+      `
+      if (request.method === 'fixture/worker-request') {
+        send({id: 'worker-' + request.id, ...request.params});
+      } else if (String(request.id).startsWith('worker-')) {
+        send({id: Number(request.id.slice(7)), result: request.result ?? {error: request.error.message}});
+      }`,
+      1,
+      {}
+    );
+    let agent: NativeAgentProcess | undefined;
+    let generation = 1;
+    let listed = true;
+    const dispatches: string[] = [];
+    const network = (name: string) => {
+      const captured = generation;
+      const isCurrent = () => generation === captured;
+      return {
+        isCurrent,
+        prepare: () =>
+          !isCurrent()
+            ? null
+            : async () => {
+                dispatches.push(name);
+                return new Response("data: ok", {
+                  headers: { "content-type": "text/event-stream" },
+                });
+              },
+      };
+    };
+    try {
+      const connectionId = "b".repeat(64);
+      const endpoint = "http://127.0.0.1:2/v1";
+      agent = await NativeAgentProcess.start({
+        ...test.options,
+        providerNetwork: network("A"),
+        lookupProviderRoute: async (id, model) => {
+          const primary = id === null && model === test.options.model;
+          if (!primary && (!listed || id !== connectionId || model !== "B"))
+            throw new Error("unknown selection");
+          return {
+            prepare: async () => ({
+              launch: {
+                provider: "openai-compatible",
+                model,
+                endpoint: primary ? test.options.endpoint : endpoint,
+                providerNetwork: network(primary ? "A" : "B"),
+              },
+            }),
+          };
+        },
+      });
+      expect(agent.acceptsInputRoutes).toBe(true);
+      const worker = (method: string, params: Record<string, unknown>) =>
+        agent!.request("fixture/worker-request", { method, params });
+      const exchange = (params: Record<string, unknown>) =>
+        worker("_co.grida/provider/exchange", params);
+      const open = (id: string, base: string, routeId?: string) =>
+        exchange({
+          action: "open",
+          id,
+          routeId,
+          target: base + "/chat/completions",
+          headers: [
+            ["content-type", "application/json"],
+            ["accept", "text/event-stream"],
+          ],
+          initial: Buffer.from("{}").toString("base64"),
+          timeoutMs: 10_000,
+          maxResponseBytes: 32,
+        });
+      const resolve = (id: string | null, model: string) =>
+        worker("_co.grida/provider/resolve", {
+          connectionId: id,
+          model,
+        }) as Promise<{ routeId: string }>;
+      expect(await resolve(null, test.options.model)).toMatchObject({
+        kind: "launch",
+      });
+      const active = randomUUID(),
+        next = randomUUID();
+      expect(await open(active, test.options.endpoint)).toEqual({
+        status: "accepted",
+      });
+      const route = await resolve(connectionId, "B");
+      expect(route).toMatchObject({
+        kind: "http",
+        protocol: "openai-compatible",
+        model: "B",
+        endpoint,
+      });
+      expect(await open(next, test.options.endpoint, route.routeId)).toEqual({
+        status: "unavailable",
+      });
+      expect(await open(next, endpoint, randomUUID())).toEqual({
+        status: "unavailable",
+      });
+      expect(await open(next, endpoint, route.routeId)).toEqual({
+        status: "accepted",
+      });
+      expect(await exchange({ action: "dispatch", id: next })).toEqual({
+        status: "unavailable",
+      });
+      expect(
+        await exchange({ action: "dispatch", id: next, routeId: route.routeId })
+      ).toMatchObject({ status: "ready" });
+      expect(await exchange({ action: "dispatch", id: active })).toMatchObject({
+        status: "ready",
+      });
+      const revoked = randomUUID();
+      expect(await open(revoked, endpoint, route.routeId)).toEqual({
+        status: "accepted",
+      });
+      generation++;
+      expect(
+        await exchange({
+          action: "dispatch",
+          id: revoked,
+          routeId: route.routeId,
+        })
+      ).toEqual({ status: "unavailable" });
+      expect(await resolve(null, test.options.model)).toMatchObject({
+        kind: "http",
+        endpoint: test.options.endpoint,
+      });
+      const reauthorized = await resolve(connectionId, "B");
+      expect(reauthorized.routeId).toBeDefined();
+      expect(reauthorized.routeId).not.toBe(route.routeId);
+      const fresh = randomUUID();
+      expect(await open(fresh, endpoint, reauthorized.routeId)).toMatchObject({
+        status: "accepted",
+      });
+      expect(
+        await exchange({
+          action: "dispatch",
+          id: fresh,
+          routeId: reauthorized.routeId,
+        })
+      ).toMatchObject({ status: "ready" });
+      listed = false;
+      expect(await resolve(connectionId, "B")).toHaveProperty("error");
+      expect(dispatches).toEqual(["B", "A", "B"]);
+    } finally {
+      try {
+        await agent?.close();
+      } finally {
+        test.close();
+      }
+    }
+  });
 
   it("answers a provider exchange beyond the concurrency bound without disconnecting", async () => {
     const test = fixture(

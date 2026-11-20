@@ -17,6 +17,10 @@ pub(super) async fn question_socket(url: &str, questions: bool) -> SharedSocket 
     }
     let initialized = ws_rpc(&mut socket, 1, "initialize", capabilities).await;
     assert_eq!(initialized["result"]["protocolVersion"], 1);
+    assert_eq!(
+        initialized["result"]["agentCapabilities"]["_meta"]["co.grida/session/optional-questions"],
+        1
+    );
     socket
 }
 
@@ -32,6 +36,66 @@ pub(super) async fn question_list(socket: &mut SharedSocket, session: &str, turn
     listed["result"].clone()
 }
 
+async fn check_reopened_reply(state: &Path, workspace: &Path, session: &str, expected: &str) {
+    use super::approvals::Stdio;
+    const WINDOW: &str = "co.grida/session/transcript-window";
+    let mut client = Stdio::from_child(spawn_serve(state, "http://127.0.0.1:1"));
+    let mut capabilities = extension_initialize();
+    capabilities["clientCapabilities"]["_meta"][WINDOW] = 1.into();
+    capabilities["clientCapabilities"]["_meta"]["co.grida/session/activity-order"] = 1.into();
+    client.request("initialize", capabilities).await;
+    let mut load = json!({"sessionId":session,"cwd":workspace,"mcpServers":[],
+        "_meta":{WINDOW:{"kind":"attach"}}});
+    assert!(
+        client
+            .request("session/load", load.clone())
+            .await
+            .get("error")
+            .is_none()
+    );
+    load["_meta"][WINDOW] = json!({"kind":"read","requestId":"reply-window"});
+    let id = client.send("session/load", load).await;
+    let mut replies = Vec::new();
+    loop {
+        let frame = client.read_frame().await;
+        if frame["id"] == id {
+            assert!(frame.get("error").is_none(), "{frame}");
+            break;
+        }
+        let params = &frame["params"];
+        if params["update"]["sessionUpdate"] == "user_message_chunk" {
+            assert!(
+                !params["update"]
+                    .to_string()
+                    .contains("send_user_message_question_reply")
+            );
+            if let Some(reply) = params["_meta"][WINDOW].get("questionReply") {
+                assert_eq!(reply["question"], "Which edition?");
+                assert!(reply["waitId"].as_str().unwrap().starts_with("question/"));
+                assert!(params["_meta"][WINDOW]["activityOrder"].as_u64().is_some());
+                replies.push(params["update"]["content"]["text"].clone());
+            }
+        }
+    }
+    assert_eq!(replies, [json!(expected)]);
+    let history = client
+        .request("_co.grida/session/history", json!({"sessionId": session}))
+        .await;
+    let messages = history["result"]["messages"].as_array().unwrap();
+    assert!(
+        messages
+            .iter()
+            .any(|message| message["preview"] == expected && message["editable"] == false)
+    );
+    assert!(!messages.iter().any(|message| {
+        message["preview"]
+            .as_str()
+            .unwrap()
+            .contains("send_user_message_question_reply")
+    }));
+    client.close().await;
+}
+
 #[tokio::test]
 async fn negotiated_question_survives_restart_and_answer_resumes_the_same_turn() {
     let temporary = TempDir::new().unwrap();
@@ -40,7 +104,7 @@ async fn negotiated_question_survives_restart_and_answer_resumes_the_same_turn()
     let mut endpoint = Endpoint::start(vec![
         Reply::Finished("Plain reply."),
         Reply::Question("question_async"),
-        Reply::Finished("Independent work is complete."),
+        Reply::Question("question"),
         Reply::Finished("Applied the user's answer."),
     ])
     .await;
@@ -94,13 +158,18 @@ async fn negotiated_question_survives_restart_and_answer_resumes_the_same_turn()
     })
     .await;
     let pending = question_list(&mut first, session, turn).await;
-    assert_eq!(pending["questions"].as_array().unwrap().len(), 1);
-    assert_eq!(pending["questions"][0]["style"], "nonblocking");
-    assert_eq!(pending["questions"][0]["question"], "Which edition?");
-    assert_eq!(
-        pending["questions"][0]["options"],
-        json!(["Screen", "Print"])
-    );
+    let questions = pending["questions"].as_array().unwrap();
+    assert_eq!(questions.len(), 2);
+    let required = questions
+        .iter()
+        .find(|q| q["style"] == "answer_dependent")
+        .unwrap();
+    let optional = questions
+        .iter()
+        .find(|q| q["style"] == "nonblocking")
+        .unwrap();
+    assert_eq!(required["question"], "Which edition?");
+    assert_eq!(required["options"], json!(["Screen", "Print"]));
     drop(first);
     terminate_shared_server(first_host).await;
 
@@ -120,6 +189,7 @@ async fn negotiated_question_survives_restart_and_answer_resumes_the_same_turn()
         Err(mpsc::error::TryRecvError::Empty)
     ));
     let snapshot = session_snapshot(&mut second, session).await;
+    assert_eq!(snapshot["current"]["inputNeeded"], true);
     let answer = json!({
         "sessionId":session,
         "turnId":turn,
@@ -127,7 +197,7 @@ async fn negotiated_question_survives_restart_and_answer_resumes_the_same_turn()
         "expectedSessionRevision":snapshot["sessionRevision"],
         "expectedControlRevision":pending["controlRevision"],
         "expectedHistoryPosition":pending["historyPosition"],
-        "waitId":pending["questions"][0]["waitId"],
+        "waitId":required["waitId"],
         "answer":{"kind":"text", "text":"Use large print."}
     });
     let mut wrong = answer.clone();
@@ -150,13 +220,20 @@ async fn negotiated_question_survives_restart_and_answer_resumes_the_same_turn()
     .await;
     assert_eq!(accepted["result"]["turnId"], turn, "{accepted}");
     let request = endpoint.request().await;
-    let input = request["messages"].as_array().unwrap().last().unwrap();
-    assert_eq!(input["role"], "user");
     assert!(
-        input["content"]
-            .as_str()
+        request["messages"]
+            .as_array()
             .unwrap()
-            .ends_with("Use large print.")
+            .iter()
+            .any(|message| message["role"] == "tool"
+                && message["content"]
+                    .as_str()
+                    .is_some_and(|s| s.contains("Use large print.")))
+    );
+    assert!(
+        !request["messages"]
+            .to_string()
+            .contains("<send_user_message_question_reply>")
     );
     let settled = wait_for_snapshot(&mut second, session, |snapshot| {
         snapshot["current"].is_null()
@@ -168,11 +245,17 @@ async fn negotiated_question_survives_restart_and_answer_resumes_the_same_turn()
         question_list(&mut second, session, turn).await["questions"],
         json!([])
     );
+    let mut expired = answer.clone();
+    expired["waitId"] = optional["waitId"].clone();
+    expired["requestId"] = "late-optional".into();
+    let late = ws_rpc(&mut second, 6, "_co.grida/session/answer-question", expired).await;
+    assert_eq!(late["error"]["data"], "question_no_longer_answerable");
     let replayed = ws_rpc(&mut second, 5, "_co.grida/session/answer-question", answer).await;
     assert_eq!(replayed["result"], accepted["result"]);
     endpoint.done().await;
     drop(second);
     terminate_shared_server(second_host).await;
+    check_reopened_reply(&state, workspace.path(), session, "Use large print.").await;
 }
 
 #[tokio::test]
@@ -222,6 +305,39 @@ async fn embedded_questions_return_an_identified_input_required_result() {
     assert!(inspected.status.success());
     let saved = records(&inspected.stdout);
     assert_eq!(saved[0]["current"]["disposition"], "suspended");
+    assert_eq!(saved[0]["input_needed"], true);
+
+    // The same one-shot CLI must finish without an input-required exit when
+    // the tool only invited an optional refinement.
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Question("question_async"),
+        Reply::Finished("Applied the default."),
+    ])
+    .await;
+    let mut run = executable();
+    run.arg("run");
+    configured(&mut run, &state, &endpoint.url);
+    let output = timeout(
+        WAIT,
+        run.arg("--cwd")
+            .arg(workspace.path())
+            .args(["--questions", "--prompt", "Prepare a second document."])
+            .output(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result = records(&output.stdout);
+    assert_eq!(result.last().unwrap()["disposition"], "succeeded");
+    assert!(result.last().unwrap().get("questions").is_none());
+    endpoint.request().await;
+    endpoint.request().await;
+    endpoint.done().await;
 }
 
 async fn start_question(socket: &mut SharedSocket, workspace: &Path) -> (String, String) {
@@ -277,7 +393,8 @@ async fn answer_during_independent_inference_reaches_the_next_decision_without_a
         Reply::Finished("Applied the print choice."),
     ])
     .await;
-    let (host, url) = shared_server(&temporary.path().join("agent-state"), &endpoint.url).await;
+    let state = temporary.path().join("agent-state");
+    let (host, url) = shared_server(&state, &endpoint.url).await;
     let mut socket = question_socket(&url, true).await;
     let (session, turn) = start_question(&mut socket, workspace.path()).await;
     endpoint.request().await;
@@ -292,7 +409,22 @@ async fn answer_during_independent_inference_reaches_the_next_decision_without_a
     let request = endpoint.request().await;
     let last = request["messages"].as_array().unwrap().last().unwrap();
     assert_eq!(last["role"], "user");
-    assert!(last["content"].as_str().unwrap().ends_with("Print"));
+    let body = last["content"]
+        .as_str()
+        .unwrap()
+        .strip_prefix("<send_user_message_question_reply>")
+        .unwrap()
+        .strip_suffix("</send_user_message_question_reply>")
+        .unwrap();
+    let reply: Value = serde_json::from_str(body).unwrap();
+    assert!(
+        reply[0]["questionItemId"]
+            .as_str()
+            .unwrap()
+            .starts_with("question/")
+    );
+    assert_eq!(reply[0]["question"], "Which edition?");
+    assert_eq!(reply[0]["answer"], "Print");
     let settled = wait_for_snapshot(&mut socket, &session, |snapshot| {
         snapshot["current"].is_null()
     })
@@ -302,6 +434,7 @@ async fn answer_during_independent_inference_reaches_the_next_decision_without_a
     endpoint.done().await;
     drop(socket);
     terminate_shared_server(host).await;
+    check_reopened_reply(&state, workspace.path(), &session, "Print").await;
 }
 
 #[tokio::test]

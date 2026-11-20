@@ -116,7 +116,12 @@ export namespace turn_activity {
         continue;
       }
       let opening = 0;
-      while (opening < members.length && members[opening].role === "user")
+      // A window may start at a question reply, after the call that asked it.
+      while (
+        opening < members.length &&
+        members[opening].role === "user" &&
+        !members[opening].questionReply
+      )
         opening++;
       const requests = members.slice(0, opening);
       const rest = members.slice(opening);

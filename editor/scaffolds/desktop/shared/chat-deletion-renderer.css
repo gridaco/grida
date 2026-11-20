@@ -1,0 +1,28 @@
+@import "@app/ui/globals.css";
+
+/* Electron supplies the frame and modality for this bundled dialog. */
+[data-slot="alert-dialog-overlay"] {
+  display: none;
+}
+
+[data-slot="alert-dialog-content"] {
+  position: static;
+  min-height: 100dvh;
+  max-width: none;
+  translate: none;
+  align-content: safe center;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  animation: none;
+}
+
+[data-slot="alert-dialog-header"] {
+  place-items: start;
+  text-align: start;
+}
+
+[data-slot="alert-dialog-footer"] {
+  flex-flow: row wrap;
+  justify-content: flex-end;
+}

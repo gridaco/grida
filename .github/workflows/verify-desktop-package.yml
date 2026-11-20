@@ -92,4 +92,9 @@ jobs:
         run: |
           export GRIDA_DESKTOP_TEST_NATIVE_RESOURCES="$PWD/out/Grida-darwin-arm64/Grida.app/Contents/Resources"
           test -d "$GRIDA_DESKTOP_TEST_NATIVE_RESOURCES"
-          pnpm exec vitest run src/main/native-agent-chat.test.ts src/main/native-chat-store.test.ts
+          pnpm exec vitest run \
+            src/main/live-chat-catalog.test.ts \
+            src/main/native-agent-command-profile.test.ts \
+            src/main/native-chat-ipc.test.ts \
+            src/main/native-agent-chat.test.ts \
+            src/main/native-chat-store.test.ts

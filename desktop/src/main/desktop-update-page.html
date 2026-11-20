@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
+    />
+    <meta name="color-scheme" content="dark" />
+    <meta http-equiv="x-dns-prefetch-control" content="off" />
+    <title>{{title}}</title>
+    <style>
+      :root {
+        --window-padding: 24px;
+        color-scheme: dark;
+        color: #f5f5f5;
+        background: #000;
+        font:
+          14px/1.5 system-ui,
+          sans-serif;
+        user-select: none;
+      }
+
+      body {
+        box-sizing: border-box;
+        display: grid;
+        grid-template-rows: 1fr auto;
+        place-items: center;
+        min-height: 100vh;
+        margin: 0;
+        padding: var(--window-padding);
+        text-align: center;
+      }
+
+      body::before {
+        position: fixed;
+        inset: 0 0 auto;
+        height: 36px;
+        content: "";
+        -webkit-app-region: drag;
+      }
+
+      main {
+        width: 100%;
+      }
+
+      .symbol svg {
+        display: block;
+        width: 32px;
+        height: 32px;
+        margin: 0 auto 24px;
+      }
+
+      .symbol svg,
+      a {
+        -webkit-user-drag: none;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 500;
+        letter-spacing: -0.03em;
+        line-height: 1.2;
+      }
+
+      p {
+        max-width: 326px;
+        margin: 10px auto 0;
+        color: #c4c4c4;
+        font-size: 13px;
+        overflow-wrap: anywhere;
+        white-space: pre-line;
+      }
+
+      .footer {
+        display: grid;
+        gap: 16px;
+        width: 100%;
+      }
+
+      .detail {
+        color: #8c8c8c;
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+        overflow-wrap: anywhere;
+      }
+
+      .actions {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .secondary-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 4px 12px;
+      }
+
+      a {
+        padding: 6px 8px;
+        border-radius: 8px;
+        color: #b3b3b3;
+        font-size: 13px;
+        text-decoration: none;
+      }
+
+      .detail a {
+        padding: 0;
+        border-radius: 2px;
+        color: inherit;
+        font: inherit;
+        white-space: nowrap;
+      }
+
+      a:hover {
+        color: #fff;
+      }
+
+      a[data-action="download"]:hover {
+        text-decoration: underline;
+        text-underline-offset: 0.2em;
+      }
+
+      a:focus-visible {
+        outline: 2px solid #fff;
+        outline-offset: 3px;
+      }
+
+      .actions > a {
+        align-self: stretch;
+        padding: 9px 20px;
+        background: #fff;
+        color: #000;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .actions > a:hover {
+        background: #e6e6e6;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="grida-desktop-update-page">
+      <div class="symbol" aria-hidden="true">{{symbol}}</div>
+      <h1>{{title}}</h1>
+      {{message}}
+    </main>
+    {{footer}}
+  </body>
+</html>

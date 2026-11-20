@@ -325,7 +325,10 @@ describe("DesktopNativeChat input capture", () => {
   it("accepts the selected File independently from inline PNG and exposes no source path", () => {
     expectTypeOf<
       Parameters<NonNullable<DesktopNativeChat["acceptsSelectedImage"]>>
-    >().toEqualTypeOf<[]>();
+    >().toEqualTypeOf<[attachmentId?: string]>();
+    expectTypeOf<
+      Parameters<NonNullable<DesktopNativeChat["acceptsPng"]>>
+    >().toEqualTypeOf<[attachmentId?: string]>();
     expectTypeOf<
       Awaited<
         ReturnType<NonNullable<DesktopNativeChat["acceptsSelectedImage"]>>

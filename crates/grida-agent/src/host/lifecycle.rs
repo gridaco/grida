@@ -119,7 +119,7 @@ mod tests {
         let competing = prompt("competing");
         let policy = host.submission_policy(&competing, false).unwrap();
         let first = host
-            .register_prompt(competing, false, policy)
+            .register_prompt(competing, false, policy, None)
             .await
             .unwrap();
         let receipt = stop().await.unwrap();
@@ -140,7 +140,10 @@ mod tests {
         admission = host.configuration_admission.lock().await;
         let another = prompt("another");
         let policy = host.submission_policy(&another, false).unwrap();
-        let second = host.register_prompt(another, false, policy).await.unwrap();
+        let second = host
+            .register_prompt(another, false, policy, None)
+            .await
+            .unwrap();
         {
             let work = host.work.lock().await;
             assert!(work.ready.iter().any(|ready| matches!(ready, ReadyWork::Stop(owner, target) if owner == &session && target == &turn)));
@@ -179,10 +182,14 @@ mod tests {
     }
 
     fn fixture_host(state: &std::path::Path, model: &str) -> Host {
+        fixture_host_at(state, model, "http://127.0.0.1:9/v1".into())
+    }
+
+    fn fixture_host_at(state: &std::path::Path, model: &str, endpoint: String) -> Host {
         Host::open(
             state,
             Some(ProviderOptions {
-                endpoint: "http://127.0.0.1:9/v1".into(),
+                endpoint,
                 protocol: ProviderProtocol::OpenAiCompatible,
                 model: ModelId::new(model).unwrap(),
                 credential_env: None,
@@ -208,6 +215,54 @@ mod tests {
             effort: None,
             reasoning: Default::default(),
         }
+    }
+
+    #[tokio::test]
+    async fn settled_worker_keeps_the_next_queued_input_scheduled_during_handoff() {
+        let root = tempfile::tempdir().unwrap();
+        let provider = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let host = fixture_host_at(
+            &root.path().join("state"),
+            "fixture",
+            format!("http://{}/v1", provider.local_addr().unwrap()),
+        );
+        let session = host
+            .new_session(root.path().canonicalize().unwrap())
+            .await
+            .unwrap();
+        tokio::time::timeout(Duration::from_secs(10), async {
+            let run = host
+                .start_prompt(fixture_prompt(&session, "first"))
+                .await
+                .unwrap();
+            host.enqueue(fixture_prompt(&session, "next"))
+                .await
+                .unwrap();
+            // The worker sends completion after releasing its active slot. Hold the ready
+            // drain so a snapshot lands exactly before it kicks the next queued input.
+            let drain = host.wake_lock.lock().await;
+            sponsorship::tests::synthetic_reply(&provider).await;
+            assert!(matches!(
+                run.completion.await.unwrap().unwrap(),
+                RunResult::Settled(_)
+            ));
+            let (view, _, resume) = host.inspect_snapshot(session.clone()).await.unwrap();
+            assert!(view.current.is_none() && !view.admission_paused);
+            assert_eq!(view.queued[0].input.id.as_str(), "next");
+            assert!(!resume);
+            drop(drain);
+            sponsorship::tests::synthetic_reply(&provider).await;
+            loop {
+                let view = host.store.inspect(session.clone()).await.unwrap();
+                if view.current.is_none() && view.queued.is_empty() {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        host.shutdown().await.unwrap();
     }
 
     async fn paused_turn(host: &Host, session: &SessionId) -> TurnView {
@@ -747,6 +802,10 @@ impl InputSettings {
     }
 
     pub fn for_input(input: &Submission) -> Result<Self> {
+        Self::with_parts(input).map(|(settings, _)| settings)
+    }
+
+    pub(crate) fn with_parts(input: &Submission) -> Result<(Self, Vec<PromptPart>)> {
         if input.payload.schema().as_str() != INPUT_SCHEMA {
             return Err(problem(
                 ErrorKind::Unsupported,
@@ -764,7 +823,7 @@ impl InputSettings {
                             .map(|selection| selection.maximum().to_owned())
                     })
                     .flatten();
-                Ok(Self {
+                let settings = Self {
                     goal_max_cost_mills,
                     model: stored.model,
                     operating_regime: stored.operating_regime,
@@ -794,7 +853,8 @@ impl InputSettings {
                         .as_ref()
                         .and_then(|guidance| guidance.project_revision())
                         .map(str::to_owned),
-                })
+                };
+                Ok((settings, stored.parts))
             }
             _ => Err(problem(
                 ErrorKind::Unsupported,
@@ -805,15 +865,35 @@ impl InputSettings {
 }
 
 impl Host {
-    pub(crate) async fn inspect_with_retry(
+    pub(crate) async fn inspect_snapshot(
         &self,
         session: SessionId,
-    ) -> Result<(SessionView, Option<u64>)> {
-        self.store
-            .inspect_with_current(session, |current| {
+    ) -> Result<(SessionView, Option<u64>, bool)> {
+        let (view, retry) = self
+            .store
+            .inspect_with_current(session.clone(), |current| {
                 current.map_or(Ok(None), grida_agent_master::pending_retry_not_before)
             })
-            .await
+            .await?;
+        let mut idle_queue_resume_available = false;
+        if !view.admission_paused
+            && view.current.is_none()
+            && subagents::queued_work(&view).is_some()
+        {
+            // Enqueue and Resume hold admission from the durable write through their queue kick.
+            let _admission = self.configuration_admission.lock().await;
+            let work = self.work.lock().await;
+            if !work.closed
+                && !work.retiring.contains(&session)
+                && !work.owns_queue_dispatch(&session)
+            {
+                // A worker may have claimed and completed this input since the initial read.
+                // Confirm the same durable basis while dispatch cannot register a new worker.
+                idle_queue_resume_available =
+                    self.store.inspect(session).await?.revision == view.revision;
+            }
+        }
+        Ok((view, retry, idle_queue_resume_available))
     }
 
     pub(super) async fn owned_control<T, F>(
@@ -866,6 +946,12 @@ impl Host {
         context: SubmissionContext,
     ) -> Result<DurableSubmission> {
         validate_prompt_parts(&request.parts)?;
+        if let Some(accepted) = self.existing_submission(&request, &context).await? {
+            return Ok(accepted);
+        }
+        let host = self
+            .for_selection(&request.session, context.selection_revision)
+            .await?;
         let admission = self.configuration_admission.lock().await;
         if let Some(accepted) = self.existing_submission(&request, &context).await? {
             return Ok(accepted);
@@ -874,19 +960,21 @@ impl Host {
             return Err(problem(ErrorKind::Unavailable, "host_shutting_down"));
         }
         let view = self.store.inspect(request.session.clone()).await?;
-        self.check_execution(&view).await?;
+        host.check_new_submission(&view).await?;
         if view.current.is_none() && !view.admission_paused {
             self.check_ready_capacity(&request.session).await?;
         }
-        let mut policy = self.submission_policy(&request, context.allow_wakeups)?;
+        let mut policy = host.submission_policy(&request, context.allow_wakeups)?;
         policy.selection_revision = context.selection_revision;
-        self.bind_editor(&mut policy, &request, &context)?;
-        let title = self.title_candidate(&view, &request.parts);
-        let input = self
+        host.bind_editor(&mut policy, &request, &context)?;
+        let title = host.title_candidate(&view, &request.parts, context.initial_title)?;
+        let input = host
             .capture_input(&view, request.id, request.parts, policy)
             .await?;
-        let acceptance = self.store.submit(request.session, input).await?;
-        self.start_title(title);
+        let acceptance = host
+            .accept_with_title(request.session, input, None, title)
+            .await?
+            .start_title();
         self.kick_queue(acceptance.session.clone()).await;
         drop(admission);
         Ok(DurableSubmission {
@@ -915,8 +1003,7 @@ impl Host {
             .input(session.clone(), id.clone())
             .await?
             .ok_or_else(|| problem(ErrorKind::Unavailable, "input_unavailable"))?;
-        let settings = InputSettings::for_input(&view.input)?;
-        let mut parts = decode_input::<StoredPrompt>(&view.input)?.parts;
+        let (settings, mut parts) = InputSettings::with_parts(&view.input)?;
         for part in &mut parts {
             if let PromptPart::Skill { reference } = part
                 && reference.uri().is_none()
@@ -966,6 +1053,22 @@ impl Host {
         expected: SessionRevision,
         edit: QueueEdit,
     ) -> Result<ControlReceipt> {
+        let host = if let QueueEdit::Replace {
+            input, replacement, ..
+        } = &edit
+            && self.has_routes()
+            && self
+                .store
+                .input(session.clone(), replacement.clone())
+                .await?
+                .is_none()
+            && let Some(previous) = self.store.input(session.clone(), input.clone()).await?
+        {
+            self.for_retained_input(&previous.input, "session_queued_route_changed")
+                .await?
+        } else {
+            self.clone()
+        };
         // Capture settings atomically with new queue inputs. A retry reuses
         // the retained replacement's payload rather than recapturing defaults.
         let _admission = self.configuration_admission.lock().await;
@@ -1016,7 +1119,7 @@ impl Host {
                     previous.input
                 } else {
                     let view = self.store.inspect(session.clone()).await?;
-                    self.check_execution(&view).await?;
+                    host.check_new_submission(&view).await?;
                     let operating_regime = if !self.operating_regime.is_act() {
                         self.operating_regime
                     } else {
@@ -1031,7 +1134,7 @@ impl Host {
                         .as_ref()
                         .and_then(|input| input.host_tools_capture.as_ref());
                     if let Some(capture) = capture {
-                        self.retained_host_tools(capture)?;
+                        host.retained_host_tools(capture)?;
                     }
                     let allow_host_tools = capture.is_some();
                     let desktop_image_generation = stored
@@ -1043,7 +1146,7 @@ impl Host {
                     let spending = stored.as_ref().and_then(|input| input.spending.clone());
                     let reasoning = stored.as_ref().and_then(|input| input.reasoning);
                     let effort = stored.and_then(|input| input.effort);
-                    self.capture_input(
+                    host.capture_input(
                         &view,
                         replacement,
                         parts,
@@ -1091,7 +1194,6 @@ impl Host {
         expected: SessionRevision,
     ) -> Result<ControlReceipt> {
         self.owned_control(move |host| async move {
-            let _admission = host.configuration_admission.lock().await;
             let control = ControlRequest {
                 id: request,
                 session: session.clone(),
@@ -1105,11 +1207,16 @@ impl Host {
                 return Ok(receipt);
             }
             let view = host.store.inspect(session.clone()).await?;
-            if view.current.is_none() && super::subagents::queued_work(&view).is_some() {
-                // Queued work this route cannot run is withdrawn, not resumed.
-                host.check_execution(&view).await?;
+            if view.current.is_none()
+                && let Some(head) = super::subagents::queued_work(&view)
+            {
+                host.for_retained_input(head, "session_queued_route_changed")
+                    .await?
+                    .check_execution(&view)
+                    .await?;
                 host.check_ready_capacity(&session).await?;
             }
+            let _admission = host.configuration_admission.lock().await;
             let receipt = host.store.control(control).await?;
             host.kick_queue(session).await;
             Ok(receipt)

@@ -99,6 +99,8 @@ pub struct ProcessTools {
 struct Shared {
     sandbox: Arc<Sandbox>,
     authority: Authority,
+    /// The posture of the accepted turn that owns these tools.
+    unconfined: bool,
     sessions: Arc<ProcessSessions>,
     session: SessionId,
     recorded: Mutex<VecDeque<Recorded>>,
@@ -186,6 +188,7 @@ impl ProcessTools {
         let shared = Arc::new(Shared {
             sandbox,
             authority,
+            unconfined,
             sessions,
             session,
             recorded: Mutex::default(),
@@ -492,6 +495,7 @@ impl ExecCommand {
                 Err(error) => return ToolOutcome::failed(&error.code),
             },
         };
+        let unconfined = matches!(scope, ProcessScope::Unconfined(_));
         let spec = arguments.spec(&root, &environment);
         let cwd = spec.cwd.clone();
         let launch = match shared
@@ -549,10 +553,14 @@ impl ExecCommand {
             Err(_) => return ToolOutcome::uncertain(),
         };
         let launched_at = Instant::now();
-        let entry =
-            shared
-                .sessions
-                .supervise(launch, arguments.cmd.clone(), cwd, arguments.tty, running);
+        let entry = shared.sessions.supervise(
+            launch,
+            arguments.cmd.clone(),
+            cwd,
+            arguments.tty,
+            unconfined,
+            running,
+        );
         let mut unlisted = Unlisted {
             sessions: &shared.sessions,
             entry: &entry,
@@ -625,6 +633,9 @@ impl WriteStdin {
                 "unknown session id {id} (it may have ended or been stopped)"
             ));
         };
+        if entry.unconfined && !shared.unconfined {
+            return ToolOutcome::failed("process_requires_full_access");
+        }
         let mut io = tokio::select! {
             io = entry.io.lock() => io,
             _ = context.cancellation.cancelled() => return cancelled(),
