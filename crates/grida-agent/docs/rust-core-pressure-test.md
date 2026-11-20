@@ -954,8 +954,16 @@ The [private Desktop catalog process cases](../tests/process/desktop_tools.rs)
 check deferred offers, endpoint replacement, an unverified SVG
 mutation, and an unconfirmed trusted reveal. A scripted peer adds a read and
 a counted mutation through the same catalog. The master tests preserve the
-original request inventory across interrupted publication. The authenticated
-export and browser capture retain their separate loopback and Electron tests.
+original request inventory across interrupted publication and cover the
+source-choice step when several extensions match. The
+[native Browser capture cases](../tests/process/tool_images.rs) cover the
+shared carrier, model image eligibility, and legacy compatibility. The
+[Main process cases](../../../desktop/src/main/native-agent-process.test.ts)
+exercise Browser replies under backpressure and against the packaged host.
+The authenticated export and actual guest interaction have separate
+[loopback](../../../desktop/src/main/native-editor-mcp-export.test.ts) and
+[Electron](../../../desktop/src/main/browser-automation.electron.test.ts)
+tests.
 
 ### ACP client boundary
 

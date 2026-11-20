@@ -22,6 +22,7 @@ import { NativeEditorSvgText } from "@grida/desktop-bridge";
 import { NativeEditorSvgReplies } from "./native-editor-svg-replies";
 import { NativeDesktopTools } from "./native-desktop-tools";
 import { NativeChatTitle } from "./native-chat-title";
+import type { DesktopBrowserToolLease } from "./desktop-browser-tools";
 
 function state() {
   const root = fs.mkdtempSync(
@@ -2269,19 +2270,35 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
     }
   );
 
-  it.each([{ revoked: false }, { revoked: true }])(
-    "delivers a browser capture through stdin pressure (owner revoked: $revoked)",
-    async ({ revoked }) => {
+  it.each([
+    { carrier: "legacy", revoked: false },
+    { carrier: "legacy", revoked: true },
+    { carrier: "mcp", revoked: false },
+    { carrier: "mcp", revoked: true },
+  ])(
+    "delivers a $carrier browser capture through stdin pressure (owner revoked: $revoked)",
+    async ({ carrier, revoked }) => {
       const callId = "00000000-0000-4000-8000-000000000001";
+      const shared = carrier === "mcp";
+      const methodName = shared
+        ? NativeDesktopTools.method
+        : NativeEditorSurfaceEndpoints.browserMethod;
+      const params = shared
+        ? `scope:{browser:true},expiresAtMs:Date.now()+5000,message:{
+            jsonrpc:'2.0',id:'${callId}',method:'tools/call',params:{
+              name:'browser_capture',arguments:{},_meta:{'co.grida/definitionRevision':1}
+            }
+          }`
+        : `callId:'${callId}',operation:'browser_capture',arguments:{}`;
       const test = fixture(
         `
       if (request.method === 'fixture/ping') {
         globalThis.ping = request.id;
       } else if (request.method === 'fixture/capture') {
         globalThis.capture = request.id;
-        send({id:'capture',method:'${NativeEditorSurfaceEndpoints.browserMethod}',params:{
+        send({id:'capture',method:'${methodName}',params:{
           sessionId:'session',endpointId:request.params.endpointId,
-          callId:'${callId}',operation:'browser_capture',arguments:{},timeoutMs:5000
+          timeoutMs:5000,${params}
         }});
       } else if (request.method === undefined && request.id === 'capture') {
         send({id:globalThis.capture,result:request.result});
@@ -2343,15 +2360,38 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
         expect(stdin.writableLength).toBe(frameLimit);
         if (revoked) lease!.close();
         stdin.uncork();
+        const disposition = revoked ? "unknown" : "dispatched_verified";
+        const result = revoked
+          ? { disposition, error: "outcome_unknown" }
+          : { disposition };
         await expect(replies).resolves.toEqual([
           { pong: true },
           {
             sessionId: "session",
             endpointId,
-            callId,
-            result: revoked
-              ? { disposition: "unknown", error: "outcome_unknown" }
-              : { disposition: "dispatched_verified", image },
+            ...(shared
+              ? {
+                  message: {
+                    jsonrpc: "2.0",
+                    id: callId,
+                    result: {
+                      resultType: "complete",
+                      _meta: { "co.grida/disposition": disposition },
+                      isError: revoked,
+                      structuredContent: result,
+                      content: revoked
+                        ? [{ type: "text", text: "outcome_unknown" }]
+                        : [
+                            {
+                              type: "image",
+                              mimeType: image.mimeType,
+                              data: image.base64,
+                            },
+                          ],
+                    },
+                  },
+                }
+              : { callId, result: revoked ? result : { ...result, image } }),
           },
         ]);
       } finally {
@@ -2649,6 +2689,218 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
 });
 
 const packaged = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
+
+it.runIf(Boolean(packaged) && process.platform !== "win32")(
+  "discovers Browser, presents a tab, and retains a capture through the packaged MCP carrier",
+  async () => {
+    const directory = state();
+    const root = fs.realpathSync(directory.root);
+    const cwd = path.join(root, "workspace");
+    fs.mkdirSync(cwd, { mode: 0o700 });
+    const jpeg = fs.readFileSync(
+      new URL("../../../fixtures/images/512.jpg", import.meta.url)
+    );
+    const capture = {
+      target: { kind: "workbench", tabId: "visible-tab" },
+      documentId: "visible-document",
+    };
+    const calls = [
+      {
+        name: "tool_search",
+        arguments: { query: "browser help workbench show" },
+      },
+      {
+        name: "tool_search",
+        arguments: { query: "browser_help", source: "browser" },
+      },
+      { name: "browser_help", arguments: { topic: "targets" } },
+      {
+        name: "tool_search",
+        arguments: { query: "workbench_show", source: "workbench" },
+      },
+      {
+        name: "workbench_show",
+        arguments: { target: { kind: "url", url: "https://example.test/" } },
+      },
+      {
+        name: "tool_search",
+        arguments: { query: "browser_capture", source: "browser" },
+      },
+      { name: "browser_capture", arguments: capture },
+    ];
+    const offers: string[][] = [];
+    const bodies: string[] = [];
+    const invoke = vi.fn<DesktopBrowserToolLease["invoke"]>();
+    invoke
+      .mockResolvedValueOnce({
+        disposition: "not_dispatched",
+        data: { topic: "targets", text: "Use surface_list_open." },
+      })
+      .mockResolvedValueOnce({
+        disposition: "dispatched_verified",
+        data: {
+          admission: "accepted",
+          presentation: "requested",
+          tabId: capture.target.tabId,
+        },
+      })
+      .mockResolvedValueOnce({
+        disposition: "dispatched_verified",
+        data: { documentId: capture.documentId },
+        image: { mimeType: "image/jpeg", base64: jpeg.toString("base64") },
+      });
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        ...launch(packaged!, path.join(root, "state")),
+        cwd,
+        provider: "responses",
+        model: "gpt-6.1-sol",
+        providerNetwork: {
+          prepare: () => async (body) => {
+            const text = body.toString();
+            const request = JSON.parse(text);
+            const names = (request.tools ?? []).map(
+              (tool: { name: string }) => tool.name
+            );
+            const call = calls[offers.length];
+            bodies.push(text);
+            offers.push(names);
+            const item = call
+              ? {
+                  type: "function_call",
+                  id: `fc_browser_fixture_${offers.length}`,
+                  call_id: `call_browser_fixture_${offers.length}`,
+                  name: call.name,
+                  arguments: JSON.stringify(call.arguments),
+                  status: "completed",
+                }
+              : {
+                  type: "message",
+                  id: "browser_fixture_message",
+                  role: "assistant",
+                  status: "completed",
+                  content: [
+                    {
+                      type: "output_text",
+                      text: "Finished browser fixture.",
+                      annotations: [],
+                    },
+                  ],
+                };
+            const frames = [
+              { type: "response.output_item.done", output_index: 0, item },
+              {
+                type: "response.completed",
+                response: {
+                  status: "completed",
+                  usage: { input_tokens: 5, output_tokens: 3 },
+                },
+              },
+            ];
+            return new Response(
+              frames
+                .map((frame) => `data: ${JSON.stringify(frame)}\n\n`)
+                .join(""),
+              { headers: { "content-type": "text/event-stream" } }
+            );
+          },
+        },
+      });
+      const session = await chat.create();
+      const lease = chat.registerEditorSurfaces(
+        session,
+        { active: null, open: [], truncated: false },
+        () => {},
+        () => {
+          throw new Error("browser_presentation_must_use_browser_owner");
+        },
+        1,
+        undefined,
+        { ready: () => true, invoke, close: () => {} }
+      )!;
+      await chat.submit(
+        session,
+        "browser-discovery",
+        "Show me the example site and capture it",
+        "act",
+        lease.selection()
+      );
+      const active = chat;
+      await vi.waitFor(
+        async () => {
+          expect((await active.observe(session)).latest?.status).toBe(
+            "succeeded"
+          );
+        },
+        { timeout: 8000 }
+      );
+      expect(offers).toHaveLength(8);
+      expect(offers[0]).toContain("tool_search");
+      expect(offers[0]).not.toContain("browser_help");
+      expect(offers[0]).not.toContain("workbench_show");
+      expect(offers[1]).not.toContain("browser_help");
+      expect(offers[1]).not.toContain("workbench_show");
+      expect(offers[2]).toContain("browser_help");
+      expect(offers[4]).toContain("workbench_show");
+      expect(offers[6]).toContain("browser_capture");
+      expect(invoke.mock.calls.map((args) => args.slice(0, 2))).toEqual([
+        ["browser_help", { topic: "targets" }],
+        [
+          "surface_open",
+          { target: { kind: "url", url: "https://example.test/" } },
+        ],
+        ["browser_capture", capture],
+      ]);
+      expect(bodies[3]).toContain("Use workbench_list_tabs.");
+      const page = await chat.transcriptPage(session);
+      const images = page.messages.flatMap((message) =>
+        (message.activity ?? []).flatMap((item) => item.output?.images ?? [])
+      );
+      expect(images).toMatchObject([
+        { previewId: expect.any(String), mimeType: "image/png" },
+      ]);
+      const image = images[0];
+      const png = Buffer.from(
+        await chat.readToolImage(session, image.previewId)
+      );
+      expect(png.length).toBe(image.size);
+      expect(png.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+      const width = png.readUInt32BE(16);
+      const height = png.readUInt32BE(20);
+      expect(width).toBeGreaterThan(0);
+      expect(width).toBeLessThanOrEqual(512);
+      expect(height).toBe(width);
+      const captureResult = JSON.parse(bodies[7]).input.find(
+        (item: { call_id?: string; type: string }) =>
+          item.type === "function_call_output" &&
+          item.call_id === "call_browser_fixture_7"
+      );
+      expect(JSON.parse(captureResult.output[0].text)).toMatchObject({
+        status: "succeeded",
+        structured: {
+          disposition: "dispatched_verified",
+          documentId: capture.documentId,
+          nativeImage: { width, height },
+        },
+      });
+      expect(captureResult.output[1].image_url).toBe(
+        `data:image/png;base64,${png.toString("base64")}`
+      );
+      const otherSession = await chat.create();
+      await expect(
+        chat.readToolImage(otherSession, image.previewId)
+      ).rejects.toThrow("tool_image_unavailable");
+    } finally {
+      try {
+        await chat?.close();
+      } finally {
+        directory.close();
+      }
+    }
+  },
+  15_000
+);
 
 it.runIf(Boolean(packaged))(
   "starts the packaged native executable and opens an ACP session",

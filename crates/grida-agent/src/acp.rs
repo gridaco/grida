@@ -305,12 +305,15 @@ async fn serve_connection(
                         let browser_offered = offered(browser);
                         let desktop_tools = crate::editor_surfaces::DESKTOP_TOOLS_CAPABILITY;
                         let desktop_tools_offered = offered(desktop_tools);
+                        let browser_mcp = crate::editor_surfaces::mcp::BROWSER_CAPABILITY;
+                        let browser_mcp_offered = desktop_tools_offered && browser_offered && offered(browser_mcp);
                         if let Err(error) = initialized_host.editor_surfaces.attach(
                             connection.clone(),
                             presentation,
                             svg,
                             browser_offered,
                             desktop_tools_offered,
+                            browser_mcp_offered,
                         ) {
                             return responder.respond_with_error(host_error(error));
                         }
@@ -323,6 +326,9 @@ async fn serve_connection(
                         }
                         if browser_offered {
                             advertised.insert(browser.into(), 1.into());
+                        }
+                        if browser_mcp_offered {
+                            advertised.insert(browser_mcp.into(), 1.into());
                         }
                         advertised.insert(capability.into(), 1.into());
                         if presentation {
@@ -352,6 +358,7 @@ async fn serve_connection(
                             crate::editor_surfaces::SVG_TEXT_CAPABILITY,
                             crate::editor_surfaces::DESKTOP_TOOLS_CAPABILITY,
                             crate::editor_surfaces::mcp::TOOL_CONTEXT_CAPABILITY,
+                            crate::editor_surfaces::mcp::BROWSER_CAPABILITY,
                             crate::browser_tools::CAPABILITY,
                             extensions::gateway_billing::CAPABILITY,
                             extensions::gateway_billing::CHILD_CAPABILITY,

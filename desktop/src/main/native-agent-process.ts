@@ -219,6 +219,7 @@ export class NativeAgentProcess {
   private editorSurfaceOpen = false;
   private editorSvgText = false;
   private editorBrowserTools = false;
+  private editorBrowserMcp = false;
   private editorTools = false;
   private editorContext = false;
   private editorToolContext = false;
@@ -736,6 +737,7 @@ export class NativeAgentProcess {
                   [NativeEditorSurfaceEndpoints.svgTextCapability]: 1,
                   [NativeEditorSurfaceEndpoints.browserCapability]: 1,
                   [NativeDesktopTools.capability]: 1,
+                  [NativeDesktopTools.browserCapability]: 1,
                   [NativeEditorSurfaceEndpoints.toolContextCapability]: 1,
                 }),
                 [NativeAgentArtifacts.capability]: 1,
@@ -903,6 +905,9 @@ export class NativeAgentProcess {
       processOwner.editorTools =
         processOwner.editorSurfaces &&
         advertised?.[NativeDesktopTools.capability] === 1;
+      processOwner.editorBrowserMcp =
+        processOwner.editorTools &&
+        advertised?.[NativeDesktopTools.browserCapability] === 1;
       processOwner.editorToolContext =
         processOwner.editorTools &&
         advertised?.[NativeEditorSurfaceEndpoints.toolContextCapability] === 1;
@@ -1009,7 +1014,7 @@ export class NativeAgentProcess {
         this.editorSurfaceOpen || this.editorTools ? deliver : undefined,
         revision,
         this.editorSvgText || this.editorTools ? svgText : undefined,
-        this.editorBrowserTools ? browser : undefined,
+        this.editorBrowserTools || this.editorBrowserMcp ? browser : undefined,
         this.editorToolContext ? svgSelection : undefined
       );
   }
@@ -1426,9 +1431,22 @@ export class NativeAgentProcess {
           this.startEditorRequest(
             message.id,
             (signal) =>
-              this.editorEndpoints.desktopTools(message.params, signal),
-            () => this.editorEndpoints.desktopToolsBusy(message.params),
-            (reply) => this.editorEndpoints.desktopToolsReplyGuard(reply)
+              this.editorEndpoints.desktopTools(
+                message.params,
+                signal,
+                this.editorBrowserMcp
+              ),
+            () =>
+              this.editorEndpoints.desktopToolsBusy(
+                message.params,
+                this.editorBrowserMcp
+              ),
+            (reply) =>
+              this.editorEndpoints.desktopToolsReplyGuard(
+                reply,
+                message.params,
+                this.editorBrowserMcp
+              )
           );
           return;
         }

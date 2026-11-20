@@ -101,8 +101,11 @@ access or document mutation.
 
 The negotiated Desktop catalog supplies the definition and handler for each
 eligible operation. The host retains that catalog, its source generation,
-and the endpoint with accepted input. Native discovery selects definitions
-from that capture and offers them on the model request after search. A
+and the endpoint with accepted input. Native discovery first presents one
+bounded summary per extension. A query spanning several extensions returns
+their summaries so the model can choose a source. A source-specific query or
+an exact tool lookup can reveal captured definitions, which become available
+on the model request after search. A
 concurrent invocation from the request that performed the lookup still uses
 that request's original inventory. A continued turn keeps the recorded
 definitions even after the source disconnects. Calls to that source report
@@ -134,15 +137,18 @@ document and viewport guards, and the actual guest. Background pages remain
 within their creating scope, and workbench calls use the exact authorized
 tab. `browser_close` and scope cleanup retire owned background pages.
 `workbench_close_browser_tab` requests closure of a visible browser tab.
-Older captured turns and MCP export profiles keep their existing names
-and schemas.
-Observations from a revoked or replaced endpoint are discarded.
+Browser and browser-enabled Workbench calls use the negotiated private MCP
+carrier with the captured Browser lease. The same Browser operation definitions
+and lease dispatcher serve the opt-in external profile, whose wire names and
+schemas remain stable. Older accepted turns keep their captured definitions
+and dispatch contract. Observations from a revoked or replaced endpoint are
+discarded.
 
-The browser opt-in for the external export adds a bounded, correlated private
-request path and normal MCP image content. The read-only export keeps its
-existing operation. Native capture media is scoped to the owning tool result.
-A lost reply after a browser mutation remains uncertain. Repeating a call is
-a new operation.
+Both paths use bounded MCP JPEG image content. Native chat validates the
+image and, when the model connection accepts tool images, prepares it as
+PNG in retained media scoped to the owning tool result. A lost reply after
+a browser mutation remains uncertain. Repeating a call starts a new
+operation.
 
 Workspace turns with `editorPresentation` receive primary-artifact checkpoint
 guidance even when `editorBrowserTools` enables the browser catalog.

@@ -2749,8 +2749,7 @@ impl Host {
         let host_tools_capture =
             self.capture_host_tools(!child_work && allow_host_tools && operating_regime.is_act())?;
         let desktop_context = !child_work && self.editor_surfaces.desktop_tools_negotiated();
-        // Browser-aware workbenches source inventory and presentation from
-        // their tab-aware binding. The private catalog supplies SVG support.
+        let browser_mcp = editor_browser_tools && self.editor_surfaces.browser_mcp_negotiated();
         let editor_tool_catalog = match &editor_endpoint {
             Some(endpoint) => self
                 .editor_surfaces
@@ -2758,14 +2757,15 @@ impl Host {
                     &session.session,
                     endpoint,
                     crate::editor_surfaces::mcp::Scope {
-                        presentation: editor_presentation && !editor_browser_tools,
+                        presentation: editor_presentation && (!editor_browser_tools || browser_mcp),
                         svg_target_id: editor_svg_target.clone(),
                         context_id: editor_tool_context_id.clone(),
+                        browser: browser_mcp,
                     },
                 )
                 .await
                 .map(|catalog| {
-                    if editor_browser_tools {
+                    if editor_browser_tools && !browser_mcp {
                         catalog.without_workbench_compatibility()
                     } else {
                         catalog
@@ -2774,6 +2774,13 @@ impl Host {
             _ => None,
         };
         let workbench_tools = editor_tool_catalog.is_some();
+        let mut optional_skills = self.optional_bundled_skills();
+        if editor_tool_catalog
+            .as_ref()
+            .is_some_and(crate::editor_surfaces::DesktopToolCatalog::has_browser_tools)
+        {
+            optional_skills.push(crate::skills::BROWSER_SKILL.to_owned());
+        }
         let allow_image_placement = allow_image_placement && desktop_image_generation.is_some();
         let allow_image_reference = allow_library_selection
             && desktop_image_generation.is_some()
@@ -2787,7 +2794,7 @@ impl Host {
             skills::capture_guidance(
                 self.guidance_scope(session)?,
                 &parts,
-                self.optional_bundled_skills(),
+                optional_skills.clone(),
             )
             .await?
         };
@@ -2800,13 +2807,7 @@ impl Host {
         {
             None
         } else {
-            Some(
-                skills::capture_listing(
-                    self.guidance_scope(session)?,
-                    self.optional_bundled_skills(),
-                )
-                .await?,
-            )
+            Some(skills::capture_listing(self.guidance_scope(session)?, optional_skills).await?)
         };
         let parts = if parts.iter().any(|part| {
             matches!(
@@ -3186,6 +3187,10 @@ impl Host {
                         .instructions
                         .push_str(grida_agent_master::presentation::DESKTOP_CONTEXT);
                 }
+                let browser_mcp = stored
+                    .editor_tool_catalog
+                    .as_ref()
+                    .is_some_and(crate::editor_surfaces::DesktopToolCatalog::uses_browser_mcp);
                 if stored.editor_browser_tools && stored.editor_tool_catalog.is_none() {
                     config.instructions.push_str("\n\n");
                     config
@@ -3196,12 +3201,12 @@ impl Host {
                     } else {
                         " This model connection cannot receive browser captures. Use browser snapshots for inspection and report the screenshot limitation if asked."
                     });
-                } else if stored.editor_browser_tools && !image_tool_results {
+                } else if stored.editor_browser_tools && !browser_mcp && !image_tool_results {
                     config
                         .instructions
                         .push_str("\n\nThis model connection cannot receive browser captures.");
                 }
-                let presentation = if stored.editor_browser_tools {
+                let presentation = if stored.editor_browser_tools && !browser_mcp {
                     stored.editor_presentation
                 } else {
                     stored.editor_tool_catalog.as_ref().map_or(
@@ -3250,6 +3255,13 @@ impl Host {
                             "invalid_editor_surface_scope",
                         ));
                     }
+                    let browser_capture = if stored.editor_browser_tools && image_tool_results {
+                        execution.retained_inputs.as_ref().map(|images| {
+                            images.browser_image_capture(session.clone(), cwd.to_owned())
+                        })
+                    } else {
+                        None
+                    };
                     if let Some(catalog) = &stored.editor_tool_catalog {
                         use crate::editor_surfaces::mcp::GrantKind;
                         for kind in [GrantKind::Extension, GrantKind::Presentation] {
@@ -3259,6 +3271,7 @@ impl Host {
                                 catalog,
                                 kind,
                                 workbench_tools,
+                                browser_capture.clone(),
                             )? {
                                 host_tools.push(Arc::new(host_tools::HostTools::desktop(
                                     host,
@@ -3276,15 +3289,8 @@ impl Host {
                         inventory: legacy,
                         presentation: legacy && stored.editor_presentation,
                         svg_target: stored.editor_svg_target.clone().filter(|_| legacy),
-                        browser: stored.editor_browser_tools,
+                        browser: stored.editor_browser_tools && !browser_mcp,
                         workbench_tools,
-                    };
-                    let browser_capture = if scope.browser && image_tool_results {
-                        execution.retained_inputs.as_ref().map(|images| {
-                            images.browser_image_capture(session.clone(), cwd.to_owned())
-                        })
-                    } else {
-                        None
                     };
                     if scope.inventory
                         || scope.presentation
@@ -3397,7 +3403,11 @@ impl Host {
                 skills = stored.skills.clone();
                 if let Some(listing) = &skills {
                     config.instructions.push_str("\n\n");
-                    config.instructions.push_str(&listing.instructions());
+                    config
+                        .instructions
+                        .push_str(&listing.instructions_with_discovery(
+                            desktop_context && stored.goal.is_none() && !cancellation_only,
+                        ));
                 }
                 if stored.goal.is_some() {
                     config.instructions.push_str("\n\n");

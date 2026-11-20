@@ -1271,6 +1271,11 @@ pixels through this reader, with no additional filesystem or model grant.
   Native workbench and browser grants distinguish visible tab closure from
   background page cleanup. Both operations retain the exact bound page and
   workbench validation at the Main receiver.
+  The [Browser MCP adapter](desktop/src/main/desktop-browser-mcp.ts) uses the
+  captured Browser lease and discards replies after revocation.
+  [Native tool image validation](crates/grida-agent/src/file_tools/tool_image.rs)
+  bounds and verifies the JPEG before placing prepared media under the
+  owning tool-result scope.
   Each observation revalidates the current frame and chat. Navigation or
   replacement revokes the binding. Rust retains it with the accepted input,
   checks the reply's chat and endpoint identity, and bounds the projected
@@ -4671,6 +4676,8 @@ outside that tool surface. Users can open DevTools for an actual owned page.
   `desktop/src/main/browser-automation-guest.ts`, and
   `desktop/src/main/desktop-browser-tools.ts` — fixed background shell,
   admitted target and document checks, typed operations and bounded captures.
+- `desktop/src/main/desktop-browser-mcp.ts` — dispatch scoped to the captured
+  lease, bounded image results and reply revocation on the private MCP carrier.
 - `desktop/src/main/fx-viewer.ts` and its tests — exact project service and
   document correlation, bounded FX observations, independent file authorization
   and workspace-relative resolution results.

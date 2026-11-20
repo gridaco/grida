@@ -9,7 +9,10 @@ and [browser guide](../../docs/editor/desktop/browser.md#test-a-page-with-the-ag
 
 Native workspace chat can use browser tools in Act when the Desktop host and
 workbench negotiate the automation capability. New native turns discover
-Workbench and Browser tools as separate sources. The independent Desktop MCP
+Workbench and Browser as separate sources. The Browser source includes a
+skill with workflow guidance, which the agent can read before choosing an
+operation. Native chat uses the shared private Desktop tool carrier when
+both peers support it. The independent Desktop MCP
 export enables its existing browser catalog with the explicit
 `--native-chat-export-mcp-browser` option. That profile uses
 `surface_list_open`, `surface_open`, and its original `browser_close`
@@ -17,8 +20,9 @@ contract. The default editor export retains its read-only inventory.
 
 The tools address the workbench captured by the invocation or export. Native
 workspace chat and an independent MCP client can use that workbench without
-sharing their background page handles. Closing or reloading the workbench
-withdraws the lease. Workspace and account changes use the existing admission
+sharing their background page handles. Both routes use the Browser feature's
+operation definitions and Main-owned lease dispatcher. Closing or reloading
+the workbench withdraws the lease. Workspace and account changes use the existing admission
 checks. The [tool-host contract](../../crates/grida-agent/docs/tool-host-contract.md)
 and [security boundaries](../../SECURITY.md) describe the surrounding grants.
 
@@ -130,9 +134,10 @@ For an authored workflow, use `grida-fx plan <workflow> --register --json` or
 specific plan or saved run. Registration works while the viewer is stopped.
 For a running viewer, resolve the route against the URL from
 `grida-fx status --project-root <project-dir> --json` for the same project.
-Pass that URL to `surface_open`. Use `browser_snapshot` to identify the
-current document and confirm the viewer's subject before calling its page
-API through `browser_evaluate`.
+Pass that URL to `workbench_show` as a URL target in native chat, or
+`surface_open` in the external Browser MCP profile. Use `browser_snapshot`
+to identify the current document and confirm the viewer's subject before
+calling its page API through `browser_evaluate`.
 
 For one-shot `call image.generate` results, present the saved PNG directly.
 FX 0.11.0 can register the run but its viewer rejects the inline workflow graph.

@@ -1,10 +1,12 @@
 // GRIDA-SEC-004 — this catalog is scoped to the endpoint that owns its grants.
 export namespace NativeDesktopTools {
   export const capability = "co.grida/session/desktop-tools";
+  export const browserCapability = "co.grida/session/desktop-browser-mcp";
   export const method = "_co.grida/editor/desktop-tools";
 
   const DEFINITION_REVISION = "co.grida/definitionRevision";
   const REQUEST_LIMIT = 32 * 1024;
+  const EXTENDED_REQUEST_LIMIT = 48 * 1024;
 
   export type Invocation = Readonly<{
     id: string;
@@ -12,8 +14,11 @@ export namespace NativeDesktopTools {
     expiresAtMs: number;
   }>;
 
-  type ToolResult = Readonly<{
-    content: readonly Readonly<{ type: "text"; text: string }>[];
+  export type ToolResult = Readonly<{
+    content: readonly (
+      | Readonly<{ type: "text"; text: string }>
+      | Readonly<{ type: "image"; mimeType: "image/jpeg"; data: string }>
+    )[];
     structuredContent?: Readonly<Record<string, unknown>>;
     isError?: boolean;
     _meta?: Readonly<Record<string, unknown>>;
@@ -36,6 +41,11 @@ export namespace NativeDesktopTools {
       outputSchema?: Readonly<Record<string, unknown>>;
     }>;
     revision: number;
+    transfer?: Readonly<{
+      maxInputBytes: number;
+      maxOutputBytes: number;
+      resultMimeType?: "image/jpeg";
+    }>;
     invoke(
       args: Readonly<Record<string, unknown>> | undefined,
       invocation: Invocation
@@ -55,8 +65,8 @@ export namespace NativeDesktopTools {
       ...reply,
       error: { code, message },
     });
-    if (Buffer.byteLength(JSON.stringify(value)) > REQUEST_LIMIT)
-      return error(-32602, "Invalid params");
+    const bytes = Buffer.byteLength(JSON.stringify(value));
+    if (bytes > EXTENDED_REQUEST_LIMIT) return error(-32602, "Invalid params");
     if (context && context.expiresAtMs <= Date.now())
       return error(-32004, "desktop_tool_deadline_elapsed");
     if (!tools) return error(-32001, "editor_surface_endpoint_unavailable");
@@ -67,15 +77,27 @@ export namespace NativeDesktopTools {
     if (params && Object.hasOwn(params, "_meta") && !meta)
       return error(-32602, "Invalid params");
     if (request.method === "tools/list") {
-      if (params && Object.keys(params).some((key) => key !== "_meta"))
+      if (
+        bytes > REQUEST_LIMIT ||
+        (params && Object.keys(params).some((key) => key !== "_meta"))
+      )
         return error(-32602, "Invalid params");
       return {
         ...reply,
         result: {
           resultType: "complete",
-          tools: tools.map(({ definition, revision }) => ({
+          tools: tools.map(({ definition, revision, transfer }) => ({
             ...definition,
-            _meta: { [DEFINITION_REVISION]: revision },
+            _meta: {
+              [DEFINITION_REVISION]: revision,
+              ...(transfer && {
+                "co.grida/maxInputBytes": transfer.maxInputBytes,
+                "co.grida/maxOutputBytes": transfer.maxOutputBytes,
+                ...(transfer.resultMimeType && {
+                  "co.grida/resultMimeType": transfer.resultMimeType,
+                }),
+              }),
+            },
           })),
         },
       };
@@ -96,6 +118,13 @@ export namespace NativeDesktopTools {
       ({ definition }) => definition.name === params.name
     );
     if (!tool) return error(-32602, "Unknown tool");
+    if (
+      tool.transfer
+        ? Buffer.byteLength(JSON.stringify(args ?? {})) >
+          tool.transfer.maxInputBytes
+        : bytes > REQUEST_LIMIT
+    )
+      return error(-32602, "Invalid params");
     if (meta?.[DEFINITION_REVISION] !== tool.revision)
       return error(-32002, "desktop_tool_definition_changed");
     const result = await tool.invoke(args, {
@@ -105,10 +134,13 @@ export namespace NativeDesktopTools {
         expiresAtMs: Date.now() + 2000,
       }),
     });
-    return {
-      ...reply,
-      result: { ...result, resultType: "complete" },
-    };
+    const output = { ...result, resultType: "complete" as const };
+    if (
+      tool.transfer &&
+      Buffer.byteLength(JSON.stringify(output)) > tool.transfer.maxOutputBytes
+    )
+      return unverified(request.id);
+    return { ...reply, result: output };
   }
 
   export function busy(value: unknown): Reply | null {
@@ -124,6 +156,13 @@ export namespace NativeDesktopTools {
 
   export function isCall(value: unknown): boolean {
     return parseRequest(value)?.method === "tools/call";
+  }
+
+  export function toolName(value: unknown): string | undefined {
+    const request = parseRequest(value);
+    if (request?.method !== "tools/call") return;
+    const name = record(request.params)?.name;
+    return typeof name === "string" ? name : undefined;
   }
 
   export function unverified(id: string): Reply {

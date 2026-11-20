@@ -7,6 +7,7 @@ import {
   type NativeEditorSurfaceSnapshot,
 } from "@grida/desktop-bridge";
 import { DesktopArtifactPresentation } from "./desktop-artifact-presentation";
+import { DesktopBrowserMcp } from "./desktop-browser-mcp";
 import type { DesktopBrowserToolLease } from "./desktop-browser-tools";
 import { DesktopSelectedSvgSelection } from "./desktop-selected-svg-selection";
 import { DesktopSelectedSvgText } from "./desktop-selected-svg-text";
@@ -375,8 +376,11 @@ export class NativeEditorSurfaceEndpoints {
     };
   }
 
-  desktopToolsBusy(value: unknown): NativeDesktopToolReply | null {
-    const request = this.desktopToolRequest(value);
+  desktopToolsBusy(
+    value: unknown,
+    browserNegotiated = false
+  ): NativeDesktopToolReply | null {
+    const request = this.desktopToolRequest(value, browserNegotiated);
     if (!request) return null;
     const { sessionId, endpointId, message } = request;
     const reply = NativeDesktopTools.busy(message);
@@ -385,9 +389,10 @@ export class NativeEditorSurfaceEndpoints {
 
   async desktopTools(
     value: unknown,
-    signal: AbortSignal
+    signal: AbortSignal,
+    browserNegotiated = false
   ): Promise<NativeDesktopToolReply | null> {
-    const request = this.desktopToolRequest(value);
+    const request = this.desktopToolRequest(value, browserNegotiated);
     if (!request) return null;
     const { sessionId, endpointId, scope, message, timeoutMs } = request;
     const now = Date.now();
@@ -395,12 +400,23 @@ export class NativeEditorSurfaceEndpoints {
     const expiresAtMs = Math.min(request.expiresAtMs, now + timeoutMs);
     const deadline = AbortSignal.timeout(Math.max(0, expiresAtMs - now));
     const endpoint = this.current(sessionId, endpointId);
-    const tools = endpoint && [
-      DesktopWorkbenchInventory.bind(endpoint.snapshot),
-    ];
+    const browser = endpoint?.browser;
+    const tools =
+      endpoint &&
+      (scope?.browser
+        ? browser?.ready() || NativeDesktopTools.isCall(message)
+          ? DesktopBrowserMcp.bind(
+              browser,
+              scope.presentation === true &&
+                endpoint.deliver !== undefined &&
+                endpoint.revision !== undefined
+            )
+          : []
+        : [DesktopWorkbenchInventory.bind(endpoint.snapshot)]);
     if (
       endpoint &&
       tools &&
+      !scope?.browser &&
       scope?.presentation &&
       endpoint.deliver &&
       endpoint.revision !== undefined
@@ -461,15 +477,43 @@ export class NativeEditorSurfaceEndpoints {
     return reply && { sessionId, endpointId, message: reply };
   }
 
-  desktopToolsReplyGuard(reply: NativeDesktopToolReply) {
-    return () =>
-      "result" in reply.message &&
-      !this.current(reply.sessionId, reply.endpointId)
-        ? { ...reply, message: NativeDesktopTools.unverified(reply.message.id) }
-        : undefined;
+  desktopToolsReplyGuard(
+    reply: NativeDesktopToolReply,
+    value?: unknown,
+    browserNegotiated = false
+  ) {
+    const request = this.desktopToolRequest(value, browserNegotiated);
+    const browserScope = request?.scope?.browser === true;
+    const call = browserScope && NativeDesktopTools.isCall(request.message);
+    const browserCall =
+      call &&
+      DesktopBrowserMcp.hasDefinition(
+        NativeDesktopTools.toolName(request.message)
+      );
+    return () => {
+      if (!("result" in reply.message)) return;
+      const endpoint = this.current(reply.sessionId, reply.endpointId);
+      if (browserCall) {
+        const reason = !endpoint?.browser?.ready()
+          ? "owner_revoked"
+          : request.expiresAtMs <= Date.now()
+            ? "canceled"
+            : undefined;
+        if (reason)
+          return {
+            ...reply,
+            message: DesktopBrowserMcp.revokeReply(reply.message, reason),
+          };
+      }
+      if (!endpoint || (browserScope && !call && !endpoint.browser?.ready()))
+        return {
+          ...reply,
+          message: NativeDesktopTools.unverified(reply.message.id),
+        };
+    };
   }
 
-  private desktopToolRequest(value: unknown) {
+  private desktopToolRequest(value: unknown, browserNegotiated: boolean) {
     if (!value || typeof value !== "object" || Array.isArray(value))
       return null;
     const { sessionId, endpointId, message, scope, timeoutMs, expiresAtMs } =
@@ -509,12 +553,15 @@ export class NativeEditorSurfaceEndpoints {
           (key) =>
             key === "svgTargetId" ||
             key === "presentation" ||
-            key === "contextId"
+            key === "contextId" ||
+            key === "browser"
         ) ||
         (Object.hasOwn(scoped, "svgTargetId") &&
           !NativeEditorSvgText.isId(scoped.svgTargetId)) ||
         (Object.hasOwn(scoped, "contextId") &&
           !NativeEditorSvgText.isId(scoped.contextId)) ||
+        (Object.hasOwn(scoped, "browser") &&
+          (!browserNegotiated || scoped.browser !== true)) ||
         (Object.hasOwn(scoped, "presentation") && scoped.presentation !== true))
     )
       return null;
@@ -529,6 +576,7 @@ export class NativeEditorSurfaceEndpoints {
             svgTargetId?: string;
             presentation?: true;
             contextId?: string;
+            browser?: true;
           }>
         | undefined,
     };

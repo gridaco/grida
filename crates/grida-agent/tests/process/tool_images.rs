@@ -273,9 +273,21 @@ async fn retained_tool_images_read_exact_prepared_pixels_after_source_deletion_a
 
 #[tokio::test]
 async fn native_browser_capture_requires_act_and_projects_correlated_pixels() {
+    browser_capture(false).await;
+}
+
+#[tokio::test]
+async fn shared_desktop_carrier_delivers_bounded_browser_pixels_and_presentation() {
+    browser_capture(true).await;
+}
+
+async fn browser_capture(shared: bool) {
     const EDITOR: &str = "co.grida/session/editor-surfaces";
     const PRESENTATION: &str = "co.grida/session/editor-surface-open";
     const BROWSER: &str = "co.grida/session/browser-tools";
+    const DESKTOP: &str = "co.grida/session/desktop-tools";
+    const SHARED_BROWSER: &str = "co.grida/session/desktop-browser-mcp";
+    const DESKTOP_METHOD: &str = "_co.grida/editor/desktop-tools";
     const EDITOR_CONTEXT: &str = "co.grida/session/editor-context";
     const ENDPOINT: &str = "6f9619ff-8b86-4011-b42d-00c04fc964ff";
     let root = TempDir::new().unwrap();
@@ -299,12 +311,21 @@ async fn native_browser_capture_requires_act_and_projects_correlated_pixels() {
     offer["clientCapabilities"]["_meta"][EDITOR] = 1.into();
     offer["clientCapabilities"]["_meta"][PRESENTATION] = 1.into();
     offer["clientCapabilities"]["_meta"][BROWSER] = 1.into();
+    if shared {
+        offer["clientCapabilities"]["_meta"][DESKTOP] = 1.into();
+        offer["clientCapabilities"]["_meta"][SHARED_BROWSER] = 1.into();
+    }
     offer["clientCapabilities"]["_meta"][EDITOR_CONTEXT] = 1.into();
     offer["clientCapabilities"]["_meta"]["co.grida/provider/egress"] = 1.into();
     offer["clientCapabilities"]["_meta"]["co.grida/session/updates"] = 1.into();
     let ready = client.request("initialize", offer).await;
     assert_eq!(
         ready["result"]["agentCapabilities"]["_meta"][BROWSER], 1,
+        "{ready}"
+    );
+    assert_eq!(
+        ready["result"]["agentCapabilities"]["_meta"][SHARED_BROWSER].as_u64(),
+        shared.then_some(1),
         "{ready}"
     );
     let created = client
@@ -339,25 +360,61 @@ async fn native_browser_capture_requires_act_and_projects_correlated_pixels() {
     image::codecs::jpeg::JpegEncoder::new(&mut jpeg)
         .encode(&[121, 18, 96], 1, 1, image::ExtendedColorType::Rgb8)
         .unwrap();
-    let mut replies = [
-        Reply::Tool(
-            "surface_open",
-            r#"{"target":{"kind":"file","path":"/poster.canvas"}}"#,
-        ),
+    if shared {
+        // Valid JPEG comments raise the transfer to its shipped size limit
+        // without depending on encoder output from hundreds of noisy pixels.
+        let mut max_capture = jpeg[..2].to_vec();
+        let mut remaining = 256 * 1024 - jpeg.len();
+        while remaining > 0 {
+            let segment = remaining.min(60 * 1024);
+            max_capture.extend_from_slice(&[0xff, 0xfe]);
+            max_capture.extend_from_slice(&u16::try_from(segment - 2).unwrap().to_be_bytes());
+            max_capture.resize(max_capture.len() + segment - 4, 0);
+            remaining -= segment;
+        }
+        max_capture.extend_from_slice(&jpeg[2..]);
+        assert_eq!(max_capture.len(), 256 * 1024);
+        jpeg = max_capture;
+    }
+    let show = if shared {
+        "workbench_show"
+    } else {
+        "surface_open"
+    };
+    let mut replies = Vec::new();
+    if shared {
+        replies.push(Reply::Tool(
+            "tool_search",
+            r#"{"query":"workbench_show","source":"workbench"}"#,
+        ));
+    }
+    replies.push(Reply::Tool(
+        show,
+        r#"{"target":{"kind":"file","path":"/poster.canvas"}}"#,
+    ));
+    if shared {
+        replies.push(Reply::Tool(
+            "tool_search",
+            r#"{"query":"browser_capture","source":"browser"}"#,
+        ));
+    }
+    replies.extend([
         Reply::Tool(
             "browser_capture",
             r#"{"target":{"kind":"background","pageId":"page"},"documentId":"document"}"#,
         ),
         Reply::Finished("Captured the fixture."),
-    ]
-    .into_iter();
+    ]);
+    let total = replies.len();
+    let mut replies = replies.into_iter();
     let mut chunk = None;
     let mut requests = Vec::new();
     let mut completed = 0;
     let mut accepted = false;
+    let mut listed = false;
     let mut file_revealed = false;
     let mut image_update = None;
-    while !accepted || image_update.is_none() || completed < 3 {
+    while !accepted || image_update.is_none() || completed < total {
         let frame = client.read_frame().await;
         let params = &frame["params"];
         if frame["id"] == id {
@@ -388,7 +445,58 @@ async fn native_browser_capture_requires_act_and_projects_correlated_pixels() {
                 client.respond(&frame["id"], result).await;
             }
             Some("_co.grida/provider/cancel") => completed += 1,
-            Some("_co.grida/editor/browser-tool") => {
+            Some(DESKTOP_METHOD) if shared => {
+                assert_eq!(params["sessionId"], session);
+                assert_eq!(params["endpointId"], ENDPOINT);
+                assert_eq!(params["scope"], json!({"browser":true,"presentation":true}));
+                let message = &params["message"];
+                let result = match message["method"].as_str() {
+                    Some("tools/list") => {
+                        assert!(!listed);
+                        listed = true;
+                        json!({"resultType":"complete","tools":browser_desktop_catalog()})
+                    }
+                    Some("tools/call") if message["params"]["name"] == show => {
+                        assert_eq!(
+                            message["params"]["arguments"]["target"],
+                            json!({"kind":"file","path":"/poster.canvas"})
+                        );
+                        assert_eq!(message["params"]["_meta"]["co.grida/definitionRevision"], 3);
+                        file_revealed = true;
+                        json!({"resultType":"complete","content":[],"isError":true,
+                            "_meta":{"co.grida/disposition":"unknown"},
+                            "structuredContent":{"disposition":"unknown"}})
+                    }
+                    Some("tools/call") => {
+                        assert_eq!(message["params"]["name"], "browser_capture");
+                        assert_eq!(message["params"]["arguments"]["documentId"], "document");
+                        assert!(
+                            params["timeoutMs"]
+                                .as_u64()
+                                .is_some_and(|ms| ms > 2000 && ms <= 8000)
+                        );
+                        let snapshot = client
+                            .request("_co.grida/session/snapshot", json!({"sessionId":session}))
+                            .await;
+                        assert!(snapshot["result"]["current"].is_object(), "{snapshot}");
+                        json!({"resultType":"complete","content":[
+                            {"type":"image","mimeType":"image/jpeg","data":STANDARD.encode(&jpeg)}
+                        ],"isError": false,"_meta":{"co.grida/disposition":"dispatched_verified"},
+                            "structuredContent":{"disposition":"dispatched_verified","documentId":"document"}})
+                    }
+                    _ => panic!("unexpected shared Desktop request: {frame}"),
+                };
+                client
+                    .respond(
+                        &frame["id"],
+                        json!({
+                            "sessionId":session,"endpointId":ENDPOINT,
+                            "message":{"jsonrpc":"2.0","id":message["id"],"result":result}
+                        }),
+                    )
+                    .await;
+            }
+            Some("_co.grida/editor/browser-tool") if !shared => {
                 assert_eq!(params["sessionId"], session);
                 assert_eq!(params["endpointId"], ENDPOINT);
                 if params["operation"] == "surface_open" {
@@ -421,6 +529,9 @@ async fn native_browser_capture_requires_act_and_projects_correlated_pixels() {
                         "image":{"mimeType":"image/jpeg","base64":STANDARD.encode(&jpeg)}}
                 })).await;
             }
+            Some(method) if method.starts_with("_co.grida/editor/") => {
+                panic!("unexpected editor transport: {frame}");
+            }
             _ => {}
         }
         if params["update"]["rawOutput"]["images"].is_array() {
@@ -428,22 +539,30 @@ async fn native_browser_capture_requires_act_and_projects_correlated_pixels() {
         }
     }
     assert!(file_revealed);
-    assert_eq!(requests.len(), 3);
+    assert_eq!(listed, shared);
+    assert_eq!(requests.len(), total);
+    let offered = |request: &Value, name: &str| {
+        request["tools"]
+            .as_array()
+            .is_some_and(|tools| tools.iter().any(|tool| tool["name"] == name))
+    };
     let instructions = requests[0]["instructions"].as_str().unwrap();
     assert!(instructions.contains("first meaningful renderable checkpoint"));
-    assert!(instructions.contains("For new browser work, use browser_open"));
+    if shared {
+        assert!(offered(&requests[0], "tool_search"));
+        assert!(!offered(&requests[0], "browser_capture"));
+        assert!(!offered(&requests[0], show));
+    } else {
+        assert!(instructions.contains("For new browser work, use browser_open"));
+    }
     assert!(requests[0]["input"].to_string().contains("selected-step"));
-    assert!(
-        requests[0]["tools"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|tool| tool["name"] == "browser_capture")
-    );
-    let inputs = requests[1]["input"].as_array().unwrap();
+    assert!(offered(&requests[total - 2], "browser_capture"));
+    let inputs = requests[1 + usize::from(shared)]["input"]
+        .as_array()
+        .unwrap();
     let reveal_call = inputs
         .iter()
-        .find(|item| item["type"] == "function_call" && item["name"] == "surface_open")
+        .find(|item| item["type"] == "function_call" && item["name"] == show)
         .expect("recorded file reveal");
     let reveal_output = inputs
         .iter()
@@ -455,7 +574,7 @@ async fn native_browser_capture_requires_act_and_projects_correlated_pixels() {
         serde_json::from_str(reveal_output["output"].as_str().unwrap()).unwrap();
     assert_eq!(reveal_result["status"], "uncertain");
     assert_eq!(reveal_result["structured"]["disposition"], "unknown");
-    let pixels = requests[2]["input"]
+    let pixels = requests[total - 1]["input"]
         .as_array()
         .unwrap()
         .iter()
@@ -512,4 +631,36 @@ async fn native_browser_capture_requires_act_and_projects_correlated_pixels() {
         );
     }
     assert!(client.finish().await.status.success());
+}
+
+fn browser_desktop_catalog() -> Vec<Value> {
+    let descriptors: Vec<Value> = serde_json::from_str(include_str!(
+        "../../../../desktop/src/main/browser-tool-catalog.json"
+    ))
+    .unwrap();
+    [
+        ("surface_open", "workbench_show"),
+        ("browser_capture", "browser_capture"),
+    ]
+    .into_iter()
+    .map(|(stored, name)| {
+        let descriptor = descriptors
+            .iter()
+            .find(|entry| entry["name"] == stored)
+            .unwrap();
+        let mut meta = json!({"co.grida/definitionRevision":descriptor["version"],
+                "co.grida/maxInputBytes":40960,"co.grida/maxOutputBytes":458752});
+        if name == "browser_capture" {
+            meta["co.grida/resultMimeType"] = "image/jpeg".into();
+        }
+            let description = if name == "workbench_show" {
+                "Ask the attached workbench to show a workspace file, HTTP(S) URL, or exact tab. The workbench chooses the viewer. Window focus requires an explicit request. Use browser_open for background browser work."
+            } else {
+                descriptor["description"].as_str().unwrap()
+            };
+            json!({"name":name,"description":description,
+                "inputSchema":descriptor["inputSchema"],"outputSchema":descriptor["outputSchema"],
+                "annotations":{"readOnlyHint":descriptor["effect"] == "read"},"_meta":meta})
+    })
+    .collect()
 }

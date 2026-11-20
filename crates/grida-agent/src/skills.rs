@@ -36,6 +36,19 @@ const OPTIONAL_BUNDLED: [(&str, &str); 1] = [(
     include_str!("../../../skills/desktop-fx/SKILL.md"),
 )];
 
+pub(crate) const BROWSER_SKILL: &str = "browser";
+
+// This skill enters the listing through the accepted Browser tool grant.
+// Command launch profiles can select only OPTIONAL_BUNDLED.
+const GRANT_BUNDLED: [(&str, &str); 1] = [(
+    BROWSER_SKILL,
+    include_str!("../../../skills/browser/SKILL.md"),
+)];
+
+fn extension_bundled() -> impl Iterator<Item = &'static (&'static str, &'static str)> {
+    OPTIONAL_BUNDLED.iter().chain(&GRANT_BUNDLED)
+}
+
 pub(crate) fn validate_optional_bundled(names: &[String]) -> Result<()> {
     let mut seen = BTreeSet::new();
     if names
@@ -54,9 +67,7 @@ fn bundled_names(optional: &[String]) -> impl Iterator<Item = &str> {
     BUILTIN
         .iter()
         .chain(
-            OPTIONAL_BUNDLED
-                .iter()
-                .filter(|(name, _)| optional.iter().any(|enabled| enabled == name)),
+            extension_bundled().filter(|(name, _)| optional.iter().any(|enabled| enabled == name)),
         )
         .map(|(name, _)| *name)
 }
@@ -272,17 +283,22 @@ impl SkillListing {
     pub(crate) fn extension_skills(&self) -> impl Iterator<Item = (&str, &str)> {
         self.skills
             .iter()
-            .filter(|skill| {
-                skill.source == SkillSource::Bundled
-                    && OPTIONAL_BUNDLED.iter().any(|(name, _)| *name == skill.name)
-            })
+            .filter(|skill| skill.is_extension())
             .map(|skill| (skill.name.as_str(), skill.description.as_str()))
     }
 
+    #[cfg(test)]
     pub(crate) fn instructions(&self) -> String {
+        self.instructions_with_discovery(false)
+    }
+
+    pub(crate) fn instructions_with_discovery(&self, discovery: bool) -> String {
         let mut entries = String::new();
         let mut omitted = 0;
         for skill in &self.skills {
+            if discovery && skill.is_extension() {
+                continue;
+            }
             let locator = match skill.source {
                 SkillSource::Bundled => format!("bundled; read with `{READ_SKILL}`"),
                 SkillSource::ProjectAgents => {
@@ -310,6 +326,13 @@ impl SkillListing {
         format!(
             "## Skills\n{LISTING_INTRO}\n### Available skills\n{entries}### How to use skills\n{LISTING_USE}"
         )
+    }
+}
+
+impl ListedSkill {
+    fn is_extension(&self) -> bool {
+        self.source == SkillSource::Bundled
+            && extension_bundled().any(|(name, _)| *name == self.name)
     }
 }
 
@@ -454,7 +477,7 @@ pub(crate) fn capture_with(
 fn builtin(name: &str) -> Result<Option<CapturedSkill>> {
     let Some((_, document)) = BUILTIN
         .iter()
-        .chain(OPTIONAL_BUNDLED.iter())
+        .chain(extension_bundled())
         .find(|(known, _)| *known == name)
     else {
         return Ok(None);
@@ -630,6 +653,31 @@ mod tests {
                 .selected()[0]
                 .name,
             name
+        );
+    }
+
+    #[test]
+    fn a_browser_grant_adds_the_skill_to_discovery_and_its_reader() {
+        let optional = vec![BROWSER_SKILL.to_owned(), "desktop-fx".into()];
+        assert!(validate_optional_bundled(&optional).is_err());
+        let absent = SkillListing::capture_with(None, &[]).unwrap();
+        assert!(!absent.bundled().any(|name| name == BROWSER_SKILL));
+        let admitted = SkillListing::capture_with(None, &optional).unwrap();
+        assert!(admitted.bundled().any(|name| name == BROWSER_SKILL));
+        assert!(
+            admitted
+                .extension_skills()
+                .any(|(name, _)| name == BROWSER_SKILL)
+        );
+        let discovery_instructions = admitted.instructions_with_discovery(true);
+        assert!(discovery_instructions.contains("- svg:"));
+        assert!(!discovery_instructions.contains("- browser:"));
+        assert!(!discovery_instructions.contains("- desktop-fx:"));
+        assert!(
+            bundled_instructions(BROWSER_SKILL)
+                .unwrap()
+                .unwrap()
+                .contains("browser_snapshot")
         );
     }
 

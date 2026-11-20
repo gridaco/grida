@@ -1286,6 +1286,20 @@ uncorrelated reply after an execution request leaves the outcome uncertain.
 Accepted input cannot switch to a replacement source or retry its call
 through a legacy route.
 
+Peers can also negotiate `co.grida/session/desktop-browser-mcp` version 1.
+The modern Browser and browser-enabled Workbench tools use the same reverse
+request with `scope.browser: true` for the captured Browser lease. The
+Browser-scoped catalog is limited to 24 definitions and 48 KiB. Its
+definitions may declare `co.grida/maxInputBytes` (at most 40 KiB) and
+`co.grida/maxOutputBytes` (at most 448 KiB) in `_meta`. Definitions without
+an override use 32 KiB per direction. A capture with
+`co.grida/resultMimeType: "image/jpeg"` can return one standard MCP image
+alongside bounded structured metadata. The image is capped at 256 KiB decoded,
+with a longest edge of at most 1,024 pixels. Browser call results carry
+`co.grida/disposition` in result `_meta`, matching the structured disposition.
+Revocation and cancellation discard late replies. If the host cannot verify a
+dispatched effect, the result remains uncertain.
+
 On private Desktop stdio, peers can additionally negotiate
 `co.grida/session/editor-tool-context` version 1. An eligible Act text Submit
 or Enqueue can include `editorToolContextId` alongside the editor endpoint.
@@ -1305,10 +1319,11 @@ attached workbench and `workbench_show` accepts a typed target. The file-only
 binding maps a `file` target to the existing private path request. The browser
 binding also accepts `url` and `tab` targets and supplies
 `workbench_close_browser_tab` for a visible web tab. The model-facing
-`browser_close` handles background pages. The private transport and the
-external MCP catalogs retain their existing schemas. Older accepted inputs
-retain their original names, schema revisions and grants. Without modern
-negotiation, the private supervisor uses the legacy methods below.
+`browser_close` handles background pages. The external MCP catalogs retain
+their existing schemas. Older accepted inputs retain their original names,
+schema revisions and grants. Peers without the Browser companion capability
+use the existing Browser route below for newly accepted Browser-enabled
+inputs.
 
 | Direction      | Method                               | Parameters and result                                                                                                                                                                   |
 | -------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

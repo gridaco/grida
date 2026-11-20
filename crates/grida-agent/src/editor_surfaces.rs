@@ -39,6 +39,7 @@ pub(crate) struct EditorSurfaces {
 struct EditorConnectionState {
     connection: Option<DesktopConnection>,
     tool_source: Option<BindingId>,
+    browser_mcp: bool,
 }
 
 struct DesktopConnection {
@@ -65,6 +66,7 @@ impl EditorSurfaces {
         svg_text: bool,
         browser: bool,
         desktop_tools: bool,
+        browser_mcp: bool,
     ) -> Result<()> {
         let tools = desktop_tools
             .then(|| mcp::Source::new(client.clone()))
@@ -78,6 +80,7 @@ impl EditorSurfaces {
             tools.close();
         }
         state.tool_source = tools.as_ref().map(|source| source.id().clone());
+        state.browser_mcp = browser_mcp;
         state.connection = Some(DesktopConnection {
             client,
             presentation,
@@ -114,6 +117,10 @@ impl EditorSurfaces {
         self.tool_source().is_some()
     }
 
+    pub(crate) fn browser_mcp_negotiated(&self) -> bool {
+        self.state.lock().unwrap().browser_mcp
+    }
+
     pub(crate) async fn discover_tools(
         &self,
         session: &SessionId,
@@ -143,12 +150,13 @@ impl EditorSurfaces {
         catalog: &DesktopToolCatalog,
         kind: mcp::GrantKind,
         workbench_tools: bool,
+        capture: Option<Arc<crate::file_tools::ImageCapture>>,
     ) -> Result<Option<ToolHost>> {
         // Rebuild the accepted inventory even when its owner is gone. Its
         // definitions keep the recorded request reproducible, while only the
         // matching live source can execute a new operation.
         let source = self.tool_source().filter(|source| source.matches(catalog));
-        catalog.tool_host(source, session, endpoint, kind, workbench_tools)
+        catalog.tool_host(source, session, endpoint, kind, workbench_tools, capture)
     }
 
     fn client(&self, needs_presentation: bool) -> Option<ConnectionTo<Client>> {
@@ -564,6 +572,7 @@ mod tests {
                 &catalog,
                 mcp::GrantKind::Extension,
                 false,
+                None,
             )
             .unwrap()
             .expect("the retained offer survives loss of its source");

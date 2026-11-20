@@ -1,7 +1,9 @@
 //! GRIDA-SEC-004 — one typed browser catalog for the captured Desktop owner.
 
 use crate::editor_surfaces::{LIST_OPEN, WORKBENCH_LIST_TABS};
-use crate::file_tools::ImageCapture;
+use crate::file_tools::{
+    ImageCapture, MAX_TOOL_JPEG_BASE64_BYTES, ToolImageError, prepare_tool_jpeg, verify_tool_jpeg,
+};
 use crate::tool_host::{
     CallBinding, CapabilityCall, CapabilityDefinition, CapabilityEffect, CapabilityExecutor,
 };
@@ -9,7 +11,6 @@ use agent_kit_core::inference::InputFormat;
 use agent_kit_core::messages::{MediaRef, OutcomeStatus, ResultContent, Retention};
 use agent_kit_core::tools::{RecoveryKind, ToolDefinition, ToolOutcome};
 use agent_kit_core::{ArtifactId, Error, ErrorKind, Result, ToolId};
-use base64::{Engine, engine::general_purpose::STANDARD};
 use grida_agent_master::presentation::{OPEN, WORKBENCH_SHOW};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
@@ -74,8 +75,6 @@ pub(crate) fn wire_arguments(name: &str, arguments: &Value) -> Value {
 
 pub(crate) const MAX_INPUT_BYTES: usize = 40 * 1024;
 pub(crate) const MAX_REPLY_BYTES: usize = 448 * 1024;
-const MAX_IMAGE_BYTES: usize = 256 * 1024;
-const MAX_IMAGE_SIDE: u32 = 1024;
 const IMAGE_MIME: &str = "image/jpeg";
 const IMAGE_PREFIX: &str = "browser-capture/";
 const IMAGE_LOCATOR: &str = "browser-result-jpeg:";
@@ -149,7 +148,7 @@ pub(crate) fn native_definitions(
         .collect()
 }
 
-fn definition(name: &str, workbench: bool) -> Result<CapabilityDefinition> {
+pub(crate) fn definition(name: &str, workbench: bool) -> Result<CapabilityDefinition> {
     let descriptor = descriptor(wire_name(name))?;
     let (version, description) = match (workbench, name) {
         (true, WORKBENCH_SHOW) => (
@@ -417,54 +416,29 @@ impl Reply {
             Some(image)
                 if status == OutcomeStatus::Succeeded && call.capability.as_str() == CAPTURE =>
             {
-                let Some(bytes) = image.decode() else {
-                    return uncertain();
-                };
                 let media = match capture {
                     Capture::Mcp => {
-                        // The JPEG decoder tolerates some truncation. Require
-                        // the complete frame marker as well as decodable pixels
-                        // before giving the client the owner's original bytes.
-                        let verified = bytes.ends_with(&[0xff, 0xd9])
-                            && matches!(
-                                tokio::task::spawn_blocking(move || {
-                                    let mut reader = image::ImageReader::with_format(
-                                        std::io::Cursor::new(bytes),
-                                        image::ImageFormat::Jpeg,
-                                    );
-                                    let mut limits = image::Limits::default();
-                                    limits.max_image_width = Some(MAX_IMAGE_SIDE);
-                                    limits.max_image_height = Some(MAX_IMAGE_SIDE);
-                                    limits.max_alloc = Some(u64::from(MAX_IMAGE_SIDE).pow(2) * 4);
-                                    reader.limits(limits);
-                                    reader.decode().is_ok()
-                                })
-                                .await,
-                                Ok(true)
-                            );
-                        if !verified {
+                        if verify_tool_jpeg(&image.mime_type, &image.base64)
+                            .await
+                            .is_err()
+                        {
                             return uncertain();
                         }
                         scoped_jpeg(&call.binding, image.base64)
                     }
-                    Capture::Native(Some(retain)) => {
-                        let result = tokio::task::spawn_blocking(move || {
-                            let normalized = crate::host::image_preparation::prepare(&bytes)?;
-                            let media = retain(normalized.bytes)?;
-                            Ok::<_, Error>((media, normalized.preparation))
-                        })
-                        .await
-                        .ok()
-                        .and_then(Result::ok);
-                        result.map(|(media, preparation)| {
-                            data.insert(
-                                "nativeImage".into(),
-                                json!({"width": preparation.width, "height": preparation.height}),
-                            );
-                            media
-                        })
+                    Capture::Native(retain) => {
+                        match prepare_tool_jpeg(&image.mime_type, &image.base64, retain).await {
+                            Ok(image) => {
+                                data.insert(
+                                    "nativeImage".into(),
+                                    json!({"width": image.width, "height": image.height}),
+                                );
+                                Some(image.media)
+                            }
+                            Err(ToolImageError::Invalid) => return uncertain(),
+                            Err(ToolImageError::Unavailable) => None,
+                        }
                     }
-                    Capture::Native(None) => None,
                 };
                 let Some(media) = media else {
                     return failure(
@@ -491,23 +465,6 @@ impl Reply {
     }
 }
 
-impl Image {
-    fn decode(&self) -> Option<Vec<u8>> {
-        if self.mime_type != IMAGE_MIME || self.base64.len() > MAX_IMAGE_BYTES.div_ceil(3) * 4 {
-            return None;
-        }
-        let bytes = STANDARD.decode(&self.base64).ok()?;
-        if bytes.len() > MAX_IMAGE_BYTES {
-            return None;
-        }
-        let (width, height) =
-            image::ImageReader::with_format(std::io::Cursor::new(&bytes), image::ImageFormat::Jpeg)
-                .into_dimensions()
-                .ok()?;
-        (width > 0 && height > 0 && width.max(height) <= MAX_IMAGE_SIDE).then_some(bytes)
-    }
-}
-
 fn scoped_jpeg(binding: &CallBinding, base64: String) -> Option<MediaRef> {
     Some(MediaRef {
         id: ArtifactId::new(format!("{IMAGE_PREFIX}{}", binding.id.as_str())).ok()?,
@@ -531,7 +488,7 @@ pub(crate) fn mcp_image<'a>(media: &'a MediaRef, binding: &CallBinding) -> Optio
     media
         .locator
         .strip_prefix(IMAGE_LOCATOR)
-        .filter(|data| !data.is_empty() && data.len() <= MAX_IMAGE_BYTES.div_ceil(3) * 4)
+        .filter(|data| !data.is_empty() && data.len() <= MAX_TOOL_JPEG_BASE64_BYTES)
 }
 
 fn failure(code: &str, disposition: &'static str) -> ToolOutcome {
@@ -554,6 +511,7 @@ pub(crate) fn uncertain() -> ToolOutcome {
 mod tests {
     use super::*;
     use agent_kit_core::BindingId;
+    use base64::{Engine, engine::general_purpose::STANDARD};
 
     #[test]
     fn browser_catalog_requires_the_legacy_names_and_surface_revisions() {
@@ -731,7 +689,15 @@ mod tests {
                 base64: base64.clone(),
             };
             // Both have readable headers, including the complete scan header.
-            assert_eq!(image.decode().as_deref(), Some(bytes));
+            assert_eq!(
+                image::ImageReader::with_format(
+                    std::io::Cursor::new(bytes),
+                    image::ImageFormat::Jpeg
+                )
+                .into_dimensions()
+                .unwrap(),
+                (16, 16),
+            );
             let outcome = Reply {
                 disposition: Disposition::DispatchedVerified,
                 data: None,
