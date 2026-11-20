@@ -684,21 +684,39 @@ describe("NativeChatSelections", () => {
     await owner.read("workspace", null, firstId);
     const first = await owner.prepareCreation("workspace", firstId);
     await owner.finishCreation("workspace", firstId);
-    for (let n = 0; n < 132; n++) {
+    // Start at capacity so the test exercises eviction and retry with real
+    // durable writes, independently of disk throughput.
+    const filename = path.join(directory, "chat-selections.json");
+    const atCapacity = JSON.parse(await fs.readFile(filename, "utf8"));
+    while (atCapacity.completed.length < 128) {
       const id = randomUUID();
-      await owner.read("workspace", null, id);
-      await owner.prepareCreation("workspace", id);
-      await owner.finishCreation("workspace", id);
+      atCapacity.completed.push(id);
+      atCapacity.drafts[id] = {
+        ...atCapacity.drafts[firstId],
+        promotion: {
+          sessionId: randomUUID(),
+          requestId: randomUUID(),
+          firstInputId: randomUUID(),
+        },
+      };
     }
-    const stored = JSON.parse(
-      await fs.readFile(path.join(directory, "chat-selections.json"), "utf8")
-    );
-    expect(stored.completed.length).toBeLessThanOrEqual(128);
-    expect(Object.keys(stored.drafts).length).toBeLessThanOrEqual(128);
+    await fs.writeFile(filename, JSON.stringify(atCapacity));
+    owner = await open();
+    const nextId = randomUUID();
+    await owner.read("workspace", null, nextId);
+    await owner.prepareCreation("workspace", nextId);
+    await owner.finishCreation("workspace", nextId);
+    const stored = JSON.parse(await fs.readFile(filename, "utf8"));
+    expect(stored.completed).toEqual([
+      ...atCapacity.completed.slice(1),
+      nextId,
+    ]);
+    expect(Object.keys(stored.drafts)).toHaveLength(128);
+    expect(stored.drafts[firstId]).toBeUndefined();
     owner = await open();
     await owner.read("workspace", null, firstId);
     expect(await owner.prepareCreation("workspace", firstId)).toEqual(first);
-  }, 20_000);
+  });
 
   it("acknowledges creation only after the completed promotion is durable", async () => {
     const configured = options(),
