@@ -3,7 +3,6 @@ import { DesktopUpdateFeed } from "./desktop-update-feed";
 import { DesktopUpdateWindow } from "./desktop-update-window";
 
 const HANDSHAKE_TIMEOUT_MS = 5_000;
-const HANDSHAKE_MAX_BYTES = 4_096;
 const FEED_WAIT_MS = 90_000;
 const CHECK_INTERVAL_MS = 10 * 60 * 1_000;
 const RELEASES_URL = "https://github.com/gridaco/grida/releases/latest";
@@ -18,7 +17,7 @@ export class DesktopUpdates {
   #open = false;
   #hostedDesktopVersion?: string;
   #downloadUrl?: string;
-  #restartAvailable = false;
+  #restartVersion?: string;
   #lastNotification?: string;
   #backgroundCheck = false;
   #timer?: NodeJS.Timeout;
@@ -70,7 +69,7 @@ export class DesktopUpdates {
     this.#generation++;
     this.#open = false;
     this.#downloadUrl = undefined;
-    this.#restartAvailable = false;
+    this.#restartVersion = undefined;
     this.#startup?.resolve(false);
     this.#startup = undefined;
   }
@@ -81,11 +80,14 @@ export class DesktopUpdates {
         void this.#check(true);
         break;
       case "restart":
-        if (this.#restartAvailable && this.#options.feed) {
+        if (this.#restartVersion && this.#options.feed) {
           const feed = this.#options.feed;
           const downloadUrl = this.#downloadUrl;
+          const version = this.#restartVersion;
           this.#options.restart(() =>
-            feed.install(() => this.#options.installFailed(downloadUrl))
+            feed.install(version, () =>
+              this.#options.installFailed(downloadUrl)
+            )
           );
         }
         break;
@@ -107,7 +109,7 @@ export class DesktopUpdates {
 
   async #check(showProgress: boolean): Promise<void> {
     const generation = ++this.#generation;
-    this.#restartAvailable = false;
+    this.#restartVersion = undefined;
     this.#downloadUrl = undefined;
     if (showProgress) {
       void this.#show({
@@ -150,23 +152,49 @@ export class DesktopUpdates {
         actions: this.#downloadUrl ? ["download"] : undefined,
       });
     }
-    const result = this.#options.feed
-      ? await waitForFeed(this.#options.feed.check())
-      : undefined;
+    const feed = this.#options.feed;
+    if (!feed) {
+      const result = required
+        ? ({ kind: "unavailable" } as const)
+        : await this.#checkLinuxRelease();
+      if (generation === this.#generation) this.#present(result);
+      return;
+    }
+    // The UI can offer a manual fallback without abandoning a live download.
+    const timer = setTimeout(() => {
+      if (generation === this.#generation)
+        this.#present({ kind: "unavailable" });
+    }, FEED_WAIT_MS);
+    timer.unref();
+    const result = await feed
+      .check(hostedVersion)
+      .finally(() => clearTimeout(timer));
     if (generation === this.#generation) this.#present(result);
   }
 
-  #present(result?: DesktopUpdateFeed.Result): void {
+  async #checkLinuxRelease(): Promise<DesktopUpdates.Result> {
+    const version = await this.#options.linuxRelease?.();
+    if (!version) return { kind: "unavailable" };
+    return DesktopCompatibility.compare(version, this.#options.version) === 1
+      ? { kind: "available", version }
+      : { kind: "current" };
+  }
+
+  #present(result: DesktopUpdates.Result): void {
     const hostedVersion = this.#hostedDesktopVersion;
     const required = this.#requiresUpdate(this.#options.version);
     const ready =
-      result?.kind === "downloaded" && !this.#requiresUpdate(result.version)
+      result.kind === "downloaded" && !this.#requiresUpdate(result.version)
         ? result.version
         : undefined;
-    this.#restartAvailable = ready !== undefined;
-    this.#downloadUrl =
-      (ready ? DesktopCompatibility.releaseUrl(ready) : null) ??
-      this.#hostedReleaseDownload();
+    const offered =
+      ready ?? (result.kind === "available" ? result.version : undefined);
+    this.#restartVersion = ready;
+    this.#downloadUrl = offered
+      ? (DesktopCompatibility.releaseUrl(offered) ?? undefined)
+      : required || this.#options.feed || result.kind === "unavailable"
+        ? this.#hostedReleaseDownload()
+        : undefined;
 
     if (ready) {
       void this.#show({
@@ -183,10 +211,10 @@ export class DesktopUpdates {
         message: required
           ? `Install Grida ${hostedVersion}.`
           : "Download the installer for your platform to update Grida Desktop.",
-        detail: this.#versions(hostedVersion),
+        detail: this.#versions(offered ?? hostedVersion),
         actions: this.#options.feed ? ["download", "retry"] : ["download"],
       });
-    } else if (result?.kind === "current" || (!result && hostedVersion)) {
+    } else if (result.kind === "current") {
       void this.#show({
         title: "Grida Desktop is up to date",
         message: `You’re running version ${this.#options.version}.`,
@@ -227,7 +255,7 @@ export class DesktopUpdates {
     if (this.#backgroundCheck || this.#open || !this.#options.feed) return;
     this.#backgroundCheck = true;
     try {
-      const result = await this.#options.feed.check();
+      const result = await this.#options.feed.check(this.#hostedDesktopVersion);
       if (
         this.#timer &&
         !this.#open &&
@@ -258,15 +286,9 @@ export class DesktopUpdates {
   /** undefined is the previous renderer without a handshake; null is a failed check. */
   async #fetchHostedVersion(): Promise<string | undefined | null> {
     try {
-      const response = await this.#options.fetch(
+      const response = await this.#options.requestCompatibility(
         new URL("/desktop/compatibility", this.#options.origin).href,
-        {
-          credentials: "omit",
-          redirect: "manual",
-          cache: "no-store",
-          headers: { Accept: "application/json" },
-          signal: AbortSignal.timeout(HANDSHAKE_TIMEOUT_MS),
-        }
+        AbortSignal.timeout(HANDSHAKE_TIMEOUT_MS)
       );
       // A candidate must also launch against the previous hosted deployment.
       const location = response.headers.get("location");
@@ -287,22 +309,7 @@ export class DesktopUpdates {
         void response.body?.cancel().catch(() => {});
         return null;
       }
-      const reader = response.body.getReader();
-      const bytes = new Uint8Array(HANDSHAKE_MAX_BYTES);
-      let length = 0;
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (length + value.length > bytes.length) {
-          void reader.cancel().catch(() => {});
-          return null;
-        }
-        bytes.set(value, length);
-        length += value.length;
-      }
-      const handshake = DesktopCompatibility.parse(
-        JSON.parse(new TextDecoder().decode(bytes.subarray(0, length)))
-      );
+      const handshake = DesktopCompatibility.parse(await response.json());
       return handshake?.desktopVersion ?? null;
     } catch {
       return null;
@@ -314,31 +321,18 @@ export namespace DesktopUpdates {
   export type Options = {
     origin: string;
     version: string;
-    fetch: (url: string, init: RequestInit) => Promise<Response>;
+    requestCompatibility: (
+      url: string,
+      signal: AbortSignal
+    ) => Promise<Response>;
+    linuxRelease?: () => Promise<string | null>;
     openExternal: (url: string) => Promise<void>;
     restart: (install: () => void) => void;
     installFailed: (downloadUrl?: string) => void;
     showError: () => void;
     feed?: Pick<DesktopUpdateFeed, "check" | "install">;
   };
-}
-
-async function waitForFeed(
-  check: Promise<DesktopUpdateFeed.Result>
-): Promise<DesktopUpdateFeed.Result> {
-  let timer: NodeJS.Timeout | undefined;
-  try {
-    return await Promise.race([
-      check,
-      new Promise<DesktopUpdateFeed.Result>((resolve) => {
-        timer = setTimeout(
-          () => resolve({ kind: "unavailable" }),
-          FEED_WAIT_MS
-        );
-        timer.unref();
-      }),
-    ]);
-  } finally {
-    clearTimeout(timer);
-  }
+  export type Result =
+    | DesktopUpdateFeed.Result
+    | { kind: "available"; version: string };
 }

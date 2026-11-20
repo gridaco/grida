@@ -30,7 +30,7 @@ describe("DesktopUpdateFeed", () => {
     expect(feed.check()).toBe(result);
     expect(electron.checkForUpdates).toHaveBeenCalledTimes(1);
     const onFailure = vi.fn<() => void>();
-    feed.install(onFailure);
+    feed.install("0.7.1", onFailure);
     expect(electron.quitAndInstall).not.toHaveBeenCalled();
     expect(onFailure).toHaveBeenCalledOnce();
 
@@ -40,7 +40,7 @@ describe("DesktopUpdateFeed", () => {
       version: "0.7.1",
     });
     onFailure.mockClear();
-    feed.install(onFailure);
+    feed.install("0.7.1", onFailure);
     expect(electron.quitAndInstall).toHaveBeenCalledOnce();
     expect(onFailure).not.toHaveBeenCalled();
     electron.emit("error", new Error("install failed"));
@@ -62,7 +62,7 @@ describe("DesktopUpdateFeed", () => {
     const invalid = feed.check();
     electron.emit("update-downloaded", {}, "", "0.8.0-beta.1");
     await expect(invalid).resolves.toEqual({ kind: "unavailable" });
-    feed.install(vi.fn<() => void>());
+    feed.install("0.8.0-beta.1", vi.fn<() => void>());
     expect(electron.quitAndInstall).not.toHaveBeenCalled();
 
     const next = feed.check();
@@ -71,5 +71,45 @@ describe("DesktopUpdateFeed", () => {
       kind: "downloaded",
       version: "0.7.1",
     });
+  });
+
+  it("checks again when a cached update is older than the hosted release line", async () => {
+    const electron = updater();
+    const feed = new DesktopUpdateFeed(
+      electron as unknown as AutoUpdater,
+      "0.7.0",
+      "darwin",
+      "arm64"
+    );
+    const patch = feed.check();
+    electron.emit("update-downloaded", {}, "", "v0.7.1");
+    await expect(patch).resolves.toEqual({
+      kind: "downloaded",
+      version: "0.7.1",
+    });
+    await expect(feed.check("0.7.2")).resolves.toEqual({
+      kind: "downloaded",
+      version: "0.7.1",
+    });
+    expect(electron.checkForUpdates).toHaveBeenCalledOnce();
+
+    const replacement = feed.check("0.8.0");
+    expect(feed.check("0.8.0")).toBe(replacement);
+    expect(electron.checkForUpdates).toHaveBeenCalledTimes(2);
+    const onFailure = vi.fn<() => void>();
+    feed.install("0.7.1", onFailure);
+    expect(electron.quitAndInstall).not.toHaveBeenCalled();
+
+    electron.emit("update-downloaded", {}, "", "v0.8.0");
+    await expect(replacement).resolves.toEqual({
+      kind: "downloaded",
+      version: "0.8.0",
+    });
+    feed.install("0.7.1", onFailure);
+    expect(onFailure).toHaveBeenCalledTimes(2);
+    expect(electron.quitAndInstall).not.toHaveBeenCalled();
+
+    feed.install("0.8.0", onFailure);
+    expect(electron.quitAndInstall).toHaveBeenCalledOnce();
   });
 });

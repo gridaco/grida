@@ -27,6 +27,7 @@ export function DesktopCanvasBundleShell({
   workspaceId,
   basePath = "",
   active,
+  onDirtyChange,
   slideSurfaceHost,
 }: {
   workspaceId: string;
@@ -34,6 +35,7 @@ export function DesktopCanvasBundleShell({
   /** Slides-only: gates the deck's Cmd+S when embedded as an inactive tab. The
    *  board host auto-persists, so it ignores this. */
   active?: boolean;
+  onDirtyChange: (dirty: boolean) => void;
   slideSurfaceHost?: DocumentSurfaceHost;
 }) {
   const [editor, setEditor] = useState<dotcanvas.EditorType | null>(null);
@@ -95,6 +97,7 @@ export function DesktopCanvasBundleShell({
       workspaceId={workspaceId}
       basePath={basePath}
       active={active}
+      onDirtyChange={onDirtyChange}
       slideSurfaceHost={slideSurfaceHost}
     />
   );

@@ -1,4 +1,4 @@
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { DesktopUpdateFeed } from "./desktop-update-feed";
 import type { DesktopUpdateWindow } from "./desktop-update-window";
 
@@ -36,29 +36,33 @@ import { DesktopUpdates } from "./desktop-updates";
 beforeEach(() => {
   mock.windows.length = 0;
 });
+afterEach(() => vi.useRealTimers());
 
 function handshake(desktopVersion: string): Response {
   return Response.json({ desktopVersion });
 }
 
 function fixture(
-  fetch: DesktopUpdates.Options["fetch"],
-  feedResult?: DesktopUpdateFeed.Result
+  requestCompatibility: DesktopUpdates.Options["requestCompatibility"],
+  feedResult?: DesktopUpdateFeed.Result,
+  linuxRelease?: DesktopUpdates.Options["linuxRelease"]
 ) {
-  const request = vi.fn<DesktopUpdates.Options["fetch"]>(fetch);
+  const request =
+    vi.fn<DesktopUpdates.Options["requestCompatibility"]>(requestCompatibility);
   const openExternal = vi.fn<(url: string) => Promise<void>>(async () => {});
   const restart = vi.fn<(install: () => void) => void>();
   const installFailed = vi.fn<DesktopUpdates.Options["installFailed"]>();
   const feed = feedResult
     ? {
         check: vi.fn<DesktopUpdateFeed["check"]>(async () => feedResult),
-        install: vi.fn<(onFailure: () => void) => void>(),
+        install: vi.fn<DesktopUpdateFeed["install"]>(),
       }
     : undefined;
   const updates = new DesktopUpdates({
     origin: "https://grida.co",
     version: "0.7.0",
-    fetch: request,
+    requestCompatibility: request,
+    linuxRelease,
     openExternal,
     restart,
     installFailed,
@@ -96,11 +100,7 @@ it.each([
   await expect(updates.admitStartup()).resolves.toBe(true);
   expect(request).toHaveBeenCalledExactlyOnceWith(
     "https://grida.co/desktop/compatibility",
-    expect.objectContaining({
-      credentials: "omit",
-      redirect: "manual",
-      cache: "no-store",
-    })
+    expect.any(AbortSignal)
   );
   expect(window.show).not.toHaveBeenCalled();
   expect(feed?.check).not.toHaveBeenCalled();
@@ -124,7 +124,9 @@ it("leaves an unexpected handshake redirect in retryable recovery", async () => 
 
 it("surfaces a retryable handshake outage and admits startup after recovery", async () => {
   const fetch = vi
-    .fn<DesktopUpdates.Options["fetch"]>(async () => handshake("0.7.0"))
+    .fn<DesktopUpdates.Options["requestCompatibility"]>(async () =>
+      handshake("0.7.0")
+    )
     .mockRejectedValueOnce(new Error("offline"));
   const { updates, window } = fixture(fetch);
   const startup = updates.admitStartup();
@@ -214,7 +216,7 @@ it("offers the downloaded patch and hands installation failures back to Main", a
     );
     expect(window.view?.actions).toContain("restart");
   });
-  expect(feed?.check).toHaveBeenCalledOnce();
+  expect(feed?.check).toHaveBeenCalledExactlyOnceWith("0.7.1");
   window.action("download");
   expect(openExternal).toHaveBeenCalledExactlyOnceWith(
     "https://github.com/gridaco/grida/releases/tag/v0.7.2"
@@ -223,22 +225,31 @@ it("offers the downloaded patch and hands installation failures back to Main", a
   expect(restart).toHaveBeenCalledOnce();
   expect(feed?.install).not.toHaveBeenCalled();
   restart.mock.lastCall?.[0]();
-  expect(feed?.install).toHaveBeenCalledOnce();
-  feed?.install.mock.lastCall?.[0]();
+  expect(feed?.install).toHaveBeenCalledExactlyOnceWith(
+    "0.7.2",
+    expect.any(Function)
+  );
+  feed?.install.mock.lastCall?.[1]();
   expect(installFailed).toHaveBeenCalledExactlyOnceWith(
     "https://github.com/gridaco/grida/releases/tag/v0.7.2"
   );
 });
 
-it("offers the exact release installer page from Linux's manual menu check", async () => {
-  const { updates, window, openExternal, restart } = fixture(async () =>
-    handshake("0.7.1")
+it("offers a published Linux installer before the editor promotes that version", async () => {
+  const linuxRelease = vi.fn<() => Promise<string | null>>(async () => "0.7.1");
+  const { updates, window, openExternal, restart } = fixture(
+    async () => handshake("0.7.0"),
+    undefined,
+    linuxRelease
   );
+  await expect(updates.admitStartup()).resolves.toBe(true);
+  expect(linuxRelease).not.toHaveBeenCalled();
   updates.checkFromMenu();
 
   await vi.waitFor(() => {
     expect(window.view).toMatchObject({
       title: "Update available",
+      detail: "Installed 0.7.0 · Update 0.7.1",
       actions: ["download"],
     });
   });
@@ -248,3 +259,71 @@ it("offers the exact release installer page from Linux's manual menu check", asy
   );
   expect(restart).not.toHaveBeenCalled();
 });
+
+it("offers the hosted release directly for required Linux recovery", async () => {
+  const linuxRelease = vi.fn<() => Promise<string | null>>(async () => null);
+  const { updates, window, openExternal } = fixture(
+    async () => handshake("0.8.0"),
+    undefined,
+    linuxRelease
+  );
+  const startup = updates.admitStartup();
+  await vi.waitFor(() => {
+    expect(window.view).toMatchObject({
+      title: "Update to continue",
+      actions: ["download"],
+    });
+  });
+  expect(linuxRelease).not.toHaveBeenCalled();
+  window.action("download");
+  expect(openExternal).toHaveBeenCalledExactlyOnceWith(
+    "https://github.com/gridaco/grida/releases/tag/v0.8.0"
+  );
+  window.closeFromChrome();
+  await expect(startup).resolves.toBe(false);
+});
+
+it.each([
+  ["0.7.0", "Grida Desktop is up to date"],
+  [null, "Couldn't check for updates"],
+] as const)(
+  "shows the Linux check result for published version %s",
+  async (version, title) => {
+    const { updates, window } = fixture(
+      async () => handshake("0.7.0"),
+      undefined,
+      async () => version
+    );
+    updates.checkFromMenu();
+    await vi.waitFor(() => expect(window.view?.title).toBe(title));
+  }
+);
+
+it.each([false, true])(
+  "observes a slow download after showing a fallback (window closed: %s)",
+  async (closed) => {
+    vi.useFakeTimers();
+    const download = Promise.withResolvers<DesktopUpdateFeed.Result>();
+    const { updates, window, feed } = fixture(async () => handshake("0.8.0"), {
+      kind: "current",
+    });
+    feed?.check.mockReturnValueOnce(download.promise);
+    const startup = updates.admitStartup();
+    await vi.advanceTimersByTimeAsync(90_000);
+    expect(window.view).toMatchObject({
+      title: "Update to continue",
+      actions: ["download", "retry"],
+    });
+    expect(feed?.check).toHaveBeenCalledExactlyOnceWith("0.8.0");
+    const presentations = window.show.mock.calls.length;
+    if (closed) window.closeFromChrome();
+    download.resolve({ kind: "downloaded", version: "0.8.0" });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(window.show).toHaveBeenCalledTimes(presentations + Number(!closed));
+    expect(window.view?.actions).toEqual(
+      closed ? ["download", "retry"] : ["restart", "download"]
+    );
+    if (!closed) window.closeFromChrome();
+    await expect(startup).resolves.toBe(false);
+  }
+);

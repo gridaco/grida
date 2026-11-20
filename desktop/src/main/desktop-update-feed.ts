@@ -28,6 +28,7 @@ export class DesktopUpdateFeed {
         !DesktopCompatibility.releaseUrl(version) ||
         DesktopCompatibility.compare(version, this.#installed) !== 1
       ) {
+        this.#downloaded = undefined;
         this.#finish({ kind: "unavailable" });
         return;
       }
@@ -45,12 +46,23 @@ export class DesktopUpdateFeed {
     }
   }
 
-  check(): Promise<DesktopUpdateFeed.Result> {
+  check(hostedDesktopVersion?: string): Promise<DesktopUpdateFeed.Result> {
     if (this.#active) return this.#active.promise;
     if (!this.#configured) return Promise.resolve({ kind: "unavailable" });
-    if (this.#downloaded)
+    if (
+      this.#downloaded &&
+      (!hostedDesktopVersion ||
+        !DesktopCompatibility.requiresUpdate(
+          this.#downloaded,
+          hostedDesktopVersion
+        ))
+    ) {
       return Promise.resolve({ kind: "downloaded", version: this.#downloaded });
+    }
 
+    // The native updater can replace its pending installer during this check.
+    // Only a fresh download event can identify what is ready to install.
+    this.#downloaded = undefined;
     const active = Promise.withResolvers<DesktopUpdateFeed.Result>();
     this.#active = active;
     try {
@@ -61,8 +73,8 @@ export class DesktopUpdateFeed {
     return active.promise;
   }
 
-  install(onFailure: () => void): void {
-    if (!this.#downloaded) {
+  install(expectedVersion: string, onFailure: () => void): void {
+    if (this.#downloaded !== expectedVersion) {
       onFailure();
       return;
     }

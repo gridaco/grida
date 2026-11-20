@@ -6,6 +6,7 @@ import {
   BrowserWindow,
   Menu,
   dialog,
+  net,
   session,
 } from "electron";
 import path from "node:path";
@@ -71,6 +72,8 @@ import { DesktopMediaRoot } from "./main/media-root";
 import { NativeImagePlacement } from "./main/native-image-placement";
 import type { ImageReferenceReview } from "./main/native-image-generation";
 import { NativeWorkspaceReview } from "./main/native-workspace-review";
+import { requestDesktopCompatibility } from "./main/desktop-compatibility-request";
+import { DesktopLinuxUpdates } from "./main/desktop-linux-updates";
 import { DesktopUpdateFeed } from "./main/desktop-update-feed";
 import { DesktopUpdates } from "./main/desktop-updates";
 
@@ -324,13 +327,17 @@ function requestDesktopUpdateRestart(install: () => void): void {
     });
     return;
   }
-  const workspaceUrl = new URL("/desktop/workspace", EDITOR_BASE_URL);
+  const editorOrigin = new URL(EDITOR_BASE_URL).origin;
   if (
     windows.some(({ webContents }) => {
       const url = URL.parse(webContents.getURL());
+      if (url?.origin !== editorOrigin) return false;
+      const standaloneDeck =
+        url.pathname === "/desktop/file" &&
+        !!url.searchParams.get("id") &&
+        !url.searchParams.get("docId");
       return (
-        url?.origin === workspaceUrl.origin &&
-        url.pathname === workspaceUrl.pathname &&
+        (url.pathname === "/desktop/workspace" || standaloneDeck) &&
         !dirtyState.hasReport(webContents.id)
       );
     })
@@ -730,7 +737,11 @@ app.on("ready", async () => {
     desktopUpdates = new DesktopUpdates({
       version,
       origin: EDITOR_BASE_URL,
-      fetch,
+      requestCompatibility: requestDesktopCompatibility,
+      linuxRelease:
+        process.platform === "linux"
+          ? () => DesktopLinuxUpdates.latestVersion(process.arch, net.fetch)
+          : undefined,
       openExternal: (url) => shell.openExternal(url),
       restart: requestDesktopUpdateRestart,
       installFailed: desktopUpdateInstallFailed,

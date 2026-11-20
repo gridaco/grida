@@ -107,8 +107,9 @@ during the transition. For a timeout, invalid response, or other failure,
 it shows a local connection error with **Retry**. The bundled recovery
 page and **Check for Updates…** work independently of the hosted UI.
 Recovery can open the exact Desktop release page for the hosted version.
-macOS and Windows also use the Electron update feed. On Linux, download
-and install the DEB or RPM from the release page.
+macOS and Windows also use the Electron update feed. On Linux, manual
+checks look up the latest stable release with packages for the installed
+architecture. Download and install the DEB or RPM from its release page.
 
 Desktop `0.7.0` introduces Main-owned checks. Until the matching web
 deployment goes live, `0.7.0` can open the previous hosted editor. After
