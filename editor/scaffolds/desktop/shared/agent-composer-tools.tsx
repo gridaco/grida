@@ -24,11 +24,15 @@ export function AgentComposerTools({
 }: AgentComposerTools.Props) {
   const [accessOpen, setAccessOpen] = useState(false);
   const full = access?.mode === "full_access";
+  const automatic = access?.mode === "approve_for_me";
+  const restricted = !automatic && !full;
   const label = access?.uncertain
     ? "Access unknown"
     : full
       ? "Full access"
-      : "Default";
+      : automatic
+        ? "Approve for me"
+        : "Default";
   return (
     <>
       <ComposerActionMenu items={actions} />
@@ -66,7 +70,7 @@ export function AgentComposerTools({
             </p>
             <button
               type="button"
-              aria-pressed={!full && !access?.uncertain}
+              aria-pressed={restricted && !access?.uncertain}
               disabled={!access?.available || access.busy}
               onClick={() => {
                 setAccessOpen(false);
@@ -78,18 +82,44 @@ export function AgentComposerTools({
               <div className="min-w-0 flex-1">
                 <p>Default</p>
                 <p className="text-xs text-muted-foreground">
-                  Reads and edits this project's files and runs sandboxed
-                  commands. Commands cannot use the internet.
+                  Reads and edits project files and runs sandboxed commands. You
+                  review requests for extra access.
                 </p>
               </div>
-              {!full && !access?.uncertain && (
+              {restricted && !access?.uncertain && (
                 <CheckIcon className="mt-0.5 size-4 shrink-0" />
               )}
             </button>
+            {access?.automaticReview && (
+              <button
+                type="button"
+                aria-pressed={automatic && !access.uncertain}
+                disabled={!access.available || access.busy}
+                onClick={() => {
+                  setAccessOpen(false);
+                  access.onChange("approve_for_me");
+                }}
+                className="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left hover:bg-muted disabled:opacity-50"
+              >
+                <ShieldIcon className="mt-0.5 size-4 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p>Approve for me</p>
+                  <p className="text-xs text-muted-foreground">
+                    Let the chat’s model decide individual file reads and
+                    supported command requests. You decide when it needs help.
+                  </p>
+                </div>
+                {automatic && !access.uncertain && (
+                  <CheckIcon className="mt-0.5 size-4 shrink-0" />
+                )}
+              </button>
+            )}
             <button
               type="button"
               aria-pressed={full && !access?.uncertain}
-              disabled={!access?.available || access.busy}
+              disabled={
+                !access?.available || access.fullAccess === false || access.busy
+              }
               onClick={() => {
                 setAccessOpen(false);
                 access?.onChange("full_access");
@@ -168,6 +198,8 @@ export namespace AgentComposerTools {
     actions: readonly ComposerMenuAction[];
     access?: Readonly<{
       mode: NativeChatPermissionMode;
+      automaticReview?: boolean;
+      fullAccess?: boolean;
       available: boolean;
       loading?: boolean;
       staged?: boolean;

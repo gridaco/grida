@@ -1296,6 +1296,7 @@ export class NativeDesktopAgent {
           ...(identity && { identity }),
         },
         additionalReadRoots: [],
+        ...(!nestedProtectedPaths && { allowScopedAccess: true as const }),
         protectedPaths: [
           ...this.store.protectedPaths,
           ...(this.workspaceCatalogRoot ? [this.workspaceCatalogRoot] : []),

@@ -2,12 +2,14 @@ import { useState, type ReactNode } from "react";
 import { ChevronDownIcon, ChevronRightIcon } from "lucide-react";
 import type {
   NativeChatMessage,
+  NativeChatTurnRecord,
   NativeSubagentLifecycleEvent,
 } from "@grida/desktop-bridge";
 import { ChatMessageView, ToolCallGroupView } from "@/kits/agent-chat";
 import { native_tool_parts } from "@/lib/agent-chat/native-tool-parts";
 import { native_message_parts } from "@/lib/agent-chat/native-message-parts";
 import { turn_activity } from "@/lib/agent-chat/turn-activity";
+import { reviewText } from "../shared/agent-approval";
 import { NativeSubagentIdentity } from "./native-subagent-identity";
 
 /**
@@ -19,10 +21,12 @@ export function NativeTurnActivity({
   block,
   renderMessage,
   subagentEvents = [],
+  approvalReviews,
   onOpenSubagent,
   loadToolImage,
 }: {
   block: Extract<turn_activity.Block, { kind: "turn" }>;
+  approvalReviews?: NativeChatTurnRecord["approvalReviews"];
   renderMessage: (message: NativeChatMessage) => ReactNode;
   subagentEvents?: readonly NativeSubagentLifecycleEvent[];
   onOpenSubagent?: (childId: string, inputId: string) => void;
@@ -39,7 +43,10 @@ export function NativeTurnActivity({
     block.turnId
   );
   const hasWork =
-    (timeline.work.length > 0 || timeline.unplaced.length > 0) && !stopped;
+    (timeline.work.length > 0 ||
+      timeline.unplaced.length > 0 ||
+      !!approvalReviews?.length) &&
+    !stopped;
   return (
     <div
       data-testid="native-turn-activity"
@@ -51,7 +58,8 @@ export function NativeTurnActivity({
     >
       {block.requests.map(renderMessage)}
       {(turn_activity.showsHeader(block) ||
-        (block.finished && subagentEvents.length > 0)) && (
+        (block.finished &&
+          (subagentEvents.length > 0 || !!approvalReviews?.length))) && (
         <div className="border-b pb-1">
           {hasWork ? (
             <button
@@ -74,6 +82,13 @@ export function NativeTurnActivity({
           )}
         </div>
       )}
+      {open &&
+        approvalReviews?.map((approvalReview, index) => (
+          <p key={index} className="text-xs text-muted-foreground break-words">
+            {REVIEW_LABEL[approvalReview.decision]}{" "}
+            <bdi>{reviewText(approvalReview.action)}</bdi>
+          </p>
+        ))}
       {open &&
         timeline.work.map((item) =>
           item.kind === "commentary" ? (
@@ -155,3 +170,10 @@ function SubagentEventRow({
     </button>
   );
 }
+
+const REVIEW_LABEL = {
+  reviewing: "Reviewing access for",
+  approved: "Automatically approved",
+  declined: "Automatically declined",
+  needs_human: "Automatic review deferred to you for",
+} as const;

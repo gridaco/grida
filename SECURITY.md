@@ -548,6 +548,17 @@ guest except a one-use, exact-document browser mount admitted under
 GRIDA-SEC-016; guest preferences and session selection are forced by Main;
 every main-process IPC handler validates `event.senderFrame.url`.
 
+**Scoped automatic approval.** A trusted workspace launcher can enable one-action
+requests and the per-chat automatic reviewer. The host records each requested
+effect, captured authority and exact operation. It validates the retained answer,
+file identity or prepared command, current controls and authority before dispatch.
+Settings writes stay with the person. Failure, timeout or incomplete evidence
+leaves an eligible wait open for a manual decision. A scoped external read uses
+a verified descriptor and checks the file version before disclosing its bytes.
+A network command uses a finite confined process with a supervisor-owned broker
+for its approved destination. Interactive input cannot extend that grant.
+Electron Main retains scoped approval objects and issues opaque frame-local tokens.
+
 **Explicit Full access.** The ordinary restricted profile retains all command
 and filesystem exclusions below. A trusted launch can separately opt into
 Full access, and Desktop Main requires an in-app confirmation for the exact
@@ -4031,6 +4042,12 @@ grant custody and cleanup.
 ---
 
 ### `GRIDA-SEC-014` — Shared native provider credential boundary
+
+Scoped command review receives the names of environment variables and the
+prepared filesystem grants. Environment values, proxy credentials and the
+private protected-path inventory are excluded from the review payload. A
+one-file approval rechecks the host’s protected paths, including the adopted
+credential home, before returning bytes.
 
 Desktop [hook registration](desktop/src/main/native-agent-hooks.ts),
 [its tests](desktop/src/main/native-agent-hooks.test.ts),

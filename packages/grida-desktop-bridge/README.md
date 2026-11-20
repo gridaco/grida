@@ -105,6 +105,14 @@ returned chat with the requested model and effort, and sends no input. Open
 that exact session in the selected workspace to attach and submit through the
 ordinary API. The confirmation does not authorize another window, workspace,
 or chat.
+
+For automatic review, call `acceptsAutomaticApprovalReview()` to check the
+installed executable before showing the choice on Home or in a new workspace
+draft. If supported, `prepareWelcomeAutomaticReview(workspaceId)` reserves
+that mode. The same frame-bound answer and start methods consume it. The
+receiving workspace verifies the exact mode and chat before sending the first
+message. An attached chat reports its choices through `permissionMode`.
+
 An unknown result after startup is unavailable. The app issues an attachment for each
 renderer that creates or loads a chat. Submit keeps the caller's input ID.
 Pause, Resume, and Stop use an observation issued for that attachment.
@@ -290,10 +298,18 @@ host performs revision admission; a navigated or foreign frame cannot finish
 the grant. This is confirmation in the trusted app UI, not an independent OS
 user-presence proof against a compromised eligible renderer. The native owner persists this per-chat
 choice separately from model/effort defaults; new chats begin restricted.
-Changing access requires accepted work and background processes to finish or
-stop. Stable request IDs bind retries to the original decision. Queries and
+Current hosts apply changes to newly accepted work. Running and queued work
+keep their captures. Some older hosts report a busy chat. Stable request IDs bind retries to the original decision. Queries and
 changes start no inference. Older hosts omit methods or return false; keep
 the Default presentation and withhold the selection action.
+
+An attached chat can offer **Approve for me** when its available modes contain
+`approve_for_me`. Selecting it delegates eligible individual decisions and
+preserves command confinement. A private review can leave the original wait
+open for an exact manual answer. Pending approvals may carry `reviewFailure`.
+A finite command includes its filesystem reach and environment names. If that scope is missing, Desktop offers only Decline.
+The transcript's optional `approvalReviews` records the review decisions and
+their bounded action descriptions.
 
 New hosts optionally expose `selection(target)`, `updateSelection(...)`, and
 `createFromDraft(draftId)`. A target names exactly one saved `sessionId` or

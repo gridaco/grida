@@ -284,6 +284,7 @@ describe("ipc_admission", () => {
   it.each([
     IPC_CHANNELS.WELCOME_CHAT_PROFILES,
     IPC_CHANNELS.WELCOME_CHAT_PREPARE_FULL_ACCESS,
+    IPC_CHANNELS.WELCOME_CHAT_PREPARE_AUTOMATIC_REVIEW,
     IPC_CHANNELS.WELCOME_CHAT_ANSWER_FULL_ACCESS,
     IPC_CHANNELS.WELCOME_CHAT_START_FULL_ACCESS,
   ])("admits %s only on the exact Welcome route", (channel) => {
@@ -306,7 +307,7 @@ describe("ipc_admission", () => {
       allowedFor("main", "/desktop/welcome").filter((allowed) =>
         nativeChat.includes(allowed)
       )
-    ).toEqual([]);
+    ).toEqual([IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_AUTOMATIC_REVIEW]);
   });
 
   it("admits notification focus consumption only in the main workspace", () => {

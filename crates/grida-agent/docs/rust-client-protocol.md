@@ -1045,12 +1045,10 @@ returns pending `approvals` with `input_required` and exit code `6`.
 
 `co.grida/session/permission-mode` version 1 is available only to a negotiated
 private supervising stdio connection. It grants no authority by itself. The
-launch permission profile must independently enable `allowFullAccess` before
-the supervisor can select that mode.
+trusted launcher enables the available choices. Full access and automatic review have independent opt-ins.
 
 - `_co.grida/session/permission-mode` takes `{cwd, sessionId}` and returns
-  `{sessionId, revision, mode, available}`. Modes are `restricted` and
-  `full_access`; an unselected chat starts at revision 0 in restricted mode.
+  `{sessionId, revision, mode, available}`. An unselected chat starts at revision 0 in `restricted`. Read `available` before offering `approve_for_me` or `full_access`.
 - `_co.grida/session/permission-mode/update` takes
   `{cwd, sessionId, expectedRevision, requestId, mode}` and returns the state
   plus `requestId`. An exact retry observes the committed receipt. Conflicting
@@ -1066,9 +1064,27 @@ captured mode through replay and recovery. Child and side chats cannot select
 their own broader posture. A running command retains its launch permissions.
 Only turns with Full access can read or write its terminal when it launched
 unconfined. The supervisor can always list and stop the chat's processes.
+When the launcher withdraws automatic review, the next permission inspection,
+update or new input for a chat with a saved `approve_for_me` selection records
+`restricted` at the next revision. An exact retry still returns its historical
+receipt. Restoring support requires a fresh user selection to enable review.
 Saved Full access is unavailable when the current trusted launch does not
 authorize it. Earlier implementations can return `permission_mode_busy` when
 work or running processes remain.
+
+With `approve_for_me`, the reviewer's decision resolves the original
+exact-action wait. An indeterminate review leaves that wait with the
+supervisor. Its optional `reviewFailure` is one of `timed_out`, `interrupted`,
+`unavailable`, `invalid_reply` or `needs_human`. Use the original wait and
+revision basis to answer manually.
+
+A finite command's effect can carry `network: {host, port}`, as well as
+`filesystem` with the captured `disk_read`, `read_roots`, `write_roots`,
+`runtime_roots`, `private_temp_write`, `resolved_executable` and
+`resolved_cwd`. The effect's `environment_names` lists names only. A client
+that cannot present the scope can decline the request. A transcript turn can
+include `approvalReviews: [{action, decision}]` with bounded display text
+and a decision of `reviewing`, `approved`, `declined` or `needs_human`.
 
 Desktop presents an in-app confirmation bound to the exact chat before
 enabling Full access. Clients must feature-detect the capability; older hosts
@@ -1331,6 +1347,8 @@ The host retains the opaque ID with the accepted input. An exact retry keeps
 the same capture and receipt. A retry that changes the ID fails. The catalog
 and invocation requests carry it as `scope.contextId`. Main authorizes that
 reference against the capture's owning attachment, session and endpoint.
+Desktop uses it for inspection, opacity, and text operations on the same
+editable SVG document, including a mounted slide.
 Inherited work receives no live editor-tool context. The local accepted
 user message may carry `editorToolContext: true` in the transcript metadata
 to indicate a capture was attached. The marker contains no capture identity
@@ -1373,7 +1391,7 @@ bounded structured data or a domain error, and optional JPEG bytes for a
 browser capture. JSON-RPC cancellation closes the outstanding request against
 that endpoint. Legacy file requests keep their existing method and schema.
 
-The client and agent negotiate
+For compatibility with earlier Desktop clients, the client and agent negotiate
 `co.grida/session/editor-svg-text` version 1 alongside editor surfaces.
 An Act text submission or queued input may carry `editorSvgTargetId` with its
 `editorEndpointId`. This is the renderer's opaque capture of the current

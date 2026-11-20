@@ -865,6 +865,32 @@ Continuation rechecks the launch profile and native identity before dispatch.
 Unverified command cleanup surfaces uncertainty and stops automatic queue
 advancement.
 
+### Delegate individual approval decisions
+
+The trusted launcher may enable `allowApproveForMe` to offer
+`approve_for_me` on the private permission-mode endpoint. The filesystem and
+command authorities have separate opt-ins. `allowExternalFileRead` permits a
+request to read one ordinary file via `read_file`, directory `external-file`,
+and a path relative to `/`. `allowCommandNetwork` permits a finite,
+noninteractive `exec_command` to request one supported TCP destination with
+`network: {"host": "example.org", "port": 443}`. The host binds the decision
+to that invocation and rechecks the captured authority at dispatch. A broader
+retry after a sandbox refusal needs a fresh decision.
+
+A supervisor can pass `--allow-scoped-approvals` alongside
+`--permission-profile` to offer these choices while keeping its existing
+profile file. The command grant requires a compatible confined command
+installation. A chat still starts in Default unless the trusted launcher
+explicitly chooses an initial mode. Selecting automatic review retains the
+workspace sandbox and delegates eligible decisions to the accepted turn's
+model and connection. The reviewer receives the exact proposed action and
+the owning chat's original user instructions. Missing or oversized evidence,
+an exhausted allowance, or an indeterminate verdict leaves the request for
+the person. A turn can fund up to four such reviews within its step budget.
+The review has no tools and a ten-second deadline. See the
+[permission guide](../../docs/agent/permissions.md#choose-who-reviews-extra-access)
+and [sandbox contract](./docs/rust-sandbox.md).
+
 ### Select Full access explicitly
 
 A trusted launch profile with a command installation may set

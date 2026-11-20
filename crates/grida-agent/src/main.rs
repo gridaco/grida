@@ -396,6 +396,13 @@ fn launch(command: Command) -> Command {
                 .help("Trusted launch profile for explicitly selected workspace roots"),
         )
         .arg(
+            Arg::new("allow-scoped-approvals")
+                .long("allow-scoped-approvals")
+                .action(ArgAction::SetTrue)
+                .requires("permission-profile")
+                .help("Offer one-action file approvals, supported command networking and the automatic reviewer for newly accepted work"),
+        )
+        .arg(
             Arg::new("headless-surface")
                 .long("headless-surface")
                 .action(ArgAction::SetTrue)
@@ -820,11 +827,12 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
     let permissions = args
         .get_one::<PathBuf>("permission-profile")
         .map(|path| {
-            grida_agent::launch_permissions::load_permission_profile_excluding(
+            grida_agent::launch_permissions::load_launch_permission_profile(
                 path,
                 state_dir,
                 provider.credential_home.as_deref(),
                 &launch_secrets,
+                args.get_flag("allow-scoped-approvals"),
             )
         })
         .transpose()?;

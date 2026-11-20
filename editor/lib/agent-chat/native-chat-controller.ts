@@ -67,8 +67,10 @@ import { NativeBackgroundProcessController } from "./native-background-process-c
 
 /** Composer choices made before opening a workspace; all execution uses existing APIs. */
 export type NativeChatInitialComposer = Readonly<{
-  /** The exact session prepared and granted Full access by Desktop Main. */
+  /** The exact session prepared with the selected permissions by Desktop Main. */
   preparedSessionId?: string;
+  /** Absent on legacy Full access handoffs. Always verify against native state. */
+  preparedMode?: "approve_for_me";
   effort?: NativeChatEffort;
   operatingRegime?: NativeChatOperatingRegime;
   goal?: boolean;
@@ -115,7 +117,7 @@ export const SIDE_CHAT_TITLE = "Side chat";
 const MESSAGE_NOT_SENT =
   "Your message from Welcome wasn't sent. It is in the composer; send it when the chat is ready.";
 const PREPARED_MESSAGE_NOT_SENT =
-  "Couldn't start the new chat with Full access. Your message is still in the composer.";
+  "Couldn't verify the new chat’s access. Your message is still in the composer.";
 /** A second look for a background chat title after a turn progresses. */
 const TITLE_RECHECK_MS = 6_000;
 const CHAT_LIST_REFRESH_MS = 2_000;
@@ -204,6 +206,7 @@ export type NativeChatView = Readonly<{
   permissionMode: NativeChatPermissionState | null;
   permissionModeLoading: boolean;
   permissionModeAvailable: boolean;
+  draftAutomaticReviewAvailable: boolean;
   permissionModeBusy: boolean;
   permissionModeUncertain: boolean;
   permissionModeError: string | null;
@@ -501,6 +504,7 @@ const EMPTY: NativeChatView = Object.freeze({
   permissionMode: null,
   permissionModeLoading: false,
   permissionModeAvailable: false,
+  draftAutomaticReviewAvailable: false,
   permissionModeBusy: false,
   permissionModeUncertain: false,
   permissionModeError: null,
@@ -1315,9 +1319,9 @@ export class NativeChatController {
       this.view.messages.length === 0 &&
       this.view.turnRecords.length === 0 &&
       permission?.sessionId === sessionId &&
-      permission.mode === "full_access" &&
+      permission.mode === (composer.preparedMode ?? "full_access") &&
       permission.revision > 0 &&
-      permission.available.includes("full_access");
+      permission.available.includes(permission.mode);
 
     scope.preparedStart = undefined;
     this.chatStart = undefined;
@@ -2929,6 +2933,8 @@ export class NativeChatController {
         });
         return;
       }
+      if (!current.available.includes(mode))
+        throw new Error("native_chat_permission_mode_unavailable");
       const pending =
         scope.pendingPermission?.mode === mode
           ? scope.pendingPermission
@@ -3074,7 +3080,7 @@ export class NativeChatController {
             permissionModeError: null,
           }),
           permissionModeAvailable:
-            available && state?.available.includes("full_access") === true,
+            available && !!state && state.available.length > 1,
         });
         return state;
       }
@@ -3111,6 +3117,7 @@ export class NativeChatController {
       image,
       queuedText,
       permissionMode,
+      draftAutomaticReview,
     ] = await Promise.all([
       this.bridge.submitImage &&
         this.bridge.acceptsPng?.(attachment?.attachmentId).catch(() => false),
@@ -3135,6 +3142,9 @@ export class NativeChatController {
         this.bridge.permissionMode &&
         this.bridge.setPermissionMode &&
         this.bridge.acceptsPermissionMode?.().catch(() => false),
+      !this.fixed &&
+        !attachment &&
+        this.bridge.acceptsAutomaticApprovalReview?.().catch(() => false),
     ]);
     if (
       !this.owns(scope) ||
@@ -3149,8 +3159,8 @@ export class NativeChatController {
     this.update({
       permissionModeAvailable:
         permissionMode === true &&
-        (!attachment ||
-          this.view.permissionMode?.available.includes("full_access") === true),
+        (!attachment || (this.view.permissionMode?.available.length ?? 0) > 1),
+      draftAutomaticReviewAvailable: draftAutomaticReview === true,
       imageInput: png === true,
       selectedImageInput: image === true,
       fileInput: file === true,
@@ -7888,6 +7898,11 @@ function lifecycleBasis(observation: NativeChatObservation | null): string {
   return JSON.stringify([
     current?.turnId,
     current?.disposition,
+    // Opening and answering a wait both advance controlRevision, even if an
+    // automatic review finishes between polls. Private inference can begin
+    // after the wait opens, while only its journal position advances.
+    current?.controlRevision,
+    current?.inputNeeded ? current.journalPosition : undefined,
     latest?.turnId,
     latest?.status,
   ]);

@@ -279,8 +279,8 @@ are never adopted as removable user data by a later launch.
 
 ## Raw execution and extensions
 
-Desktop offers Default and explicitly confirmed Full access for an attached
-project chat. Main stages `allowFullAccess` as a launch capability, not an
+Desktop workspace chats start in Default. A compatible launcher also offers
+Approve for me and explicitly confirmed Full access. Main stages `allowFullAccess` as a launch capability, not an
 initial selection. Its guarded permission-mode bridge uses an in-app
 confirmation bound to the attached chat before enabling Full access. The Rust
 host retains that chat's choice and captures it with accepted work and worker
@@ -288,7 +288,7 @@ assignments. New chats begin restricted. On Welcome, Main reserves a new chat
 identity for the selected registered workspace and owns an expiring review
 bound to that frame. Approval is kept until Send, revocation or navigation.
 On Send, Main consumes the approval once, creates the exact chat with the
-current model and effort, and applies Full access before handing back its
+current model and effort, and applies the selected access mode before handing back its
 session identity. The Welcome operation carries no message and issues no
 workspace attachment. When a permission reply is unverified, sending the
 same request from the current Welcome frame checks the original grant and
@@ -305,7 +305,18 @@ injection. It uses its own network stack; Grida makes no system-proxy/PAC or
 destination-filtering claim for that traffic. Process supervision and truthful
 cleanup evidence remain. This choice does not widen the retained sidecar,
 provider HTTP service or renderer's raw capabilities. Older hosts without the
-negotiated operation keep Default. Automatic approval review remains separate.
+negotiated operation keep Default.
+
+Approve for me delegates individual decisions to the chat’s captured model and
+connection. Main checks the installed binary before offering scoped approvals
+for a new project chat. An attached chat reports its own available modes.
+The original workspace sandbox, protected paths and manual settings approvals
+remain in force. The file tool can ask for a descriptor-checked outside file.
+A finite command can request one brokered public destination. The broker and
+native sandbox enforce that grant on macOS and Linux. When private review
+cannot decide, Main exposes the original native wait to the frame and accepts
+a one-time answer. The [permission guide](../../docs/agent/permissions.md#choose-who-reviews-extra-access)
+describes the user-facing behavior.
 
 Default model commands run through the Rust host and native sandbox helper. The host
 captures explicit directory permissions, protected paths, trusted executable

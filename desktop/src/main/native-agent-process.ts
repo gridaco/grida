@@ -1,8 +1,13 @@
 // GRIDA-SEC-004 / GRIDA-SEC-008 — main-owned ACP connection to the packaged agent.
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import {
+  execFile,
+  spawn,
+  type ChildProcessWithoutNullStreams,
+} from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { clearTimeout, setTimeout } from "node:timers";
+import { promisify } from "node:util";
 import type { NativeEditorSurfaceSnapshot } from "@grida/desktop-bridge";
 import { NativeProviderRoutes } from "./native-provider-routes";
 import { NativeAgentArtifacts } from "./native-agent-artifacts";
@@ -52,6 +57,7 @@ const FRAME_LIMIT = 1024 * 1024;
 const REQUEST_LIMIT = 16;
 const EDITOR_BUSY_REPLY_LIMIT = 8 * 1024;
 const START_TIMEOUT_MS = 10_000;
+const readAgentHelp = promisify(execFile);
 const SHUTDOWN_TIMEOUT_MS = 12_000;
 const KILL_TIMEOUT_MS = 2_000;
 const SESSION_EFFORT = "co.grida/session/effort";
@@ -155,6 +161,10 @@ export class NativeAgentTerminationPending extends Error {
 }
 
 export class NativeAgentProcess {
+  private static readonly scopedApprovalProbes = new Map<
+    string,
+    { identity: string; supported: Promise<boolean> }
+  >();
   readonly permissions?: NativeAgentPermissions;
   private readonly pending = new Map<number, Pending>();
   private readonly providerRequests = new Set<number | string>();
@@ -242,6 +252,7 @@ export class NativeAgentProcess {
     permissions?: Readonly<{
       askRoots: ReadonlyMap<string, string>;
       settingsRoot?: string;
+      scopedAccess?: ConstructorParameters<typeof NativeAgentPermissions>[3];
     }>,
     private readonly providerEgress?: NativeProviderEgress,
     private readonly imageGeneration?: NativeImageGeneration,
@@ -254,7 +265,8 @@ export class NativeAgentProcess {
       this.permissions = new NativeAgentPermissions(
         (method, params) => this.call(method, params),
         permissions.askRoots,
-        permissions.settingsRoot
+        permissions.settingsRoot,
+        permissions.scopedAccess
       );
     }
     let diagnostics = "";
@@ -483,6 +495,65 @@ export class NativeAgentProcess {
     return executable;
   }
 
+  /** Whether the packaged host can launch with scoped approvals before a chat exists. */
+  static async supportsScopedApprovals(
+    resourcesPath: string
+  ): Promise<boolean> {
+    if (process.platform !== "darwin" && process.platform !== "linux")
+      return false;
+    try {
+      return await this.supportsScopedApprovalLaunch(
+        this.executable(resourcesPath)
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  /** The switch is parsed before ACP can advertise the host's permission modes. */
+  private static async supportsScopedApprovalLaunch(
+    executable: string
+  ): Promise<boolean> {
+    const [installed, file] = await Promise.all([
+      fs.promises.realpath(executable).catch(() => undefined),
+      fs.promises.lstat(executable, { bigint: true }).catch(() => undefined),
+    ]);
+    if (!installed || !file?.isFile()) return false;
+    const identity = [
+      file.dev,
+      file.ino,
+      file.size,
+      file.mtimeNs,
+      file.ctimeNs,
+    ].join("/");
+    const cached = this.scopedApprovalProbes.get(installed);
+    if (cached?.identity === identity) return cached.supported;
+    const supported: Promise<boolean> = readAgentHelp(
+      executable,
+      ["serve", "--help"],
+      {
+        env: {},
+        timeout: 2000,
+        killSignal: "SIGKILL",
+        maxBuffer: 64 * 1024,
+        encoding: "utf8",
+        windowsHide: true,
+      }
+    )
+      .then(({ stdout }) =>
+        /^[ \t]*--allow-scoped-approvals[ \t]*\r?$/m.test(stdout)
+      )
+      .catch(() => {
+        // A timeout or process error can clear on a later launch.
+        if (this.scopedApprovalProbes.get(installed)?.supported === supported) {
+          this.scopedApprovalProbes.delete(installed);
+        }
+        return false;
+      });
+    this.scopedApprovalProbes.set(installed, { identity, supported });
+    return supported;
+  }
+
   /** Metadata-only ACP host. Its client has no provider route or editor capabilities. */
   static async startCatalog(
     resourcesPath: string,
@@ -654,6 +725,14 @@ export class NativeAgentProcess {
       args.push("--supervised-chatgpt-scope", options.subscriptionScope);
     if (permissionProfile)
       args.push("--permission-profile", permissionProfile.profile);
+    // Keep the content-derived profile path stable for work accepted by an
+    // earlier binary. The launcher selects additional per-action capabilities.
+    const scopedAccess =
+      permissionProfile?.scopedAccess &&
+      (await this.supportsScopedApprovalLaunch(executable))
+        ? permissionProfile.scopedAccess
+        : undefined;
+    if (scopedAccess) args.push("--allow-scoped-approvals");
     const environment = nativeEnvironment();
     if (options.mcp) {
       if (!options.workspace || !options.gatewayScope)
@@ -676,6 +755,7 @@ export class NativeAgentProcess {
       options.onSessionUpdate,
       permissionProfile && {
         askRoots: permissionProfile.askRoots,
+        scopedAccess,
         // The host keeps the agent settings file in the workspace
         // configuration folder, or in its own state folder.
         settingsRoot: await fs.promises.realpath(

@@ -111,6 +111,9 @@ pub(super) fn render(
             if !ending.verified {
                 header.push("Process cleanup was not confirmed".into());
             }
+            if ending.details.get("network_error").is_some() {
+                header.push("Network transfer exceeded the command's byte limit".into());
+            }
         }
     }
     let text = output.text();

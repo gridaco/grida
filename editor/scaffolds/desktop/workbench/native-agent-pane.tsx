@@ -83,13 +83,6 @@ const MAX_DRAFT_BYTES = 512 * 1024;
 const readNoActivity = () => null;
 const subscribeNoActivity = () => () => {};
 const readNoSvgSelection = () => undefined;
-const APPROVAL_ACTION = {
-  read_file: "Read file",
-  list_files: "List folder",
-  search_text: "Search files",
-  write_file: "Replace file",
-  edit_file: "Edit file",
-} as const;
 const selectionMemory = {
   getItem: (key: string) => window.localStorage.getItem(key),
   setItem: (key: string, value: string) =>
@@ -894,6 +887,7 @@ function NativeChatPane({
                   <NativeTurnActivity
                     key={block.turnId}
                     block={block}
+                    approvalReviews={records.get(block.turnId)?.approvalReviews}
                     renderMessage={renderMessage}
                     loadToolImage={controller.readToolImage}
                     subagentEvents={subagentActivity?.events.filter(
@@ -1027,31 +1021,10 @@ function NativeChatPane({
         )}
         {approval && (
           <AgentApprovalPrompt
-            description={
-              approval.tool === "write_file" || approval.tool === "edit_file"
-                ? "The agent is asking to change its settings file."
-                : "The agent is asking for additional read access."
-            }
-            detail={
-              <div className="mt-1 max-h-24 overflow-y-auto break-all font-mono text-xs text-foreground/80">
-                <div>
-                  {APPROVAL_ACTION[approval.tool]}{" "}
-                  {reviewText(approval.relativePath || ".")}
-                </div>
-                <div>Folder {reviewText(approval.root)}</div>
-                {approval.query !== undefined && (
-                  <div>Search {reviewText(approval.query)}</div>
-                )}
-              </div>
-            }
-            acceptLabel="Allow once"
-            declineLabel="Decline"
+            approval={approval}
             disabled={state.acting}
-            onDecision={(allowed) =>
-              controller.answerApproval(
-                approval.reviewId,
-                allowed ? "approve_once" : "decline"
-              )
+            onDecision={(decision) =>
+              controller.answerApproval(approval.reviewId, decision)
             }
           />
         )}
@@ -1218,6 +1191,12 @@ function NativeChatPane({
                   !recovery &&
                   controller.supportsPermissionModeRead),
               available: state.permissionModeAvailable,
+              fullAccess:
+                state.permissionMode?.available.includes("full_access"),
+              automaticReview: state.permissionMode
+                ? state.permissionMode.available.includes("approve_for_me")
+                : state.draftAutomaticReviewAvailable &&
+                  state.permissionModeAvailable,
               uncertain: state.permissionModeUncertain,
               onRetry: () => void controller.checkPermissionMode(),
               busy:
@@ -1490,11 +1469,4 @@ async function readLibraryPng(
   const source = await readLibraryAttachment(id);
   if (!source) throw new Error("library_image_unavailable");
   return encodeLibraryPng(source, maxBytes);
-}
-
-function reviewText(value: string): string {
-  return JSON.stringify(value).replace(
-    /[\u007f-\u009f\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069]/g,
-    (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`
-  );
 }

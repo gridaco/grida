@@ -58,7 +58,26 @@ jobs:
           cargo test -p agent-kit-sandbox --locked --test native -- --include-ignored --test-threads=1
           cargo build -p agent-kit-sandbox --locked --bin agent-kit-sandbox-helper
           export GRIDA_AGENT_TEST_SANDBOX_HELPER="$PWD/target/debug/agent-kit-sandbox-helper"
+          cargo test -p grida-agent --locked --lib confined_command_transfers_through_its_approved_broker -- --ignored
           cargo test -p grida-agent --locked --test commands --test permissions --test process --test external_acp -- --include-ignored --test-threads=1
+          if [ "$RUNNER_OS" = Linux ]; then
+            # Give the built host a local origin with a public-class address.
+            # Only this namespace can resolve or reach the fixture.
+            test_bin=$(cargo test -p grida-agent --locked --test process --no-run --message-format=json |
+              jq -r 'select(.target.name == "process" and .executable) | .executable')
+            fixture_hosts=$(mktemp)
+            trap 'rm -f "$fixture_hosts"' EXIT
+            cat /etc/hosts > "$fixture_hosts"
+            echo '1.1.1.1 updates.example updates.example.' >> "$fixture_hosts"
+            sudo unshare --net --mount --propagation private bash -eu -c '
+              ip link set lo up
+              ip address add 1.1.1.1/32 dev lo
+              mount --bind "$1" /etc/hosts
+              exec runuser -u "$2" -- env GRIDA_AGENT_TEST_BROKER_ORIGIN=1 \
+                AGENT_KIT_TEST_BWRAP=/usr/bin/bwrap GRIDA_AGENT_TEST_SANDBOX_HELPER="$3" \
+                "$4" approvals::reviewer::approved_network_command_uses_its_exact_destination_broker --exact --ignored
+            ' _ "$fixture_hosts" "$(id -un)" "$GRIDA_AGENT_TEST_SANDBOX_HELPER" "$test_bin"
+          fi
       - name: Build
         run: cargo build --workspace --locked
   conformance:

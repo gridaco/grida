@@ -110,6 +110,8 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_PROFILES: "grida:native-chat:profiles",
   NATIVE_CHAT_SELECT_PROFILE: "grida:native-chat:select-profile",
   WELCOME_CHAT_PROFILES: "grida:welcome:chat-profiles",
+  WELCOME_CHAT_PREPARE_AUTOMATIC_REVIEW:
+    "grida:welcome:chat-prepare-automatic-review",
   WELCOME_CHAT_PREPARE_FULL_ACCESS: "grida:welcome:chat-prepare-full-access",
   WELCOME_CHAT_ANSWER_FULL_ACCESS: "grida:welcome:chat-answer-full-access",
   WELCOME_CHAT_START_FULL_ACCESS: "grida:welcome:chat-start-full-access",
@@ -133,6 +135,8 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_CONTROL_SUBAGENT_CHILD:
     "grida:native-chat:control-subagent-child",
   NATIVE_CHAT_CREATE: "grida:native-chat:create",
+  NATIVE_CHAT_ACCEPTS_AUTOMATIC_REVIEW:
+    "grida:native-chat:accepts-automatic-review",
   NATIVE_CHAT_ACCEPTS_PERMISSION_MODE:
     "grida:native-chat:accepts-permission-mode",
   NATIVE_CHAT_REVIEW_PERMISSION_MODE:

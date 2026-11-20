@@ -55,6 +55,24 @@ it through shutdown. The existing output budget covers streamed stdout and
 captured stderr together, and the separate stdin budget stops excess input.
 The running handle still owns cancellation, cleanup, and native evidence.
 
+## Finite commands with a SOCKS broker
+
+A host can approve one finite confined command and supply an authenticated
+SOCKS5 broker with `PreparedProcess::spawn_with_socks_proxy`. The sandbox
+checks the socket's canonical path against the host's expected path and
+requires a mandatory read/write denial covering that location. The host
+owns the broker, destination checks, stream limits, lifetime and credentials.
+
+On macOS, Seatbelt permits outgoing connections to the exact broker Unix
+socket. The command receives a SOCKS5-over-Unix proxy URL. On Linux, the
+helper verifies the private network namespace, connects the host-mounted
+socket and exposes a one-connection TCP forwarder on the namespace's
+loopback. The inherited seccomp filter permits IPv4 TCP streams inside
+that namespace. Unix sockets, raw sockets and other families stay denied.
+The broker descriptor closes on payload exec. The host's network and
+loopback are unreachable directly. Both platforms supply proxy environment
+variables to the command and retain ordinary filesystem confinement.
+
 ## Explicit unconfined execution
 
 `Sandbox::prepare` and `Sandbox::probe` always enforce an `ExecutionScope`.

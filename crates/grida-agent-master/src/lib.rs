@@ -475,8 +475,13 @@ impl Master {
                     .map_or(0, effort::Policy::reserved_child_generation_steps),
             )?
         };
-        let reviewer = self.approval_reviewer.as_ref().filter(|_| max_steps > 1);
-        let max_steps = max_steps - u32::from(reviewer.is_some());
+        let allowance = self.approval_reviewer.as_ref().map_or(0, |reviewer| {
+            reviewer
+                .allowance(max_steps)
+                .min(max_steps.saturating_sub(1))
+        });
+        let reviewer = self.approval_reviewer.as_ref().filter(|_| allowance > 0);
+        let max_steps = max_steps - allowance;
         let mut continuation = self.continuation(&turn)?;
         self.accept_input(&mut turn, input).await?;
         Self::retain_orphaned_work(&turn, &turn.view()).await?;
@@ -835,7 +840,7 @@ impl Master {
                     && continuation.request_history == Some(current.state.history().position())
                     && let Some(reviewer) = reviewer
                     && reviewer
-                        .review(&turn.operations(), &current, &deferred)
+                        .review_with_allowance(&turn.operations(), &current, &deferred, allowance)
                         .await?
                 {
                     continue;

@@ -854,6 +854,10 @@ fn validate(launch: Launch) -> std::io::Result<Launch> {
         return Err(std::io::ErrorKind::InvalidData.into());
     }
     if launch.enforcement == wire::Enforcement::Unconfined {
+        #[cfg(target_os = "linux")]
+        if launch.broker_password.is_some() {
+            return Err(std::io::ErrorKind::InvalidData.into());
+        }
         #[allow(unsafe_code)]
         let ordinary = unsafe {
             libc::geteuid() != 0
@@ -887,7 +891,65 @@ fn validate(launch: Launch) -> std::io::Result<Launch> {
         {
             return Err(std::io::ErrorKind::PermissionDenied.into());
         }
-        crate::linux_seccomp::apply()?;
+        confine_linux(launch)
+    }
+    #[cfg(not(target_os = "linux"))]
+    Ok(launch)
+}
+
+#[cfg(target_os = "linux")]
+fn confine_linux(mut launch: Launch) -> std::io::Result<Launch> {
+    use std::io;
+    use std::net::{Shutdown, TcpListener};
+    use std::os::unix::net::UnixStream;
+
+    let relay = if let Some(password) = launch.broker_password.take() {
+        let Task::Command {
+            environment,
+            mode: Mode::Finite,
+            ..
+        } = &mut launch.task
+        else {
+            return Err(io::ErrorKind::InvalidData.into());
+        };
+        let broker = UnixStream::connect(launch.private_temp.join("broker.sock"))?;
+        let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))?;
+        let proxy = format!("socks5h://grida:{password}@{}", listener.local_addr()?);
+        environment.retain(|key, _| !key.to_ascii_lowercase().ends_with("_proxy"));
+        for key in [
+            "all_proxy",
+            "ALL_PROXY",
+            "http_proxy",
+            "HTTPS_PROXY",
+            "https_proxy",
+        ] {
+            environment.insert(key.into(), proxy.clone());
+        }
+        Some((listener, broker))
+    } else {
+        None
+    };
+    // Install before creating any child or relay thread. No payload can
+    // use the mounted Unix socket. The one preconnected fd is CLOEXEC.
+    crate::linux_seccomp::apply(relay.is_some())?;
+    if let Some((listener, broker)) = relay {
+        std::thread::Builder::new()
+            .name("broker".into())
+            .spawn(move || -> io::Result<()> {
+                let (stream, _) = listener.accept()?;
+                let mut request = stream.try_clone()?;
+                let mut uplink = broker.try_clone()?;
+                std::thread::Builder::new()
+                    .name("broker-send".into())
+                    .spawn(move || -> io::Result<()> {
+                        io::copy(&mut request, &mut uplink)?;
+                        uplink.shutdown(Shutdown::Write)
+                    })?;
+                let mut response = broker;
+                let mut downlink = stream;
+                io::copy(&mut response, &mut downlink)?;
+                downlink.shutdown(Shutdown::Write)
+            })?;
     }
     Ok(launch)
 }

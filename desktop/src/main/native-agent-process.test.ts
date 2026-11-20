@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { NativeAgentChat } from "./native-agent-chat";
+import { NativeCommandProfiles } from "./native-agent-command-profile";
 import { NativeAgentGoals } from "./native-agent-goals";
 import {
   NativeAgentProcess,
@@ -51,7 +52,8 @@ function fixture(
   source: string,
   initializationVersion = 1,
   capabilities?: Record<string, number | null>,
-  imageInput = false
+  imageInput = false,
+  startup = ""
 ) {
   const directory = state();
   const resources = path.join(directory.root, "native-agent");
@@ -61,6 +63,7 @@ function fixture(
     path.join(resources, "grida-agent"),
     `#!${process.execPath}
 const fs = require('node:fs');
+${startup}
 const readline = require('node:readline');
 const lines = readline.createInterface({input:process.stdin});
 const send = (value) => process.stdout.write(JSON.stringify({jsonrpc:'2.0',...value})+'\\n');
@@ -90,6 +93,101 @@ lines.on('close', () => fs.writeFileSync(${JSON.stringify(receipt)}, 'eof'));
 }
 
 describe.skipIf(process.platform === "win32")("Native agent process", () => {
+  it("gates scoped requests on the installed executable and retries failed probes", async () => {
+    const test = fixture(
+      `
+      if (request.method === 'fixture/argv') send({id:request.id,result:process.argv.slice(2)});
+      if (request.method === '_co.grida/session/snapshot') send({id:request.id,result:{sessionId:'session',sessionRevision:1,current:{turnId:'turn',controlRevision:1}}});
+      if (request.method === '_co.grida/session/approvals') send({id:request.id,result:{sessionId:'session',turnId:'turn',controlRevision:1,approvals:[{waitId:'wait',request:{session:'session',turn:'turn',directory:'external-file',root:'/',effect:{kind:'read',tool:'read_file',relative_path:'example/report.txt'}}}]}});
+      `,
+      1,
+      {},
+      false,
+      `
+      const help = fs.readFileSync(__dirname+'/help', 'utf8');
+      if (process.argv.slice(2).join(' ') === 'serve --help') {
+        fs.appendFileSync(__dirname+'/probes', 'p');
+        if (help === 'failed') process.exit(1);
+        process.stdout.write(help);
+        process.exit(0);
+      }
+      if (!help.includes('      --allow-scoped-approvals') && process.argv.includes('--allow-scoped-approvals')) process.exit(2);
+      `
+    );
+    const root = fs.realpathSync(test.root);
+    const project = path.join(root, "project");
+    const resources = path.join(root, "native-agent");
+    const executable = path.join(resources, "grida-agent");
+    const help = path.join(resources, "help");
+    fs.mkdirSync(project, { mode: 0o700 });
+    const command = vi
+      .spyOn(NativeCommandProfiles, "launch")
+      .mockResolvedValue({
+        helper: { path: "/bin/true", sha256: Array(32).fill(0) },
+        runtimePaths: [],
+        temporaryParent: root,
+        diskRead: true,
+        environment: {},
+      });
+    const options: NativeAgentLaunch = {
+      ...test.options,
+      workspace: {
+        id: "workspace",
+        primary: { id: "project", name: "Project", path: project },
+        additionalReadRoots: [],
+        protectedPaths: [],
+        allowScopedAccess: true,
+      },
+    };
+    async function check(supported: boolean, probes: number) {
+      const agent = await NativeAgentProcess.start(options);
+      try {
+        const args = (await agent.request("fixture/argv", {})) as string[];
+        expect(args.includes("--allow-scoped-approvals")).toBe(supported);
+        expect(
+          fs.readFileSync(path.join(resources, "probes"), "utf8")
+        ).toHaveLength(probes);
+        const result = await agent
+          .permissions!.list("session", "turn")
+          .catch((error: Error) => error.message);
+        const expectedRead = expect.objectContaining({
+          tool: "read_file",
+          relativePath: "example/report.txt",
+        });
+        expect(result).toEqual(
+          supported ? [expectedRead] : "native_agent_approval_invalid"
+        );
+        return args[args.indexOf("--permission-profile") + 1];
+      } finally {
+        await agent.close();
+      }
+    }
+    try {
+      await expect(
+        NativeAgentProcess.supportsScopedApprovals(project)
+      ).resolves.toBe(false);
+      fs.writeFileSync(help, "failed");
+      const profile = await check(false, 1);
+      fs.writeFileSync(help, "      --other-option\n");
+      await expect(
+        NativeAgentProcess.supportsScopedApprovals(root)
+      ).resolves.toBe(false);
+      expect(await check(false, 2)).toBe(profile);
+      expect(await check(false, 2)).toBe(profile);
+      fs.writeFileSync(help, "      --allow-scoped-approvals\n");
+      fs.copyFileSync(executable, executable + ".update");
+      fs.renameSync(executable + ".update", executable);
+      await expect(
+        NativeAgentProcess.supportsScopedApprovals(root)
+      ).resolves.toBe(true);
+      expect(await check(true, 3)).toBe(profile);
+      expect(await check(true, 3)).toBe(profile);
+    } finally {
+      command.mockRestore();
+      test.close();
+    }
+  });
+
   it("projects the same captured tool image during live updates and replay and reads only its exact result", async () => {
     const bytes = Buffer.alloc(300 * 1024, 7);
     bytes.set([137, 80, 78, 71, 13, 10, 26, 10]);

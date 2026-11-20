@@ -1,5 +1,6 @@
 // GRIDA-SEC-004 — native chat attachments and delivery belong to the admitted frame.
 import { randomUUID } from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
 import { GG_PROVIDER_ID } from "@grida/ai-host";
 import type { IpcMainInvokeEvent, WebContents, WebFrameMain } from "electron";
 import type { WorkspaceDirectoryIdentity } from "@grida/daemon/server";
@@ -110,6 +111,7 @@ export type NativeWelcomeWorkspace = Readonly<{
 }>;
 
 type WelcomePermissionReview = {
+  mode: "approve_for_me" | "full_access";
   id: string;
   phase: "pending" | "confirmed" | "starting";
   workspace?: NativeWelcomeWorkspace;
@@ -1060,8 +1062,16 @@ export class NativeChatIpc {
 
   /** A Welcome frame may reserve a review, never attach or submit to a workspace. */
   async prepareWelcomeFullAccess(
-    { sender, senderFrame: frame }: IpcMainInvokeEvent,
+    event: IpcMainInvokeEvent,
     workspaceId: unknown
+  ): Promise<NativeChatPermissionReview> {
+    return this.prepareWelcomePermission(event, workspaceId, "full_access");
+  }
+
+  async prepareWelcomePermission(
+    { sender, senderFrame: frame }: IpcMainInvokeEvent,
+    workspaceId: unknown,
+    mode: "approve_for_me" | "full_access"
   ): Promise<NativeChatPermissionReview> {
     const href = frame?.url;
     if (
@@ -1087,6 +1097,7 @@ export class NativeChatIpc {
     const expiresAt = Date.now() + PERMISSION_REVIEW_TTL_MS;
     let currentHref = href;
     const review: WelcomePermissionReview = {
+      mode,
       id: randomUUID(),
       phase: "pending",
       check: () => {
@@ -1286,7 +1297,7 @@ export class NativeChatIpc {
           state.sessionId !== session.id ||
           state.revision !== 0 ||
           state.mode !== "restricted" ||
-          !state.available.includes("full_access")
+          !state.available.includes(review.mode)
         )
           throw new Error("native_chat_permission_mode_unavailable");
         review.grant = { sessionId: session.id, profileId, effort };
@@ -1297,13 +1308,13 @@ export class NativeChatIpc {
         session,
         0,
         review.id,
-        "full_access"
+        review.mode
       );
       check();
       if (
         updated.sessionId !== session.id ||
         updated.revision !== 1 ||
-        updated.mode !== "full_access"
+        updated.mode !== review.mode
       )
         throw new Error("native_chat_permission_mode_invalid_response");
       if (prior) {
@@ -1479,7 +1490,9 @@ export class NativeChatIpc {
       !Number.isSafeInteger(expectedRevision) ||
       (expectedRevision as number) < 0 ||
       !token(requestId) ||
-      (mode !== "restricted" && mode !== "full_access")
+      (mode !== "restricted" &&
+        mode !== "full_access" &&
+        mode !== "approve_for_me")
     )
       throw new Error("native_chat_permission_mode_invalid");
     const response = answer as
@@ -3585,12 +3598,34 @@ export class NativeChatIpc {
     );
     this.revalidate(owner, attachment);
     return reviews.slice(0, MAX_REVIEWS).map((review) => {
-      const reviewId = retainReview(attachment.approvals, review, sameApproval);
-      const { tool, root, relativePath, query } = review;
-      return {
+      const reviewId = retainReview(
+        attachment.approvals,
+        review,
+        isDeepStrictEqual
+      );
+      const basis = {
         reviewId,
+        root: review.root,
+        ...(review.reviewFailure && { reviewFailure: review.reviewFailure }),
+      };
+      if (review.tool === "exec_command") {
+        const { tool, command, cwd, executable, access, network, scope } =
+          review;
+        return {
+          ...basis,
+          tool,
+          command,
+          cwd,
+          executable,
+          access,
+          network,
+          scope,
+        };
+      }
+      const { tool, relativePath, query } = review;
+      return {
+        ...basis,
         tool,
-        root,
         relativePath,
         ...(query === undefined ? {} : { query }),
       };
@@ -4349,24 +4384,6 @@ function retainReview<T>(
   if (oldest && reviews.size >= MAX_REVIEWS) reviews.delete(oldest);
   reviews.set(id, review);
   return id;
-}
-
-function sameApproval(
-  left: NativeApprovalReview,
-  right: NativeApprovalReview
-): boolean {
-  return (
-    left.sessionId === right.sessionId &&
-    left.turnId === right.turnId &&
-    left.waitId === right.waitId &&
-    left.sessionRevision === right.sessionRevision &&
-    left.controlRevision === right.controlRevision &&
-    left.directory === right.directory &&
-    left.root === right.root &&
-    left.tool === right.tool &&
-    left.relativePath === right.relativePath &&
-    left.query === right.query
-  );
 }
 
 function sameQuestion(

@@ -937,6 +937,37 @@ it("streams turn activity live and adopts recorded turns from each page", async 
   controller.disconnect();
 });
 
+it("keeps ordinary journal progress on the live stream without rereading the transcript", async () => {
+  vi.useFakeTimers();
+  const { bridge, controller, running } = fixture();
+  running.add("chat-a");
+  const observe = bridge.observe.bind(bridge);
+  let journalPosition = 1;
+  bridge.observe = async (id) => {
+    const { snapshot, observationId } = await observe(id);
+    return {
+      observationId,
+      snapshot: {
+        ...snapshot,
+        current: { ...snapshot.current!, journalPosition, inputNeeded: false },
+      },
+    };
+  };
+  const transcript = vi.spyOn(bridge, "transcript");
+  try {
+    await controller.select("chat-a");
+    journalPosition++;
+    await vi.advanceTimersByTimeAsync(500);
+    expect(
+      controller.read().observation?.snapshot.current?.journalPosition
+    ).toBe(2);
+    expect(transcript).toHaveBeenCalledTimes(1);
+  } finally {
+    controller.disconnect();
+    vi.useRealTimers();
+  }
+});
+
 it("advances visible progress only for new live output, independently of history and observation reads", async () => {
   const { bridge, controller, running, updates } = fixture();
   running.add("chat-a");

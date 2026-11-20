@@ -30,7 +30,7 @@ decision it awaits and the owner of that decision:
 
 | Requirement                                                 | Unresolved decision                                                                                                           | Owner                                     |
 | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| Network escalation (on request, or after a sandbox refusal) | Raw execution currently has no network; reaching the network needs an attributable, enforceable network grant per action.     | Execution authority and sandbox contracts |
+| Network escalation (on request, or after a sandbox refusal) | Each supported execution backend needs an attributable, enforceable network grant per action.                                 | Execution authority and sandbox contracts |
 | Layered configuration (user, project, launch)               | How user-level profiles and trusted project files combine with the host's launch-scoped permission profile and settings file. | Host configuration contract               |
 
 ## Vocabulary
@@ -155,10 +155,7 @@ access after a fresh approval of that retry. The model may also request
 escalation up front, for example to reach the network, with a justification
 shown to the reviewer.
 
-Escalation is the target behavior. The Desktop app has none today: a sandbox
-refusal stays refused, and a path outside the project is refused rather than
-asked; the [feature catalog](../../../agent/features.md) records current
-availability.
+A broader retry is a distinct action with a fresh decision. Available file and network scopes depend on the host and execution platform. The [feature catalog](../../../agent/features.md) records current availability.
 
 ## Presets
 
@@ -174,8 +171,16 @@ editing and running commands inside a project well, and asking for each step
 costs more attention than it protects. A project the person has not marked as
 trusted starts as Read only.
 
-The automatic reviewer never widens limits: it can approve only what the person
-could approve, and when it cannot decide, the request goes to the person.
+Selecting **Approve for me** delegates individual decisions within the same
+workspace sandbox. The reviewer can decide an outside-file read explicitly
+named by the person, or a supported finite command with its exact executable,
+arguments, working directory, filesystem scope and optional destination.
+Command evidence includes disk-read breadth, readable, writable and runtime
+roots, private temporary writes, resolved shell and environment variable names.
+The reviewer receives the owning chat’s user instructions, including earlier
+restrictions and revocations. A fresh invocation or broader retry needs a new
+decision. Settings edits and requests with inconclusive evidence go to the
+person. An unsupported grant is refused by the host.
 
 ## Configuration
 
@@ -218,9 +223,7 @@ remain recoverable without new model work.
 | The person is unavailable and approval mode is never | Refused with a typed denial; the turn continues.    |
 | The host cannot enforce the sandbox on this platform | Commands are refused; file tools still apply L3.    |
 
-The table states the target policy. On a surface without escalation, such as
-the Desktop app today, a row that asks to retry or to reach outside the project
-is refused instead; the settings-file edit still asks.
+The table states the target policy. A host that cannot enforce the requested scope refuses the action. Settings-file edits always ask the person.
 
 ## See also
 

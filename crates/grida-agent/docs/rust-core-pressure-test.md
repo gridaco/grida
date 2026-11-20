@@ -825,6 +825,29 @@ platform qualification must identify which OS was actually exercised.
 | A review decision is committed just before restart                 | Restore its action binding and consumption state before dispatch |
 | An allowed network destination is used for a sensitive operation   | Product policy can still require semantic review of the action   |
 
+A user can select **Approve for me**, request an exact external file, and see
+the file read once or the request return for manual review. Changing the file
+while a decision is pending invalidates it. Earlier instructions in the same
+chat remain relevant to later actions. A confined command retried with a
+network destination requires review of the new authority. Tests must account
+for the execution attempts and the evidence supplied to each reviewer.
+Answering a clarifying question preserves the user's earlier restrictions.
+If one action needs human input, another eligible action in the same response
+can still receive its own review within the turn's allowance. A connected
+Desktop chat shows a pending review and its verdict while the turn is running.
+Manual decisions remain available across the host's command-size range.
+Withdrawing the launcher's reviewer opt-in returns new work to Default and
+preserves earlier selection receipts. Finite command cleanup remains owned
+through shutdown, and a transfer beyond the broker's byte limit reports an
+incomplete result.
+The [built-host review cases](../tests/process/approvals/reviewer.rs) exercise
+both scopes and count real command starts. The Linux qualification also
+serves a response from the approved hostname inside an isolated network
+and checks the bytes returned to the model and the request received by
+the origin. The [native sandbox fixture](../../agent-kit-sandbox/tests/native.rs)
+checks the broker path and direct-network denial, and the [permission tests](../tests/permissions.rs)
+cover file identity and revocation.
+
 The host authorization adapter handles asynchronous review through the generic
 admission gate. Sessions retains correlated interactions and operation results.
 Runtime rechecks current authority before dispatch. The host issues grants and
@@ -1006,13 +1029,13 @@ enforcement evidence.
 
 The [native sandbox binding](./rust-sandbox.md) uses one crate with Seatbelt on
 macOS and bubblewrap plus a trusted seccomp helper on Linux. The raw-command
-profile denies networking. Native Windows raw execution is deferred behind
+profile denies direct networking. A qualified finite invocation may separately obtain a single mediated destination. Native Windows raw execution is deferred behind
 capability checks.
 
 | Pressure case                                              | Required result                                                                                                                                                                                             |
 | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Two concurrent children have different filesystem grants   | Each execution retains its own scope, including after either grant changes.                                                                                                                                 |
-| A command requests networking                              | Admission reports an unsupported profile before executing the target.                                                                                                                                       |
+| A command requests networking                              | Admission refuses an unsupported profile before execution. A qualified finite command uses its exact reviewed destination and keeps direct network access denied.                                           |
 | A child daemonizes outside its original process group      | Cancellation reports whether the descendant terminated, remains confined, or is unresolved. Conflicting work cannot assume revocation.                                                                      |
 | A process exits before temporary-resource cleanup finishes | The outcome preserves cleanup state before releasing ownership that depends on it.                                                                                                                          |
 | Host proxy or trust configuration changes                  | The host routing adapter handles the change within authorized destinations. Confinement does not silently widen.                                                                                            |

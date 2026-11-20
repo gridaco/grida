@@ -93,6 +93,7 @@ pub(super) struct PriorContext {
 #[derive(Default)]
 pub(crate) struct TranscriptInputFacts {
     pub(crate) goal_starts: BTreeSet<TurnId>,
+    pub(crate) approval_reviews: BTreeMap<TurnId, Vec<super::permissions::ApprovalReview>>,
     pub(crate) svg_text_selections: BTreeSet<MessageId>,
     pub(crate) editor_tool_contexts: BTreeSet<MessageId>,
     pub(crate) display_parts: BTreeMap<MessageId, Vec<message_context::DisplayPart>>,
@@ -176,6 +177,7 @@ impl Host {
     ) -> Result<TranscriptInputFacts> {
         let mut facts = TranscriptInputFacts::default();
         for turn in turns {
+            let mut automatic_review = false;
             for input in self
                 .store
                 .turn_submissions(session.clone(), turn.clone())
@@ -185,6 +187,9 @@ impl Host {
                     continue;
                 }
                 let stored: StoredPrompt = decode_input(&input)?;
+                automatic_review |= stored.permission_capture.as_ref().is_some_and(|capture| {
+                    capture.mode() == crate::permissions::PermissionMode::ApproveForMe
+                });
                 if matches!(stored.goal, Some(goals::GoalInput::Start(_))) {
                     facts.goal_starts.insert(turn.clone());
                 }
@@ -204,6 +209,19 @@ impl Host {
                     facts
                         .display_parts
                         .insert(prompt_message_id(&input.id)?, context.display_parts.clone());
+                }
+            }
+            if automatic_review {
+                let reviews = self
+                    .store
+                    .inspect_turn_with(
+                        session.clone(),
+                        turn.clone(),
+                        super::permissions::approval_review_facts,
+                    )
+                    .await?;
+                if !reviews.is_empty() {
+                    facts.approval_reviews.insert(turn.clone(), reviews);
                 }
             }
         }

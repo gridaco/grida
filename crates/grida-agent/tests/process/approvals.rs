@@ -22,6 +22,7 @@ pub(super) struct Fixture {
     pub(super) primary: PathBuf,
     pub(super) extra: PathBuf,
     pub(super) profile: PathBuf,
+    scoped_approvals: bool,
 }
 
 /// Fixture directories outside the system's shared temporary directory, which
@@ -93,6 +94,7 @@ impl Fixture {
             primary,
             extra,
             profile,
+            scoped_approvals: false,
         }
     }
 
@@ -101,6 +103,9 @@ impl Fixture {
         process.arg(mode);
         configured(&mut process, &self.state, endpoint);
         process.arg("--permission-profile").arg(&self.profile);
+        if self.scoped_approvals {
+            process.arg("--allow-scoped-approvals");
+        }
         process
     }
 
@@ -227,13 +232,22 @@ impl Stdio {
 
     pub(super) async fn read_frame(&mut self) -> Value {
         let mut line = String::new();
-        assert_ne!(
-            timeout(WAIT, self.stdout.read_line(&mut line))
-                .await
-                .unwrap()
-                .unwrap(),
-            0
-        );
+        if timeout(WAIT, self.stdout.read_line(&mut line))
+            .await
+            .unwrap()
+            .unwrap()
+            == 0
+        {
+            use tokio::io::AsyncReadExt;
+            let mut error = String::new();
+            if let Some(stderr) = &mut self.child.stderr {
+                timeout(WAIT, stderr.take(4096).read_to_string(&mut error))
+                    .await
+                    .unwrap()
+                    .unwrap();
+            }
+            panic!("native host closed stdio: {error}");
+        }
         serde_json::from_str(&line).unwrap()
     }
 
@@ -404,6 +418,120 @@ async fn durable_headless_approval_accepts_only_the_private_reviewer() {
             .to_string()
             .contains("approved fixture text")
     );
+    settle(&mut owner, session).await;
+    owner.close().await;
+    endpoint.done().await;
+}
+
+fn external_read_fixture() -> Fixture {
+    let mut fixture = Fixture::new(false);
+    fixture.scoped_approvals = true;
+    fixture
+}
+
+fn external_read(path: &Path) -> Reply {
+    let args = json!({"directory":"external-file","path":path.strip_prefix("/").unwrap()});
+    Reply::Tool("read_file", Box::leak(args.to_string().into_boxed_str()))
+}
+
+#[tokio::test]
+async fn external_file_approval_after_restart_checks_the_same_file_version() {
+    for replace in [false, true] {
+        let fixture = external_read_fixture();
+        let outside = fixture.primary.parent().unwrap().join("outside.txt");
+        fs::write(&outside, "approved external reference").unwrap();
+        let relative = outside.strip_prefix("/").unwrap();
+        let mut endpoint =
+            Endpoint::start(vec![external_read(&outside), Reply::Finished("Done.")]).await;
+        let output = fixture.run(&endpoint.url, &fixture.primary, 6).await;
+        let approval = &output[1]["approvals"][0];
+        assert_eq!(approval["request"]["root"], "/");
+        assert_eq!(approval["request"]["directory"], "external-file");
+        assert_eq!(
+            approval["request"]["effect"]["relative_path"],
+            json!(relative)
+        );
+        let session = output[0]["session_id"].as_str().unwrap();
+        let turn = output[0]["turn_id"].as_str().unwrap();
+        let wait = approval["waitId"].as_str().unwrap();
+        endpoint.request().await;
+        if replace {
+            let replacement = outside.with_extension("new");
+            fs::write(&replacement, "substituted external reference").unwrap();
+            fs::rename(replacement, &outside).unwrap();
+        }
+        let mut owner = approve(&fixture, &endpoint.url, session, turn, wait).await;
+        let continuation = endpoint.request().await["messages"].to_string();
+        assert_eq!(
+            continuation.contains("approved external reference"),
+            !replace,
+            "{continuation}"
+        );
+        assert_eq!(
+            continuation.contains("permission_action_changed"),
+            replace,
+            "{continuation}"
+        );
+        assert!(!continuation.contains("substituted external reference"));
+        settle(&mut owner, session).await;
+        owner.close().await;
+        endpoint.done().await;
+    }
+}
+
+#[tokio::test]
+async fn external_file_approval_leaves_a_sibling_read_waiting_for_its_own_decision() {
+    let fixture = external_read_fixture();
+    let directory = fixture.primary.parent().unwrap();
+    let first = directory.join("a.txt");
+    let second = directory.join("b.txt");
+    fs::write(&first, "reference A contents").unwrap();
+    fs::write(&second, "reference B contents").unwrap();
+    let mut endpoint = Endpoint::start(vec![
+        external_read(&first),
+        external_read(&second),
+        Reply::Finished("Done."),
+    ])
+    .await;
+    let output = fixture.run(&endpoint.url, &fixture.primary, 6).await;
+    let session = output[0]["session_id"].as_str().unwrap();
+    let turn = output[0]["turn_id"].as_str().unwrap();
+    let first_wait = output[1]["approvals"][0]["waitId"].as_str().unwrap();
+    endpoint.request().await;
+    let mut owner = approve(&fixture, &endpoint.url, session, turn, first_wait).await;
+    let continued = endpoint.request().await["messages"].to_string();
+    assert!(continued.contains("reference A contents"));
+    let second_pending = timeout(WAIT, async {
+        loop {
+            let view = owner
+                .request(
+                    "_co.grida/session/approvals",
+                    json!({"sessionId":session,"turnId":turn}),
+                )
+                .await;
+            if view["result"]["approvals"][0]["request"]["effect"]["relative_path"]
+                == json!(second.strip_prefix("/").unwrap())
+            {
+                break view["result"].clone();
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    let next_wait = second_pending["approvals"][0]["waitId"].as_str().unwrap();
+    assert_ne!(first_wait, next_wait);
+    let state = owner
+        .request("_co.grida/session/snapshot", json!({"sessionId":session}))
+        .await;
+    let declined = owner.request("_co.grida/session/answer-approval", json!({
+        "sessionId":session,"turnId":turn,"waitId":next_wait,"decision":"decline","requestId":"decline-sibling",
+        "expectedSessionRevision":state["result"]["sessionRevision"],"expectedControlRevision":second_pending["controlRevision"],
+    })).await;
+    assert!(declined.get("error").is_none(), "{declined}");
+    let messages = endpoint.request().await["messages"].to_string();
+    assert!(messages.contains("permission_declined"));
+    assert!(!messages.contains("reference B contents"));
     settle(&mut owner, session).await;
     owner.close().await;
     endpoint.done().await;

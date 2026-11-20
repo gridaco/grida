@@ -267,17 +267,37 @@ function WelcomeSurface({
   const [openingFolder, setBusy] = useState(false);
   const busy = openingFolder || staged.busy || staged.permissionBusy;
   const {
+    acceptsAutomaticApprovalReview,
     prepareWelcomeFullAccess,
+    prepareWelcomeAutomaticReview,
     answerWelcomeFullAccess,
     startWelcomeFullAccess,
     welcomeFullAccessAcrossPresets,
   } = bridge?.nativeChat ?? {};
-  const fullAccess =
+  const [automaticReviewAvailable, setAutomaticReviewAvailable] =
+    useState(false);
+  useEffect(() => {
+    let current = true;
+    setAutomaticReviewAvailable(false);
+    void acceptsAutomaticApprovalReview?.().then(
+      (supported) => {
+        if (current) setAutomaticReviewAvailable(supported);
+      },
+      () => {}
+    );
+    return () => {
+      current = false;
+    };
+  }, [acceptsAutomaticApprovalReview]);
+  const accessHost =
     prepareWelcomeFullAccess &&
     answerWelcomeFullAccess &&
     startWelcomeFullAccess
       ? {
           prepare: prepareWelcomeFullAccess,
+          prepareAutomatic: automaticReviewAvailable
+            ? prepareWelcomeAutomaticReview
+            : undefined,
           answer: answerWelcomeFullAccess,
           start: startWelcomeFullAccess,
         }
@@ -850,7 +870,8 @@ function WelcomeSurface({
                   <AgentComposer
                     access={{
                       mode: staged.permissionMode,
-                      available: !!fullAccess,
+                      available: !!accessHost,
+                      automaticReview: !!accessHost?.prepareAutomatic,
                       staged: true,
                       busy,
                       onChange: (mode) => {
@@ -860,7 +881,7 @@ function WelcomeSurface({
                             workspace: target ?? defaultWorkspace,
                             defaultWorkspace: workspacesNs.getDefault,
                           },
-                          fullAccess
+                          accessHost
                         );
                       },
                     }}
