@@ -1266,6 +1266,38 @@ retains that binding, including while it waits in the queue, and the turn's
 editor tools target only that endpoint. Both operations require Act, a text
 prompt with optional editor context, and the negotiated capabilities.
 
+When both peers also negotiate `co.grida/session/desktop-tools` version 1,
+new accepted input carries the Desktop product context, including when no
+workbench is attached. For an eligible editor binding, the agent requests
+its catalog at input acceptance, including for queued input.
+`_co.grida/editor/desktop-tools` is a reverse ACP request with
+`sessionId`, `endpointId`, `timeoutMs`, `expiresAtMs` in Unix milliseconds,
+and `message`, an MCP JSON-RPC `tools/list` or `tools/call` request. An
+optional `scope` object names the accepted `svgTargetId` or sets
+`presentation: true`. Main bounds the operation by the original absolute
+deadline and its local relative timeout. The reply echoes the session and
+endpoint and carries the correlated MCP reply in `message`.
+Each listed definition gives `co.grida/definitionRevision` in `_meta` and a
+call repeats that revision in `params._meta`. The agent captures at most 16
+definitions and 32 KiB of catalog data. Main rejects an expired request,
+unavailable endpoint, or changed definition before dispatch. ACP
+cancellation applies to the individual outstanding call. A lost or
+uncorrelated reply after an execution request leaves the outcome uncertain.
+Accepted input cannot switch to a replacement source or retry its call
+through a legacy route.
+
+The modern catalog supplies the file inventory, selected SVG operations and
+the exact file presentation operation where granted. New accepted inputs
+record the model-facing workbench contract. `workbench_list_tabs` lists the
+attached workbench and `workbench_show` accepts a typed target. The file-only
+binding maps a `file` target to the existing private path request. The browser
+binding also accepts `url` and `tab` targets and supplies
+`workbench_close_browser_tab` for a visible web tab. The model-facing
+`browser_close` handles background pages. The private transport and the
+external MCP catalogs retain their existing schemas. Older accepted inputs
+retain their original names, schema revisions and grants. Without modern
+negotiation, the private supervisor uses the legacy methods below.
+
 | Direction      | Method                               | Parameters and result                                                                                                                                                                   |
 | -------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Agent → client | `_co.grida/editor/surface-list-open` | `sessionId`, `endpointId`. Returns the same identities with `available`, the `active` path or null, up to 50 `open` paths relative to the workspace root, and `truncated`.              |

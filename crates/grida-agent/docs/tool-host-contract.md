@@ -99,16 +99,28 @@ workbench returns an empty view. A detached or replaced workbench is unavailable
 An unverified reply supplies no editor data. The binding grants no filesystem
 access or document mutation.
 
-The disposable Desktop export uses the same `surface_list_open` definition,
-snapshot validation, and domain result through its authenticated MCP listener.
+The negotiated Desktop catalog supplies the definition and handler for each
+eligible operation. The host retains that catalog, its source generation,
+and the endpoint with accepted input. Native discovery selects definitions
+from that capture and offers them on the model request after search. A
+concurrent invocation from the request that performed the lookup still uses
+that request's original inventory. A continued turn keeps the recorded
+definitions even after the source disconnects. Calls to that source report
+unavailable before dispatch. Execution requires the exact captured source
+generation and live endpoint.
+
+The default disposable Desktop export grants only `surface_list_open` and
+uses the same definition, snapshot validation, and domain result through its
+authenticated MCP listener.
 The launcher selects an exact registered workspace and Main binds its first
 admitted workbench frame independently of chat. A bounded reverse stdio read
 asks Main for that frame's current published view on each tool call. Loss of
 the frame withdraws the view for the lifetime of the export. Losing the private
 stdio connection closes the listener.
 
-When the same workbench offers presentation, `surface_open` asks that exact
-frame to open a workspace artifact. Main binds the request to a call identity
+When the same workbench offers presentation, `workbench_show` asks that exact
+frame to show a workspace artifact as a file target. The workbench chooses
+the viewer. Main binds the request to a call identity
 and the frame's last published view. The editor validates the target and
 checks the view again before changing tabs. A dispatch receipt confirms Main
 accepted the send to the captured frame. Observed display requires separate
@@ -120,7 +132,10 @@ browser catalog. The existing tool host captures the endpoint in Act and
 preserves it throughout the accepted input. Main owns page admission,
 document and viewport guards, and the actual guest. Background pages remain
 within their creating scope, and workbench calls use the exact authorized
-tab. Browser close and scope cleanup retire owned background pages.
+tab. `browser_close` and scope cleanup retire owned background pages.
+`workbench_close_browser_tab` requests closure of a visible browser tab.
+Older captured turns and MCP export profiles keep their existing names
+and schemas.
 Observations from a revoked or replaced endpoint are discarded.
 
 The browser opt-in for the external export adds a bounded, correlated private
@@ -135,8 +150,9 @@ A file reveal through the trusted workbench remains auxiliary when its reply is
 unconfirmed. URL opens, tab selection and explicit focus retain ordinary
 uncertain-outcome handling.
 
-The SVG text binding captures one plain selected text node at immediate Act
-submission. The renderer owns the loaded editor, tab and selection identity.
+The SVG text binding captures one plain selected text node when an eligible
+Act input is submitted or queued. The renderer owns the loaded editor, tab
+and selection identity.
 `svg_read_selected_text` supplies the text and its opaque revision.
 `svg_replace_selected_text` verifies that same capture and calls the editor's
 undoable text command. The result reports the live edit separately from disk

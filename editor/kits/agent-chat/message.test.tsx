@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChatMessage } from "@/lib/agent-chat/types";
 import { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
 import { native_message_parts } from "@/lib/agent-chat/native-message-parts";
+import { native_tool_parts } from "@/lib/agent-chat/native-tool-parts";
 import {
   IMAGE_REFERENCE_PART,
   imagesMessageContext,
@@ -76,6 +77,40 @@ function region(html: string, attribute: string): string | null {
   }
   throw new Error("unbalanced rendered element");
 }
+
+describe("tool call icons", () => {
+  it.each([
+    { toolName: "workbench_list_tabs", icon: "lucide-monitor" },
+    { toolName: "browser_snapshot", icon: "lucide-monitor" },
+    { toolName: "other_tool", icon: "lucide-wrench" },
+  ])("renders the icon for $toolName", ({ toolName, icon }) => {
+    expect(renderToolCalls(toolName)).toContain(icon);
+  });
+
+  it("uses a monitor on a collapsed group dominated by desktop tools", () => {
+    const html = renderToolCalls(
+      "workbench_list_tabs",
+      "browser_snapshot",
+      "other_tool"
+    );
+    expect(html.match(/<svg[^>]*>/)?.[0]).toContain("lucide-monitor");
+    expect(html).toContain("Used 2 desktop tools, used 1 tool call");
+  });
+
+  function renderToolCalls(...toolNames: string[]) {
+    const parts = toolNames.map((title) =>
+      native_tool_parts.entry({
+        callId: title,
+        title,
+        kind: "other",
+        outcome: "succeeded",
+      })
+    );
+    return renderToStaticMarkup(
+      <ChatMessageView message={{ id: "reply", role: "assistant", parts }} />
+    );
+  }
+});
 
 describe("user message attachments", () => {
   it("keeps workflow references and model-only context out of authored prose", async () => {

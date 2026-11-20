@@ -48,6 +48,7 @@ import {
   ImagesIcon,
   ListTodoIcon,
   MessageCircleQuestionIcon,
+  MonitorIcon,
   PaperclipIcon,
   PanelsTopLeftIcon,
   PencilIcon,
@@ -1029,6 +1030,8 @@ function iconForAction(action: ToolDisplayDescription["action"]): LucideIcon {
       return AppWindowIcon;
     case "list_tabs":
       return PanelsTopLeftIcon;
+    case "desktop_tool":
+      return MonitorIcon;
     case "tool":
       return WrenchIcon;
   }

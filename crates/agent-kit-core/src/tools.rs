@@ -253,6 +253,21 @@ pub struct InventorySnapshot {
 }
 
 impl InventorySnapshot {
+    /// Project a previously captured inventory for one inference request.
+    pub fn select(&self, selected: &BTreeSet<ToolId>) -> Result<Self> {
+        let tools = selected
+            .iter()
+            .map(|id| {
+                let tool = self
+                    .tools
+                    .get(id)
+                    .ok_or_else(|| Error::new(ErrorKind::Unavailable, "tool_unavailable"))?;
+                Ok((id.clone(), tool.clone()))
+            })
+            .collect::<Result<_>>()?;
+        Ok(Self { tools })
+    }
+
     pub fn offers(&self) -> Result<Vec<ToolOffer>> {
         self.tools
             .values()

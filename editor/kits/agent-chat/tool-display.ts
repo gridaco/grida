@@ -22,6 +22,7 @@ export type ToolDisplayAction =
   | "skill"
   | "open_tab"
   | "list_tabs"
+  | "desktop_tool"
   | "tool";
 
 export type ToolDisplayTone = "running" | "ok" | "warn" | "error";
@@ -272,7 +273,10 @@ export namespace toolDisplay {
 
       default:
         return {
-          action: "tool",
+          action:
+            toolName.startsWith("workbench_") || toolName.startsWith("browser_")
+              ? "desktop_tool"
+              : "tool",
           title: describeTitle(tone, "Using tool", "Used tool", "Tool failed"),
           detail: toolName,
           tone,
@@ -364,6 +368,7 @@ const GROUP_VERBS: Record<
   skill: ["loaded", "loading", "load"],
   open_tab: ["opened", "opening", "open"],
   list_tabs: ["checked", "checking", "check"],
+  desktop_tool: ["used", "using", "use"],
   tool: ["used", "using", "use"],
 };
 
@@ -465,6 +470,8 @@ function nounForAction(action: ToolDisplayAction): string {
       return "tab";
     case "list_tabs":
       return "tab check";
+    case "desktop_tool":
+      return "desktop tool";
     case "tool":
       return "tool call";
   }

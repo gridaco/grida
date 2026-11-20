@@ -36,6 +36,12 @@ mod delegation;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[path = "process/deletion.rs"]
 mod deletion;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[path = "process/desktop_fx_discovery.rs"]
+mod desktop_fx_discovery;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[path = "process/desktop_tools.rs"]
+mod desktop_tools;
 #[cfg(unix)]
 #[path = "process/effort.rs"]
 mod effort;

@@ -29,8 +29,13 @@ impl Server {
     }
 
     async fn start_profile(command: &str, extra: &[&str]) -> Self {
+        let (state, child) = Self::spawn(command, extra);
+        Self::ready(state, child).await
+    }
+
+    fn spawn(command: &str, extra: &[&str]) -> (tempfile::TempDir, Child) {
         let state = tempfile::tempdir().unwrap();
-        let mut child = Command::new(env!("CARGO_BIN_EXE_grida-agent"))
+        let child = Command::new(env!("CARGO_BIN_EXE_grida-agent"))
             .env_clear()
             // Windows sockets need the system root, which clearing the environment removes.
             .envs(std::env::var_os("SystemRoot").map(|root| ("SystemRoot", root)))
@@ -50,6 +55,10 @@ impl Server {
             .stderr(Stdio::piped())
             .spawn()
             .unwrap();
+        (state, child)
+    }
+
+    async fn ready(state: tempfile::TempDir, mut child: Child) -> Self {
         let mut stderr = BufReader::new(child.stderr.take().unwrap()).lines();
         let mut seen = Vec::new();
         let url = tokio::time::timeout(Duration::from_secs(5), async {
@@ -106,7 +115,34 @@ impl Server {
 
 #[tokio::test]
 async fn live_editor_exports_the_same_bounded_read_without_a_chat_store() {
-    let mut server = Server::start_tool("serve-editor-mcp").await;
+    let (state, mut child) = Server::spawn("serve-editor-mcp", &[]);
+    let mut input = child.stdin.take().unwrap();
+    let mut output = BufReader::new(child.stdout.take().unwrap()).lines();
+    let listing: Value = serde_json::from_str(
+        &tokio::time::timeout(Duration::from_secs(5), output.next_line())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(listing["method"], "tools/list");
+    let descriptor = json!({
+        "name":"surface_list_open",
+        "description":"Read the workbench inventory from the fixture producer",
+        "annotations":{"readOnlyHint":true},
+        "inputSchema":{"type":"object", "additionalProperties":false},
+        "outputSchema":{"type":"object", "properties":{"open":{"type":"array", "maxItems":50}}},
+    });
+    let mut private = descriptor.clone();
+    private["_meta"] = json!({"co.grida/definitionRevision": 17});
+    let response = json!({"jsonrpc":"2.0","id":listing["id"],
+        "result":{"resultType":"complete","tools":[private]}});
+    input
+        .write_all(format!("{response}\n").as_bytes())
+        .await
+        .unwrap();
+    let mut server = Server::ready(state, child).await;
     let listed = decode(
         server
             .request("tools/list", json!({}))
@@ -116,43 +152,29 @@ async fn live_editor_exports_the_same_bounded_read_without_a_chat_store() {
     )
     .await;
     let tools = listed["result"]["tools"].as_array().unwrap();
-    assert_eq!(tools.len(), 1);
-    assert_eq!(tools[0]["name"], "surface_list_open");
-    assert_eq!(tools[0]["inputSchema"]["additionalProperties"], false);
-    assert_eq!(
-        tools[0]["outputSchema"]["properties"]["open"]["maxItems"],
-        50
-    );
-    let mut input = server.child.stdin.take().unwrap();
-    let mut output = BufReader::new(server.child.stdout.take().unwrap()).lines();
-    let invalid = decode(
-        server
-            .request(
-                "tools/call",
-                json!({
-                    "name": "surface_list_open", "arguments": {"workspace": "other"}
-                }),
-            )
-            .send()
-            .await
-            .unwrap(),
-    )
-    .await;
-    assert_eq!(invalid["result"]["isError"], true);
-    assert!(
-        tokio::time::timeout(Duration::from_millis(75), output.next_line())
-            .await
-            .is_err()
-    );
+    assert_eq!(*tools, [descriptor]);
 
-    for snapshot in [
-        json!({"available":true,"active":null,"open":[],"truncated":false}),
-        json!({"available":true,"active":"/second.canvas","open":["/first.svg","/second.canvas"],"truncated":false}),
-        json!({"available":false,"active":null,"open":[],"truncated":false}),
+    for (arguments, result) in [
+        (
+            json!({"workspace":"other"}),
+            json!({"content":[{"type":"text","text":"invalid_editor_surface_arguments"}],"isError":true}),
+        ),
+        (
+            json!({}),
+            json!({"content":[],"structuredContent":{"interactive":true,"active":null,"open":[],"truncated":false},"isError":false}),
+        ),
+        (
+            json!({}),
+            json!({"content":[],"structuredContent":{"interactive":true,"active":"/second.canvas","open":["/first.svg","/second.canvas"],"truncated":false},"isError":false}),
+        ),
+        (
+            json!({}),
+            json!({"content":[{"type":"text","text":"editor_surface_endpoint_unavailable"}],"isError":true}),
+        ),
     ] {
         let call = server.request(
             "tools/call",
-            json!({"name":"surface_list_open","arguments":{}}),
+            json!({"name":"surface_list_open","arguments":arguments}),
         );
         let pending = tokio::spawn(async move { decode(call.send().await.unwrap()).await });
         let line = tokio::time::timeout(Duration::from_secs(1), output.next_line())
@@ -161,30 +183,22 @@ async fn live_editor_exports_the_same_bounded_read_without_a_chat_store() {
             .unwrap()
             .unwrap();
         let request: Value = serde_json::from_str(&line).unwrap();
-        assert_eq!(request.as_object().unwrap().len(), 1);
-        assert!(uuid::Uuid::parse_str(request["requestId"].as_str().unwrap()).is_ok());
-        let reply = json!({"requestId":request["requestId"], "snapshot":snapshot});
+        assert!(uuid::Uuid::parse_str(request["id"].as_str().unwrap()).is_ok());
+        assert_eq!(request["method"], "tools/call");
+        assert_eq!(request["params"]["name"], "surface_list_open");
+        assert_eq!(request["params"]["arguments"], arguments);
+        assert_eq!(
+            request["params"]["_meta"]["co.grida/definitionRevision"],
+            17
+        );
+        let mut result = result;
+        result["resultType"] = "complete".into();
+        let reply = json!({"jsonrpc":"2.0","id":request["id"],"result":result});
         input
             .write_all(format!("{reply}\n").as_bytes())
             .await
             .unwrap();
-        let result = pending.await.unwrap();
-        if snapshot["available"] == true {
-            assert_eq!(result["result"]["isError"], false);
-            assert_eq!(
-                result["result"]["structuredContent"],
-                json!({
-                    "interactive":true,"active":snapshot["active"],"open":snapshot["open"],"truncated":false
-                })
-            );
-        } else {
-            assert_eq!(result["result"]["isError"], true);
-            assert_eq!(
-                result["result"]["content"][0]["text"],
-                "editor_surface_endpoint_unavailable"
-            );
-            assert!(result["result"].get("structuredContent").is_none());
-        }
+        assert_eq!(pending.await.unwrap()["result"], result);
     }
     assert!(server.state.path().read_dir().unwrap().next().is_none());
     drop(input);
@@ -193,6 +207,41 @@ async fn live_editor_exports_the_same_bounded_read_without_a_chat_store() {
         .unwrap()
         .unwrap();
     assert!(status.success());
+}
+
+#[tokio::test]
+async fn live_editor_does_not_substitute_an_unrelated_read_in_the_inventory_profile() {
+    let (_state, mut child) = Server::spawn("serve-editor-mcp", &[]);
+    let mut input = child.stdin.take().unwrap();
+    let mut output = BufReader::new(child.stdout.take().unwrap()).lines();
+    let line = tokio::time::timeout(Duration::from_secs(5), output.next_line())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    let listing: Value = serde_json::from_str(&line).unwrap();
+    assert_eq!(listing["method"], "tools/list");
+    let response = json!({"jsonrpc":"2.0","id":listing["id"],
+    "result":{"resultType":"complete","tools":[{
+        "name":"unrelated_read",
+        "description":"A fixture operation outside the inventory profile.",
+        "annotations":{"readOnlyHint":true},
+        "inputSchema":{"type":"object"},
+        "_meta":{"co.grida/definitionRevision":1}
+    }]}});
+    input
+        .write_all(format!("{response}\n").as_bytes())
+        .await
+        .unwrap();
+    let result = tokio::time::timeout(Duration::from_secs(5), child.wait_with_output())
+        .await
+        .unwrap()
+        .unwrap();
+    let stderr = String::from_utf8_lossy(&result.stderr);
+    assert!(!result.status.success(), "{stderr}");
+    assert!(stderr.contains("editor_mcp_pipe_unavailable"), "{stderr}");
+    assert!(!stderr.contains("MCP listening"), "{stderr}");
+    drop(input);
 }
 
 #[tokio::test]

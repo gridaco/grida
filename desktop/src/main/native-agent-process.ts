@@ -29,11 +29,11 @@ import { NativeActivityOrder } from "./native-activity-order";
 import { NativeSelectedImages } from "./native-selected-images";
 import {
   NativeEditorSurfaceEndpoints,
-  type NativeEditorBrowserReply,
   type NativeEditorSurfaceDelivery,
   type NativeEditorSvgTextDelivery,
 } from "./native-editor-surfaces";
 import type { DesktopBrowserToolLease } from "./desktop-browser-tools";
+import { NativeDesktopTools } from "./native-desktop-tools";
 import {
   NativeAgentPermissions,
   type NativeWorkspaceSelection,
@@ -49,7 +49,7 @@ import {
 
 const FRAME_LIMIT = 1024 * 1024;
 const REQUEST_LIMIT = 16;
-const BROWSER_BUSY_REPLY_LIMIT = 8 * 1024;
+const EDITOR_BUSY_REPLY_LIMIT = 8 * 1024;
 const START_TIMEOUT_MS = 10_000;
 const SHUTDOWN_TIMEOUT_MS = 12_000;
 const KILL_TIMEOUT_MS = 2_000;
@@ -120,11 +120,11 @@ type Pending = {
   timer: ReturnType<typeof setTimeout>;
 };
 
-type BrowserRequest = {
+type EditorRequest = {
   controller: AbortController;
   reply?: {
     bytes: Buffer;
-    ifRevoked?: () => NativeEditorBrowserReply | undefined;
+    ifRevoked?: () => Buffer | undefined;
   };
 };
 
@@ -218,15 +218,13 @@ export class NativeAgentProcess {
   private editorSurfaceOpen = false;
   private editorSvgText = false;
   private editorBrowserTools = false;
+  private editorTools = false;
   private editorContext = false;
   private messageContext = false;
   private initialTitle = false;
-  private readonly editorBrowserRequests = new Map<
-    string | number,
-    BrowserRequest
-  >();
-  private readonly browserBusyReplies = new Map<string | number, Buffer>();
-  private browserBusyReplyBytes = 0;
+  private readonly editorRequests = new Map<string | number, EditorRequest>();
+  private readonly editorBusyReplies = new Map<string | number, Buffer>();
+  private editorBusyReplyBytes = 0;
   private chatSelection = false;
   private permissionMode = false;
   private readonly commandCapabilities = new Set<string>();
@@ -731,6 +729,7 @@ export class NativeAgentProcess {
                   [NativeEditorSurfaceEndpoints.openCapability]: 1,
                   [NativeEditorSurfaceEndpoints.svgTextCapability]: 1,
                   [NativeEditorSurfaceEndpoints.browserCapability]: 1,
+                  [NativeDesktopTools.capability]: 1,
                 }),
                 [NativeAgentArtifacts.capability]: 1,
                 [NativeAgentBackgroundProcesses.capability]: 1,
@@ -894,6 +893,9 @@ export class NativeAgentProcess {
       processOwner.editorBrowserTools =
         processOwner.editorSurfaces &&
         advertised?.[NativeEditorSurfaceEndpoints.browserCapability] === 1;
+      processOwner.editorTools =
+        processOwner.editorSurfaces &&
+        advertised?.[NativeDesktopTools.capability] === 1;
       processOwner.editorContext =
         options.workspace !== undefined && advertised?.[EDITOR_CONTEXT] === 1;
       processOwner.messageContext =
@@ -993,9 +995,9 @@ export class NativeAgentProcess {
         sessionId,
         snapshot,
         requireCurrent,
-        this.editorSurfaceOpen ? deliver : undefined,
+        this.editorSurfaceOpen || this.editorTools ? deliver : undefined,
         revision,
-        this.editorSvgText ? svgText : undefined,
+        this.editorSvgText || this.editorTools ? svgText : undefined,
         this.editorBrowserTools ? browser : undefined
       );
   }
@@ -1087,7 +1089,7 @@ export class NativeAgentProcess {
     this.child.stdin.write(bytes, (error) => {
       if (error) return;
       try {
-        this.flushBrowserReplies();
+        this.flushEditorReplies();
       } catch {
         this.disconnect("native_agent_browser_reply_failed");
       }
@@ -1095,9 +1097,9 @@ export class NativeAgentProcess {
     return true;
   }
 
-  private browserReplyFrame(
+  private editorReplyFrame(
     id: string | number,
-    result?: NativeEditorBrowserReply | null
+    result?: object | null
   ): Buffer {
     const message = {
       jsonrpc: "2.0",
@@ -1108,85 +1110,114 @@ export class NativeAgentProcess {
             error:
               result === null
                 ? { code: -32602, message: "Invalid params" }
-                : { code: -32603, message: "Browser reply unverified" },
+                : { code: -32603, message: "Editor reply unverified" },
           }),
     };
     return Buffer.from(JSON.stringify(message) + "\n");
   }
 
-  private completeBrowserRequest(
+  private startEditorRequest<T extends object>(
     id: string | number,
-    request: BrowserRequest,
-    result?: NativeEditorBrowserReply | null
+    invoke: (signal: AbortSignal) => Promise<T | null>,
+    busy: () => T | null,
+    replyGuard: (reply: T) => () => T | undefined
+  ): void {
+    if (this.editorRequests.has(id) || this.editorBusyReplies.has(id))
+      throw new Error("native_agent_editor_request_id_reused");
+    if (this.editorRequests.size >= REQUEST_LIMIT) {
+      this.writeEditorBusyReply(id, busy());
+      return;
+    }
+    const controller = new AbortController();
+    const request = { controller };
+    this.editorRequests.set(id, request);
+    void invoke(controller.signal)
+      .then(
+        (result) => {
+          const check = result ? replyGuard(result) : undefined;
+          this.completeEditorRequest(
+            id,
+            request,
+            result,
+            check &&
+              (() => {
+                const revoked = check();
+                return revoked && this.editorReplyFrame(id, revoked);
+              })
+          );
+        },
+        () => this.completeEditorRequest(id, request)
+      )
+      .catch(() => this.disconnect("native_agent_editor_reply_failed"));
+  }
+
+  private completeEditorRequest(
+    id: string | number,
+    request: EditorRequest,
+    result?: object | null,
+    ifRevoked?: () => Buffer | undefined
   ): void {
     if (!this.connected) return;
     if (request.controller.signal.aborted) {
-      this.editorBrowserRequests.delete(id);
+      this.editorRequests.delete(id);
       return;
     }
-    const bytes = this.browserReplyFrame(id, result);
+    const bytes = this.editorReplyFrame(id, result);
     const reply =
       bytes.length <= FRAME_LIMIT
-        ? {
-            bytes,
-            ifRevoked: result
-              ? this.editorEndpoints.browserReplyGuard(result)
-              : undefined,
-          }
-        : { bytes: this.browserReplyFrame(id) };
+        ? { bytes, ifRevoked }
+        : { bytes: this.editorReplyFrame(id) };
     if (reply.bytes.length > FRAME_LIMIT)
       throw new Error("native_agent_frame_limit");
     // A completed request keeps its admitted slot until its one bounded frame
     // is written or canceled. This keeps the stdin cap and the admission cap.
-    if (this.tryWriteBrowserReply(id, reply))
-      this.editorBrowserRequests.delete(id);
+    if (this.tryWriteEditorReply(reply)) this.editorRequests.delete(id);
     else request.reply = reply;
   }
 
-  private tryWriteBrowserReply(
-    id: string | number,
-    reply: NonNullable<BrowserRequest["reply"]>
+  private tryWriteEditorReply(
+    reply: NonNullable<EditorRequest["reply"]>
   ): boolean {
     const revoked = reply.ifRevoked?.();
     if (revoked) {
-      reply.bytes = this.browserReplyFrame(id, revoked);
+      reply.bytes = revoked;
       reply.ifRevoked = undefined;
     }
     return this.tryWrite(reply.bytes);
   }
 
-  private writeBrowserBusyReply(
+  private writeEditorBusyReply(
     id: string | number,
-    result: NativeEditorBrowserReply | null
+    result: object | null
   ): void {
-    const bytes = this.browserReplyFrame(id, result);
+    const bytes = this.editorReplyFrame(id, result);
     if (this.tryWrite(bytes)) return;
     // The caller can time out if this queue also fills. The operation was never
     // dispatched, and its refusal must not disconnect the shared worker.
-    if (this.browserBusyReplyBytes + bytes.length > BROWSER_BUSY_REPLY_LIMIT)
+    if (this.editorBusyReplyBytes + bytes.length > EDITOR_BUSY_REPLY_LIMIT)
       return;
-    this.browserBusyReplies.set(id, bytes);
-    this.browserBusyReplyBytes += bytes.length;
+    this.editorBusyReplies.set(id, bytes);
+    this.editorBusyReplyBytes += bytes.length;
   }
 
-  private flushBrowserReplies(): void {
+  private flushEditorReplies(): void {
     if (!this.connected) return;
-    for (const [id, request] of this.editorBrowserRequests) {
+    for (const [id, request] of this.editorRequests) {
       if (!request.reply) continue;
-      if (!this.tryWriteBrowserReply(id, request.reply)) return;
-      this.editorBrowserRequests.delete(id);
+      if (!this.tryWriteEditorReply(request.reply)) return;
+      this.editorRequests.delete(id);
     }
-    for (const [id, bytes] of this.browserBusyReplies) {
+    for (const [id, bytes] of this.editorBusyReplies) {
       if (!this.tryWrite(bytes)) return;
-      this.removeBrowserBusyReply(id);
+      this.removeEditorBusyReply(id);
     }
   }
 
-  private removeBrowserBusyReply(id: string | number): void {
-    const bytes = this.browserBusyReplies.get(id);
+  private removeEditorBusyReply(id: string | number): void {
+    const bytes = this.editorBusyReplies.get(id);
     if (bytes) {
-      this.browserBusyReplyBytes -= bytes.length;
-      this.browserBusyReplies.delete(id);
+      this.editorBusyReplyBytes -= bytes.length;
+      this.editorBusyReplies.delete(id);
     }
   }
 
@@ -1366,29 +1397,27 @@ export class NativeAgentProcess {
           this.editorBrowserTools &&
           message.method === NativeEditorSurfaceEndpoints.browserMethod
         ) {
-          const id = message.id;
-          if (
-            this.editorBrowserRequests.has(id) ||
-            this.browserBusyReplies.has(id)
-          )
-            throw new Error("native_agent_browser_request_id_reused");
-          if (this.editorBrowserRequests.size >= REQUEST_LIMIT) {
-            this.writeBrowserBusyReply(
-              id,
-              this.editorEndpoints.browserBusy(message.params)
-            );
-            return;
-          }
-          const controller = new AbortController();
-          const request = { controller };
-          this.editorBrowserRequests.set(id, request);
-          void this.editorEndpoints
-            .browserTool(message.params, controller.signal)
-            .then(
-              (result) => this.completeBrowserRequest(id, request, result),
-              () => this.completeBrowserRequest(id, request)
-            )
-            .catch(() => this.disconnect("native_agent_browser_reply_failed"));
+          this.startEditorRequest(
+            message.id,
+            (signal) =>
+              this.editorEndpoints.browserTool(message.params, signal),
+            () => this.editorEndpoints.browserBusy(message.params),
+            (reply) => this.editorEndpoints.browserReplyGuard(reply)
+          );
+          return;
+        }
+        if (
+          this.connected &&
+          this.editorTools &&
+          message.method === NativeDesktopTools.method
+        ) {
+          this.startEditorRequest(
+            message.id,
+            (signal) =>
+              this.editorEndpoints.desktopTools(message.params, signal),
+            () => this.editorEndpoints.desktopToolsBusy(message.params),
+            (reply) => this.editorEndpoints.desktopToolsReplyGuard(reply)
+          );
           return;
         }
         if (
@@ -1422,10 +1451,10 @@ export class NativeAgentProcess {
         const id = object(message.params)?.requestId;
         if (typeof id === "number" || typeof id === "string") {
           this.gatewayBillingRequests.get(id)?.abort();
-          const request = this.editorBrowserRequests.get(id);
+          const request = this.editorRequests.get(id);
           request?.controller.abort();
-          if (request?.reply) this.editorBrowserRequests.delete(id);
-          this.removeBrowserBusyReply(id);
+          if (request?.reply) this.editorRequests.delete(id);
+          this.removeEditorBusyReply(id);
         }
         this.imageGeneration?.cancel(id);
         if (typeof id === "string" || typeof id === "number")
@@ -1491,11 +1520,11 @@ export class NativeAgentProcess {
   }
 
   private closeEditorEndpoints(): void {
-    for (const request of this.editorBrowserRequests.values())
+    for (const request of this.editorRequests.values())
       request.controller.abort();
-    this.editorBrowserRequests.clear();
-    this.browserBusyReplies.clear();
-    this.browserBusyReplyBytes = 0;
+    this.editorRequests.clear();
+    this.editorBusyReplies.clear();
+    this.editorBusyReplyBytes = 0;
     this.editorEndpoints.close();
   }
 

@@ -1,5 +1,6 @@
 //! GRIDA-SEC-004 — one typed browser catalog for the captured Desktop owner.
 
+use crate::editor_surfaces::{LIST_OPEN, WORKBENCH_LIST_TABS};
 use crate::file_tools::ImageCapture;
 use crate::tool_host::{
     CallBinding, CapabilityCall, CapabilityDefinition, CapabilityEffect, CapabilityExecutor,
@@ -9,16 +10,21 @@ use agent_kit_core::messages::{MediaRef, OutcomeStatus, ResultContent, Retention
 use agent_kit_core::tools::{RecoveryKind, ToolDefinition, ToolOutcome};
 use agent_kit_core::{ArtifactId, Error, ErrorKind, Result, ToolId};
 use base64::{Engine, engine::general_purpose::STANDARD};
+use grida_agent_master::presentation::{OPEN, WORKBENCH_SHOW};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
-use std::sync::Arc;
+use std::collections::BTreeSet;
+use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 
 pub(crate) const CAPABILITY: &str = "co.grida/session/browser-tools";
 pub(crate) const CAPTURE: &str = "browser_capture";
+pub(crate) const WORKBENCH_CLOSE_BROWSER_TAB: &str = "workbench_close_browser_tab";
+const CLOSE: &str = "browser_close";
+pub(crate) const HELP: &str = "browser_help";
 pub(crate) const NAMES: &[&str] = &[
-    "surface_list_open",
-    "surface_open",
+    LIST_OPEN,
+    OPEN,
     "browser_open",
     "browser_snapshot",
     "browser_navigate",
@@ -27,9 +33,44 @@ pub(crate) const NAMES: &[&str] = &[
     CAPTURE,
     "browser_diagnostics",
     "browser_evaluate",
-    "browser_close",
-    "browser_help",
+    CLOSE,
+    HELP,
 ];
+
+pub(crate) fn names(workbench: bool) -> &'static [&'static str] {
+    static WORKBENCH_NAMES: OnceLock<Vec<&str>> = OnceLock::new();
+    if !workbench {
+        return NAMES;
+    }
+    WORKBENCH_NAMES.get_or_init(|| {
+        NAMES
+            .iter()
+            .map(|&name| match name {
+                LIST_OPEN => WORKBENCH_LIST_TABS,
+                OPEN => WORKBENCH_SHOW,
+                other => other,
+            })
+            .chain([WORKBENCH_CLOSE_BROWSER_TAB])
+            .collect()
+    })
+}
+
+pub(crate) fn wire_name(name: &str) -> &str {
+    match name {
+        WORKBENCH_LIST_TABS => LIST_OPEN,
+        WORKBENCH_SHOW => OPEN,
+        WORKBENCH_CLOSE_BROWSER_TAB => CLOSE,
+        other => other,
+    }
+}
+
+pub(crate) fn wire_arguments(name: &str, arguments: &Value) -> Value {
+    if name == WORKBENCH_CLOSE_BROWSER_TAB {
+        json!({"target":{"kind":"workbench","tabId":arguments["tabId"]}})
+    } else {
+        arguments.clone()
+    }
+}
 
 pub(crate) const MAX_INPUT_BYTES: usize = 40 * 1024;
 pub(crate) const MAX_REPLY_BYTES: usize = 448 * 1024;
@@ -45,297 +86,165 @@ pub(crate) const INSTRUCTIONS: &str = r#"For new browser work, use browser_open 
 
 For an already open tab, use surface_list_open to get its exact tab ID and use {"kind":"workbench","tabId":"…"} as the browser target. Use surface_open for explicit presentation. A page stays with its original owner. Evaluation can change the page. After an unknown action outcome, observe the same target before retrying."#;
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct BrowserToolDescriptor {
+    name: String,
+    version: u32,
+    effect: CapabilityEffect,
+    description: String,
+    input_schema: Value,
+    output_schema: Value,
+}
+
+// The Desktop browser feature owns these schemas. Both legacy transports
+// continue to bind calls to their existing browser owner under that catalog.
+const CATALOG: &str = include_str!("../../../desktop/src/main/browser-tool-catalog.json");
+
+fn parse_catalog(source: &str) -> Option<Vec<BrowserToolDescriptor>> {
+    let catalog: Vec<BrowserToolDescriptor> = serde_json::from_str(source).ok()?;
+    let names: BTreeSet<_> = catalog.iter().map(|tool| tool.name.as_str()).collect();
+    if catalog.len() != NAMES.len()
+        || names != NAMES.iter().copied().collect()
+        || catalog.iter().any(|tool| {
+            tool.version == 0
+                || (tool.name == grida_agent_master::presentation::OPEN
+                    && (tool.version != grida_agent_master::presentation::TARGETED_VERSION
+                        || tool.effect != CapabilityEffect::Presentation))
+                || (tool.name == crate::editor_surfaces::LIST_OPEN && tool.version != 3)
+                || tool.description.is_empty()
+                || tool.input_schema["type"] != "object"
+                || tool.output_schema["type"] != "object"
+        })
+    {
+        return None;
+    }
+    Some(catalog)
+}
+
+fn descriptor(name: &str) -> Result<&'static BrowserToolDescriptor> {
+    static PARSED: OnceLock<Option<Vec<BrowserToolDescriptor>>> = OnceLock::new();
+    PARSED
+        .get_or_init(|| parse_catalog(CATALOG))
+        .as_ref()
+        .ok_or_else(|| Error::new(ErrorKind::InvalidState, "invalid_browser_tool_catalog"))?
+        .iter()
+        .find(|tool| tool.name == name)
+        .ok_or_else(invalid)
+}
+
 pub(crate) fn definitions(
     executor: impl Fn(&'static str) -> Arc<dyn CapabilityExecutor>,
 ) -> Result<Vec<(CapabilityDefinition, Arc<dyn CapabilityExecutor>)>> {
-    NAMES
+    native_definitions(false, executor)
+}
+
+pub(crate) fn native_definitions(
+    workbench: bool,
+    executor: impl Fn(&'static str) -> Arc<dyn CapabilityExecutor>,
+) -> Result<Vec<(CapabilityDefinition, Arc<dyn CapabilityExecutor>)>> {
+    names(workbench)
         .iter()
-        .map(|name| {
-            let (description, input, effect) = spec(name).ok_or_else(invalid)?;
-            Ok((
-                CapabilityDefinition {
-                    tool: ToolDefinition {
-                        id: ToolId::new(*name)?,
-                        version: match *name {
-                            grida_agent_master::presentation::OPEN => grida_agent_master::presentation::TARGETED_VERSION,
-                            "surface_list_open" => 3,
-                            _ => 1,
-                        },
-                        description: description.into(),
-                        input: InputFormat::Json(input),
-                        max_input_bytes: MAX_INPUT_BYTES,
-                        max_output_bytes: MAX_REPLY_BYTES,
-                        recovery: RecoveryKind::Unavailable,
-                    },
-                    output_schema: json!({
-                        "type": "object",
-                        "properties": {
-                            "disposition": {"enum": ["not_dispatched", "dispatched_verified", "unknown"]},
-                            "error": {"type": "string"}
-                        },
-                        "required": ["disposition"]
-                    }),
-                    effect,
-                },
-                executor(name),
-            ))
-        })
+        .map(|&name| Ok((definition(name, workbench)?, executor(name))))
         .collect()
 }
 
-fn spec(name: &str) -> Option<(&'static str, Value, CapabilityEffect)> {
-    use CapabilityEffect::{Mutation, Presentation, Read};
-    Some(match name {
-        "surface_list_open" => (
-            "Inspect the exact authorized workbench's open file and browser tabs. Use the returned tab ID to target what the user is viewing.",
-            object(json!({}), &[]),
-            Read,
+fn definition(name: &str, workbench: bool) -> Result<CapabilityDefinition> {
+    let descriptor = descriptor(wire_name(name))?;
+    let (version, description) = match (workbench, name) {
+        (true, WORKBENCH_SHOW) => (
+            descriptor.version,
+            "Ask the attached workbench to show a workspace file, HTTP(S) URL, or exact tab. The workbench chooses the viewer. Window focus requires an explicit request. Use browser_open for background browser work.",
         ),
-        "surface_open" => (
-            "Present a workspace file as described by artifact guidance, or explicitly show a URL or existing tab in the workbench. Use browser_open for new background browser work.",
-            object(
-                json!({
-                    "target": variants([
-                        tagged("file", json!({"path": text(grida_agent_master::presentation::MAX_PATH_BYTES)}), &["path"]),
-                        tagged("url", json!({"url": url()}), &["url"]),
-                        tagged("tab", json!({"tabId": identifier()}), &["tabId"]),
-                    ]),
-                    "presentation": {"enum":["reveal","focus"]}
-                }),
-                &["target"],
+        (true, CLOSE) => (
+            2,
+            "Close an exact background page owned by this browser scope.",
+        ),
+        (true, WORKBENCH_CLOSE_BROWSER_TAB) => (
+            1,
+            "When the user asks to close a visible browser tab, use its exact tab ID from workbench_list_tabs.",
+        ),
+        _ => (descriptor.version, descriptor.description.as_str()),
+    };
+    Ok(CapabilityDefinition {
+        tool: ToolDefinition {
+            id: ToolId::new(name)?,
+            version,
+            description: description.into(),
+            input: InputFormat::Json(
+                native_close_schema(name, workbench, descriptor)?
+                    .unwrap_or_else(|| descriptor.input_schema.clone()),
             ),
-            Presentation,
-        ),
-        "browser_open" => (
-            "Open a new independent background page at an HTTP(S) URL. Wait on the returned navigation readiness.",
-            object(json!({"url": url()}), &["url"]),
-            Mutation,
-        ),
-        "browser_snapshot" => (
-            "Get a page's current documentId, element refs, and viewport. Pass the entire target object. Omit documentId to discover the current document.",
-            page(json!({}), &[]),
-            Read,
-        ),
-        "browser_navigate" => (
-            "Navigate the exact page guarded by its current document and return navigation readiness. For stop, omit documentId to interrupt the target's pending load.",
-            navigation(),
-            Mutation,
-        ),
-        "browser_action" => (
-            r#"Perform one click, fill, key press, select, hover, or scroll. Supply the target object and current documentId. For a click, set action to {"kind":"click","ref":"…"} using a ref from the snapshot. Verify the result afterward."#,
-            page(json!({"action": actions()}), &["documentId", "action"]),
-            Mutation,
-        ),
-        "browser_wait" => (
-            "Wait for a page condition. Use readiness from browser_open or browser_navigate, or guard a current document.",
-            targeted(
-                json!({
-                    "readiness": variants([
-                        tagged("navigation", json!({"navigationId": identifier()}), &["navigationId"]),
-                        tagged("document", json!({"documentId": identifier()}), &["documentId"]),
-                    ]),
-                    "condition": variants([
-                        tagged("ready", json!({"state":{"enum":["dom-content-loaded","load"]}}), &["state"]),
-                        tagged("text", json!({"text":nonempty_text(512)}), &["text"]),
-                        tagged("url", json!({"url":nonempty_text(4096)}), &["url"]),
-                        tagged("ref", json!({"ref":identifier(),"state":{"enum":["attached","detached","visible","hidden"]}}), &["ref","state"]),
-                    ]),
-                    "timeoutMs": timeout(),
-                }),
-                &["condition"],
-            ),
-            Read,
-        ),
-        CAPTURE => (
-            "Capture viewport pixels and metadata from the exact guarded document. Available to MCP clients and native model connections that accept tool images.",
-            page(json!({}), &["documentId"]),
-            Read,
-        ),
-        "browser_diagnostics" => (
-            "Read bounded console messages and page or load errors for the target.",
-            page(
-                json!({"limit": {"type":"integer","minimum":1,"maximum":100}, "cursor": identifier()}),
-                &[],
-            ),
-            Read,
-        ),
-        "browser_evaluate" => (
-            "Call a JavaScript function with one JSON argument in the exact guarded website document. It can affect the website and cannot access Desktop APIs.",
-            page(
-                json!({"functionText":nonempty_text(16_384),"arg":{},"timeoutMs":timeout()}),
-                &["documentId", "functionText"],
-            ),
-            Mutation,
-        ),
-        "browser_close" => (
-            "Close the exact background page or user-requested workbench tab.",
-            object(json!({"target": target()}), &["target"]),
-            Mutation,
-        ),
-        "browser_help" => (
-            "Read the browser tool contract for a topic.",
-            object(
-                json!({"topic":{"enum":["targets","actions","wait","capture","errors"]}}),
-                &[],
-            ),
-            Read,
-        ),
-        _ => return None,
+            max_input_bytes: MAX_INPUT_BYTES,
+            max_output_bytes: MAX_REPLY_BYTES,
+            recovery: RecoveryKind::Unavailable,
+        },
+        output_schema: descriptor.output_schema.clone(),
+        effect: descriptor.effect,
     })
 }
 
-fn navigation() -> Value {
-    let mut schema = variants([
-        page(
-            json!({"action": tagged("stop", json!({}), &[])}),
-            &["action"],
-        ),
-        page(
-            json!({"action": variants([
-                tagged("goto", json!({"url":url()}), &["url"]),
-                tagged("back", json!({}), &[]),
-                tagged("forward", json!({}), &[]),
-                tagged("reload", json!({}), &[]),
-            ])}),
-            &["documentId", "action"],
-        ),
-    ]);
-    schema["type"] = json!("object");
-    schema
-}
-
-fn actions() -> Value {
-    variants([
-        tagged(
-            "fill",
-            json!({"ref":identifier(),"value":text(8192)}),
-            &["ref", "value"],
-        ),
-        tagged("click", json!({"ref":identifier()}), &["ref"]),
-        tagged("click", json!({"point":point()}), &["point"]),
-        tagged("hover", json!({"ref":identifier()}), &["ref"]),
-        tagged("hover", json!({"point":point()}), &["point"]),
-        tagged(
-            "press",
-            json!({
-                "key":nonempty_text(32),
-                "ref":identifier(),
-                "modifiers":{
-                    "type":"array", "maxItems":4, "uniqueItems":true,
-                    "items":{"enum":["Alt","Control","Meta","Shift"]}
-                }
-            }),
-            &["key"],
-        ),
-        tagged(
-            "select",
-            json!({"ref":identifier(),"value":text(8192)}),
-            &["ref", "value"],
-        ),
-        tagged(
-            "scroll",
-            json!({"deltaX":scroll_delta(),"deltaY":scroll_delta(),"point":point()}),
-            &[],
-        ),
-    ])
-}
-
-fn point() -> Value {
-    object(
-        json!({"x":coordinate(),"y":coordinate(),"viewportId":identifier()}),
-        &["x", "y", "viewportId"],
-    )
-}
-
-fn coordinate() -> Value {
-    json!({"type":"number","minimum":0,"maximum":32_000})
-}
-
-fn scroll_delta() -> Value {
-    json!({"type":"number","minimum":-12_000,"maximum":12_000})
-}
-
-fn target() -> Value {
-    variants([
-        tagged("background", json!({"pageId": identifier()}), &["pageId"]),
-        tagged("workbench", json!({"tabId": identifier()}), &["tabId"]),
-    ])
-}
-
-fn page(mut properties: Value, required: &[&str]) -> Value {
-    properties["documentId"] = identifier();
-    targeted(properties, required)
-}
-
-fn targeted(mut properties: Value, required: &[&str]) -> Value {
-    properties["target"] = target();
-    object(
-        properties,
-        &["target"]
-            .into_iter()
-            .chain(required.iter().copied())
-            .collect::<Vec<_>>(),
-    )
-}
-
-fn tagged(kind: &str, mut properties: Value, required: &[&str]) -> Value {
-    properties["kind"] = json!({"const": kind});
-    object(
-        properties,
-        &["kind"]
-            .into_iter()
-            .chain(required.iter().copied())
-            .collect::<Vec<_>>(),
-    )
-}
-
-fn object(properties: Value, required: &[&str]) -> Value {
-    json!({"type":"object", "properties":properties, "required":required, "additionalProperties":false})
-}
-
-fn variants<const N: usize>(schemas: [Value; N]) -> Value {
-    json!({"oneOf":schemas.into_iter().collect::<Vec<_>>()})
-}
-
-fn identifier() -> Value {
-    nonempty_text(128)
-}
-
-fn text(maximum: usize) -> Value {
-    json!({"type":"string","maxLength":maximum})
-}
-
-fn nonempty_text(maximum: usize) -> Value {
-    json!({"type":"string","minLength":1,"maxLength":maximum})
-}
-
-fn url() -> Value {
-    json!({"type":"string","format":"uri","minLength":1,"maxLength":4096})
-}
-
-fn timeout() -> Value {
-    json!({"type":"integer","minimum":1,"maximum":5000})
+fn native_close_schema(
+    name: &str,
+    workbench: bool,
+    descriptor: &BrowserToolDescriptor,
+) -> Result<Option<Value>> {
+    let kind = match (workbench, name) {
+        (true, CLOSE) => "background",
+        (true, WORKBENCH_CLOSE_BROWSER_TAB) => "workbench",
+        _ => return Ok(None),
+    };
+    let target = descriptor.input_schema["properties"]["target"]["oneOf"]
+        .as_array()
+        .and_then(|variants| {
+            variants
+                .iter()
+                .find(|variant| variant["properties"]["kind"]["const"] == kind)
+        })
+        .ok_or_else(|| Error::new(ErrorKind::InvalidState, "invalid_browser_tool_catalog"))?;
+    if name == CLOSE {
+        let mut schema = descriptor.input_schema.clone();
+        schema["properties"]["target"] = target.clone();
+        Ok(Some(schema))
+    } else {
+        Ok(Some(json!({
+            "type":"object",
+            "properties":{"tabId":target["properties"]["tabId"]},
+            "required":["tabId"],
+            "additionalProperties":false
+        })))
+    }
 }
 
 pub(crate) fn validate(name: &str, arguments: &Value) -> Result<()> {
-    let (_, schema, _) = spec(name).ok_or_else(invalid)?;
-    if !matches_schema(&schema, arguments, false) {
+    validate_native(name, false, arguments)
+}
+
+pub(crate) fn validate_native(name: &str, workbench: bool, arguments: &Value) -> Result<()> {
+    if !names(workbench).contains(&name) {
         return Err(invalid());
     }
-    if name == "browser_evaluate"
+    let operation = wire_name(name);
+    let descriptor = descriptor(operation)?;
+    let schema = native_close_schema(name, workbench, descriptor)?;
+    let schema = schema.as_ref().unwrap_or(&descriptor.input_schema);
+    if !matches_schema(schema, arguments, false) {
+        return Err(invalid());
+    }
+    if operation == "browser_evaluate"
         && let Some(arg) = arguments.get("arg")
         && serde_json::to_vec(arg).map_or(usize::MAX, |bytes| bytes.len()) > 16 * 1024
     {
         return Err(invalid());
     }
-    if name == "browser_action"
+    if operation == "browser_action"
         && arguments["action"]["kind"] == "scroll"
         && arguments["action"]["deltaX"].as_f64().unwrap_or_default() == 0.0
         && arguments["action"]["deltaY"].as_f64().unwrap_or_default() == 0.0
     {
         return Err(invalid());
     }
-    if name == "surface_open"
+    if operation == OPEN
         && let Some(path) = arguments["target"]["path"].as_str()
         && !crate::editor_surfaces::valid_path(path)
     {
@@ -344,7 +253,7 @@ pub(crate) fn validate(name: &str, arguments: &Value) -> Result<()> {
     Ok(())
 }
 
-// Only the closed schema vocabulary constructed above is needed here. Using
+// Only the closed schema vocabulary in the browser catalog is needed here. Using
 // the same schema for discovery and admission prevents them drifting apart.
 fn matches_schema(schema: &Value, value: &Value, count_code_points: bool) -> bool {
     if let Some(variants) = schema["oneOf"].as_array() {
@@ -468,6 +377,17 @@ pub(crate) fn owner_timeout(deadline: Instant) -> Option<u64> {
 }
 
 impl Reply {
+    pub(crate) fn with_workbench_help(mut self) -> Self {
+        if let Some(data) = self.data.as_mut()
+            && data.get("topic").and_then(Value::as_str) == Some("targets")
+            && let Some(text) = data.get_mut("text")
+            && let Some(previous) = text.as_str()
+        {
+            *text = Value::String(previous.replace(LIST_OPEN, WORKBENCH_LIST_TABS));
+        }
+        self
+    }
+
     pub(crate) async fn outcome(self, call: &CapabilityCall, capture: Capture) -> ToolOutcome {
         let mut data = self.data.unwrap_or_default();
         if data.contains_key("disposition") || data.contains_key("error") {
@@ -636,6 +556,97 @@ mod tests {
     use agent_kit_core::BindingId;
 
     #[test]
+    fn browser_catalog_requires_the_legacy_names_and_surface_revisions() {
+        assert!(parse_catalog(CATALOG).is_some());
+        let catalog: Vec<Value> = serde_json::from_str(CATALOG).unwrap();
+        for name in [
+            crate::editor_surfaces::LIST_OPEN,
+            grida_agent_master::presentation::OPEN,
+        ] {
+            let mut incompatible = catalog.clone();
+            let tool = incompatible.iter_mut().find(|tool| tool["name"] == name);
+            tool.unwrap()["version"] = json!(2);
+            assert!(parse_catalog(&serde_json::to_string(&incompatible).unwrap()).is_none());
+        }
+
+        let mut duplicate = catalog.clone();
+        duplicate[0] = duplicate[1].clone();
+        assert!(parse_catalog(&serde_json::to_string(&duplicate).unwrap()).is_none());
+
+        let mut malformed = catalog;
+        malformed[0]["inputSchema"] = json!("object");
+        assert!(parse_catalog(&serde_json::to_string(&malformed).unwrap()).is_none());
+    }
+
+    #[test]
+    fn modern_workbench_names_project_to_the_existing_browser_wire() {
+        let legacy = names(false);
+        let modern = names(true);
+        assert_eq!(modern.len(), legacy.len() + 1);
+        for (old, new) in [(LIST_OPEN, WORKBENCH_LIST_TABS), (OPEN, WORKBENCH_SHOW)] {
+            assert!(legacy.contains(&old));
+            assert!(!legacy.contains(&new));
+            assert!(modern.contains(&new));
+            assert!(!modern.contains(&old));
+            assert_eq!(wire_name(new), old);
+            let old = definition(old, false).unwrap();
+            let new = definition(new, true).unwrap();
+            assert_eq!(new.tool.input, old.tool.input);
+            assert_eq!(new.tool.version, old.tool.version);
+        }
+
+        for target in [
+            json!({"kind":"file","path":"/poster.canvas"}),
+            json!({"kind":"url","url":"https://grida.co/_/canvas"}),
+            json!({"kind":"tab","tabId":"observed-tab"}),
+        ] {
+            assert!(validate_native(WORKBENCH_SHOW, true, &json!({"target":target})).is_ok());
+        }
+        for target in [
+            json!({"kind":"url","url":"file:///poster.svg"}),
+            json!({"kind":"file","path":"/../poster.svg"}),
+        ] {
+            assert!(validate_native(WORKBENCH_SHOW, true, &json!({"target":target})).is_err());
+        }
+    }
+
+    #[test]
+    fn modern_browser_close_only_accepts_background_pages() {
+        let background = json!({"target":{"kind":"background","pageId":"owned-page"}});
+        let visible = json!({"target":{"kind":"workbench","tabId":"observed-tab"}});
+        assert!(validate(CLOSE, &background).is_ok());
+        assert!(validate(CLOSE, &visible).is_ok());
+        assert!(validate_native(CLOSE, true, &background).is_ok());
+        assert!(validate_native(CLOSE, true, &visible).is_err());
+
+        let authorized_tab = json!({"tabId":"observed-tab"});
+        assert!(validate(WORKBENCH_CLOSE_BROWSER_TAB, &authorized_tab).is_err());
+        assert!(validate_native(WORKBENCH_CLOSE_BROWSER_TAB, true, &authorized_tab).is_ok());
+        assert!(validate_native(WORKBENCH_CLOSE_BROWSER_TAB, true, &background).is_err());
+        assert_eq!(wire_name(WORKBENCH_CLOSE_BROWSER_TAB), CLOSE);
+        assert_eq!(
+            wire_arguments(WORKBENCH_CLOSE_BROWSER_TAB, &authorized_tab),
+            visible
+        );
+        assert_eq!(definition(CLOSE, false).unwrap().tool.version, 1);
+        assert_eq!(definition(CLOSE, true).unwrap().tool.version, 2);
+    }
+
+    #[test]
+    fn modern_browser_help_names_the_visible_workbench_catalog() {
+        let data = json!({"topic":"targets","text":"Get a tab ID from surface_list_open."});
+        let reply = Reply {
+            disposition: Disposition::NotDispatched,
+            data: data.as_object().cloned(),
+            error: None,
+            image: None,
+        };
+        assert_eq!(reply.data.as_ref(), data.as_object());
+        let modern = reply.with_workbench_help().data.unwrap();
+        assert_eq!(modern["text"], "Get a tab ID from workbench_list_tabs.");
+    }
+
+    #[test]
     fn wait_text_limit_counts_unicode_code_points() {
         let mut args = json!({
             "target": {"kind": "workbench", "tabId": "tab"},
@@ -650,7 +661,7 @@ mod tests {
 
     #[test]
     fn only_stop_allows_navigation_without_a_document_guard() {
-        let (_, schema, _) = spec("browser_navigate").unwrap();
+        let schema = &descriptor("browser_navigate").unwrap().input_schema;
         assert_eq!(schema["type"], "object");
         let mut args = json!({
             "target": {"kind": "workbench", "tabId": "tab"},
@@ -658,7 +669,7 @@ mod tests {
         });
         assert!(validate("browser_navigate", &args).is_ok());
         args["action"]["kind"] = json!("reload");
-        assert!(!matches_schema(&schema, &args, false));
+        assert!(!matches_schema(schema, &args, false));
         assert!(validate("browser_navigate", &args).is_err());
         args["documentId"] = json!("document");
         assert!(validate("browser_navigate", &args).is_ok());

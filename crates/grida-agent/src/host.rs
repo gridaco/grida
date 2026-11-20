@@ -10,6 +10,7 @@ pub(crate) mod compaction;
 mod completion_checks;
 mod delegation;
 pub(crate) mod deletion;
+mod discovery;
 pub(crate) mod editor_observation;
 mod execution_routes;
 mod file_references;
@@ -548,6 +549,13 @@ struct StoredPrompt {
     allow_image_placement: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     editor_endpoint: Option<BindingId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    editor_tool_catalog: Option<crate::editor_surfaces::DesktopToolCatalog>,
+    // Accepted inputs keep their model-facing names and argument schemas on replay.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    workbench_tools: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    desktop_context: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     editor_presentation: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -731,6 +739,8 @@ struct PreparedInput {
     allow_library_selection: bool,
     permission_capture: Option<crate::permissions::PermissionCapture>,
     host_tools: Vec<Arc<host_tools::HostTools>>,
+    desktop_context: bool,
+    workbench_tools: bool,
     image_generation: Option<image_generation::Prepared>,
     guidance: Option<Message>,
     skills: Option<crate::skills::SkillListing>,
@@ -2238,11 +2248,26 @@ impl Host {
                 workspace_capture,
             )?);
         }
-        let host_tools = prepared
+        let mut host_tools = prepared
             .host_tools
             .into_iter()
             .map(|owner| owner.bind(claim.lease.binding()))
             .collect::<Result<Vec<_>>>()?;
+        let discovery = if prepared.desktop_context && prepared.goal.is_none() && !cancellation_only
+        {
+            discovery::bind(
+                &host_tools,
+                prepared.skills.as_ref().filter(|_| skill_reader.is_some()),
+                claim.lease.binding(),
+                prepared.workbench_tools,
+            )?
+        } else {
+            None
+        };
+        let discovery = discovery.map(|(catalog, owner)| {
+            host_tools.push(owner);
+            catalog
+        });
         let delegation = (!cancellation_only && prepared.effort.is_some())
             .then(|| sponsorship::DelegationAccess::bind(self, claim.lease.binding()))
             .transpose()?;
@@ -2414,6 +2439,9 @@ impl Host {
         let mut master = Master::new(prepared.config, provider.clone(), tools, authority)?
             .with_history(prior)
             .with_input_limit(prepared.limit);
+        if let Some(catalog) = discovery {
+            master = master.with_discovery(catalog);
+        }
         if let Some(file) = file {
             master = master.with_retained_file_check(move || file.check());
         }
@@ -2714,6 +2742,31 @@ impl Host {
                 .is_some_and(|profile| profile.allows_primary_review());
         let host_tools_capture =
             self.capture_host_tools(!child_work && allow_host_tools && operating_regime.is_act())?;
+        let desktop_context = !child_work && self.editor_surfaces.desktop_tools_negotiated();
+        // Browser-aware workbenches source inventory and presentation from
+        // their tab-aware binding. The private catalog supplies SVG support.
+        let editor_tool_catalog = match &editor_endpoint {
+            Some(endpoint) => self
+                .editor_surfaces
+                .discover_tools(
+                    &session.session,
+                    endpoint,
+                    crate::editor_surfaces::mcp::Scope {
+                        presentation: editor_presentation && !editor_browser_tools,
+                        svg_target_id: editor_svg_target.clone(),
+                    },
+                )
+                .await
+                .map(|catalog| {
+                    if editor_browser_tools {
+                        catalog.without_workbench_compatibility()
+                    } else {
+                        catalog
+                    }
+                }),
+            _ => None,
+        };
+        let workbench_tools = editor_tool_catalog.is_some();
         let allow_image_placement = allow_image_placement && desktop_image_generation.is_some();
         let allow_image_reference = allow_library_selection
             && desktop_image_generation.is_some()
@@ -2871,6 +2924,9 @@ impl Host {
                 allow_workspace_reference,
                 allow_image_placement,
                 editor_endpoint,
+                editor_tool_catalog,
+                workbench_tools,
+                desktop_context,
                 editor_presentation,
                 editor_browser_tools,
                 editor_svg_target,
@@ -2906,6 +2962,8 @@ impl Host {
         let spending;
         let cancellation_only = matches!(authority, InputAuthority::CancellationOnly);
         let mut host_tools = Vec::new();
+        let desktop_context;
+        let workbench_tools;
         let mut image_generation = None;
         let subagent;
         let effort;
@@ -2927,6 +2985,14 @@ impl Host {
         ) = match input.payload.version() {
             INPUT_VERSION if input.payload.schema().as_str() == INPUT_SCHEMA => {
                 let stored: StoredPrompt = decode_input(input)?;
+                if stored.workbench_tools && stored.editor_tool_catalog.is_none() {
+                    return Err(problem(
+                        ErrorKind::InvalidState,
+                        "workbench_tools_require_captured_catalog",
+                    ));
+                }
+                desktop_context = stored.desktop_context || stored.editor_tool_catalog.is_some();
+                workbench_tools = stored.workbench_tools;
                 config.instructions = stored
                     .initial_instructions
                     .clone()
@@ -3055,6 +3121,9 @@ impl Host {
                             || stored.allow_workspace_reference
                             || stored.allow_image_placement
                             || stored.editor_endpoint.is_some()
+                            || stored.editor_tool_catalog.is_some()
+                            || stored.workbench_tools
+                            || stored.desktop_context
                             || stored.editor_presentation
                             || stored.editor_browser_tools
                             || stored.editor_svg_target.is_some()
@@ -3102,7 +3171,13 @@ impl Host {
                     return Err(problem(ErrorKind::Conflict, "retained_act_requires_act"));
                 }
                 stored.operating_regime.apply(&mut config);
-                if stored.editor_browser_tools {
+                if desktop_context {
+                    config.instructions.push_str("\n\n");
+                    config
+                        .instructions
+                        .push_str(grida_agent_master::presentation::DESKTOP_CONTEXT);
+                }
+                if stored.editor_browser_tools && stored.editor_tool_catalog.is_none() {
                     config.instructions.push_str("\n\n");
                     config
                         .instructions
@@ -3112,12 +3187,27 @@ impl Host {
                     } else {
                         " This model connection cannot receive browser captures. Use browser snapshots for inspection and report the screenshot limitation if asked."
                     });
-                }
-                if stored.editor_presentation {
-                    config.instructions.push_str("\n\n");
+                } else if stored.editor_browser_tools && !image_tool_results {
                     config
                         .instructions
-                        .push_str(grida_agent_master::presentation::INSTRUCTIONS);
+                        .push_str("\n\nThis model connection cannot receive browser captures.");
+                }
+                let presentation = if stored.editor_browser_tools {
+                    stored.editor_presentation
+                } else {
+                    stored.editor_tool_catalog.as_ref().map_or(
+                        stored.editor_presentation,
+                        crate::editor_surfaces::DesktopToolCatalog::has_presentation,
+                    )
+                };
+                if presentation {
+                    config.instructions.push_str("\n\n");
+                    use grida_agent_master::presentation;
+                    config.instructions.push_str(if workbench_tools {
+                        presentation::WORKBENCH_INSTRUCTIONS
+                    } else {
+                        presentation::INSTRUCTIONS
+                    });
                 }
                 if !cancellation_only
                     && stored.editor_svg_target.is_some()
@@ -3142,27 +3232,58 @@ impl Host {
                             "invalid_editor_surface_scope",
                         ));
                     }
-                    let browser_capture = if stored.editor_browser_tools && image_tool_results {
+                    if let Some(catalog) = &stored.editor_tool_catalog {
+                        use crate::editor_surfaces::mcp::GrantKind;
+                        for kind in [GrantKind::Extension, GrantKind::Presentation] {
+                            if let Some(host) = self.editor_surfaces.captured_tools(
+                                session,
+                                endpoint,
+                                catalog,
+                                kind,
+                                workbench_tools,
+                            )? {
+                                host_tools.push(Arc::new(host_tools::HostTools::desktop(
+                                    host,
+                                    catalog.source(),
+                                    endpoint,
+                                    kind,
+                                    &catalog.names(kind, workbench_tools),
+                                )?));
+                            }
+                        }
+                    }
+                    let legacy = stored.editor_tool_catalog.is_none();
+                    let scope = crate::editor_surfaces::LegacyToolScope {
+                        inventory: legacy,
+                        presentation: legacy && stored.editor_presentation,
+                        svg_target: stored.editor_svg_target.clone().filter(|_| legacy),
+                        browser: stored.editor_browser_tools,
+                        workbench_tools,
+                    };
+                    let browser_capture = if scope.browser && image_tool_results {
                         execution.retained_inputs.as_ref().map(|images| {
                             images.browser_image_capture(session.clone(), cwd.to_owned())
                         })
                     } else {
                         None
                     };
-                    host_tools.push(Arc::new(host_tools::HostTools::editor(
-                        self.editor_surfaces.tool_host(
-                            session.clone(),
+                    if scope.inventory
+                        || scope.presentation
+                        || scope.svg_target.is_some()
+                        || scope.browser
+                    {
+                        host_tools.push(Arc::new(host_tools::HostTools::editor(
+                            self.editor_surfaces.tool_host(
+                                session.clone(),
+                                endpoint.clone(),
+                                &scope,
+                                browser_capture,
+                            )?,
                             endpoint.clone(),
-                            stored.editor_presentation,
-                            stored.editor_svg_target.clone(),
-                            stored.editor_browser_tools,
-                            browser_capture,
-                        )?,
-                        endpoint.clone(),
-                        stored.editor_presentation,
-                        stored.editor_svg_target.is_some(),
-                        stored.editor_browser_tools,
-                    )?));
+                            &scope,
+                            scope.browser && !legacy,
+                        )?));
+                    }
                 }
                 if !cancellation_only && let Some(binding) = &stored.desktop_image_generation {
                     if !stored.operating_regime.is_act()
@@ -3372,6 +3493,8 @@ impl Host {
             allow_library_selection,
             permission_capture,
             host_tools,
+            desktop_context,
+            workbench_tools,
             image_generation,
             guidance,
             skills,

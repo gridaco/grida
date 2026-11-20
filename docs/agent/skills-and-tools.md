@@ -80,6 +80,16 @@ guidance but never add access. [Understand agent permissions](./permissions.md)
 Source-built headless and ACP hosts use the permission profile you supply.
 [Work with selected folders](./clients.md#work-with-selected-folders)
 
+In a Desktop **Act** chat with an attached workbench, describe the operation
+you need. The agent can look up the available Desktop tools for that task,
+such as listing open tabs or reading selected SVG text. The lookup uses
+the workbench bound when your message was sent. If it has since been closed
+or replaced, send a new message from the current workbench. Ask the agent to
+show a workspace file or web link and the workbench chooses its viewer. Ask
+it to check how a web page behaves and it can use Browser tools on the
+specific page. A request about an FX workflow can lead the agent to the
+bundled FX skill, which uses the chat's existing command permissions.
+
 Current limits:
 
 - The agent cannot render the SVG or HTML it writes to an image to check how

@@ -303,12 +303,20 @@ async fn serve_connection(
                         let svg = offered(svg_text);
                         let browser = crate::browser_tools::CAPABILITY;
                         let browser_offered = offered(browser);
-                        initialized_host.editor_surfaces.attach(
+                        let desktop_tools = crate::editor_surfaces::DESKTOP_TOOLS_CAPABILITY;
+                        let desktop_tools_offered = offered(desktop_tools);
+                        if let Err(error) = initialized_host.editor_surfaces.attach(
                             connection.clone(),
                             presentation,
                             svg,
                             browser_offered,
-                        );
+                            desktop_tools_offered,
+                        ) {
+                            return responder.respond_with_error(host_error(error));
+                        }
+                        if desktop_tools_offered {
+                            advertised.insert(desktop_tools.into(), 1.into());
+                        }
                         if browser_offered {
                             advertised.insert(browser.into(), 1.into());
                         }
@@ -338,6 +346,7 @@ async fn serve_connection(
                             crate::editor_surfaces::CAPABILITY,
                             crate::editor_surfaces::OPEN_CAPABILITY,
                             crate::editor_surfaces::SVG_TEXT_CAPABILITY,
+                            crate::editor_surfaces::DESKTOP_TOOLS_CAPABILITY,
                             crate::browser_tools::CAPABILITY,
                             extensions::gateway_billing::CAPABILITY,
                             extensions::gateway_billing::CHILD_CAPABILITY,

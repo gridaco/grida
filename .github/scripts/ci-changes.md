@@ -22,6 +22,9 @@ and `providers-v1/*.toml`, consumed directly by Rust tests. The checker PNG is
 read by the Rust conformance driver and documentation examples. Shared AI
 authoring data and SDK projections require contract verification even though
 production Rust embeds the generated copies under `crates/grida-ai/data/`.
+Cargo also embeds the Desktop browser schema from
+`desktop/src/main/browser-tool-catalog.json` in `grida-agent`. Catalog changes
+select the same verification as Rust source changes.
 
 The separate Local OAuth proof retains its cross-product auth/editor paths.
 The Machine API boundary workflow intentionally remains unconditional.

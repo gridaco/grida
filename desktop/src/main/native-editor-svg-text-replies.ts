@@ -12,23 +12,33 @@ export class NativeEditorSvgTextReplies {
   async dispatch(
     attachmentId: string,
     request: NativeEditorSvgText.Request & { callId: string },
-    send: () => void
+    send: () => void,
+    signal?: AbortSignal
   ): Promise<NativeEditorSvgText.Result> {
     const remaining = request.expiresAtMs - Date.now();
     if (
       remaining <= 0 ||
+      signal?.aborted ||
       this.pending.size >= 8 ||
       this.pending.has(request.callId)
     )
       return { kind: "unavailable" };
     const reply = Promise.withResolvers<NativeEditorSvgText.Result>();
     this.pending.set(request.callId, { attachmentId, reply });
-    const timer = setTimeout(() => reply.reject(unverified()), remaining);
+    const unverify = () => reply.reject(unverified());
+    const timer = setTimeout(unverify, remaining);
+    signal?.addEventListener("abort", unverify, { once: true });
     try {
-      send();
+      try {
+        send();
+      } catch (error) {
+        // Revalidating the owner can abort the reply and throw in the same send.
+        reply.reject(error);
+      }
       return await reply.promise;
     } finally {
       clearTimeout(timer);
+      signal?.removeEventListener("abort", unverify);
       this.pending.delete(request.callId);
     }
   }

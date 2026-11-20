@@ -269,6 +269,16 @@ impl SkillListing {
             .map(|skill| skill.name.as_str())
     }
 
+    pub(crate) fn extension_skills(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.skills
+            .iter()
+            .filter(|skill| {
+                skill.source == SkillSource::Bundled
+                    && OPTIONAL_BUNDLED.iter().any(|(name, _)| *name == skill.name)
+            })
+            .map(|skill| (skill.name.as_str(), skill.description.as_str()))
+    }
+
     pub(crate) fn instructions(&self) -> String {
         let mut entries = String::new();
         let mut omitted = 0;

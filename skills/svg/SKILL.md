@@ -14,29 +14,26 @@ When you operate on `.svg` files inside a Grida editor session:
 
 ## Show the result
 
-- Treat presentation as the first production milestone, not the final
-  "validate and open" step. For a new standalone SVG, write a meaningful valid
-  first frame with the intended dimensions and basic visible composition, call
-  `surface_open` immediately with its workspace-rooted path (for example,
-  `/poster.svg`), then continue adding and refining details while the user can
-  watch. Do not wait for complete content, polish, preview generation,
-  exhaustive validation, or task completion. For nontrivial work,
-  intentionally start with the basic frame instead of authoring the finished
-  SVG before opening it.
+- When the workbench offers presentation, use `workbench_show` with a
+  workspace file target such as `{"target":{"kind":"file","path":"/poster.svg"}}`.
+  Discover deferred workbench tools with `tool_search` before invoking them.
+  On an older host that offers `surface_open`, follow that tool's schema.
+- For a new standalone SVG, write a meaningful valid first frame with the
+  intended dimensions and basic visible composition. Show it at that
+  checkpoint, then continue adding and refining details while the user can
+  watch.
 - Never open an empty or invalid SVG. For an existing primary SVG, open it
   before substantial edits.
 - Open a standalone SVG by its file path. When the SVG belongs to a `.canvas`
   board or deck, the board/deck skill owns presentation: open the `.canvas`
   bundle directory once its manifest references a valid document, never the
   internal SVG or `.canvas.json` manifest.
-- If the standalone SVG or `.canvas` bundle is already mounted at the dedicated
-  file surface's root, it is already presented; do not call `surface_open` just
-  to reopen it.
-- Treat presentation as auxiliary: continue regardless of the result, never
-  retry based on presentation status, and do not call `surface_open` after
-  every write.
-- Use `surface_list_open` only when the current host surface state is materially
-  useful. It is not required before `surface_open`.
+- If the standalone SVG or `.canvas` bundle is already mounted at the
+  dedicated file surface's root, keep the current view open.
+- Continue artifact work after the reveal request. Show it again only when the
+  user asks or the primary artifact changes.
+- Use `workbench_list_tabs` only when the current tabs matter to the task. On
+  an older host, use `surface_list_open` for this read when offered.
 
 ## SVG style
 

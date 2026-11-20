@@ -14,6 +14,7 @@ import { NativeGatewayConnection } from "./native-gateway-connection";
 
 const resources = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
 const origin = "https://editor.fixture.invalid";
+const SEARCH = "tool_search";
 const READ = "svg_read_selected_text";
 const REPLACE = "svg_replace_selected_text";
 
@@ -59,14 +60,26 @@ it.runIf(Boolean(resources)).each(["workbench", "root deck", "nested deck"])(
                 JSON.parse(message.content)
               )
           );
-          if (offers.length === 1) return tool(READ, {}, "svg-read");
-          if (offers.length === 2)
+          if (offers.length === 1)
+            return tool(
+              SEARCH,
+              { source: "workbench", query: "selected SVG text" },
+              "svg-discover"
+            );
+          if (offers.length === 2) return tool(READ, {}, "svg-read");
+          if (offers.length === 3)
             return tool(
               REPLACE,
               { revision: target, text: "Changed" },
               "svg-replace"
             );
-          if (offers.length === 5)
+          if (offers.length === 6)
+            return tool(
+              SEARCH,
+              { source: "workbench", query: REPLACE },
+              "svg-discover-again"
+            );
+          if (offers.length === 7)
             return tool(
               REPLACE,
               { revision: target, text: "Unverified" },
@@ -213,7 +226,11 @@ it.runIf(Boolean(resources)).each(["workbench", "root deck", "nested deck"])(
         },
         { timeout: 6000 }
       );
-      expect(offers[0]).toEqual(expect.arrayContaining([READ, REPLACE]));
+      expect(offers).toHaveLength(4);
+      expect(offers[0]).toContain(SEARCH);
+      expect(offers[0]).not.toContain(READ);
+      expect(offers[0]).not.toContain(REPLACE);
+      expect(offers[1]).toEqual(expect.arrayContaining([READ, REPLACE]));
       expect(delivered).toHaveLength(2);
       expect(
         delivered.map(({ attachmentId, targetId, operation }) => ({
@@ -239,6 +256,15 @@ it.runIf(Boolean(resources)).each(["workbench", "root deck", "nested deck"])(
           expect.objectContaining({
             status: "succeeded",
             structured: {
+              matches: expect.arrayContaining([
+                expect.objectContaining({ kind: "tool", name: READ }),
+                expect.objectContaining({ kind: "tool", name: REPLACE }),
+              ]),
+            },
+          }),
+          expect.objectContaining({
+            status: "succeeded",
+            structured: {
               kind: "read",
               path: "/poster.svg",
               revision: target,
@@ -261,9 +287,10 @@ it.runIf(Boolean(resources)).each(["workbench", "root deck", "nested deck"])(
           "plan"
         )
       );
-      await vi.waitFor(() => expect(offers).toHaveLength(4));
-      expect(offers[3]).not.toContain(READ);
-      expect(offers[3]).not.toContain(REPLACE);
+      await vi.waitFor(() => expect(offers).toHaveLength(5));
+      expect(offers[4]).not.toContain(SEARCH);
+      expect(offers[4]).not.toContain(READ);
+      expect(offers[4]).not.toContain(REPLACE);
       expect(delivered).toHaveLength(2);
       const unknown = await onRoute(() => ipc.create(event));
       await onRoute(() =>
@@ -293,8 +320,17 @@ it.runIf(Boolean(resources)).each(["workbench", "root deck", "nested deck"])(
         },
         { timeout: 6000 }
       );
-      expect(offers).toHaveLength(5);
+      expect(offers).toHaveLength(7);
+      expect(offers[5]).toContain(SEARCH);
+      expect(offers[5]).not.toContain(READ);
+      expect(offers[5]).not.toContain(REPLACE);
+      expect(offers[6]).toContain(REPLACE);
       expect(delivered).toHaveLength(3);
+      expect(delivered[2]).toMatchObject({
+        attachmentId: unknown.attachmentId,
+        targetId: target,
+        operation: { kind: "replace", revision: target, text: "Unverified" },
+      });
     } finally {
       try {
         await chat?.close();

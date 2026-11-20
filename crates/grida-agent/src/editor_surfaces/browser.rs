@@ -15,14 +15,16 @@ pub(super) fn tools(
     session_id: SessionId,
     endpoint_id: BindingId,
     capture: Option<Arc<ImageCapture>>,
+    workbench: bool,
 ) -> Result<Vec<(CapabilityDefinition, Arc<dyn CapabilityExecutor>)>> {
-    browser_tools::definitions(|operation| {
+    browser_tools::native_definitions(workbench, |operation| {
         Arc::new(Execute {
             owner: owner.clone(),
             session_id: session_id.clone(),
             endpoint_id: endpoint_id.clone(),
             operation,
             capture: Capture::Native(capture.clone()),
+            workbench,
         })
     })
 }
@@ -33,11 +35,12 @@ struct Execute {
     endpoint_id: BindingId,
     operation: &'static str,
     capture: Capture,
+    workbench: bool,
 }
 
 impl CapabilityExecutor for Execute {
     fn validate(&self, arguments: &Value) -> Result<()> {
-        browser_tools::validate(self.operation, arguments)
+        browser_tools::validate_native(self.operation, self.workbench, arguments)
     }
 
     fn invoke(&self, call: CapabilityCall) -> BoxFuture<'_, CapabilityReply> {
@@ -70,8 +73,8 @@ impl Execute {
             session_id: self.session_id.clone(),
             endpoint_id: self.endpoint_id.clone(),
             call_id: call.binding.id.clone(),
-            operation: self.operation.to_owned(),
-            arguments: call.arguments.clone(),
+            operation: browser_tools::wire_name(self.operation).to_owned(),
+            arguments: browser_tools::wire_arguments(self.operation, &call.arguments),
             timeout_ms,
         };
         // Dropping the pinned ACP response future sends $/cancel_request.
@@ -86,7 +89,12 @@ impl Execute {
             && reply.endpoint_id == request.endpoint_id
             && reply.call_id == request.call_id
         {
-            return reply.result.outcome(call, self.capture.clone()).await;
+            let result = if self.workbench && self.operation == browser_tools::HELP {
+                reply.result.with_workbench_help()
+            } else {
+                reply.result
+            };
+            return result.outcome(call, self.capture.clone()).await;
         }
         browser_tools::uncertain()
     }

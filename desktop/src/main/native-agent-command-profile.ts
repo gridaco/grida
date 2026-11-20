@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { FxExtension } from "./fx-extension";
 import type { NativeHookLaunchProfile } from "./native-agent-hooks";
 import {
   commandTemporaryRoot,
@@ -61,20 +62,27 @@ export namespace NativeCommandProfiles {
       return undefined;
     const [shell, tools] = await Promise.all([
       programEnvironment(),
-      NativeCommandRuntime.prepare(resources, workspace, protectedPaths),
+      FxExtension.command(resources).then((command) =>
+        NativeCommandRuntime.prepare(
+          resources,
+          workspace,
+          protectedPaths,
+          command
+        )
+      ),
     ]);
-    const environment = !tools.programDirectory
+    const environment = !tools.program
       ? shell
       : bounded({
           ...shell,
-          PATH: [tools.programDirectory, shell.PATH]
+          PATH: [tools.program.directory, shell.PATH]
             .filter(Boolean)
             .join(path.delimiter),
         });
-    const runtimeTools = tools.programDirectory
+    const runtimeTools = tools.program
       ? {
-          paths: [tools.programDirectory],
-          skills: { bundledSkills: ["desktop-fx"] },
+          paths: [tools.program.directory],
+          skills: { bundledSkills: [tools.program.skill] },
         }
       : { paths: [], skills: {} };
     if (hooks) {

@@ -2348,7 +2348,7 @@ export class NativeChatIpc {
                 ...request,
               }),
         revision,
-        async (request) => {
+        async (request, signal) => {
           const slide = attachment.deckEditorSurface;
           if (deck && !slide?.active) return { kind: "unavailable" };
           if (file) await file.recheck();
@@ -2361,7 +2361,8 @@ export class NativeChatIpc {
                 attachmentId: attachment.id,
                 ...request,
               });
-            }
+            },
+            signal
           );
           if (file) await file.recheck();
           if (

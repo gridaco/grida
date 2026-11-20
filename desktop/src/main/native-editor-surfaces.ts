@@ -6,7 +6,11 @@ import {
   type NativeEditorSurfaceOpen,
   type NativeEditorSurfaceSnapshot,
 } from "@grida/desktop-bridge";
+import { DesktopArtifactPresentation } from "./desktop-artifact-presentation";
 import type { DesktopBrowserToolLease } from "./desktop-browser-tools";
+import { DesktopSelectedSvgText } from "./desktop-selected-svg-text";
+import { DesktopWorkbenchInventory } from "./desktop-workbench-inventory";
+import { NativeDesktopTools } from "./native-desktop-tools";
 
 const MAX_ENDPOINTS = 32;
 const MAX_PRESENTATION_CALLS = 64;
@@ -30,9 +34,7 @@ export type NativeEditorSurfaceSelection = Readonly<{
 export type NativeEditorSurfaceDelivery = (
   request: NativeEditorSurfaceOpen
 ) => void;
-export type NativeEditorSvgTextDelivery = (
-  request: NativeEditorSvgText.Request & { callId: string }
-) => Promise<NativeEditorSvgText.Result>;
+export type NativeEditorSvgTextDelivery = DesktopSelectedSvgText.Delivery;
 
 type Endpoint = {
   sessionId: string;
@@ -42,6 +44,7 @@ type Endpoint = {
   deliver?: NativeEditorSurfaceDelivery;
   svgText?: NativeEditorSvgTextDelivery;
   browser?: DesktopBrowserToolLease;
+  lifetime: AbortController;
   calls: Map<string, { path: string; requested: boolean }>;
 };
 
@@ -51,6 +54,11 @@ export type NativeEditorBrowserReply = Readonly<{
   endpointId: string;
   callId: string;
   result: BrowserResult;
+}>;
+export type NativeDesktopToolReply = Readonly<{
+  sessionId: string;
+  endpointId: string;
+  message: NativeDesktopTools.Reply;
 }>;
 
 export class NativeEditorSurfaceEndpoints {
@@ -86,6 +94,7 @@ export class NativeEditorSurfaceEndpoints {
       deliver,
       svgText,
       browser,
+      lifetime: new AbortController(),
       calls: new Map(),
     };
     this.endpoints.set(id, endpoint);
@@ -285,6 +294,127 @@ export class NativeEditorSurfaceEndpoints {
     };
   }
 
+  desktopToolsBusy(value: unknown): NativeDesktopToolReply | null {
+    const request = this.desktopToolRequest(value);
+    if (!request) return null;
+    const { sessionId, endpointId, message } = request;
+    const reply = NativeDesktopTools.busy(message);
+    return reply && { sessionId, endpointId, message: reply };
+  }
+
+  async desktopTools(
+    value: unknown,
+    signal: AbortSignal
+  ): Promise<NativeDesktopToolReply | null> {
+    const request = this.desktopToolRequest(value);
+    if (!request) return null;
+    const { sessionId, endpointId, scope, message, timeoutMs } = request;
+    const now = Date.now();
+    // Transit through the private pipe consumes the original tool deadline.
+    const expiresAtMs = Math.min(request.expiresAtMs, now + timeoutMs);
+    const deadline = AbortSignal.timeout(Math.max(0, expiresAtMs - now));
+    const endpoint = this.current(sessionId, endpointId);
+    const tools = endpoint && [
+      DesktopWorkbenchInventory.bind(endpoint.snapshot),
+    ];
+    if (
+      endpoint &&
+      tools &&
+      scope?.presentation &&
+      endpoint.deliver &&
+      endpoint.revision !== undefined
+    ) {
+      tools.push(
+        DesktopArtifactPresentation.bind((path, callId, expiresAtMs) =>
+          this.requestPresentation(
+            sessionId,
+            endpointId,
+            callId,
+            path,
+            expiresAtMs
+          )
+        )
+      );
+    }
+    if (endpoint?.svgText && tools && scope?.svgTargetId)
+      tools.push(
+        ...DesktopSelectedSvgText.bind(scope.svgTargetId, endpoint.svgText)
+      );
+    const reply = await NativeDesktopTools.reply(message, tools, {
+      signal: AbortSignal.any(
+        endpoint
+          ? [signal, deadline, endpoint.lifetime.signal]
+          : [signal, deadline]
+      ),
+      expiresAtMs,
+    });
+    return reply && { sessionId, endpointId, message: reply };
+  }
+
+  desktopToolsReplyGuard(reply: NativeDesktopToolReply) {
+    return () =>
+      "result" in reply.message &&
+      !this.current(reply.sessionId, reply.endpointId)
+        ? { ...reply, message: NativeDesktopTools.unverified(reply.message.id) }
+        : undefined;
+  }
+
+  private desktopToolRequest(value: unknown) {
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      return null;
+    const { sessionId, endpointId, message, scope, timeoutMs, expiresAtMs } =
+      value as Record<string, unknown>;
+    if (
+      !Object.keys(value).every((key) =>
+        [
+          "sessionId",
+          "endpointId",
+          "message",
+          "scope",
+          "timeoutMs",
+          "expiresAtMs",
+        ].includes(key)
+      ) ||
+      typeof sessionId !== "string" ||
+      !SESSION_ID.test(sessionId) ||
+      typeof endpointId !== "string" ||
+      !ENDPOINT_ID.test(endpointId) ||
+      !Object.hasOwn(value, "message") ||
+      typeof timeoutMs !== "number" ||
+      !Number.isSafeInteger(timeoutMs) ||
+      timeoutMs < 1 ||
+      timeoutMs > 120_000 ||
+      typeof expiresAtMs !== "number" ||
+      !Number.isSafeInteger(expiresAtMs) ||
+      expiresAtMs < 1
+    )
+      return null;
+    const scoped = scope as Record<string, unknown> | undefined;
+    if (
+      scope !== undefined &&
+      (!scoped ||
+        typeof scoped !== "object" ||
+        Array.isArray(scoped) ||
+        !Object.keys(scoped).every(
+          (key) => key === "svgTargetId" || key === "presentation"
+        ) ||
+        (Object.hasOwn(scoped, "svgTargetId") &&
+          !NativeEditorSvgText.isId(scoped.svgTargetId)) ||
+        (Object.hasOwn(scoped, "presentation") && scoped.presentation !== true))
+    )
+      return null;
+    return {
+      sessionId,
+      endpointId,
+      message,
+      timeoutMs,
+      expiresAtMs,
+      scope: scoped as
+        | Readonly<{ svgTargetId?: string; presentation?: true }>
+        | undefined,
+    };
+  }
+
   open(value: unknown) {
     if (!value || typeof value !== "object" || Array.isArray(value))
       return null;
@@ -303,33 +433,47 @@ export class NativeEditorSurfaceEndpoints {
       !NativeEditorSurfaces.isPath(path)
     )
       return null;
-    const reply = (requested: boolean) => ({
+    return {
       sessionId,
       endpointId,
       callId,
-      requested,
-    });
+      requested: this.requestPresentation(
+        sessionId,
+        endpointId,
+        callId,
+        path,
+        Date.now() + PRESENTATION_WINDOW_MS
+      ),
+    };
+  }
+
+  private requestPresentation(
+    sessionId: string,
+    endpointId: string,
+    callId: string,
+    path: string,
+    expiresAtMs: number
+  ): boolean {
     const endpoint = this.current(sessionId, endpointId);
-    if (!endpoint) return reply(false);
+    if (!endpoint || expiresAtMs <= Date.now()) return false;
     const previous = endpoint.calls.get(callId);
-    if (previous) return reply(previous.path === path && previous.requested);
-    if (endpoint.calls.size >= MAX_PRESENTATION_CALLS) return reply(false);
+    if (previous) return previous.path === path && previous.requested;
+    if (endpoint.calls.size >= MAX_PRESENTATION_CALLS) return false;
 
     const receipt = { path, requested: false };
     endpoint.calls.set(callId, receipt);
-    if (!endpoint.deliver || endpoint.revision === undefined)
-      return reply(false);
+    if (!endpoint.deliver || endpoint.revision === undefined) return false;
     try {
       endpoint.deliver({
         path,
         revision: endpoint.revision,
-        expiresAtMs: Date.now() + PRESENTATION_WINDOW_MS,
+        expiresAtMs: Math.min(expiresAtMs, Date.now() + PRESENTATION_WINDOW_MS),
       });
       receipt.requested = true;
     } catch {
       // The exact frame can disappear before Electron accepts the send.
     }
-    return reply(receipt.requested);
+    return receipt.requested;
   }
 
   private current(sessionId: string, endpointId: string): Endpoint | undefined {
@@ -346,6 +490,7 @@ export class NativeEditorSurfaceEndpoints {
   private release(endpointId: string): void {
     const endpoint = this.endpoints.get(endpointId);
     this.endpoints.delete(endpointId);
+    endpoint?.lifetime.abort();
     endpoint?.browser?.close();
   }
 

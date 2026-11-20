@@ -813,6 +813,9 @@ impl Host {
         captured.allow_workspace_reference = false;
         captured.allow_image_placement = false;
         captured.editor_endpoint = None;
+        captured.editor_tool_catalog = None;
+        captured.workbench_tools = false;
+        captured.desktop_context = false;
         captured.editor_presentation = false;
         captured.editor_browser_tools = false;
         captured.editor_svg_target = None;

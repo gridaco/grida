@@ -950,6 +950,13 @@ implementation. Actual editor behavior and rendering require their corresponding
 Desktop evidence. MCP-only execution must work without constructing the
 built-in agent session.
 
+The [private Desktop catalog process cases](../tests/process/desktop_tools.rs)
+check deferred offers, endpoint replacement, an unverified SVG
+mutation, and an unconfirmed trusted reveal. A scripted peer adds a read and
+a counted mutation through the same catalog. The master tests preserve the
+original request inventory across interrupted publication. The authenticated
+export and browser capture retain their separate loopback and Electron tests.
+
 ### ACP client boundary
 
 The [client protocol binding](./rust-client-protocol.md) maps standard ACP
