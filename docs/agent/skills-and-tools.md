@@ -101,6 +101,24 @@ Current limits:
   agent is told the request could not be read and can send it again in the
   same turn. Repeated failures end the turn at its step limit.
 
+## Search the web for one message
+
+In a regular Desktop workspace chat using **GPT-6.2 Sol** on a connected
+**ChatGPT Subscription**, the default **On demand** setting lets you open **+** and choose **Web search**. Send your
+question. This gives the model permission to search for that message. You
+can turn it off before sending. If sending fails before the chat accepts the
+message, your draft keeps the choice.
+
+If Desktop cannot check search availability, open **+** and choose **Web
+search** to check again. Once search is available, choose it to add it to your
+message. If the menu asks you to sign in, reconnect your ChatGPT subscription.
+
+When the model searches, the chat shows the reported search activity. Open a
+cited source from the reply to read it. Sources remain available when you
+reopen the chat. A reply can have no citations. In **Settings → Personalization**,
+choose an automatic search mode or turn search off across your chats.
+[Web search preferences](./desktop-settings.md#personalization)
+
 ## Use tools from a local MCP server
 
 On macOS and Linux, a source-built host can let the agent use an explicit list

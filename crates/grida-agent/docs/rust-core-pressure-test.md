@@ -234,6 +234,26 @@ exercise their corresponding process boundary. These opt-in cases use
 provider replies; they do not establish rendered Desktop interaction or live
 provider entitlement.
 
+The [subscription model fixtures](../../../desktop/src/main/native-subscription-profiles.test.ts)
+exercise selected-account discovery, persistence and actual queued execution through
+a staged native worker. A queued search uses its accepted model, effort and speed
+after a later selection edit. The next Standard message omits both options, and
+reopening the chat restores the cited source without generating another response.
+The same worker fixtures edit the user’s global TOML, verify the exact cached
+and indexed search declarations, and restore an accelerated speed after Fast
+mode is enabled again. Credential-owner fixtures cover opting out during a
+token refresh and replacing the account during the final preference read.
+The [Personalization settings interaction](../../../editor/app/desktop/settings/_components/personalization-settings.browser.tsx)
+covers every search choice, both switches, and preference changes that arrive
+while an older read is pending.
+The [Responses adapter fixtures](../../agent-kit-providers/tests/responses.rs) cover
+mixed hosted and local tools, duplicate search evidence and safe citations.
+Sparse terminal items preserve streamed actions. Failed and incomplete responses
+retain reported sources without dispatching pending local functions. Malformed
+optional annotations leave the assistant's answer readable.
+The [workspace composer interaction](../../../editor/scaffolds/desktop/workbench/native-chat-focus.browser.tsx)
+checks what the person selects, sends and sees when the reply arrives.
+
 Raster preparation, subscription transport and captured tool-version cases
 verify the new view definition without granting it to old accepted work.
 An older pending image turn reconstructs its original PNG definition and
@@ -360,7 +380,7 @@ chat disabled, Settings explained why suggestions were unavailable. A trusted
 deny hook still refused an input after toggling the setting. The Desktop
 0.7.0 reader rejected the added table and accepted the restored hook-only
 file with its original trust decision. [Settings IPC](../../../desktop/src/main/settings-ipc.test.ts),
-[config editing](../../../desktop/src/main/desktop-composer-predictions.test.ts)
+[config editing](../../../desktop/src/main/desktop-personalization.test.ts)
 and [native hook execution](../../../desktop/src/main/native-agent-hooks.test.ts)
 cover the respective contracts.
 

@@ -39,6 +39,8 @@ export default defineConfig(async () => {
         "clsx",
         "tailwind-merge",
         "next/image",
+        "next/link",
+        "nanoid",
         "streamdown",
         "@streamdown/cjk",
         "@streamdown/code",
@@ -57,6 +59,7 @@ export default defineConfig(async () => {
     },
     test: {
       include: [
+        "app/desktop/settings/_components/personalization-settings.browser.tsx",
         "scaffolds/desktop/workbench/conversation-scrollbar.browser.tsx",
         "scaffolds/desktop/workbench/native-chat-focus.browser.tsx",
         "scaffolds/desktop/workbench/native-chat-recovery.browser.tsx",

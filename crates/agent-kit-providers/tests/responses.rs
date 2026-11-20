@@ -1539,3 +1539,311 @@ async fn count_preserves_typed_http_failures_and_rejects_invalid_counts() {
     assert_eq!(failure.kind, FailureKind::Protocol);
     assert_eq!(failure.code, "input_measurement_invalid");
 }
+
+#[tokio::test]
+async fn hosted_search_and_local_function_share_one_bound_subscription_request() {
+    use agent_kit_core::inference::{RequestOptions, ResponseSpeed};
+    use agent_kit_core::messages::{ProviderEvidence, SearchAction, SearchStatus};
+
+    let search = json!({"type":"web_search_call","id":"ws_1","status":"completed"});
+    let action = json!({"type":"search","query":"rust release"});
+    let citation = json!({"type":"url_citation","url":"https://example.org/release","title":"Release notes","start_index":1,"end_index":5});
+    let cited_answer = json!({"type":"message","id":"msg_1","role":"assistant","status":"completed","content":[
+        {"type":"output_text","text":"🌈Rust release", "annotations":[citation.clone(),{"type":"url_citation","url":"javascript:alert(1)","title":"Bad","start_index":0,"end_index":1}]}
+    ]});
+    let events = [
+        json!({"type":"response.output_item.added","item":{"type":"web_search_call","id":"ws_1","status":"in_progress","action":action}}),
+        json!({"type":"response.web_search_call.searching","item_id":"ws_1"}),
+        json!({"type":"response.web_search_call.completed","item_id":"ws_1"}),
+        item(0, search.clone()),
+        text_delta("🌈Rust release"),
+        json!({"type":"response.output_text.annotation.added","item_id":"msg_1","annotation":citation}),
+        json!({"type":"response.output_text.annotation.added","item_id":"msg_1","content_index":0,"annotation_index":0,"annotation":citation}),
+        item(1, cited_answer.clone()),
+        call(2, "fc_1", r#"{"value":"echo"}"#),
+        completed(Some(
+            json!([search,cited_answer,{"type":"function_call","id":"fc_1"}]),
+        )),
+    ];
+    let transport = FixtureTransport::new([
+        Ok(response(events.into_iter().map(frame), true)),
+        Ok(response(
+            [
+                frame(text_delta("OK")),
+                frame(answer("msg_1", "OK")),
+                frame(completed(None)),
+            ],
+            true,
+        )),
+    ]);
+    let provider = adapter(
+        transport.clone(),
+        ResponsesEndpoint::RestrictedImages,
+        "lineage",
+        "live",
+    );
+    let mut input = tool_request();
+    input.max_output_tokens = None;
+    input.extension = RequestOptions {
+        speed: ResponseSpeed::Ultrafast,
+        web_search: true,
+        ..Default::default()
+    }
+    .extension()
+    .unwrap();
+    let mut stream = provider
+        .start(
+            provider.prepare(input.clone()).unwrap(),
+            control("hosted-search"),
+        )
+        .unwrap();
+    let mut statuses = Vec::new();
+    let mut citations = Vec::new();
+    while let Some(update) = stream.next().await {
+        if let InferenceUpdate::ProviderEvidence { evidence, .. } = update {
+            match evidence {
+                ProviderEvidence::WebSearch { status, action } => statuses.push((status, action)),
+                ProviderEvidence::UrlCitation(citation) => citations.push(citation),
+            }
+        }
+    }
+    let outcome = stream.finish().await;
+    assert_eq!(outcome.status, InferenceStatus::Completed);
+    let observed = Some(SearchAction::Search {
+        query: Some("rust release".into()),
+        queries: vec![],
+    });
+    assert_eq!(
+        statuses,
+        [
+            (SearchStatus::InProgress, observed.clone()),
+            (SearchStatus::Completed, observed)
+        ]
+    );
+    assert_eq!(citations.len(), 1);
+    assert_eq!((citations[0].start_index, citations[0].end_index), (1, 5));
+    assert_eq!(outcome.messages[0].content.len(), 2); // One observation and its private replay state.
+    assert_eq!(outcome.messages[1].content.len(), 3); // Text, one source, replay state.
+    assert_eq!(body(&transport, 0)["service_tier"], "ultrafast");
+    assert_eq!(
+        body(&transport, 0)["tools"][1],
+        json!({"type":"web_search","external_web_access":true})
+    );
+    assert_eq!(body(&transport, 0)["tools"][0]["type"], "function");
+    let local = first_call(&outcome).clone();
+    input.messages.extend(
+        serde_json::from_value::<Vec<Message>>(serde_json::to_value(outcome.messages).unwrap())
+            .unwrap(),
+    );
+    input.messages.push(message(
+        "result",
+        Role::Tool,
+        vec![Content::ToolResult(ToolResult {
+            call: local.id,
+            status: OutcomeStatus::Succeeded,
+            content: vec![ResultContent::Text("echo".into())],
+            structured: None,
+            truncated: false,
+        })],
+    ));
+    input.extension = None;
+    let next = run(&provider, input, "next-turn").await;
+    assert_eq!(next.status, InferenceStatus::Completed);
+    let wire = body(&transport, 1);
+    assert!(wire.get("service_tier").is_none());
+    assert_eq!(wire["tools"].as_array().unwrap().len(), 1);
+    let history = wire["input"].as_array().unwrap();
+    let replayed_search = history.iter().find(|item| item["id"] == "ws_1").unwrap();
+    assert_eq!(replayed_search["action"], action);
+    let replayed_answer = history.iter().find(|item| item["id"] == "msg_1").unwrap();
+    assert_eq!(
+        replayed_answer["content"][0]["annotations"],
+        json!([citation])
+    );
+    assert_eq!(
+        history
+            .iter()
+            .filter(|item| item["type"] == "web_search_call")
+            .count(),
+        1
+    );
+    assert_eq!(
+        history
+            .iter()
+            .filter(|item| item["type"] == "function_call_output")
+            .count(),
+        1
+    );
+}
+
+#[tokio::test]
+async fn hosted_search_evidence_survives_interruption_without_dispatching_a_function() {
+    use agent_kit_core::inference::{RequestOptions, ResponseSpeed};
+    use agent_kit_core::messages::{ProviderEvidence, SearchStatus};
+    let events = [
+        json!({"type":"response.web_search_call.in_progress","item_id":"ws_1"}),
+        json!({"type":"response.web_search_call.completed","item_id":"ws_1"}),
+    ];
+    let transport = FixtureTransport::new([Ok(response(events.into_iter().map(frame), false))]);
+    let provider = adapter(
+        transport.clone(),
+        ResponsesEndpoint::Restricted,
+        "lineage",
+        "live",
+    );
+    let mut input = request();
+    input.max_output_tokens = None;
+    input.extension = RequestOptions {
+        speed: ResponseSpeed::Fast,
+        web_search: true,
+        ..Default::default()
+    }
+    .extension()
+    .unwrap();
+    let outcome = run(&provider, input.clone(), "interrupted-search").await;
+    assert_eq!(outcome.status, InferenceStatus::Interrupted);
+    assert!(matches!(
+        outcome.messages[0].content.as_slice(),
+        [Content::ProviderEvidence(ProviderEvidence::WebSearch {
+            status: SearchStatus::Completed,
+            ..
+        })]
+    ));
+    assert_eq!(body(&transport, 0)["service_tier"], "priority");
+    assert_eq!(transport.requests.lock().unwrap().len(), 1);
+    assert_eq!(
+        adapter(transport, ResponsesEndpoint::Api, "api", "live")
+            .prepare(input)
+            .unwrap_err()
+            .code,
+        "unsupported_request_extension"
+    );
+}
+
+#[tokio::test]
+async fn terminal_only_search_reports_the_provider_action_and_sources_on_the_correct_text_part() {
+    use agent_kit_core::inference::RequestOptions;
+    use agent_kit_core::messages::{ProviderEvidence, SearchAction, SearchStatus};
+    let output = json!([
+        {"type":"web_search_call","id":"ws_full","status":"completed","action":{"type":"open_page","url":"https://example.org/"}},
+        {"type":"message","id":"msg_1","role":"assistant","content":[
+            {"type":"output_text","text":"😀 ", "annotations":null},
+            {"type":"output_text","text":"Release notes","annotations":[
+                {"type":"url_citation","url":"https://example.org/","start_index":0,"end_index":7},
+                {"type":"url_citation","url":"https://user:password@example.org/","start_index":0,"end_index":7},
+                {"type":"url_citation","url":"https://example.org/missing","start_index":10,"end_index":70}
+            ]}
+        ]}
+    ]);
+    let transport = FixtureTransport::new([Ok(response([frame(completed(Some(output)))], false))]);
+    let provider = adapter(
+        transport,
+        ResponsesEndpoint::RestrictedImages,
+        "lineage",
+        "live",
+    );
+    let mut input = request();
+    input.max_output_tokens = None;
+    input.extension = RequestOptions {
+        web_search: true,
+        ..Default::default()
+    }
+    .extension()
+    .unwrap();
+    let outcome = run(&provider, input, "terminal-only").await;
+    assert_eq!(outcome.status, InferenceStatus::Completed);
+    assert!(
+        matches!(&outcome.messages[0].content[0],Content::ProviderEvidence(ProviderEvidence::WebSearch{status:SearchStatus::Completed,action:Some(SearchAction::OpenPage{url:Some(url)})}) if url == "https://example.org/")
+    );
+    let links: Vec<_> = outcome.messages[1]
+        .content
+        .iter()
+        .filter_map(|part| match part {
+            Content::ProviderEvidence(ProviderEvidence::UrlCitation(citation)) => Some(citation),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(links.len(), 1);
+    assert_eq!((links[0].start_index, links[0].end_index), (2, 9));
+}
+
+#[tokio::test]
+async fn unsuccessful_terminal_search_retains_only_visible_evidence() {
+    use agent_kit_core::inference::RequestOptions;
+    use agent_kit_core::messages::{ProviderEvidence, SearchStatus};
+
+    for (event, status) in [
+        ("response.failed", InferenceStatus::Failed),
+        ("response.incomplete", InferenceStatus::Limited),
+    ] {
+        let mut terminal = json!({"type":event,"response":{"id":"r","output":[
+            {"type":"web_search_call","id":"ws","status":"completed"},
+            {"type":"message","id":"msg_1","role":"assistant","content":[
+                {"type":"output_text","text":"Rust","annotations":[
+                    {"type":"url_citation","url":"https://example.org/","start_index":0,"end_index":4}
+                ]}
+            ]},
+            {"type":"function_call","id":"fc_1"}
+        ]}});
+        if event == "response.incomplete" {
+            terminal["response"]["incomplete_details"] = json!({"reason":"max_output_tokens"});
+        } else {
+            terminal["response"]["error"] = json!({"code":"server_error"});
+        }
+        let transport = FixtureTransport::new([Ok(response(
+            [call(2, "fc_1", "{}"), terminal].into_iter().map(frame),
+            true,
+        ))]);
+        let provider = adapter(
+            transport.clone(),
+            ResponsesEndpoint::Restricted,
+            "lineage",
+            "live",
+        );
+        let mut input = tool_request();
+        input.max_output_tokens = None;
+        input.extension = RequestOptions {
+            web_search: true,
+            ..Default::default()
+        }
+        .extension()
+        .unwrap();
+        let outcome = run(&provider, input, "unsuccessful-search").await;
+        assert_eq!(outcome.status, status);
+        assert_eq!(outcome.messages.len(), 2);
+        assert!(matches!(
+            outcome.messages[0].content.as_slice(),
+            [Content::ProviderEvidence(ProviderEvidence::WebSearch {
+                status: SearchStatus::Completed,
+                ..
+            })]
+        ));
+        assert!(matches!(outcome.messages[1].content.as_slice(), [
+            Content::Text(text), Content::ProviderEvidence(ProviderEvidence::UrlCitation(c))
+        ] if text == "Rust" && c.url == "https://example.org/"));
+        assert_eq!(transport.requests.lock().unwrap().len(), 1);
+    }
+}
+
+#[tokio::test]
+async fn unoffered_hosted_activity_is_a_protocol_failure_without_a_local_dispatch() {
+    let transport = FixtureTransport::new([Ok(response(
+        [frame(
+            json!({"type":"response.web_search_call.completed","item_id":"ws_unknown"}),
+        )],
+        false,
+    ))]);
+    let provider = adapter(
+        transport.clone(),
+        ResponsesEndpoint::Restricted,
+        "lineage",
+        "live",
+    );
+    let mut input = request();
+    input.max_output_tokens = None;
+    let outcome = run(&provider, input, "unoffered").await;
+    assert_eq!(outcome.status, InferenceStatus::Interrupted);
+    assert_eq!(outcome.failure.unwrap().code, "unoffered_hosted_search");
+    assert!(outcome.messages.is_empty());
+    assert!(body(&transport, 0).get("tools").is_none());
+}

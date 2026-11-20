@@ -90,7 +90,8 @@ use agent_kit_core::authority::{
 };
 use agent_kit_core::history::{HistoryPosition, HistoryRecord};
 use agent_kit_core::inference::{
-    Modality, ModelCapabilities, Provider, ProviderBinding, RequestControl,
+    Modality, ModelCapabilities, Provider, ProviderBinding, RequestControl, RequestOptions,
+    ResponseSpeed,
 };
 use agent_kit_core::messages::{Content, Message, Provenance, ProvenanceKind, Role};
 use agent_kit_core::tools::Inventory;
@@ -506,6 +507,8 @@ struct StoredPrompt {
     image_tool_results: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     selection: Option<SelectionSnapshot>,
+    #[serde(default, skip_serializing_if = "RequestOptions::is_default")]
+    request_options: RequestOptions,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     lifecycle_hooks: Option<grida_agent_master::lifecycle_hooks::LifecycleHooks>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -622,6 +625,7 @@ impl CapturedRoute {
 }
 
 struct SubmissionPolicy {
+    request_options: RequestOptions,
     selection_revision: Option<u64>,
     selection_goal: bool,
     questions: bool,
@@ -768,6 +772,7 @@ pub struct PendingInteractions {
 
 #[derive(Default)]
 pub(crate) struct SubmissionContext {
+    pub web_search: bool,
     pub initial_title: Option<String>,
     pub selection_revision: Option<u64>,
     pub allow_wakeups: bool,
@@ -2639,6 +2644,7 @@ impl Host {
             .as_ref()
             .filter(|_| operating_regime.is_act() && !allow_wakeups);
         Ok(SubmissionPolicy {
+            request_options: RequestOptions::default(),
             selection_revision: None,
             selection_goal: false,
             questions: request.questions,
@@ -2670,6 +2676,7 @@ impl Host {
         policy: SubmissionPolicy,
     ) -> Result<Submission> {
         let SubmissionPolicy {
+            request_options,
             selection_revision,
             selection_goal,
             questions,
@@ -2916,6 +2923,7 @@ impl Host {
                     && execution.accepts_selected_png,
                 image_tool_results: Some(execution.tool_result_images),
                 selection,
+                request_options,
                 lifecycle_hooks,
                 spending,
                 parts,
@@ -3452,6 +3460,7 @@ impl Host {
                 }
                 config.max_steps = stored.max_steps.unwrap_or(1);
                 config.max_output_tokens = stored.max_output_tokens.or(config.max_output_tokens);
+                config.request_options = stored.request_options;
                 // A level the current model cannot take falls back to its default.
                 config.reasoning = stored
                     .reasoning
@@ -3746,11 +3755,10 @@ impl Host {
         if let Some(accepted) = self.existing_submission(&request, &context).await? {
             return Ok(accepted);
         }
-        let host = self
-            .for_selection(&request.session, context.selection_revision)
-            .await?;
+        let (host, options) = self.for_foreground(&request.session, &context).await?;
         let mut policy = host.submission_policy(&request, context.allow_wakeups)?;
         policy.selection_revision = context.selection_revision;
+        policy.request_options = options;
         host.bind_editor(&mut policy, &request, &context)?;
         policy.allow_library_selection = context.allow_library_selection;
         let result = async {
@@ -3842,6 +3850,7 @@ impl Host {
             return Ok(None);
         };
         let StoredPrompt {
+            request_options,
             allow_library_selection,
             unavailable_library_selection_requested,
             editor_browser_tools,
@@ -3850,6 +3859,12 @@ impl Host {
         } = lifecycle::check_input(&view.input, &request.parts)?;
         let settings = InputSettings::for_input(&view.input)?;
         settings.require_effort(request.effort, request.reasoning)?;
+        if request_options.web_search != context.web_search {
+            return Err(problem(
+                ErrorKind::Conflict,
+                "submission_web_search_changed",
+            ));
+        }
         if request
             .operating_regime
             .is_some_and(|regime| regime != settings.operating_regime)
@@ -4470,6 +4485,7 @@ impl Execution {
                 max_steps: MAX_TURN_STEPS,
                 max_output_tokens,
                 reasoning: Default::default(),
+                request_options: Default::default(),
             },
             provider,
             legacy_subscription_provider: None,

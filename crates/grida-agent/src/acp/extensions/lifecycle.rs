@@ -251,6 +251,10 @@ pub(super) fn handlers(
                                 reasoning: request.reasoning,
                             },
                             SubmissionContext {
+                                web_search: selection::web_search(
+                                    request.meta.as_ref(),
+                                    &enqueue.1,
+                                )?,
                                 initial_title: initial_title(&enqueue.1, request.initial_title)?,
                                 selection_revision: selection::revision(
                                     request.meta.as_ref(),

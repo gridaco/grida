@@ -7,6 +7,7 @@ import type {
   NativeChatAttachment,
   NativeChatDraftAttachment,
   NativeChatEffort,
+  NativeChatSpeed,
   NativeChatFileInput,
   NativeChatFileReferenceInput,
   NativeChatGoal,
@@ -250,6 +251,7 @@ describe("DesktopNativeChat saved selection", () => {
         choice: Readonly<{
           profileId: string | null;
           effort: NativeChatEffort;
+          speed?: NativeChatSpeed;
         }>,
       ]
     >();

@@ -23,7 +23,7 @@ import {
 } from "./native-chat-ipc";
 import { NativeChatSelections } from "./native-chat-selections";
 import { NativeAgentChat, type NativeChatSession } from "./native-agent-chat";
-import { DesktopComposerPredictions } from "./desktop-composer-predictions";
+import { DesktopPersonalization } from "./desktop-personalization";
 import { NativeWorkspaceAgents } from "./native-workspace-agents";
 import type { NativeSavedChatDeletionPreview } from "./native-agent-deletion";
 import { NativeEditorSurfaceEndpoints } from "./native-editor-surfaces";
@@ -291,6 +291,51 @@ it("reuses an accepted image receipt without revisions or current model support 
   await expect(
     ipc.submitSelectedImage(first.event, opened.attachmentId, request)
   ).rejects.toThrow("image_input_unavailable");
+  expect(submit).not.toHaveBeenCalled();
+});
+
+it("checks search permission before returning a selected-image receipt after its custody is retired", async () => {
+  const { ipc, first, chat } = setup();
+  const opened = await ipc.create(first.event);
+  const read = vi.fn<typeof chat.inputReceipt>(
+    async (session, inputId, expected) => {
+      if (expected !== undefined && expected !== (inputId === "search"))
+        throw new Error("submission_web_search_changed");
+      return {
+        sessionId: session.id,
+        inputId,
+        inputPosition: 1,
+        turnId: null,
+        disposition: "queued",
+      };
+    }
+  );
+  chat.inputReceipt = read;
+  const submit = (chat.submitSelectedImage =
+    vi.fn<NonNullable<typeof chat.submitSelectedImage>>());
+  for (const inputId of ["search", "plain"]) {
+    const on = { inputId, webSearch: true };
+    const off = { inputId };
+    await expect(
+      ipc.submitSelectedImage(
+        first.event,
+        opened.attachmentId,
+        inputId === "search" ? off : on
+      )
+    ).rejects.toThrow("submission_web_search_changed");
+    const receipt = await ipc.inputReceipt(
+      first.event,
+      opened.attachmentId,
+      inputId
+    );
+    await expect(
+      ipc.submitSelectedImage(
+        first.event,
+        opened.attachmentId,
+        inputId === "search" ? on : off
+      )
+    ).resolves.toEqual(receipt);
+  }
   expect(submit).not.toHaveBeenCalled();
 });
 
@@ -4215,6 +4260,76 @@ describe("saved selection IPC", () => {
     } as unknown as NativeChatSelections;
   }
 
+  it("keeps Standard chat available when an older attached worker lacks optional turn capabilities", async () => {
+    const read = vi.fn<NativeChatSelections["read"]>(async () => state());
+    const turnCapabilities =
+      vi.fn<NonNullable<NativeChatProfileOwner["turnCapabilities"]>>();
+    const f = setup(
+      undefined,
+      undefined,
+      undefined,
+      {
+        list: vi.fn<NativeChatProfileOwner["list"]>(),
+        select: vi.fn<NativeChatProfileOwner["select"]>(),
+        turnCapabilities,
+      },
+      owner(read)
+    );
+    f.scopes.set(f.first.sender, {
+      workspaceId: WORKSPACE,
+      chat: { ...f.chat, acceptsTurnCapabilities: false },
+    });
+    expect(await f.ipc.turnCapabilities(f.first.event, state().target)).toEqual(
+      { status: "unsupported", speeds: [], webSearch: false }
+    );
+    expect(read).not.toHaveBeenCalled();
+    expect(turnCapabilities).not.toHaveBeenCalled();
+  });
+
+  it("reads only the saved target's capability offer and discards a changed selection", async () => {
+    const offered = {
+      status: "available" as const,
+      speeds: ["fast" as const],
+      webSearch: false,
+    };
+    const current = state();
+    const read = vi.fn<NativeChatSelections["read"]>(async () => current);
+    const turnCapabilities = vi.fn<
+      NonNullable<NativeChatProfileOwner["turnCapabilities"]>
+    >(async () => offered);
+    const f = setup(
+      undefined,
+      undefined,
+      undefined,
+      {
+        list: vi.fn<NativeChatProfileOwner["list"]>(),
+        select: vi.fn<NativeChatProfileOwner["select"]>(),
+        turnCapabilities,
+      },
+      owner(read)
+    );
+    expect(await f.ipc.turnCapabilities(f.first.event, current.target)).toEqual(
+      offered
+    );
+    expect(turnCapabilities).toHaveBeenCalledExactlyOnceWith(
+      WORKSPACE,
+      profile,
+      "model-a"
+    );
+    read
+      .mockResolvedValueOnce(current)
+      .mockResolvedValueOnce({ ...current, revision: 3 });
+    expect(await f.ipc.turnCapabilities(f.first.event, current.target)).toEqual(
+      { status: "unavailable", speeds: [], webSearch: false }
+    );
+    await expect(
+      f.ipc.turnCapabilities(f.first.event, {
+        ...current.target,
+        accountId: "forged",
+      })
+    ).rejects.toThrow("native_chat_selection_invalid");
+  });
+
   it("reads and edits fork selection metadata without opening a chat or provider", async () => {
     const selections = owner();
     const f = setup(undefined, undefined, undefined, undefined, selections);
@@ -4318,6 +4433,59 @@ describe("saved selection IPC", () => {
     expect(read).not.toHaveBeenCalled();
     expect(submit).not.toHaveBeenCalled();
   });
+
+  it.each(["submit", "enqueue", "submitWithLibrarySelection"] as const)(
+    "checks the original search permission on a routed %s retry before newer settings",
+    async (action) => {
+      const selections = owner();
+      const f = setup(undefined, undefined, undefined, undefined, selections);
+      const attachment = await f.ipc.create(f.first.event);
+      const receipt = {
+        sessionId: attachment.sessionId,
+        inputId: "original",
+        disposition: "completed" as const,
+        inputPosition: 1,
+        turnId: "old-turn",
+      };
+      const accepted = vi.fn<typeof f.chat.inputReceipt>(
+        async (_session, _inputId, expected) => {
+          if (expected !== true)
+            throw new Error("submission_web_search_changed");
+          return receipt;
+        }
+      );
+      f.chat.inputReceipt = accepted;
+      const retry = (permission?: true) =>
+        action === "submitWithLibrarySelection"
+          ? f.ipc[action](
+              f.first.event,
+              attachment.attachmentId,
+              "original",
+              "Hello",
+              "act",
+              undefined,
+              1,
+              undefined,
+              permission
+            )
+          : f.ipc[action](
+              f.first.event,
+              attachment.attachmentId,
+              "original",
+              "Hello",
+              "act",
+              undefined,
+              undefined,
+              1,
+              undefined,
+              undefined,
+              permission
+            );
+      await expect(retry()).rejects.toThrow("submission_web_search_changed");
+      await expect(retry(true)).resolves.toEqual(receipt);
+      expect(selections.read).not.toHaveBeenCalled();
+    }
+  );
 
   it("lets the native host verify a routed retry when its capture or regime changed", async () => {
     const selections = owner();
@@ -4780,7 +4948,7 @@ it
     const directory = await fs.promises.mkdtemp(
       path.join(await fs.promises.realpath(os.tmpdir()), "grida-prediction-")
     );
-    const preference = new DesktopComposerPredictions(
+    const preference = new DesktopPersonalization(
       path.join(directory, "config.toml")
     );
     const waiting = Promise.withResolvers<void>();

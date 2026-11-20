@@ -29,7 +29,10 @@ async function fixture() {
   let fail: string | undefined;
   const process = {
     connected: true,
-    acceptsSelectedImage: true,
+    acceptsPng: true,
+    get acceptsSelectedImage() {
+      return this.connected && this.acceptsPng && this.supportsSelectedImage;
+    },
     supportsSelectedImage: true,
     acceptsSelection: true,
     acceptsEffort: true,
@@ -328,11 +331,11 @@ describe("NativeAgentChat selected-image adapter", () => {
     const chat = await f.start(),
       session = await chat.create();
     try {
-      f.process.acceptsSelectedImage = false;
+      f.process.acceptsPng = false;
       await expect(chat.submitSelectedImage(session, f.input)).rejects.toThrow(
         "image_input_unavailable"
       );
-      f.process.acceptsSelectedImage = true;
+      f.process.acceptsPng = true;
       await expect(
         chat.submitSelectedImage(session, { ...f.input, preview: "poster" })
       ).rejects.toThrow("invalid_protocol_value");

@@ -1,4 +1,6 @@
 import type {
+  DesktopBridge,
+  DesktopPersonalizationSettings,
   DesktopNativeChat,
   NativeChatArtifactSaveResult,
   NativeChatAcceptance,
@@ -37,6 +39,8 @@ import type {
   NativeChatProfileCatalog,
   NativeChatProfileSelection,
   NativeChatSelectionState,
+  NativeChatTurnCapabilities,
+  NativeChatSpeed,
   NativeChatQuestion,
   NativeChatQuestionAnswer,
   NativeChatQueueAction,
@@ -303,6 +307,9 @@ export type NativeChatView = Readonly<{
   pausing: string | null;
   operatingRegime: NativeChatOperatingRegime;
   effort: NativeChatEffort;
+  speed: NativeChatSpeed;
+  turnCapabilities: NativeChatTurnCapabilities | null;
+  webSearch: boolean;
   effortAvailable: boolean;
   goalEffortAvailable: boolean;
   goal: NativeChatGoalObservation | null;
@@ -318,6 +325,8 @@ export type NativeChatView = Readonly<{
 }>;
 
 type Scope = {
+  turnCapabilityRead?: object;
+  webSearchModel?: string | false;
   permissionRead?: object;
   permissionConfirmation?: {
     review: NativeChatPermissionReview;
@@ -435,6 +444,7 @@ type Scope = {
     mode: "submit" | "enqueue";
     operatingRegime?: NativeChatOperatingRegime;
     effort?: NativeChatEffort;
+    webSearch?: true;
     selectionRevision?: number;
     attachment?: SelectedAttachment;
     missingAttachment?: Readonly<{
@@ -560,6 +570,9 @@ const EMPTY: NativeChatView = Object.freeze({
   pausing: null,
   operatingRegime: "act",
   effort: "medium",
+  speed: "standard",
+  turnCapabilities: null,
+  webSearch: false,
   effortAvailable: false,
   goalEffortAvailable: false,
   goal: null,
@@ -602,6 +615,11 @@ function pickSessionIndependent(
 export class NativeChatController {
   readonly composerPrediction: NativeComposerPrediction;
   private view = EMPTY;
+  private personalization?: Pick<
+    DesktopPersonalizationSettings,
+    "fastMode" | "webSearch"
+  >;
+  private personalizationReady?: Promise<void>;
   private readonly listeners = new Set<() => void>();
   private scope?: Scope;
   private generation = 0;
@@ -760,6 +778,9 @@ export class NativeChatController {
     this.drafts.store.writeModes(key, {
       ...(this.view.operatingRegime === "plan" && { plan: true }),
       ...(this.view.goalIntent && { goal: true }),
+      ...(this.scope?.webSearchModel !== undefined && {
+        webSearch: this.scope.webSearchModel,
+      }),
     });
   }
 
@@ -848,9 +869,12 @@ export class NativeChatController {
       "draftId" in scope.selection.target
     )
       await drafts.store.initializeDraft(`${drafts.workspace}:new`, key);
+    if (!this.owns(scope)) return;
     const modes = drafts.store.readModes(key);
     if (modes.plan && this.bridge.submitInRegime)
       this.update({ operatingRegime: "plan" });
+    scope.webSearchModel = modes.webSearch;
+    this.update({});
     if (modes.goal && this.bridge.startGoal) this.update({ goalIntent: true });
     const pending = await drafts.store.readPending(key);
     const saved = await drafts.store.readAttachment(key);
@@ -1867,6 +1891,7 @@ export class NativeChatController {
 
   private presentSelection(state: NativeChatSelectionState): void {
     this.update({
+      turnCapabilities: null,
       ...(state.selection && { effort: state.selection.effort }),
       ...(this.view.profiles &&
         state.selection && {
@@ -1881,12 +1906,14 @@ export class NativeChatController {
           : "This chat's selected model connection is unavailable. Choose an available model."
         : "Choose a model for this chat. Its earlier connection could not be verified.",
     });
+    void this.refreshTurnCapabilities();
   }
 
   private async saveSelection(
     scope: Scope,
     profileId: string | null,
-    effort: NativeChatEffort
+    effort: NativeChatEffort,
+    speed?: NativeChatSpeed
   ): Promise<void> {
     if (
       !this.owns(scope) ||
@@ -1907,7 +1934,7 @@ export class NativeChatController {
           scope.selection!.target,
           scope.selection!.revision,
           operationId,
-          { profileId, effort }
+          { profileId, effort, ...(speed && { speed }) }
         );
       let state;
       try {
@@ -1960,7 +1987,7 @@ export class NativeChatController {
             error instanceof Error &&
             /revision_changed|selection_conflict/.test(error.message)
               ? "This chat's model settings changed in another window. Review the selection and try again."
-              : "Couldn't confirm the saved model and effort. Your draft is still here; retry the selection.",
+              : "Couldn't confirm this chat’s model settings. Your draft is still here. Retry the selection.",
         });
       }
     } finally {
@@ -2031,6 +2058,7 @@ export class NativeChatController {
       replay: true,
       selection: previous.selection,
       selectionReady: Promise.resolve(),
+      webSearchModel: previous.webSearchModel,
       firstInputId: previous.firstInputId,
       selectedAttachment: previous.selectedAttachment,
       messageContext: previous.messageContext,
@@ -2207,7 +2235,9 @@ export class NativeChatController {
         initialSession === undefined ? this.view.selected : initialSession;
       await this.select(
         initialSession === null ? null : (continuing ?? saved.selected),
-        { reattach: !!continuing }
+        {
+          reattach: !!continuing,
+        }
       );
     } catch (error) {
       if (this.catalogConnection === connection) {
@@ -2396,6 +2426,7 @@ export class NativeChatController {
       !this.scope.preparedStart &&
       (!this.scope.draftReady || this.scope.draftRestored === true) &&
       !this.scope.pendingRestoreFailed &&
+      (!!this.scope.pending || !this.turnOptionsError) &&
       !this.view.loading &&
       !this.view.connectionRecovery &&
       this.view.observation?.snapshot.current?.disposition !== "interrupted" &&
@@ -4450,6 +4481,160 @@ export class NativeChatController {
     this.update({ steering: false });
   }
 
+  connectPersonalization(
+    preferences:
+      | Pick<NonNullable<DesktopBridge["personalization"]>, "onChange" | "get">
+      | undefined
+  ): () => void {
+    if (!preferences || this.fixed) return () => {};
+    let connected = true;
+    let revision = -1;
+    this.personalization = { fastMode: false, webSearch: "disabled" };
+    this.update({});
+    const receive = (next: DesktopPersonalizationSettings) => {
+      if (!connected || next.revision <= revision) return;
+      revision = next.revision;
+      const changed =
+        next.fastMode !== this.personalization?.fastMode ||
+        next.webSearch !== this.personalization?.webSearch;
+      this.personalization = next;
+      this.update({});
+      if (changed) void this.refreshTurnCapabilities();
+    };
+    const stop = preferences.onChange(receive);
+    this.personalizationReady = preferences.get().then(receive, () => {});
+    return () => {
+      connected = false;
+      stop();
+      this.personalization = undefined;
+      this.personalizationReady = undefined;
+      this.update({});
+    };
+  }
+
+  get fastModeEnabled(): boolean {
+    return this.personalization?.fastMode !== false;
+  }
+
+  get webSearchAllowed(): boolean {
+    return this.personalization?.webSearch !== "disabled";
+  }
+
+  private get automaticSearch(): boolean {
+    const mode = this.personalization?.webSearch;
+    return !!mode && mode !== "disabled" && mode !== "onDemand";
+  }
+
+  async refreshTurnCapabilities(): Promise<void> {
+    const scope = this.scope;
+    const state = scope?.selection;
+    if (
+      !scope ||
+      !state?.selection ||
+      !state.available ||
+      !this.bridge.turnCapabilities
+    )
+      return;
+    const read = {};
+    scope.turnCapabilityRead = read;
+    const capabilities = await this.bridge
+      .turnCapabilities(state.target)
+      .catch(() => ({
+        status: "unavailable" as const,
+        speeds: [],
+        webSearch: false,
+      }));
+    if (
+      this.owns(scope) &&
+      scope.selection === state &&
+      scope.turnCapabilityRead === read
+    )
+      this.update({ turnCapabilities: capabilities });
+  }
+
+  selectSpeed(speed: NativeChatSpeed): void {
+    const scope = this.scope;
+    const selection = scope?.selection?.selection;
+    if (
+      !scope ||
+      !selection ||
+      !this.fastModeEnabled ||
+      !this.bridge.turnCapabilities ||
+      (speed !== "standard" &&
+        !this.view.turnCapabilities?.speeds.includes(speed))
+    )
+      return;
+    void this.saveSelection(
+      scope,
+      selection.profileId,
+      selection.effort,
+      speed
+    );
+  }
+
+  selectWebSearch(active: boolean): void {
+    const scope = this.scope;
+    if (
+      !scope ||
+      this.view.acting ||
+      this.view.submitting ||
+      scope.pending ||
+      (active &&
+        (!this.webSearchAllowed ||
+          !this.view.turnCapabilities?.webSearch ||
+          this.view.goalIntent ||
+          this.view.steering))
+    )
+      return;
+    scope.webSearchModel = active
+      ? this.searchModel
+      : this.automaticSearch
+        ? false
+        : undefined;
+    this.update({ error: null });
+    this.saveDraftModes();
+  }
+
+  private get searchModel(): string | undefined {
+    const model = this.scope?.selection?.selection;
+    return model ? JSON.stringify([model.profileId, model.modelId]) : undefined;
+  }
+
+  get turnOptionsError(): string | null {
+    return this.turnOptionRefusal(this.view.webSearch);
+  }
+
+  private turnOptionRefusal(webSearch: boolean): string | null {
+    const { speed, turnCapabilities: capabilities } = this.view;
+    if (webSearch && !this.webSearchAllowed)
+      return "Web search is disabled in Personalization.";
+    if (
+      !webSearch &&
+      (speed === "standard" || this.view.goalIntent || this.view.steering)
+    )
+      return null;
+    if (
+      webSearch &&
+      this.scope?.webSearchModel &&
+      this.scope.webSearchModel !== this.searchModel
+    )
+      return "Web search was selected for a different model. Remove it, then add it again to search with this model.";
+    if (webSearch && (this.view.goalIntent || this.view.steering))
+      return "Remove Web search to use this action.";
+    if (capabilities?.status === "reauthenticationRequired")
+      return "Sign in to ChatGPT again or change your message options.";
+    if (
+      capabilities?.status === "unavailable" ||
+      (!capabilities && this.bridge.turnCapabilities)
+    )
+      return "Couldn’t verify these ChatGPT options. Check availability or change your selection.";
+    if (speed !== "standard" && !capabilities?.speeds.includes(speed))
+      return "This connection cannot use the selected speed. Choose Standard or another model.";
+    if (webSearch && !capabilities?.webSearch)
+      return "Web search is unavailable for this connection. Remove it or choose another model.";
+    return null;
+  }
+
   selectEffort(effort: NativeChatEffort): void {
     if (this.remembersSelection && this.scope) {
       const scope = this.scope;
@@ -4758,12 +4943,23 @@ export class NativeChatController {
         !selectedAttachment
       )
         await this.readInputCapabilities(scope);
+      await this.personalizationReady;
+      // Resolve the current offer before choosing whether this new message
+      // should search automatically. An explicit or retried request keeps its intent.
+      const needsSearchOffer = retained
+        ? retained.webSearch === true
+        : this.view.webSearch ||
+          (this.automaticSearch && scope.webSearchModel !== false);
+      if (needsSearchOffer || this.view.speed !== "standard")
+        await this.refreshTurnCapabilities();
+      this.attachment(scope);
       const pending: NonNullable<Scope["pending"]> = retained ?? {
         text,
         inputId: scope.firstInputId ?? crypto.randomUUID(),
         mode,
         operatingRegime,
         effort,
+        ...(this.view.webSearch && { webSearch: true as const }),
         ...(scope.selection &&
           scope.selection.revision > 0 && {
             selectionRevision: scope.selection.revision,
@@ -4783,6 +4979,15 @@ export class NativeChatController {
       };
       let accepted;
       try {
+        if (pending.webSearch || this.view.speed !== "standard") {
+          const error = this.turnOptionRefusal(pending.webSearch === true);
+          if (error) {
+            // The earlier receipt check confirmed this retry was never accepted.
+            if (retained && scope.pending === retained)
+              await this.discardPending(scope);
+            throw new Error(error);
+          }
+        }
         if (pending.attachment) {
           const capabilities = await this.readInputCapabilities(scope);
           if (
@@ -4818,8 +5023,11 @@ export class NativeChatController {
         )
           throw new Error("native_chat_editor_context_unavailable");
         if (next) await this.endPausedTurn(scope);
-        const context = pending.messageContext && {
-          messageContext: pending.messageContext,
+        const context = {
+          ...(pending.messageContext && {
+            messageContext: pending.messageContext,
+          }),
+          ...(pending.webSearch && { webSearch: true as const }),
         };
         if (pending.attachment?.kind === "image") {
           if (!this.bridge.submitSelectedImage || !pending.operatingRegime)
@@ -4902,6 +5110,7 @@ export class NativeChatController {
             inputId: pending.inputId,
             text: pending.text,
             operatingRegime: pending.operatingRegime,
+            ...(pending.webSearch && { webSearch: true }),
             messageContext: pending.messageContext,
             ...(pending.effort && { effort: pending.effort }),
             ...(pending.selectionRevision !== undefined && {
@@ -4914,12 +5123,13 @@ export class NativeChatController {
           const options: [
             selectionRevision?: number,
             editorContextId?: string,
-          ] =
-            pending.editorContextId !== undefined
-              ? [pending.selectionRevision, pending.editorContextId]
-              : pending.selectionRevision !== undefined
-                ? [pending.selectionRevision]
-                : [];
+            webSearch?: true,
+          ] = [
+            pending.selectionRevision,
+            pending.editorContextId,
+            pending.webSearch,
+          ];
+          while (options.length && options.at(-1) === undefined) options.pop();
           accepted = await this.bridge.submitWithLibrarySelection(
             attachment.attachmentId,
             pending.inputId,
@@ -4937,12 +5147,14 @@ export class NativeChatController {
             selectionRevision?: number,
             editorContextId?: string,
             editorToolContextId?: string,
+            webSearch?: true,
           ] = [
             pending.effort,
             pending.editorSvgTargetId || undefined,
             pending.selectionRevision,
             pending.editorContextId,
             pending.editorToolContextId,
+            pending.webSearch,
           ];
           while (options.length && options.at(-1) === undefined) options.pop();
           accepted = await this.bridge.submitInRegime(
@@ -4954,6 +5166,8 @@ export class NativeChatController {
             ...options
           );
         } else {
+          if (pending.webSearch)
+            throw new Error("Web search requires a newer Desktop connection.");
           const send = this.bridge[pending.mode];
           if (!send) throw new Error("native_chat_enqueue_unavailable");
           accepted = await send.call(
@@ -4983,7 +5197,13 @@ export class NativeChatController {
                 await this.discardPending(submissionScope);
                 throw new Error("native_chat_editor_context_reselect");
               }
-              if (selectionRouteRefused(error))
+              if (
+                selectionRouteRefused(error) ||
+                (error instanceof Error &&
+                  /^(?:chat_speed_unavailable|chat_web_search_unavailable|chat_turn_capabilities_unavailable|chat_turn_options_unsupported|chatgpt_reauthentication_required|web_search_selection_required|chat_selection_revision_changed)$/.test(
+                    error.message
+                  ))
+              )
                 await this.discardPending(submissionScope);
             }
             throw error;
@@ -5802,6 +6022,8 @@ export class NativeChatController {
         scope.selectedAttachment = undefined;
         this.update({ attachmentDraft: null, attachmentNotice: null });
       }
+      scope.webSearchModel = undefined;
+      this.update({});
       onAccepted();
       this.readFirstTitle(scope, accepted);
       // A read already in flight can describe the chat before this receipt.
@@ -6085,6 +6307,7 @@ export class NativeChatController {
   }
 
   async repair(): Promise<void> {
+    void this.refreshTurnCapabilities();
     const scope = this.scope;
     if (!scope || (!scope.attachment && !scope.requested && !this.fixed))
       return;
@@ -7654,7 +7877,23 @@ export class NativeChatController {
   private update(change: Partial<NativeChatView>): void {
     const focus = this.pendingFocus;
     const wasBlocked = focus && this.focusBlocked();
-    this.view = { ...this.view, ...change };
+    const next = { ...this.view, ...change };
+    const scopeSearch = this.scope?.webSearchModel;
+    next.speed = this.fastModeEnabled
+      ? (this.scope?.selection?.selection?.speed ?? "standard")
+      : "standard";
+    next.webSearch =
+      this.webSearchAllowed &&
+      !!this.scope &&
+      (this.scope.pending
+        ? this.scope.pending.webSearch === true
+        : typeof scopeSearch === "string" ||
+          (scopeSearch !== false &&
+            this.automaticSearch &&
+            !next.goalIntent &&
+            !next.steering &&
+            !!next.turnCapabilities?.webSearch));
+    this.view = next;
     this.composerPrediction.viewChanged(this.presentedAttachmentId, this.view);
     for (const listener of this.listeners) listener();
     if (focus && wasBlocked && !this.focusBlocked())
@@ -7747,7 +7986,9 @@ export class NativeChatController {
           ...(typeof value.draftId === "string" &&
             /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(
               value.draftId
-            ) && { draftId: value.draftId }),
+            ) && {
+              draftId: value.draftId,
+            }),
           sessions,
           selected: sessions.includes(value.selected) ? value.selected : null,
           profileId:
@@ -8005,6 +8246,9 @@ function applyText(
     turnId: update.turnId,
     bytes: bytes + added.length,
     text: (existing?.text ?? "") + update.text,
+    ...((update.citations ?? existing?.citations)?.length && {
+      citations: update.citations ?? existing?.citations,
+    }),
     ...activityOrderMetadata(
       previous?.turnId === update.turnId ? previous : undefined,
       update
@@ -8064,6 +8308,14 @@ function selectionRouteRefused(error: unknown): boolean {
 
 function describe(error: unknown, fallback: string): string {
   if (!(error instanceof Error)) return fallback;
+  if (error.message === "chatgpt_reauthentication_required")
+    return "Sign in to ChatGPT again before retrying this message.";
+  if (
+    /^(?:chat_speed_unavailable|chat_web_search_unavailable|chat_turn_capabilities_unavailable|chat_turn_options_unsupported|web_search_selection_required)$/.test(
+      error.message
+    )
+  )
+    return "Your selected speed or web search is unavailable. Check the model options before retrying.";
   if (error.message === "native_chat_editor_context_reselect")
     return "Select the editor item again to send this draft.";
   if (error.message.includes("native_chat_message_context_unavailable"))

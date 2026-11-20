@@ -439,7 +439,7 @@ http://localhost:*`. The nonce is generated in the proxy, exposed
    There is no renderer broker method, loopback proxy, socket path, or
    environment credential. The ChatGPT-subscription grant registered by
    GRIDA-SEC-008 holds only exact `auth.openai.com` token and `chatgpt.com`
-   Responses destinations. It is a Main-only grant: Main dispatches it for its
+   Responses and authenticated subscription models destinations. It is a Main-only grant: Main dispatches it for its
    native subscription host, it is never published to the sidecar, and it is
    never eligible for the asset lane.
    When this transport is enabled, the outer native
@@ -899,10 +899,14 @@ pixels through this reader, with no additional filesystem or model grant.
 
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-004 .` to enumerate.
 
-- [Composer preference](desktop/src/main/desktop-composer-predictions.ts),
+- [Desktop personalization settings](desktop/src/main/desktop-personalization.ts),
   [physical config reads](desktop/src/main/native-agent-files.ts) and
   [prediction route resolution](desktop/src/main/native-prediction-route.ts)
   keep the user opt-in, config integrity and the authorized connection in Main.
+  Settings alone can edit global search mode, accelerated speed availability and
+  suggested prompts. Main rechecks the frame before replacing the file, serializes
+  writes across all three preferences, and checks for concurrent hand edits.
+  Invalid source revokes optional capabilities and preserves the original file.
   Turning predictions off revokes pending model lookup and provider dispatch
   for that opt-in across all Desktop windows.
   The [native prediction host](crates/grida-agent/src/host/prediction.rs)
@@ -2926,8 +2930,10 @@ trusted merely because it is “local.”
    previous account.
 5. **Pinned provider traffic.** Desktop grants, through a Main-only provider
    grant the sidecar never receives, only the exact OpenAI token
-   endpoint and ChatGPT Responses endpoint to the authenticated provider lane;
-   neither is a provider-asset/download grant. The captured native transport
+   endpoint and ChatGPT Responses endpoint for POST, and the fixed
+   subscription models endpoint and compatibility-version query for GET.
+   These are authenticated provider requests. No grant reaches the asset
+   download lane. The captured native transport
    sends only to the configured Responses route, injects bearer/account/product
    headers only at request time, forces stateless Responses posture, and
    permits at most one refresh/replay after `401` within the captured account
@@ -2943,6 +2949,16 @@ trusted merely because it is “local.”
    strict disk reader shared by credential mutations and ignores the generic
    test environment override. Failed Responses return bounded status, request
    identity, and retry timing without upstream response bodies.
+   Optional response speed and hosted search require a fresh, bounded model
+   offer for the captured sign-in lineage. Main projects only supported tiers
+   and hosted-search eligibility. Raw catalog rows and provider-authored
+   instructions stay outside both the renderer and native process. The fixed
+   Responses validator accepts only the supported tier values and a single
+   hosted search declaration alongside local functions. Cached search forbids external access,
+   indexed search requires the provider index gate and live search allows external access.
+   The credential owner enforces the current preference and then rechecks the
+   captured account immediately before each authenticated generation attempt,
+   including token-refresh retries. Standard inference needs no catalog read.
    The private native launch carries the opaque scope and selected model.
    Its stdio transport grants only the exact generation route and sends no
    credentials. The in-process Desktop owner exposes the OAuth ceremony as
@@ -3042,6 +3058,10 @@ platform credential store is a separate hardening step.
   bind one private launch to an exact OAuth connection and the fixed Responses
   route. [Process fixtures](desktop/src/main/native-provider-egress.test.ts)
   exercise the ceremony and scoped continuation with synthetic responses.
+- [Subscription model discovery](packages/grida-ai-host/src/providers/chatgpt-models.ts)
+  bounds and filters the authenticated catalog for the captured account.
+  [Provider fixtures](packages/grida-ai-host/src/providers/chatgpt.test.ts)
+  cover stale offers and account replacement before dispatch.
 - [Native chat host](crates/grida-agent/src/host.rs), its
   [portable history projection](crates/grida-agent/src/host/history.rs),
   [compaction](crates/grida-agent/src/host/compaction.rs) and

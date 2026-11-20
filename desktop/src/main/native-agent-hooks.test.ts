@@ -5,7 +5,7 @@ import path from "node:path";
 import { stringify } from "smol-toml";
 import { afterEach, describe, expect, it } from "vitest";
 import { NativeAgentHooks } from "./native-agent-hooks";
-import { DesktopComposerPredictions } from "./desktop-composer-predictions";
+import { DesktopPersonalization } from "./desktop-personalization";
 import { NativeAgentChat } from "./native-agent-chat";
 
 const fixtures: string[] = [];
@@ -109,12 +109,14 @@ describe("global config.toml hooks", () => {
     const receipt = path.join(f.home, "agent", "hooks-trust.json");
     const trusted = await fs.readFile(receipt);
     const before = await NativeAgentHooks.open(f.home, f.workspace);
-    const setting = new DesktopComposerPredictions(f.file);
+    const setting = new DesktopPersonalization(f.file);
     await setting.set(true);
     const withDesktop = await fs.readFile(f.file, "utf8");
     expect(withDesktop).toBe(
       source + "\n[desktop]\ncomposer-predictions-enabled = true\n"
     );
+    await setting.setPersonalization({ webSearch: "live" });
+    await setting.setPersonalization({ fastMode: false });
     const after = await NativeAgentHooks.open(f.home, f.otherWorkspace);
     expect(await after.inspect(active)).toEqual(await before.inspect(active));
     expect(await fs.readFile(receipt)).toEqual(trusted);
@@ -330,7 +332,7 @@ it.runIf(Boolean(process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES))(
       },
     ]);
     await f.trust();
-    await new DesktopComposerPredictions(f.file).set(true);
+    await new DesktopPersonalization(f.file).set(true);
     const hooks = await NativeAgentHooks.open(f.home, f.workspace);
     const resourcesPath = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES!;
     const plan = await hooks.launch(resourcesPath, {

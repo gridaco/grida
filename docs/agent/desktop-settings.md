@@ -15,7 +15,7 @@ Select a category in its sidebar:
 | --------------- | ------------------------------------------------------------------------------------------------ |
 | Account         | Your Grida account and sign-out action.                                                          |
 | Appearance      | Light, Dark or System theme, remembered on this device.                                          |
-| Chat            | Next-prompt suggestions for the empty chat composer.                                             |
+| Personalization | Fast mode, suggested prompts and web search.                                                     |
 | Browser         | [Downloads, site permissions, shared history and browser cleanup](../editor/desktop/browser.md). |
 | Credits         | Your Grida AI credit information.                                                                |
 | LLM Providers   | ChatGPT subscription, API-key providers and compatible text-model endpoints.                     |
@@ -24,26 +24,59 @@ Select a category in its sidebar:
 | Archived chats  | Archived chats across local workspaces, with an Unarchive action.                                |
 | About           | Desktop version and platform information.                                                        |
 
+## Personalization
+
+These settings apply across your Desktop workspaces. Each control also reads
+and writes the user-wide `~/.grida/config.toml`. An absolute `GRIDA_HOME`
+selects a different Grida home.
+
+**Fast mode** makes Fast and Ultrafast available in the chat's speed picker
+when your ChatGPT subscription and model offer them. It starts on. New chats
+still start at Standard. Turn it off to send new messages at Standard and
+turn it back on to use the chat's saved speed again. Faster speeds can use
+more of your ChatGPT allowance.
+
+**Web search** controls whether the model can search when you send a message
+in an eligible subscription chat.
+
+| Choice              | What happens                                                            |
+| ------------------- | ----------------------------------------------------------------------- |
+| Off                 | Blocks hosted web search.                                               |
+| On demand (default) | Enable search for one message in the composer.                          |
+| Cached              | Allows automatic search of previously indexed content.                  |
+| Indexed             | Allows automatic search with external access gated by the search index. |
+| Live                | Allows automatic search with live internet access.                      |
+
+For any automatic mode, you can skip search for one message. The model
+decides whether a permitted search is useful. Changing to a more restrictive
+setting can block a queued request that would exceed it.
+
 ## Suggest the next prompt
 
-Turn on **Chat → Suggest the next prompt** to let Grida suggest a follow-up after a successful reply. The preview starts off. An eligible reply in an open, empty composer can trigger one additional model request using that chat’s connection and retained context. Provider rates or usage limits can apply even if you ignore the suggestion.
+Turn on **Personalization → Suggested prompts** to let Grida suggest a follow-up after a successful reply. The preview starts off. An eligible reply in an open, empty composer can trigger one additional model request using that chat’s connection and retained context. Provider rates or usage limits can apply even if you ignore the suggestion.
 
 For hosted chats, Grida looks for its economy model on the same connection and account. For example, a ChatGPT subscription can supply the suggestion even when you have also connected OpenRouter. Your conversation keeps its selected model. If the economy model is unavailable, the composer stays empty. A local connection, including Ollama at its default `http://localhost:11434/v1` address, can use its configured model.
 
 Press **Tab** to put the full suggestion into your draft. Edit it and press **Send** when ready, or start typing your own message to dismiss it. Turning the switch off clears suggestions across open windows and cancels requests still waiting for a model or authorization. Turning it back on applies to future replies. A request already sent to the provider can still count toward usage. Any text you already accepted stays in your draft.
 
-The switch reads and writes the user-wide `~/.grida/config.toml`. An absolute `GRIDA_HOME` selects a different Grida home. To enable the feature by hand, set this boolean in the global file:
+To set the same preferences by hand, edit the matching keys in the existing global file:
 
 ```toml
 schema_version = 1
+web_search = "cached"
+
+[features]
+fast_mode = true
 
 [desktop]
 composer-predictions-enabled = true
 ```
 
-Set the value to `false` to disable predictions. When editing an existing file, keep the single top-level `schema_version` and add the key to its Desktop table.
+For `web_search`, use `"disabled"`, `"cached"`, `"indexed"` or `"live"`.
+Remove the top-level key to restore **On demand**. Suggested prompts default
+to off. The other preferences work independently.
 
-Desktop 0.7.0’s hook reader rejects the `[desktop]` table. Upgrade builds sharing this file before saving the setting, or give a concurrently used older build its own `GRIDA_HOME`. To reopen the same home with 0.7.0, remove the Desktop table and its fields, keeping `schema_version` and any `[[hooks]]` entries.
+Desktop 0.7.0’s hook reader rejects the `[desktop]` table. Upgrade builds sharing this file before saving the setting, or give a concurrently used older build its own `GRIDA_HOME`. To reopen the same home with 0.7.0, remove the personalization keys and tables introduced since that build, keeping `schema_version` and any `[[hooks]]` entries.
 
 ## Compatible endpoints and Ollama
 

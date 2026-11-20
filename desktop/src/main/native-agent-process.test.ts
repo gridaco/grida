@@ -285,6 +285,43 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
     }
   );
 
+  it("checks retry search permission against the accepted input while receipt observation stays independent", async () => {
+    const test = fixture(
+      `
+      if (request.method === "session/new") return send({id:request.id,result:{sessionId:"chat"}});
+      if (request.method !== "_co.grida/session/input") throw Error("unexpected request");
+      const {sessionId,inputId}=request.params;
+      const result = {receipt:{sessionId,inputId,inputPosition:1,turnId:null,disposition:"queued"}};
+      if(inputId!=="legacy-worker") result.settings = inputId==="search" ? {webSearch:true} : {};
+      send({id:request.id,result});
+    `,
+      1,
+      {}
+    );
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        ...test.options,
+        cwd: fs.realpathSync(test.root),
+      });
+      const session = await chat.create();
+      for (const id of ["search", "legacy-record", "legacy-worker"]) {
+        const enabled = id === "search";
+        const receipt = await chat.inputReceipt(session, id);
+        expect(receipt).not.toHaveProperty("webSearch");
+        await expect(chat.inputReceipt(session, id, enabled)).resolves.toEqual(
+          receipt
+        );
+        await expect(chat.inputReceipt(session, id, !enabled)).rejects.toThrow(
+          "submission_web_search_changed"
+        );
+      }
+    } finally {
+      await chat?.close();
+      test.close();
+    }
+  });
+
   it("preserves retained message and individual call order across live chunks, replay and older pages", async () => {
     const test = fixture(
       `
@@ -303,11 +340,12 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
         send({id:request.id,result:{_meta:{[window]:{requestId:read.requestId,view:1,older:null,turns:[{turnId:'older-turn',status:'succeeded',startedAtMs:1,settledAtMs:2}]}}}}); return;
       }
       const live=(update,extra,fact)=>send({method:'session/update',params:{sessionId:'chat',_meta:{'co.grida/session/updates':{turnId:'live-turn',...extra,...fact},[ordered]:{turnId:'live-turn',...fact}},update}});
-      live({sessionUpdate:'agent_message_chunk',messageId:'live-message',content:{type:'text',text:'Later'}},{offsetBytes:0,replace:false},{activityOrder:8});
-      live({sessionUpdate:'tool_call',toolCallId:'live-call',title:'read_file',kind:'read',status:'completed'},{messageId:'live-container',activity:'read',outcome:'succeeded'},{activityOrder:4});
+      const citations=[{url:'https://example.org/reference',title:'Reference',startIndex:0,endIndex:5},{url:'javascript:wrong()',startIndex:0,endIndex:3}];
+      live({sessionUpdate:'agent_message_chunk',messageId:'live-message',content:{type:'text',text:'Later'}},{offsetBytes:0,replace:true,citations},{activityOrder:8});
+      live({sessionUpdate:'tool_call',toolCallId:'live-call',title:'web_search',kind:'search',status:'completed'},{messageId:'live-container',activity:'search',source:'provider',outcome:'succeeded'},{activityOrder:4});
       live({sessionUpdate:'agent_message_chunk',messageId:'live-message',content:{type:'text',text:' grows'}},{offsetBytes:5,replace:false},{activityOrder:8});
       send({method:'session/update',params:{sessionId:'chat',_meta:meta({activityOrder:1}),update:{sessionUpdate:'user_message_chunk',messageId:'request',content:{type:'resource_link',name:'report.txt',uri:'file:///workspace/report.txt',mimeType:'text/plain',size:4}}}});
-      text('work','First ',{activityOrder:2},{phase:'progress'});
+      text('work','First ',{activityOrder:2},{phase:'progress',citations});
       text('work','message.',{activityOrder:2},{phase:'progress'});
       send({method:'session/update',params:{sessionId:'chat',_meta:meta({activityOrder:4},{messageId:'work',activity:'read',outcome:'succeeded'}),update:{sessionUpdate:'tool_call',toolCallId:'call',title:'read_file',kind:'read',status:'completed'}}});
       text('tool-only','',{});
@@ -335,7 +373,16 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
       const work = page.messages.find(
         (message) => message.messageId === "work"
       )!;
+      const citations = [
+        {
+          url: "https://example.org/reference",
+          title: "Reference",
+          startIndex: 0,
+          endIndex: 5,
+        },
+      ];
       expect(work).toMatchObject({
+        citations,
         text: "First message.",
         activityOrder: 2,
         activity: [{ callId: "call", activityOrder: 4 }],
@@ -374,7 +421,8 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
           turnId: "live-turn",
           text: "Later",
           offsetBytes: 0,
-          replace: false,
+          replace: true,
+          citations,
           activityOrder: 8,
         },
         {
@@ -383,8 +431,9 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
           turnId: "live-turn",
           activity: {
             callId: "live-call",
-            title: "read_file",
-            kind: "read",
+            title: "web_search",
+            kind: "search",
+            source: "provider",
             outcome: "succeeded",
             activityOrder: 4,
           },

@@ -23,6 +23,7 @@ pub(super) struct Routes {
     supervisor: SupervisedProvider,
     input_routes: bool,
     prediction_route: bool,
+    turn_capabilities: bool,
     launch: Arc<Execution>,
     tools: Option<Arc<host_tools::HostTools>>,
     image_generation: Option<image_generation::DesktopImageGeneration>,
@@ -39,12 +40,14 @@ impl Host {
         supervisor: SupervisedProvider,
         input_routes: bool,
         prediction_route: bool,
+        turn_capabilities: bool,
     ) -> Result<()> {
         self.routes
             .set(Routes {
                 supervisor,
                 input_routes,
                 prediction_route,
+                turn_capabilities,
                 launch: self.execution.clone().ok_or_else(route_changed)?,
                 tools: self.host_tools.clone(),
                 image_generation: self.desktop_image_generation.clone(),
@@ -93,6 +96,66 @@ impl Host {
             self.resolve_route(session_configuration(&view)?.inherited_route)
                 .await
         }
+    }
+
+    /// Resolve an ordinary user turn before taking the admission lock. The
+    /// selection revision is checked again when the resulting input is captured.
+    pub(super) async fn for_foreground(
+        &self,
+        session: &SessionId,
+        context: &SubmissionContext,
+    ) -> Result<(Self, RequestOptions)> {
+        let Some(revision) = context.selection_revision else {
+            if context.web_search {
+                return Err(problem(
+                    ErrorKind::Unsupported,
+                    "web_search_selection_required",
+                ));
+            }
+            return Ok((
+                self.for_selection(session, None).await?,
+                RequestOptions::default(),
+            ));
+        };
+        let view = self.store.inspect(session.clone()).await?;
+        let selection = self.selected_provider(&view, revision)?;
+        let host = self.resolve_route(Some((&selection).into())).await?;
+        let mut options = RequestOptions {
+            speed: selection.speed,
+            web_search: context.web_search,
+            ..RequestOptions::default()
+        };
+        if !options.is_default() {
+            let config = session_configuration(&view)?;
+            if config.side.is_some() || config.subagent.is_some() || config.worker.is_some() {
+                return Err(problem(
+                    ErrorKind::Unsupported,
+                    "chat_turn_options_unsupported",
+                ));
+            }
+            let routes = self
+                .routes
+                .get()
+                .filter(|r| r.turn_capabilities)
+                .ok_or_else(|| problem(ErrorKind::Unsupported, "chat_turn_options_unsupported"))?;
+            let offer = routes
+                .supervisor
+                .turn_capabilities(host.route_id, selection.model)
+                .await?;
+            options = offer.resolve(options)?;
+            if !options.is_default()
+                && !matches!(
+                    host.execution()?.authorization.credential,
+                    Credential::SupervisedChatGpt(_)
+                )
+            {
+                return Err(problem(
+                    ErrorKind::Unsupported,
+                    "chat_turn_options_unsupported",
+                ));
+            }
+        }
+        Ok((host, options))
     }
 
     /// Choose a route for a new derived session before taking admission. The

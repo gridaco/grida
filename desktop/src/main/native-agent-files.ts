@@ -111,7 +111,14 @@ export function parseGlobalConfig(bytes: Buffer) {
   if (
     table.schema_version !== 1 ||
     Object.keys(table).some(
-      (key) => !["schema_version", "hooks", "desktop"].includes(key)
+      (key) =>
+        ![
+          "schema_version",
+          "hooks",
+          "desktop",
+          "web_search",
+          "features",
+        ].includes(key)
     ) ||
     (hooks !== undefined && !Array.isArray(hooks)) ||
     (desktop !== undefined &&

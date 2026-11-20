@@ -12,6 +12,7 @@ vi.mock("electron", () => ({
   net: { request: vi.fn<(...args: unknown[]) => unknown>() },
 }));
 
+import { ProviderNetworkPolicy } from "../provider-network-policy";
 import { ServicesSidecarChannel } from "../services-sidecar-channel";
 import { ProviderNetworkAuthority } from "./provider-network-authority";
 import {
@@ -43,6 +44,41 @@ describe("ProviderNetworkHost", () => {
     );
     expect(setProxy).toHaveBeenCalledWith({ mode: "system" });
     expect(net.request).not.toHaveBeenCalled();
+  });
+
+  it("pins authenticated subscription discovery to a bodyless GET on the Main-only grant", async () => {
+    const { CHATGPT_MODELS_URL } = await import("../chatgpt-configuration");
+    const authority = new ProviderNetworkAuthority("https://gg.example.test");
+    vi.mocked(session.fromPartition).mockReturnValue({
+      setProxy: vi.fn<() => Promise<void>>(async () => {}),
+      setUserAgent: vi.fn<(value: string) => void>(),
+    } as never);
+    mockEmptyProviderResponse();
+    const subscription = await ProviderNetworkHost.nativeProviderNetwork(
+      authority,
+      ProviderNetworkPolicy.CHATGPT_SUBSCRIPTION_GRANT_ID
+    );
+    await subscription.getSubscriptionModels!(
+      new Headers({
+        accept: "application/json",
+        authorization: "Bearer fixture",
+        "chatgpt-account-id": "fixture-account",
+      }),
+      new AbortController().signal
+    );
+    expect(net.request).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        url: CHATGPT_MODELS_URL,
+        method: "GET",
+        redirect: "manual",
+        credentials: "omit",
+      })
+    );
+    const ordinary = await ProviderNetworkHost.nativeProviderNetwork(
+      authority,
+      ProviderNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID
+    );
+    expect(ordinary.getSubscriptionModels).toBeUndefined();
   });
 
   it("bootstraps and updates control while authorized provider session setup is pending", async () => {

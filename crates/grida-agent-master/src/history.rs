@@ -45,7 +45,9 @@ pub fn portable_message(mut message: Message) -> Option<Message> {
                 })
             ))),
             Content::Media(media) => Some(Content::Media(media)),
-            Content::Reasoning(_) | Content::ProviderState(_) => None,
+            Content::Reasoning(_) | Content::ProviderState(_) | Content::ProviderEvidence(_) => {
+                None
+            }
         })
         .collect();
     if message.content.is_empty() {

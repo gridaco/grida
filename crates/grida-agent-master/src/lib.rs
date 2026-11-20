@@ -21,6 +21,7 @@ pub mod retained_file;
 mod retry;
 pub mod side_chat;
 pub mod subagents;
+pub mod turn_options;
 pub mod usage;
 pub mod wakeups;
 
@@ -105,6 +106,11 @@ pub struct MasterConfig {
     /// None selects the provider's own reasoning default.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<agent_kit_core::inference::ReasoningEffort>,
+    #[serde(
+        default,
+        skip_serializing_if = "agent_kit_core::inference::RequestOptions::is_default"
+    )]
+    pub request_options: agent_kit_core::inference::RequestOptions,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1363,7 +1369,7 @@ impl Master {
             messages,
             tools: self.offers(discovered)?,
             max_output_tokens: self.config.max_output_tokens,
-            extension: None,
+            extension: self.config.request_options.extension()?,
             reasoning: self.config.reasoning,
         })?;
         match self.input_limit {

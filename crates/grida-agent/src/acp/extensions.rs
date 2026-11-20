@@ -757,6 +757,10 @@ pub(super) fn handlers(
                                 reasoning: request.reasoning,
                             },
                             SubmissionContext {
+                                web_search: selection::web_search(
+                                    request.meta.as_ref(),
+                                    &submit_sessions,
+                                )?,
                                 initial_title: initial_title(
                                     &submit_sessions,
                                     request.initial_title,

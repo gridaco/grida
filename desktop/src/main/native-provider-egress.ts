@@ -32,6 +32,11 @@ export type NativeProviderNetwork = {
   /** Whether this captured grant still names the current authority for a fresh turn. */
   isCurrent?(): boolean | Promise<boolean>;
   prepare(target: string, headers: Headers): Dispatch | null;
+  /** Main-only, fixed authenticated catalog GET on the subscription grant. */
+  getSubscriptionModels?(
+    headers: Headers,
+    signal: AbortSignal
+  ): Promise<Response | null>;
 };
 
 type Exchange = {

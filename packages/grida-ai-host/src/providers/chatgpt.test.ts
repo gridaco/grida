@@ -1,3 +1,4 @@
+import { ChatGptModels } from "./chatgpt-models";
 // GRIDA-SEC-008 — exact native wire shape, refresh lineage, and error-body pins.
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -12,7 +13,11 @@ import {
   isChatGptSubscriptionModelId,
 } from "../protocol/chatgpt";
 import { ChatGptCredentialManager } from "./chatgpt-credentials";
-import { ChatGptProvider, type ChatGptProviderConfig } from "./chatgpt";
+import {
+  ChatGptProvider,
+  type ChatGptProviderConfig,
+  type ChatGptProviderRuntime,
+} from "./chatgpt";
 import { ProviderHttp } from "./http";
 
 const RESPONSES_URL =
@@ -90,6 +95,352 @@ describe("ChatGptProvider", () => {
     ).resolves.toBeNull();
     expect(request).toHaveBeenCalledTimes(2);
   });
+  it("shares fresh account discovery and dispatches only the offered tier and exact hosted search", async () => {
+    await connection("offer-account");
+    const model = "openai/gpt-6.2-sol";
+    const wire = "gpt-6.2-sol";
+    const request = vi.fn<typeof fetch>(async (_target, init) => {
+      if (init?.method === "GET") {
+        return Response.json({
+          models: [
+            {
+              slug: wire,
+              visibility: "list",
+              use_responses_lite: true,
+              supports_search_tool: false,
+              service_tiers: [
+                { id: "priority" },
+                { id: "ultrafast" },
+                { id: "unknown-tier" },
+              ],
+              instructions: "private provider text",
+            },
+          ],
+        });
+      }
+      return completedResponse(wire);
+    });
+    const rt = runtime(request, true);
+    const [a, b] = await Promise.all([
+      rt.captureNative(model),
+      rt.captureNative(model),
+    ]);
+    const offer = {
+      status: "available",
+      speeds: ["fast", "ultrafast"],
+      webSearch: true,
+    };
+    expect(await Promise.all([a.capabilities(), b.capabilities()])).toEqual([
+      offer,
+      offer,
+    ]);
+    const tool = { type: "web_search", external_web_access: true };
+    const signal = new AbortController().signal;
+    const send = (options: Record<string, unknown>) =>
+      a.request(nativeBody({ model: wire, ...options }), signal);
+    for (const options of [
+      { service_tier: "fast" },
+      { service_tier: "default" },
+      { tools: [tool, tool] },
+      { tools: [{ ...tool, filters: {} }] },
+      {
+        tools: [
+          { ...tool, external_web_access: false, indexed_web_access: true },
+        ],
+      },
+    ]) {
+      await expect(send(options)).resolves.toBeNull();
+    }
+    expect(request).toHaveBeenCalledTimes(1);
+    await expect(
+      send({
+        service_tier: "priority",
+        tools: [{ type: "function", name: "draw" }, tool],
+      })
+    ).resolves.toMatchObject({ status: 200 });
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(
+      request.mock.calls.map(([target, init]) => [
+        target,
+        init?.method,
+        new Headers(init?.headers).get("authorization"),
+      ])
+    ).toEqual([
+      [
+        new URL("models?client_version=0.170.0", RESPONSES_URL).href,
+        "GET",
+        "Bearer access-one",
+      ],
+      [RESPONSES_URL, "POST", "Bearer access-one"],
+    ]);
+    await connection("new-lineage", "access-two");
+    await expect(a.capabilities()).resolves.toEqual({
+      status: "reauthenticationRequired",
+      speeds: [],
+      webSearch: false,
+    });
+    await expect(send({ service_tier: "ultrafast" })).resolves.toBeNull();
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
+  it("checks the current search and speed preferences again at dispatch", async () => {
+    await connection("preferences");
+    const wire = "gpt-6.2-sol";
+    let webSearch: "cached" | "indexed" | "live" | "disabled" = "live";
+    let fastMode = true;
+    const request = vi.fn<typeof fetch>(async (_, init) =>
+      init?.method === "GET"
+        ? Response.json({
+            models: [
+              {
+                slug: wire,
+                visibility: "list",
+                service_tiers: [{ id: "priority" }],
+              },
+            ],
+          })
+        : completedResponse(wire)
+    );
+    const bound = await runtime(request, true, async () => ({
+      webSearch,
+      fastMode,
+    })).captureNative("openai/gpt-6.2-sol");
+    const send = (tool: Record<string, unknown>) =>
+      bound.request(
+        nativeBody({ model: wire, tools: [{ type: "web_search", ...tool }] }),
+        new AbortController().signal
+      );
+    await expect(bound.capabilities()).resolves.toMatchObject({
+      webSearch: true,
+      speeds: ["fast"],
+    });
+    webSearch = "indexed";
+    await expect(send({ external_web_access: true })).rejects.toThrow(
+      "chat_turn_preference_changed"
+    );
+    await expect(
+      send({ external_web_access: true, indexed_web_access: true })
+    ).resolves.toMatchObject({ status: 200 });
+    webSearch = "cached";
+    await expect(
+      send({ external_web_access: true, indexed_web_access: true })
+    ).rejects.toThrow("chat_turn_preference_changed");
+    await expect(send({ external_web_access: false })).resolves.toMatchObject({
+      status: 200,
+    });
+    fastMode = false;
+    webSearch = "disabled";
+    await expect(bound.capabilities()).resolves.toMatchObject({
+      webSearch: false,
+      speeds: [],
+      fastModeDisabled: true,
+    });
+    await expect(send({ external_web_access: false })).resolves.toBeNull();
+    const speedBody = nativeBody({ model: wire, service_tier: "priority" });
+    await expect(
+      bound.request(speedBody, new AbortController().signal)
+    ).resolves.toBeNull();
+    expect(
+      request.mock.calls.filter(([, init]) => init?.method === "POST")
+    ).toHaveLength(2);
+  });
+
+  it("refuses a captured credential replaced during the dispatch preference check", async () => {
+    await connection("original");
+    const wire = "gpt-6.2-sol";
+    const request = vi.fn<typeof fetch>(async (_, init) =>
+      init?.method === "GET"
+        ? Response.json({ models: [{ slug: wire, visibility: "list" }] })
+        : completedResponse(wire)
+    );
+    const preferences = { fastMode: true, webSearch: "live" } as const;
+    const readPreferences = vi.fn<() => Promise<typeof preferences>>();
+    readPreferences
+      .mockResolvedValueOnce(preferences)
+      .mockImplementationOnce(async () => {
+        await connection("replacement", "access-two");
+        return preferences;
+      });
+    const bound = await runtime(request, true, readPreferences).captureNative(
+      "openai/gpt-6.2-sol"
+    );
+    const body = nativeBody({
+      model: wire,
+      tools: [{ type: "web_search", external_web_access: true }],
+    });
+    await expect(
+      bound.request(body, new AbortController().signal)
+    ).resolves.toMatchObject({ status: 401 });
+    expect(request.mock.calls.some(([, init]) => init?.method === "POST")).toBe(
+      false
+    );
+  });
+
+  it("honors a search opt-out made while refreshing a rejected request", async () => {
+    await connection("refresh-preference");
+    const wire = "gpt-6.2-sol";
+    let enabled = true;
+    const request = vi.fn<typeof fetch>(async (url, init) => {
+      if (init?.method === "GET")
+        return Response.json({ models: [{ slug: wire, visibility: "list" }] });
+      if (url === TOKEN_URL) {
+        enabled = false;
+        return Response.json({
+          access_token: "access-rotated",
+          refresh_token: "refresh-rotated",
+          expires_in: 3600,
+        });
+      }
+      return new Response(null, { status: 401 });
+    });
+    const bound = await runtime(request, true, async () => ({
+      fastMode: true,
+      webSearch: enabled ? "live" : "disabled",
+    })).captureNative("openai/gpt-6.2-sol");
+    const body = nativeBody({
+      model: wire,
+      tools: [{ type: "web_search", external_web_access: true }],
+    });
+    await expect(
+      bound.request(body, new AbortController().signal)
+    ).rejects.toThrow("chat_turn_preference_changed");
+    expect(
+      request.mock.calls.filter(([url]) => url === RESPONSES_URL)
+    ).toHaveLength(1);
+    expect(
+      request.mock.calls.filter(([url]) => url === TOKEN_URL)
+    ).toHaveLength(1);
+  });
+
+  it("expires positive offers; a failed refresh refuses optional work and preserves Standard", async () => {
+    await connection("expiring-account");
+    const now = vi.spyOn(Date, "now");
+    const base = Date.now();
+    const request = vi.fn<typeof fetch>();
+    request
+      .mockResolvedValueOnce(
+        Response.json({
+          models: [
+            {
+              slug: "gpt-5.6-terra",
+              visibility: "list",
+              service_tiers: [{ id: "priority" }],
+            },
+          ],
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response("private backend error", { status: 503 })
+      )
+      .mockResolvedValueOnce(completedResponse("gpt-5.6-terra"));
+    try {
+      const a = await runtime(request, true).captureNative();
+      expect(await a.capabilities()).toEqual({
+        status: "available",
+        speeds: ["fast"],
+        webSearch: false,
+      });
+      now.mockReturnValue(base + 6 * 60 * 1000);
+      const signal = new AbortController().signal;
+      await expect(
+        a.request(nativeBody({ service_tier: "priority" }), signal)
+      ).resolves.toBeNull();
+      expect(await a.capabilities()).toEqual({
+        status: "unavailable",
+        speeds: [],
+        webSearch: false,
+      });
+      await expect(a.request(nativeBody(), signal)).resolves.toMatchObject({
+        status: 200,
+      });
+      expect(request.mock.calls.map((v) => v[1]?.method)).toEqual([
+        "GET",
+        "GET",
+        "POST",
+      ]);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it("rejects ambiguous member names before custody while preserving unique-member wire bytes", async () => {
+    await connection("unique-member-lineage");
+    const wire = "gpt-5.6-terra";
+    const request = vi.fn<typeof fetch>(async () => completedResponse(wire));
+    const bound = await runtime(request, true).captureNative();
+    const signal = new AbortController().signal;
+    const original = nativeBody({
+      instructions: 'text containing ": and \\ and {}[]',
+      input: [{ "": [null, { k: "x:y" }] }],
+    });
+    const distinct = Buffer.from(
+      JSON.stringify(JSON.parse(original.toString()), null, 2)
+    );
+    expect(await bound.request(distinct, signal)).toMatchObject({
+      status: 200,
+    });
+    expect(Buffer.from(request.mock.calls[0]![1]!.body as ArrayBuffer)).toEqual(
+      distinct
+    );
+    const ordinary = nativeBody().toString().slice(0, -1);
+    for (const extra of [
+      ',"service_tier":"priority","service_tier":"ultrafast"}',
+      ',"tools":[{"type":"web_search","type":"function"}]}',
+      ',"tools":[{"type":"web_search","external_web_access":true}],"tools":[]}',
+      ',"tools":[{"type":"function","t\\u0079pe":"function"}]}',
+    ])
+      expect(
+        await bound.request(Buffer.from(ordinary + extra), signal)
+      ).toBeNull();
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("distinguishes missing catalog evidence, a hidden model, and an empty but valid offer", async () => {
+    await connection("invalid-catalog-lineage");
+    for (const [models, status] of [
+      [[null], "unavailable"],
+      [[{ slug: "gpt-5.6-terra", service_tiers: [] }], "unavailable"],
+      [
+        [{ slug: "gpt-5.6-terra", visibility: "list", service_tiers: [{}] }],
+        "unavailable",
+      ],
+      [
+        [{ slug: "gpt-5.6-terra", visibility: "hide", service_tiers: [] }],
+        "unsupported",
+      ],
+      [[], "unsupported"],
+      [
+        [{ slug: "gpt-5.6-terra", visibility: "list", service_tiers: [] }],
+        "available",
+      ],
+    ] as const) {
+      const request = vi.fn<typeof fetch>(async () =>
+        Response.json({ models })
+      );
+      const bound = await runtime(request, true).captureNative();
+      expect(await bound.capabilities()).toEqual({
+        status,
+        speeds: [],
+        webSearch: false,
+      });
+    }
+  });
+
+  it("keeps verified hosted search available when the account model omits its empty tier list", async () => {
+    await connection("search-without-speed");
+    const request = vi.fn<typeof fetch>(async () =>
+      Response.json({ models: [{ slug: "gpt-6.2-sol", visibility: "list" }] })
+    );
+    const bound = await runtime(request, true).captureNative(
+      "openai/gpt-6.2-sol"
+    );
+    expect(await bound.capabilities()).toEqual({
+      status: "available",
+      speeds: [],
+      webSearch: true,
+    });
+  });
+
   it("offers current subscription models and keeps retired IDs outside execution", () => {
     expect(CHATGPT_SUBSCRIPTION_MODEL_IDS).toEqual([
       "openai/gpt-6.2-sol",
@@ -362,14 +713,25 @@ describe("ChatGptProvider", () => {
   });
 });
 
-function runtime(request: typeof fetch) {
+function runtime(
+  request: typeof fetch,
+  withCatalog = false,
+  turnPreferences?: ChatGptProviderRuntime["turnPreferences"]
+) {
   const providerHttp = new ProviderHttp({ request, download: request });
   const credentials = new ChatGptCredentialManager(
     auth,
     providerHttp,
     CONFIG.oauth
   );
-  const providerRuntime = { config: CONFIG, credentials };
+  const providerRuntime = {
+    config: withCatalog
+      ? { ...CONFIG, catalog_client_version: "0.170.0" }
+      : CONFIG,
+    credentials,
+    catalog: new ChatGptModels(),
+    turnPreferences,
+  };
   return {
     credentials,
     captureNative: (model: string = CONFIG.default_model_id) =>

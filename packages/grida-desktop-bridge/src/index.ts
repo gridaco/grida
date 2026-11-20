@@ -281,6 +281,18 @@ export type DesktopArchivedChatPage = Readonly<{
   unavailableWorkspaces?: readonly string[];
 }>;
 
+export type DesktopPersonalizationSettings = Readonly<{
+  fastMode: boolean;
+  suggestedPrompts: boolean;
+  webSearch: "onDemand" | "disabled" | "cached" | "indexed" | "live";
+  revision: number;
+}>;
+
+export type DesktopPersonalizationChange =
+  | Readonly<{ fastMode: boolean }>
+  | Readonly<{ suggestedPrompts: boolean }>
+  | Readonly<{ webSearch: DesktopPersonalizationSettings["webSearch"] }>;
+
 export type DesktopComposerPredictionSettings = Readonly<{
   enabled: boolean;
   revision: number;
@@ -294,6 +306,16 @@ export type DesktopBridge = {
   browser?: DesktopBrowser.Bridge;
   handshake: () => Promise<HandshakeResponse>;
   nativeChat?: DesktopNativeChat;
+  /** User-wide preferences shared by Settings and regular workspace chats. */
+  personalization?: {
+    get(): Promise<DesktopPersonalizationSettings>;
+    set(
+      change: DesktopPersonalizationChange
+    ): Promise<DesktopPersonalizationSettings>;
+    onChange(
+      listener: (settings: DesktopPersonalizationSettings) => void
+    ): () => void;
+  };
   /** User-wide Desktop preference. Only the Settings window can change it. */
   composerPredictions?: {
     get(): Promise<DesktopComposerPredictionSettings>;

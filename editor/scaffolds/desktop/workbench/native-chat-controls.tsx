@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { app, useDesktopBridge } from "@/lib/desktop/bridge";
 import type {
   NativeChatEffort,
+  NativeChatSpeed,
+  NativeChatTurnCapabilities,
   NativeChatProfileCatalog,
   NativeChatProfileSelection,
 } from "@grida/desktop-bridge";
@@ -468,6 +470,7 @@ export function NativeModelPicker({
   initialError,
   effort,
   onEffort,
+  speed,
   ultraAvailable,
   ultraOffered = true,
   defaultUnavailable,
@@ -489,6 +492,12 @@ export function NativeModelPicker({
   initialError?: string | null;
   effort?: NativeChatEffort;
   onEffort?: (effort: NativeChatEffort) => void;
+  speed?: {
+    value: NativeChatSpeed;
+    capabilities: NativeChatTurnCapabilities | null;
+    onChange(speed: NativeChatSpeed): void;
+    refresh(): void;
+  };
   /** Negotiated harness support; absent until the installed host is checked. */
   ultraAvailable?: boolean;
   /**
@@ -605,6 +614,7 @@ export function NativeModelPicker({
           setAllModels(false);
           setModelSearch("");
           setSettingsError(null);
+          speed?.refresh();
           if (onSelect && !onEffort) onRefresh();
         }
       }}
@@ -725,6 +735,71 @@ export function NativeModelPicker({
                       onEffort(next);
                   }}
                 />
+                {speed &&
+                  (speed.value !== "standard" ||
+                    !!speed.capabilities?.speeds.length ||
+                    speed.capabilities?.status === "reauthenticationRequired" ||
+                    speed.capabilities?.status === "unavailable") && (
+                    <fieldset className="space-y-1.5 border-t pt-2">
+                      <legend className="sr-only">Speed</legend>
+                      <div aria-hidden="true" className="text-xs font-medium">
+                        Speed
+                      </div>
+                      <div className="flex gap-1">
+                        {(["standard", "fast", "ultrafast"] as const)
+                          .filter(
+                            (choice) =>
+                              choice === "standard" ||
+                              choice === speed.value ||
+                              speed.capabilities?.speeds.includes(choice)
+                          )
+                          .map((choice) => (
+                            <Button
+                              key={choice}
+                              type="button"
+                              size="xs"
+                              variant={
+                                choice === speed.value ? "secondary" : "ghost"
+                              }
+                              aria-pressed={choice === speed.value}
+                              disabled={
+                                busy ||
+                                (choice !== "standard" &&
+                                  !speed.capabilities?.speeds.includes(choice))
+                              }
+                              onClick={() => speed.onChange(choice)}
+                            >
+                              {
+                                {
+                                  standard: "Standard",
+                                  fast: "Fast",
+                                  ultrafast: "Ultrafast",
+                                }[choice]
+                              }
+                            </Button>
+                          ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {speed.capabilities?.status ===
+                        "reauthenticationRequired"
+                          ? "Sign in to ChatGPT again to check faster speeds."
+                          : speed.capabilities?.status === "unavailable"
+                            ? "Couldn’t check available speeds."
+                            : "Faster speeds use more of your ChatGPT allowance."}
+                      </p>
+                      {speed.capabilities?.status === "unavailable" && (
+                        <Button
+                          type="button"
+                          size="xs"
+                          variant="outline"
+                          disabled={busy}
+                          onClick={speed.refresh}
+                        >
+                          Retry availability
+                        </Button>
+                      )}
+                    </fieldset>
+                  )}
                 {goal && (
                   <p className="text-[11px] text-muted-foreground">
                     Goal turns use the model&apos;s default reasoning. Ultra

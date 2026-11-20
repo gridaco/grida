@@ -252,6 +252,7 @@ impl Host {
                 input.clone(),
                 parts,
                 SubmissionPolicy {
+                    request_options: Default::default(),
                     selection_revision: None,
                     selection_goal: false,
                     questions: false,

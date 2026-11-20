@@ -946,6 +946,7 @@ impl Fixture {
     }
     fn master_in(&self, steps: u32, instructions: &str, regime: OperatingRegime) -> Master {
         let mut config = MasterConfig {
+            request_options: Default::default(),
             model: ModelId::new("model").unwrap(),
             instructions: instructions.into(),
             max_steps: steps,

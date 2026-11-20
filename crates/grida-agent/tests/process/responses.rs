@@ -468,13 +468,27 @@ mod subscription_history {
                     };
                     self.client.respond(&frame["id"], route).await;
                 }
+                Some("_co.grida/provider/turnCapabilities") => {
+                    let expected = match frame["params"]["routeId"].as_str() {
+                        Some(route) if Some(route) == self.alternate_route.as_deref() => SECOND,
+                        None | Some(LAUNCH_ROUTE) => &self.model,
+                        _ => panic!("unexpected capability route {frame}"),
+                    };
+                    assert_eq!(frame["params"]["model"], expected);
+                    self.client
+                        .respond(
+                            &frame["id"],
+                            json!({"status":"available","speeds":["fast"],"webSearch":true}),
+                        )
+                        .await;
+                }
                 Some("_co.grida/provider/exchange") => self.exchange(frame).await,
                 Some("_co.grida/provider/cancel") => {
                     self.cancelled += 1;
                     self.exchanges
                         .remove(frame["params"]["id"].as_str().unwrap());
                 }
-                Some("session/update") => self.updates.push(frame["params"]["update"].clone()),
+                Some("session/update") => self.updates.push(frame["params"].clone()),
                 _ => {}
             }
         }
@@ -999,6 +1013,7 @@ mod subscription_history {
         let transcript: Vec<_> = worker
             .updates
             .iter()
+            .map(|notification| &notification["update"])
             .filter(|update| {
                 matches!(
                     update["sessionUpdate"].as_str(),
@@ -1019,6 +1034,111 @@ mod subscription_history {
             ]
         );
         worker.close().await;
+    }
+
+    #[tokio::test]
+    async fn subscription_search_streams_activity_then_restores_the_same_cited_answer() {
+        use super::super::lifecycle::prompt_request;
+        let fixture = Fixture::new(false);
+        let model = "openai/gpt-6.1-sol";
+        let capabilities = [
+            "provider/routes",
+            "provider/turn-capabilities",
+            "session/selection",
+            "session/updates",
+            "session/transcript-window",
+            "session/activity-order",
+        ];
+        let reply = Reply::ResponsesEvents(vec![
+            json!({"type":"response.web_search_call.searching","item_id":"ws_1"}),
+            json!({"type":"response.output_item.done","output_index":0,"item":{"type":"web_search_call","id":"ws_1","status":"completed","action":{"type":"search","query":"release date"}}}),
+            json!({"type":"response.output_item.done","output_index":1,"item":{"type":"message","id":"msg_1","role":"assistant","status":"completed","phase":"final_answer","content":[{"type":"output_text","text":"Release notes","annotations":[{"type":"url_citation","url":"https://example.org/release","title":"Release notes","start_index":0,"end_index":7}]}]}}),
+            json!({"type":"response.completed","response":{"status":"completed"}}),
+        ]);
+        let mut worker =
+            Worker::start(&fixture, model, Some('a'), vec![reply], &capabilities).await;
+        let session = "search-subscription";
+        let created = worker.request("_co.grida/session/selection/create",json!({
+            "cwd":fixture.primary,"sessionId":session,"requestId":"create","selection":{"connectionId":"a".repeat(64),"model":model,"effort":"medium","speed":"fast"}
+        })).await;
+        assert_eq!(created["result"]["revision"], 1, "{created}");
+        worker.load(&fixture, session).await;
+        let mut input = prompt_request(session, "search", "Find the release notes.");
+        input["_meta"] = json!({"co.grida/selectionRevision":1,"co.grida/webSearch":true});
+        let accepted = worker.request("_co.grida/session/submit", input).await;
+        assert!(accepted.get("error").is_none(), "{accepted}");
+        worker.idle(session).await;
+        let inspected = worker
+            .request(
+                "_co.grida/session/input",
+                json!({"sessionId":session,"inputId":"search"}),
+            )
+            .await;
+        assert_eq!(
+            inspected["result"]["settings"]["webSearch"], true,
+            "{inspected}"
+        );
+        assert!(inspected["result"]["receipt"].get("webSearch").is_none());
+        let wire = &worker.requests[0];
+        assert_eq!(worker.requests.len(), 1);
+        assert_eq!(wire["service_tier"], "priority");
+        let tools = wire["tools"].as_array().unwrap();
+        assert!(tools.iter().any(|tool| tool["type"] == "function"));
+        assert!(tools.contains(&json!({"type":"web_search","external_web_access":true})));
+        let assert_evidence = |notifications: &[Value], key: &str| {
+            let searches: Vec<_> = notifications
+                .iter()
+                .filter(|v| v["update"]["title"] == "web_search" && !v["_meta"][key].is_null())
+                .collect();
+            assert!(!searches.is_empty(), "{notifications:?}");
+            let last = searches.last().unwrap();
+            assert_eq!(last["_meta"][key]["source"], "provider");
+            assert_eq!(last["_meta"][key]["outcome"], "succeeded");
+            assert_eq!(last["update"]["rawInput"]["query"], "release date");
+            let id = &last["update"]["toolCallId"];
+            assert!(
+                searches
+                    .iter()
+                    .all(|item| &item["update"]["toolCallId"] == id)
+            );
+            let answer = notifications
+                .iter()
+                .find(|v| v["_meta"][key]["citations"].is_array())
+                .expect("a cited answer");
+            assert_eq!(answer["update"]["content"]["text"], "Release notes");
+            assert_eq!(
+                answer["_meta"][key]["citations"],
+                json!([{"url":"https://example.org/release","title":"Release notes","startIndex":0,"endIndex":7}])
+            );
+            id.clone()
+        };
+        let live_id = assert_evidence(&worker.updates, "co.grida/session/updates");
+        worker.close().await;
+
+        let mut restored = Worker::start(&fixture, model, Some('a'), vec![], &capabilities).await;
+        let window = "co.grida/session/transcript-window";
+        let attached = restored.request("session/load",json!({"cwd":fixture.primary,"sessionId":session,"mcpServers":[],"_meta":{window:{"kind":"attach"}}})).await;
+        assert!(attached.get("error").is_none(), "{attached}");
+        let page = restored.request("session/load",json!({"cwd":fixture.primary,"sessionId":session,"mcpServers":[],"_meta":{window:{"kind":"read","requestId":"restore"}}})).await;
+        assert!(page.get("error").is_none(), "{page}");
+        assert_eq!(assert_evidence(&restored.updates, window), live_id);
+        assert!(restored.requests.is_empty());
+        restored.updates.clear();
+        restored.load(&fixture, session).await;
+        assert!(
+            restored
+                .updates
+                .iter()
+                .any(|frame| frame["update"]["content"]["text"] == "Release notes")
+        );
+        assert!(
+            restored
+                .updates
+                .iter()
+                .all(|frame| frame["update"]["sessionUpdate"] != "tool_call"
+                    && !frame.to_string().contains("example.org"))
+        );
+        restored.close().await;
     }
 
     #[tokio::test]
@@ -1045,6 +1165,7 @@ mod subscription_history {
             &[
                 "provider/routes",
                 "provider/prediction-route",
+                "provider/turn-capabilities",
                 "session/selection",
                 "session/predict-prompt",
             ],
@@ -1056,17 +1177,28 @@ mod subscription_history {
                 "_co.grida/session/selection/create",
                 json!({
                     "cwd":fixture.primary,"sessionId":session,"requestId":"create",
-                    "selection":{"connectionId":"b".repeat(64),"model":SECOND,"effort":"medium"}
+                    "selection":{"connectionId":"b".repeat(64),"model":SECOND,"effort":"medium","speed":"fast"}
                 }),
             )
             .await;
         assert_eq!(created["result"]["revision"], 1, "{created}");
         worker.load(&fixture, session).await;
         let mut input = prompt_request(session, "source", "Prepare a summary.");
-        input["_meta"] = json!({"co.grida/selectionRevision":1});
+        input["_meta"] = json!({"co.grida/selectionRevision":1,"co.grida/webSearch":true});
         let accepted = worker.request("_co.grida/session/submit", input).await;
         let turn = accepted["result"]["turnId"].as_str().unwrap();
         let before = worker.idle(session).await;
+        assert_eq!(worker.requests.len(), 2);
+        for foreground in &worker.requests {
+            assert_eq!(foreground["service_tier"], "priority");
+            assert!(
+                foreground["tools"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|tool| tool["type"] == "web_search")
+            );
+        }
         let request = json!({"sessionId":session,"turnId":turn});
         let source = json!({
             "connectionId": "b".repeat(64), "model": SECOND,
@@ -1126,6 +1258,7 @@ mod subscription_history {
         assert!(!counts.iter().any(|row| row["category"] == "cached_input"));
         assert_eq!(worker.requests.len(), 3);
         let wire = &worker.requests[2];
+        assert!(wire.get("service_tier").is_none());
         assert_eq!(
             wire["model"],
             ECONOMY_MODEL.strip_prefix("openai/").unwrap()
@@ -1580,6 +1713,7 @@ mod subscription_history {
         let attached = worker
             .updates
             .iter()
+            .map(|notification| &notification["update"])
             .find(|update| {
                 update["sessionUpdate"] == "user_message_chunk"
                     && update["content"]["type"] == "resource_link"

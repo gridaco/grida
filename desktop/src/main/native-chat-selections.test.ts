@@ -139,6 +139,79 @@ describe("NativeChatSelections", () => {
     expect(providerCalls).toBe(0);
   });
 
+  it("keeps speed with its chat across restart and a lost edit reply", async () => {
+    let owner = await open();
+    const id = session();
+    const target = { sessionId: id };
+    await owner.update("workspace", target, 0, randomUUID(), {
+      profileId: a,
+      effort: "low",
+    });
+    const draft = await owner.read("workspace", null, randomUUID());
+    await owner.update(
+      "workspace",
+      draft.target,
+      draft.revision,
+      randomUUID(),
+      { profileId: b, effort: "high" }
+    );
+    failAfterCommit = true;
+    await expect(
+      owner.update("workspace", target, 1, randomUUID(), {
+        profileId: a,
+        effort: "low",
+        speed: "fast",
+      })
+    ).rejects.toThrow("lost reply");
+    owner = await open();
+    const restored = await owner.read("workspace", id);
+    expect(restored.selection).toMatchObject({
+      profileId: a,
+      effort: "low",
+      speed: "fast",
+    });
+    expect(
+      (await owner.read("workspace", null, randomUUID())).selection
+    ).toEqual({ profileId: b, modelId: "model-b", effort: "high" });
+    const updated = await owner.update(
+      "workspace",
+      target,
+      restored.revision,
+      randomUUID(),
+      { profileId: a, effort: "high" }
+    );
+    expect(updated.selection?.speed).toBe("fast");
+    const standard = await owner.update(
+      "workspace",
+      target,
+      updated.revision,
+      randomUUID(),
+      { profileId: a, effort: "high", speed: "standard" }
+    );
+    expect(standard.selection?.speed ?? "standard").toBe("standard");
+  });
+
+  it("restores an unsent draft's speed while new drafts start at Standard", async () => {
+    const owner = await open();
+    const id = randomUUID();
+    const draft = await owner.read("workspace", null, id);
+    await owner.update(
+      "workspace",
+      draft.target,
+      draft.revision,
+      randomUUID(),
+      { profileId: a, effort: "medium", speed: "ultrafast" }
+    );
+    const restored = await open();
+    expect((await restored.read("workspace", null, id)).selection?.speed).toBe(
+      "ultrafast"
+    );
+    expect(
+      (await restored.read("workspace", null, randomUUID())).selection?.speed ??
+        "standard"
+    ).toBe("standard");
+  });
+
   it("restoring a chat never replaces a newer explicit default", async () => {
     const owner = await open();
     const one = session(),
