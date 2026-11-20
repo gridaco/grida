@@ -82,6 +82,10 @@ reach only the files within the deck.
 [Edit selected text](#edit-selected-text-in-an-svg-or-slide)
 [Work with an SVG selection](#work-with-an-svg-selection)
 
+## Continue from a suggested prompt
+
+With **Settings → Chat → Suggest the next prompt** enabled, a follow-up may appear in faint text in your empty composer after a reply. Press **Tab** to accept it, edit the draft, and send it when ready. You can start typing immediately, including while Grida is generating a suggestion. [Costs and configuration](./desktop-settings.md#suggest-the-next-prompt)
+
 ## Attach an image
 
 Choose **+ → Image**, or drop or paste one PNG, JPEG, WebP or GIF into the

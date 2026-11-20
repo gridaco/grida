@@ -73,6 +73,7 @@ describe("ipc_admission", () => {
           !channel.startsWith("grida:browser:") &&
           !channel.startsWith("grida:provider:endpoint:") &&
           !channel.startsWith("grida:hooks:") &&
+          !channel.startsWith("grida:composer-predictions:") &&
           !channel.startsWith("grida:archives:") &&
           !channel.startsWith("grida:chat-catalog:") &&
           !nativeChat.includes(channel) &&

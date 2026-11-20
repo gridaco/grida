@@ -58,6 +58,7 @@ import {
   unavailableChatGptOAuth,
   type ChatGptOAuthCoordinator,
 } from "./chatgpt-oauth";
+import type { DesktopComposerPredictions } from "./desktop-composer-predictions";
 import type { NativeAgentHooks } from "./native-agent-hooks";
 import { ipc_admission, type DesktopIpcRole } from "./ipc-admission";
 import { ipc_sender } from "./ipc-sender";
@@ -102,6 +103,7 @@ type RegisterIpcHandlersOptions = {
   chat_catalog?: DesktopChatCatalog;
   open_restored_chat?: (workspaceId: string, sessionId: string) => boolean;
   global_hooks?: NativeAgentHooks;
+  composer_predictions?: DesktopComposerPredictions;
   recent_files?: Pick<RecentStore, "list" | "touch" | "pin" | "forget">;
   document_files?: NativeDocumentFiles;
   resolve_document_window?: (id: string) => BrowserWindow | undefined;
@@ -259,7 +261,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     },
     options.native_chat_selections,
     browserTools,
-    options.resolve_welcome_chat_workspace
+    options.resolve_welcome_chat_workspace,
+    options.composer_predictions
   );
   options.on_native_chat?.(nativeChat);
   const externalAgent = new NativeExternalRunIpc(
@@ -959,6 +962,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       nativeChat.setPresented(event, id, visible)
   );
   guarded(
+    IPC_CHANNELS.NATIVE_CHAT_PREDICT_PROMPT,
+    (event, id: string, observation: string) =>
+      nativeChat.predictPrompt(event, id, observation)
+  );
+  guarded(
     IPC_CHANNELS.NATIVE_CHAT_TURN_SUMMARY,
     (
       event,
@@ -1396,6 +1404,57 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     if (!options.global_hooks) throw new Error("native_hooks_unavailable");
     return options.global_hooks;
   };
+  const predictions = options.composer_predictions;
+  predictions?.onChange((state) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      try {
+        if (window.isDestroyed() || window.webContents.isDestroyed()) continue;
+        const url = window.webContents.mainFrame.url;
+        const pathname = ipc_sender.pathname(url);
+        const role = options.resolve_ipc_role(window);
+        if (
+          role &&
+          pathname &&
+          ipc_sender.isAllowed(url, EDITOR_ORIGIN) &&
+          ipc_admission.allows({
+            role,
+            pathname,
+            channel: IPC_CHANNELS.COMPOSER_PREDICTIONS_CHANGED,
+          })
+        ) {
+          window.webContents.send(
+            IPC_CHANNELS.COMPOSER_PREDICTIONS_CHANGED,
+            state
+          );
+        }
+      } catch {
+        // A closing renderer cannot block the update in other workspaces.
+      }
+    }
+  });
+  guarded(
+    IPC_CHANNELS.COMPOSER_PREDICTIONS_GET,
+    (_event, ...args: unknown[]) => {
+      if (args.length)
+        throw new Error("composer_predictions_preference_invalid");
+      if (!predictions) throw new Error("composer_predictions_unavailable");
+      return predictions.get();
+    }
+  );
+  guarded(
+    IPC_CHANNELS.COMPOSER_PREDICTIONS_SET,
+    (event, enabled: unknown, ...args: unknown[]) => {
+      if (typeof enabled !== "boolean" || args.length)
+        throw new Error("composer_predictions_preference_invalid");
+      if (!predictions) throw new Error("composer_predictions_unavailable");
+      return windowRequest(
+        event,
+        "composer predictions settings denied",
+        (_signal, check) => predictions.set(enabled, check),
+        (_window, url) => ipc_sender.pathname(url) === "/desktop/settings"
+      );
+    }
+  );
   guarded(IPC_CHANNELS.GLOBAL_HOOKS_INSPECT, (event, ...args: unknown[]) =>
     globalHooksOwner(event, args).configuration()
   );

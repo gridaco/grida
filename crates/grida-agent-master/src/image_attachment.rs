@@ -72,12 +72,28 @@ fn context(media: &MediaRef) -> Option<Context> {
 /// Intake rejects unsupported new image submissions before accepting them.
 /// This projection neither erases the retained history nor claims inspection.
 pub(crate) fn project(messages: &mut [Message], accepts_images: bool) {
+    project_pixels(messages, accepts_images, false);
+}
+
+/// A prepared request already describes the pixels immediately before their
+/// media reference. When used by a text-only model, replace that description
+/// along with the pixels so it cannot claim the new model received a view.
+pub(crate) fn omit_prepared_pixels(messages: &mut [Message]) {
+    project_pixels(messages, false, true);
+}
+
+fn project_pixels(messages: &mut [Message], accepts_images: bool, prepared: bool) {
     for message in messages {
         let mut projected = Vec::with_capacity(message.content.len());
         for part in std::mem::take(&mut message.content) {
             match part {
                 Content::Media(media) if media.media_type.starts_with("image/") => {
                     if let Some(context) = context(&media) {
+                        if prepared
+                            && projected.last() == Some(&Content::Text(context.description()))
+                        {
+                            projected.pop();
+                        }
                         projected.push(Content::Text(if accepts_images {
                             context.description()
                         } else {
@@ -177,6 +193,10 @@ mod tests {
         assert!(description.contains("omitted"));
         assert!(description.contains("not been inspected"));
         assert!(matches!(original.content[0], Content::Media(_)));
+        let mut prepared = vec![original];
+        project(&mut prepared, true);
+        omit_prepared_pixels(&mut prepared);
+        assert_eq!(prepared, projected);
     }
 
     #[test]

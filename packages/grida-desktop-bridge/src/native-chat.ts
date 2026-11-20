@@ -1282,6 +1282,11 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   observe(attachmentId: string): Promise<NativeChatObservation>;
   /** Whether this attached chat is actually on screen for notification gating. */
   setPresented?(attachmentId: string, visible: boolean): Promise<void>;
+  /** One optional suggestion for the observed reply. Accepting it only edits a draft. */
+  predictPrompt?(
+    attachmentId: string,
+    observationId: string
+  ): Promise<string | null>;
   turnSummary?(
     attachmentId: string,
     observationId: string,

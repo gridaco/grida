@@ -67,6 +67,9 @@ function ComposerBox() {
 ## Capabilities
 
 - Slash commands with keyboard selection, Escape and outside-click dismissal.
+- An optional inline suggestion in an empty paragraph. Its full text stays
+  outside the document until the person presses Tab. It then becomes editable
+  text and follows the ordinary Send action.
 - Optional host actions on explicit command selection, shared by keyboard and menu clicks.
 - Mentions from a caller-provided catalog.
 - File attachments as message parts.

@@ -27,6 +27,7 @@ import {
   NativeEditorSurfaces,
   NativeEditorSvgSelection,
   NativeEditorSvgText,
+  type DesktopComposerPredictionSettings,
   type NativeEditorSurfaceOpen,
 } from "@grida/desktop-bridge";
 import {
@@ -635,6 +636,21 @@ const bridge: DesktopBridge = {
     },
   },
 
+  composerPredictions: {
+    get: () => ipcRenderer.invoke(IPC_CHANNELS.COMPOSER_PREDICTIONS_GET),
+    set: (enabled) =>
+      ipcRenderer.invoke(IPC_CHANNELS.COMPOSER_PREDICTIONS_SET, enabled),
+    onChange: (listener) => {
+      const receive = (
+        _event: Electron.IpcRendererEvent,
+        settings: DesktopComposerPredictionSettings
+      ) => listener(settings);
+      ipcRenderer.on(IPC_CHANNELS.COMPOSER_PREDICTIONS_CHANGED, receive);
+      return () => {
+        ipcRenderer.off(IPC_CHANNELS.COMPOSER_PREDICTIONS_CHANGED, receive);
+      };
+    },
+  },
   hooks: {
     inspect: () => ipcRenderer.invoke(IPC_CHANNELS.GLOBAL_HOOKS_INSPECT),
     reload: () => ipcRenderer.invoke(IPC_CHANNELS.GLOBAL_HOOKS_RELOAD),
@@ -1083,6 +1099,12 @@ const bridge: DesktopBridge = {
         FileReferenceRequest.from(input, (each) =>
           webUtils.getPathForFile(each)
         )
+      ),
+    predictPrompt: (attachmentId, observationId) =>
+      nativeChatInvoke(
+        IPC_CHANNELS.NATIVE_CHAT_PREDICT_PROMPT,
+        attachmentId,
+        observationId
       ),
     turnSummary: (
       attachmentId,

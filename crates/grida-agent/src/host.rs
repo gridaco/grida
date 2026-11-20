@@ -30,6 +30,7 @@ pub(crate) mod live;
 pub(crate) mod message_context;
 pub(crate) mod model_change;
 mod permissions;
+pub(crate) mod prediction;
 pub mod prompt_preview;
 mod questions;
 mod queued_text;
@@ -237,6 +238,7 @@ pub struct Host {
     work: Arc<Mutex<Work>>,
     wake_lock: Arc<Mutex<()>>,
     workers: Arc<AtomicUsize>,
+    predictions: Arc<prediction::Availability>,
     title_observation: Arc<tokio::sync::RwLock<()>>,
     title_workers: Arc<std::sync::Mutex<BTreeSet<SessionId>>>,
     changed: Arc<Notify>,
@@ -992,6 +994,7 @@ impl Host {
             work: Arc::default(),
             wake_lock: Arc::default(),
             workers: Arc::default(),
+            predictions: Arc::default(),
             title_observation: Arc::default(),
             title_workers: Arc::default(),
             changed: Arc::default(),
@@ -2604,18 +2607,14 @@ impl Host {
         if view.current.is_none()
             && queued
                 .by_ref()
-                .take(if self.routes.get().is_some() {
-                    1
-                } else {
-                    usize::MAX
-                })
+                .take(if self.has_routes() { 1 } else { usize::MAX })
                 .any(|input| !CapturedRoute::admits(input, execution, configuration.execution))
         {
             return Err(problem(ErrorKind::Conflict, "session_queued_route_changed"));
         }
         if configuration.subagent.is_none()
             && goals::require_resolved_goal(&view.driver_state).is_err()
-            && (self.routes.get().is_none() || (view.current.is_none() && view.queued.is_empty()))
+            && (!self.has_routes() || (view.current.is_none() && view.queued.is_empty()))
             && !self.goal_matches_execution(view).await?
         {
             return Err(problem(ErrorKind::Conflict, "session_goal_route_changed"));
@@ -3999,6 +3998,7 @@ impl Host {
                 .await
                 .map_err(|_| problem(ErrorKind::Uncertain, "host_shutdown_timeout"))?;
             work.closed = true;
+            self.predictions.close();
             if let Some(host_tools) = &self.host_tools {
                 host_tools.close();
             }

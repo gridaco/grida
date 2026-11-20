@@ -245,11 +245,17 @@ async fn serve_connection(
                     }
                     advertised.insert(capability.into(), 1.into());
                     let routes = crate::supervised_provider::ROUTES;
+                    let prediction_route = crate::supervised_provider::PREDICTION_ROUTE;
+                    let predictions = reviewer && offered(prediction_route);
+                    if (routed || predictions)
+                        && let Err(error) = initialized_host.attach_routes(provider.clone(), routed, predictions) {
+                        return responder.respond_with_error(host_error(error));
+                    }
                     if routed {
-                        if let Err(error) = initialized_host.attach_routes(provider.clone()) {
-                            return responder.respond_with_error(host_error(error));
-                        }
                         advertised.insert(routes.into(), 1.into());
+                    }
+                    if predictions {
+                        advertised.insert(prediction_route.into(), 1.into());
                     }
                     let billing = extensions::gateway_billing::CAPABILITY;
                     if reviewer

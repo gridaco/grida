@@ -8,10 +8,12 @@ import { NativeCommandProfiles } from "./native-agent-command-profile";
 import { NativeAgentGoals } from "./native-agent-goals";
 import {
   NativeAgentProcess,
+  PREDICT_PROMPT,
   TRANSCRIPT_WINDOW,
   type NativeAgentLaunch,
 } from "./native-agent-process";
 import { NativeGatewayConnection } from "./native-gateway-connection";
+import { NativeProviderRoutes } from "./native-provider-routes";
 import { NativeInputImages } from "./native-input-images";
 import { NativeToolImages } from "./native-tool-images";
 import { NativeQueuedMessages } from "./native-queued-messages";
@@ -1031,6 +1033,38 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
     }
   });
 
+  it("cancels a held composer prediction before preparing a model switch", async () => {
+    const test = fixture(
+      `
+      if (request.method === '_${PREDICT_PROMPT}') {
+        globalThis.prediction = request.id;
+      } else if (request.method === '$/cancel_request' && request.params.requestId === globalThis.prediction) {
+        globalThis.cancelled = true;
+      } else if (request.method === '_co.grida/session/model-change' && globalThis.cancelled) {
+        send({id:globalThis.prediction,result:{text:'A late suggestion.'}});
+        send({id:request.id,result:{prepared:true}});
+      } else { throw new Error('unexpected prediction or switch order'); }
+      `,
+      1,
+      { [PREDICT_PROMPT]: 1, "co.grida/session/model-change": 1 }
+    );
+    const agent = await NativeAgentProcess.start(test.options);
+    try {
+      const prediction = agent.request(`_${PREDICT_PROMPT}`, {
+        sessionId: "chat",
+        turnId: "finished",
+      });
+      await Promise.all([
+        expect(prediction).rejects.toThrow("native_chat_prediction_cancelled"),
+        agent.prepareModelChange(),
+      ]);
+      expect(agent.modelChangePending).toBe(true);
+    } finally {
+      await agent.close();
+      test.close();
+    }
+  });
+
   it("does not seal the worker while a prior ACP admission is unresolved", async () => {
     const test = fixture(
       `if (request.method !== 'fixture/held') throw new Error('unexpected transition');`,
@@ -1433,6 +1467,172 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
             child: { childId: "child", inputId: "assignment" },
           })
         ).resolves.toEqual(childResult);
+      } finally {
+        try {
+          await agent?.close();
+        } finally {
+          test.close();
+        }
+      }
+    }
+  );
+
+  it.each([true, false])(
+    "negotiates prediction separately from foreground model switching on a fixed worker (economy routing %s)",
+    async (supported) => {
+      const test = fixture(
+        `
+      if (request.method === '_${PREDICT_PROMPT}') {
+        globalThis.prediction = request.id;
+      } else if (request.method === 'fixture/finish') {
+        send({id:globalThis.prediction,result:{text:'A late suggestion.'}});
+        send({id:request.id,result:{}});
+      } else if (request.method === 'fixture/worker') {
+        send({id: 'worker-' + request.id, ...request.params});
+      } else if (String(request.id).startsWith('worker-')) {
+        send({id: Number(request.id.slice(7)), result: request.result ?? {error: request.error.message}});
+      }`,
+        1,
+        { [NativeProviderRoutes.predictionCapability]: supported ? 1 : null }
+      );
+      const lookup = vi.fn<NativeProviderRoutes.PredictionLookup>(
+        async (source) => ({ ...source, model: "economy" })
+      );
+      let agent: NativeAgentProcess | undefined;
+      try {
+        const endpoint = "https://fixture.test/v1";
+        const billing = vi.fn<NativeGatewayConnection["readJobBilling"]>(
+          async () => ({ kind: "settled", chargedMills: "1" })
+        );
+        agent = await NativeAgentProcess.start({
+          ...test.options,
+          endpoint,
+          providerNetwork: {
+            prepare: () => async () =>
+              new Response("data: ok", {
+                headers: { "content-type": "text/event-stream" },
+              }),
+          },
+          gatewayScope: "a".repeat(64),
+          gatewayJobBilling: billing,
+          lookupPredictionRoute: lookup,
+        });
+        expect(agent.acceptsInputRoutes).toBe(false);
+        expect(agent.acceptsPromptPrediction).toBe(supported);
+        const worker = (method: string, params: Record<string, unknown>) =>
+          agent!.request("fixture/worker", { method, params });
+        const selection = { connectionId: null, model: test.options.model };
+        expect(
+          await worker(NativeProviderRoutes.resolveMethod, selection)
+        ).toHaveProperty("error");
+        const turn = {
+          sessionId: "chat",
+          turnId: "finished",
+        };
+        const permission = new AbortController();
+        const pending = agent.request(
+          `_${PREDICT_PROMPT}`,
+          turn,
+          20_000,
+          permission.signal
+        );
+        void pending.catch(() => {});
+        const target = (await worker(NativeProviderRoutes.resolveMethod, {
+          ...selection,
+          purpose: "composerPrediction",
+        })) as { routeId?: string };
+        expect(lookup).toHaveBeenCalledTimes(supported ? 1 : 0);
+        expect(target).toMatchObject(
+          supported
+            ? {
+                kind: "gateway",
+                model: "economy",
+                endpoint,
+              }
+            : { error: "Method not found" }
+        );
+        if (!supported) return;
+        const id = randomUUID();
+        expect(
+          await worker("_co.grida/provider/exchange", {
+            id,
+            routeId: target.routeId,
+            action: "open",
+            target: endpoint + "/chat/completions",
+            headers: [
+              ["content-type", "application/json"],
+              ["accept", "text/event-stream"],
+            ],
+            initial: Buffer.from("{}").toString("base64"),
+            timeoutMs: 1000,
+            maxResponseBytes: 32,
+          })
+        ).toEqual({ status: "accepted" });
+        expect(
+          await worker("_co.grida/provider/exchange", {
+            id,
+            routeId: target.routeId,
+            action: "dispatch",
+          })
+        ).toMatchObject({ status: "ready" });
+        const read = { id, routeId: target.routeId, action: "read" };
+        expect(await worker("_co.grida/provider/exchange", read)).toMatchObject(
+          { status: "chunk" }
+        );
+        expect(await worker("_co.grida/provider/exchange", read)).toEqual({
+          status: "end",
+        });
+        expect(
+          await worker(NativeGatewayConnection.readJobBillingMethod, {
+            requestId: "req_fixture",
+            routeId: randomUUID(),
+          })
+        ).toEqual({ kind: "unavailable" });
+        expect(billing).not.toHaveBeenCalled();
+        const reading = Promise.withResolvers<void>();
+        const settle = Promise.withResolvers<void>();
+        billing.mockImplementationOnce(async () => {
+          reading.resolve();
+          await settle.promise;
+          return { kind: "settled", chargedMills: "1" };
+        });
+        const receipt = worker(NativeGatewayConnection.readJobBillingMethod, {
+          requestId: "req_fixture",
+          routeId: target.routeId,
+        });
+        await reading.promise;
+        lookup.mockImplementationOnce(async (source) => ({
+          ...source,
+          model: "economy",
+          maxOutputTokens: 64,
+        }));
+        const next = await worker(NativeProviderRoutes.resolveMethod, {
+          ...selection,
+          purpose: "composerPrediction",
+        });
+        expect(next).toMatchObject({ model: "economy", maxOutputTokens: 64 });
+        permission.abort();
+        // The worker still owns the cancelled operation. Its delayed resolver
+        // cannot take the permission of a new opt-in before it acknowledges.
+        expect(
+          await agent.request(
+            `_${PREDICT_PROMPT}`,
+            turn,
+            1000,
+            new AbortController().signal
+          )
+        ).toEqual({ text: null });
+        expect(
+          await worker(NativeProviderRoutes.resolveMethod, {
+            ...selection,
+            purpose: "composerPrediction",
+          })
+        ).toEqual({ error: "Provider route unavailable" });
+        settle.resolve();
+        expect(await receipt).toEqual({ kind: "settled", chargedMills: "1" });
+        expect(billing).toHaveBeenCalledOnce();
+        await agent.request("fixture/finish", {});
+        expect(await pending).toEqual({ text: null });
       } finally {
         try {
           await agent?.close();

@@ -14,6 +14,7 @@ pub mod history;
 pub mod hooks;
 pub mod image_attachment;
 pub mod lifecycle_hooks;
+pub mod prediction;
 pub mod presentation;
 pub mod questions;
 pub mod retained_file;

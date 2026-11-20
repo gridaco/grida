@@ -281,6 +281,11 @@ export type DesktopArchivedChatPage = Readonly<{
   unavailableWorkspaces?: readonly string[];
 }>;
 
+export type DesktopComposerPredictionSettings = Readonly<{
+  enabled: boolean;
+  revision: number;
+}>;
+
 export type DesktopBridge = {
   protocol: typeof DESKTOP_BRIDGE_PROTOCOL;
   app: { version: string; platform: string };
@@ -289,6 +294,14 @@ export type DesktopBridge = {
   browser?: DesktopBrowser.Bridge;
   handshake: () => Promise<HandshakeResponse>;
   nativeChat?: DesktopNativeChat;
+  /** User-wide Desktop preference. Only the Settings window can change it. */
+  composerPredictions?: {
+    get(): Promise<DesktopComposerPredictionSettings>;
+    set(enabled: boolean): Promise<DesktopComposerPredictionSettings>;
+    onChange(
+      listener: (value: DesktopComposerPredictionSettings) => void
+    ): () => void;
+  };
   /** Metadata discovery for Home and the workbench. Older hosts omit this capability. */
   chatCatalog?: {
     list(query?: DesktopChatCatalogQuery): Promise<DesktopChatCatalogPage>;

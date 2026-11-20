@@ -3,6 +3,7 @@ export namespace SettingsNavigation {
   export const sections = [
     { id: "account", label: "Account" },
     { id: "appearance", label: "Appearance" },
+    { id: "chat", label: "Chat" },
     { id: "browser", label: "Browser" },
     { id: "credits", label: "Credits" },
     { id: "models", label: "LLM Providers" },

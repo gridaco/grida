@@ -10,6 +10,7 @@ import { clearTimeout, setTimeout } from "node:timers";
 import { promisify } from "node:util";
 import type { NativeEditorSurfaceSnapshot } from "@grida/desktop-bridge";
 import { NativeProviderRoutes } from "./native-provider-routes";
+import { NativeProviderSelection } from "./native-provider-selection";
 import { NativeAgentArtifacts } from "./native-agent-artifacts";
 import { NativeAgentBackgroundProcesses } from "./native-agent-background-processes";
 import { NativeAgentDeletion } from "./native-agent-deletion";
@@ -67,6 +68,7 @@ const LIBRARY_SELECTION_CAPABILITIES = {
 } as const;
 const CATALOG_QUERY = "co.grida/session/catalog-query";
 export const TRANSCRIPT_WINDOW = "co.grida/session/transcript-window";
+export const PREDICT_PROMPT = "co.grida/session/predict-prompt";
 const MODEL_CHANGE = "co.grida/session/model-change";
 const SUBAGENT_CAPABILITIES = {
   "co.grida/subagent/list": 1,
@@ -98,11 +100,14 @@ export type NativeAgentLaunch = {
   reasoning?: true;
   credentialHome?: string;
   configuredEndpointKey?: string;
+  /** Main-owned settings identity, including anonymous configured endpoints. */
+  configuredEndpointId?: string;
   workspaceConfiguration?: Readonly<{ directory: string; epoch: string }>;
   hooks?: NativeAgentHooks;
   providerNetwork?: NativeProviderNetwork;
   inputRouteConnectionId?: string | null;
   lookupProviderRoute?: NativeProviderRoutes.Lookup;
+  lookupPredictionRoute?: NativeProviderRoutes.PredictionLookup;
   gatewayScope?: string;
   gatewayJobBilling?: NativeGatewayConnection["readJobBilling"];
   subscriptionScope?: string;
@@ -122,6 +127,8 @@ const EDITOR_CONTEXT = "co.grida/session/editor-context";
 const MESSAGE_CONTEXT = "co.grida/session/message-context";
 
 type Pending = {
+  method: string;
+  prediction?: AbortController;
   resolve: (result: unknown) => void;
   reject: (error: Error) => void;
   timer: ReturnType<typeof setTimeout>;
@@ -205,6 +212,7 @@ export class NativeAgentProcess {
   private catalogQuery = false;
   private modelChange = false;
   private inputRoutes = false;
+  private predictionRoutes = false;
   get acceptsInputRoutes() {
     return this.connected && this.inputRoutes;
   }
@@ -236,6 +244,7 @@ export class NativeAgentProcess {
   private editorToolContext = false;
   private messageContext = false;
   private initialTitle = false;
+  private promptPrediction = false;
   private readonly editorRequests = new Map<string | number, EditorRequest>();
   private readonly editorBusyReplies = new Map<string | number, Buffer>();
   private editorBusyReplyBytes = 0;
@@ -346,6 +355,10 @@ export class NativeAgentProcess {
 
   get acceptsMessageContext(): boolean {
     return this.connected && this.messageContext;
+  }
+
+  get acceptsPromptPrediction(): boolean {
+    return this.connected && this.promptPrediction;
   }
 
   get acceptsInitialTitle(): boolean {
@@ -654,12 +667,20 @@ export class NativeAgentProcess {
           )
         )
       : undefined;
+    const inputRoutes = !!(providerEgress && options.lookupProviderRoute);
+    const predictionRoutes = !!(
+      providerEgress && options.lookupPredictionRoute
+    );
+    const directLocalPrediction =
+      !providerEgress &&
+      NativeProviderSelection.isLoopbackEndpoint(options.endpoint);
     const providerRoutes =
-      providerEgress && options.lookupProviderRoute
+      inputRoutes || predictionRoutes
         ? new NativeProviderRoutes(
             options.inputRouteConnectionId ?? null,
             options,
-            options.lookupProviderRoute
+            options.lookupProviderRoute,
+            options.lookupPredictionRoute
           )
         : undefined;
     const capabilities: Record<string, 1> = {
@@ -793,7 +814,7 @@ export class NativeAgentProcess {
                 [NativeAgentGoals.completionCapability]: 1,
                 [NativeAgentGoals.manualContinuationCapability]: 1,
                 ...(((options.gatewayScope && options.gatewayJobBilling) ||
-                  providerRoutes) && {
+                  inputRoutes) && {
                   [NativeAgentGoals.spendingCapability]: 1,
                 }),
                 ...(options.subagents && {
@@ -813,6 +834,9 @@ export class NativeAgentProcess {
                 ...(options.workspace && { [EDITOR_CONTEXT]: 1 }),
                 [MESSAGE_CONTEXT]: 1,
                 [NativeChatTitle.capability]: 1,
+                ...((predictionRoutes || directLocalPrediction) && {
+                  [PREDICT_PROMPT]: 1,
+                }),
                 ...(providerEgress && {
                   [NativeEditorSurfaceEndpoints.openCapability]: 1,
                   [NativeEditorSurfaceEndpoints.svgTextCapability]: 1,
@@ -824,7 +848,7 @@ export class NativeAgentProcess {
                 }),
                 [NativeAgentArtifacts.capability]: 1,
                 [NativeAgentBackgroundProcesses.capability]: 1,
-                ...((options.gatewayJobBilling || providerRoutes) && {
+                ...((options.gatewayJobBilling || inputRoutes) && {
                   [NativeGatewayConnection.billingCapability]: 1,
                   [NativeGatewayConnection.childBillingCapability]: 1,
                 }),
@@ -841,7 +865,10 @@ export class NativeAgentProcess {
                 [CATALOG_QUERY]: 1,
                 [NativeActivityOrder.capability]: 1,
                 [MODEL_CHANGE]: 1,
-                ...(providerRoutes && { [NativeProviderRoutes.capability]: 1 }),
+                ...(inputRoutes && { [NativeProviderRoutes.capability]: 1 }),
+                ...(predictionRoutes && {
+                  [NativeProviderRoutes.predictionCapability]: 1,
+                }),
                 "co.grida/session/selection": 1,
                 "co.grida/session/permission-mode": 1,
                 ...(requestDeletion && {
@@ -870,7 +897,10 @@ export class NativeAgentProcess {
         advertised?.[NativeActivityOrder.capability] === 1;
       processOwner.modelChange = advertised?.[MODEL_CHANGE] === 1;
       processOwner.inputRoutes =
-        !!providerRoutes && advertised?.[NativeProviderRoutes.capability] === 1;
+        inputRoutes && advertised?.[NativeProviderRoutes.capability] === 1;
+      processOwner.predictionRoutes =
+        predictionRoutes &&
+        advertised?.[NativeProviderRoutes.predictionCapability] === 1;
       processOwner.permissionMode =
         advertised?.["co.grida/session/permission-mode"] === 1;
       processOwner.chatSelection =
@@ -1000,6 +1030,9 @@ export class NativeAgentProcess {
         options.workspace !== undefined && advertised?.[EDITOR_CONTEXT] === 1;
       processOwner.messageContext =
         processOwner.transcriptWindow && advertised?.[MESSAGE_CONTEXT] === 1;
+      processOwner.promptPrediction =
+        (processOwner.predictionRoutes || directLocalPrediction) &&
+        advertised?.[PREDICT_PROMPT] === 1;
       processOwner.initialTitle =
         advertised?.[NativeChatTitle.capability] === 1;
       processOwner.ready = true;
@@ -1013,13 +1046,68 @@ export class NativeAgentProcess {
   request(
     method: string,
     params: unknown,
-    timeoutMs = 130_000
+    timeoutMs = 130_000,
+    permission?: AbortSignal
   ): Promise<unknown> {
     if (this.changingModel)
       return Promise.reject(new Error("native_chat_model_change_busy"));
     if (method === NativeAgentPermissions.answerMethod)
       return Promise.reject(new Error("native_agent_approval_requires_review"));
+    if (method === `_${PREDICT_PROMPT}`)
+      return this.predictPrompt(params, timeoutMs, permission);
     return this.call(method, params, timeoutMs);
+  }
+
+  private get predictionPermission(): AbortSignal | undefined {
+    for (const request of this.pending.values())
+      if (request.prediction) return request.prediction.signal;
+    return undefined;
+  }
+
+  private async predictPrompt(
+    params: unknown,
+    timeoutMs: number,
+    permission?: AbortSignal
+  ): Promise<unknown> {
+    if (
+      !this.acceptsPromptPrediction ||
+      permission?.aborted ||
+      this.predictionPermission
+    )
+      return { text: null };
+    const controller = new AbortController();
+    const id = this.nextId;
+    const cancel = () => {
+      controller.abort();
+      if (this.connected && this.pending.has(id)) {
+        // Main revokes egress synchronously. ACP cancellation also stops the
+        // worker while it is preparing a request or waiting on a provider.
+        try {
+          this.notify("$/cancel_request", { requestId: id });
+        } catch {
+          // A disconnected worker cannot receive cancellation. Its pending
+          // prediction still has no authority to dispatch from Main.
+        }
+      }
+    };
+    permission?.addEventListener("abort", cancel, { once: true });
+    try {
+      // Keep the slot until the worker replies, including after opt-out. A
+      // delayed resolver from this request cannot borrow a later opt-in.
+      const result = await this.call(
+        `_${PREDICT_PROMPT}`,
+        params,
+        timeoutMs,
+        controller
+      );
+      return permission?.aborted ? { text: null } : result;
+    } catch (error) {
+      if (permission?.aborted) return { text: null };
+      throw error;
+    } finally {
+      permission?.removeEventListener("abort", cancel);
+      controller.abort();
+    }
   }
 
   /** Seal native work admission before the owner replaces this store's worker. */
@@ -1031,8 +1119,18 @@ export class NativeAgentProcess {
     if (!this.modelChange)
       throw new Error("native_chat_model_change_unsupported");
     if (this.changingModel) throw new Error("native_chat_model_change_busy");
-    if (this.pending.size)
-      throw new Error("native_chat_model_change_pending_work");
+    for (const request of this.pending.values())
+      if (request.method !== `_${PREDICT_PROMPT}`)
+        throw new Error("native_chat_model_change_pending_work");
+    // An optional prediction must give way to an explicit connection switch.
+    // A late native reply carries the retired id and cannot enter the new chat.
+    for (const [id, prediction] of this.pending) {
+      prediction.prediction?.abort();
+      this.notify("$/cancel_request", { requestId: id });
+      this.pending.delete(id);
+      clearTimeout(prediction.timer);
+      prediction.reject(new Error("native_chat_prediction_cancelled"));
+    }
     this.changingModel = true;
     // A lost response can mean that native admission was already sealed.
     // Keep the local gate closed until this exact process has exited.
@@ -1107,7 +1205,8 @@ export class NativeAgentProcess {
   private call(
     method: string,
     params: unknown,
-    timeoutMs = 130_000
+    timeoutMs = 130_000,
+    prediction?: AbortController
   ): Promise<unknown> {
     if (this.failure || this.shutdown) {
       return Promise.reject(this.failure ?? new Error("native_agent_closing"));
@@ -1127,7 +1226,7 @@ export class NativeAgentProcess {
         // The host can still own the accepted operation and its response slot.
         reject(new Error("native_agent_request_timeout"));
       }, timeoutMs);
-      this.pending.set(id, { resolve, reject, timer });
+      this.pending.set(id, { method, resolve, reject, timer, prediction });
       try {
         this.write({ jsonrpc: "2.0", id, method, params });
       } catch (error) {
@@ -1356,7 +1455,10 @@ export class NativeAgentProcess {
           throw new Error("native_agent_invalid_message");
         if (
           message.method === NativeProviderRoutes.resolveMethod &&
-          this.acceptsInputRoutes
+          this.connected &&
+          (object(message.params)?.purpose === "composerPrediction"
+            ? this.predictionRoutes
+            : this.inputRoutes)
         ) {
           const id = message.id;
           if (this.providerRequests.has(id))
@@ -1370,7 +1472,10 @@ export class NativeAgentProcess {
             return;
           }
           this.providerRequests.add(id);
-          void this.providerRoutes!.resolve(message.params)
+          void this.providerRoutes!.resolve(
+            message.params,
+            this.predictionPermission
+          )
             .then(
               (result) => {
                 if (this.connected) this.write({ jsonrpc: "2.0", id, result });
@@ -1658,7 +1763,7 @@ export class NativeAgentProcess {
     const billing =
       routeId === undefined
         ? this.gatewayJobBilling
-        : this.acceptsInputRoutes
+        : this.connected && (this.inputRoutes || this.predictionRoutes)
           ? this.providerRoutes?.get(routeId)?.launch.gatewayJobBilling
           : undefined;
     if (
@@ -1684,7 +1789,7 @@ export class NativeAgentProcess {
   private egress(params: unknown): NativeProviderEgress | undefined {
     const routeId = object(params)?.routeId;
     if (routeId === undefined) return this.providerEgress;
-    return this.acceptsInputRoutes
+    return this.connected && (this.inputRoutes || this.predictionRoutes)
       ? this.providerRoutes?.get(routeId)?.egress
       : undefined;
   }

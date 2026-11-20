@@ -546,6 +546,48 @@ and structured display parts remain available through inspection of the
 queued input at the same session revision. Supplemental model context is
 excluded from the preview.
 
+### Composer predictions
+
+A private stdio client can negotiate `co.grida/session/predict-prompt: 1` and
+request `_co.grida/session/predict-prompt` with `{sessionId, turnId}` for an
+attached chat. The client decides whether its composer can use a suggestion.
+The request accepts no instructions, provider choice, grants, or message text.
+
+An idle, active regular chat can receive one prediction for its latest
+successful user turn. The host validates the completed turn's provider and
+account. A hosted connection must offer the product's `nano` model under the
+same authority. A local endpoint on `localhost` or a numeric loopback address
+can use its selected model directly. A supervised endpoint must confirm its
+live offer through `co.grida/provider/prediction-route: 1`. An unavailable
+offer skips prediction.
+The prediction includes the visible reply, retained compacted context and a
+fixed instruction. A different model receives portable conversation text and
+tool observations. Private reasoning and signed continuation data stay with
+their original model.
+It offers no tools, rechecks inference authority and runs one generation under
+a 15-second deadline with a separate output allowance. Goals, workers, side
+chats and queued work are ineligible. The host reserves the attempt only
+while the chat is active and the same reply is still current. Archiving the
+chat while the supervisor resolves its model skips generation. Changing the chat's selected model,
+connection or effort invalidates the completed turn's prediction. Cancellation,
+stale context, unavailable authority and provider failure can all yield an empty
+result.
+
+The result contains `text` (a short editable prompt or `null`) and `elapsedMs`.
+Optional `modelId` names the requested prediction model when there is provider
+execution evidence.
+Optional `tokenUsage` uses the turn summary's reported categories for this
+prediction alone. With Gateway billing negotiated, `gatewayBilling` can report
+the scoped charge from the prediction's terminal receipt. For a pending or
+missing terminal receipt, the host makes one bounded lookup for the exact
+dispatched request on its captured supervisor route. A charge that remains
+pending when the draft returns stays pending in this response. Missing counts and
+unavailable receipts represent unknown measurements. The host retains only a
+session-scoped reservation so concurrent or replayed requests cannot charge
+twice, even after a restart. The inference and suggestion stay outside the
+parent transcript, queue and turn account. Clients insert accepted text into
+their ordinary draft and send only upon explicit submission.
+
 ### Retained tool-result images
 
 Private stdio clients on macOS and Linux can negotiate
@@ -1779,8 +1821,22 @@ Its parameters are the saved `connectionId` (null selects the configured
 default) and the exact `model`. Only the supervising client supplies an
 endpoint, custody configuration or Gateway/subscription scope.
 
-Every successful response carries the same model and a supervisor-local
+Every successful ordinary selection response carries the same model and a supervisor-local
 `routeId` UUID. The `kind` determines the remaining fields.
+
+Private supervisors can independently negotiate
+`co.grida/provider/prediction-route: 1`. A [composer prediction](#composer-predictions)
+adds `purpose: "composerPrediction"` to the request. The `connectionId` and
+`model` identify the completed turn's selection. For an alternate foreground
+route, `sourceRouteId` identifies the exact supervisor-issued handle for that
+selection. Its absence identifies the worker's original launch, including a
+named launch. The supervisor verifies the source handle, connection and model
+together before resolving an economy model under that account. The response
+supplies the verified prediction model and route under the same account.
+Desktop issues a separate route for each supervised prediction, even when it
+uses the foreground model. Turning predictions off revokes that route and
+leaves the foreground exchange available. A fixed worker can negotiate this
+operation while keeping its original foreground model.
 
 | Kind      | Fields                                                                                                                                                                                                                        |
 | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

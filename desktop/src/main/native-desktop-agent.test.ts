@@ -1,5 +1,6 @@
 // GRIDA-SEC-004 / GRIDA-SEC-008 — native Desktop provider lifetime fixtures.
 import { AuthStore, SecretsStore } from "@grida/daemon/server";
+import { OLLAMA_ENDPOINT_PRESET } from "@grida/ai-host";
 import { AGENT_DEFAULT_TIER, TIER_MODEL_IDS } from "@grida/ai/catalogue";
 import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
@@ -1591,9 +1592,9 @@ it.runIf(Boolean(resources) && process.platform !== "win32").each([
     png: false,
   },
   {
-    selection: { kind: "endpoint", id: "local" } as const,
-    endpoint: "http://127.0.0.1:11434/v1",
-    model: "openai/gpt-5.6-terra",
+    selection: { kind: "endpoint", id: OLLAMA_ENDPOINT_PRESET.id } as const,
+    endpoint: OLLAMA_ENDPOINT_PRESET.base_url,
+    model: "qwen3:4b",
     unavailable: "native_provider_endpoint_not_approved",
     keyed: false,
     png: false,
@@ -1661,11 +1662,13 @@ it.runIf(Boolean(resources) && process.platform !== "win32").each([
           network: async () => ({ prepare }),
         })
       );
+      const configurations = [
+        { id: selection.id, base_url: endpoint, models: [{ id: model }] },
+      ];
+      sidecar.listProviderEndpoints.mockResolvedValue(configurations);
       sidecar.nativeConfiguredEndpoint.mockImplementation((id, modelId) =>
         NativeProviderSelection.configuredEndpoint(id, modelId, {
-          list: async () => [
-            { id: "local", base_url: endpoint, models: [{ id: model }] },
-          ],
+          list: async () => configurations,
           hasKey: (id) => secrets.has(id),
           credentialHome: source.providerHome,
           network: async () => {
@@ -1770,6 +1773,19 @@ it.runIf(Boolean(resources) && process.platform !== "win32").each([
       expect(prepare.mock.calls[0][1].get("authorization")).toBe(
         keyed ? `Bearer ${key}` : null
       );
+      // Configured endpoints can reuse the approved local model for predictions.
+      const prompt =
+        selection.kind === "endpoint"
+          ? await chat.predictPrompt!(session, await chat.observe(session))
+          : null;
+      const usesOllama = selection.id === OLLAMA_ENDPOINT_PRESET.id;
+      expect(prompt).toBe(usesOllama ? "Selected provider answered" : null);
+      expect(dispatch).toHaveBeenCalledTimes(usesOllama ? 2 : 1);
+      expect(
+        prepare.mock.calls
+          .slice(1)
+          .map(([url, headers]) => [url, headers.get("authorization")])
+      ).toEqual(usesOllama ? [[`${endpoint}/chat/completions`, null]] : []);
       expect(sidecar.nativeAgentGatewayConnection).not.toHaveBeenCalled();
     } finally {
       await agent?.close();

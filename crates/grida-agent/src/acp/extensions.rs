@@ -14,6 +14,7 @@ mod input_images;
 pub(super) mod library;
 mod lifecycle;
 mod model_change;
+mod prediction;
 mod processes;
 pub(super) mod tool_images;
 pub(super) use processes::PROCESSES;
@@ -188,6 +189,7 @@ fn capability_keys(
         .chain([skills::CATALOG])
         .chain([hooks::INSPECT])
         .chain([summaries::SUMMARY])
+        .chain(reviewer.then_some(prediction::CAPABILITY))
         .chain(summaries::artifact_capability(reviewer))
         .chain(input_images::capability(reviewer))
         .chain(input_images::chunks_capability(reviewer))
@@ -692,6 +694,7 @@ pub(super) fn handlers(
         ))
         .extend(skills::handlers(host.clone(), sessions.clone()))
         .extend(summaries::handlers(host.clone(), sessions.clone()))
+        .extend(prediction::handlers(host.clone(), sessions.clone()))
         .extend(input_images::handlers(host.clone(), sessions.clone()))
         .extend(tool_images::handlers(host.clone(), sessions.clone()))
         .extend(gateway_billing::handlers(host.clone(), sessions.clone()))

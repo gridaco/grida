@@ -37,6 +37,7 @@ import type { NativeImagePlacement } from "./native-image-placement";
 import type { ImageReferenceReview } from "./native-image-generation";
 import type { NativeMcpLaunch } from "./native-mcp-launch";
 import { NativeProviderSelection } from "./native-provider-selection";
+import { NativePredictionRoute } from "./native-prediction-route";
 import {
   NativeDeckGrant,
   type NativeNestedDeckGrant,
@@ -1186,6 +1187,10 @@ export class NativeDesktopAgent {
             return {
               launch: {
                 ...provider,
+                lookupPredictionRoute: this.predictionRouteLookup(
+                  workspace.id,
+                  workspace.requireCurrent
+                ),
                 subagents: undefined,
                 resourcesPath: this.resourcesPath,
               },
@@ -1280,6 +1285,10 @@ export class NativeDesktopAgent {
       subagents: true as const,
       ...(this.chatTitles && { chatTitles: true as const }),
       workspaceConfiguration,
+      lookupPredictionRoute: this.predictionRouteLookup(
+        id,
+        workspace.requireDirectoryCurrent
+      ),
       ...(workspaceConfiguration && {
         lookupProviderRoute: this.inputRouteLookup(workspace),
       }),
@@ -1303,6 +1312,36 @@ export class NativeDesktopAgent {
           ...(nestedProtectedPaths ?? []),
         ],
       },
+    };
+  }
+
+  private predictionRouteLookup(
+    workspaceId: string,
+    requireCurrent?: () => void
+  ): NativeProviderRoutes.PredictionLookup {
+    const generation = this.accountGeneration;
+    return async (source, signal) => {
+      const check = () => {
+        signal.throwIfAborted();
+        if (
+          this.closed ||
+          this.transitions ||
+          this.accountGeneration !== generation ||
+          this.workspaceActivity.get(workspaceId)?.retired
+        )
+          throw new Error("native_workspace_closing");
+        requireCurrent?.();
+      };
+      check();
+      const host = this.subscription?.host;
+      const target = await NativePredictionRoute.resolve(source, signal, {
+        subscription: host?.launch.bind(host),
+        endpoints: servicesSidecarClient.listProviderEndpoints,
+        gateway: servicesSidecarClient.listGatewayModels,
+      });
+      if (target) await this.store.requireProviderIsolation(target);
+      check();
+      return target;
     };
   }
 

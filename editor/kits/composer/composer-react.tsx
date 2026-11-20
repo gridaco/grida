@@ -55,6 +55,8 @@ export type ComposerController = {
   removeAttachment: ComposerCore["removeAttachment"];
   setContexts: ComposerCore["setContexts"];
   clear: () => void;
+  /** Whether an inline suggestion can occupy the empty editable paragraph. */
+  isEmptyDraft: () => boolean;
   /** The editor's document, or null when it is empty. */
   readDocument: () => unknown | null;
   /** Restore a saved document into an empty editor. False when not applied. */
@@ -147,6 +149,16 @@ export function useComposer() {
         editor?.commands.clearContent(true);
         core.clear();
       },
+      isEmptyDraft() {
+        const current = core.getSnapshot();
+        return (
+          !!editor &&
+          !editor.view.composing &&
+          ComposerTiptap.hasEmptyParagraph(editor) &&
+          !current.attachments.length &&
+          !current.contexts.length
+        );
+      },
       readDocument() {
         return editor && !editor.isEmpty ? editor.getJSON() : null;
       },
@@ -217,6 +229,8 @@ export function ComposerContent({
   triggerMenuId,
   autofocus,
   onSubmitRequest,
+  suggestion,
+  onDraftChange,
   onTransfer,
   onFiles,
   onDirectories,
@@ -230,6 +244,10 @@ export function ComposerContent({
   editorClassName?: string;
   triggerMenuId?: string;
   onSubmitRequest?: () => void;
+  /** Faint text outside the document. Only plain Tab accepts the full text. */
+  suggestion?: { text: string; take(text: string): boolean };
+  /** Synchronous document and composition changes, including edits within one render. */
+  onDraftChange?: (empty: boolean) => void;
   /**
    * Preferred source-aware transfer callback. Receives one envelope per paste or
    * drop, retaining gesture provenance, resource kind, ordering, and the original
@@ -267,6 +285,11 @@ export function ComposerContent({
   const editorRef = useRef<Editor | null>(null);
   // The editor is created once; read the latest callback through a ref so a
   // re-rendered consumer's handler is always the one invoked.
+  const suggestionRef = useRef(suggestion);
+  suggestionRef.current = suggestion;
+  const draftChangeRef = useRef(onDraftChange);
+  draftChangeRef.current = onDraftChange;
+  const visiblePlaceholder = suggestion?.text ?? placeholder;
   const onTransferRef = useRef(onTransfer);
   onTransferRef.current = onTransfer;
   const onFilesRef = useRef(onFiles);
@@ -294,6 +317,7 @@ export function ComposerContent({
           core,
           editor: editorRef.current,
           event,
+          suggestion: suggestionRef.current,
           triggerIndex: core.getSnapshot().triggerIndex,
           moveTriggerIndex: (delta) => core.moveTriggerIndex(delta),
           submit() {
@@ -301,6 +325,19 @@ export function ComposerContent({
           },
           onCommandSelect: commandSelection.current,
         });
+      },
+      handleDOMEvents: {
+        compositionstart() {
+          draftChangeRef.current?.(false);
+          return false;
+        },
+        compositionend() {
+          const editor = editorRef.current;
+          draftChangeRef.current?.(
+            !!editor && ComposerTiptap.hasEmptyParagraph(editor)
+          );
+          return false;
+        },
       },
       handlePaste(_view, event) {
         const transfer = ComposerTransfer.fromPaste(event.clipboardData);
@@ -343,6 +380,9 @@ export function ComposerContent({
       }
     },
     onUpdate({ editor }) {
+      draftChangeRef.current?.(
+        !editor.view.composing && ComposerTiptap.hasEmptyParagraph(editor)
+      );
       ComposerTiptap.syncCore(core, editor);
     },
     onSelectionUpdate({ editor }) {
@@ -372,14 +412,24 @@ export function ComposerContent({
     const ext = editor.extensionManager.extensions.find(
       (e) => e.name === "placeholder"
     );
-    if (!ext || ext.options.placeholder === placeholder) return;
-    ext.options.placeholder = placeholder;
+    if (!ext || ext.options.placeholder === visiblePlaceholder) return;
+    ext.options.placeholder = visiblePlaceholder;
     editor.view.dispatch(editor.state.tr);
-  }, [editor, placeholder]);
+  }, [editor, visiblePlaceholder]);
 
   useEffect(() => {
     if (!editor) return;
     const dom = editor.view.dom;
+    if (suggestion) {
+      dom.setAttribute("aria-keyshortcuts", "Tab");
+      dom.setAttribute(
+        "aria-description",
+        `Suggested prompt: ${suggestion.text}. Press Tab to edit it.`
+      );
+    } else {
+      dom.removeAttribute("aria-keyshortcuts");
+      dom.removeAttribute("aria-description");
+    }
     const selectedItem = snapshot.trigger?.items[snapshot.triggerIndex];
     dom.setAttribute("aria-controls", resolvedTriggerMenuId);
     dom.setAttribute("aria-expanded", snapshot.trigger ? "true" : "false");
@@ -391,14 +441,26 @@ export function ComposerContent({
     } else {
       dom.removeAttribute("aria-activedescendant");
     }
-  }, [editor, resolvedTriggerMenuId, snapshot.trigger, snapshot.triggerIndex]);
+  }, [
+    editor,
+    resolvedTriggerMenuId,
+    snapshot.trigger,
+    snapshot.triggerIndex,
+    suggestion,
+  ]);
 
   return (
     <div
       {...props}
       className={cn("composer-content", className)}
       data-composer-content
+      data-composer-suggestion={suggestion ? "" : undefined}
     >
+      {suggestion && (
+        <kbd aria-hidden="true" className="composer-suggestion-key">
+          Tab
+        </kbd>
+      )}
       <EditorContent editor={editor} />
     </div>
   );

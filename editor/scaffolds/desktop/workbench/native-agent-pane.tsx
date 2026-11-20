@@ -4,6 +4,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -41,6 +42,7 @@ import {
   type NativeChatInitialComposer,
   type NativeChatFirstInput,
 } from "@/lib/agent-chat/native-chat-controller";
+import { useDesktopBridge } from "@/lib/desktop/bridge";
 import { PanelIsPresented } from "./workbench-panel-content";
 import { subscribeToNativeNotificationFocus } from "@/lib/desktop/agent-focus-session";
 import {
@@ -597,6 +599,24 @@ function NativeChatPane({
   const [libraryScope, setLibraryScope] = useState<number | null>(null);
   const activityOpen = !subagentsInTabs && !!subagentActivity?.open;
   const panelPresented = useContext(PanelIsPresented);
+  const preferences = useDesktopBridge()?.composerPredictions;
+  const prediction = controller.composerPrediction;
+  useEffect(() => prediction.connect(preferences), [prediction, preferences]);
+  useLayoutEffect(() => {
+    const report = () =>
+      prediction.setPresented(
+        !controller.fixedSession &&
+          panelPresented &&
+          !activityOpen &&
+          !document.hidden
+      );
+    report();
+    document.addEventListener("visibilitychange", report);
+    return () => {
+      document.removeEventListener("visibilitychange", report);
+      prediction.setPresented(false);
+    };
+  }, [prediction, controller, panelPresented, activityOpen]);
   const conversationPane = useRef<HTMLDivElement>(null);
   const attachmentId = controller.presentedAttachmentId;
   useEffect(() => {
@@ -1209,6 +1229,7 @@ function NativeChatPane({
               onChange: (mode) => void controller.selectPermissionMode(mode),
             }}
             draft={controller.composerDraft()}
+            prediction={prediction}
             editing={
               state.queueDraft
                 ? {

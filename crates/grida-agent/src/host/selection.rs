@@ -1003,7 +1003,7 @@ mod tests {
         );
         let a_pair = pair("model-a", SelectionEffort::Low);
         let b_pair = pair("model-b", SelectionEffort::High);
-        host.attach_routes(Default::default()).unwrap();
+        host.attach_routes(Default::default(), true, false).unwrap();
         let (_, revision) = host.for_derived_session(&a).await.unwrap();
         let revision = revision.expect("routed derivation must recheck the first selection");
         assert_eq!(

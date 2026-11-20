@@ -44,6 +44,10 @@ facts authoring homes. Updating the public dependency requires reviewing the
 model facts diff, regenerating and testing its consumers. Ordinary GG catalogue
 updates do not require changing product defaults or native adapters.
 
+The generator projects `tiers.nano` into the native agent master's
+`data/economy-model.txt`. Desktop and the master use the same product choice
+when resolving a hosted composer prediction on the chat's connection.
+
 The generator also projects context windows for exact OpenAI model bindings used
 by the native Responses profile. The host uses them only for the canonical
 OpenAI route.

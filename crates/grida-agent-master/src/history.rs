@@ -3,9 +3,62 @@
 use agent_kit_core::MessageId;
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::inference::{FailureKind, InferenceFailure, InferenceStatus};
-use agent_kit_core::messages::{Content, Message, OutcomeStatus, Provenance, ProvenanceKind, Role};
+use agent_kit_core::messages::{
+    Content, Message, OutcomeStatus, Provenance, ProvenanceKind, ResultContent, Role,
+};
 use agent_kit_core::turn::{OperationInput, OperationOutcome, TurnState};
 use std::collections::{BTreeMap, BTreeSet};
+
+/// Render prior assistant and tool messages for a different model. Preserve
+/// visible facts while omitting private reasoning and provider continuation state.
+pub fn portable_message(mut message: Message) -> Option<Message> {
+    if !matches!(message.role, Role::Assistant | Role::Tool) {
+        return Some(message);
+    }
+    message.content = message
+        .content
+        .into_iter()
+        .filter_map(|part| match part {
+            Content::Text(text) => Some(Content::Text(text)),
+            Content::ToolCall(call) => Some(Content::Text(format!(
+                "Earlier tool call (history only): {}",
+                serde_json::json!({
+                    "call": call.id,
+                    "tool": call.tool,
+                    "arguments": call.arguments,
+                })
+            ))),
+            Content::ToolResult(result) => Some(Content::Text(format!(
+                "Earlier tool result (history only): {}",
+                serde_json::json!({
+                    "call": result.call,
+                    "status": result.status,
+                    "content": result.content.into_iter().map(|part| match part {
+                        ResultContent::Text(text) => serde_json::json!({"text": text}),
+                        ResultContent::Media(media) => serde_json::json!({
+                            "mediaType": media.media_type,
+                            "omitted": "Media bytes are not portable between model routes.",
+                        }),
+                    }).collect::<Vec<_>>(),
+                    "structured": result.structured,
+                    "truncated": result.truncated,
+                })
+            ))),
+            Content::Media(media) => Some(Content::Media(media)),
+            Content::Reasoning(_) | Content::ProviderState(_) => None,
+        })
+        .collect();
+    if message.content.is_empty() {
+        return None;
+    }
+    message.role = Role::Assistant;
+    message.provenance = Provenance {
+        source: "retained_model_context".into(),
+        kind: ProvenanceKind::Transformed,
+        fingerprint: None,
+    };
+    Some(message)
+}
 
 /// Told to the model after the person interrupts work, in place of the
 /// response that was cut off. The unfinished response stays out of model

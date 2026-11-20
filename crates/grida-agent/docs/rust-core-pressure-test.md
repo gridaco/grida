@@ -329,6 +329,121 @@ report that the agent is working; `/stop` reports when nothing runs.
 and the [Desktop interaction case](../../../test/desktop-agent-chat-composer-intents.md)
 cover these obligations.
 
+A suggested follow-up belongs to the empty Desktop composer until the person
+accepts it as a draft. Replaying a completion must never issue another model
+request. A delayed result must stay dismissed after a chat switch, a newer
+turn, a model or effort change, a draft edit or a preference change. Archiving
+the chat while its economy route is being resolved must prevent dispatch.
+Turning predictions off during model lookup or provider authorization must
+prevent the pending request from reaching the provider, even after the switch
+is turned back on. A later eligible reply can use the new opt-in.
+The host uses the completed inference's captured context and connection.
+A hosted prediction must resolve the product's economy model on the same
+account. The default Ollama connection at `localhost` and numeric loopback
+connections use the selected local model. Switching models preserves the
+visible history and compacted context while removing provider-private
+continuation state.
+A tool call, provider failure or deadline can yield an empty suggestion. Durable request deduplication
+survives a host restart. Generation must leave the parent transcript and turn
+summary intact. [Native process evidence](../tests/process/prediction.rs),
+[Desktop IPC](../../../desktop/src/main/native-chat-ipc.test.ts) and the
+[composer interaction](../../../editor/scaffolds/desktop/workbench/native-chat-recovery.browser.tsx)
+exercise those boundaries. [Subscription selection in Desktop](../../../desktop/src/main/native-subscription-profiles.test.ts)
+also exercises a premium subscription chat with OpenRouter available, the
+subscription economy request and the next foreground turn.
+
+Four cold launches of Electron on macOS exercised the real Settings page,
+preload and Main handlers against a temporary Grida home. Enabling the switch
+notified an open workspace. A new workspace read the saved value on the next
+launch, and a hand edit to `false` appeared as Off on the third. With native
+chat disabled, Settings explained why suggestions were unavailable. A trusted
+deny hook still refused an input after toggling the setting. The Desktop
+0.7.0 reader rejected the added table and accepted the restored hook-only
+file with its original trust decision. [Settings IPC](../../../desktop/src/main/settings-ipc.test.ts),
+[config editing](../../../desktop/src/main/desktop-composer-predictions.test.ts)
+and [native hook execution](../../../desktop/src/main/native-agent-hooks.test.ts)
+cover the respective contracts.
+
+### Composer prediction measurements
+
+#### Hosted economy model
+
+On November 20, 2026 (UTC), Desktop Main and the native stdio host ran one
+short and one long synthetic exhibit-planning chat. Both used the same saved
+OpenRouter connection. Scripted foreground replies on the Haiku profile
+established the chat history. Only the two prediction requests went to
+OpenRouter, using `openai/gpt-6-luna`. The long chat included 120 field notes
+between the original plan and the final reply.
+
+| Chat  | Host elapsed | Input tokens | Cached input | Output tokens | Estimated USD |
+| ----- | -----------: | -----------: | -----------: | ------------: | ------------: |
+| Short |     1,693 ms |          591 |            0 |            24 |     0.0000711 |
+| Long  |     1,338 ms |        2,811 |            0 |            25 |     0.0002936 |
+
+Both suggestions requested the planned two-sentence audio guide, the original
+age group and the required word “moonlight”. OpenRouter reported zero reasoning
+tokens in both responses. The estimated combined cost was $0.0003647 at $0.10
+per million input tokens and $0.50 per million output tokens. Two samples
+measure these particular requests. [Model pricing](https://openrouter.ai/openai/gpt-6-luna)
+
+#### Same-model design comparison
+
+On November 20, 2026 (UTC), the native stdio host ran synthetic exhibit-planning
+chats on OpenRouter with `anthropic/claude-haiku-5.5` and the reasoning capability
+that Desktop advertises for that model. This baseline used Haiku for both
+requests before the hosted prediction policy selected the product's economy
+model. The client requested a prediction immediately after the final reply.
+Each row is one request, timed inside the
+host and counted separately from the completed turn. The long chat included
+120 field notes over three user turns. The compacted case used the host's
+ordinary compaction command before the final turn.
+
+| Chat                | Prediction time | Input | Cached input | Output | Estimated USD | Result                                                                                  |
+| ------------------- | --------------: | ----: | -----------: | -----: | ------------: | --------------------------------------------------------------------------------------- |
+| Short               |          922 ms |   800 |            0 |     31 |      0.000096 | Requested the two-sentence audio guide for ages 9–12.                                   |
+| Long                |        1,326 ms | 5,478 |            0 |     47 |      0.000571 | Recovered the audience and the required word “moonlight” from the first turn.           |
+| Compacted           |        1,230 ms | 1,444 |            0 |     34 |      0.000161 | Selected a proposed title and mentioned the guide, but assigned writing it to the user. |
+| Explicitly finished |          885 ms |   773 |            0 |      5 |      0.000080 | Returned an empty suggestion.                                                           |
+
+Repeated requests for each turn returned empty without another inference.
+OpenRouter reported zero cached input in every row despite immediate reuse
+of the retained conversation. Estimates use the model's listed rates of
+$0.10 per million input tokens and $0.50 per million output tokens. They
+exclude the preceding chat and compaction. A compatible profile that omitted
+the reasoning capability exhausted the 128-token prediction allowance on
+the long chat and yielded no text. [Model and pricing](https://openrouter.ai/anthropic/claude-haiku-5.5)
+
+For comparison, the same short and long tasks requested both an answer and a
+suggested prompt as JSON in the main reply. The short combined reply took
+2,804 ms (733 input, 435 output), versus 1,528 ms (673 input, 15 output)
+for the ordinary reply before prediction. The long combined reply took
+3,847 ms (5,304 input, 590 output), versus 4,224 ms (5,249 input, 522
+output). Both combined replies used Markdown fences. The short one recovered
+the intended guide, while the long one requested the plan again. The JSON
+comparison used a single inference per final answer.
+
+In a separate short-chat run, the agent called an inert local `wrap_up` tool
+with a suggestion to write the guide for ages 9–12. The tool received the
+suggestion at 2,367 ms. The model then took another 1,032 ms to deliver its
+visible answer, for a total of 3,399 ms. The two provider requests used
+1,163 input and 344 output tokens, then 1,282 input and 14 output tokens.
+Both reported zero cached input (estimated $0.000424 combined). This measures
+the ordinary tool-call loop. A host that terminates on the tool call would
+need another way to deliver the final reply.
+
+Keep the preview opt-in. A separate request allows the user to see the
+completed reply immediately and lets Desktop skip prediction when their
+composer is occupied. Latency, cost, cache reuse and suggestion quality
+vary with the model and conversation. These one-time samples cover one live
+provider. Executable tests with fixture responses verify the reported token
+categories on the direct provider protocols, the captured OpenRouter and
+Vercel connections, and the account and signed context on the ChatGPT
+subscription route. A Gateway fixture checks a terminal charge and a
+pending charge resolved by one scoped lookup. An unavailable settlement
+stays unknown. [Direct providers](../tests/process/prediction.rs),
+[subscription](../tests/process/responses.rs) and
+[saved connections and Gateway receipts](../tests/process/subagents.rs).
+
 ## Consumer one, a minimal master
 
 The smallest useful master answers a request, optionally calls tools, and returns

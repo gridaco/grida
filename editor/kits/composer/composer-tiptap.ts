@@ -181,6 +181,16 @@ export namespace ComposerTiptap {
     core.inspectCursor(textBeforeCursor, from);
   }
 
+  /** A single untouched paragraph can display an inline prompt. */
+  export function hasEmptyParagraph(editor: Editor): boolean {
+    const { doc } = editor.state;
+    return (
+      doc.childCount === 1 &&
+      doc.firstChild?.type.name === "paragraph" &&
+      doc.firstChild.content.size === 0
+    );
+  }
+
   export function handleKeyDown(input: {
     core: ComposerCore;
     editor: Editor | null;
@@ -188,14 +198,35 @@ export namespace ComposerTiptap {
     triggerIndex: number;
     moveTriggerIndex: (delta: number) => void;
     submit: () => void;
+    suggestion?: { text: string; take(text: string): boolean };
     onCommandSelect?: (command: ComposerCommand) => boolean;
   }): boolean {
-    if (isComposing(input.event)) {
+    if (isComposing(input.event) || input.editor?.view.composing) {
       return false;
     }
 
     const trigger = input.core.getSnapshot().trigger;
     const triggerItemsCount = trigger?.items.length ?? 0;
+
+    const { editor, event, suggestion } = input;
+    if (
+      event.key === "Tab" &&
+      !event.shiftKey &&
+      !event.metaKey &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.repeat &&
+      !event.defaultPrevented &&
+      !trigger &&
+      suggestion &&
+      editor?.isEditable &&
+      hasEmptyParagraph(editor) &&
+      suggestion.take(suggestion.text)
+    ) {
+      event.preventDefault();
+      editor.view.dispatch(editor.state.tr.insertText(suggestion.text));
+      return true;
+    }
 
     if (trigger && input.event.key === "Escape") {
       input.event.preventDefault();

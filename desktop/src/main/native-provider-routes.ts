@@ -16,6 +16,7 @@ export type NativeProviderRouteLaunch = Pick<
   | "llamaCppInputCount"
   | "credentialHome"
   | "configuredEndpointKey"
+  | "configuredEndpointId"
   | "gatewayScope"
   | "gatewayJobBilling"
   | "subscriptionScope"
@@ -33,20 +34,27 @@ const MAX_ROUTES = 256;
 
 export class NativeProviderRoutes {
   static readonly capability = "co.grida/provider/routes";
+  static readonly predictionCapability = "co.grida/provider/prediction-route";
   static readonly resolveMethod = "_co.grida/provider/resolve";
   private readonly lifetime = new AbortController();
   private readonly launchId = randomUUID();
   private readonly bySelection = new Map<string, Promise<Route>>();
   private readonly resolved = new Map<string, Route>();
+  private predictionRoute?: {
+    key: string;
+    permission: AbortSignal;
+    route: Route;
+  };
 
   constructor(
     private readonly connectionId: string | null,
     private readonly launch: NativeProviderRouteLaunch,
-    private readonly lookup: NativeProviderRoutes.Lookup
+    private readonly lookup?: NativeProviderRoutes.Lookup,
+    private readonly predict?: NativeProviderRoutes.PredictionLookup
   ) {}
 
   /** Exactly the same custody and limits apply at process launch and per-input selection. */
-  static egress(options: NativeProviderRouteLaunch) {
+  static egress(options: NativeProviderRouteLaunch, permission?: AbortSignal) {
     const { imageGeneration } = options;
     if (
       imageGeneration &&
@@ -119,18 +127,24 @@ export class NativeProviderRoutes {
           options.endpoint,
           options.model,
           options.llamaCppInputCount,
-          options.gatewayScope && options.gatewayJobBilling ? true : undefined
+          options.gatewayScope && options.gatewayJobBilling ? true : undefined,
+          permission
         )
       : undefined;
   }
 
-  async resolve(value: unknown) {
+  async resolve(value: unknown, permission?: AbortSignal) {
     const params = record(value);
     const model = params?.model;
     const connectionId = params?.connectionId;
+    const prediction = params?.purpose === "composerPrediction";
+    const sourceRouteId = params?.sourceRouteId;
     if (
       this.lifetime.signal.aborted ||
-      Object.keys(params ?? {}).length !== 2 ||
+      Object.keys(params ?? {}).length !==
+        (prediction ? (sourceRouteId === undefined ? 3 : 4) : 2) ||
+      (sourceRouteId !== undefined &&
+        (typeof sourceRouteId !== "string" || sourceRouteId.length !== 36)) ||
       typeof model !== "string" ||
       !/^[A-Za-z0-9_.:@/-]{1,256}$/.test(model) ||
       (connectionId !== null &&
@@ -138,6 +152,19 @@ export class NativeProviderRoutes {
           !/^[a-f0-9]{64}$/.test(connectionId)))
     )
       throw new Error("native_chat_profile_unavailable");
+    const key = JSON.stringify([connectionId, model]);
+    if (prediction) {
+      if (!permission || permission.aborted)
+        throw new Error("native_chat_profile_unavailable");
+      return await this.prediction(
+        key,
+        connectionId,
+        model,
+        sourceRouteId,
+        permission
+      );
+    }
+    if (!this.lookup) throw new Error("native_chat_profile_unavailable");
     // A saved receipt identifies a choice. The live catalog must still admit
     // it, even when the same endpoint or network grant remains available.
     const profile = await this.lookup(
@@ -153,7 +180,73 @@ export class NativeProviderRoutes {
     )
       return { kind: "launch", model, routeId: this.launchId };
 
-    const key = JSON.stringify([connectionId, model]);
+    return this.describe(await this.acquire(key, model, profile));
+  }
+
+  private async prediction(
+    key: string,
+    connectionId: string | null,
+    model: string,
+    sourceRouteId: string | undefined,
+    permission: AbortSignal
+  ) {
+    // Only an issued foreground route can authorize its own auxiliary model.
+    // A receipt for a different choice cannot open it through prediction.
+    const source = sourceRouteId ? await this.bySelection.get(key) : undefined;
+    if (sourceRouteId !== source?.routeId)
+      throw new Error("native_chat_profile_unavailable");
+    // An implicit initial selection on a named worker uses its launch. A
+    // later explicit Default selection can share that model on another account.
+    const launch = source
+      ? source.launch
+      : (connectionId === null || connectionId === this.connectionId) &&
+          model === this.launch.model
+        ? this.launch
+        : undefined;
+    if (
+      !launch ||
+      !this.predict ||
+      (await launch.providerNetwork?.isCurrent?.()) === false
+    )
+      throw new Error("native_chat_profile_unavailable");
+    const signal = AbortSignal.any([this.lifetime.signal, permission]);
+    signal.throwIfAborted();
+    const target = await this.predict(launch, signal);
+    if (!target || (await launch.providerNetwork?.isCurrent?.()) === false)
+      throw new Error("native_chat_profile_unavailable");
+    signal.throwIfAborted();
+    const derived = JSON.stringify([
+      "composerPrediction",
+      source?.routeId ?? this.launchId,
+      target.model,
+      target.maxOutputTokens,
+    ]);
+    // The host runs one prediction at a time. Its handle consumes no ordinary
+    // selection slots, and an open exchange stays on the authority that began it.
+    if (
+      this.predictionRoute?.key === derived &&
+      this.predictionRoute.permission === permission
+    )
+      return this.describe(this.predictionRoute.route);
+    if (this.predictionRoute?.permission.aborted)
+      this.predictionRoute.route.egress.close();
+    if (this.predictionRoute?.route.egress.openExchangeCount)
+      throw new Error("native_chat_profile_unavailable");
+    // Even an unchanged model gets a separate handle so revoking a prediction
+    // during upload or credential admission never cancels foreground inference.
+    const egress = NativeProviderRoutes.egress(target, signal);
+    if (!egress) throw new Error("native_chat_profile_unavailable");
+    this.predictionRoute?.route.egress.close();
+    const route = { launch: target, routeId: randomUUID(), egress };
+    this.predictionRoute = { key: derived, route, permission };
+    return this.describe(route);
+  }
+
+  private async acquire(
+    key: string,
+    model: string,
+    profile: NativeProviderRoutes.Profile
+  ) {
     const previous = this.bySelection.get(key);
     if (previous) {
       const captured = await previous;
@@ -174,10 +267,13 @@ export class NativeProviderRoutes {
       this.bySelection.set(key, opening);
       void opening.catch(() => this.bySelection.delete(key));
     }
-    const { launch, routeId } = await opening;
+    return await opening;
+  }
+
+  private describe({ launch, routeId }: Route) {
     return {
       routeId,
-      model,
+      model: launch.model,
       protocol: launch.provider,
       endpoint: launch.endpoint,
       kind: launch.gatewayScope
@@ -198,11 +294,14 @@ export class NativeProviderRoutes {
   }
 
   get(id: unknown) {
-    return typeof id === "string" ? this.resolved.get(id) : undefined;
+    if (typeof id !== "string") return;
+    return id === this.predictionRoute?.route.routeId
+      ? this.predictionRoute.route
+      : this.resolved.get(id);
   }
 
   get openExchangeCount(): number {
-    let count = 0;
+    let count = this.predictionRoute?.route.egress.openExchangeCount ?? 0;
     for (const route of this.resolved.values())
       count += route.egress.openExchangeCount;
     return count;
@@ -236,6 +335,8 @@ export class NativeProviderRoutes {
 
   close(): void {
     this.lifetime.abort();
+    this.predictionRoute?.route.egress.close();
+    this.predictionRoute = undefined;
     for (const route of this.resolved.values()) {
       route.egress.close();
       route.launch.imageGeneration?.close();
@@ -246,6 +347,10 @@ export class NativeProviderRoutes {
   }
 }
 export namespace NativeProviderRoutes {
+  export type PredictionLookup = (
+    source: NativeProviderRouteLaunch,
+    signal: AbortSignal
+  ) => Promise<NativeProviderRouteLaunch | undefined>;
   export type Profile = { prepare(): Promise<PreparedProviderRoute> };
   export type Lookup = (
     connectionId: string | null,
