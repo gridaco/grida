@@ -1000,6 +1000,105 @@ async fn tool_calls_require_verified_terminal_and_use_attempt_scoped_identity() 
 }
 
 #[tokio::test]
+async fn subscription_completion_can_omit_its_output_array_contents() {
+    use agent_kit_core::inference::RequestOptions;
+
+    let mut commentary = answer("msg_1", "I’ll use the slides skill.");
+    commentary["item"]["phase"] = json!("commentary");
+    let read = call(1, "fc_1", r#"{"value":"slides"}"#);
+    let empty = completed(Some(json!([])));
+    let wrong = completed(Some(json!([{"type":"message","id":"msg_replaced"}])));
+    let unfinished = text_delta("Unfinished.");
+    for endpoint in [
+        ResponsesEndpoint::Api,
+        ResponsesEndpoint::Restricted,
+        ResponsesEndpoint::RestrictedImages,
+    ] {
+        let transport = FixtureTransport::new([
+            Ok(response(
+                [commentary.clone(), read.clone(), empty.clone()].map(frame),
+                true,
+            )),
+            Ok(response(
+                [commentary.clone(), read.clone(), wrong.clone()].map(frame),
+                true,
+            )),
+            Ok(response(
+                [unfinished.clone(), empty.clone()].map(frame),
+                true,
+            )),
+            Ok(response(
+                [commentary.clone(), empty.clone()].map(frame),
+                true,
+            )),
+            Ok(response(
+                [answer("msg_1", "Ready."), empty.clone()].map(frame),
+                true,
+            )),
+        ]);
+        let provider = adapter(transport, endpoint, "lineage", "live");
+        let mut input = tool_request();
+        if endpoint != ResponsesEndpoint::Api {
+            input.max_output_tokens = None;
+            input.extension = RequestOptions {
+                web_search: true,
+                ..Default::default()
+            }
+            .extension()
+            .unwrap();
+        }
+        let outcome = run(&provider, input.clone(), "empty-terminal").await;
+        if endpoint == ResponsesEndpoint::Api {
+            assert_eq!(outcome.status, InferenceStatus::Interrupted);
+            assert_eq!(outcome.failure.unwrap().code, "terminal_output_changed");
+        } else {
+            assert_eq!(outcome.status, InferenceStatus::Completed, "{outcome:?}");
+            assert_eq!(outcome.messages[0].phase, Some(MessagePhase::Progress));
+            assert_eq!(
+                first_call(&outcome).arguments,
+                ToolArguments::Json(json!({"value":"slides"}))
+            );
+        }
+        let mismatch = run(&provider, input.clone(), "mismatched-terminal").await;
+        assert_eq!(mismatch.status, InferenceStatus::Interrupted);
+        assert_eq!(mismatch.failure.unwrap().code, "terminal_output_changed");
+        assert!(!mismatch.messages.iter().any(|message| {
+            message
+                .content
+                .iter()
+                .any(|item| matches!(item, Content::ToolCall(_)))
+        }));
+
+        let incomplete = run(&provider, input.clone(), "unfinished-item").await;
+        assert_eq!(incomplete.status, InferenceStatus::Interrupted);
+        assert_eq!(incomplete.failure.unwrap().code, "output_items_incomplete");
+
+        let progress_only = run(&provider, input.clone(), "progress-only").await;
+        assert_eq!(progress_only.status, InferenceStatus::Interrupted);
+        assert_eq!(
+            progress_only.failure.unwrap().code,
+            "terminal_output_changed"
+        );
+        assert_eq!(
+            progress_only.messages[0].phase,
+            Some(MessagePhase::Progress)
+        );
+
+        let answer_only = run(&provider, input, "answer-only").await;
+        if endpoint == ResponsesEndpoint::Api {
+            assert_eq!(answer_only.status, InferenceStatus::Interrupted);
+        } else {
+            assert_eq!(answer_only.status, InferenceStatus::Completed);
+            assert!(
+                answer_only.messages[0]
+                    .content
+                    .contains(&Content::Text("Ready.".into()))
+            );
+        }
+    }
+}
+
+#[tokio::test]
 async fn malformed_arguments_complete_and_replay_as_the_model_wrote_them() {
     let transport = FixtureTransport::new([
         Ok(response(

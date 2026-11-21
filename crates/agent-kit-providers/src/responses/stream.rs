@@ -1,5 +1,7 @@
 use super::search;
-use super::{ItemStatus, ReplayScope, Summary, WireContent, WireItem};
+use super::{
+    ItemStatus, ReplayScope, ResponsesEndpoint, Summary, WireContent, WireItem, WirePhase,
+};
 use crate::wire::{
     Incoming, RateRejectionEvidence, Usage, WireError, WireStream, classify_error, json_arguments,
     short_identity,
@@ -680,7 +682,27 @@ impl Response {
         if !self.items.keys().copied().eq(0..self.items.len()) {
             return Err("output_item_order_incomplete");
         }
-        if let Some(output) = output
+        // The subscription backend can send a metadata-only completion with
+        // output: []. Use the finalized items only if they contain an answer,
+        // a refusal, or a tool call. Commentary alone cannot finish a turn.
+        let omitted = self.scope.endpoint != ResponsesEndpoint::Api
+            && output.is_some_and(<[_]>::is_empty)
+            && self.items.values().any(|item| match item {
+                WireItem::FunctionCall { .. } => true,
+                WireItem::Message {
+                    content: Some(parts),
+                    phase,
+                    ..
+                } => parts.iter().any(|part| match part {
+                    WireContent::OutputText { text, .. } => {
+                        matches!(phase, None | Some(WirePhase::FinalAnswer))
+                            && !text.trim().is_empty()
+                    }
+                    WireContent::Refusal { refusal } => !refusal.trim().is_empty(),
+                }),
+                _ => false,
+            });
+        if let Some(output) = output.filter(|_| !omitted)
             && !self
                 .items
                 .values()
