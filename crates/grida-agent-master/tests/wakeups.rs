@@ -283,6 +283,7 @@ impl Fixture {
         };
         let master = Master::new(
             MasterConfig {
+                request_options: Default::default(),
                 model: ModelId::new("fixture-model").unwrap(),
                 instructions: "Finish the task.".into(),
                 max_steps: 4,

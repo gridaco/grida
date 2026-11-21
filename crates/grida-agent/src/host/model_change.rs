@@ -140,6 +140,7 @@ impl Host {
         if prepare {
             work.closed = true;
             work.model_change_prepared = true;
+            self.predictions.close();
             self.controls.close();
         }
         drop(controls);

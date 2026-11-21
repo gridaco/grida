@@ -37,6 +37,33 @@ pub struct ConversationReadState {
     pub reply_id: Option<String>,
 }
 
+/// The visible reply in a particular session view and catalog placement.
+#[derive(Clone)]
+pub struct ObservedReply {
+    pub session: SessionId,
+    pub session_revision: SessionRevision,
+    pub bucket: u8,
+    pub reply_id: String,
+}
+
+impl ObservedReply {
+    fn is_current(&self, connection: &Connection) -> Result<bool> {
+        connection
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM sessions
+                    WHERE id=?1 AND revision=?2 AND bucket=?3 AND reply_id=?4)",
+                params![
+                    self.session.as_str(),
+                    sql_number(self.session_revision.0)?,
+                    self.bucket,
+                    self.reply_id
+                ],
+                |row| row.get(0),
+            )
+            .map_err(database_error)
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "camelCase", deny_unknown_fields)]
 pub enum ReadStateUpdate {
@@ -178,6 +205,53 @@ pub struct CatalogPage<T = CatalogEntry> {
 }
 
 impl SqliteStore {
+    /// Reserve an operation on the observed reply once. A change to the chat
+    /// or its placement before reservation leaves the request available for
+    /// a later eligible observation. A committed reservation survives restart.
+    pub async fn reserve_reply_observation(
+        &self,
+        reply: ObservedReply,
+        request: ChangeId,
+    ) -> Result<bool> {
+        execute(Arc::clone(&self.inner), move |inner, connection| {
+            let transaction = connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(database_error)?;
+            let identity = Fingerprint::of(&request)?;
+            if !reply.is_current(&transaction)?
+                || lookup_request::<()>(
+                    &transaction,
+                    &reply.session,
+                    "observation",
+                    &request,
+                    identity,
+                )?
+                .is_some()
+            {
+                return Ok(false);
+            }
+            save_request(
+                &transaction,
+                &reply.session,
+                "observation",
+                &request,
+                identity,
+                &(),
+            )?;
+            commit(inner, transaction)?;
+            Ok(true)
+        })
+        .await
+    }
+
+    /// Check whether this reply still belongs to the same view and placement.
+    pub async fn reply_is_current(&self, reply: ObservedReply) -> Result<bool> {
+        execute(Arc::clone(&self.inner), move |_, connection| {
+            reply.is_current(connection)
+        })
+        .await
+    }
+
     /// Acknowledge a displayed reply or deliberately mark a public chat unread.
     pub async fn update_read_state(
         &self,

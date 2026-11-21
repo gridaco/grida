@@ -32,6 +32,11 @@ export type NativeProviderNetwork = {
   /** Whether this captured grant still names the current authority for a fresh turn. */
   isCurrent?(): boolean | Promise<boolean>;
   prepare(target: string, headers: Headers): Dispatch | null;
+  /** Main-only, fixed authenticated catalog GET on the subscription grant. */
+  getSubscriptionModels?(
+    headers: Headers,
+    signal: AbortSignal
+  ): Promise<Response | null>;
 };
 
 type Exchange = {
@@ -69,7 +74,8 @@ export class NativeProviderEgress {
     endpoint: string,
     model: string,
     llamaCppInputCount?: true,
-    private readonly gatewayCeilings?: true
+    private readonly gatewayCeilings?: true,
+    private readonly permission?: AbortSignal
   ) {
     this.targets = providerTargets(
       protocol,
@@ -134,6 +140,7 @@ export class NativeProviderEgress {
   private open(id: string, input: Record<string, unknown>): Reply {
     const { target, timeoutMs, maxResponseBytes } = input;
     if (
+      this.permission?.aborted ||
       this.exchanges.has(id) ||
       this.exchanges.size >= MAX_EXCHANGES ||
       typeof target !== "string" ||
@@ -176,7 +183,9 @@ export class NativeProviderEgress {
     exchange.phase = "dispatch";
     let dispatch: Dispatch | null;
     try {
-      dispatch = this.network.prepare(exchange.target, exchange.headers);
+      dispatch = this.permission?.aborted
+        ? null
+        : this.network.prepare(exchange.target, exchange.headers);
     } catch {
       dispatch = null;
     }
@@ -187,7 +196,10 @@ export class NativeProviderEgress {
     const body = Buffer.concat(exchange.uploaded, exchange.requestBytes);
     exchange.uploaded.length = 0;
     try {
-      const response = await dispatch(body, exchange.controller.signal);
+      const signal = this.permission
+        ? AbortSignal.any([exchange.controller.signal, this.permission])
+        : exchange.controller.signal;
+      const response = await dispatch(body, signal);
       if (!response) {
         this.end(id, exchange);
         return { status: "unavailable" };

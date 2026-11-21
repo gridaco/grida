@@ -48,6 +48,7 @@ import {
   ImagesIcon,
   ListTodoIcon,
   MessageCircleQuestionIcon,
+  MonitorIcon,
   PaperclipIcon,
   PanelsTopLeftIcon,
   PencilIcon,
@@ -66,6 +67,7 @@ import {
   MessageResponse,
 } from "@app/ui/ai-elements/message";
 import { Shimmer } from "@app/ui/ai-elements/shimmer";
+import { Source } from "@app/ui/ai-elements/sources";
 import { ToolOutput } from "@app/ui/ai-elements/tool";
 import { Task, TaskContent, TaskTrigger } from "@app/ui/ai-elements/task";
 // Message/tool types stay in the shared `@/lib/agent-chat` seam (the
@@ -193,6 +195,11 @@ export function ChatMessageView({
         part.type === chat_vocabulary.CONTEXT_PARTS.svgTextSelection &&
         part.data === true
     );
+    const svgSelection = message.parts.some(
+      (part) =>
+        part.type === chat_vocabulary.CONTEXT_PARTS.svgSelection &&
+        part.data === true
+    );
     const messageContext = message.parts.find(
       (part) => part.type === chat_vocabulary.CONTEXT_PARTS.messageContext
     );
@@ -209,8 +216,11 @@ export function ChatMessageView({
     );
     return (
       <Message from="user" ref={ref}>
-        {svgTextSelection && !edit && (
-          <EditorSelectionIndicator kind="svg-text" className="self-end" />
+        {(svgSelection || svgTextSelection) && !edit && (
+          <EditorSelectionIndicator
+            kind={svgSelection ? "svg-selection" : "svg-text"}
+            className="self-end"
+          />
         )}
         {messageContext &&
           "data" in messageContext &&
@@ -292,7 +302,10 @@ export function ChatMessageView({
   // a document. Matches the web panel's `w-full max-w-none` on
   // `<Message from="assistant">`.
   const groups = groupMessageParts(message);
-  const hasVisibleContent = groups.length > 0;
+  const sources = message.parts
+    .filter((part) => part.type === "source-url")
+    .filter((source) => /^https?:\/\//i.test(source.url));
+  const hasVisibleContent = groups.length > 0 || sources.length > 0;
   // Copyable response = the assistant's visible text only (non-text parts are
   // excluded). Multiple text parts can be split by tool
   // calls, so rejoin them with blank lines to preserve paragraph breaks.
@@ -326,6 +339,23 @@ export function ChatMessageView({
             />
           );
         })}
+        {sources.length > 0 && (
+          <ul
+            aria-label="Sources"
+            className="flex flex-wrap gap-2 text-xs text-muted-foreground"
+          >
+            {sources.map((source) => (
+              <li key={source.sourceId}>
+                <Source
+                  href={source.url}
+                  className="underline underline-offset-2"
+                >
+                  {source.title || source.url}
+                </Source>
+              </li>
+            ))}
+          </ul>
+        )}
         {isStreaming && !hasVisibleContent && (
           <Shimmer className="text-xs">Thinking</Shimmer>
         )}
@@ -1008,6 +1038,7 @@ function iconForAction(action: ToolDisplayDescription["action"]): LucideIcon {
       return FilePlus2Icon;
     case "list":
       return FolderTreeIcon;
+    case "web_search":
     case "search":
       return SearchIcon;
     case "pick_references":
@@ -1029,6 +1060,8 @@ function iconForAction(action: ToolDisplayDescription["action"]): LucideIcon {
       return AppWindowIcon;
     case "list_tabs":
       return PanelsTopLeftIcon;
+    case "desktop_tool":
+      return MonitorIcon;
     case "tool":
       return WrenchIcon;
   }

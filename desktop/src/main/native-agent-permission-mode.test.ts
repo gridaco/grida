@@ -59,7 +59,18 @@ describe("NativeAgentPermissionModes", () => {
     );
   });
 
+  it("accepts automatic review only when the native state advertises it", async () => {
+    const mode = "approve_for_me";
+    const available = ["restricted", mode, "full_access"];
+    const modes = new NativeAgentPermissionModes(
+      async () => ({ ...state, mode, available }),
+      "/project"
+    );
+    expect(await modes.inspect("chat")).toMatchObject({ mode, available });
+  });
+
   it.each([
+    { ...state, mode: "approve_for_me" },
     { ...state, sessionId: "other" },
     { ...state, revision: -1 },
     { ...state, mode: "unknown" },

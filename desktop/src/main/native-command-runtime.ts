@@ -3,7 +3,6 @@ import { createHash, randomUUID } from "node:crypto";
 import { constants, rmSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { BundledPrograms } from "./bundled-programs";
 import {
   commandTemporaryRoot,
   pinExecutable,
@@ -11,6 +10,7 @@ import {
 } from "./native-agent-hooks";
 
 type Pin = Awaited<ReturnType<typeof pinExecutable>>;
+type Command = Pin & { skill: string };
 
 export namespace NativeCommandRuntime {
   // Reuse pinned copies during this launch and own their cleanup exclusively.
@@ -22,22 +22,22 @@ export namespace NativeCommandRuntime {
   export async function prepare(
     resources: string,
     workspace: string,
-    protectedPaths: readonly string[]
+    protectedPaths: readonly string[],
+    command?: Command
   ): Promise<{
     helper: Pin;
-    programDirectory?: string;
+    program?: { directory: string; skill: string };
   }> {
     const helper = await pinExecutable(
       path.join(resources, "native-agent", "agent-kit-sandbox-helper")
     );
-    const program = await BundledPrograms.resolve(resources, "grida-fx");
     const protectedRoots = await Promise.all(
       protectedPaths.map((root) => fs.realpath(root).catch(() => root))
     );
     const projectHelper = protectedRoots.some((root) =>
       contains(root, helper.path)
     );
-    if (!projectHelper && !program) return { helper };
+    if (!projectHelper && !command) return { helper };
 
     const binRevision = createHash("sha256")
       .update(
@@ -45,7 +45,8 @@ export namespace NativeCommandRuntime {
           helper.path,
           projectHelper,
           helper.sha256,
-          program?.sha256,
+          command?.path,
+          command?.sha256,
         ])
       )
       .digest("hex");
@@ -63,61 +64,61 @@ export namespace NativeCommandRuntime {
     )
       throw new Error("native_command_runtime_scope_invalid");
 
-    const files = [
-      ...(projectHelper ? [helper] : []),
-      ...(program ? [program] : []),
-    ];
+    const projectedHelper = projectHelper ? helper : undefined;
     let prepared = projections.get(directory);
     if (!prepared) {
-      prepared = project(directory, files).catch((error) => {
+      prepared = project(directory, projectedHelper, command).catch((error) => {
         projections.delete(directory);
         throw error;
       });
       projections.set(directory, prepared);
     }
     await prepared;
-    for (const file of files) await verifyCopy(directory, file);
+    const projected = path.join(directory, "bin");
+    const helperPath = projectHelper
+      ? path.join(directory, path.basename(helper.path))
+      : helper.path;
+    if (projectHelper) await verifyCopy(helperPath, helper);
+    if (command)
+      await verifyCopy(
+        path.join(projected, path.basename(command.path)),
+        command
+      );
     return {
-      helper: projectHelper
-        ? { ...helper, path: inProjection(directory, helper) }
-        : helper,
-      ...(program ? { programDirectory: path.join(directory, "bin") } : {}),
+      helper: { ...helper, path: helperPath },
+      ...(command
+        ? { program: { directory: projected, skill: command.skill } }
+        : {}),
     };
   }
 
-  async function project(directory: string, files: readonly Pin[]) {
+  async function project(directory: string, helper?: Pin, command?: Pin) {
     const staging = await fs.mkdtemp(
       path.join(path.dirname(directory), ".grida-command-runtime-")
     );
     try {
       await requirePrivateDirectory(staging);
-      for (const file of files) {
-        const destination = inProjection(staging, file);
-        if (path.dirname(destination) !== staging)
-          await fs.mkdir(path.dirname(destination), { mode: 0o700 });
-        await fs.copyFile(file.path, destination, constants.COPYFILE_EXCL);
-        await fs.chmod(destination, 0o500);
-        await verifyCopy(staging, file);
+      const inventory: string[] = [];
+      if (helper) {
+        const name = path.basename(helper.path);
+        await copy(path.join(staging, name), helper);
+        inventory.push(name);
+      }
+      if (command) {
+        const bin = path.join(staging, "bin");
+        const name = path.basename(command.path);
+        await fs.mkdir(bin, { mode: 0o700 });
+        await requirePrivateDirectory(bin);
+        await copy(path.join(bin, name), command);
+        if ((await fs.readdir(bin)).join("\n") !== name)
+          throw new Error("native_command_runtime_inventory_invalid");
+        inventory.push("bin");
       }
       if (
         (await fs.readdir(staging)).sort().join("\n") !==
-        files
-          .map(
-            (file) =>
-              path
-                .relative(staging, inProjection(staging, file))
-                .split(path.sep)[0]
-          )
-          .sort()
-          .join("\n")
+        inventory.sort().join("\n")
       )
         throw new Error("native_command_runtime_inventory_invalid");
-      if (files.some((file) => path.basename(file.path) === "grida-fx")) {
-        const bin = path.join(staging, "bin");
-        await requirePrivateDirectory(bin);
-        if ((await fs.readdir(bin)).join("\n") !== "grida-fx")
-          throw new Error("native_command_runtime_inventory_invalid");
-      }
       await fs.rename(staging, directory);
       cleanup.add(directory);
       if (!registeredCleanup) {
@@ -137,15 +138,13 @@ export namespace NativeCommandRuntime {
     }
   }
 
-  function inProjection(directory: string, file: Pin) {
-    const name = path.basename(file.path);
-    return name === "grida-fx"
-      ? path.join(directory, "bin", name)
-      : path.join(directory, name);
+  async function copy(destination: string, file: Pin) {
+    await fs.copyFile(file.path, destination, constants.COPYFILE_EXCL);
+    await fs.chmod(destination, 0o500);
+    await verifyCopy(destination, file);
   }
 
-  async function verifyCopy(directory: string, expected: Pin) {
-    const destination = inProjection(directory, expected);
+  async function verifyCopy(destination: string, expected: Pin) {
     const actual = await pinExecutable(destination);
     const stat = await fs.lstat(destination);
     if (

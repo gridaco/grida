@@ -4,7 +4,7 @@ use std::io;
 
 #[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
 #[allow(unsafe_code)]
-pub fn apply() -> io::Result<()> {
+pub fn apply(allow_private_tcp: bool) -> io::Result<()> {
     const LOAD_WORD: u16 = 0x20;
     const JUMP_EQ: u16 = 0x15;
     #[cfg(target_arch = "x86_64")]
@@ -34,6 +34,38 @@ pub fn apply() -> io::Result<()> {
         instruction(JUMP_EQ, 0, 1, libc::SYS_clone3 as u32),
         instruction(RETURN, 0, 0, ERRNO | libc::ENOSYS as u32),
     ]);
+    if allow_private_tcp {
+        // bwrap created and the helper verified a fresh network namespace.
+        // This exception admits TCP streams to its own private loopback.
+        // AF_UNIX (including abstract sockets) stays denied, as do packet,
+        // netlink and raw sockets. Architecture checks above pin the ABI.
+        let restricted_socket = [
+            instruction(LOAD_WORD, 0, 0, 16), // args[0]: domain
+            instruction(JUMP_EQ, 1, 0, libc::AF_INET as u32),
+            instruction(RETURN, 0, 0, ERRNO | libc::EPERM as u32),
+            instruction(LOAD_WORD, 0, 0, 24), // args[1]: type and flags
+            instruction(
+                0x54,
+                0,
+                0,
+                !(libc::SOCK_CLOEXEC | libc::SOCK_NONBLOCK) as u32,
+            ), // AND
+            instruction(JUMP_EQ, 1, 0, libc::SOCK_STREAM as u32),
+            instruction(RETURN, 0, 0, ERRNO | libc::EPERM as u32),
+            instruction(LOAD_WORD, 0, 0, 32), // args[2]: protocol
+            instruction(JUMP_EQ, 1, 0, 0),
+            instruction(JUMP_EQ, 0, 1, libc::IPPROTO_TCP as u32),
+            instruction(RETURN, 0, 0, ALLOW),
+            instruction(RETURN, 0, 0, ERRNO | libc::EPERM as u32),
+        ];
+        filter.push(instruction(
+            JUMP_EQ,
+            0,
+            restricted_socket.len() as u8,
+            libc::SYS_socket as u32,
+        ));
+        filter.extend(restricted_socket);
+    }
     for syscall in [
         libc::SYS_socket,
         libc::SYS_socketpair,
@@ -73,6 +105,6 @@ pub fn apply() -> io::Result<()> {
 }
 
 #[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
-pub fn apply() -> io::Result<()> {
+pub fn apply(_allow_private_tcp: bool) -> io::Result<()> {
     Err(io::ErrorKind::Unsupported.into())
 }

@@ -6,13 +6,16 @@ for the native agent. The native agent continues to own the model loop, tools,
 approvals, sessions, and persistence. This path never launches Codex
 app-server and never enters the external ACP agent branch.
 
-One host process constructs the subscription host with three options:
+One host process constructs the subscription host with these options:
 
 - `userDataPath` — the absolute, normalized directory whose `AuthStore` holds
   the credential;
 - `post` — the host's narrow request callback for the two fixed destinations,
   the token endpoint and the subscription Responses endpoint. It returns the
-  provider response, or `null` when the host refuses or cannot dispatch; and
+  provider response, or `null` when the host refuses or cannot dispatch;
+- `getModels` — optional, fixed authenticated GET of the subscription model offer;
+- `turnPreferences` — optional callback that supplies the current
+  `webSearchAllowed` permission; and
 - `configuration` — a `ChatGptProviderConfig` containing:
 
 - the exact authorization and token endpoints;
@@ -115,16 +118,41 @@ only that exact target and header set, then passes the body to the captured
 connection, which attaches the credential headers above.
 
 The connection refuses any body that departs from the native request shape:
-the captured model, streaming, `store: false`, string `instructions`, function
-tools only, and encrypted reasoning as the only included field. A connection
-captured under a replaced account lineage answers `401` without dispatch, and
-a new capture yields a different scope.
+the captured model, streaming, `store: false`, string `instructions`, and
+encrypted reasoning as the only included field. Alongside ordinary functions
+it can offer one `web_search` tool on a compatible model. New search requests
+set `external_web_access: true`. The validator also accepts previously
+captured cache-only and index-gated requests with their original limits.
+Accelerated speed uses `service_tier: "priority"` or `"ultrafast"` and
+requires an offer for the captured account and model. The credential owner
+checks current search permission on each POST attempt that includes search.
+Revoking search permission or failing to read it can block a previously
+accepted request that uses search. A connection captured under a replaced
+account lineage answers `401` without dispatch, and a new capture yields
+a different scope.
 
 Grida session and renderer ids remain namespaced (`openai/gpt-…`). The native
 host maps the closed supported set to the bare model names required by the
 subscription backend and refuses any other model. The current default is
 **GPT-6.2 Sol**. The picker also offers GPT-6.2 Astra and earlier compatible
 models from the subscription list below.
+
+### Optional features on the selected connection
+
+The subscription host reads the signed-in account's fixed
+`GET /backend-api/codex/models?client_version=…` through Main. It intersects
+the offered rows with the installed wire-model list and projects only supported
+service tiers and hosted-search availability. The hosted full Responses search
+profile currently covers GPT-6.2 Sol. The subscription catalogue's preferred
+transport does not change Grida's full HTTP Responses implementation.
+
+Concurrent requests share a bounded discovery read for the same sign-in
+lineage. Successful offers expire after five minutes. A failed refresh
+withdraws the optional features until discovery succeeds. Account replacement
+invalidates the captured lineage, including previously cached offers. Standard
+inference without search does not require a catalogue read. Renderer and
+native consumers receive eligibility or an availability reason; the raw feed,
+provider instructions and subscription credentials stay in Main.
 
 ### Update membership and the default
 
@@ -187,9 +215,9 @@ and default changes, subscription evidence, and which checks passed.
 
 ## Network authority
 
-OAuth exchange, refresh, and subscription requests use the host's `post`
-callback and nothing else. Desktop routes it through its Main-owned provider
-network service, limited to the token and Responses endpoints. The subscription
+OAuth exchange, refresh, and inference use the host's fixed `post` callback.
+Authenticated model discovery uses its separate `getModels` callback. Desktop
+routes both through its Main-owned provider network service. The subscription
 host refuses any other destination or request shape before credentials are
 attached.
 

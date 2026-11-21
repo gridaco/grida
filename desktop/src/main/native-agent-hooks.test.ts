@@ -5,6 +5,7 @@ import path from "node:path";
 import { stringify } from "smol-toml";
 import { afterEach, describe, expect, it } from "vitest";
 import { NativeAgentHooks } from "./native-agent-hooks";
+import { DesktopPersonalization } from "./desktop-personalization";
 import { NativeAgentChat } from "./native-agent-chat";
 
 const fixtures: string[] = [];
@@ -97,6 +98,34 @@ describe("global config.toml hooks", () => {
       )
     ).toEqual({ version: 1, revisions: [before.hooks[0].revision] });
     expect(await fs.readFile(f.file, "utf8")).toContain("[[hooks]]");
+  });
+
+  it("preserves reviewed hooks and permits rolling back to the hook-only schema", async () => {
+    const f = await fixture();
+    await f.write();
+    await fs.appendFile(f.file, "# Keep the verification hook.\n");
+    await f.trust();
+    const source = await fs.readFile(f.file, "utf8");
+    const receipt = path.join(f.home, "agent", "hooks-trust.json");
+    const trusted = await fs.readFile(receipt);
+    const before = await NativeAgentHooks.open(f.home, f.workspace);
+    const setting = new DesktopPersonalization(f.file);
+    await setting.set(true);
+    const withDesktop = await fs.readFile(f.file, "utf8");
+    expect(withDesktop).toBe(
+      source + "\n[desktop]\ncomposer-predictions-enabled = true\n"
+    );
+    await setting.setPersonalization({ webSearch: "live" });
+    const after = await NativeAgentHooks.open(f.home, f.otherWorkspace);
+    expect(await after.inspect(active)).toEqual(await before.inspect(active));
+    expect(await fs.readFile(receipt)).toEqual(trusted);
+    await fs.writeFile(
+      f.file,
+      withDesktop.slice(0, withDesktop.indexOf("\n[desktop]"))
+    );
+    expect(await fs.readFile(f.file, "utf8")).toBe(source);
+    expect((await f.settings.configuration()).hooks[0].trusted).toBe(true);
+    expect((await setting.get()).enabled).toBe(false);
   });
 
   it("accepts an existing 0755 Grida home and agent directory without a config", async () => {
@@ -302,6 +331,7 @@ it.runIf(Boolean(process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES))(
       },
     ]);
     await f.trust();
+    await new DesktopPersonalization(f.file).set(true);
     const hooks = await NativeAgentHooks.open(f.home, f.workspace);
     const resourcesPath = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES!;
     const plan = await hooks.launch(resourcesPath, {

@@ -110,7 +110,7 @@ impl SummaryResponse {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct ReportedTokenUsage {
+pub(super) struct ReportedTokenUsage {
     reported: Vec<ReportedTokenCount>,
     attempts_without_counts: usize,
 }
@@ -152,7 +152,7 @@ impl TokenCategory {
 }
 
 impl ReportedTokenUsage {
-    fn from_usage(usage: &InferenceUsage) -> Option<Self> {
+    pub(super) fn from_usage(usage: &InferenceUsage) -> Option<Self> {
         let mut attempts: BTreeSet<_> = usage.unreported_attempts.iter().collect();
         let mut categories: BTreeMap<_, BTreeMap<&AttemptId, _>> = BTreeMap::new();
         for observation in &usage.observations {

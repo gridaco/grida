@@ -173,6 +173,52 @@ pub fn visible_reply(message: &Message) -> Option<QuestionReply> {
     attributed.then_some(reply)
 }
 
+/// The accepted answer that reached this inference, either as a contextual
+/// user message or as the completed result of its exact question operation.
+pub fn reply_in_context(
+    state: &agent_kit_core::turn::TurnState,
+    contribution: &Message,
+    context: &[Message],
+) -> Option<QuestionReply> {
+    let reply = visible_reply(contribution)?;
+    let wait = state.waits().get(&reply.question_item_id)?;
+    let request = read_question(wait).ok()?;
+    let envelope = wait.answer.as_ref()?;
+    let answer = decode(ANSWER_SCHEMA, envelope).ok()?;
+    let prepared = prepare_answer(wait, answer).ok()?;
+    let HistoryRecord::Message(expected) = prepared.contribution?;
+    if expected != *contribution {
+        return None;
+    }
+    let included = match request.style {
+        QuestionStyle::Nonblocking => context.contains(contribution),
+        QuestionStyle::AnswerDependent => {
+            let operation = state.operations().get(&request.operation)?;
+            let call = operation.record.source_call.as_ref()?;
+            let Some(agent_kit_core::turn::OperationOutcome::Tool(outcome)) = operation.outcome()
+            else {
+                return None;
+            };
+            if outcome.receipt.as_ref() != Some(envelope) {
+                return None;
+            }
+            context.iter().any(|message| {
+                let [Content::ToolResult(result)] = message.content.as_slice() else {
+                    return false;
+                };
+                message.role == Role::Tool
+                    && message.provenance.kind == ProvenanceKind::Observed
+                    && &result.call == call
+                    && result.status == OutcomeStatus::Succeeded
+                    && !result.truncated
+                    && answered_wait(result) == Some(wait.id.as_str())
+                    && matches!(result.content.as_slice(), [ResultContent::Text(text)] if text == &reply.answer)
+            })
+        }
+    };
+    included.then_some(reply)
+}
+
 /// Older turns recorded required answers only in the tool result and used a
 /// plain user message for optional answers. Render them from the original
 /// journaled wait without changing their model inputs or stored history.

@@ -2,7 +2,13 @@
 
 import { useState, type ReactNode } from "react";
 import type { NativeChatPermissionMode } from "@grida/desktop-bridge";
-import { CheckIcon, ShieldIcon, ShieldAlertIcon, XIcon } from "lucide-react";
+import {
+  CheckIcon,
+  ShieldAlertIcon,
+  ShieldCheckIcon,
+  ShieldQuestionMarkIcon,
+  XIcon,
+} from "lucide-react";
 import { Button } from "@app/ui/components/button";
 import {
   Popover,
@@ -13,7 +19,20 @@ import { ComposerActionMenu, type ComposerMenuAction } from "@/kits/composer";
 import {
   ComposerControlSkeleton,
   composerAccessLabelClassName,
+  composerAccessReviewLabel,
 } from "./composer-control-skeleton";
+
+const ACCESS_MODES = {
+  restricted: {
+    label: composerAccessReviewLabel,
+    icon: ShieldQuestionMarkIcon,
+  },
+  approve_for_me: { label: "Auto", icon: ShieldCheckIcon },
+  full_access: { label: "Full access", icon: ShieldAlertIcon },
+} satisfies Record<
+  NativeChatPermissionMode,
+  { label: string; icon: typeof ShieldCheckIcon }
+>;
 
 /** Composer toolbar presentation; the caller owns actions, intents and state. */
 export function AgentComposerTools({
@@ -23,19 +42,25 @@ export function AgentComposerTools({
   children,
 }: AgentComposerTools.Props) {
   const [accessOpen, setAccessOpen] = useState(false);
-  const full = access?.mode === "full_access";
-  const label = access?.uncertain
-    ? "Access unknown"
-    : full
-      ? "Full access"
-      : "Default";
+  const mode = access?.mode ?? "restricted";
+  const full = mode === "full_access";
+  const automatic = mode === "approve_for_me";
+  const restricted = mode === "restricted";
+  const { label: modeLabel, icon: AccessIcon } = ACCESS_MODES[mode];
+  const label = access?.uncertain ? "Access unknown" : modeLabel;
   return (
     <>
       <ComposerActionMenu items={actions} />
       {access?.loading ? (
         <ComposerControlSkeleton kind="access" />
       ) : (
-        <Popover open={accessOpen} onOpenChange={setAccessOpen}>
+        <Popover
+          open={accessOpen}
+          onOpenChange={(open) => {
+            setAccessOpen(open);
+            if (open) access?.onOpen?.();
+          }}
+        >
           <PopoverTrigger asChild>
             <Button
               type="button"
@@ -46,11 +71,7 @@ export function AgentComposerTools({
               title={`Access for new messages: ${label}`}
               disabled={access?.busy}
             >
-              {full ? (
-                <ShieldAlertIcon className="size-3.5" />
-              ) : (
-                <ShieldIcon className="size-3.5" />
-              )}
+              <AccessIcon className="size-3.5" />
               <span className={composerAccessLabelClassName}>{label}</span>
             </Button>
           </PopoverTrigger>
@@ -66,7 +87,7 @@ export function AgentComposerTools({
             </p>
             <button
               type="button"
-              aria-pressed={!full && !access?.uncertain}
+              aria-pressed={restricted && !access?.uncertain}
               disabled={!access?.available || access.busy}
               onClick={() => {
                 setAccessOpen(false);
@@ -74,31 +95,57 @@ export function AgentComposerTools({
               }}
               className="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left hover:bg-muted disabled:cursor-default"
             >
-              <ShieldIcon className="mt-0.5 size-4 shrink-0" />
+              <ACCESS_MODES.restricted.icon className="mt-0.5 size-4 shrink-0" />
               <div className="min-w-0 flex-1">
-                <p>Default</p>
+                <p>{ACCESS_MODES.restricted.label}</p>
                 <p className="text-xs text-muted-foreground">
-                  Reads and edits this project's files and runs sandboxed
-                  commands. Commands cannot use the internet.
+                  Reads and edits project files and runs sandboxed commands. You
+                  review requests for extra access.
                 </p>
               </div>
-              {!full && !access?.uncertain && (
+              {restricted && !access?.uncertain && (
                 <CheckIcon className="mt-0.5 size-4 shrink-0" />
               )}
             </button>
+            {access?.automaticReview && (
+              <button
+                type="button"
+                aria-pressed={automatic && !access.uncertain}
+                disabled={!access.available || access.busy}
+                onClick={() => {
+                  setAccessOpen(false);
+                  access.onChange("approve_for_me");
+                }}
+                className="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left hover:bg-muted disabled:opacity-50"
+              >
+                <ACCESS_MODES.approve_for_me.icon className="mt-0.5 size-4 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p>{ACCESS_MODES.approve_for_me.label}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Let the chat’s model decide individual file reads and
+                    supported command requests. You decide when it needs help.
+                  </p>
+                </div>
+                {automatic && !access.uncertain && (
+                  <CheckIcon className="mt-0.5 size-4 shrink-0" />
+                )}
+              </button>
+            )}
             <button
               type="button"
               aria-pressed={full && !access?.uncertain}
-              disabled={!access?.available || access.busy}
+              disabled={
+                !access?.available || access.fullAccess === false || access.busy
+              }
               onClick={() => {
                 setAccessOpen(false);
                 access?.onChange("full_access");
               }}
               className="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-amber-600 hover:bg-muted disabled:opacity-50"
             >
-              <ShieldAlertIcon className="mt-0.5 size-4 shrink-0" />
+              <ACCESS_MODES.full_access.icon className="mt-0.5 size-4 shrink-0" />
               <div className="min-w-0 flex-1">
-                <p>Full access</p>
+                <p>{ACCESS_MODES.full_access.label}</p>
                 <p className="text-xs">
                   Uses the internet and any file your account can access.
                   Commands run without a sandbox or approval prompts.
@@ -168,10 +215,13 @@ export namespace AgentComposerTools {
     actions: readonly ComposerMenuAction[];
     access?: Readonly<{
       mode: NativeChatPermissionMode;
+      automaticReview?: boolean;
+      fullAccess?: boolean;
       available: boolean;
       loading?: boolean;
       staged?: boolean;
       uncertain?: boolean;
+      onOpen?(): void;
       onRetry?(): void;
       busy: boolean;
       error?: string | null;

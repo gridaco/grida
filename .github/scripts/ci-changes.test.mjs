@@ -49,6 +49,11 @@ for (const [name, paths, expected] of [
     ["rust", "conformance", "native", "docs"],
   ],
   [
+    "embedded Desktop browser tool catalog",
+    ["desktop/src/main/browser-tool-catalog.json"],
+    ["rust", "conformance", "native", "docs"],
+  ],
+  [
     "Cargo build configuration",
     [".cargo/config.toml"],
     ["rust", "conformance", "native", "docs"],

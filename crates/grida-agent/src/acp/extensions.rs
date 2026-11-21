@@ -14,6 +14,7 @@ mod input_images;
 pub(super) mod library;
 mod lifecycle;
 mod model_change;
+mod prediction;
 mod processes;
 pub(super) mod tool_images;
 pub(super) use processes::PROCESSES;
@@ -188,6 +189,7 @@ fn capability_keys(
         .chain([skills::CATALOG])
         .chain([hooks::INSPECT])
         .chain([summaries::SUMMARY])
+        .chain(reviewer.then_some(prediction::CAPABILITY))
         .chain(summaries::artifact_capability(reviewer))
         .chain(input_images::capability(reviewer))
         .chain(input_images::chunks_capability(reviewer))
@@ -248,6 +250,7 @@ struct Submit {
     #[serde(default)]
     editor_browser_tools: bool,
     editor_svg_target_id: Option<BindingId>,
+    editor_tool_context_id: Option<BindingId>,
     editor_context: Option<EditorObservation>,
     message_context: Option<MessageContext>,
 }
@@ -691,6 +694,7 @@ pub(super) fn handlers(
         ))
         .extend(skills::handlers(host.clone(), sessions.clone()))
         .extend(summaries::handlers(host.clone(), sessions.clone()))
+        .extend(prediction::handlers(host.clone(), sessions.clone()))
         .extend(input_images::handlers(host.clone(), sessions.clone()))
         .extend(tool_images::handlers(host.clone(), sessions.clone()))
         .extend(gateway_billing::handlers(host.clone(), sessions.clone()))
@@ -724,6 +728,7 @@ pub(super) fn handlers(
                         request.editor_presentation,
                         request.editor_browser_tools,
                         request.editor_svg_target_id.as_ref(),
+                        request.editor_tool_context_id.as_ref(),
                         request.allow_wakeups,
                     )?;
                     let mut parts = identified_prompt(
@@ -752,6 +757,10 @@ pub(super) fn handlers(
                                 reasoning: request.reasoning,
                             },
                             SubmissionContext {
+                                web_search: selection::web_search(
+                                    request.meta.as_ref(),
+                                    &submit_sessions,
+                                )?,
                                 initial_title: initial_title(
                                     &submit_sessions,
                                     request.initial_title,
@@ -766,6 +775,7 @@ pub(super) fn handlers(
                                 editor_presentation: request.editor_presentation,
                                 editor_browser_tools: request.editor_browser_tools,
                                 editor_svg_target: request.editor_svg_target_id,
+                                editor_tool_context_id: request.editor_tool_context_id,
                             },
                         )
                         .await
@@ -889,6 +899,7 @@ fn editor_binding(
     presentation: bool,
     browser: bool,
     svg_target: Option<&BindingId>,
+    tool_context: Option<&BindingId>,
     allow_wakeups: bool,
 ) -> Result<()> {
     if let Some(endpoint) = endpoint {
@@ -912,6 +923,16 @@ fn editor_binding(
     if let Some(target) = svg_target {
         require(sessions, crate::editor_surfaces::SVG_TEXT_CAPABILITY, None)?;
         if endpoint.is_none() || allow_wakeups || uuid::Uuid::parse_str(target.as_str()).is_err() {
+            return Err(Error::invalid_params());
+        }
+    }
+    if let Some(context) = tool_context {
+        require(
+            sessions,
+            crate::editor_surfaces::mcp::TOOL_CONTEXT_CAPABILITY,
+            None,
+        )?;
+        if endpoint.is_none() || allow_wakeups || uuid::Uuid::parse_str(context.as_str()).is_err() {
             return Err(Error::invalid_params());
         }
     }

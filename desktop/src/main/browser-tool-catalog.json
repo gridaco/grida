@@ -1,0 +1,1106 @@
+[
+  {
+    "name": "browser_action",
+    "description": "Perform one click, fill, key press, select, hover, or scroll. Supply the target object and current documentId. For a click, set action to {\"kind\":\"click\",\"ref\":\"…\"} using a ref from the snapshot. Verify the result afterward.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "value": {
+                  "type": "string",
+                  "maxLength": 8192
+                },
+                "kind": {
+                  "const": "fill"
+                }
+              },
+              "required": ["kind", "ref", "value"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "kind": {
+                  "const": "click"
+                }
+              },
+              "required": ["kind", "ref"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "point": {
+                  "type": "object",
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 32000
+                    },
+                    "y": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 32000
+                    },
+                    "viewportId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    }
+                  },
+                  "required": ["x", "y", "viewportId"],
+                  "additionalProperties": false
+                },
+                "kind": {
+                  "const": "click"
+                }
+              },
+              "required": ["kind", "point"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "kind": {
+                  "const": "hover"
+                }
+              },
+              "required": ["kind", "ref"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "point": {
+                  "type": "object",
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 32000
+                    },
+                    "y": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 32000
+                    },
+                    "viewportId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    }
+                  },
+                  "required": ["x", "y", "viewportId"],
+                  "additionalProperties": false
+                },
+                "kind": {
+                  "const": "hover"
+                }
+              },
+              "required": ["kind", "point"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 32
+                },
+                "ref": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "modifiers": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "enum": ["Alt", "Control", "Meta", "Shift"]
+                  }
+                },
+                "kind": {
+                  "const": "press"
+                }
+              },
+              "required": ["kind", "key"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "value": {
+                  "type": "string",
+                  "maxLength": 8192
+                },
+                "kind": {
+                  "const": "select"
+                }
+              },
+              "required": ["kind", "ref", "value"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "deltaX": {
+                  "type": "number",
+                  "minimum": -12000,
+                  "maximum": 12000
+                },
+                "deltaY": {
+                  "type": "number",
+                  "minimum": -12000,
+                  "maximum": 12000
+                },
+                "point": {
+                  "type": "object",
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 32000
+                    },
+                    "y": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 32000
+                    },
+                    "viewportId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    }
+                  },
+                  "required": ["x", "y", "viewportId"],
+                  "additionalProperties": false
+                },
+                "kind": {
+                  "const": "scroll"
+                }
+              },
+              "required": ["kind"],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "documentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "target": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "pageId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "kind": {
+                  "const": "background"
+                }
+              },
+              "required": ["kind", "pageId"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "tabId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "kind": {
+                  "const": "workbench"
+                }
+              },
+              "required": ["kind", "tabId"],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": ["target", "documentId", "action"],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "disposition": {
+          "enum": ["not_dispatched", "dispatched_verified", "unknown"]
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": ["disposition"]
+    },
+    "version": 1,
+    "effect": "mutation"
+  },
+  {
+    "name": "browser_capture",
+    "description": "Capture viewport pixels and metadata from the exact guarded document. Available to MCP clients and native model connections that accept tool images.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "target": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "pageId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "kind": {
+                  "const": "background"
+                }
+              },
+              "required": ["kind", "pageId"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "tabId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "kind": {
+                  "const": "workbench"
+                }
+              },
+              "required": ["kind", "tabId"],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": ["target", "documentId"],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "disposition": {
+          "enum": ["not_dispatched", "dispatched_verified", "unknown"]
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": ["disposition"]
+    },
+    "version": 1,
+    "effect": "read"
+  },
+  {
+    "name": "browser_close",
+    "description": "Close the exact background page or user-requested workbench tab.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "pageId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "kind": {
+                  "const": "background"
+                }
+              },
+              "required": ["kind", "pageId"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "tabId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "kind": {
+                  "const": "workbench"
+                }
+              },
+              "required": ["kind", "tabId"],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": ["target"],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "disposition": {
+          "enum": ["not_dispatched", "dispatched_verified", "unknown"]
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": ["disposition"]
+    },
+    "version": 1,
+    "effect": "mutation"
+  },
+  {
+    "name": "browser_diagnostics",
+    "description": "Read bounded console messages and page or load errors for the target.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "cursor": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "documentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "target": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "pageId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "kind": {
+                  "const": "background"
+                }
+              },
+              "required": ["kind", "pageId"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "tabId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "kind": {
+                  "const": "workbench"
+                }
+              },
+              "required": ["kind", "tabId"],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": ["target"],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "disposition": {
+          "enum": ["not_dispatched", "dispatched_verified", "unknown"]
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": ["disposition"]
+    },
+    "version": 1,
+    "effect": "read"
+  },
+  {
+    "name": "browser_evaluate",
+    "description": "Call a JavaScript function with one JSON argument in the exact guarded website document. It can affect the website and cannot access Desktop APIs.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "functionText": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16384
+        },
+        "arg": {},
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5000
+        },
+        "documentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "target": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "pageId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "kind": {
+                  "const": "background"
+                }
+              },
+              "required": ["kind", "pageId"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "tabId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "kind": {
+                  "const": "workbench"
+                }
+              },
+              "required": ["kind", "tabId"],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": ["target", "documentId", "functionText"],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "disposition": {
+          "enum": ["not_dispatched", "dispatched_verified", "unknown"]
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": ["disposition"]
+    },
+    "version": 1,
+    "effect": "mutation"
+  },
+  {
+    "name": "browser_help",
+    "description": "Read the browser tool contract for a topic.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "topic": {
+          "enum": ["targets", "actions", "wait", "capture", "errors"]
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "disposition": {
+          "enum": ["not_dispatched", "dispatched_verified", "unknown"]
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": ["disposition"]
+    },
+    "version": 1,
+    "effect": "read"
+  },
+  {
+    "name": "browser_navigate",
+    "description": "Navigate the exact page guarded by its current document and return navigation readiness. For stop, omit documentId to interrupt the target's pending load.",
+    "inputSchema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "const": "stop"
+                }
+              },
+              "required": ["kind"],
+              "additionalProperties": false
+            },
+            "documentId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "target": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "pageId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "kind": {
+                      "const": "background"
+                    }
+                  },
+                  "required": ["kind", "pageId"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "tabId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "kind": {
+                      "const": "workbench"
+                    }
+                  },
+                  "required": ["kind", "tabId"],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "required": ["target", "action"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "format": "uri",
+                      "minLength": 1,
+                      "maxLength": 4096
+                    },
+                    "kind": {
+                      "const": "goto"
+                    }
+                  },
+                  "required": ["kind", "url"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "const": "back"
+                    }
+                  },
+                  "required": ["kind"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "const": "forward"
+                    }
+                  },
+                  "required": ["kind"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "const": "reload"
+                    }
+                  },
+                  "required": ["kind"],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "documentId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "target": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "pageId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "kind": {
+                      "const": "background"
+                    }
+                  },
+                  "required": ["kind", "pageId"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "tabId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "kind": {
+                      "const": "workbench"
+                    }
+                  },
+                  "required": ["kind", "tabId"],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "required": ["target", "documentId", "action"],
+          "additionalProperties": false
+        }
+      ],
+      "type": "object"
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "disposition": {
+          "enum": ["not_dispatched", "dispatched_verified", "unknown"]
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": ["disposition"]
+    },
+    "version": 1,
+    "effect": "mutation"
+  },
+  {
+    "name": "browser_open",
+    "description": "Open a new independent background page at an HTTP(S) URL. Wait on the returned navigation readiness.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      },
+      "required": ["url"],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "disposition": {
+          "enum": ["not_dispatched", "dispatched_verified", "unknown"]
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": ["disposition"]
+    },
+    "version": 1,
+    "effect": "mutation"
+  },
+  {
+    "name": "browser_snapshot",
+    "description": "Get a page's current documentId, element refs, and viewport. Pass the entire target object. Omit documentId to discover the current document.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "target": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "pageId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "kind": {
+                  "const": "background"
+                }
+              },
+              "required": ["kind", "pageId"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "tabId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "kind": {
+                  "const": "workbench"
+                }
+              },
+              "required": ["kind", "tabId"],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": ["target"],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "disposition": {
+          "enum": ["not_dispatched", "dispatched_verified", "unknown"]
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": ["disposition"]
+    },
+    "version": 1,
+    "effect": "read"
+  },
+  {
+    "name": "browser_wait",
+    "description": "Wait for a page condition. Use readiness from browser_open or browser_navigate, or guard a current document.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "readiness": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "navigationId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "kind": {
+                  "const": "navigation"
+                }
+              },
+              "required": ["kind", "navigationId"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "documentId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "kind": {
+                  "const": "document"
+                }
+              },
+              "required": ["kind", "documentId"],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "condition": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "state": {
+                  "enum": ["dom-content-loaded", "load"]
+                },
+                "kind": {
+                  "const": "ready"
+                }
+              },
+              "required": ["kind", "state"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                },
+                "kind": {
+                  "const": "text"
+                }
+              },
+              "required": ["kind", "text"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "kind": {
+                  "const": "url"
+                }
+              },
+              "required": ["kind", "url"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "state": {
+                  "enum": ["attached", "detached", "visible", "hidden"]
+                },
+                "kind": {
+                  "const": "ref"
+                }
+              },
+              "required": ["kind", "ref", "state"],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5000
+        },
+        "target": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "pageId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "kind": {
+                  "const": "background"
+                }
+              },
+              "required": ["kind", "pageId"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "tabId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "kind": {
+                  "const": "workbench"
+                }
+              },
+              "required": ["kind", "tabId"],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": ["target", "condition"],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "disposition": {
+          "enum": ["not_dispatched", "dispatched_verified", "unknown"]
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": ["disposition"]
+    },
+    "version": 1,
+    "effect": "read"
+  },
+  {
+    "name": "surface_list_open",
+    "description": "Inspect the exact authorized workbench's open file and browser tabs. Use the returned tab ID to target what the user is viewing.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "disposition": {
+          "enum": ["not_dispatched", "dispatched_verified", "unknown"]
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": ["disposition"]
+    },
+    "version": 3,
+    "effect": "read"
+  },
+  {
+    "name": "surface_open",
+    "description": "Present a workspace file as described by artifact guidance, or explicitly show a URL or existing tab in the workbench. Use browser_open for new background browser work.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "maxLength": 4096
+                },
+                "kind": {
+                  "const": "file"
+                }
+              },
+              "required": ["kind", "path"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "format": "uri",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "kind": {
+                  "const": "url"
+                }
+              },
+              "required": ["kind", "url"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "tabId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "kind": {
+                  "const": "tab"
+                }
+              },
+              "required": ["kind", "tabId"],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "presentation": {
+          "enum": ["reveal", "focus"]
+        }
+      },
+      "required": ["target"],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "disposition": {
+          "enum": ["not_dispatched", "dispatched_verified", "unknown"]
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": ["disposition"]
+    },
+    "version": 3,
+    "effect": "presentation"
+  }
+]

@@ -69,24 +69,51 @@ select it again. [Use durable client operations](./clients.md#use-durable-client
 
 ## Use the tools available to the task
 
-A Desktop workspace chat on macOS and Linux runs under the **Default** access
-shown in the composer. The agent reads, creates and edits files in the project
-and runs commands there in a sandbox without asking each time; its commands
-can read elsewhere on your computer but cannot write outside the project or
-reach the internet. Turn on the **Plan** badge (**+ → Plan mode** or `/plan`)
+With **Auto** or **Ask for approval**, a Desktop workspace chat on macOS and
+Linux can read, create and edit files in the project and run commands there
+in a sandbox without asking each time. Commands can read elsewhere on your
+computer. The sandbox limits writes to the project and a temporary directory,
+and the agent needs approval to connect a command to a public destination.
+Turn on the **Plan** badge (**+ → Plan mode** or `/plan`)
 when you want it to investigate without changing anything. Skills add
 guidance but never add access. [Understand agent permissions](./permissions.md)
 
 Source-built headless and ACP hosts use the permission profile you supply.
 [Work with selected folders](./clients.md#work-with-selected-folders)
 
+In a Desktop **Act** chat with an attached workbench, describe the operation
+you need. The agent can look up the available Desktop tools for that task,
+such as listing open tabs, inspecting selected SVG objects or path points,
+or editing an object's opacity. The lookup uses
+the workbench bound when your message was sent. If it has since been closed
+or replaced, send a new message from the current workbench. Ask the agent to
+show a workspace file or web link and the workbench chooses its viewer. Ask
+it to check how a web page behaves and it can use Browser tools on the
+specific page. When several extensions could help, the agent sees a short
+description of each and can look up the chosen extension's tools or skill.
+A request about an FX workflow can lead the agent to the bundled FX skill,
+which uses the chat's existing command permissions.
+
 Current limits:
 
-- The agent cannot render the SVG or HTML it writes to an image to check how
-  it looks, so review visual results in the editor yourself.
+- Browser captures show a page's current viewport. Review the appearance of
+  a standalone SVG in its editor.
 - If the model sends a tool request whose details Grida cannot read, the
   agent is told the request could not be read and can send it again in the
   same turn. Repeated failures end the turn at its step limit.
+
+## Search the web for one message
+
+With **GPT-6.2 Sol** on a connected **ChatGPT Subscription**, the agent can
+search the live web when a question needs current information. Ask a question
+from Home or in a workspace chat, or ask directly, for example “Search the
+web for today’s forecast in Seoul.” **Settings → Personalization → Web search**
+controls this across workspaces and is on by default.
+
+When the model searches, the chat shows the reported search activity. Open a
+cited source from the reply to read it. Sources remain available when you
+reopen the chat. A reply can have no citations.
+[Web search preferences](./desktop-settings.md#personalization)
 
 ## Use tools from a local MCP server
 

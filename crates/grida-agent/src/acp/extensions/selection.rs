@@ -7,6 +7,24 @@ use std::path::PathBuf;
 pub(super) const CAPABILITY: &str = "co.grida/session/selection";
 pub(super) const REVISION_META: &str = "co.grida/selectionRevision";
 
+pub(super) fn web_search(
+    meta: Option<&Meta>,
+    sessions: &Mutex<ConnectionSessions>,
+) -> Result<bool> {
+    let Some(value) = meta.and_then(|meta| meta.get("co.grida/webSearch")) else {
+        return Ok(false);
+    };
+    require(
+        sessions,
+        crate::supervised_provider::TURN_CAPABILITIES,
+        None,
+    )?;
+    if value != &Value::Bool(true) {
+        return Err(Error::invalid_params().data("web_search_invalid"));
+    }
+    Ok(true)
+}
+
 pub(super) fn revision(
     meta: Option<&Meta>,
     sessions: &Mutex<ConnectionSessions>,

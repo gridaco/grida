@@ -36,12 +36,19 @@ describe("NativeTurnActivity", () => {
     const html = renderToStaticMarkup(
       <NativeTurnActivity
         block={block as Extract<typeof block, { kind: "turn" }>}
+        approvalReviews={[
+          { decision: "approved", action: "/reference/prices.csv" },
+          { decision: "declined", action: "example.org:443" },
+        ]}
         renderMessage={(message) => (
           <p key={message.messageId}>{message.text}</p>
         )}
       />
     );
     // The kit's read card names the action and the file, not the tool id.
+    expect(html).toContain("Automatically approved");
+    expect(html).toContain("example.org:443");
+    expect(html).toContain("Automatically declined");
     expect(html).toContain("Read file");
     expect(html).toContain("cart.js");
     expect(html).not.toContain("read_file");

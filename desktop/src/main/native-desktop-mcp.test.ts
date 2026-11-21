@@ -33,7 +33,8 @@ vi.mock("./services-sidecar-client", () => ({
 const resources = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
 const token = "fixture.local.peer.bearer";
 const toolName = "mcp_local_lookup";
-const editorTool = "surface_list_open";
+const editorTool = "workbench_list_tabs";
+const searchTool = "tool_search";
 
 it.runIf(Boolean(resources) && process.platform !== "win32")(
   "retains separate editor and allowlisted MCP authority through selected Act compaction",
@@ -41,6 +42,19 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
     const earlier = `Earlier workspace context ${"a".repeat(105_000)}`;
     const recent = "Keep this recent workspace message verbatim.";
     const summary = "Compacted workspace setup.";
+    const selectedActCalls = [
+      {
+        id: "fixture-workbench-search",
+        name: searchTool,
+        args: { query: "active", source: "workbench" },
+      },
+      { id: "fixture-editor-call", name: editorTool, args: {} },
+      {
+        id: "fixture-mcp-call",
+        name: toolName,
+        args: { label: "sample" },
+      },
+    ];
     const releaseSummary = Promise.withResolvers<void>();
     const base = await fs.mkdtemp(
       path.join(await fs.realpath(os.tmpdir()), "grida-native-desktop-mcp-")
@@ -147,6 +161,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       sidecar.findWorkspace.mockImplementation((id) => catalog.find(id));
       let organizationId = 12;
       const offers: string[][] = [];
+      const selectedToolOffers: { name: string; offered: string[] }[] = [];
       const bodies: string[] = [];
       const warmupOffers: string[][] = [];
       const warmupReceipts: NativeChatAcceptance[] = [];
@@ -206,22 +221,21 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
                 const results = request.messages.filter(
                   (item: { role: string }) => item.role === "tool"
                 );
-                if (names.includes(toolName) && results.length < 2) {
-                  const readingEditor = results.length === 0;
+                const next = names.includes(toolName)
+                  ? selectedActCalls[results.length]
+                  : undefined;
+                if (next) {
+                  selectedToolOffers.push({ name: next.name, offered: names });
                   return stream(
                     {
                       tool_calls: [
                         {
                           index: 0,
-                          id: readingEditor
-                            ? "fixture-editor-call"
-                            : "fixture-mcp-call",
+                          id: next.id,
                           type: "function",
                           function: {
-                            name: readingEditor ? editorTool : toolName,
-                            arguments: readingEditor
-                              ? "{}"
-                              : '{"label":"sample"}',
+                            name: next.name,
+                            arguments: JSON.stringify(next.args),
                           },
                         },
                       ],
@@ -344,6 +358,11 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       await send(selected.id, "plan");
       expect(methods).toEqual(["server/discover", "tools/list"]);
       await send(selected.id, "act");
+      expect(selectedToolOffers.map(({ name }) => name)).toEqual(
+        selectedActCalls.map(({ name }) => name)
+      );
+      for (const { name, offered } of selectedToolOffers)
+        expect(offered).toContain(name);
       expect(warmupReceipts.map((receipt) => receipt.disposition)).toEqual([
         "claimed",
         "claimed",
@@ -370,29 +389,39 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         },
       ]);
       expect(faults).toEqual([]);
+      expect(offers[0]).toContain(searchTool);
+      expect(bodies[0]).toContain("- workbench:");
+      expect(bodies[1]).not.toContain("- workbench:");
+      expect(offers[2]).toContain(searchTool);
+      expect(bodies[2]).toContain("- workbench:");
       expect(
         offers.map((names) => names.filter((name) => name.startsWith("mcp_")))
-      ).toEqual([[], [], [toolName], [toolName], [toolName]]);
+      ).toEqual([[], [], [toolName], [toolName], [toolName], [toolName]]);
       expect(
         offers.map((names) =>
           names.filter(
-            (name) => name.startsWith("surface_") || name.startsWith("svg_")
+            (name) =>
+              name.startsWith("surface_") ||
+              name.startsWith("workbench_") ||
+              name.startsWith("svg_")
           )
         )
-      ).toEqual([
-        [editorTool, "surface_open"],
-        [],
-        [editorTool, "surface_open"],
-        [editorTool, "surface_open"],
-        [editorTool, "surface_open"],
+      ).toEqual([[], [], [], [editorTool], [editorTool], [editorTool]]);
+      const results = JSON.parse(bodies.at(-1)!)
+        .messages.filter((item: { role: string }) => item.role === "tool")
+        .map((item: { content: string }) => JSON.parse(item.content));
+      expect(results.slice(0, 2)).toMatchObject([
+        {
+          status: "succeeded",
+          structured: {
+            matches: [{ kind: "tool", name: editorTool, source: "workbench" }],
+          },
+        },
+        {
+          status: "succeeded",
+          structured: { active: "/poster.svg", open: ["/poster.svg"] },
+        },
       ]);
-      const firstResult = JSON.parse(bodies[3]).messages.find(
-        (item: { role: string }) => item.role === "tool"
-      );
-      expect(JSON.parse(firstResult.content)).toMatchObject({
-        status: "succeeded",
-        structured: { active: "/poster.svg", open: ["/poster.svg"] },
-      });
       expect(bodies.at(-1)).toContain("Exact local result");
       expect(bodies.at(-1)).toContain(summary);
       expect(bodies.at(-1)).toContain(recent);

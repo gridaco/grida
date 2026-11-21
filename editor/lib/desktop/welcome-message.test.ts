@@ -38,6 +38,33 @@ describe("welcome_message", () => {
     expect(welcome_message.peek("workspace-a", storage)).toBeNull();
   });
 
+  it("does not let an older pane consume a replacement handoff", () => {
+    const storage = memoryStorage();
+    const message = { text: "Look this up", profileId: PROFILE };
+    welcome_message.stash("workspace-a", message, storage);
+    const older = welcome_message.pending("workspace-a", storage)!;
+    expect(older.waiting()).toBe(true);
+    welcome_message.stash("workspace-a", message, storage);
+    expect(older.waiting()).toBe(false);
+    expect(older.take()).toBeNull();
+    const replacement = welcome_message.pending("workspace-a", storage)!;
+    expect(replacement.take()).toEqual(message);
+    expect(replacement.take()).toBeNull();
+  });
+
+  it("keeps the explicit manual approval choice through navigation", () => {
+    const storage = memoryStorage();
+    const message = {
+      text: "Check this",
+      profileId: PROFILE,
+      manualApproval: true as const,
+    };
+    welcome_message.stash("workspace-a", message, storage);
+    expect(welcome_message.takeMessage("workspace-a", storage)).toEqual(
+      message
+    );
+  });
+
   it("hands over settings and the original selected File once", () => {
     const storage = memoryStorage();
     const file = new File(["notes"], "notes.txt", { type: "text/plain" });
@@ -45,9 +72,16 @@ describe("welcome_message", () => {
       text: "Read these notes",
       profileId: PROFILE,
       effort: "high" as const,
+      turnOptions: {
+        profileId: PROFILE,
+        modelId: "subscription-model",
+        speed: "fast" as const,
+        webSearch: true as const,
+      },
       operatingRegime: "plan" as const,
       goal: false,
       preparedSessionId: "abf7864b-6bd5-4d77-9159-7d17ddbed879",
+      preparedMode: "approve_for_me" as const,
       attachment: { kind: "file" as const, file },
     };
     expect(welcome_message.stash("settings", message, storage)).toBe(true);
@@ -110,6 +144,21 @@ describe("welcome_message", () => {
     JSON.stringify({ text: "Ask", profileId: null, effort: "maximum" }),
     JSON.stringify({
       text: "Ask",
+      profileId: PROFILE,
+      turnOptions: { profileId: PROFILE, modelId: "model", speed: "fastest" },
+    }),
+    JSON.stringify({
+      text: "Ask",
+      profileId: PROFILE,
+      turnOptions: { profileId: PROFILE, modelId: "model", webSearch: false },
+    }),
+    JSON.stringify({
+      text: "Ask",
+      profileId: PROFILE,
+      turnOptions: { modelId: "model", webSearch: true },
+    }),
+    JSON.stringify({
+      text: "Ask",
       profileId: null,
       operatingRegime: "unknown",
     }),
@@ -117,8 +166,14 @@ describe("welcome_message", () => {
     JSON.stringify({
       text: "Ask",
       profileId: null,
+      preparedMode: "approve_for_me",
+    }),
+    JSON.stringify({
+      text: "Ask",
+      profileId: null,
       preparedSessionId: "not-a-session",
     }),
+    JSON.stringify({ text: "Ask", profileId: null, manualApproval: false }),
     JSON.stringify({ text: "Ask", profileId: null, attachment: { token: 4 } }),
     JSON.stringify({
       text: "Ask",

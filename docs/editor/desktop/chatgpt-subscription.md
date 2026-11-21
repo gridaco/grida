@@ -1,6 +1,6 @@
 ---
 title: Use Your ChatGPT Subscription
-description: Connect your ChatGPT account and use supported text models in Grida Desktop.
+description: Connect your ChatGPT account to Grida Desktop, choose a model and response speed, and use live web search in chat.
 keywords:
   - chatgpt subscription
   - chatgpt sign in
@@ -15,9 +15,9 @@ doc_tasks:
 
 # Use Your ChatGPT Subscription
 
-Connect ChatGPT to use supported text models in Grida with your existing plan.
-You do not need an API key or separate OpenAI API billing. Available models and
-usage depend on your ChatGPT plan.
+Sign in with ChatGPT to use your existing plan in Grida Desktop without an
+OpenAI API key or separate API billing. This connection is experimental.
+Available models and usage limits depend on your ChatGPT plan and workspace.
 
 ## Connect during onboarding
 
@@ -44,30 +44,49 @@ not automatically sign out of the other.
 
 ## Choose a model
 
-Open the text-model picker in a new conversation. When your ChatGPT connection
-is ready, **ChatGPT Subscription** appears first with the supported models.
-When no model or provider has already been chosen, new conversations start on
-**GPT-5.6 Sol**.
+On Home or in a workspace chat, open the model picker at the bottom right of
+the composer. Click the model name beneath the effort level to see the model
+list. Choose a model under **ChatGPT Subscription** to use your plan. If the
+list shows only your current provider, choose **Show all models** or search
+for the model by name.
 
-Choosing a provider/model option changes both for that conversation. Existing
-conversations keep their previous provider until you choose another
-provider/model option.
+With ChatGPT connected, new chats start on **GPT-6.2 Sol** unless you have
+already chosen a different model. An existing chat keeps its saved choice.
 
-The model picker organizes other text models by provider:
+The picker also groups models by provider. Grida Gateway uses your
+organization’s Grida AI credit. OpenRouter, Vercel AI Gateway, and compatible
+endpoints such as Ollama appear when configured.
 
-- **Grida** is always shown. Its hosted models are metered against your
-  organization's prepaid Grida AI credit.
-- **OpenRouter** and **Vercel AI Gateway** appear after their keys are configured.
-- **Ollama** appears after it is configured with at least one model.
+## Choose a response speed
 
-Other provider groups appear when they are configured and available.
+New chats use **Standard** speed. To get faster replies, open the model picker
+and click the lightning bolt in the upper-left corner of the effort panel.
+Depending on your account and model, you can choose **Fast** or **Ultrafast**.
+Faster speeds use more of your ChatGPT allowance. A dimmed bolt means faster
+speeds are unavailable for the current selection.
+
+Grida remembers the speed for that chat. Choosing a speed on Home applies it
+to the chat you start there. Choose **Standard** in the same menu to switch
+back.
+
+## Search the web
+
+With **GPT-6.2 Sol** on your ChatGPT subscription, you can ask “What’s the
+weather in Seoul today?” directly from Home or a workspace chat. The agent can
+search automatically when it needs current information. You can also ask it
+to search the web explicitly.
+
+When the agent searches, Grida shows the search activity in the chat. If the
+reply cites a source, click the citation to open it.
+
+Web search is on by default. To turn it off across your Desktop chats, open
+**Settings → Personalization** and turn off **Web search**.
 
 ## Images and media generation
 
-ChatGPT Subscription is a text-model provider. Image, video, and audio
-generation continue to use the providers shown under
-**Settings → Image/Video/Audio Providers** or Grida-hosted models metered
-against your organization's prepaid Grida AI credit.
+You can attach an image for a supported chat model to examine. Image, video,
+and audio generation use the providers shown in **Settings → Media Providers**.
+Grida-hosted media generation uses your organization’s Grida AI credit.
 
 ## Troubleshooting
 

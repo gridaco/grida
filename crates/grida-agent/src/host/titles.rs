@@ -243,6 +243,7 @@ impl Host {
             work: Arc::default(),
             wake_lock: Arc::default(),
             workers: Arc::default(),
+            predictions: Arc::default(),
             title_observation: Arc::default(),
             title_workers: Arc::default(),
             changed: Arc::default(),

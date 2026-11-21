@@ -19,17 +19,28 @@ use std::time::{Duration, Instant};
 pub(crate) const CAPABILITY: &str = "co.grida/session/editor-surfaces";
 pub(crate) const OPEN_CAPABILITY: &str = "co.grida/session/editor-surface-open";
 pub(crate) const LIST_OPEN: &str = "surface_list_open";
+pub(crate) const WORKBENCH_LIST_TABS: &str = "workbench_list_tabs";
 const MAX_OPEN_PATHS: usize = 50;
 const SNAPSHOT_BYTES: usize = 16 * 1024;
 const REPLY_TIMEOUT: Duration = Duration::from_secs(2);
 
 mod browser;
+pub(crate) mod mcp;
 mod svg_text;
+pub(crate) use mcp::{CAPABILITY as DESKTOP_TOOLS_CAPABILITY, Catalog as DesktopToolCatalog};
 pub(crate) use svg_text::{CAPABILITY as SVG_TEXT_CAPABILITY, READ_TEXT, REPLACE_TEXT};
 
 #[derive(Clone, Default)]
 pub(crate) struct EditorSurfaces {
-    connection: Arc<Mutex<Option<DesktopConnection>>>,
+    state: Arc<Mutex<EditorConnectionState>>,
+}
+
+#[derive(Default)]
+struct EditorConnectionState {
+    connection: Option<DesktopConnection>,
+    tool_source: Option<BindingId>,
+    browser_mcp: bool,
+    tool_sources: bool,
 }
 
 struct DesktopConnection {
@@ -37,50 +48,154 @@ struct DesktopConnection {
     presentation: bool,
     svg_text: bool,
     browser: bool,
+    tools: Option<mcp::Source>,
+}
+
+pub(crate) struct DesktopCapabilities {
+    pub(crate) presentation: bool,
+    pub(crate) svg_text: bool,
+    pub(crate) browser: bool,
+    pub(crate) tools: bool,
+    pub(crate) browser_mcp: bool,
+    pub(crate) tool_sources: bool,
+}
+
+pub(crate) struct LegacyToolScope {
+    pub(crate) inventory: bool,
+    pub(crate) presentation: bool,
+    pub(crate) svg_target: Option<BindingId>,
+    pub(crate) browser: bool,
+    pub(crate) workbench_tools: bool,
 }
 
 impl EditorSurfaces {
     pub(crate) fn attach(
         &self,
         client: ConnectionTo<Client>,
-        presentation: bool,
-        svg_text: bool,
-        browser: bool,
-    ) {
-        *self.connection.lock().unwrap() = Some(DesktopConnection {
+        capabilities: DesktopCapabilities,
+    ) -> Result<()> {
+        let tools = capabilities
+            .tools
+            .then(|| mcp::Source::new(client.clone()))
+            .transpose()?;
+        let mut state = self.state.lock().unwrap();
+        if let Some(tools) = state
+            .connection
+            .take()
+            .and_then(|connection| connection.tools)
+        {
+            tools.close();
+        }
+        state.tool_source = tools.as_ref().map(|source| source.id().clone());
+        state.browser_mcp = capabilities.browser_mcp;
+        state.tool_sources = capabilities.tool_sources;
+        state.connection = Some(DesktopConnection {
             client,
-            presentation,
-            svg_text,
-            browser,
+            presentation: capabilities.presentation,
+            svg_text: capabilities.svg_text,
+            browser: capabilities.browser,
+            tools,
         });
+        Ok(())
     }
 
     pub(crate) fn detach(&self) {
-        self.connection.lock().unwrap().take();
+        if let Some(tools) = self
+            .state
+            .lock()
+            .unwrap()
+            .connection
+            .take()
+            .and_then(|connection| connection.tools)
+        {
+            tools.close();
+        }
+    }
+
+    fn tool_source(&self) -> Option<mcp::Source> {
+        self.state
+            .lock()
+            .unwrap()
+            .connection
+            .as_ref()
+            .and_then(|connection| connection.tools.clone())
+    }
+
+    pub(crate) fn desktop_tools_negotiated(&self) -> bool {
+        self.tool_source().is_some()
+    }
+
+    pub(crate) fn browser_mcp_negotiated(&self) -> bool {
+        self.state.lock().unwrap().browser_mcp
+    }
+
+    pub(crate) fn tool_sources_negotiated(&self) -> bool {
+        self.state.lock().unwrap().tool_sources
+    }
+
+    pub(crate) async fn discover_tools(
+        &self,
+        session: &SessionId,
+        endpoint: &BindingId,
+        scope: mcp::Scope,
+    ) -> Option<DesktopToolCatalog> {
+        let (generation, source) = {
+            let state = self.state.lock().unwrap();
+            (
+                state.tool_source.clone()?,
+                state
+                    .connection
+                    .as_ref()
+                    .and_then(|connection| connection.tools.clone()),
+            )
+        };
+        Some(match source {
+            Some(source) => source.discover(session, endpoint, scope).await,
+            None => DesktopToolCatalog::unavailable(generation, scope),
+        })
+    }
+
+    pub(crate) fn captured_tools(
+        &self,
+        session: &SessionId,
+        endpoint: &BindingId,
+        catalog: &DesktopToolCatalog,
+        kind: mcp::GrantKind,
+        workbench_tools: bool,
+        capture: Option<Arc<crate::file_tools::ImageCapture>>,
+    ) -> Result<Option<ToolHost>> {
+        // Rebuild the accepted inventory even when its owner is gone. Its
+        // definitions keep the recorded request reproducible, while only the
+        // matching live source can execute a new operation.
+        let source = self.tool_source().filter(|source| source.matches(catalog));
+        catalog.tool_host(source, session, endpoint, kind, workbench_tools, capture)
     }
 
     fn client(&self, needs_presentation: bool) -> Option<ConnectionTo<Client>> {
-        self.connection
+        self.state
             .lock()
             .unwrap()
+            .connection
             .as_ref()
             .filter(|connection| !needs_presentation || connection.presentation)
             .map(|connection| connection.client.clone())
     }
 
     fn svg_client(&self) -> Option<ConnectionTo<Client>> {
-        self.connection
+        self.state
             .lock()
             .unwrap()
+            .connection
             .as_ref()
             .filter(|connection| connection.svg_text)
             .map(|connection| connection.client.clone())
     }
 
     fn browser_client(&self) -> Option<ConnectionTo<Client>> {
-        self.connection
+        self.state
             .lock()
             .unwrap()
+            .connection
             .as_ref()
             .filter(|connection| connection.browser)
             .map(|connection| connection.client.clone())
@@ -94,34 +209,36 @@ impl EditorSurfaces {
         &self,
         session: SessionId,
         endpoint: BindingId,
-        present: bool,
-        svg_target: Option<BindingId>,
-        browser: bool,
+        scope: &LegacyToolScope,
         browser_capture: Option<Arc<crate::file_tools::ImageCapture>>,
     ) -> Result<ToolHost> {
-        if browser {
+        if scope.browser {
             let mut capabilities = browser::tools(
                 self.clone(),
                 session.clone(),
                 endpoint.clone(),
                 browser_capture,
+                scope.workbench_tools,
             )?;
-            if let Some(target) = svg_target {
+            if let Some(target) = scope.svg_target.clone() {
                 capabilities.extend(svg_text::tools(self.clone(), session, endpoint, target)?);
             }
             return ToolHost::new(capabilities);
         }
-        let mut capabilities = vec![(
-            open_surfaces_definition()?,
-            Arc::new(Observe {
-                owner: self.clone(),
-                request: Read {
-                    session_id: session.clone(),
-                    endpoint_id: endpoint.clone(),
-                },
-            }) as Arc<dyn CapabilityExecutor>,
-        )];
-        if present {
+        let mut capabilities = Vec::new();
+        if scope.inventory {
+            capabilities.push((
+                open_surfaces_definition()?,
+                Arc::new(Observe {
+                    owner: self.clone(),
+                    request: Read {
+                        session_id: session.clone(),
+                        endpoint_id: endpoint.clone(),
+                    },
+                }) as Arc<dyn CapabilityExecutor>,
+            ));
+        }
+        if scope.presentation {
             capabilities.push((
                 CapabilityDefinition {
                     tool: presentation::definition()?,
@@ -144,7 +261,7 @@ impl EditorSurfaces {
                 }),
             ));
         }
-        if let Some(target) = svg_target {
+        if let Some(target) = scope.svg_target.clone() {
             capabilities.extend(svg_text::tools(self.clone(), session, endpoint, target)?);
         }
         ToolHost::new(capabilities)
@@ -450,6 +567,47 @@ pub(crate) fn valid_path(path: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn a_disconnected_desktop_catalog_keeps_its_offer_and_refuses_dispatch() {
+        let definition = open_surfaces_definition().unwrap();
+        let catalog: DesktopToolCatalog = serde_json::from_value(json!({
+            "source": "retired-source",
+            "definitions": [definition],
+        }))
+        .unwrap();
+        let request = read();
+        let host = EditorSurfaces::default()
+            .captured_tools(
+                &request.session_id,
+                &request.endpoint_id,
+                &catalog,
+                mcp::GrantKind::Extension,
+                false,
+                None,
+            )
+            .unwrap()
+            .expect("the retained offer survives loss of its source");
+        let grant = host.grant(&definition.tool.id).unwrap();
+        assert_eq!(grant.describe().unwrap(), &definition);
+        let outcome = grant
+            .invoke(
+                definition.tool.version,
+                json!({}),
+                agent_kit_core::CancellationToken::new(),
+                Instant::now() + REPLY_TIMEOUT,
+                definition.tool.max_output_bytes,
+            )
+            .await
+            .unwrap();
+        assert_eq!(outcome.status, OutcomeStatus::Failed);
+        assert_eq!(
+            outcome.content,
+            [agent_kit_core::messages::ResultContent::Text(
+                "editor_surface_endpoint_unavailable".into()
+            )]
+        );
+    }
 
     fn read() -> Read {
         Read {

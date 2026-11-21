@@ -10,6 +10,7 @@ pub(crate) mod compaction;
 mod completion_checks;
 mod delegation;
 pub(crate) mod deletion;
+mod discovery;
 pub(crate) mod editor_observation;
 mod execution_routes;
 mod file_references;
@@ -29,6 +30,7 @@ pub(crate) mod live;
 pub(crate) mod message_context;
 pub(crate) mod model_change;
 mod permissions;
+pub(crate) mod prediction;
 pub mod prompt_preview;
 mod questions;
 mod queued_text;
@@ -61,6 +63,7 @@ pub use images::{ImageSource, ImageUpload, RetainedRaster, SelectedImage};
 pub(crate) use images::{is_retained_image, retained_image_size, retained_raster};
 pub use lifecycle::{InputInspection, InputSettings, QueueEdit, TurnControl};
 pub use lifecycle_hooks::HookInspection;
+pub(crate) use permissions::ApprovalReview;
 pub use permissions::{Approvals, PendingApproval};
 pub use questions::{PendingQuestion, Questions};
 pub use retained_file::FileUpload;
@@ -87,7 +90,8 @@ use agent_kit_core::authority::{
 };
 use agent_kit_core::history::{HistoryPosition, HistoryRecord};
 use agent_kit_core::inference::{
-    Modality, ModelCapabilities, Provider, ProviderBinding, RequestControl,
+    Modality, ModelCapabilities, Provider, ProviderBinding, RequestControl, RequestOptions,
+    ResponseSpeed,
 };
 use agent_kit_core::messages::{Content, Message, Provenance, ProvenanceKind, Role};
 use agent_kit_core::tools::Inventory;
@@ -235,6 +239,7 @@ pub struct Host {
     work: Arc<Mutex<Work>>,
     wake_lock: Arc<Mutex<()>>,
     workers: Arc<AtomicUsize>,
+    predictions: Arc<prediction::Availability>,
     title_observation: Arc<tokio::sync::RwLock<()>>,
     title_workers: Arc<std::sync::Mutex<BTreeSet<SessionId>>>,
     changed: Arc<Notify>,
@@ -502,6 +507,8 @@ struct StoredPrompt {
     image_tool_results: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     selection: Option<SelectionSnapshot>,
+    #[serde(default, skip_serializing_if = "RequestOptions::is_default")]
+    request_options: RequestOptions,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     lifecycle_hooks: Option<grida_agent_master::lifecycle_hooks::LifecycleHooks>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -548,12 +555,21 @@ struct StoredPrompt {
     allow_image_placement: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     editor_endpoint: Option<BindingId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    editor_tool_catalog: Option<crate::editor_surfaces::DesktopToolCatalog>,
+    // Accepted inputs keep their model-facing names and argument schemas on replay.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    workbench_tools: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    desktop_context: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     editor_presentation: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     editor_browser_tools: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     editor_svg_target: Option<BindingId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    editor_tool_context_id: Option<BindingId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     guidance: Option<crate::skills::CapturedGuidance>,
     /// Skills the model may read and follow without an explicit selection.
@@ -609,6 +625,7 @@ impl CapturedRoute {
 }
 
 struct SubmissionPolicy {
+    request_options: RequestOptions,
     selection_revision: Option<u64>,
     selection_goal: bool,
     questions: bool,
@@ -621,6 +638,7 @@ struct SubmissionPolicy {
     editor_presentation: bool,
     editor_browser_tools: bool,
     editor_svg_target: Option<BindingId>,
+    editor_tool_context_id: Option<BindingId>,
     operating_regime: OperatingRegime,
     subagent: Option<grida_agent_master::subagents::Assignment>,
     effort: Option<EffortPolicy>,
@@ -731,6 +749,9 @@ struct PreparedInput {
     allow_library_selection: bool,
     permission_capture: Option<crate::permissions::PermissionCapture>,
     host_tools: Vec<Arc<host_tools::HostTools>>,
+    desktop_context: bool,
+    workbench_tools: bool,
+    desktop_tool_sources: Option<discovery::Sources>,
     image_generation: Option<image_generation::Prepared>,
     guidance: Option<Message>,
     skills: Option<crate::skills::SkillListing>,
@@ -751,6 +772,7 @@ pub struct PendingInteractions {
 
 #[derive(Default)]
 pub(crate) struct SubmissionContext {
+    pub web_search: bool,
     pub initial_title: Option<String>,
     pub selection_revision: Option<u64>,
     pub allow_wakeups: bool,
@@ -759,6 +781,7 @@ pub(crate) struct SubmissionContext {
     pub editor_presentation: bool,
     pub editor_browser_tools: bool,
     pub editor_svg_target: Option<BindingId>,
+    pub editor_tool_context_id: Option<BindingId>,
 }
 
 #[derive(Debug, Serialize)]
@@ -976,6 +999,7 @@ impl Host {
             work: Arc::default(),
             wake_lock: Arc::default(),
             workers: Arc::default(),
+            predictions: Arc::default(),
             title_observation: Arc::default(),
             title_workers: Arc::default(),
             changed: Arc::default(),
@@ -2238,11 +2262,27 @@ impl Host {
                 workspace_capture,
             )?);
         }
-        let host_tools = prepared
+        let mut host_tools = prepared
             .host_tools
             .into_iter()
             .map(|owner| owner.bind(claim.lease.binding()))
             .collect::<Result<Vec<_>>>()?;
+        let discovery = if prepared.desktop_context && prepared.goal.is_none() && !cancellation_only
+        {
+            discovery::bind(
+                &host_tools,
+                prepared.skills.as_ref().filter(|_| skill_reader.is_some()),
+                claim.lease.binding(),
+                prepared.workbench_tools,
+                prepared.desktop_tool_sources.as_ref(),
+            )?
+        } else {
+            None
+        };
+        let discovery = discovery.map(|(catalog, owner)| {
+            host_tools.push(owner);
+            catalog
+        });
         let delegation = (!cancellation_only && prepared.effort.is_some())
             .then(|| sponsorship::DelegationAccess::bind(self, claim.lease.binding()))
             .transpose()?;
@@ -2414,6 +2454,9 @@ impl Host {
         let mut master = Master::new(prepared.config, provider.clone(), tools, authority)?
             .with_history(prior)
             .with_input_limit(prepared.limit);
+        if let Some(catalog) = discovery {
+            master = master.with_discovery(catalog);
+        }
         if let Some(file) = file {
             master = master.with_retained_file_check(move || file.check());
         }
@@ -2421,14 +2464,26 @@ impl Host {
             && prepared.goal.is_none()
             && !prepared.subagent
             && permission_scope.is_some()
-            && let Some(profile) = self
-                .permissions
-                .as_ref()
-                .and_then(|profile| profile.automatic_read_review())
         {
-            master = master.with_approval_reviewer(Arc::new(
-                approval_review::AutomaticReadReview::new(self, profile, execution, provider),
-            ));
+            let policy = match prepared.permission_capture.as_ref() {
+                Some(capture)
+                    if capture.mode() == crate::permissions::PermissionMode::ApproveForMe =>
+                {
+                    Some(approval_review::ReviewPolicy::ApproveForMe {
+                        external_file_read: capture.external_file_read(),
+                    })
+                }
+                _ => self
+                    .permissions
+                    .as_ref()
+                    .and_then(|profile| profile.automatic_read_review().cloned())
+                    .map(approval_review::ReviewPolicy::ConfiguredRead),
+            };
+            if let Some(policy) = policy {
+                master = master.with_approval_reviewer(Arc::new(
+                    approval_review::AutomaticReview::new(self, policy, execution, provider),
+                ));
+            }
         }
         if let Some(effort) = prepared.effort {
             master = master
@@ -2557,18 +2612,14 @@ impl Host {
         if view.current.is_none()
             && queued
                 .by_ref()
-                .take(if self.routes.get().is_some() {
-                    1
-                } else {
-                    usize::MAX
-                })
+                .take(if self.has_routes() { 1 } else { usize::MAX })
                 .any(|input| !CapturedRoute::admits(input, execution, configuration.execution))
         {
             return Err(problem(ErrorKind::Conflict, "session_queued_route_changed"));
         }
         if configuration.subagent.is_none()
             && goals::require_resolved_goal(&view.driver_state).is_err()
-            && (self.routes.get().is_none() || (view.current.is_none() && view.queued.is_empty()))
+            && (!self.has_routes() || (view.current.is_none() && view.queued.is_empty()))
             && !self.goal_matches_execution(view).await?
         {
             return Err(problem(ErrorKind::Conflict, "session_goal_route_changed"));
@@ -2593,6 +2644,7 @@ impl Host {
             .as_ref()
             .filter(|_| operating_regime.is_act() && !allow_wakeups);
         Ok(SubmissionPolicy {
+            request_options: RequestOptions::default(),
             selection_revision: None,
             selection_goal: false,
             questions: request.questions,
@@ -2607,6 +2659,7 @@ impl Host {
             editor_presentation: false,
             editor_browser_tools: false,
             editor_svg_target: None,
+            editor_tool_context_id: None,
             operating_regime,
             subagent: None,
             effort: self.capture_effort(request.effort.unwrap_or(self.effort))?,
@@ -2623,6 +2676,7 @@ impl Host {
         policy: SubmissionPolicy,
     ) -> Result<Submission> {
         let SubmissionPolicy {
+            request_options,
             selection_revision,
             selection_goal,
             questions,
@@ -2635,6 +2689,7 @@ impl Host {
             editor_presentation,
             editor_browser_tools,
             editor_svg_target,
+            editor_tool_context_id,
             operating_regime,
             subagent,
             effort,
@@ -2714,6 +2769,42 @@ impl Host {
                 .is_some_and(|profile| profile.allows_primary_review());
         let host_tools_capture =
             self.capture_host_tools(!child_work && allow_host_tools && operating_regime.is_act())?;
+        let desktop_context = !child_work && self.editor_surfaces.desktop_tools_negotiated();
+        let browser_mcp = editor_browser_tools && self.editor_surfaces.browser_mcp_negotiated();
+        let tool_sources = self.editor_surfaces.tool_sources_negotiated()
+            && (!editor_browser_tools || browser_mcp);
+        let editor_tool_catalog = match &editor_endpoint {
+            Some(endpoint) => self
+                .editor_surfaces
+                .discover_tools(
+                    &session.session,
+                    endpoint,
+                    crate::editor_surfaces::mcp::Scope {
+                        presentation: editor_presentation && (!editor_browser_tools || browser_mcp),
+                        svg_target_id: editor_svg_target.clone(),
+                        context_id: editor_tool_context_id.clone(),
+                        browser: browser_mcp,
+                        sources: tool_sources,
+                    },
+                )
+                .await
+                .map(|catalog| {
+                    if editor_browser_tools && !browser_mcp {
+                        catalog.without_workbench_compatibility()
+                    } else {
+                        catalog
+                    }
+                }),
+            _ => None,
+        };
+        let workbench_tools = editor_tool_catalog.is_some();
+        let mut optional_skills = self.optional_bundled_skills();
+        if editor_tool_catalog
+            .as_ref()
+            .is_some_and(crate::editor_surfaces::DesktopToolCatalog::has_browser_tools)
+        {
+            optional_skills.push(crate::skills::BROWSER_SKILL.to_owned());
+        }
         let allow_image_placement = allow_image_placement && desktop_image_generation.is_some();
         let allow_image_reference = allow_library_selection
             && desktop_image_generation.is_some()
@@ -2727,7 +2818,7 @@ impl Host {
             skills::capture_guidance(
                 self.guidance_scope(session)?,
                 &parts,
-                self.optional_bundled_skills(),
+                optional_skills.clone(),
             )
             .await?
         };
@@ -2740,13 +2831,7 @@ impl Host {
         {
             None
         } else {
-            Some(
-                skills::capture_listing(
-                    self.guidance_scope(session)?,
-                    self.optional_bundled_skills(),
-                )
-                .await?,
-            )
+            Some(skills::capture_listing(self.guidance_scope(session)?, optional_skills).await?)
         };
         let parts = if parts.iter().any(|part| {
             matches!(
@@ -2838,6 +2923,7 @@ impl Host {
                     && execution.accepts_selected_png,
                 image_tool_results: Some(execution.tool_result_images),
                 selection,
+                request_options,
                 lifecycle_hooks,
                 spending,
                 parts,
@@ -2871,9 +2957,13 @@ impl Host {
                 allow_workspace_reference,
                 allow_image_placement,
                 editor_endpoint,
+                editor_tool_catalog,
+                workbench_tools,
+                desktop_context,
                 editor_presentation,
                 editor_browser_tools,
                 editor_svg_target,
+                editor_tool_context_id,
                 guidance,
                 skills,
                 goal: None,
@@ -2906,6 +2996,9 @@ impl Host {
         let spending;
         let cancellation_only = matches!(authority, InputAuthority::CancellationOnly);
         let mut host_tools = Vec::new();
+        let desktop_context;
+        let workbench_tools;
+        let desktop_tool_sources;
         let mut image_generation = None;
         let subagent;
         let effort;
@@ -2927,6 +3020,27 @@ impl Host {
         ) = match input.payload.version() {
             INPUT_VERSION if input.payload.schema().as_str() == INPUT_SCHEMA => {
                 let stored: StoredPrompt = decode_input(input)?;
+                if stored.workbench_tools && stored.editor_tool_catalog.is_none() {
+                    return Err(problem(
+                        ErrorKind::InvalidState,
+                        "workbench_tools_require_captured_catalog",
+                    ));
+                }
+                desktop_context = stored.desktop_context || stored.editor_tool_catalog.is_some();
+                workbench_tools = stored.workbench_tools;
+                desktop_tool_sources = stored
+                    .editor_tool_catalog
+                    .as_ref()
+                    .filter(|catalog| catalog.uses_tool_sources())
+                    .map(|catalog| {
+                        catalog
+                            .source_summaries(workbench_tools)
+                            .into_iter()
+                            .map(|(tool, (name, summary))| {
+                                (tool, (name.to_owned(), summary.to_owned()))
+                            })
+                            .collect()
+                    });
                 config.instructions = stored
                     .initial_instructions
                     .clone()
@@ -3055,9 +3169,13 @@ impl Host {
                             || stored.allow_workspace_reference
                             || stored.allow_image_placement
                             || stored.editor_endpoint.is_some()
+                            || stored.editor_tool_catalog.is_some()
+                            || stored.workbench_tools
+                            || stored.desktop_context
                             || stored.editor_presentation
                             || stored.editor_browser_tools
                             || stored.editor_svg_target.is_some()
+                            || stored.editor_tool_context_id.is_some()
                             || stored.guidance.is_some()
                             || stored.skills.is_some()
                             || stored.goal.is_some()
@@ -3102,7 +3220,17 @@ impl Host {
                     return Err(problem(ErrorKind::Conflict, "retained_act_requires_act"));
                 }
                 stored.operating_regime.apply(&mut config);
-                if stored.editor_browser_tools {
+                if desktop_context {
+                    config.instructions.push_str("\n\n");
+                    config
+                        .instructions
+                        .push_str(grida_agent_master::presentation::DESKTOP_CONTEXT);
+                }
+                let browser_mcp = stored
+                    .editor_tool_catalog
+                    .as_ref()
+                    .is_some_and(crate::editor_surfaces::DesktopToolCatalog::uses_browser_mcp);
+                if stored.editor_browser_tools && stored.editor_tool_catalog.is_none() {
                     config.instructions.push_str("\n\n");
                     config
                         .instructions
@@ -3112,18 +3240,42 @@ impl Host {
                     } else {
                         " This model connection cannot receive browser captures. Use browser snapshots for inspection and report the screenshot limitation if asked."
                     });
-                }
-                if stored.editor_presentation {
-                    config.instructions.push_str("\n\n");
+                } else if stored.editor_browser_tools && !browser_mcp && !image_tool_results {
                     config
                         .instructions
-                        .push_str(grida_agent_master::presentation::INSTRUCTIONS);
+                        .push_str("\n\nThis model connection cannot receive browser captures.");
+                }
+                let presentation = if stored.editor_browser_tools && !browser_mcp {
+                    stored.editor_presentation
+                } else {
+                    stored.editor_tool_catalog.as_ref().map_or(
+                        stored.editor_presentation,
+                        crate::editor_surfaces::DesktopToolCatalog::has_presentation,
+                    )
+                };
+                if presentation {
+                    config.instructions.push_str("\n\n");
+                    use grida_agent_master::presentation;
+                    config.instructions.push_str(if workbench_tools {
+                        presentation::WORKBENCH_INSTRUCTIONS
+                    } else {
+                        presentation::INSTRUCTIONS
+                    });
                 }
                 if !cancellation_only
                     && stored.editor_svg_target.is_some()
                     && (stored.editor_endpoint.is_none() || stored.allow_wakeups)
                 {
                     return Err(problem(ErrorKind::InvalidState, "invalid_svg_text_scope"));
+                }
+                if !cancellation_only
+                    && stored.editor_tool_context_id.is_some()
+                    && (stored.editor_endpoint.is_none() || stored.allow_wakeups)
+                {
+                    return Err(problem(
+                        ErrorKind::InvalidState,
+                        "invalid_editor_tool_context_scope",
+                    ));
                 }
                 if !cancellation_only
                     && stored.operating_regime.is_act()
@@ -3142,27 +3294,64 @@ impl Host {
                             "invalid_editor_surface_scope",
                         ));
                     }
-                    let browser_capture = if stored.editor_browser_tools && image_tool_results {
+                    let captures_images = stored.editor_browser_tools
+                        || stored.editor_tool_catalog.as_ref().is_some_and(
+                            crate::editor_surfaces::DesktopToolCatalog::has_image_results,
+                        );
+                    let tool_image_capture = if captures_images && image_tool_results {
                         execution.retained_inputs.as_ref().map(|images| {
-                            images.browser_image_capture(session.clone(), cwd.to_owned())
+                            images.desktop_tool_image_capture(session.clone(), cwd.to_owned())
                         })
                     } else {
                         None
                     };
-                    host_tools.push(Arc::new(host_tools::HostTools::editor(
-                        self.editor_surfaces.tool_host(
-                            session.clone(),
+                    if let Some(catalog) = &stored.editor_tool_catalog {
+                        use crate::editor_surfaces::mcp::GrantKind;
+                        for kind in [GrantKind::Extension, GrantKind::Presentation] {
+                            if let Some(host) = self.editor_surfaces.captured_tools(
+                                session,
+                                endpoint,
+                                catalog,
+                                kind,
+                                workbench_tools,
+                                tool_image_capture.clone(),
+                            )? {
+                                host_tools.push(Arc::new(host_tools::HostTools::desktop(
+                                    host,
+                                    catalog.source(),
+                                    endpoint,
+                                    kind,
+                                    &catalog.names(kind, workbench_tools),
+                                )?));
+                            }
+                        }
+                    }
+                    let legacy = stored.editor_tool_catalog.is_none()
+                        && stored.editor_tool_context_id.is_none();
+                    let scope = crate::editor_surfaces::LegacyToolScope {
+                        inventory: legacy,
+                        presentation: legacy && stored.editor_presentation,
+                        svg_target: stored.editor_svg_target.clone().filter(|_| legacy),
+                        browser: stored.editor_browser_tools && !browser_mcp,
+                        workbench_tools,
+                    };
+                    if scope.inventory
+                        || scope.presentation
+                        || scope.svg_target.is_some()
+                        || scope.browser
+                    {
+                        host_tools.push(Arc::new(host_tools::HostTools::editor(
+                            self.editor_surfaces.tool_host(
+                                session.clone(),
+                                endpoint.clone(),
+                                &scope,
+                                tool_image_capture,
+                            )?,
                             endpoint.clone(),
-                            stored.editor_presentation,
-                            stored.editor_svg_target.clone(),
-                            stored.editor_browser_tools,
-                            browser_capture,
-                        )?,
-                        endpoint.clone(),
-                        stored.editor_presentation,
-                        stored.editor_svg_target.is_some(),
-                        stored.editor_browser_tools,
-                    )?));
+                            &scope,
+                            scope.browser && !legacy,
+                        )?));
+                    }
                 }
                 if !cancellation_only && let Some(binding) = &stored.desktop_image_generation {
                     if !stored.operating_regime.is_act()
@@ -3257,7 +3446,11 @@ impl Host {
                 skills = stored.skills.clone();
                 if let Some(listing) = &skills {
                     config.instructions.push_str("\n\n");
-                    config.instructions.push_str(&listing.instructions());
+                    config
+                        .instructions
+                        .push_str(&listing.instructions_with_discovery(
+                            desktop_context && stored.goal.is_none() && !cancellation_only,
+                        ));
                 }
                 if stored.goal.is_some() {
                     config.instructions.push_str("\n\n");
@@ -3267,6 +3460,7 @@ impl Host {
                 }
                 config.max_steps = stored.max_steps.unwrap_or(1);
                 config.max_output_tokens = stored.max_output_tokens.or(config.max_output_tokens);
+                config.request_options = stored.request_options;
                 // A level the current model cannot take falls back to its default.
                 config.reasoning = stored
                     .reasoning
@@ -3372,6 +3566,9 @@ impl Host {
             allow_library_selection,
             permission_capture,
             host_tools,
+            desktop_context,
+            workbench_tools,
+            desktop_tool_sources,
             image_generation,
             guidance,
             skills,
@@ -3558,11 +3755,10 @@ impl Host {
         if let Some(accepted) = self.existing_submission(&request, &context).await? {
             return Ok(accepted);
         }
-        let host = self
-            .for_selection(&request.session, context.selection_revision)
-            .await?;
+        let (host, options) = self.for_foreground(&request.session, &context).await?;
         let mut policy = host.submission_policy(&request, context.allow_wakeups)?;
         policy.selection_revision = context.selection_revision;
+        policy.request_options = options;
         host.bind_editor(&mut policy, &request, &context)?;
         policy.allow_library_selection = context.allow_library_selection;
         let result = async {
@@ -3609,6 +3805,22 @@ impl Host {
                 "editor_surface_requires_workspace_act_text",
             ));
         }
+        if context.editor_tool_context_id.is_some()
+            && (editor_endpoint.is_none()
+                || context.allow_wakeups
+                || !request.parts.iter().any(
+                    |part| matches!(part, PromptPart::Text { text } if !text.trim().is_empty()),
+                )
+                || !request
+                    .parts
+                    .iter()
+                    .all(|part| matches!(part, PromptPart::Text { .. })))
+        {
+            return Err(problem(
+                ErrorKind::Unsupported,
+                "editor_tool_context_requires_attached_act_text",
+            ));
+        }
         if context.editor_browser_tools
             && (editor_endpoint.is_none() || !self.editor_surfaces.browser_tools_available())
         {
@@ -3620,6 +3832,7 @@ impl Host {
         policy.editor_endpoint = editor_endpoint;
         policy.editor_presentation = context.editor_presentation;
         policy.editor_svg_target = editor_svg_target;
+        policy.editor_tool_context_id = context.editor_tool_context_id.clone();
         policy.editor_browser_tools = context.editor_browser_tools;
         Ok(())
     }
@@ -3637,13 +3850,21 @@ impl Host {
             return Ok(None);
         };
         let StoredPrompt {
+            request_options,
             allow_library_selection,
             unavailable_library_selection_requested,
             editor_browser_tools,
+            editor_tool_context_id,
             ..
         } = lifecycle::check_input(&view.input, &request.parts)?;
         let settings = InputSettings::for_input(&view.input)?;
         settings.require_effort(request.effort, request.reasoning)?;
+        if request_options.web_search != context.web_search {
+            return Err(problem(
+                ErrorKind::Conflict,
+                "submission_web_search_changed",
+            ));
+        }
         if request
             .operating_regime
             .is_some_and(|regime| regime != settings.operating_regime)
@@ -3667,7 +3888,16 @@ impl Host {
                 "submission_library_selection_changed",
             ));
         }
-        if editor_browser_tools != context.editor_browser_tools {
+        if editor_tool_context_id != context.editor_tool_context_id {
+            return Err(problem(
+                ErrorKind::Conflict,
+                "submission_editor_tool_context_changed",
+            ));
+        }
+        // A matching context recovers the accepted input and its catalog even
+        // if the current attachment no longer has the same browser lease.
+        if editor_tool_context_id.is_none() && editor_browser_tools != context.editor_browser_tools
+        {
             return Err(problem(
                 ErrorKind::Conflict,
                 "submission_browser_tools_changed",
@@ -3783,6 +4013,7 @@ impl Host {
                 .await
                 .map_err(|_| problem(ErrorKind::Uncertain, "host_shutdown_timeout"))?;
             work.closed = true;
+            self.predictions.close();
             if let Some(host_tools) = &self.host_tools {
                 host_tools.close();
             }
@@ -4254,6 +4485,7 @@ impl Execution {
                 max_steps: MAX_TURN_STEPS,
                 max_output_tokens,
                 reasoning: Default::default(),
+                request_options: Default::default(),
             },
             provider,
             legacy_subscription_provider: None,
@@ -4348,12 +4580,19 @@ async fn drive(
         activity_order::Publisher::new(ordering, binding.clone(), parent, &initial.state);
     let mut live = live.map(|sender| live::Publisher::new(sender, &initial.state));
     drop(initial);
-    let review = turn
-        .operations()
-        .operation_id(&grida_agent_master::approval_review::operation_key())?;
+    let operations = turn.operations();
+    let mut private_reviews = BTreeSet::from([
+        operations.operation_id(&grida_agent_master::approval_review::operation_key())?
+    ]);
+    for slot in 0..grida_agent_master::approval_review::MAX_SCOPED_REVIEWS {
+        private_reviews.insert(operations.operation_id(
+            &grida_agent_master::approval_review::scoped_operation_key(slot)?,
+        )?);
+    }
+    drop(operations);
     let mut publish = |update| {
         if matches!(&update, TurnUpdate::Inference { operation, .. } | TurnUpdate::Operation { operation, .. }
-            if operation == &review)
+            if private_reviews.contains(operation))
         {
             return;
         }

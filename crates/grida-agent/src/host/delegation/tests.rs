@@ -102,6 +102,7 @@ async fn parent(host: &Host, root: &Path, ultra: bool) -> (ClaimedTurn, StoredPr
                 text: "Coordinate independent general tasks.".into(),
             }],
             SubmissionPolicy {
+                request_options: Default::default(),
                 selection_revision: None,
                 selection_goal: false,
                 questions: true,
@@ -114,6 +115,7 @@ async fn parent(host: &Host, root: &Path, ultra: bool) -> (ClaimedTurn, StoredPr
                 editor_presentation: false,
                 editor_browser_tools: false,
                 editor_svg_target: None,
+                editor_tool_context_id: None,
                 operating_regime: OperatingRegime::Act,
                 subagent: None,
                 effort,

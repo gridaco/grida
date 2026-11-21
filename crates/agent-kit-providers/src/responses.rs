@@ -1,3 +1,4 @@
+mod search;
 mod stream;
 
 use crate::wire::{
@@ -75,7 +76,7 @@ pub struct ResponsesProfile {
     pub reasoning_effort: Option<ResponsesReasoningEffort>,
 }
 
-/// Stateless Responses SSE with text, optional images, and client-executed JSON functions.
+/// Stateless Responses SSE with text, optional images, local functions and hosted search.
 pub struct Responses {
     binding: ProviderBinding,
     replay_binding: BindingId,
@@ -183,7 +184,7 @@ impl Responses {
         scope: &ReplayScope,
         resolve_images: bool,
     ) -> Result<(Value, BTreeMap<String, ToolId>)> {
-        if request.extension.is_some() {
+        if self.endpoint == ResponsesEndpoint::Api && request.extension.is_some() {
             return Err(Error::new(
                 ErrorKind::Unsupported,
                 "unsupported_request_extension",
@@ -268,6 +269,21 @@ impl Responses {
             "model": profile.wire_model, "input": input,
             "instructions": instructions.join("\n\n")
         });
+        use agent_kit_core::inference::{RequestOptions, ResponseSpeed};
+        let options = RequestOptions::from_extension(request.extension.as_ref())?;
+        match options.speed {
+            ResponseSpeed::Standard => {}
+            ResponseSpeed::Fast => body["service_tier"] = json!("priority"),
+            ResponseSpeed::Ultrafast => body["service_tier"] = json!("ultrafast"),
+        }
+        if options.web_search {
+            use agent_kit_core::inference::WebSearchMode;
+            let mut search = json!({"type":"web_search","external_web_access":options.web_search_mode != WebSearchMode::Cached});
+            if options.web_search_mode == WebSearchMode::Indexed {
+                search["indexed_web_access"] = true.into();
+            }
+            tools.push(search);
+        }
         if !tools.is_empty() {
             body["tools"] = tools.into();
         }
@@ -465,6 +481,10 @@ impl Provider for Responses {
         let encoded = self.encode(request.request(), profile, &scope, true)?;
         let transport = Arc::clone(&self.transport);
         let limits = self.limits;
+        let search = agent_kit_core::inference::RequestOptions::from_extension(
+            request.request().extension.as_ref(),
+        )?
+        .web_search;
         let rate_rejection_evidence = if self.endpoint == ResponsesEndpoint::Api {
             RateRejectionEvidence::Code
         } else {
@@ -483,7 +503,7 @@ impl Provider for Responses {
                 control,
                 limits,
                 scope,
-                encoded.names,
+                (encoded.names, search),
                 rate_rejection_evidence,
             )
         }))
@@ -531,9 +551,16 @@ impl ReplayScope {
                 "provider_state_binding_changed",
             ));
         }
-        serde_json::from_slice(state.payload.bytes())
-            .map(Some)
-            .map_err(|_| Error::new(ErrorKind::InvalidInput, "invalid_provider_state"))
+        let mut item: WireItem = serde_json::from_slice(state.payload.bytes())
+            .map_err(|_| Error::new(ErrorKind::InvalidInput, "invalid_provider_state"))?;
+        if let WireItem::Message {
+            content: Some(parts),
+            ..
+        } = &mut item
+        {
+            search::replay_citations(parts, projection);
+        }
+        Ok(Some(item))
     }
 
     fn fingerprint(
@@ -589,6 +616,11 @@ enum WireItem {
         #[serde(skip_serializing_if = "Option::is_none")]
         encrypted_content: Option<String>,
     },
+    WebSearchCall {
+        id: String,
+        #[serde(flatten)]
+        call: search::Call,
+    },
     FunctionCall {
         id: String,
         call_id: ToolCallId,
@@ -608,6 +640,7 @@ impl WireItem {
         match self {
             Self::Message { id, .. }
             | Self::Reasoning { id, .. }
+            | Self::WebSearchCall { id, .. }
             | Self::FunctionCall { id, .. } => id,
         }
     }
@@ -617,6 +650,7 @@ impl WireItem {
             Self::Message { .. } => "message",
             Self::Reasoning { .. } => "reasoning",
             Self::FunctionCall { .. } => "function_call",
+            Self::WebSearchCall { .. } => "web_search_call",
         }
     }
 }
@@ -651,7 +685,7 @@ enum ItemStatus {
 enum WireContent {
     OutputText {
         text: String,
-        #[serde(skip_deserializing)]
+        #[serde(default, deserialize_with = "search::read_annotations")]
         annotations: Vec<Value>,
     },
     Refusal {
@@ -670,7 +704,8 @@ fn text(message: &Message) -> Result<Vec<&str>> {
     for part in &message.content {
         match part {
             Content::Text(text) => parts.push(text.as_str()),
-            Content::Reasoning(_) if message.role == Role::Assistant => {}
+            Content::Reasoning(_) | Content::ProviderEvidence(_)
+                if message.role == Role::Assistant => {}
             _ => {
                 return Err(Error::new(
                     ErrorKind::Unsupported,

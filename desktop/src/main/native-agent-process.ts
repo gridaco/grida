@@ -1,10 +1,17 @@
+import type { ChatGptTurnCapabilities } from "@grida/ai-host";
 // GRIDA-SEC-004 / GRIDA-SEC-008 — main-owned ACP connection to the packaged agent.
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import {
+  execFile,
+  spawn,
+  type ChildProcessWithoutNullStreams,
+} from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { clearTimeout, setTimeout } from "node:timers";
+import { promisify } from "node:util";
 import type { NativeEditorSurfaceSnapshot } from "@grida/desktop-bridge";
 import { NativeProviderRoutes } from "./native-provider-routes";
+import { NativeProviderSelection } from "./native-provider-selection";
 import { NativeAgentArtifacts } from "./native-agent-artifacts";
 import { NativeAgentBackgroundProcesses } from "./native-agent-background-processes";
 import { NativeAgentDeletion } from "./native-agent-deletion";
@@ -29,11 +36,12 @@ import { NativeActivityOrder } from "./native-activity-order";
 import { NativeSelectedImages } from "./native-selected-images";
 import {
   NativeEditorSurfaceEndpoints,
-  type NativeEditorBrowserReply,
   type NativeEditorSurfaceDelivery,
+  type NativeEditorSvgSelectionDelivery,
   type NativeEditorSvgTextDelivery,
 } from "./native-editor-surfaces";
 import type { DesktopBrowserToolLease } from "./desktop-browser-tools";
+import { NativeDesktopTools } from "./native-desktop-tools";
 import {
   NativeAgentPermissions,
   type NativeWorkspaceSelection,
@@ -49,8 +57,9 @@ import {
 
 const FRAME_LIMIT = 1024 * 1024;
 const REQUEST_LIMIT = 16;
-const BROWSER_BUSY_REPLY_LIMIT = 8 * 1024;
+const EDITOR_BUSY_REPLY_LIMIT = 8 * 1024;
 const START_TIMEOUT_MS = 10_000;
+const readAgentHelp = promisify(execFile);
 const SHUTDOWN_TIMEOUT_MS = 12_000;
 const KILL_TIMEOUT_MS = 2_000;
 const SESSION_EFFORT = "co.grida/session/effort";
@@ -60,6 +69,7 @@ const LIBRARY_SELECTION_CAPABILITIES = {
 } as const;
 const CATALOG_QUERY = "co.grida/session/catalog-query";
 export const TRANSCRIPT_WINDOW = "co.grida/session/transcript-window";
+export const PREDICT_PROMPT = "co.grida/session/predict-prompt";
 const MODEL_CHANGE = "co.grida/session/model-change";
 const SUBAGENT_CAPABILITIES = {
   "co.grida/subagent/list": 1,
@@ -91,14 +101,18 @@ export type NativeAgentLaunch = {
   reasoning?: true;
   credentialHome?: string;
   configuredEndpointKey?: string;
+  /** Main-owned settings identity, including anonymous configured endpoints. */
+  configuredEndpointId?: string;
   workspaceConfiguration?: Readonly<{ directory: string; epoch: string }>;
   hooks?: NativeAgentHooks;
   providerNetwork?: NativeProviderNetwork;
   inputRouteConnectionId?: string | null;
   lookupProviderRoute?: NativeProviderRoutes.Lookup;
+  lookupPredictionRoute?: NativeProviderRoutes.PredictionLookup;
   gatewayScope?: string;
   gatewayJobBilling?: NativeGatewayConnection["readJobBilling"];
   subscriptionScope?: string;
+  subscriptionCapabilities?: () => Promise<ChatGptTurnCapabilities>;
   /** Trusted Main opt-in for child work on the selected provider connection. */
   subagents?: true;
   /** Title an untitled chat from its first request (one extra model request). */
@@ -115,16 +129,18 @@ const EDITOR_CONTEXT = "co.grida/session/editor-context";
 const MESSAGE_CONTEXT = "co.grida/session/message-context";
 
 type Pending = {
+  method: string;
+  prediction?: AbortController;
   resolve: (result: unknown) => void;
   reject: (error: Error) => void;
   timer: ReturnType<typeof setTimeout>;
 };
 
-type BrowserRequest = {
+type EditorRequest = {
   controller: AbortController;
   reply?: {
     bytes: Buffer;
-    ifRevoked?: () => NativeEditorBrowserReply | undefined;
+    ifRevoked?: () => Buffer | undefined;
   };
 };
 
@@ -154,6 +170,10 @@ export class NativeAgentTerminationPending extends Error {
 }
 
 export class NativeAgentProcess {
+  private static readonly scopedApprovalProbes = new Map<
+    string,
+    { identity: string; supported: Promise<boolean> }
+  >();
   readonly permissions?: NativeAgentPermissions;
   private readonly pending = new Map<number, Pending>();
   private readonly providerRequests = new Set<number | string>();
@@ -194,6 +214,11 @@ export class NativeAgentProcess {
   private catalogQuery = false;
   private modelChange = false;
   private inputRoutes = false;
+  private turnCapabilities = false;
+  get acceptsTurnCapabilities() {
+    return this.connected && this.turnCapabilities;
+  }
+  private predictionRoutes = false;
   get acceptsInputRoutes() {
     return this.connected && this.inputRoutes;
   }
@@ -218,15 +243,17 @@ export class NativeAgentProcess {
   private editorSurfaceOpen = false;
   private editorSvgText = false;
   private editorBrowserTools = false;
+  private editorBrowserMcp = false;
+  private editorTools = false;
+  private editorToolSources = false;
   private editorContext = false;
+  private editorToolContext = false;
   private messageContext = false;
   private initialTitle = false;
-  private readonly editorBrowserRequests = new Map<
-    string | number,
-    BrowserRequest
-  >();
-  private readonly browserBusyReplies = new Map<string | number, Buffer>();
-  private browserBusyReplyBytes = 0;
+  private promptPrediction = false;
+  private readonly editorRequests = new Map<string | number, EditorRequest>();
+  private readonly editorBusyReplies = new Map<string | number, Buffer>();
+  private editorBusyReplyBytes = 0;
   private chatSelection = false;
   private permissionMode = false;
   private readonly commandCapabilities = new Set<string>();
@@ -240,6 +267,7 @@ export class NativeAgentProcess {
     permissions?: Readonly<{
       askRoots: ReadonlyMap<string, string>;
       settingsRoot?: string;
+      scopedAccess?: ConstructorParameters<typeof NativeAgentPermissions>[3];
     }>,
     private readonly providerEgress?: NativeProviderEgress,
     private readonly imageGeneration?: NativeImageGeneration,
@@ -252,7 +280,8 @@ export class NativeAgentProcess {
       this.permissions = new NativeAgentPermissions(
         (method, params) => this.call(method, params),
         permissions.askRoots,
-        permissions.settingsRoot
+        permissions.settingsRoot,
+        permissions.scopedAccess
       );
     }
     let diagnostics = "";
@@ -326,8 +355,16 @@ export class NativeAgentProcess {
     return this.connected && this.editorContext;
   }
 
+  get acceptsEditorToolContext(): boolean {
+    return this.connected && this.editorToolContext;
+  }
+
   get acceptsMessageContext(): boolean {
     return this.connected && this.messageContext;
+  }
+
+  get acceptsPromptPrediction(): boolean {
+    return this.connected && this.promptPrediction;
   }
 
   get acceptsInitialTitle(): boolean {
@@ -477,6 +514,65 @@ export class NativeAgentProcess {
     return executable;
   }
 
+  /** Whether the packaged host can launch with scoped approvals before a chat exists. */
+  static async supportsScopedApprovals(
+    resourcesPath: string
+  ): Promise<boolean> {
+    if (process.platform !== "darwin" && process.platform !== "linux")
+      return false;
+    try {
+      return await this.supportsScopedApprovalLaunch(
+        this.executable(resourcesPath)
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  /** The switch is parsed before ACP can advertise the host's permission modes. */
+  private static async supportsScopedApprovalLaunch(
+    executable: string
+  ): Promise<boolean> {
+    const [installed, file] = await Promise.all([
+      fs.promises.realpath(executable).catch(() => undefined),
+      fs.promises.lstat(executable, { bigint: true }).catch(() => undefined),
+    ]);
+    if (!installed || !file?.isFile()) return false;
+    const identity = [
+      file.dev,
+      file.ino,
+      file.size,
+      file.mtimeNs,
+      file.ctimeNs,
+    ].join("/");
+    const cached = this.scopedApprovalProbes.get(installed);
+    if (cached?.identity === identity) return cached.supported;
+    const supported: Promise<boolean> = readAgentHelp(
+      executable,
+      ["serve", "--help"],
+      {
+        env: {},
+        timeout: 2000,
+        killSignal: "SIGKILL",
+        maxBuffer: 64 * 1024,
+        encoding: "utf8",
+        windowsHide: true,
+      }
+    )
+      .then(({ stdout }) =>
+        /^[ \t]*--allow-scoped-approvals[ \t]*\r?$/m.test(stdout)
+      )
+      .catch(() => {
+        // A timeout or process error can clear on a later launch.
+        if (this.scopedApprovalProbes.get(installed)?.supported === supported) {
+          this.scopedApprovalProbes.delete(installed);
+        }
+        return false;
+      });
+    this.scopedApprovalProbes.set(installed, { identity, supported });
+    return supported;
+  }
+
   /** Metadata-only ACP host. Its client has no provider route or editor capabilities. */
   static async startCatalog(
     resourcesPath: string,
@@ -577,12 +673,20 @@ export class NativeAgentProcess {
           )
         )
       : undefined;
+    const inputRoutes = !!(providerEgress && options.lookupProviderRoute);
+    const predictionRoutes = !!(
+      providerEgress && options.lookupPredictionRoute
+    );
+    const directLocalPrediction =
+      !providerEgress &&
+      NativeProviderSelection.isLoopbackEndpoint(options.endpoint);
     const providerRoutes =
-      providerEgress && options.lookupProviderRoute
+      inputRoutes || predictionRoutes || options.subscriptionCapabilities
         ? new NativeProviderRoutes(
             options.inputRouteConnectionId ?? null,
             options,
-            options.lookupProviderRoute
+            options.lookupProviderRoute,
+            options.lookupPredictionRoute
           )
         : undefined;
     const capabilities: Record<string, 1> = {
@@ -648,6 +752,14 @@ export class NativeAgentProcess {
       args.push("--supervised-chatgpt-scope", options.subscriptionScope);
     if (permissionProfile)
       args.push("--permission-profile", permissionProfile.profile);
+    // Keep the content-derived profile path stable for work accepted by an
+    // earlier binary. The launcher selects additional per-action capabilities.
+    const scopedAccess =
+      permissionProfile?.scopedAccess &&
+      (await this.supportsScopedApprovalLaunch(executable))
+        ? permissionProfile.scopedAccess
+        : undefined;
+    if (scopedAccess) args.push("--allow-scoped-approvals");
     const environment = nativeEnvironment();
     if (options.mcp) {
       if (!options.workspace || !options.gatewayScope)
@@ -670,6 +782,7 @@ export class NativeAgentProcess {
       options.onSessionUpdate,
       permissionProfile && {
         askRoots: permissionProfile.askRoots,
+        scopedAccess,
         // The host keeps the agent settings file in the workspace
         // configuration folder, or in its own state folder.
         settingsRoot: await fs.promises.realpath(
@@ -707,7 +820,7 @@ export class NativeAgentProcess {
                 [NativeAgentGoals.completionCapability]: 1,
                 [NativeAgentGoals.manualContinuationCapability]: 1,
                 ...(((options.gatewayScope && options.gatewayJobBilling) ||
-                  providerRoutes) && {
+                  inputRoutes) && {
                   [NativeAgentGoals.spendingCapability]: 1,
                 }),
                 ...(options.subagents && {
@@ -727,14 +840,21 @@ export class NativeAgentProcess {
                 ...(options.workspace && { [EDITOR_CONTEXT]: 1 }),
                 [MESSAGE_CONTEXT]: 1,
                 [NativeChatTitle.capability]: 1,
+                ...((predictionRoutes || directLocalPrediction) && {
+                  [PREDICT_PROMPT]: 1,
+                }),
                 ...(providerEgress && {
                   [NativeEditorSurfaceEndpoints.openCapability]: 1,
                   [NativeEditorSurfaceEndpoints.svgTextCapability]: 1,
                   [NativeEditorSurfaceEndpoints.browserCapability]: 1,
+                  [NativeDesktopTools.capability]: 1,
+                  [NativeDesktopTools.browserCapability]: 1,
+                  [NativeDesktopTools.sourcesCapability]: 1,
+                  [NativeEditorSurfaceEndpoints.toolContextCapability]: 1,
                 }),
                 [NativeAgentArtifacts.capability]: 1,
                 [NativeAgentBackgroundProcesses.capability]: 1,
-                ...((options.gatewayJobBilling || providerRoutes) && {
+                ...((options.gatewayJobBilling || inputRoutes) && {
                   [NativeGatewayConnection.billingCapability]: 1,
                   [NativeGatewayConnection.childBillingCapability]: 1,
                 }),
@@ -751,7 +871,13 @@ export class NativeAgentProcess {
                 [CATALOG_QUERY]: 1,
                 [NativeActivityOrder.capability]: 1,
                 [MODEL_CHANGE]: 1,
-                ...(providerRoutes && { [NativeProviderRoutes.capability]: 1 }),
+                ...(inputRoutes && { [NativeProviderRoutes.capability]: 1 }),
+                ...((inputRoutes || options.subscriptionCapabilities) && {
+                  [NativeProviderRoutes.turnCapability]: 1,
+                }),
+                ...(predictionRoutes && {
+                  [NativeProviderRoutes.predictionCapability]: 1,
+                }),
                 "co.grida/session/selection": 1,
                 "co.grida/session/permission-mode": 1,
                 ...(requestDeletion && {
@@ -780,7 +906,13 @@ export class NativeAgentProcess {
         advertised?.[NativeActivityOrder.capability] === 1;
       processOwner.modelChange = advertised?.[MODEL_CHANGE] === 1;
       processOwner.inputRoutes =
-        !!providerRoutes && advertised?.[NativeProviderRoutes.capability] === 1;
+        inputRoutes && advertised?.[NativeProviderRoutes.capability] === 1;
+      processOwner.turnCapabilities =
+        !!providerRoutes &&
+        advertised?.[NativeProviderRoutes.turnCapability] === 1;
+      processOwner.predictionRoutes =
+        predictionRoutes &&
+        advertised?.[NativeProviderRoutes.predictionCapability] === 1;
       processOwner.permissionMode =
         advertised?.["co.grida/session/permission-mode"] === 1;
       processOwner.chatSelection =
@@ -894,10 +1026,25 @@ export class NativeAgentProcess {
       processOwner.editorBrowserTools =
         processOwner.editorSurfaces &&
         advertised?.[NativeEditorSurfaceEndpoints.browserCapability] === 1;
+      processOwner.editorTools =
+        processOwner.editorSurfaces &&
+        advertised?.[NativeDesktopTools.capability] === 1;
+      processOwner.editorBrowserMcp =
+        processOwner.editorTools &&
+        advertised?.[NativeDesktopTools.browserCapability] === 1;
+      processOwner.editorToolSources =
+        processOwner.editorTools &&
+        advertised?.[NativeDesktopTools.sourcesCapability] === 1;
+      processOwner.editorToolContext =
+        processOwner.editorTools &&
+        advertised?.[NativeEditorSurfaceEndpoints.toolContextCapability] === 1;
       processOwner.editorContext =
         options.workspace !== undefined && advertised?.[EDITOR_CONTEXT] === 1;
       processOwner.messageContext =
         processOwner.transcriptWindow && advertised?.[MESSAGE_CONTEXT] === 1;
+      processOwner.promptPrediction =
+        (processOwner.predictionRoutes || directLocalPrediction) &&
+        advertised?.[PREDICT_PROMPT] === 1;
       processOwner.initialTitle =
         advertised?.[NativeChatTitle.capability] === 1;
       processOwner.ready = true;
@@ -911,13 +1058,68 @@ export class NativeAgentProcess {
   request(
     method: string,
     params: unknown,
-    timeoutMs = 130_000
+    timeoutMs = 130_000,
+    permission?: AbortSignal
   ): Promise<unknown> {
     if (this.changingModel)
       return Promise.reject(new Error("native_chat_model_change_busy"));
     if (method === NativeAgentPermissions.answerMethod)
       return Promise.reject(new Error("native_agent_approval_requires_review"));
+    if (method === `_${PREDICT_PROMPT}`)
+      return this.predictPrompt(params, timeoutMs, permission);
     return this.call(method, params, timeoutMs);
+  }
+
+  private get predictionPermission(): AbortSignal | undefined {
+    for (const request of this.pending.values())
+      if (request.prediction) return request.prediction.signal;
+    return undefined;
+  }
+
+  private async predictPrompt(
+    params: unknown,
+    timeoutMs: number,
+    permission?: AbortSignal
+  ): Promise<unknown> {
+    if (
+      !this.acceptsPromptPrediction ||
+      permission?.aborted ||
+      this.predictionPermission
+    )
+      return { text: null };
+    const controller = new AbortController();
+    const id = this.nextId;
+    const cancel = () => {
+      controller.abort();
+      if (this.connected && this.pending.has(id)) {
+        // Main revokes egress synchronously. ACP cancellation also stops the
+        // worker while it is preparing a request or waiting on a provider.
+        try {
+          this.notify("$/cancel_request", { requestId: id });
+        } catch {
+          // A disconnected worker cannot receive cancellation. Its pending
+          // prediction still has no authority to dispatch from Main.
+        }
+      }
+    };
+    permission?.addEventListener("abort", cancel, { once: true });
+    try {
+      // Keep the slot until the worker replies, including after opt-out. A
+      // delayed resolver from this request cannot borrow a later opt-in.
+      const result = await this.call(
+        `_${PREDICT_PROMPT}`,
+        params,
+        timeoutMs,
+        controller
+      );
+      return permission?.aborted ? { text: null } : result;
+    } catch (error) {
+      if (permission?.aborted) return { text: null };
+      throw error;
+    } finally {
+      permission?.removeEventListener("abort", cancel);
+      controller.abort();
+    }
   }
 
   /** Seal native work admission before the owner replaces this store's worker. */
@@ -929,8 +1131,18 @@ export class NativeAgentProcess {
     if (!this.modelChange)
       throw new Error("native_chat_model_change_unsupported");
     if (this.changingModel) throw new Error("native_chat_model_change_busy");
-    if (this.pending.size)
-      throw new Error("native_chat_model_change_pending_work");
+    for (const request of this.pending.values())
+      if (request.method !== `_${PREDICT_PROMPT}`)
+        throw new Error("native_chat_model_change_pending_work");
+    // An optional prediction must give way to an explicit connection switch.
+    // A late native reply carries the retired id and cannot enter the new chat.
+    for (const [id, prediction] of this.pending) {
+      prediction.prediction?.abort();
+      this.notify("$/cancel_request", { requestId: id });
+      this.pending.delete(id);
+      clearTimeout(prediction.timer);
+      prediction.reject(new Error("native_chat_prediction_cancelled"));
+    }
     this.changingModel = true;
     // A lost response can mean that native admission was already sealed.
     // Keep the local gate closed until this exact process has exited.
@@ -986,24 +1198,27 @@ export class NativeAgentProcess {
     deliver: NativeEditorSurfaceDelivery | undefined,
     revision?: number,
     svgText?: NativeEditorSvgTextDelivery,
-    browser?: DesktopBrowserToolLease
+    browser?: DesktopBrowserToolLease,
+    svgSelection?: NativeEditorSvgSelectionDelivery
   ) {
     if (this.connected && this.editorSurfaces)
       return this.editorEndpoints.register(
         sessionId,
         snapshot,
         requireCurrent,
-        this.editorSurfaceOpen ? deliver : undefined,
+        this.editorSurfaceOpen || this.editorTools ? deliver : undefined,
         revision,
-        this.editorSvgText ? svgText : undefined,
-        this.editorBrowserTools ? browser : undefined
+        this.editorSvgText || this.editorTools ? svgText : undefined,
+        this.editorBrowserTools || this.editorBrowserMcp ? browser : undefined,
+        this.editorToolContext ? svgSelection : undefined
       );
   }
 
   private call(
     method: string,
     params: unknown,
-    timeoutMs = 130_000
+    timeoutMs = 130_000,
+    prediction?: AbortController
   ): Promise<unknown> {
     if (this.failure || this.shutdown) {
       return Promise.reject(this.failure ?? new Error("native_agent_closing"));
@@ -1023,7 +1238,7 @@ export class NativeAgentProcess {
         // The host can still own the accepted operation and its response slot.
         reject(new Error("native_agent_request_timeout"));
       }, timeoutMs);
-      this.pending.set(id, { resolve, reject, timer });
+      this.pending.set(id, { method, resolve, reject, timer, prediction });
       try {
         this.write({ jsonrpc: "2.0", id, method, params });
       } catch (error) {
@@ -1087,7 +1302,7 @@ export class NativeAgentProcess {
     this.child.stdin.write(bytes, (error) => {
       if (error) return;
       try {
-        this.flushBrowserReplies();
+        this.flushEditorReplies();
       } catch {
         this.disconnect("native_agent_browser_reply_failed");
       }
@@ -1095,9 +1310,9 @@ export class NativeAgentProcess {
     return true;
   }
 
-  private browserReplyFrame(
+  private editorReplyFrame(
     id: string | number,
-    result?: NativeEditorBrowserReply | null
+    result?: object | null
   ): Buffer {
     const message = {
       jsonrpc: "2.0",
@@ -1108,85 +1323,112 @@ export class NativeAgentProcess {
             error:
               result === null
                 ? { code: -32602, message: "Invalid params" }
-                : { code: -32603, message: "Browser reply unverified" },
+                : { code: -32603, message: "Editor reply unverified" },
           }),
     };
     return Buffer.from(JSON.stringify(message) + "\n");
   }
 
-  private completeBrowserRequest(
+  private startEditorRequest<T extends object>(
     id: string | number,
-    request: BrowserRequest,
-    result?: NativeEditorBrowserReply | null
+    invoke: (signal: AbortSignal) => Promise<T | null>,
+    busy: () => T | null,
+    replyGuard: (reply: T) => () => T | undefined
+  ): void {
+    if (this.editorRequests.has(id) || this.editorBusyReplies.has(id))
+      throw new Error("native_agent_editor_request_id_reused");
+    if (this.editorRequests.size >= REQUEST_LIMIT) {
+      this.writeEditorBusyReply(id, busy());
+      return;
+    }
+    const controller = new AbortController();
+    const request = { controller };
+    this.editorRequests.set(id, request);
+    void invoke(controller.signal)
+      .then(
+        (result) => {
+          const check = result ? replyGuard(result) : undefined;
+          this.completeEditorRequest(
+            id,
+            request,
+            result,
+            check &&
+              (() => {
+                const revoked = check();
+                return revoked && this.editorReplyFrame(id, revoked);
+              })
+          );
+        },
+        () => this.completeEditorRequest(id, request)
+      )
+      .catch(() => this.disconnect("native_agent_editor_reply_failed"));
+  }
+
+  private completeEditorRequest(
+    id: string | number,
+    request: EditorRequest,
+    result?: object | null,
+    ifRevoked?: () => Buffer | undefined
   ): void {
     if (!this.connected) return;
     if (request.controller.signal.aborted) {
-      this.editorBrowserRequests.delete(id);
+      this.editorRequests.delete(id);
       return;
     }
-    const bytes = this.browserReplyFrame(id, result);
+    const bytes = this.editorReplyFrame(id, result);
     const reply =
       bytes.length <= FRAME_LIMIT
-        ? {
-            bytes,
-            ifRevoked: result
-              ? this.editorEndpoints.browserReplyGuard(result)
-              : undefined,
-          }
-        : { bytes: this.browserReplyFrame(id) };
+        ? { bytes, ifRevoked }
+        : { bytes: this.editorReplyFrame(id) };
     if (reply.bytes.length > FRAME_LIMIT)
       throw new Error("native_agent_frame_limit");
     // A completed request keeps its admitted slot until its one bounded frame
     // is written or canceled. This keeps the stdin cap and the admission cap.
-    if (this.tryWriteBrowserReply(id, reply))
-      this.editorBrowserRequests.delete(id);
+    if (this.tryWriteEditorReply(reply)) this.editorRequests.delete(id);
     else request.reply = reply;
   }
 
-  private tryWriteBrowserReply(
-    id: string | number,
-    reply: NonNullable<BrowserRequest["reply"]>
+  private tryWriteEditorReply(
+    reply: NonNullable<EditorRequest["reply"]>
   ): boolean {
     const revoked = reply.ifRevoked?.();
-    if (revoked) {
-      reply.bytes = this.browserReplyFrame(id, revoked);
-      reply.ifRevoked = undefined;
-    }
+    // An independently owned catalog can lose another source while queued.
+    if (revoked) reply.bytes = revoked;
     return this.tryWrite(reply.bytes);
   }
 
-  private writeBrowserBusyReply(
+  private writeEditorBusyReply(
     id: string | number,
-    result: NativeEditorBrowserReply | null
+    result: object | null
   ): void {
-    const bytes = this.browserReplyFrame(id, result);
+    const bytes = this.editorReplyFrame(id, result);
     if (this.tryWrite(bytes)) return;
     // The caller can time out if this queue also fills. The operation was never
     // dispatched, and its refusal must not disconnect the shared worker.
-    if (this.browserBusyReplyBytes + bytes.length > BROWSER_BUSY_REPLY_LIMIT)
+    if (this.editorBusyReplyBytes + bytes.length > EDITOR_BUSY_REPLY_LIMIT)
       return;
-    this.browserBusyReplies.set(id, bytes);
-    this.browserBusyReplyBytes += bytes.length;
+    this.editorBusyReplies.set(id, bytes);
+    this.editorBusyReplyBytes += bytes.length;
   }
 
-  private flushBrowserReplies(): void {
+  private flushEditorReplies(): void {
     if (!this.connected) return;
-    for (const [id, request] of this.editorBrowserRequests) {
+    for (const [id, request] of this.editorRequests) {
       if (!request.reply) continue;
-      if (!this.tryWriteBrowserReply(id, request.reply)) return;
-      this.editorBrowserRequests.delete(id);
+      if (!this.tryWriteEditorReply(request.reply)) return;
+      this.editorRequests.delete(id);
     }
-    for (const [id, bytes] of this.browserBusyReplies) {
+    for (const [id, bytes] of this.editorBusyReplies) {
       if (!this.tryWrite(bytes)) return;
-      this.removeBrowserBusyReply(id);
+      this.removeEditorBusyReply(id);
     }
   }
 
-  private removeBrowserBusyReply(id: string | number): void {
-    const bytes = this.browserBusyReplies.get(id);
+  private removeEditorBusyReply(id: string | number): void {
+    const bytes = this.editorBusyReplies.get(id);
     if (bytes) {
-      this.browserBusyReplyBytes -= bytes.length;
-      this.browserBusyReplies.delete(id);
+      this.editorBusyReplyBytes -= bytes.length;
+      this.editorBusyReplies.delete(id);
     }
   }
 
@@ -1224,8 +1466,13 @@ export class NativeAgentProcess {
         if (typeof message.id !== "string" && typeof message.id !== "number")
           throw new Error("native_agent_invalid_message");
         if (
-          message.method === NativeProviderRoutes.resolveMethod &&
-          this.acceptsInputRoutes
+          this.connected &&
+          ((message.method === NativeProviderRoutes.turnMethod &&
+            this.turnCapabilities) ||
+            (message.method === NativeProviderRoutes.resolveMethod &&
+              (object(message.params)?.purpose === "composerPrediction"
+                ? this.predictionRoutes
+                : this.inputRoutes)))
         ) {
           const id = message.id;
           if (this.providerRequests.has(id))
@@ -1239,7 +1486,14 @@ export class NativeAgentProcess {
             return;
           }
           this.providerRequests.add(id);
-          void this.providerRoutes!.resolve(message.params)
+          const resolving =
+            message.method === NativeProviderRoutes.turnMethod
+              ? this.providerRoutes!.turnCapabilities(message.params)
+              : this.providerRoutes!.resolve(
+                  message.params,
+                  this.predictionPermission
+                );
+          void resolving
             .then(
               (result) => {
                 if (this.connected) this.write({ jsonrpc: "2.0", id, result });
@@ -1366,29 +1620,43 @@ export class NativeAgentProcess {
           this.editorBrowserTools &&
           message.method === NativeEditorSurfaceEndpoints.browserMethod
         ) {
-          const id = message.id;
-          if (
-            this.editorBrowserRequests.has(id) ||
-            this.browserBusyReplies.has(id)
-          )
-            throw new Error("native_agent_browser_request_id_reused");
-          if (this.editorBrowserRequests.size >= REQUEST_LIMIT) {
-            this.writeBrowserBusyReply(
-              id,
-              this.editorEndpoints.browserBusy(message.params)
-            );
-            return;
-          }
-          const controller = new AbortController();
-          const request = { controller };
-          this.editorBrowserRequests.set(id, request);
-          void this.editorEndpoints
-            .browserTool(message.params, controller.signal)
-            .then(
-              (result) => this.completeBrowserRequest(id, request, result),
-              () => this.completeBrowserRequest(id, request)
-            )
-            .catch(() => this.disconnect("native_agent_browser_reply_failed"));
+          this.startEditorRequest(
+            message.id,
+            (signal) =>
+              this.editorEndpoints.browserTool(message.params, signal),
+            () => this.editorEndpoints.browserBusy(message.params),
+            (reply) => this.editorEndpoints.browserReplyGuard(reply)
+          );
+          return;
+        }
+        if (
+          this.connected &&
+          this.editorTools &&
+          message.method === NativeDesktopTools.method
+        ) {
+          this.startEditorRequest(
+            message.id,
+            (signal) =>
+              this.editorEndpoints.desktopTools(
+                message.params,
+                signal,
+                this.editorBrowserMcp,
+                this.editorToolSources
+              ),
+            () =>
+              this.editorEndpoints.desktopToolsBusy(
+                message.params,
+                this.editorBrowserMcp,
+                this.editorToolSources
+              ),
+            (reply) =>
+              this.editorEndpoints.desktopToolsReplyGuard(
+                reply,
+                message.params,
+                this.editorBrowserMcp,
+                this.editorToolSources
+              )
+          );
           return;
         }
         if (
@@ -1422,10 +1690,10 @@ export class NativeAgentProcess {
         const id = object(message.params)?.requestId;
         if (typeof id === "number" || typeof id === "string") {
           this.gatewayBillingRequests.get(id)?.abort();
-          const request = this.editorBrowserRequests.get(id);
+          const request = this.editorRequests.get(id);
           request?.controller.abort();
-          if (request?.reply) this.editorBrowserRequests.delete(id);
-          this.removeBrowserBusyReply(id);
+          if (request?.reply) this.editorRequests.delete(id);
+          this.removeEditorBusyReply(id);
         }
         this.imageGeneration?.cancel(id);
         if (typeof id === "string" || typeof id === "number")
@@ -1491,11 +1759,11 @@ export class NativeAgentProcess {
   }
 
   private closeEditorEndpoints(): void {
-    for (const request of this.editorBrowserRequests.values())
+    for (const request of this.editorRequests.values())
       request.controller.abort();
-    this.editorBrowserRequests.clear();
-    this.browserBusyReplies.clear();
-    this.browserBusyReplyBytes = 0;
+    this.editorRequests.clear();
+    this.editorBusyReplies.clear();
+    this.editorBusyReplyBytes = 0;
     this.editorEndpoints.close();
   }
 
@@ -1513,7 +1781,7 @@ export class NativeAgentProcess {
     const billing =
       routeId === undefined
         ? this.gatewayJobBilling
-        : this.acceptsInputRoutes
+        : this.connected && (this.inputRoutes || this.predictionRoutes)
           ? this.providerRoutes?.get(routeId)?.launch.gatewayJobBilling
           : undefined;
     if (
@@ -1539,7 +1807,7 @@ export class NativeAgentProcess {
   private egress(params: unknown): NativeProviderEgress | undefined {
     const routeId = object(params)?.routeId;
     if (routeId === undefined) return this.providerEgress;
-    return this.acceptsInputRoutes
+    return this.connected && (this.inputRoutes || this.predictionRoutes)
       ? this.providerRoutes?.get(routeId)?.egress
       : undefined;
   }

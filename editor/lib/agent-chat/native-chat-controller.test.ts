@@ -3,6 +3,7 @@ import type {
   NativeChatProfileSelection,
   NativeChatProfileCatalog,
   DesktopNativeChat,
+  DesktopComposerPredictionSettings,
   NativeChatCommand,
   NativeChatCommandResult,
   NativeChatGatewayBillingAttempt,
@@ -937,6 +938,37 @@ it("streams turn activity live and adopts recorded turns from each page", async 
   controller.disconnect();
 });
 
+it("keeps ordinary journal progress on the live stream without rereading the transcript", async () => {
+  vi.useFakeTimers();
+  const { bridge, controller, running } = fixture();
+  running.add("chat-a");
+  const observe = bridge.observe.bind(bridge);
+  let journalPosition = 1;
+  bridge.observe = async (id) => {
+    const { snapshot, observationId } = await observe(id);
+    return {
+      observationId,
+      snapshot: {
+        ...snapshot,
+        current: { ...snapshot.current!, journalPosition, inputNeeded: false },
+      },
+    };
+  };
+  const transcript = vi.spyOn(bridge, "transcript");
+  try {
+    await controller.select("chat-a");
+    journalPosition++;
+    await vi.advanceTimersByTimeAsync(500);
+    expect(
+      controller.read().observation?.snapshot.current?.journalPosition
+    ).toBe(2);
+    expect(transcript).toHaveBeenCalledTimes(1);
+  } finally {
+    controller.disconnect();
+    vi.useRealTimers();
+  }
+});
+
 it("advances visible progress only for new live output, independently of history and observation reads", async () => {
   const { bridge, controller, running, updates } = fixture();
   running.add("chat-a");
@@ -1389,6 +1421,87 @@ it("keeps the captured SVG target when the same submission reply is lost", async
     expect(send.mock.calls[0]?.at(-1)).toBe(target);
     expect(send.mock.calls[1]).toEqual(send.mock.calls[0]);
     expect(capture).toHaveBeenCalledTimes(1);
+  } finally {
+    controller.disconnect();
+  }
+});
+
+it.each([
+  "Inspect these SVG objects.",
+  "/stop is a note. Inspect these objects.",
+])("freezes both SVG grants before the queued send of %s", async (prompt) => {
+  const { bridge, running } = fixture();
+  running.add("workbench");
+  bridge.publishEditorSurfaces = async () => {};
+  bridge.onEditorSvgText = () => () => {};
+  bridge.onEditorSvgSelection = () => () => {};
+  bridge.enqueue = async () => {
+    throw new Error("fixture uses submitInRegime");
+  };
+  const send = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(
+    async (_action, sessionId, inputId) => ({
+      sessionId,
+      inputId,
+      disposition: "queued",
+      inputPosition: 2,
+      turnId: null,
+    })
+  );
+  send.mockRejectedValueOnce(new Error("fixture lost reply"));
+  bridge.submitInRegime = send;
+  const originalText = crypto.randomUUID();
+  const originalSelection = crypto.randomUUID();
+  let textTarget = originalText;
+  let selectionTarget = originalSelection;
+  const captureText = vi.fn<() => string>(() => textTarget);
+  const captureSelection = vi.fn<() => string>(() => selectionTarget);
+  const controller = new NativeChatController(bridge, undefined, undefined, {
+    readEditorSurfaces: () => ({
+      active: "/poster.svg",
+      open: ["/poster.svg"],
+      truncated: false,
+    }),
+    subscribeToEditorSurfaces: () => () => {},
+    svgText: {
+      hasSelection: () => true,
+      subscribe: () => () => {},
+      capture: captureText,
+      invoke: () => ({ kind: "unavailable" }),
+    },
+    svgSelection: {
+      hasSelection: () => true,
+      subscribe: () => () => {},
+      capture: captureSelection,
+      invoke: () => ({ kind: "unavailable" }),
+    },
+  });
+  try {
+    await controller.select("workbench");
+    expect(controller.readComposerEditorSelection()).toBe("svg-selection");
+    controller.selectOperatingRegime("plan");
+    expect(controller.readComposerEditorSelection()).toBeUndefined();
+    controller.selectOperatingRegime("act");
+
+    const sending = controller.submit(prompt);
+    textTarget = crypto.randomUUID();
+    selectionTarget = crypto.randomUUID();
+    await expect(sending).rejects.toThrow("fixture lost reply");
+    await controller.submit(prompt);
+    expect(send.mock.calls[0]).toEqual([
+      "enqueue",
+      "workbench",
+      expect.any(String),
+      prompt,
+      "act",
+      undefined,
+      originalText,
+      undefined,
+      undefined,
+      originalSelection,
+    ]);
+    expect(send.mock.calls[1]).toEqual(send.mock.calls[0]);
+    expect(captureText).toHaveBeenCalledTimes(1);
+    expect(captureSelection).toHaveBeenCalledTimes(1);
   } finally {
     controller.disconnect();
   }
@@ -3801,6 +3914,196 @@ it("needs an attached chat to open a side chat", async () => {
   await unsupported.controller.select("chat-a");
   expect(unsupported.controller.canOpenSideChat).toBe(false);
   unsupported.controller.disconnect();
+});
+
+describe("composer predictions", () => {
+  const settled: NativeChatTurn = {
+    turnId: "earlier",
+    epoch: 1,
+    journalPosition: 2,
+    historyPosition: 2,
+    controlRevision: 1,
+    paused: false,
+    cancelled: false,
+    disposition: "settled",
+    status: "succeeded",
+  };
+
+  async function opened(supported = true) {
+    const f = fixture();
+    let latest = settled;
+    const pending = Promise.withResolvers<string | null>();
+    const predict = vi.fn<NonNullable<DesktopNativeChat["predictPrompt"]>>(
+      () => pending.promise
+    );
+    if (supported) f.bridge.predictPrompt = predict;
+    const observe = f.bridge.observe;
+    f.bridge.observe = async (id) => {
+      const old = await observe(id);
+      return { ...old, snapshot: { ...old.snapshot, latest } };
+    };
+    const prediction = f.controller.composerPrediction;
+    let change:
+      | ((value: DesktopComposerPredictionSettings) => void)
+      | undefined;
+    const initial = Promise.withResolvers<DesktopComposerPredictionSettings>();
+    const disconnect = prediction.connect({
+      get: () => initial.promise,
+      onChange(receive) {
+        change = receive;
+        return () => {
+          change = undefined;
+        };
+      },
+    });
+    // The initial read may arrive after a newer preference notification.
+    change?.({ enabled: true, revision: 2 });
+    initial.resolve({ enabled: false, revision: 1 });
+    prediction.setPresented(true);
+    await f.controller.select("chat-a");
+    const scope = f.controller.read().scope;
+    prediction.setDraft(scope, true);
+    await f.controller.repair();
+    expect(predict).not.toHaveBeenCalled();
+    const complete = async (
+      turnId: string,
+      status: NativeChatTurn["status"] = "succeeded"
+    ) => {
+      latest = { ...settled, turnId, status };
+      await f.controller.repair();
+    };
+    return {
+      ...f,
+      prediction,
+      scope,
+      predict,
+      pending,
+      complete,
+      change: (enabled: boolean, revision: number) =>
+        change?.({ enabled, revision }),
+      close() {
+        disconnect();
+        f.controller.disconnect();
+      },
+    };
+  }
+
+  it.each([
+    "type then clear",
+    "switch chat",
+    "new turn",
+    "hidden pane",
+    "disable then enable",
+    "change effort",
+  ] as const)(
+    "discards a delayed response after %s and never retries a replay",
+    async (cause) => {
+      const f = await opened();
+      try {
+        await f.complete("finished");
+        await f.controller.repair();
+        expect(f.predict).toHaveBeenCalledExactlyOnceWith(
+          "chat-a",
+          "observation-chat-a"
+        );
+        switch (cause) {
+          case "type then clear":
+            f.prediction.setDraft(f.scope, false);
+            f.prediction.setDraft(f.scope, true);
+            break;
+          case "switch chat":
+            await f.controller.select("chat-b");
+            break;
+          case "new turn":
+            f.running.add("chat-a");
+            await f.controller.repair();
+            break;
+          case "hidden pane":
+            f.prediction.setPresented(false);
+            break;
+          case "disable then enable":
+            f.change(false, 3);
+            f.change(true, 4);
+            break;
+          case "change effort":
+            f.controller.selectEffort("high");
+            break;
+        }
+        f.pending.resolve("Discard this.");
+        await f.pending.promise;
+        await f.controller.repair();
+        expect(f.prediction.read()).toBeNull();
+        expect(f.predict).toHaveBeenCalledTimes(1);
+      } finally {
+        f.close();
+      }
+    }
+  );
+
+  it("retires a displayed suggestion when the same chat changes effort", async () => {
+    const f = await opened();
+    try {
+      const prompt = "Draft the speaker notes.";
+      f.predict.mockResolvedValueOnce(prompt);
+      await f.complete("finished");
+      expect(f.prediction.read()).toBe(prompt);
+      f.controller.selectEffort("high");
+      expect(f.prediction.read()).toBeNull();
+      expect(f.prediction.take(prompt)).toBe(false);
+      await f.controller.repair();
+      expect(f.predict).toHaveBeenCalledTimes(1);
+    } finally {
+      f.close();
+    }
+  });
+
+  it("keeps empty, failed and unsupported predictions out of the chat", async () => {
+    const f = await opened();
+    try {
+      f.predict
+        .mockResolvedValueOnce(null)
+        .mockRejectedValueOnce(new Error("timeout"));
+      await f.complete("cancelled", "cancelled");
+      expect(f.predict).not.toHaveBeenCalled();
+      await f.complete("empty");
+      await f.complete("timeout");
+      expect(f.predict).toHaveBeenCalledTimes(2);
+      expect(f.prediction.read()).toBeNull();
+      expect(f.controller.read().messages).toEqual([]);
+      expect(f.controller.read().error).toBeNull();
+    } finally {
+      f.close();
+    }
+    const old = await opened(false);
+    try {
+      await old.complete("old-host");
+      expect(old.prediction.read()).toBeNull();
+      expect(old.predict).not.toHaveBeenCalled();
+    } finally {
+      old.close();
+    }
+  });
+
+  it("considers only a presented empty composer with an idle queue", async () => {
+    const f = await opened();
+    try {
+      f.prediction.setDraft(f.scope, false);
+      await f.complete("has-draft");
+      f.prediction.setDraft(f.scope, true);
+      f.prediction.setPresented(false);
+      await f.complete("background");
+      f.prediction.setPresented(true);
+      const observe = f.bridge.observe;
+      f.bridge.observe = async (id) => {
+        const old = await observe(id);
+        return { ...old, snapshot: { ...old.snapshot, queuedInputs: 1 } };
+      };
+      await f.complete("queued");
+      expect(f.predict).not.toHaveBeenCalled();
+    } finally {
+      f.close();
+    }
+  });
 });
 
 it("reads one summary per observed terminal turn and drops replies after switching chats", async () => {

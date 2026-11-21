@@ -8,7 +8,9 @@ import {
 import { ipc_sender } from "./ipc-sender";
 import type { DesktopBrowserToolLease } from "./desktop-browser-tools";
 import type { BrowserAutomationResult } from "./browser-automation";
+import { DesktopWorkbenchInventory } from "./desktop-workbench-inventory";
 import { NativeAgentProcess } from "./native-agent-process";
+import { NativeDesktopTools } from "./native-desktop-tools";
 import {
   NativeMcpFiles,
   invalidMcpProfile,
@@ -17,17 +19,12 @@ import {
 
 const PREFIX = "--native-chat-export-mcp-";
 const BEARER_ENV = "GRIDA_DESKTOP_EDITOR_MCP_BEARER";
-const REQUEST_LIMIT = 256;
+// The tool argument limit excludes the private MCP envelope.
+const REQUEST_LIMIT = 40 * 1024;
 const BROWSER_REQUEST_LIMIT = 64 * 1024;
 const BROWSER_REPLY_LIMIT = 448 * 1024;
 const BROWSER_CONCURRENCY = 8;
 const REQUEST_ID = /^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
-const UNAVAILABLE: NativeEditorSurfaceSnapshot & { available: boolean } = {
-  available: false,
-  active: null,
-  open: [],
-  truncated: false,
-};
 
 type Frame = Readonly<{
   sender: WebContents;
@@ -282,43 +279,62 @@ export class NativeEditorMcpExport {
     this.buffer = Buffer.concat([this.buffer, chunk]);
     const newline = this.buffer.indexOf(0x0a);
     if (newline < 0) return;
-    let requestId: unknown;
+    let request: Record<string, unknown> | undefined;
     try {
       if (newline + 1 === this.buffer.length) {
         const value = JSON.parse(this.buffer.toString("utf8", 0, newline));
-        if (value && Object.keys(value).length === 1)
-          requestId = value.requestId;
+        if (
+          value &&
+          typeof value.id === "string" &&
+          REQUEST_ID.test(value.id) &&
+          (value.method === "tools/list" || value.method === "tools/call")
+        )
+          request = value;
       }
     } catch {
       /* Invalid private framing retires the pipe. */
     }
     this.buffer = Buffer.alloc(0);
-    if (typeof requestId !== "string" || !REQUEST_ID.test(requestId)) {
+    if (!request) {
       this.endPipe();
       return;
     }
     this.responding = true;
-    void this.reply(requestId)
+    void this.reply(request)
       .catch(() => this.endPipe())
       .finally(() => {
         this.responding = false;
       });
   }
 
-  private async reply(requestId: string): Promise<void> {
+  private async reply(request: Record<string, unknown>): Promise<void> {
     const owner = this.publication;
-    let snapshot = UNAVAILABLE;
-    if (owner) {
+    let snapshot: NativeEditorSurfaceSnapshot | undefined;
+    if (owner && request.method === "tools/call") {
       if (
         (await this.matches(owner)) &&
         this.publication === owner &&
         !this.revoked
       )
-        snapshot = { available: true, ...owner.snapshot };
+        snapshot = owner.snapshot;
       else this.revoke();
     }
+    let reply = await NativeDesktopTools.reply(request, [
+      DesktopWorkbenchInventory.bind(snapshot),
+    ]);
+    if (
+      owner &&
+      snapshot &&
+      (this.publication !== owner || !this.isCurrent(owner))
+    ) {
+      this.revoke();
+      reply = await NativeDesktopTools.reply(request, [
+        DesktopWorkbenchInventory.bind(undefined),
+      ]);
+    }
+    if (!reply) throw unavailable();
     if (!this.child.stdin.writableEnded)
-      this.child.stdin.write(`${JSON.stringify({ requestId, snapshot })}\n`);
+      this.child.stdin.write(`${JSON.stringify(reply)}\n`);
   }
 
   private browserRequest(chunk: Buffer): void {

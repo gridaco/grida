@@ -236,6 +236,14 @@ impl HttpTransport {
         self.protocol == ProviderProtocol::Responses || self.llama_cpp_input_count
     }
 
+    pub(crate) fn is_loopback(&self) -> bool {
+        self.target.host_str().is_some_and(is_loopback_host)
+    }
+
+    pub(crate) fn is_direct(&self) -> bool {
+        matches!(self.dispatch, Dispatch::Direct(_))
+    }
+
     pub(crate) fn verified_context_window(&self, model: &ModelId) -> Option<NonZeroU64> {
         if self.protocol != ProviderProtocol::Responses {
             return None;

@@ -813,9 +813,13 @@ impl Host {
         captured.allow_workspace_reference = false;
         captured.allow_image_placement = false;
         captured.editor_endpoint = None;
+        captured.editor_tool_catalog = None;
+        captured.workbench_tools = false;
+        captured.desktop_context = false;
         captured.editor_presentation = false;
         captured.editor_browser_tools = false;
         captured.editor_svg_target = None;
+        captured.editor_tool_context_id = None;
         captured.guidance = None;
         captured.skills = None;
         let mut assignment = Assignment::new(source.binding.turn.clone());
@@ -1588,6 +1592,7 @@ pub(super) mod tests {
                     text: "Private parent context".into(),
                 }],
                 SubmissionPolicy {
+                    request_options: Default::default(),
                     selection_revision: None,
                     selection_goal: false,
                     questions: true,
@@ -1600,6 +1605,7 @@ pub(super) mod tests {
                     editor_presentation: false,
                     editor_browser_tools: false,
                     editor_svg_target: None,
+                    editor_tool_context_id: None,
                     operating_regime: regime,
                     subagent: None,
                     effort: effort.clone(),

@@ -15,6 +15,7 @@ Select a category in its sidebar:
 | --------------- | ------------------------------------------------------------------------------------------------ |
 | Account         | Your Grida account and sign-out action.                                                          |
 | Appearance      | Light, Dark or System theme, remembered on this device.                                          |
+| Personalization | Suggested prompts and web search.                                                                |
 | Browser         | [Downloads, site permissions, shared history and browser cleanup](../editor/desktop/browser.md). |
 | Credits         | Your Grida AI credit information.                                                                |
 | LLM Providers   | ChatGPT subscription, API-key providers and compatible text-model endpoints.                     |
@@ -22,6 +23,49 @@ Select a category in its sidebar:
 | Hooks           | Global hook definitions, configuration diagnostics and command trust review.                     |
 | Archived chats  | Archived chats across local workspaces, with an Unarchive action.                                |
 | About           | Desktop version and platform information.                                                        |
+
+## Personalization
+
+These settings apply across your Desktop workspaces. Each control also reads
+and writes the user-wide `~/.grida/config.toml`. An absolute `GRIDA_HOME`
+selects a different Grida home.
+
+**Web search** is on by default. In eligible ChatGPT Subscription chats, the
+agent can search the live web when a question needs current information.
+You can also ask it to search in your message.
+
+## Suggest the next prompt
+
+Turn on **Personalization → Suggested prompts** to let Grida suggest a follow-up after a successful reply. The preview starts off. An eligible reply in an open, empty composer can trigger one additional model request using that chat’s connection and retained context. Provider rates or usage limits can apply even if you ignore the suggestion.
+
+For hosted chats, Grida looks for its economy model on the same connection and account. For example, a ChatGPT subscription can supply the suggestion even when you have also connected OpenRouter. Your conversation keeps its selected model. If the economy model is unavailable, the composer stays empty. A local connection, including Ollama at its default `http://localhost:11434/v1` address, can use its configured model.
+
+Press **Tab** to put the full suggestion into your draft. Edit it and press **Send** when ready, or start typing your own message to dismiss it. Turning the switch off clears suggestions across open windows and cancels requests still waiting for a model or authorization. Turning it back on applies to future replies. A request already sent to the provider can still count toward usage. Any text you already accepted stays in your draft.
+
+To set the same preferences by hand, edit the matching keys in the existing global file:
+
+```toml
+schema_version = 1
+web_search = "automatic"
+
+[desktop]
+composer-predictions-enabled = true
+```
+
+Set `web_search` to `"automatic"` or omit the key to offer search in eligible
+chats. Use `"disabled"` to block hosted search. The switch writes
+`"automatic"` when on and `"disabled"` when off. Disabling hosted search can
+block a queued request that already includes it.
+
+Desktop reads an existing `"live"` setting as automatic. It reads older
+`"on_demand"`, `"cached"`, and `"indexed"` settings as disabled.
+
+If you upgraded from a build with the Fast mode switch, eligible chats use
+their saved speeds even when your config still contains
+`[features].fast_mode = false`. Choose **Standard** in the chat’s speed picker
+to use standard speed again. [Choose a response speed](./models-and-usage.md#choose-a-response-speed)
+
+Desktop 0.7.0’s hook reader rejects the `[desktop]` table. Upgrade builds sharing this file before saving the setting, or give a concurrently used older build its own `GRIDA_HOME`. To reopen the same home with 0.7.0, remove the personalization keys and tables introduced since that build, keeping `schema_version` and any `[[hooks]]` entries.
 
 ## Compatible endpoints and Ollama
 

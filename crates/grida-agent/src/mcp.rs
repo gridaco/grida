@@ -31,6 +31,7 @@ use std::future::Future;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use tokio::io::BufReader;
 use tokio::net::TcpListener;
 use tokio::task::JoinSet;
 use zeroize::Zeroizing;
@@ -70,7 +71,9 @@ pub async fn serve_headless(
     options: ListenOptions,
     shutdown: impl Future<Output = Result<()>>,
 ) -> Result<()> {
-    serve_tools(options, headless_surface()?, &[OPEN_SURFACE], shutdown).await
+    let host = headless_surface()?;
+    let catalog = ExportedTools::new(&host, &[OPEN_SURFACE])?;
+    serve_tools(options, host, catalog, shutdown).await
 }
 
 /// Export the one live editor read owned by the private Desktop stdio peer.
@@ -79,15 +82,23 @@ pub async fn serve_editor(
     options: ListenOptions,
     shutdown: impl Future<Output = Result<()>>,
 ) -> Result<()> {
-    let (host, pipe) = editor::tool()?;
+    let mut input = BufReader::new(tokio::io::stdin());
+    let mut output = tokio::io::stdout();
+    tokio::pin!(shutdown);
+    let (host, pipe, descriptor) = tokio::select! {
+        biased;
+        result = &mut shutdown => return result,
+        result = editor::tool(&mut input, &mut output) => result?,
+    };
+    let catalog = ExportedTools::editor(&host, descriptor)?;
     let closing = async {
         tokio::select! {
             biased;
-            result = shutdown => result,
-            result = pipe.run(tokio::io::stdin(), tokio::io::stdout()) => result,
+            result = &mut shutdown => result,
+            result = pipe.run(input, output) => result,
         }
     };
-    serve_tools(options, host, &[crate::editor_surfaces::LIST_OPEN], closing).await
+    serve_tools(options, host, catalog, closing).await
 }
 
 /// Export the negotiated browser and workbench tools for the exact Desktop owner.
@@ -96,6 +107,7 @@ pub async fn serve_editor_browser(
     shutdown: impl Future<Output = Result<()>>,
 ) -> Result<()> {
     let (host, pipe) = browser::tools()?;
+    let catalog = ExportedTools::new(&host, crate::browser_tools::NAMES)?;
     let closing = async {
         tokio::select! {
             biased;
@@ -103,16 +115,15 @@ pub async fn serve_editor_browser(
             result = pipe.run(tokio::io::stdin(), tokio::io::stdout()) => result,
         }
     };
-    serve_tools(options, host, crate::browser_tools::NAMES, closing).await
+    serve_tools(options, host, catalog, closing).await
 }
 
 async fn serve_tools(
     options: ListenOptions,
     host: ToolHost,
-    names: &[&str],
+    catalog: ExportedTools,
     shutdown: impl Future<Output = Result<()>>,
 ) -> Result<()> {
-    let catalog = ExportedTools::new(&host, names)?;
     let listener = TcpListener::bind(options.address)
         .await
         .map_err(|_| Error::new(ErrorKind::Unavailable, "mcp_listener_unavailable"))?;
@@ -201,36 +212,65 @@ fn reject(
 
 #[derive(Clone)]
 struct ExportedTools {
-    grants: Arc<BTreeMap<String, CapabilityGrant>>,
+    tools: Arc<BTreeMap<String, ExportedTool>>,
+}
+
+struct ExportedTool {
+    grant: CapabilityGrant,
+    descriptor: Option<Tool>,
 }
 
 impl ExportedTools {
     fn new(host: &ToolHost, names: &[&str]) -> Result<Self> {
-        let mut grants = BTreeMap::new();
+        let mut tools = BTreeMap::new();
         for &name in names {
             let grant = host.grant(&ToolId::new(name)?)?;
-            if grants.insert(name.to_owned(), grant).is_some() {
+            let tool = ExportedTool {
+                grant,
+                descriptor: None,
+            };
+            if tools.insert(name.to_owned(), tool).is_some() {
                 return Err(Error::new(ErrorKind::Conflict, "duplicate_mcp_export_tool"));
             }
         }
         Ok(Self {
-            grants: Arc::new(grants),
+            tools: Arc::new(tools),
+        })
+    }
+
+    fn editor(host: &ToolHost, mut descriptor: Tool) -> Result<Self> {
+        let name = descriptor.name.to_string();
+        let grant = host.grant(&ToolId::new(&name)?)?;
+        // The private definition revision is carried when Rust invokes Main.
+        descriptor.meta = None;
+        Ok(Self {
+            tools: Arc::new(BTreeMap::from([(
+                name,
+                ExportedTool {
+                    grant,
+                    descriptor: Some(descriptor),
+                },
+            )])),
         })
     }
 
     fn list(&self) -> std::result::Result<ListToolsResult, ErrorData> {
         let tools = self
-            .grants
+            .tools
             .values()
             .map(Self::describe)
             .collect::<std::result::Result<Vec<_>, _>>()?;
         Ok(ListToolsResult::with_all_items(tools))
     }
 
-    fn describe(grant: &CapabilityGrant) -> std::result::Result<Tool, ErrorData> {
-        let definition = grant
+    fn describe(tool: &ExportedTool) -> std::result::Result<Tool, ErrorData> {
+        let definition = tool
+            .grant
             .describe()
             .map_err(|_| ErrorData::internal_error("Tool endpoint unavailable", None))?;
+        if let Some(descriptor) = &tool.descriptor {
+            return Ok(descriptor.clone());
+        }
         let InputFormat::Json(input) = &definition.tool.input else {
             return Err(ErrorData::internal_error("Tool schema unavailable", None));
         };
@@ -255,8 +295,9 @@ impl ExportedTools {
         cancellation: CancellationToken,
     ) -> std::result::Result<CallToolResponse, ErrorData> {
         let grant = self
-            .grants
+            .tools
             .get(request.name.as_ref())
+            .map(|tool| &tool.grant)
             .ok_or_else(|| ErrorData::invalid_params("Unknown tool", None))?;
         let definition = grant
             .describe()
@@ -276,7 +317,7 @@ impl ExportedTools {
                 definition.tool.max_output_bytes,
             )
             .await;
-        let browser_profile = self.grants.contains_key("browser_open");
+        let browser_profile = self.tools.contains_key("browser_open");
         let result = match outcome {
             Ok(outcome) => {
                 let capture_binding = (browser_profile

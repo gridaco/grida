@@ -286,6 +286,38 @@ describe("durable pending composer sends", () => {
     );
   });
 
+  it.each([JSON.stringify(["profile", "model"]), false] as const)(
+    "ignores the former draft search choice %j while retaining the frozen submission",
+    async (webSearch) => {
+      const storage = new MemoryStorage(),
+        blobs = new MemoryBlobs();
+      const drafts = new ComposerDrafts(storage, blobs);
+      storage.setItem(
+        ComposerDrafts.modesPrefix + "w:new",
+        JSON.stringify({ plan: true, webSearch })
+      );
+      expect(drafts.readModes("w:new")).toEqual({ plan: true });
+      const submission = {
+        ...pending,
+        ...(webSearch && { webSearch: true as const }),
+      };
+      await drafts.writePending("w:new", submission);
+      await drafts.move("w:new", "w:created");
+      const reopened = new ComposerDrafts(storage, blobs);
+      expect(reopened.readModes("w:another")).toEqual({});
+      expect(reopened.readModes("w:created")).toEqual({ plan: true });
+      expect(await reopened.readPending("w:created")).toEqual(submission);
+      await reopened.completePending("w:created", "unrelated");
+      expect(reopened.readModes("w:created")).toEqual({ plan: true });
+      await reopened.completePending("w:created", submission.inputId);
+      expect(new ComposerDrafts(storage, blobs).readModes("w:created")).toEqual(
+        {
+          plan: true,
+        }
+      );
+    }
+  );
+
   it("keeps a newer pending input when an older accepted send finishes", async () => {
     const drafts = new ComposerDrafts(null, new MemoryBlobs());
     await drafts.writePending("w:c", pending);

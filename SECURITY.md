@@ -439,7 +439,7 @@ http://localhost:*`. The nonce is generated in the proxy, exposed
    There is no renderer broker method, loopback proxy, socket path, or
    environment credential. The ChatGPT-subscription grant registered by
    GRIDA-SEC-008 holds only exact `auth.openai.com` token and `chatgpt.com`
-   Responses destinations. It is a Main-only grant: Main dispatches it for its
+   Responses and authenticated subscription models destinations. It is a Main-only grant: Main dispatches it for its
    native subscription host, it is never published to the sidecar, and it is
    never eligible for the asset lane.
    When this transport is enabled, the outer native
@@ -547,6 +547,17 @@ load `https://grida.co` while dev loads `http://localhost:3000`;
 guest except a one-use, exact-document browser mount admitted under
 GRIDA-SEC-016; guest preferences and session selection are forced by Main;
 every main-process IPC handler validates `event.senderFrame.url`.
+
+**Scoped automatic approval.** A trusted workspace launcher can enable one-action
+requests and the per-chat automatic reviewer. The host records each requested
+effect, captured authority and exact operation. It validates the retained answer,
+file identity or prepared command, current controls and authority before dispatch.
+Settings writes stay with the person. Failure, timeout or incomplete evidence
+leaves an eligible wait open for a manual decision. A scoped external read uses
+a verified descriptor and checks the file version before disclosing its bytes.
+A network command uses a finite confined process with a supervisor-owned broker
+for its approved destination. Interactive input cannot extend that grant.
+Electron Main retains scoped approval objects and issues opaque frame-local tokens.
 
 **Explicit Full access.** The ordinary restricted profile retains all command
 and filesystem exclusions below. A trusted launch can separately opt into
@@ -888,6 +899,19 @@ pixels through this reader, with no additional filesystem or model grant.
 
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-004 .` to enumerate.
 
+- [Desktop personalization settings](desktop/src/main/desktop-personalization.ts),
+  [physical config reads](desktop/src/main/native-agent-files.ts) and
+  [prediction route resolution](desktop/src/main/native-prediction-route.ts)
+  keep the user opt-in, config integrity and the authorized connection in Main.
+  Settings alone can edit global search mode and suggested prompts. Main rechecks
+  the frame before replacing the file, serializes preference writes, and checks
+  for concurrent hand edits. Invalid source revokes hosted search permission and
+  suggestions and preserves the original file.
+  Turning predictions off revokes pending model lookup and provider dispatch
+  for that opt-in across all Desktop windows.
+  The [native prediction host](crates/grida-agent/src/host/prediction.rs)
+  verifies the completed turn's authority before tool-free inference.
+
 - Retained tool images: [native result authorization](crates/grida-agent/src/host/tool_images.rs),
   [private ACP reader](crates/grida-agent/src/acp/extensions/tool_images.rs),
   [native process regression](crates/grida-agent/tests/process/tool_images.rs),
@@ -940,12 +964,15 @@ pixels through this reader, with no additional filesystem or model grant.
   Build output custody stays with the packaging owner. Launch-time trust and
   helper identity remain enforced by the native host.
 - [Bundled command staging](desktop/scripts/bundled-programs.mjs) checks the
-  exact platform package and copies the executable into app resources before
-  signing. [Command runtime projection](desktop/src/main/native-command-runtime.ts)
+  exact platform package in the [FX declaration](desktop/src/fx-extension.json)
+  and copies the executable into app resources before signing. The
+  [Desktop FX owner](desktop/src/main/fx-extension.ts) verifies that installed
+  resource before using it. [Command runtime projection](desktop/src/main/native-command-runtime.ts)
   checks the copy against the app resource, places it outside the installation
   and command write grants, and keeps the installation exclusion in effect.
   The command profile exposes the fixed program directory and verifies the
-  projected launcher helper. Host-owned lookups use the installed resource.
+  projected launcher helper. The bundled FX skill is enabled with the verified
+  command projection.
 - [Native agent process owner](desktop/src/main/native-agent-process.ts) and
   [its fixtures](desktop/src/main/native-agent-process.test.ts) start the fixed
   resource executable without a shell. They select the child environment,
@@ -1181,7 +1208,7 @@ pixels through this reader, with no additional filesystem or model grant.
   rechecks its physical identity before requests and delivery. Its chat worker
   uses private storage and a private working directory, without a project grant
   or external tool host. The attached editor can publish only `/canvas.svg`
-  and provide a captured plain text selection. The editor still owns Save.
+  and provide a captured SVG selection. The editor still owns Save.
   Document window retirement drains its worker. Workbench presentation and
   external-agent commands remain scoped to the workbench route.
   Attachments and observed control revisions are issued in Main. A copied
@@ -1261,15 +1288,35 @@ pixels through this reader, with no additional filesystem or model grant.
 - [Live editor observations](crates/grida-agent/src/editor_surfaces.rs)
   require the negotiated private Desktop stdio capability. Main issues the
   binding for an exact authorized [chat attachment](desktop/src/main/native-editor-surfaces.ts).
+  The [private MCP binding](desktop/src/main/native-desktop-tools.ts) correlates
+  each request with this endpoint and limits discovery and calls to its
+  accepted tool scope. It checks the tool definition revision and preserves
+  the original request deadline through dispatch.
+  The [source registry](desktop/src/main/native-desktop-tool-sources.ts)
+  keeps a distinct Main-issued generation and lifetime for each registered
+  source on the endpoint. The carrier checks the captured registration before
+  dispatch and discards a late result if that registration retires. Copying a
+  tool name and revision cannot redirect a call to a different registration.
+  Native workbench and browser grants distinguish visible tab closure from
+  background page cleanup. Both operations retain the exact bound page and
+  workbench validation at the Main receiver.
+  The [Browser MCP adapter](desktop/src/main/desktop-browser-mcp.ts) uses the
+  captured Browser lease and discards replies after revocation.
+  [Native tool image validation](crates/grida-agent/src/file_tools/tool_image.rs)
+  bounds and verifies the JPEG before placing prepared media under the
+  owning tool-result scope.
   Each observation revalidates the current frame and chat. Navigation or
   replacement revokes the binding. Rust retains it with the accepted input,
   checks the reply's chat and endpoint identity, and bounds the projected
   workspace-relative paths. The read supplies editor context only and confers
   no file, network, or document-edit authority.
-- The separately negotiated [SVG text tools](crates/grida-agent/src/editor_surfaces/svg_text.rs)
+- The separately scoped [SVG text tools](desktop/src/main/desktop-selected-svg-text.ts)
   capture one exact workbench, standalone SVG, or slide selection for an
-  immediate Act text input. Main dispatches to the admitted frame and validates the bounded
-  [correlated response](desktop/src/main/native-editor-svg-text-replies.ts).
+  accepted Act text input, including queued input. Main dispatches to the
+  admitted frame and validates the bounded
+  [correlated response](desktop/src/main/native-editor-svg-replies.ts).
+  Canceling the private request releases that pending reply and discards late
+  renderer results. It supplies no evidence of reversing a dispatched edit.
   A deck may publish one bundle-relative slide and must reply for the same
   observed slide. Main rechecks the deck's directory generation before sending
   the call and accepting its reply.
@@ -1278,7 +1325,18 @@ pixels through this reader, with no additional filesystem or model grant.
   existing SVG text command can run. Its result is a live edit. The normal
   editor save remains a separate operation. An unverified mutation reply
   stays uncertain and is never replayed.
-- Live presentation requires a separately negotiated capability and a
+- The [SVG selection tools](desktop/src/main/desktop-selected-svg-selection.ts)
+  use an additional negotiated editor-tool context for an eligible Act text
+  input. The scope resolves through the exact input and owning attachment.
+  The renderer captures the live document and selection at Send and rechecks
+  them before dispatch. Inspection supplies bounded pages of locators under
+  the attached file scope. The opacity operation verifies the capture revision
+  and invokes the editor command once. It leaves disk writes to Save. Main
+  validates the correlated reply, bound path, and original deadline before
+  accepting it. The transcript marker carries no token and the external
+  inventory has no grant.
+- [Live presentation](desktop/src/main/desktop-artifact-presentation.ts)
+  requires a separately issued grant and a
   subscription from the exact attached workbench. Main dispatches a bounded
   workspace-relative path to the authorized frame. Its receipt identifies the
   chat, endpoint, and call. The editor validates the target and the original
@@ -2872,8 +2930,10 @@ trusted merely because it is “local.”
    previous account.
 5. **Pinned provider traffic.** Desktop grants, through a Main-only provider
    grant the sidecar never receives, only the exact OpenAI token
-   endpoint and ChatGPT Responses endpoint to the authenticated provider lane;
-   neither is a provider-asset/download grant. The captured native transport
+   endpoint and ChatGPT Responses endpoint for POST, and the fixed
+   subscription models endpoint and compatibility-version query for GET.
+   These are authenticated provider requests. No grant reaches the asset
+   download lane. The captured native transport
    sends only to the configured Responses route, injects bearer/account/product
    headers only at request time, forces stateless Responses posture, and
    permits at most one refresh/replay after `401` within the captured account
@@ -2889,6 +2949,17 @@ trusted merely because it is “local.”
    strict disk reader shared by credential mutations and ignores the generic
    test environment override. Failed Responses return bounded status, request
    identity, and retry timing without upstream response bodies.
+   Optional response speed and hosted search require a fresh, bounded model
+   offer for the captured sign-in lineage. Main projects only supported tiers
+   and hosted-search eligibility. Raw catalog rows and provider-authored
+   instructions stay outside both the renderer and native process. The fixed
+   Responses validator accepts only the supported tier values and a single
+   hosted search declaration alongside local functions. Cached search forbids external access,
+   indexed search requires the provider index gate and live search allows external access.
+   The credential owner enforces current hosted-search permission for requests
+   that include search and rechecks the captured account immediately before
+   each authenticated generation attempt, including token-refresh retries.
+   Standard inference without search needs no catalog read.
    The private native launch carries the opaque scope and selected model.
    Its stdio transport grants only the exact generation route and sends no
    credentials. The in-process Desktop owner exposes the OAuth ceremony as
@@ -2962,6 +3033,11 @@ platform credential store is a separate hardening step.
 
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-008 .` to enumerate.
 
+- [Prediction route resolution](desktop/src/main/native-prediction-route.ts)
+  captures the economy model through the same subscription owner and verifies
+  its sign-in scope. [Desktop subscription tests](desktop/src/main/native-subscription-profiles.test.ts)
+  exercise this binding with a second provider configured.
+
 - [Windows credential compatibility tests](packages/grida-daemon/src/secrets-windows.test.ts) — platform-selected host-local custody and preserved OAuth records, with strict failures. These simulate platform selection with disposable files; they do not certify native Windows ACLs.
   The load-bearing groups are:
 
@@ -2983,6 +3059,10 @@ platform credential store is a separate hardening step.
   bind one private launch to an exact OAuth connection and the fixed Responses
   route. [Process fixtures](desktop/src/main/native-provider-egress.test.ts)
   exercise the ceremony and scoped continuation with synthetic responses.
+- [Subscription model discovery](packages/grida-ai-host/src/providers/chatgpt-models.ts)
+  bounds and filters the authenticated catalog for the captured account.
+  [Provider fixtures](packages/grida-ai-host/src/providers/chatgpt.test.ts)
+  cover stale offers and account replacement before dispatch.
 - [Native chat host](crates/grida-agent/src/host.rs), its
   [portable history projection](crates/grida-agent/src/host/history.rs),
   [compaction](crates/grida-agent/src/host/compaction.rs) and
@@ -3998,6 +4078,12 @@ grant custody and cleanup.
 
 ### `GRIDA-SEC-014` — Shared native provider credential boundary
 
+Scoped command review receives the names of environment variables and the
+prepared filesystem grants. Environment values, proxy credentials and the
+private protected-path inventory are excluded from the review payload. A
+one-file approval rechecks the host’s protected paths, including the adopted
+credential home, before returning bytes.
+
 Desktop [hook registration](desktop/src/main/native-agent-hooks.ts),
 [its tests](desktop/src/main/native-agent-hooks.test.ts),
 [launch profile owner](desktop/src/main/native-agent-permissions.ts),
@@ -4192,6 +4278,10 @@ proof was removed with its obsolete archive/preload assumptions; the current
 TypeScript custody owner, protocol fixtures and cross-language tests remain.
 
 **Files bound by this id.**
+
+- [Native file validation](desktop/src/main/native-agent-files.ts) supplies
+  the physical-file checks for hook configuration, trusted receipts and
+  pinned executables when Desktop shares its global config with Settings.
 
 - [General worker composition](crates/grida-agent/src/host/delegation.rs) and
   [its authority tests](crates/grida-agent/src/host/delegation/tests.rs) —
@@ -4647,9 +4737,13 @@ outside that tool surface. Users can open DevTools for an actual owned page.
   `desktop/src/main/browser-automation-guest.ts`, and
   `desktop/src/main/desktop-browser-tools.ts` — fixed background shell,
   admitted target and document checks, typed operations and bounded captures.
+- `desktop/src/main/desktop-browser-mcp.ts` — dispatch scoped to the captured
+  lease, bounded image results and reply revocation on the private MCP carrier.
 - `desktop/src/main/fx-viewer.ts` and its tests — exact project service and
   document correlation, bounded FX observations, independent file authorization
   and workspace-relative resolution results.
+- `desktop/src/main/fx-extension.ts` — admitted workspace lookup, protected-root
+  checks and Desktop-owned FX executable and viewer registration.
 - `desktop/src/main/fx-workspace-files.ts` and its tests — workbench-only file
   preparation, workspace containment, and immutable verified raster snapshots.
 - `desktop/src/main/browser-favicon.ts` and its tests — bounded, isolated

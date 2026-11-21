@@ -18,13 +18,17 @@
  * restarts.
  */
 import {
+  NativeEditorSvgSelection,
   parseNativeChatMessageContext,
   type NativeChatEffort,
   type NativeChatMessageContext,
   type NativeChatOperatingRegime,
 } from "@grida/desktop-bridge";
 
-export type ComposerDraftModes = Readonly<{ plan?: true; goal?: true }>;
+export type ComposerDraftModes = Readonly<{
+  plan?: true;
+  goal?: true;
+}>;
 
 export type ComposerDraftAttachment =
   | Readonly<{
@@ -65,10 +69,12 @@ export type ComposerDraftPending = Readonly<{
   mode: "submit" | "enqueue";
   operatingRegime?: NativeChatOperatingRegime;
   effort?: NativeChatEffort;
+  webSearch?: true;
   selectionRevision?: number;
   allowLibrarySelection: boolean;
   editorSvgTargetId?: string;
   editorContextId?: string;
+  editorToolContextId?: string;
   messageContext?: NativeChatMessageContext;
   attachment?:
     | StoredDraftAttachment
@@ -630,6 +636,7 @@ function validPending(value: ComposerDraftPending): boolean {
     typeof value.allowLibrarySelection !== "boolean" ||
     (value.operatingRegime !== undefined &&
       !["act", "plan"].includes(value.operatingRegime)) ||
+    (value.webSearch !== undefined && value.webSearch !== true) ||
     (value.effort !== undefined &&
       !["low", "medium", "high", "xhigh", "ultra", "standard"].includes(
         value.effort
@@ -644,7 +651,9 @@ function validPending(value: ComposerDraftPending): boolean {
       !parseNativeChatMessageContext(value.messageContext)) ||
     (value.editorContextId !== undefined &&
       (typeof value.editorContextId !== "string" ||
-        !/^[a-f0-9-]{36}$/.test(value.editorContextId)))
+        !/^[a-f0-9-]{36}$/.test(value.editorContextId))) ||
+    (value.editorToolContextId !== undefined &&
+      !NativeEditorSvgSelection.isId(value.editorToolContextId))
   )
     return false;
   if (
@@ -656,10 +665,12 @@ function validPending(value: ComposerDraftPending): boolean {
           "mode",
           "operatingRegime",
           "effort",
+          "webSearch",
           "selectionRevision",
           "allowLibrarySelection",
           "editorSvgTargetId",
           "editorContextId",
+          "editorToolContextId",
           "messageContext",
           "attachment",
         ].includes(key)

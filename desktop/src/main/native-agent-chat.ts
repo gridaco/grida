@@ -28,6 +28,7 @@ import type {
   NativeChatImageArtifact,
   NativeChatActivity,
   NativeChatToolImage,
+  NativeChatUrlCitation,
   NativeChatMessage,
   NativeChatMessageContext,
   NativeChatMessageAttachment,
@@ -75,6 +76,7 @@ import type { NativeHookInspection } from "@grida/desktop-bridge";
 import type {
   NativeEditorSurfaceDelivery,
   NativeEditorSurfaceSelection,
+  NativeEditorSvgSelectionDelivery,
   NativeEditorSvgTextDelivery,
 } from "./native-editor-surfaces";
 import type { DesktopBrowserToolLease } from "./desktop-browser-tools";
@@ -95,6 +97,7 @@ import {
 } from "./native-agent-side-chats";
 import {
   NativeAgentProcess,
+  PREDICT_PROMPT,
   TRANSCRIPT_WINDOW,
   type NativeAgentLaunch,
 } from "./native-agent-process";
@@ -406,6 +409,10 @@ export class NativeAgentChat {
     ).update(session.id, revision, requestId, mode);
   }
 
+  get acceptsTurnCapabilities(): boolean {
+    return this.connected && this.process.acceptsTurnCapabilities;
+  }
+
   get acceptsInputRoutes(): boolean {
     return this.connected && this.process.acceptsInputRoutes;
   }
@@ -445,6 +452,7 @@ export class NativeAgentChat {
           connectionId: input.selection.connectionId,
           model: input.selection.model,
           effort: input.selection.effort,
+          ...(input.selection.speed && { speed: input.selection.speed }),
         },
       })
     );
@@ -1014,7 +1022,8 @@ export class NativeAgentChat {
     deliver: NativeEditorSurfaceDelivery | undefined,
     revision?: number,
     svgText?: NativeEditorSvgTextDelivery,
-    browser?: DesktopBrowserToolLease
+    browser?: DesktopBrowserToolLease,
+    svgSelection?: NativeEditorSvgSelectionDelivery
   ) {
     return this.process.registerEditorSurfaces(
       this.requireAttached(session),
@@ -1023,12 +1032,17 @@ export class NativeAgentChat {
       deliver,
       revision,
       svgText,
-      browser
+      browser,
+      svgSelection
     );
   }
 
   get acceptsEditorContext(): boolean {
     return this.process.acceptsEditorContext;
+  }
+
+  get acceptsEditorToolContext(): boolean {
+    return this.process.acceptsEditorToolContext;
   }
 
   submit(
@@ -1039,13 +1053,15 @@ export class NativeAgentChat {
     editorSurfaces?: NativeEditorSurfaceSelection,
     effort?: NativeChatEffort,
     selectionRevision?: number,
-    editorContext?: NativeEditorObservation
+    editorContext?: NativeEditorObservation,
+    webSearch?: true
   ): Promise<NativeChatAcceptance> {
     return this.send("submit", session, inputId, text, operatingRegime, {
       editorSurfaces,
       effort,
       selectionRevision,
       editorContext,
+      webSearch,
     });
   }
 
@@ -1057,13 +1073,15 @@ export class NativeAgentChat {
     editorSurfaces?: NativeEditorSurfaceSelection,
     effort?: NativeChatEffort,
     selectionRevision?: number,
-    editorContext?: NativeEditorObservation
+    editorContext?: NativeEditorObservation,
+    webSearch?: true
   ): Promise<NativeChatAcceptance> {
     return this.send("enqueue", session, inputId, text, operatingRegime, {
       editorSurfaces,
       effort,
       selectionRevision,
       editorContext,
+      webSearch,
     });
   }
 
@@ -1098,7 +1116,8 @@ export class NativeAgentChat {
     editorSurfaces?: NativeEditorSurfaceSelection,
     effort?: NativeChatEffort,
     selectionRevision?: number,
-    editorContext?: NativeEditorObservation
+    editorContext?: NativeEditorObservation,
+    webSearch?: true
   ): Promise<NativeChatAcceptance> {
     if (!this.acceptsLibrarySelection)
       return Promise.reject(
@@ -1110,6 +1129,7 @@ export class NativeAgentChat {
       effort,
       selectionRevision,
       editorContext,
+      webSearch,
     });
   }
 
@@ -1138,6 +1158,7 @@ export class NativeAgentChat {
       "operatingRegime",
       "effort",
       "selectionRevision",
+      "webSearch",
       "messageContext",
     ]);
     if (
@@ -1162,6 +1183,7 @@ export class NativeAgentChat {
             ? undefined
             : choice(input.effort, EFFORT_CHOICES),
         selectionRevision: optionalSelectionRevision(input.selectionRevision),
+        webSearch: optionalWebSearch(input.webSearch),
         messageContext: this.parseMessageContext(input.messageContext),
       }
     );
@@ -1194,6 +1216,7 @@ export class NativeAgentChat {
       Object.keys(input).length !==
         (effort ? 6 : 5) +
           Number(input.selectionRevision !== undefined) +
+          Number(input.webSearch !== undefined) +
           Number(input.messageContext !== undefined) ||
       typeof input.text !== "string"
     )
@@ -1208,6 +1231,7 @@ export class NativeAgentChat {
         image: pngPrompt(input.png),
         effort,
         selectionRevision: optionalSelectionRevision(input.selectionRevision),
+        webSearch: optionalWebSearch(input.webSearch),
         messageContext: this.parseMessageContext(input.messageContext),
       }
     );
@@ -1236,6 +1260,7 @@ export class NativeAgentChat {
       "operatingRegime",
       "effort",
       "selectionRevision",
+      "webSearch",
       "sha256",
       "size",
       "lastModified",
@@ -1284,6 +1309,7 @@ export class NativeAgentChat {
         regime,
         {
           selectedImage,
+          webSearch: optionalWebSearch(input.webSearch),
           effort,
           selectionRevision,
           messageContext,
@@ -1319,6 +1345,7 @@ export class NativeAgentChat {
       Object.keys(input).length !==
         (effort ? 7 : 6) +
           Number(input.selectionRevision !== undefined) +
+          Number(input.webSearch !== undefined) +
           Number(input.messageContext !== undefined) ||
       typeof input.text !== "string"
     )
@@ -1333,6 +1360,7 @@ export class NativeAgentChat {
         file: selectedFile(input.name, input.bytes),
         effort,
         selectionRevision: optionalSelectionRevision(input.selectionRevision),
+        webSearch: optionalWebSearch(input.webSearch),
         messageContext: this.parseMessageContext(input.messageContext),
       }
     );
@@ -1362,6 +1390,7 @@ export class NativeAgentChat {
       "operatingRegime",
       "effort",
       "selectionRevision",
+      "webSearch",
       "messageContext",
     ]);
     if (
@@ -1392,6 +1421,7 @@ export class NativeAgentChat {
       }),
       effort,
       selectionRevision: optionalSelectionRevision(input.selectionRevision),
+      webSearch: optionalWebSearch(input.webSearch),
       messageContext,
     });
   }
@@ -1411,6 +1441,7 @@ export class NativeAgentChat {
       editorSurfaces?: NativeEditorSurfaceSelection;
       effort?: NativeChatEffort;
       selectionRevision?: number;
+      webSearch?: true;
       editorContext?: NativeEditorObservation;
       messageContext?: NativeChatMessageContext;
     } = {}
@@ -1428,7 +1459,13 @@ export class NativeAgentChat {
       selectionRevision,
       editorContext,
       messageContext,
+      webSearch,
     } = options;
+    if (
+      webSearch &&
+      (!this.process.acceptsTurnCapabilities || selectionRevision === undefined)
+    )
+      throw new Error("web_search_selection_required");
     if (
       selectionRevision !== undefined &&
       (!Number.isSafeInteger(selectionRevision) ||
@@ -1467,7 +1504,10 @@ export class NativeAgentChat {
         ...(operatingRegime && { operatingRegime }),
         ...hostEffort(effort),
         ...(selectionRevision !== undefined && {
-          _meta: { "co.grida/selectionRevision": selectionRevision },
+          _meta: {
+            "co.grida/selectionRevision": selectionRevision,
+            ...(webSearch && { "co.grida/webSearch": true }),
+          },
         }),
         ...(allowLibrarySelection && { allowLibrarySelection }),
         ...(editorContext && { editorContext }),
@@ -1517,7 +1557,9 @@ export class NativeAgentChat {
 
   async inputReceipt(
     session: NativeChatSession,
-    inputId: string
+    inputId: string,
+    /** Omitted for a read-only receipt lookup. A retry must match its original permission. */
+    expectedWebSearch?: boolean
   ): Promise<NativeChatAcceptance> {
     const sessionId = this.requireAttached(session);
     const result = object(
@@ -1528,6 +1570,15 @@ export class NativeAgentChat {
     );
     this.requireAttached(session);
     const accepted = acceptance(result.receipt, sessionId, inputId);
+    if (expectedWebSearch !== undefined) {
+      // Prior workers and records predate hosted search and omit this setting.
+      const stored =
+        result.settings === undefined
+          ? undefined
+          : object(result.settings).webSearch;
+      if ((stored === undefined ? false : flag(stored)) !== expectedWebSearch)
+        throw new Error("submission_web_search_changed");
+    }
     // A recovered receipt settles Main's unknown temporary custody as well.
     await this.selectedImages?.complete(sessionId, inputId).catch(() => {});
     return accepted;
@@ -1612,6 +1663,42 @@ export class NativeAgentChat {
       queue,
     });
     return snapshot;
+  }
+
+  async predictPrompt(
+    session: NativeChatSession,
+    snapshot: NativeChatSnapshot,
+    permission?: AbortSignal
+  ): Promise<string | null> {
+    const sessionId = this.requireObservation(session, snapshot);
+    const latest = snapshot.latest;
+    if (
+      !this.process.acceptsPromptPrediction ||
+      snapshot.side ||
+      snapshot.current ||
+      snapshot.queuedInputs ||
+      latest?.disposition !== "settled" ||
+      latest.status !== "succeeded"
+    )
+      return null;
+    const result = object(
+      await this.process.request(
+        `_${PREDICT_PROMPT}`,
+        { sessionId, turnId: latest.turnId },
+        20_000,
+        permission
+      )
+    );
+    this.requireAttached(session);
+    if (result.text === null) return null;
+    if (
+      typeof result.text !== "string" ||
+      !result.text.trim() ||
+      Buffer.byteLength(result.text) > 4096 ||
+      /[\p{Cc}\p{Zl}\p{Zp}]/u.test(result.text)
+    )
+      throw invalidResponse();
+    return result.text;
   }
 
   async turnSummary(
@@ -2760,6 +2847,10 @@ export class NativeAgentChat {
           captureText(capture, identity(update.messageId), role, content.text, {
             turnId: optionalIdentity(order.turnId ?? attribution?.turnId),
             phase: messagePhase(attribution?.phase, role),
+            ...(role === "assistant" &&
+              attribution?.citations !== undefined && {
+                citations: urlCitations(attribution.citations),
+              }),
             ...order,
             ...(displayParts?.length && { displayParts }),
             ...(reply && {
@@ -2772,6 +2863,11 @@ export class NativeAgentChat {
               attribution?.turnId !== undefined &&
               attribution.svgTextSelection === true && {
                 svgTextSelection: true,
+              }),
+            ...(role === "user" &&
+              attribution?.turnId !== undefined &&
+              attribution.editorToolContext === true && {
+                svgSelection: true,
               }),
           });
         }
@@ -2791,6 +2887,11 @@ export class NativeAgentChat {
               turnId: identity(attribution.turnId),
               offsetBytes: revision(attribution.offsetBytes),
               replace: flag(attribution.replace),
+              ...(role === "assistant" &&
+                attribution.replace === true &&
+                attribution.citations !== undefined && {
+                  citations: urlCitations(attribution.citations),
+                }),
               ...NativeActivityOrder.notification(
                 metadata,
                 attribution,
@@ -3105,7 +3206,9 @@ function captureText(
     | "phase"
     | "activityOrder"
     | "activityOrderIncomplete"
+    | "citations"
     | "svgTextSelection"
+    | "svgSelection"
     | "displayParts"
     | "questionReply"
   >
@@ -3113,6 +3216,8 @@ function captureText(
   if (capture.overflow) return;
   const previous = capture.messages.get(messageId);
   capture.bytes += Buffer.byteLength(text);
+  if (attribution?.citations)
+    capture.bytes += Buffer.byteLength(JSON.stringify(attribution.citations));
   if (attribution?.questionReply)
     capture.bytes += Buffer.byteLength(attribution.questionReply.question);
   if (attribution?.displayParts)
@@ -3136,10 +3241,12 @@ function captureText(
     ...kept,
     ...(attribution?.turnId && { turnId: attribution.turnId }),
     ...(attribution?.phase && { phase: attribution.phase }),
+    ...(attribution?.citations && { citations: attribution.citations }),
     ...(attribution?.questionReply && {
       questionReply: attribution.questionReply,
     }),
     ...(attribution?.svgTextSelection && { svgTextSelection: true }),
+    ...(attribution?.svgSelection && { svgSelection: true }),
     ...(attribution?.displayParts && {
       displayParts: attribution.displayParts,
     }),
@@ -3148,6 +3255,44 @@ function captureText(
     role,
     text: (previous?.text ?? "") + text,
   });
+}
+
+function urlCitations(value: unknown): readonly NativeChatUrlCitation[] {
+  const citations: NativeChatUrlCitation[] = [];
+  if (!Array.isArray(value)) return citations;
+  for (const entry of value.slice(0, 64)) {
+    if (entry === null || typeof entry !== "object") continue;
+    const { url, title, startIndex, endIndex } = entry;
+    if (
+      typeof url !== "string" ||
+      Buffer.byteLength(url) > 4096 ||
+      (title !== undefined &&
+        (typeof title !== "string" || Buffer.byteLength(title) > 1024)) ||
+      !Number.isSafeInteger(startIndex) ||
+      !Number.isSafeInteger(endIndex) ||
+      startIndex < 0 ||
+      endIndex <= startIndex
+    )
+      continue;
+    const link = URL.parse(url);
+    if (
+      !link ||
+      !["https:", "http:"].includes(link.protocol) ||
+      !link.hostname ||
+      link.username ||
+      link.password
+    )
+      continue;
+    citations.push(
+      Object.freeze({
+        url: link.href,
+        ...(title && { title }),
+        startIndex,
+        endIndex,
+      })
+    );
+  }
+  return Object.freeze(citations);
 }
 
 function captureAttachment(
@@ -3262,7 +3407,16 @@ function activity(
     throw invalidResponse();
   const source =
     attribution.source === undefined ? undefined : identity(attribution.source);
-  if (source !== undefined && kind !== "integration") throw invalidResponse();
+  if (
+    source !== undefined &&
+    kind !== "integration" &&
+    !(
+      kind === "search" &&
+      source === "provider" &&
+      update.title === "web_search"
+    )
+  )
+    throw invalidResponse();
   const input = toolDetail(update.rawInput);
   const callId = identity(update.toolCallId);
   const turnId = optionalIdentity(attribution.turnId);
@@ -3365,6 +3519,7 @@ function turnRecords(value: unknown): NativeChatTurnRecord[] | undefined {
       throw invalidResponse();
     const contextTokens = time(record.contextTokens);
     const compaction = compactionFact(record.compaction);
+    const approvalReviews = approvalReviewFacts(record.approvalReviews);
     return Object.freeze({
       turnId: identity(record.turnId),
       status: status as NativeChatTurnRecord["status"],
@@ -3373,7 +3528,29 @@ function turnRecords(value: unknown): NativeChatTurnRecord[] | undefined {
       ...(record.goalStart === true && { goalStart: true as const }),
       ...(contextTokens !== undefined && { contextTokens }),
       ...(compaction && { compaction }),
+      ...(approvalReviews && { approvalReviews }),
     });
+  });
+}
+
+function approvalReviewFacts(
+  value: unknown
+): NativeChatTurnRecord["approvalReviews"] {
+  if (value == null) return undefined;
+  if (!Array.isArray(value) || value.length > 64) throw invalidResponse();
+  return value.map((item) => {
+    const { decision, action } = object(item);
+    if (
+      (decision !== "reviewing" &&
+        decision !== "approved" &&
+        decision !== "declined" &&
+        decision !== "needs_human") ||
+      typeof action !== "string" ||
+      !action ||
+      Buffer.byteLength(action) > 4096
+    )
+      throw invalidResponse();
+    return { decision, action };
   });
 }
 
@@ -4102,6 +4279,11 @@ function hostEffort(effort: NativeChatEffort | undefined): {
     default:
       return { reasoning: effort };
   }
+}
+
+function optionalWebSearch(value: unknown): true | undefined {
+  if (value === undefined || value === true) return value;
+  throw new Error("web_search_invalid");
 }
 
 function optionalSelectionRevision(value: unknown): number | undefined {

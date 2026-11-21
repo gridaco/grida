@@ -234,6 +234,27 @@ exercise their corresponding process boundary. These opt-in cases use
 provider replies; they do not establish rendered Desktop interaction or live
 provider entitlement.
 
+The [subscription model fixtures](../../../desktop/src/main/native-subscription-profiles.test.ts)
+exercise selected-account discovery, persistence and actual queued execution through
+a staged native worker. A queued search uses its accepted model, effort and speed
+after a later selection edit. The next Standard message omits both options, and
+reopening the chat restores the cited source without generating another response.
+The same worker fixtures edit the user’s global TOML and verify that a saved
+accelerated speed still reaches the provider with the retired setting present
+and hosted search turned off. They also check that older restrictive search
+settings grant no search. Credential-owner fixtures cover opting out during a
+token refresh and replacing the account during the final preference read.
+The [Personalization settings interaction](../../../editor/app/desktop/settings/_components/personalization-settings.browser.tsx)
+covers both switches and preference changes that arrive
+while an older read is pending.
+The [Responses adapter fixtures](../../agent-kit-providers/tests/responses.rs) cover
+mixed hosted and local tools, duplicate search evidence and safe citations.
+Sparse terminal items preserve streamed actions. Failed and incomplete responses
+retain reported sources without dispatching pending local functions. Malformed
+optional annotations leave the assistant's answer readable.
+The [workspace composer interaction](../../../editor/scaffolds/desktop/workbench/native-chat-focus.browser.tsx)
+checks what the person selects, sends and sees when the reply arrives.
+
 Raster preparation, subscription transport and captured tool-version cases
 verify the new view definition without granting it to old accepted work.
 An older pending image turn reconstructs its original PNG definition and
@@ -328,6 +349,121 @@ report that the agent is working; `/stop` reports when nothing runs.
 [real-editor selection tests](../../../editor/kits/composer/composer-command-selection.browser.ts),
 and the [Desktop interaction case](../../../test/desktop-agent-chat-composer-intents.md)
 cover these obligations.
+
+A suggested follow-up belongs to the empty Desktop composer until the person
+accepts it as a draft. Replaying a completion must never issue another model
+request. A delayed result must stay dismissed after a chat switch, a newer
+turn, a model or effort change, a draft edit or a preference change. Archiving
+the chat while its economy route is being resolved must prevent dispatch.
+Turning predictions off during model lookup or provider authorization must
+prevent the pending request from reaching the provider, even after the switch
+is turned back on. A later eligible reply can use the new opt-in.
+The host uses the completed inference's captured context and connection.
+A hosted prediction must resolve the product's economy model on the same
+account. The default Ollama connection at `localhost` and numeric loopback
+connections use the selected local model. Switching models preserves the
+visible history and compacted context while removing provider-private
+continuation state.
+A tool call, provider failure or deadline can yield an empty suggestion. Durable request deduplication
+survives a host restart. Generation must leave the parent transcript and turn
+summary intact. [Native process evidence](../tests/process/prediction.rs),
+[Desktop IPC](../../../desktop/src/main/native-chat-ipc.test.ts) and the
+[composer interaction](../../../editor/scaffolds/desktop/workbench/native-chat-recovery.browser.tsx)
+exercise those boundaries. [Subscription selection in Desktop](../../../desktop/src/main/native-subscription-profiles.test.ts)
+also exercises a premium subscription chat with OpenRouter available, the
+subscription economy request and the next foreground turn.
+
+Four cold launches of Electron on macOS exercised the real Settings page,
+preload and Main handlers against a temporary Grida home. Enabling the switch
+notified an open workspace. A new workspace read the saved value on the next
+launch, and a hand edit to `false` appeared as Off on the third. With native
+chat disabled, Settings explained why suggestions were unavailable. A trusted
+deny hook still refused an input after toggling the setting. The Desktop
+0.7.0 reader rejected the added table and accepted the restored hook-only
+file with its original trust decision. [Settings IPC](../../../desktop/src/main/settings-ipc.test.ts),
+[config editing](../../../desktop/src/main/desktop-personalization.test.ts)
+and [native hook execution](../../../desktop/src/main/native-agent-hooks.test.ts)
+cover the respective contracts.
+
+### Composer prediction measurements
+
+#### Hosted economy model
+
+On November 20, 2026 (UTC), Desktop Main and the native stdio host ran one
+short and one long synthetic exhibit-planning chat. Both used the same saved
+OpenRouter connection. Scripted foreground replies on the Haiku profile
+established the chat history. Only the two prediction requests went to
+OpenRouter, using `openai/gpt-6-luna`. The long chat included 120 field notes
+between the original plan and the final reply.
+
+| Chat  | Host elapsed | Input tokens | Cached input | Output tokens | Estimated USD |
+| ----- | -----------: | -----------: | -----------: | ------------: | ------------: |
+| Short |     1,693 ms |          591 |            0 |            24 |     0.0000711 |
+| Long  |     1,338 ms |        2,811 |            0 |            25 |     0.0002936 |
+
+Both suggestions requested the planned two-sentence audio guide, the original
+age group and the required word “moonlight”. OpenRouter reported zero reasoning
+tokens in both responses. The estimated combined cost was $0.0003647 at $0.10
+per million input tokens and $0.50 per million output tokens. Two samples
+measure these particular requests. [Model pricing](https://openrouter.ai/openai/gpt-6-luna)
+
+#### Same-model design comparison
+
+On November 20, 2026 (UTC), the native stdio host ran synthetic exhibit-planning
+chats on OpenRouter with `anthropic/claude-haiku-5.5` and the reasoning capability
+that Desktop advertises for that model. This baseline used Haiku for both
+requests before the hosted prediction policy selected the product's economy
+model. The client requested a prediction immediately after the final reply.
+Each row is one request, timed inside the
+host and counted separately from the completed turn. The long chat included
+120 field notes over three user turns. The compacted case used the host's
+ordinary compaction command before the final turn.
+
+| Chat                | Prediction time | Input | Cached input | Output | Estimated USD | Result                                                                                  |
+| ------------------- | --------------: | ----: | -----------: | -----: | ------------: | --------------------------------------------------------------------------------------- |
+| Short               |          922 ms |   800 |            0 |     31 |      0.000096 | Requested the two-sentence audio guide for ages 9–12.                                   |
+| Long                |        1,326 ms | 5,478 |            0 |     47 |      0.000571 | Recovered the audience and the required word “moonlight” from the first turn.           |
+| Compacted           |        1,230 ms | 1,444 |            0 |     34 |      0.000161 | Selected a proposed title and mentioned the guide, but assigned writing it to the user. |
+| Explicitly finished |          885 ms |   773 |            0 |      5 |      0.000080 | Returned an empty suggestion.                                                           |
+
+Repeated requests for each turn returned empty without another inference.
+OpenRouter reported zero cached input in every row despite immediate reuse
+of the retained conversation. Estimates use the model's listed rates of
+$0.10 per million input tokens and $0.50 per million output tokens. They
+exclude the preceding chat and compaction. A compatible profile that omitted
+the reasoning capability exhausted the 128-token prediction allowance on
+the long chat and yielded no text. [Model and pricing](https://openrouter.ai/anthropic/claude-haiku-5.5)
+
+For comparison, the same short and long tasks requested both an answer and a
+suggested prompt as JSON in the main reply. The short combined reply took
+2,804 ms (733 input, 435 output), versus 1,528 ms (673 input, 15 output)
+for the ordinary reply before prediction. The long combined reply took
+3,847 ms (5,304 input, 590 output), versus 4,224 ms (5,249 input, 522
+output). Both combined replies used Markdown fences. The short one recovered
+the intended guide, while the long one requested the plan again. The JSON
+comparison used a single inference per final answer.
+
+In a separate short-chat run, the agent called an inert local `wrap_up` tool
+with a suggestion to write the guide for ages 9–12. The tool received the
+suggestion at 2,367 ms. The model then took another 1,032 ms to deliver its
+visible answer, for a total of 3,399 ms. The two provider requests used
+1,163 input and 344 output tokens, then 1,282 input and 14 output tokens.
+Both reported zero cached input (estimated $0.000424 combined). This measures
+the ordinary tool-call loop. A host that terminates on the tool call would
+need another way to deliver the final reply.
+
+Keep the preview opt-in. A separate request allows the user to see the
+completed reply immediately and lets Desktop skip prediction when their
+composer is occupied. Latency, cost, cache reuse and suggestion quality
+vary with the model and conversation. These one-time samples cover one live
+provider. Executable tests with fixture responses verify the reported token
+categories on the direct provider protocols, the captured OpenRouter and
+Vercel connections, and the account and signed context on the ChatGPT
+subscription route. A Gateway fixture checks a terminal charge and a
+pending charge resolved by one scoped lookup. An unavailable settlement
+stays unknown. [Direct providers](../tests/process/prediction.rs),
+[subscription](../tests/process/responses.rs) and
+[saved connections and Gateway receipts](../tests/process/subagents.rs).
 
 ## Consumer one, a minimal master
 
@@ -802,10 +938,13 @@ Full access is a separate explicit execution choice, independent of automatic
 review. Restricted work must retain its original capture after a host gains
 the ability to offer Full access. A per-chat change governs later admissions.
 An active turn retains access to its own terminal after the user selects
-Default. A subsequent restricted turn cannot drive that Full-access terminal.
+**Ask for approval** or **Auto**. Only a subsequent Full-access turn can
+drive that terminal.
 The supervisor retains the ability to stop it. Reopening preserves the selection but
 does not authorize a launch that lacks Full access capability. New Desktop
-chats remain restricted. The owning headless regressions are
+project chats use sandboxed access with automatic review when supported and
+manual review otherwise. Existing chats retain their saved choice, and older
+chats without one use manual review. The owning headless regressions are
 [permission-mode process tests](../tests/process/full_access.rs): local HTTP,
 outside-project file access, restoration of restricted denial, per-chat and
 restart continuity, and actual npm acquisition with a writable external cache
@@ -824,6 +963,29 @@ platform qualification must identify which OS was actually exercised.
 | The requested sandbox profile cannot be enforced                   | Refuse or wait for an explicitly supported route                 |
 | A review decision is committed just before restart                 | Restore its action binding and consumption state before dispatch |
 | An allowed network destination is used for a sensitive operation   | Product policy can still require semantic review of the action   |
+
+A user can select **Auto**, request an exact external file, and see
+the file read once or the request return for manual review. Changing the file
+while a decision is pending invalidates it. Earlier instructions in the same
+chat remain relevant to later actions. A confined command retried with a
+network destination requires review of the new authority. Tests must account
+for the execution attempts and the evidence supplied to each reviewer.
+Answering a clarifying question preserves the user's earlier restrictions.
+If one action needs human input, another eligible action in the same response
+can still receive its own review within the turn's allowance. A connected
+Desktop chat shows a pending review and its verdict while the turn is running.
+Manual decisions remain available across the host's command-size range.
+Withdrawing the launcher's reviewer opt-in returns new work to
+**Ask for approval** and preserves earlier selection receipts. Finite command
+cleanup remains owned through shutdown, and a transfer beyond the broker's byte
+limit reports an incomplete result.
+The [built-host review cases](../tests/process/approvals/reviewer.rs) exercise
+both scopes and count real command starts. The Linux qualification also
+serves a response from the approved hostname inside an isolated network
+and checks the bytes returned to the model and the request received by
+the origin. The [native sandbox fixture](../../agent-kit-sandbox/tests/native.rs)
+checks the broker path and direct-network denial, and the [permission tests](../tests/permissions.rs)
+cover file identity and revocation.
 
 The host authorization adapter handles asynchronous review through the generic
 admission gate. Sessions retains correlated interactions and operation results.
@@ -950,6 +1112,25 @@ implementation. Actual editor behavior and rendering require their corresponding
 Desktop evidence. MCP-only execution must work without constructing the
 built-in agent session.
 
+The [private Desktop catalog process cases](../tests/process/desktop_tools.rs)
+check deferred offers, endpoint replacement, an unverified SVG
+mutation, and an unconfirmed trusted reveal. A scripted peer adds a read and
+a counted mutation through the same catalog. The master tests preserve the
+original request inventory across interrupted publication and cover the
+source-choice step when several extensions match. The
+[native Browser capture cases](../tests/process/tool_images.rs) cover the
+shared carrier, model image eligibility, and legacy compatibility. The
+[Main process cases](../../../desktop/src/main/native-agent-process.test.ts)
+exercise Browser replies under backpressure and against the packaged host.
+The private source registration tests cover colliding local operation names
+and replacement with an identical definition after accepted input. The
+retired generation must refuse its call while the sibling source on the same
+workbench remains usable.
+The authenticated export and actual guest interaction have separate
+[loopback](../../../desktop/src/main/native-editor-mcp-export.test.ts) and
+[Electron](../../../desktop/src/main/browser-automation.electron.test.ts)
+tests.
+
 ### ACP client boundary
 
 The [client protocol binding](./rust-client-protocol.md) maps standard ACP
@@ -987,13 +1168,13 @@ enforcement evidence.
 
 The [native sandbox binding](./rust-sandbox.md) uses one crate with Seatbelt on
 macOS and bubblewrap plus a trusted seccomp helper on Linux. The raw-command
-profile denies networking. Native Windows raw execution is deferred behind
+profile denies direct networking. A qualified finite invocation may separately obtain a single mediated destination. Native Windows raw execution is deferred behind
 capability checks.
 
 | Pressure case                                              | Required result                                                                                                                                                                                             |
 | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Two concurrent children have different filesystem grants   | Each execution retains its own scope, including after either grant changes.                                                                                                                                 |
-| A command requests networking                              | Admission reports an unsupported profile before executing the target.                                                                                                                                       |
+| A command requests networking                              | Admission refuses an unsupported profile before execution. A qualified finite command uses its exact reviewed destination and keeps direct network access denied.                                           |
 | A child daemonizes outside its original process group      | Cancellation reports whether the descendant terminated, remains confined, or is unresolved. Conflicting work cannot assume revocation.                                                                      |
 | A process exits before temporary-resource cleanup finishes | The outcome preserves cleanup state before releasing ownership that depends on it.                                                                                                                          |
 | Host proxy or trust configuration changes                  | The host routing adapter handles the change within authorized destinations. Confinement does not silently widen.                                                                                            |

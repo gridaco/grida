@@ -46,7 +46,9 @@ function workspaceFixture() {
   };
 }
 
-function completion(text: string | null) {
+type FixtureAction = { name: string; args: object; review?: string };
+
+function completion(text: string | null, action: FixtureAction) {
   const delta =
     text === null
       ? {
@@ -57,11 +59,8 @@ function completion(text: string | null) {
               id: "fixture-call",
               type: "function",
               function: {
-                name: "read_file",
-                arguments: JSON.stringify({
-                  directory: "additional",
-                  path: "note.txt",
-                }),
+                name: action.name,
+                arguments: JSON.stringify(action.args),
               },
             },
           ],
@@ -83,7 +82,18 @@ function completion(text: string | null) {
   );
 }
 
-async function fixtureProvider() {
+async function fixtureProvider(
+  action: FixtureAction = {
+    name: "read_file",
+    args: { directory: "additional", path: "note.txt" },
+  },
+  beforeReply?: (index: number) => Promise<void>
+) {
+  const replies = [
+    null,
+    ...(action.review ? [action.review] : []),
+    "Read complete.",
+  ];
   const received: string[] = [];
   const server = createServer((request, response) => {
     request.setEncoding("utf8");
@@ -91,18 +101,20 @@ async function fixtureProvider() {
     request.on("data", (chunk: string) => {
       body += chunk;
     });
-    request.on("end", () => {
+    request.on("end", async () => {
+      const index = received.length;
       received.push(body);
       if (
         request.method !== "POST" ||
         request.url !== "/v1/chat/completions" ||
-        received.length > 2
+        received.length > replies.length
       ) {
         response.writeHead(400).end();
         return;
       }
+      await beforeReply?.(index);
       response.writeHead(200, { "content-type": "text/event-stream" });
-      response.end(completion(received.length === 1 ? null : "Read complete."));
+      response.end(completion(replies[index], action));
     });
   });
   server.listen(0, "127.0.0.1");
@@ -227,6 +239,149 @@ describe.skipIf(!supported)("Native agent workspace permissions", () => {
       "native_agent_approval_invalid"
     );
     expect(request).toHaveBeenCalledTimes(2);
+  });
+
+  it("binds external reads and network commands to a workspace launch and the issuing workspace", async () => {
+    const command = {
+      kind: "command",
+      command: "curl https://example.org",
+      executable: "/bin/sh",
+      cwd: "/project",
+      access: "read",
+      terminal: false,
+      finite: true,
+      network: { host: "example.org", port: 443 },
+      filesystem: {
+        disk_read: true,
+        resolved_executable: "/bin/sh",
+        resolved_cwd: "/project",
+        read_roots: ["/project"],
+        write_roots: [],
+        runtime_roots: ["/usr/bin"],
+        private_temp_write: true,
+      },
+      environment_names: ["PATH"],
+    };
+    const read = {
+      kind: "read",
+      tool: "read_file",
+      relative_path: "outside/note.txt",
+    };
+    const req = (directory: string, root: string, effect: object) =>
+      vi.fn<(method: string, params: unknown) => Promise<unknown>>(
+        async (method) =>
+          method.endsWith("/snapshot")
+            ? {
+                sessionId: "s",
+                sessionRevision: 1,
+                current: { turnId: "t", controlRevision: 1 },
+              }
+            : {
+                sessionId: "s",
+                turnId: "t",
+                controlRevision: 1,
+                approvals: [
+                  {
+                    waitId: "wait",
+                    reviewFailure: "timed_out",
+                    request: {
+                      session: "s",
+                      turn: "t",
+                      directory,
+                      root,
+                      effect,
+                    },
+                  },
+                ],
+              }
+      );
+    const scope = {
+      project: { id: "project", path: "/project" },
+      protectedPaths: ["/private-store"],
+      workspaceId: "workspace",
+    };
+    const list = (
+      directory: string,
+      root: string,
+      effect: object,
+      enabled = true
+    ) =>
+      new NativeAgentPermissions(
+        req(directory, root, effect),
+        new Map(),
+        "/settings",
+        enabled ? scope : undefined
+      ).list("s", "t");
+    const [external] = await list("external-file", "/", read);
+    expect(external).toMatchObject({
+      tool: "read_file",
+      relativePath: "outside/note.txt",
+      reviewFailure: "timed_out",
+    });
+    await expect(list("external-file", "/", read, false)).rejects.toThrow(
+      "invalid"
+    );
+    await expect(
+      list("external-file", "/", {
+        ...read,
+        relative_path: "private-store/secret",
+      })
+    ).rejects.toThrow("invalid");
+    await expect(
+      list("external-file", "/", { ...read, tool: "list_files" })
+    ).rejects.toThrow("invalid");
+    await expect(list("project", "/project", command)).resolves.toMatchObject([
+      {
+        tool: "exec_command",
+        network: command.network,
+        scope: {
+          diskRead: true,
+          readRoots: ["/project"],
+          writeRoots: [],
+          environmentNames: ["PATH"],
+        },
+      },
+    ]);
+    await expect(
+      list("project", "/project", { ...command, terminal: true })
+    ).rejects.toThrow("invalid");
+    await expect(
+      list("project", "/project", { ...command, cwd: "/other" })
+    ).rejects.toThrow("invalid");
+    const other = new NativeAgentPermissions(
+      req("external-file", "/", read),
+      new Map(),
+      "/other-settings",
+      scope
+    );
+    const oldHost = new NativeAgentPermissions(
+      req("project", "/project", { ...command, filesystem: undefined }),
+      new Map(),
+      "/settings",
+      scope
+    );
+    const [unverifiedCommand] = await oldHost.list("s", "t");
+    await expect(
+      oldHost.answer(unverifiedCommand, "approve_once")
+    ).rejects.toThrow("invalid");
+    await expect(
+      list("project", "/project", {
+        ...command,
+        filesystem: { ...command.filesystem, disk_read: "unknown" },
+      })
+    ).rejects.toThrow("invalid");
+    const foreignWorkspace = new NativeAgentPermissions(
+      req("external-file", "/", read),
+      new Map(),
+      "/settings",
+      { ...scope, workspaceId: "other" }
+    );
+    await expect(
+      foreignWorkspace.answer(external, "approve_once")
+    ).rejects.toThrow("invalid");
+    await expect(other.answer(external, "approve_once")).rejects.toThrow(
+      "invalid"
+    );
   });
 
   it("offers a write review only for the agent settings file", async () => {
@@ -539,4 +694,196 @@ it.runIf(Boolean(packaged) && supported)(
     }
   },
   15000
+);
+
+it.runIf(Boolean(packaged) && supported)(
+  "uses the selected native reviewer for an external read and reopens its decision",
+  async () => {
+    const test = workspaceFixture();
+    const reference = path.join(
+      path.dirname(test.stateDirectory),
+      "schedule.txt"
+    );
+    fs.writeFileSync(reference, "private fixture schedule");
+    const reviewReply = Promise.withResolvers<void>();
+    const finalReply = Promise.withResolvers<void>();
+    const provider = await fixtureProvider(
+      {
+        name: "read_file",
+        args: { directory: "external-file", path: reference.slice(1) },
+        review: "allow",
+      },
+      async (index) => {
+        if (index === 1) await reviewReply.promise;
+        if (index === 2) await finalReply.promise;
+      }
+    );
+    const launch = {
+      resourcesPath: packaged!,
+      cwd: test.workspace.primary.path,
+      stateDirectory: test.stateDirectory,
+      model: "fixture",
+      provider: "openai-compatible" as const,
+      endpoint: provider.endpoint,
+      workspace: { ...test.workspace, allowScopedAccess: true as const },
+    };
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start(launch);
+      const session = await chat.create();
+      const initial = await chat.permissionMode(session);
+      expect(initial.available).toContain("approve_for_me");
+      await chat.setPermissionMode(
+        session,
+        initial.revision,
+        "enable-review",
+        "approve_for_me"
+      );
+      const turn = await chat.submit(
+        session,
+        "read-schedule",
+        `Read ${reference} for today's schedule.`
+      );
+      await vi.waitFor(() => expect(provider.received).toHaveLength(2), {
+        timeout: 8000,
+      });
+      const pending = (await chat.observe(session)).current;
+      expect(pending).toMatchObject({
+        disposition: "running",
+        inputNeeded: true,
+      });
+      const reviews = async () =>
+        (await chat!.transcriptPage(session)).turns?.find(
+          (record) => record.turnId === turn.turnId
+        )?.approvalReviews;
+      expect(await reviews()).toMatchObject([
+        { decision: "reviewing", action: reference },
+      ]);
+      reviewReply.resolve();
+      await vi.waitFor(() => expect(provider.received).toHaveLength(3), {
+        timeout: 8000,
+      });
+      const resolved = (await chat.observe(session)).current;
+      expect(resolved).toMatchObject({
+        disposition: "running",
+        inputNeeded: false,
+      });
+      expect(resolved!.controlRevision).toBeGreaterThan(
+        pending!.controlRevision
+      );
+      expect(await reviews()).toMatchObject([
+        { decision: "approved", action: reference },
+      ]);
+      finalReply.resolve();
+      await vi.waitFor(
+        async () =>
+          expect((await chat!.observe(session)).latest?.status).toBe(
+            "succeeded"
+          ),
+        { timeout: 12000 }
+      );
+      expect(provider.received).toHaveLength(3);
+      expect(provider.received[1]).toContain(reference);
+      expect(provider.received[1]).not.toContain("private fixture schedule");
+      expect(provider.received[2]).toContain("private fixture schedule");
+      await chat.close();
+      chat = await NativeAgentChat.start(launch);
+      const reopened = await chat.load(session.id);
+      expect((await chat.permissionMode(reopened)).mode).toBe("approve_for_me");
+      const page = await chat.transcriptPage(reopened);
+      expect(
+        page.turns?.find((record) => record.turnId === turn.turnId)
+          ?.approvalReviews
+      ).toMatchObject([{ decision: "approved" }]);
+      expect(provider.received).toHaveLength(3);
+    } finally {
+      reviewReply.resolve();
+      finalReply.resolve();
+      try {
+        await chat?.close();
+      } finally {
+        await provider.close();
+        test.close();
+      }
+    }
+  },
+  25000
+);
+
+it.runIf(Boolean(packaged) && supported)(
+  "presents the full long command and filesystem scope for manual fallback",
+  async () => {
+    const test = workspaceFixture();
+    const command = `curl https://example.org # ${"x".repeat(40 * 1024)}`;
+    const provider = await fixtureProvider({
+      name: "exec_command",
+      args: {
+        cmd: command,
+        access: "read",
+        network: { host: "example.org", port: 443 },
+      },
+    });
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        resourcesPath: packaged!,
+        cwd: test.workspace.primary.path,
+        stateDirectory: test.stateDirectory,
+        model: "fixture",
+        provider: "openai-compatible",
+        endpoint: provider.endpoint,
+        workspace: { ...test.workspace, allowScopedAccess: true },
+      });
+      const session = await chat.create();
+      const initial = await chat.permissionMode(session);
+      await chat.setPermissionMode(
+        session,
+        initial.revision,
+        "enable-review",
+        "approve_for_me"
+      );
+      await chat.submit(
+        session,
+        "check-resource",
+        "Check https://example.org with a read-only command."
+      );
+      const review = await vi.waitFor(
+        async () => {
+          const snapshot = await chat!.observe(session);
+          const [pending] = await chat!.approvals(session, snapshot);
+          expect(pending).toMatchObject({
+            tool: "exec_command",
+            access: "read",
+            command,
+            network: { host: "example.org", port: 443 },
+            scope: {
+              diskRead: true,
+              resolvedCwd: test.workspace.primary.path,
+              environmentNames: expect.any(Array),
+            },
+          });
+          return pending;
+        },
+        { timeout: 12000 }
+      );
+      expect(provider.received).toHaveLength(1);
+      await chat.answerApproval(session, review, "decline");
+      await vi.waitFor(
+        async () =>
+          expect((await chat!.observe(session)).latest?.status).toBe(
+            "succeeded"
+          ),
+        { timeout: 12000 }
+      );
+      expect(provider.received).toHaveLength(2);
+    } finally {
+      try {
+        await chat?.close();
+      } finally {
+        await provider.close();
+        test.close();
+      }
+    }
+  },
+  30000
 );

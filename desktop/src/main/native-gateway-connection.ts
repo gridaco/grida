@@ -219,6 +219,10 @@ export class NativeGatewayConnection implements NativeProviderNetwork {
     this.closing.abort();
   }
 
+  isCurrent(): boolean {
+    return !!this.#grant?.isCurrent() && !this.closing.signal.aborted;
+  }
+
   private async currentGrant(): Promise<DesktopGatewayGrant | undefined> {
     const previous = this.#grant;
     if (!previous?.isCurrent()) return;

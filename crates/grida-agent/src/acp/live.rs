@@ -46,6 +46,10 @@ pub(super) async fn forward(
                             "offsetBytes": offset,
                             "replace": replace,
                         });
+                        if replace && !update.citations.is_empty() {
+                            metadata["citations"] =
+                                super::projection::citation_metadata(&update.citations);
+                        }
                         if sessions
                             .lock()
                             .unwrap()
@@ -77,6 +81,50 @@ pub(super) async fn forward(
                         replace = false;
                         text = remaining;
                     }
+                }
+                Ok(LiveUpdate::HostedSearch {
+                    session,
+                    turn,
+                    message,
+                    status,
+                    action,
+                    settled,
+                }) => {
+                    if !text_enabled || !sessions.lock().unwrap().can_deliver(&session) {
+                        continue;
+                    }
+                    let (update, mut metadata) = super::projection::hosted_activity(
+                        &message,
+                        status,
+                        action.as_ref(),
+                        settled,
+                        json!({"turnId":turn}),
+                    );
+                    if sessions
+                        .lock()
+                        .unwrap()
+                        .negotiated
+                        .contains(super::projection::ACTIVITY_ORDER)
+                    {
+                        metadata.as_object_mut().unwrap().extend(
+                            crate::host::activity_order::metadata(
+                                ordering.message(&session, &turn, &message),
+                            )
+                            .as_object()
+                            .unwrap()
+                            .clone(),
+                        );
+                    }
+                    send_update(
+                        &connection,
+                        &delivery,
+                        &sessions,
+                        &session,
+                        update,
+                        CAPABILITY,
+                        metadata,
+                    )
+                    .await?;
                 }
                 Ok(LiveUpdate::Activity(update)) => {
                     if !text_enabled || !sessions.lock().unwrap().can_deliver(&update.session) {

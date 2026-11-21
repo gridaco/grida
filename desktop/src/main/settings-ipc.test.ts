@@ -1,6 +1,7 @@
 // GRIDA-SEC-004 / GRIDA-SEC-005 — fixed Settings action admission.
 import type { BrowserWindow, IpcMainInvokeEvent, WebContents } from "electron";
 import { EventEmitter } from "node:events";
+import type { DesktopPersonalization } from "./desktop-personalization";
 import type { NativeAgentHooks } from "./native-agent-hooks";
 import { beforeEach, expect, it, vi } from "vitest";
 import { IPC_CHANNELS } from "../bridge/contract";
@@ -12,6 +13,7 @@ const fixture = vi.hoisted(() => ({
     (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown
   >(),
   window: {},
+  windows: [] as unknown[],
   confirm:
     vi.fn<
       (window: unknown, options: unknown) => Promise<{ response: number }>
@@ -27,7 +29,10 @@ const fixture = vi.hoisted(() => ({
 }));
 
 vi.mock("electron", () => ({
-  BrowserWindow: { fromWebContents: () => fixture.window },
+  BrowserWindow: {
+    fromWebContents: () => fixture.window,
+    getAllWindows: () => fixture.windows,
+  },
   dialog: { showMessageBox: fixture.confirm },
   shell: { openPath: fixture.openPath },
   ipcMain: {
@@ -174,13 +179,14 @@ it("revokes an endpoint Save request after navigation or role loss during native
   expect(fixture.confirm).not.toHaveBeenCalled();
 });
 
-function setup(hooks?: NativeAgentHooks) {
+function setup(hooks?: NativeAgentHooks, preferences?: DesktopPersonalization) {
   let role: DesktopIpcRole | null = "main";
   const open = vi.fn<() => void>();
   registerIpcHandlers({
     resolve_ipc_role: () => role,
     open_settings: open,
     global_hooks: hooks,
+    personalization: preferences,
   });
   const mainFrame = {
     url: "https://fixture.invalid/desktop/workspace?id=project",
@@ -210,6 +216,160 @@ function setup(hooks?: NativeAgentHooks) {
     },
   };
 }
+
+it("restricts prediction writes to the live Settings frame and broadcasts only to admitted chat surfaces", async () => {
+  const state = { enabled: false, revision: 0 };
+  let broadcast!: (next: typeof state) => void;
+  const owner = {
+    onPersonalizationChange:
+      vi.fn<DesktopPersonalization["onPersonalizationChange"]>(),
+    get: vi.fn<DesktopPersonalization["get"]>(async () => state),
+    set: vi.fn<(enabled: boolean, check: () => void) => Promise<typeof state>>(
+      async (_enabled, check) => {
+        check();
+        return state;
+      }
+    ),
+    onChange: vi.fn<DesktopPersonalization["onChange"]>((listener) => {
+      broadcast = listener;
+      return () => {};
+    }),
+  };
+  const f = setup(undefined, owner as unknown as DesktopPersonalization);
+  const navigation = new EventEmitter();
+  Object.assign(f.event.sender, {
+    on: navigation.on.bind(navigation),
+    once: navigation.once.bind(navigation),
+    off: navigation.off.bind(navigation),
+  });
+  for (const page of ["workspace", "file"]) {
+    f.mainFrame.url = "https://fixture.invalid/desktop/" + page;
+    expect(await f.hook(IPC_CHANNELS.COMPOSER_PREDICTIONS_GET)).toEqual(state);
+    expect(() => f.hook(IPC_CHANNELS.COMPOSER_PREDICTIONS_SET, true)).toThrow(
+      "denied"
+    );
+  }
+  f.mainFrame.url = "https://fixture.invalid/desktop/settings";
+  expect(await f.hook(IPC_CHANNELS.COMPOSER_PREDICTIONS_GET)).toEqual(state);
+  expect(await f.hook(IPC_CHANNELS.COMPOSER_PREDICTIONS_SET, true)).toEqual(
+    state
+  );
+  expect(() => f.hook(IPC_CHANNELS.COMPOSER_PREDICTIONS_SET, "true")).toThrow(
+    "composer_predictions_preference_invalid"
+  );
+  owner.set.mockImplementationOnce(async (_enabled, check) => {
+    navigation.emit("did-start-navigation", { isMainFrame: true });
+    check();
+    return state;
+  });
+  await expect(
+    f.hook(IPC_CHANNELS.COMPOSER_PREDICTIONS_SET, true)
+  ).rejects.toThrow("denied");
+  f.event.senderFrame = null;
+  expect(() => f.hook(IPC_CHANNELS.COMPOSER_PREDICTIONS_SET, true)).toThrow(
+    "denied"
+  );
+
+  const windows = [
+    "https://fixture.invalid/desktop/workspace",
+    "https://fixture.invalid/desktop/file",
+    "https://fixture.invalid/desktop/settings",
+    "https://fixture.invalid/desktop/tools",
+    "https://other.invalid/desktop/settings",
+  ].map((url) => ({
+    isDestroyed: () => false,
+    webContents: {
+      isDestroyed: () => false,
+      mainFrame: { url },
+      send: vi.fn<() => void>(),
+    },
+  }));
+  fixture.windows = windows;
+  windows[0].webContents.send.mockImplementationOnce(() => {
+    throw new Error("Object has been destroyed");
+  });
+  broadcast(state);
+  expect(windows.map((w) => w.webContents.send.mock.calls.length)).toEqual([
+    1, 1, 1, 0, 0,
+  ]);
+  f.role(null);
+  broadcast(state);
+  expect(windows.map((w) => w.webContents.send.mock.calls.length)).toEqual([
+    1, 1, 1, 0, 0,
+  ]);
+});
+
+it("allows Personalization edits only from the live Settings frame", async () => {
+  const state = {
+    revision: 0,
+    webSearch: "disabled",
+    suggestedPrompts: false,
+  } as const;
+  const owner = {
+    onChange: vi.fn<DesktopPersonalization["onChange"]>(),
+    onPersonalizationChange:
+      vi.fn<DesktopPersonalization["onPersonalizationChange"]>(),
+    getPersonalization: vi.fn<DesktopPersonalization["getPersonalization"]>(
+      async () => state
+    ),
+    setPersonalization: vi.fn<DesktopPersonalization["setPersonalization"]>(
+      async (_change, check) => {
+        check?.();
+        return state;
+      }
+    ),
+  };
+  const f = setup(undefined, owner as unknown as DesktopPersonalization);
+  const navigation = new EventEmitter();
+  Object.assign(f.event.sender, {
+    on: navigation.on.bind(navigation),
+    once: navigation.once.bind(navigation),
+    off: navigation.off.bind(navigation),
+  });
+  expect(await f.hook(IPC_CHANNELS.PERSONALIZATION_GET)).toEqual(state);
+  expect(() =>
+    f.hook(IPC_CHANNELS.PERSONALIZATION_SET, { webSearch: "live" })
+  ).toThrow("denied");
+  f.mainFrame.url = "https://fixture.invalid/desktop/settings";
+  expect(
+    await f.hook(IPC_CHANNELS.PERSONALIZATION_SET, { webSearch: "live" })
+  ).toEqual(state);
+  expect(owner.setPersonalization).toHaveBeenCalledWith(
+    { webSearch: "live" },
+    expect.any(Function)
+  );
+  for (const invalid of [
+    { fastMode: false },
+    { webSearch: "cached" },
+    { webSearch: "indexed" },
+    { webSearch: "online" },
+    { suggestedPrompts: true, webSearch: "live" },
+    null,
+  ]) {
+    expect(() => f.hook(IPC_CHANNELS.PERSONALIZATION_SET, invalid)).toThrow(
+      "personalization_preference_invalid"
+    );
+  }
+  owner.setPersonalization.mockImplementationOnce(async (_change, check) => {
+    navigation.emit("did-start-navigation", { isMainFrame: true });
+    check?.();
+    return state;
+  });
+  await expect(
+    f.hook(IPC_CHANNELS.PERSONALIZATION_SET, { suggestedPrompts: true })
+  ).rejects.toThrow("denied");
+});
+
+it("reports that the preference is unavailable when Main has no native chat owner", () => {
+  const f = setup();
+  f.mainFrame.url = "https://fixture.invalid/desktop/settings";
+  expect(() => f.hook(IPC_CHANNELS.COMPOSER_PREDICTIONS_GET)).toThrow(
+    "composer_predictions_unavailable"
+  );
+  expect(() => f.hook(IPC_CHANNELS.COMPOSER_PREDICTIONS_SET, false)).toThrow(
+    "composer_predictions_unavailable"
+  );
+});
 
 it("opens native Settings from an admitted main frame without navigating its caller", () => {
   const { invoke, mainFrame, open } = setup();

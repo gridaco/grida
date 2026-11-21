@@ -252,6 +252,7 @@ impl Host {
                 input.clone(),
                 parts,
                 SubmissionPolicy {
+                    request_options: Default::default(),
                     selection_revision: None,
                     selection_goal: false,
                     questions: false,
@@ -264,6 +265,7 @@ impl Host {
                     editor_presentation: false,
                     editor_browser_tools: false,
                     editor_svg_target: None,
+                    editor_tool_context_id: None,
                     operating_regime: OperatingRegime::Act,
                     subagent: Some(Assignment::new(parent_turn.clone())),
                     effort: None,

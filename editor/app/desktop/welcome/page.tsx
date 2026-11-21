@@ -267,17 +267,33 @@ function WelcomeSurface({
   const [openingFolder, setBusy] = useState(false);
   const busy = openingFolder || staged.busy || staged.permissionBusy;
   const {
+    acceptsAutomaticApprovalReview,
+    defaultsToAutomaticReview,
+    welcomeProfiles,
+    welcomeTurnCapabilities,
     prepareWelcomeFullAccess,
+    prepareWelcomeAutomaticReview,
     answerWelcomeFullAccess,
     startWelcomeFullAccess,
     welcomeFullAccessAcrossPresets,
   } = bridge?.nativeChat ?? {};
-  const fullAccess =
+  useEffect(
+    () =>
+      composer.connectAutomaticReview(
+        acceptsAutomaticApprovalReview,
+        defaultsToAutomaticReview
+      ),
+    [composer, acceptsAutomaticApprovalReview, defaultsToAutomaticReview]
+  );
+  const accessHost =
     prepareWelcomeFullAccess &&
     answerWelcomeFullAccess &&
     startWelcomeFullAccess
       ? {
           prepare: prepareWelcomeFullAccess,
+          prepareAutomatic: staged.automaticReviewAvailable
+            ? prepareWelcomeAutomaticReview
+            : undefined,
           answer: answerWelcomeFullAccess,
           start: startWelcomeFullAccess,
         }
@@ -309,19 +325,9 @@ function WelcomeSurface({
   const [defaultWorkspace, setDefaultWorkspace] = useState<Workspace | null>(
     null
   );
-  useEffect(() => {
-    let active = true;
-    void workspacesNs
-      .getDefault()
-      .then((workspace) => {
-        if (active) setDefaultWorkspace(workspace);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, []);
-  const mentions = useWorkspaceFileMentions((target ?? defaultWorkspace)?.id);
+  const defaultWorkspaceRead = useRef<Promise<Workspace | null> | null>(null);
+  const destination = target ?? defaultWorkspace;
+  const mentions = useWorkspaceFileMentions(destination?.id);
   const catalog = useMemo<ComposerCatalog>(
     () => ({ commands: [], mentions }),
     [mentions]
@@ -523,25 +529,58 @@ function WelcomeSurface({
     modelSelection.read,
     modelSelection.read
   );
-  const awaitingProfiles =
-    !!bridge?.nativeChat?.welcomeProfiles && !profilesLoaded;
+  const awaitingProfiles = !!welcomeProfiles && !profilesLoaded;
+  useLayoutEffect(
+    () =>
+      composer.connectTurnCapabilities(
+        destination?.id,
+        profileId,
+        !awaitingProfiles ? welcomeTurnCapabilities : undefined
+      ),
+    [
+      composer,
+      destination?.id,
+      profileId,
+      awaitingProfiles,
+      welcomeTurnCapabilities,
+    ]
+  );
   useEffect(() => {
     composer.initializeEffort(profiles?.newChatDefault?.effort);
   }, [composer, profiles?.newChatDefault?.effort]);
   const readProfiles = useCallback(() => {
-    const list = getDesktopBridge()?.nativeChat?.welcomeProfiles;
-    if (!list) return;
-    void modelSelection.refresh(list);
-  }, [modelSelection]);
+    if (welcomeProfiles) void modelSelection.refresh(welcomeProfiles);
+  }, [modelSelection, welcomeProfiles]);
+  const refreshOptions = useCallback(() => {
+    void composer.refreshTurnCapabilities();
+    if (defaultWorkspaceRead.current) return;
+    const request = workspacesNs.getDefault();
+    defaultWorkspaceRead.current = request;
+    void request
+      .then((workspace) => {
+        if (defaultWorkspaceRead.current === request)
+          setDefaultWorkspace(workspace);
+      }, NOOP)
+      .finally(() => {
+        if (defaultWorkspaceRead.current === request)
+          defaultWorkspaceRead.current = null;
+      });
+  }, [composer]);
   useEffect(() => {
-    readProfiles();
-    // Settings can add a provider key or endpoint in another window.
-    window.addEventListener("focus", readProfiles);
-    return () => {
-      window.removeEventListener("focus", readProfiles);
-      modelSelection.release();
+    const refresh = () => {
+      readProfiles();
+      refreshOptions();
+      composer.refreshAutomaticReview();
     };
-  }, [readProfiles, modelSelection]);
+    refresh();
+    // Settings can add a provider key or endpoint in another window.
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      modelSelection.release();
+      defaultWorkspaceRead.current = null;
+    };
+  }, [bridge, composer, readProfiles, refreshOptions, modelSelection]);
 
   // Open a workspace and, when there is one, leave the first message for its
   // chat. An empty message enters the workspace without starting a turn.
@@ -850,17 +889,22 @@ function WelcomeSurface({
                   <AgentComposer
                     access={{
                       mode: staged.permissionMode,
-                      available: !!fullAccess,
+                      available: !!accessHost,
+                      automaticReview:
+                        staged.automaticReviewAvailable &&
+                        (!!defaultsToAutomaticReview ||
+                          !!accessHost?.prepareAutomatic),
                       staged: true,
                       busy,
+                      onOpen: composer.refreshAutomaticReview,
                       onChange: (mode) => {
                         composer.selectPermissionMode(
                           mode,
                           {
-                            workspace: target ?? defaultWorkspace,
+                            workspace: destination,
                             defaultWorkspace: workspacesNs.getDefault,
                           },
-                          fullAccess
+                          accessHost
                         );
                       },
                     }}
@@ -1001,6 +1045,15 @@ function WelcomeSurface({
                       onRefresh: readProfiles,
                       refreshError: profileReadError,
                       effort: staged.effort,
+                      speed:
+                        !staged.goal && welcomeTurnCapabilities
+                          ? {
+                              value: staged.speed ?? "standard",
+                              capabilities: staged.turnCapabilities,
+                              onChange: composer.selectSpeed,
+                              refresh: refreshOptions,
+                            }
+                          : undefined,
                       onEffort: composer.selectEffort,
                       goal: staged.goal,
                     }}

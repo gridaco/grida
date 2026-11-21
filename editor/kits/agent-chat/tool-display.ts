@@ -11,6 +11,7 @@ export type ToolDisplayAction =
   | "edit"
   | "write"
   | "list"
+  | "web_search"
   | "search"
   | "pick_references"
   | "view_image"
@@ -22,6 +23,7 @@ export type ToolDisplayAction =
   | "skill"
   | "open_tab"
   | "list_tabs"
+  | "desktop_tool"
   | "tool";
 
 export type ToolDisplayTone = "running" | "ok" | "warn" | "error";
@@ -98,6 +100,29 @@ export namespace toolDisplay {
           tone,
         };
 
+      case "web_search": {
+        const queries = Array.isArray(args.queries)
+          ? args.queries
+              .filter((q): q is string => typeof q === "string")
+              .join(", ")
+          : undefined;
+        const label: [string, string, string] =
+          args.type === "open_page"
+            ? ["Opening web page", "Opened web page", "Couldn't open web page"]
+            : args.type === "find_in_page"
+              ? ["Searching page", "Searched page", "Couldn't search page"]
+              : ["Searching the web", "Searched the web", "Web search failed"];
+        return {
+          action: "web_search",
+          title: describeTitle(tone, ...label),
+          detail:
+            stringValue(args.query) ||
+            queries ||
+            stringValue(args.pattern) ||
+            stringValue(args.url),
+          tone,
+        };
+      }
       case chat_vocabulary.TOOL_NAMES.grep_files:
         return {
           action: "search",
@@ -272,7 +297,10 @@ export namespace toolDisplay {
 
       default:
         return {
-          action: "tool",
+          action:
+            toolName.startsWith("workbench_") || toolName.startsWith("browser_")
+              ? "desktop_tool"
+              : "tool",
           title: describeTitle(tone, "Using tool", "Used tool", "Tool failed"),
           detail: toolName,
           tone,
@@ -356,6 +384,7 @@ const GROUP_VERBS: Record<
   view_image: ["viewed", "viewing", "view"],
   pick_references: ["picked", "picking", "pick"],
   search: ["searched", "searching", "search"],
+  web_search: ["searched", "searching", "search"],
   list: ["listed", "listing", "list"],
   command: ["ran", "running", "run"],
   process: ["used", "using", "use"],
@@ -364,6 +393,7 @@ const GROUP_VERBS: Record<
   skill: ["loaded", "loading", "load"],
   open_tab: ["opened", "opening", "open"],
   list_tabs: ["checked", "checking", "check"],
+  desktop_tool: ["used", "using", "use"],
   tool: ["used", "using", "use"],
 };
 
@@ -373,7 +403,13 @@ function pushGroupClause(
   action: ToolDisplayAction,
   verb: string
 ) {
-  if (action === "pick_references")
+  if (action === "web_search") {
+    const count = counts.get(action);
+    if (count)
+      clauses.push(
+        count === 1 ? `${verb} the web` : `${verb} the web ${count} times`
+      );
+  } else if (action === "pick_references")
     pushReferencePickerClause(clauses, counts, verb);
   else if (action === "list_tabs") pushTabsCheckClause(clauses, counts, verb);
   else pushClause(clauses, counts, action, verb);
@@ -442,6 +478,8 @@ function nounForAction(action: ToolDisplayAction): string {
     case "edit":
     case "write":
       return "file";
+    case "web_search":
+      return "web search";
     case "search":
       return "search";
     case "pick_references":
@@ -465,6 +503,8 @@ function nounForAction(action: ToolDisplayAction): string {
       return "tab";
     case "list_tabs":
       return "tab check";
+    case "desktop_tool":
+      return "desktop tool";
     case "tool":
       return "tool call";
   }

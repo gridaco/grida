@@ -1,9 +1,10 @@
-import { act, useSyncExternalStore } from "react";
+import { act, useEffect, useSyncExternalStore } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import type {
   DesktopNativeChat,
+  NativeChatApprovalDecision,
   NativeChatPermissionMode,
 } from "@grida/desktop-bridge";
 import { NativeChatController } from "@/lib/agent-chat/native-chat-controller";
@@ -13,6 +14,7 @@ import { ComposerProvider } from "@/kits/composer";
 import { HomeComposer } from "../home/home-composer";
 import { AgentComposerInput } from "../shared/agent-composer-input";
 import { AgentComposerTools } from "../shared/agent-composer-tools";
+import { AgentApprovalPrompt } from "../shared/agent-approval";
 import { AgentPermissionConfirmation } from "../shared/agent-permission-confirmation";
 import "@/app/ui.css";
 
@@ -43,6 +45,9 @@ function Fixture({ controller }: { controller: NativeChatController }) {
           access={{
             mode: state.permissionMode?.mode ?? "restricted",
             available: state.permissionModeAvailable,
+            automaticReview:
+              state.permissionMode?.available.includes("approve_for_me") ??
+              state.draftAutomaticReviewAvailable,
             uncertain: state.permissionModeUncertain,
             busy: state.permissionModeBusy,
             error: state.permissionModeError,
@@ -64,6 +69,7 @@ function Fixture({ controller }: { controller: NativeChatController }) {
 async function setup(
   older = false,
   options: {
+    automaticReview?: boolean;
     width?: number;
     height?: number;
     workspaceName?: string;
@@ -75,6 +81,9 @@ async function setup(
     globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
   ).IS_REACT_ACT_ENVIRONMENT = true;
   await page.viewport(options.width ?? 720, options.height ?? 720);
+  const available: NativeChatPermissionMode[] = options.automaticReview
+    ? ["restricted", "approve_for_me", "full_access"]
+    : ["restricted", "full_access"];
   const modes = new Map<string, NativeChatPermissionMode>();
   const setPermissionMode = vi.fn<
     NonNullable<DesktopNativeChat["setPermissionMode"]>
@@ -85,7 +94,7 @@ async function setup(
       sessionId: id,
       revision: revision + 1,
       mode,
-      available: ["restricted", "full_access"],
+      available,
     };
   });
   const bridge: DesktopNativeChat = {
@@ -122,7 +131,7 @@ async function setup(
             sessionId: id,
             revision: 0,
             mode: modes.get(id) ?? ("restricted" as const),
-            available: ["restricted", "full_access"] as const,
+            available,
           }),
           reviewPermissionMode: vi.fn<
             NonNullable<DesktopNativeChat["reviewPermissionMode"]>
@@ -159,7 +168,7 @@ async function click(name: string | RegExp) {
 }
 
 async function openReview() {
-  await click("Access: Default");
+  await click("Access: Ask for approval");
   await click(/^Full access/);
   await expect.element(page.getByRole("alertdialog")).toBeVisible();
   await expect
@@ -175,7 +184,7 @@ async function openReview() {
     .not.toBeInTheDocument();
 }
 
-it("opens the Home dialog on selection before Desktop answers and sends without a second prompt", async () => {
+it("retries Home approval discovery on open and confirms Full access once before sending", async () => {
   (
     globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
   ).IS_REACT_ACT_ENVIRONMENT = true;
@@ -184,16 +193,21 @@ it("opens the Home dialog on selection before Desktop answers and sends without 
   const workspace = { id: "studio", name: "Studio project" } as Workspace;
   const pending =
     Promise.withResolvers<
-      Awaited<ReturnType<HomeComposer.FullAccess["prepare"]>>
+      Awaited<ReturnType<HomeComposer.AccessHost["prepare"]>>
     >();
+  const approvalAvailability = Promise.withResolvers<boolean>();
+  const probe = vi.fn<() => Promise<boolean>>(async () => true);
+  probe.mockRejectedValueOnce(new Error("Home admission pending"));
+  probe.mockReturnValueOnce(approvalAvailability.promise);
   const access = {
     prepare: () => pending.promise,
-    answer: vi.fn<HomeComposer.FullAccess["answer"]>(async () => {}),
-    start: vi.fn<HomeComposer.FullAccess["start"]>(async () => ({
+    prepareAutomatic: () => pending.promise,
+    answer: vi.fn<HomeComposer.AccessHost["answer"]>(async () => {}),
+    start: vi.fn<HomeComposer.AccessHost["start"]>(async () => ({
       sessionId: CHAT,
       profileId: null,
     })),
-  } satisfies HomeComposer.FullAccess;
+  } satisfies HomeComposer.AccessHost;
   const host = {
     defaultWorkspace: async () => workspace,
     stash: vi.fn<HomeComposer.Host["stash"]>(() => true),
@@ -201,6 +215,7 @@ it("opens the Home dialog on selection before Desktop answers and sends without 
   } satisfies HomeComposer.Host;
   function Home() {
     const view = useSyncExternalStore(composer.subscribe, composer.read);
+    useEffect(() => composer.connectAutomaticReview(probe), []);
     return (
       <section aria-label="Home" className="mx-auto mt-64 max-w-lg">
         <AgentComposerInput
@@ -228,8 +243,10 @@ it("opens the Home dialog on selection before Desktop answers and sends without 
               access={{
                 mode: view.permissionMode,
                 available: true,
+                automaticReview: view.automaticReviewAvailable,
                 staged: true,
                 busy: view.busy || view.permissionBusy,
+                onOpen: composer.refreshAutomaticReview,
                 onChange: (mode) =>
                   composer.selectPermissionMode(
                     mode,
@@ -252,11 +269,17 @@ it("opens the Home dialog on selection before Desktop answers and sends without 
   const root = createRoot(container);
   resources.push({ root });
   await act(async () => root.render(<Home />));
+  expect(probe).toHaveBeenCalledTimes(1);
   const input = container.querySelector<HTMLElement>(
     '[contenteditable="true"]'
   )!;
   await act(async () => userEvent.fill(input, "First message"));
-  await click("Access: Default");
+  await click("Access: Ask for approval");
+  expect(probe).toHaveBeenCalledTimes(2);
+  const approve = page.getByRole("button", { name: /^Auto\b/ });
+  await expect.element(approve).not.toBeInTheDocument();
+  await act(async () => approvalAvailability.resolve(true));
+  await expect.element(approve).toBeEnabled();
   await click(/^Full access/);
   const dialog = page.getByRole("alertdialog");
   await expect.element(dialog).toHaveAccessibleName("Enable Full access?");
@@ -279,7 +302,7 @@ it("opens the Home dialog on selection before Desktop answers and sends without 
     })
   );
   expect(access.answer).toHaveBeenCalledExactlyOnceWith("review-token", false);
-  await click("Access: Default");
+  await click("Access: Ask for approval");
   await click(/^Full access/);
   await expect.element(dialog).toBeVisible();
   await click("Enable Full access");
@@ -366,7 +389,7 @@ it("keeps the picker closed through compact confirmation, cancellation and exact
 it("closes the picker immediately before a delayed Full access review and changes nothing yet", async () => {
   const held = Promise.withResolvers<void>();
   const f = await setup(false, { holdReview: held.promise });
-  await click("Access: Default");
+  await click("Access: Ask for approval");
   await click(/^Full access/);
   await expect
     .element(page.getByText("Access for new messages"))
@@ -379,7 +402,7 @@ it("closes the picker immediately before a delayed Full access review and change
   await click("Cancel");
 });
 
-it("closes the picker when Default is selected and needs no warning confirmation", async () => {
+it("closes the picker when Ask for approval is selected and needs no warning confirmation", async () => {
   const f = await setup();
   await openReview();
   await click("Enable Full access");
@@ -387,7 +410,7 @@ it("closes the picker when Default is selected and needs no warning confirmation
     .poll(() => f.controller.read().permissionMode?.mode)
     .toBe("full_access");
   await click("Access: Full access");
-  await click(/^Default/);
+  await click(/^Ask for approval/);
   await expect
     .element(page.getByText("Access for new messages"))
     .not.toBeInTheDocument();
@@ -452,10 +475,37 @@ it("closes pending confirmation when another chat takes the view", async () => {
   expect(f.modes.has(CHAT)).toBe(false);
 });
 
+it("selects automatic review for this chat when the host advertises it", async () => {
+  const { bridge, setPermissionMode } = await setup(false, {
+    automaticReview: true,
+  });
+  await click("Access: Ask for approval");
+  await click(/^Auto\b/);
+  await expect
+    .element(page.getByRole("button", { name: "Access: Auto" }))
+    .toBeVisible();
+  expect(setPermissionMode).toHaveBeenCalledWith(
+    CHAT,
+    0,
+    expect.any(String),
+    "approve_for_me",
+    undefined
+  );
+  expect(bridge.reviewPermissionMode).not.toHaveBeenCalled();
+});
+
+it("omits automatic review on a two-mode host", async () => {
+  await setup();
+  await click("Access: Ask for approval");
+  expect(page.getByRole("button", { name: /^Auto\b/ }).elements()).toHaveLength(
+    0
+  );
+});
+
 it("keeps Full access disabled on older hosts", async () => {
   await setup(true);
   await page
-    .getByRole("button", { name: "Access: Default", exact: true })
+    .getByRole("button", { name: "Access: Ask for approval", exact: true })
     .click();
   await expect
     .element(page.getByRole("button", { name: /^Full access/ }))
@@ -467,4 +517,58 @@ it("keeps Full access disabled on older hosts", async () => {
       )
     )
     .toBeVisible();
+});
+
+it("shows the exact command and network scope when review times out and accepts a manual decline", async () => {
+  const element = document.createElement("div");
+  document.body.append(element);
+  const root = createRoot(element);
+  resources.push({ root });
+  const answer = vi.fn<(decision: NativeChatApprovalDecision) => void>();
+  await act(async () =>
+    root.render(
+      <AgentApprovalPrompt
+        approval={{
+          reviewId: "review",
+          root: "/project",
+          tool: "exec_command",
+          command: "curl https://example.org",
+          cwd: "/project",
+          executable: "/bin/sh",
+          access: "read",
+          network: { host: "example.org", port: 443 },
+          scope: {
+            diskRead: true,
+            resolvedExecutable: "/bin/sh",
+            resolvedCwd: "/project",
+            readRoots: ["/project"],
+            writeRoots: [],
+            runtimeRoots: ["/usr/bin"],
+            privateTempWrite: true,
+            environmentNames: ["PATH"],
+          },
+          reviewFailure: "timed_out",
+        }}
+        onDecision={answer}
+      />
+    )
+  );
+  await expect
+    .element(page.getByText("Automatic review timed out."))
+    .toBeVisible();
+  await expect
+    .element(page.getByText('Destination "example.org" port 443'))
+    .toBeVisible();
+  await expect
+    .element(page.getByText('Command "curl https://example.org"'))
+    .toBeVisible();
+  await expect
+    .element(
+      page.getByText(
+        "Can read files outside the project, except protected locations."
+      )
+    )
+    .toBeVisible();
+  await page.getByRole("button", { name: "Decline" }).click();
+  expect(answer).toHaveBeenCalledExactlyOnceWith("decline");
 });

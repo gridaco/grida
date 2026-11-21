@@ -26,6 +26,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type KeyboardEvent,
   type ReactNode,
   type Ref,
@@ -37,6 +38,7 @@ import {
   PencilIcon,
   SquareIcon,
 } from "lucide-react";
+import type { NativeComposerPrediction } from "@/lib/agent-chat/native-composer-prediction";
 import type { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
 import { ComposerDraftBinding } from "@/lib/agent-chat/composer-draft-binding";
 import { AgentComposerEditSession } from "./agent-composer-edit-session";
@@ -61,6 +63,8 @@ import {
 } from "./agent-composer-queue-submit";
 
 const ESCAPE_CONFIRM_MS = 2000;
+const noSuggestion = () => null;
+const noSubscription = () => () => {};
 
 /**
  * A `/`-command that runs an action (e.g. `/compact`) instead of being
@@ -140,6 +144,7 @@ export type AgentComposerInputProps = {
    */
   draft?: { key: string; store: ComposerDrafts };
   placeholder?: string;
+  prediction?: NativeComposerPrediction;
   /** Focus on mount and when switching to another chat's restored draft. */
   autofocus?: boolean;
   /** Send dropped or pasted items to the surface's own attachment intake. */
@@ -157,7 +162,7 @@ export type AgentComposerInputProps = {
   /** Attachments the host stages itself, shown above the editor. */
   attachments?: ReactNode;
   /** A live editor selection eligible to go with the next message. */
-  selectionContext?: "svg-text";
+  selectionContext?: "svg-text" | "svg-selection";
   /** Footer content at the start of the toolbar. */
   toolbarStart?: ReactNode;
   /** Footer content right-aligned before the submit/stop button. */
@@ -217,6 +222,7 @@ function AgentComposerInner({
   onStop,
   emptyAction,
   draft,
+  prediction,
   placeholder = "Ask anything…",
   autofocus,
   onAttachmentTransfer,
@@ -276,6 +282,35 @@ function AgentComposerInner({
     editSession,
     editOwner,
   ]);
+  const predictedText = useSyncExternalStore(
+    prediction?.subscribe ?? noSubscription,
+    prediction?.read ?? noSuggestion,
+    noSuggestion
+  );
+  const reportDraft = useCallback(
+    (empty: boolean) => {
+      if (typeof submissionScope === "number")
+        prediction?.setDraft(
+          submissionScope,
+          empty &&
+            !editing &&
+            !selectionContext &&
+            (!draftKey || binding.held === draftKey)
+        );
+    },
+    [prediction, submissionScope, editing, selectionContext, draftKey, binding]
+  );
+  useEffect(() => {
+    reportDraft(composer.isEmptyDraft());
+  }, [reportDraft, composer]);
+  useLayoutEffect(
+    () => () => {
+      if (typeof submissionScope === "number")
+        prediction?.setDraft(submissionScope, false);
+    },
+    [prediction, submissionScope]
+  );
+
   useImperativeHandle(
     draftRef,
     () => ({ appendText: composer.appendText, focus: composer.focus }),
@@ -614,6 +649,12 @@ function AgentComposerInner({
         }}
         autofocus={autofocus}
         onSubmitRequest={submit}
+        suggestion={
+          prediction && predictedText
+            ? { text: predictedText, take: prediction.take }
+            : undefined
+        }
+        onDraftChange={prediction && reportDraft}
         readOnly={readOnly}
         onTransfer={editing ? () => {} : onAttachmentTransfer}
         placeholder={placeholder}

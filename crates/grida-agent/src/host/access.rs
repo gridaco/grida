@@ -141,30 +141,61 @@ impl Host {
             .map_err(|_| storage_unavailable())
     }
 
+    /// Called under configuration admission when inspecting or selecting access for new work.
+    fn current_permission_ledger(&self, session: &SessionId, cwd: PathBuf) -> Result<Ledger> {
+        let Some(mut ledger) = self.read_permission_mode(session, &cwd)? else {
+            return Ok(Ledger {
+                schema: SCHEMA.into(),
+                session_id: session.clone(),
+                cwd,
+                revision: 0,
+                mode: self.initial_permission_mode(),
+                receipts: BTreeMap::new(),
+                acknowledged: BTreeSet::new(),
+            });
+        };
+        if ledger.mode == PermissionMode::ApproveForMe
+            && !self.supports_permission_mode(ledger.mode)
+        {
+            // Retain old receipts for idempotent retries. Restoring reviewer support
+            // later requires a fresh selection before new inputs can use it again.
+            ledger.mode = PermissionMode::Restricted;
+            ledger.revision = ledger
+                .revision
+                .checked_add(1)
+                .ok_or_else(storage_unavailable)?;
+            self.write_permission_mode(&ledger)?;
+        }
+        Ok(ledger)
+    }
+
+    fn initial_permission_mode(&self) -> PermissionMode {
+        self.permissions
+            .as_ref()
+            .map_or(PermissionMode::Restricted, |p| p.initial_mode())
+    }
+
     pub(super) fn selected_permission_mode(&self, session: &SessionView) -> Result<PermissionMode> {
         let configuration = session_configuration(session)?;
         if let Some(side) = configuration.side {
             return Ok(side.permission_mode);
         }
-        let cwd = configuration.cwd;
         // In-memory hosts have no retained selection and stay with their explicit
         // launch posture. Desktop always has private state.
         if self.state_dir.is_none() {
-            return Ok(self
-                .permissions
-                .as_ref()
-                .map_or(PermissionMode::Restricted, |p| p.initial_mode()));
+            return Ok(self.initial_permission_mode());
         }
         Ok(self
-            .read_permission_mode(&session.session, &cwd)?
-            .map_or_else(
-                || {
-                    self.permissions
-                        .as_ref()
-                        .map_or(PermissionMode::Restricted, |p| p.initial_mode())
-                },
-                |ledger| ledger.mode,
-            ))
+            .current_permission_ledger(&session.session, configuration.cwd)?
+            .mode)
+    }
+
+    fn supports_permission_mode(&self, mode: PermissionMode) -> bool {
+        self.permissions
+            .as_ref()
+            .map_or(mode == PermissionMode::Restricted, |profile| {
+                profile.supports_mode(mode)
+            })
     }
 
     fn permission_mode_snapshot(
@@ -173,14 +204,14 @@ impl Host {
         revision: u64,
         mode: PermissionMode,
     ) -> PermissionModeSnapshot {
-        let mut available = vec![PermissionMode::Restricted];
-        if self
-            .permissions
-            .as_ref()
-            .is_some_and(|p| p.supports_full_access())
-        {
-            available.push(PermissionMode::FullAccess);
-        }
+        let available = [
+            PermissionMode::Restricted,
+            PermissionMode::ApproveForMe,
+            PermissionMode::FullAccess,
+        ]
+        .into_iter()
+        .filter(|mode| self.supports_permission_mode(*mode))
+        .collect();
         PermissionModeSnapshot {
             session_id: session,
             revision,
@@ -197,20 +228,14 @@ impl Host {
         let _admission = self.configuration_admission.lock().await;
         let view = self.permission_mode_scope(&cwd, &session).await?;
         let cwd = session_configuration(&view)?.cwd;
-        let ledger = self.read_permission_mode(&session, &cwd)?;
-        let mode = self.selected_permission_mode(&view)?;
-        if mode == PermissionMode::FullAccess
-            && !self
-                .permissions
-                .as_ref()
-                .is_some_and(|p| p.supports_full_access())
-        {
+        let ledger = self.current_permission_ledger(&session, cwd)?;
+        if !self.supports_permission_mode(ledger.mode) {
             return Err(problem(
                 ErrorKind::Unavailable,
                 "permission_mode_unavailable",
             ));
         }
-        Ok(self.permission_mode_snapshot(session, ledger.map_or(0, |v| v.revision), mode))
+        Ok(self.permission_mode_snapshot(session, ledger.revision, ledger.mode))
     }
 
     /// Only a trusted supervisor may call this after authenticating the user's
@@ -225,17 +250,7 @@ impl Host {
             .permission_mode_scope(&update.cwd, &update.session_id)
             .await?;
         let cwd = session_configuration(&view)?.cwd;
-        let mut ledger = self
-            .read_permission_mode(&update.session_id, &cwd)?
-            .unwrap_or(Ledger {
-                schema: SCHEMA.into(),
-                session_id: update.session_id.clone(),
-                cwd,
-                revision: 0,
-                mode: self.selected_permission_mode(&view)?,
-                receipts: BTreeMap::new(),
-                acknowledged: BTreeSet::new(),
-            });
+        let mut ledger = self.current_permission_ledger(&update.session_id, cwd)?;
         if let Some((original, receipt)) = ledger.receipts.get(&update.request_id) {
             return if original == &update {
                 Ok(receipt.clone())
@@ -261,12 +276,7 @@ impl Host {
                 "permission_mode_revision_changed",
             ));
         }
-        if update.mode == PermissionMode::FullAccess
-            && !self
-                .permissions
-                .as_ref()
-                .is_some_and(|p| p.supports_full_access())
-        {
+        if !self.supports_permission_mode(update.mode) {
             return Err(problem(
                 ErrorKind::Unavailable,
                 "permission_mode_unavailable",

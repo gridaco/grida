@@ -5,7 +5,10 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { IpcMainInvokeEvent } from "electron";
-import type { NativeEditorSvgText } from "@grida/desktop-bridge";
+import type {
+  NativeEditorSvgSelection,
+  NativeEditorSvgText,
+} from "@grida/desktop-bridge";
 import { expect, it, vi } from "vitest";
 import { IPC_CHANNELS } from "../bridge/contract";
 import { NativeAgentChat } from "./native-agent-chat";
@@ -14,8 +17,11 @@ import { NativeGatewayConnection } from "./native-gateway-connection";
 
 const resources = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
 const origin = "https://editor.fixture.invalid";
+const SEARCH = "tool_search";
 const READ = "svg_read_selected_text";
 const REPLACE = "svg_replace_selected_text";
+const INSPECT = "svg_inspect_selection";
+const OPACITY = "svg_set_selection_opacity";
 
 it.runIf(Boolean(resources)).each(["workbench", "root deck", "nested deck"])(
   "correlates selected SVG text through the built native process in the %s",
@@ -59,14 +65,26 @@ it.runIf(Boolean(resources)).each(["workbench", "root deck", "nested deck"])(
                 JSON.parse(message.content)
               )
           );
-          if (offers.length === 1) return tool(READ, {}, "svg-read");
-          if (offers.length === 2)
+          if (offers.length === 1)
+            return tool(
+              SEARCH,
+              { source: "workbench", query: "selected SVG text" },
+              "svg-discover"
+            );
+          if (offers.length === 2) return tool(READ, {}, "svg-read");
+          if (offers.length === 3)
             return tool(
               REPLACE,
               { revision: target, text: "Changed" },
               "svg-replace"
             );
-          if (offers.length === 5)
+          if (offers.length === 6)
+            return tool(
+              SEARCH,
+              { source: "workbench", query: REPLACE },
+              "svg-discover-again"
+            );
+          if (offers.length === 7)
             return tool(
               REPLACE,
               { revision: target, text: "Unverified" },
@@ -213,7 +231,11 @@ it.runIf(Boolean(resources)).each(["workbench", "root deck", "nested deck"])(
         },
         { timeout: 6000 }
       );
-      expect(offers[0]).toEqual(expect.arrayContaining([READ, REPLACE]));
+      expect(offers).toHaveLength(4);
+      expect(offers[0]).toContain(SEARCH);
+      expect(offers[0]).not.toContain(READ);
+      expect(offers[0]).not.toContain(REPLACE);
+      expect(offers[1]).toEqual(expect.arrayContaining([READ, REPLACE]));
       expect(delivered).toHaveLength(2);
       expect(
         delivered.map(({ attachmentId, targetId, operation }) => ({
@@ -239,6 +261,15 @@ it.runIf(Boolean(resources)).each(["workbench", "root deck", "nested deck"])(
           expect.objectContaining({
             status: "succeeded",
             structured: {
+              matches: expect.arrayContaining([
+                expect.objectContaining({ kind: "tool", name: READ }),
+                expect.objectContaining({ kind: "tool", name: REPLACE }),
+              ]),
+            },
+          }),
+          expect.objectContaining({
+            status: "succeeded",
+            structured: {
               kind: "read",
               path: "/poster.svg",
               revision: target,
@@ -261,9 +292,10 @@ it.runIf(Boolean(resources)).each(["workbench", "root deck", "nested deck"])(
           "plan"
         )
       );
-      await vi.waitFor(() => expect(offers).toHaveLength(4));
-      expect(offers[3]).not.toContain(READ);
-      expect(offers[3]).not.toContain(REPLACE);
+      await vi.waitFor(() => expect(offers).toHaveLength(5));
+      expect(offers[4]).not.toContain(SEARCH);
+      expect(offers[4]).not.toContain(READ);
+      expect(offers[4]).not.toContain(REPLACE);
       expect(delivered).toHaveLength(2);
       const unknown = await onRoute(() => ipc.create(event));
       await onRoute(() =>
@@ -293,8 +325,228 @@ it.runIf(Boolean(resources)).each(["workbench", "root deck", "nested deck"])(
         },
         { timeout: 6000 }
       );
-      expect(offers).toHaveLength(5);
+      expect(offers).toHaveLength(7);
+      expect(offers[5]).toContain(SEARCH);
+      expect(offers[5]).not.toContain(READ);
+      expect(offers[5]).not.toContain(REPLACE);
+      expect(offers[6]).toContain(REPLACE);
       expect(delivered).toHaveLength(3);
+      expect(delivered[2]).toMatchObject({
+        attachmentId: unknown.attachmentId,
+        targetId: target,
+        operation: { kind: "replace", revision: target, text: "Unverified" },
+      });
+    } finally {
+      try {
+        await chat?.close();
+      } finally {
+        connection.close();
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    }
+  },
+  20_000
+);
+
+it.runIf(Boolean(resources))(
+  "offers arbitrary SVG selection through the built native catalog and delivers one opacity edit",
+  async () => {
+    const root = await fs.mkdtemp(
+      path.join(await fs.realpath(os.tmpdir()), "grida-svg-selection-")
+    );
+    const cwd = path.join(root, "workspace");
+    await fs.mkdir(cwd, { mode: 0o700 });
+    const targetId = randomUUID();
+    const pathInView = "/poster.svg";
+    const offered: string[][] = [];
+    const toolResults: unknown[] = [];
+    const delivered: NativeEditorSvgSelection.Operation[] = [];
+    const connection = await NativeGatewayConnection.open({
+      origin,
+      account: {
+        withGatewayGrant: async (_, accept) =>
+          accept({
+            token: "fixture.gateway.token",
+            subject: "synthetic-user",
+            organizationId: 12,
+            expiresAt: Date.now() + 120_000,
+            isCurrent: () => true,
+          }),
+      },
+      network: {
+        prepare: () => async (body) => {
+          const request = JSON.parse(body.toString());
+          offered.push(
+            (request.tools ?? []).map(
+              (item: { function: { name: string } }) => item.function.name
+            )
+          );
+          toolResults.push(
+            ...request.messages
+              .filter((message: { role: string }) => message.role === "tool")
+              .map((message: { content: string }) =>
+                JSON.parse(message.content)
+              )
+          );
+          if (offered.length === 1)
+            return tool(
+              SEARCH,
+              { query: "SVG selection opacity" },
+              "find-selection"
+            );
+          if (offered.length === 2)
+            return tool(INSPECT, {}, "inspect-selection");
+          if (offered.length === 3)
+            return tool(
+              OPACITY,
+              { revision: targetId, opacity: 0.5 },
+              "change-opacity"
+            );
+          return stream(
+            { content: "The selection is now at 50% opacity." },
+            "stop"
+          );
+        },
+      },
+    });
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        ...connection.launch("fixture"),
+        resourcesPath: resources!,
+        stateDirectory: path.join(root, "state"),
+        cwd,
+      });
+      expect(chat.acceptsEditorToolContext).toBe(true);
+      const project = "eac20941e6a410aa";
+      const active = {
+        workspaceId: project,
+        chat,
+        directoryIdentity: { device: "1", inode: "2", birthTimeNs: "3" },
+      };
+      const ipc = new NativeChatIpc(origin, () => active);
+      const frame = {
+        url: `${origin}/desktop/workspace?id=${project}`,
+        send(
+          channel: string,
+          request: NativeEditorSvgSelection.Request & {
+            attachmentId: string;
+            callId: string;
+          }
+        ) {
+          if (channel !== IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_SELECTION) return;
+          expect(request.targetId).toBe(targetId);
+          delivered.push(request.operation);
+          const result: NativeEditorSvgSelection.Result =
+            request.operation.kind === "inspect"
+              ? {
+                  kind: "inspection",
+                  path: pathInView,
+                  revision: targetId,
+                  mode: "objects",
+                  total: 2,
+                  targets: [
+                    { kind: "element", elementPath: [0], tag: "rect" },
+                    { kind: "element", elementPath: [1], tag: "g" },
+                  ],
+                  nextCursor: null,
+                }
+              : { kind: "applied", path: pathInView, saved: false };
+          ipc.replyEditorSvgSelection(
+            event,
+            request.attachmentId,
+            request.callId,
+            result
+          );
+        },
+      };
+      const contents = Object.assign(new EventEmitter(), {
+        mainFrame: frame,
+        isDestroyed: () => false,
+        isLoadingMainFrame: () => false,
+      });
+      const event = {
+        sender: contents,
+        senderFrame: frame,
+      } as unknown as IpcMainInvokeEvent;
+      const attachment = await ipc.create(event);
+      const id = attachment.attachmentId;
+      ipc.publishEditorSurfaces(event, id, {
+        active: pathInView,
+        open: [pathInView],
+        truncated: false,
+      });
+      const send = (capture?: string) =>
+        ipc.submit(
+          event,
+          id,
+          "selection-fixture",
+          "Change this selection.",
+          "act",
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          capture
+        );
+      const receipt = await send(targetId);
+      await vi.waitFor(
+        async () => {
+          const { snapshot } = await ipc.observe(event, id);
+          expect(snapshot.latest).toMatchObject({
+            turnId: receipt.turnId,
+            status: "succeeded",
+          });
+        },
+        { timeout: 6000 }
+      );
+      expect(offered).toHaveLength(4);
+      expect(offered[0]).toContain(SEARCH);
+      expect(offered[0]).not.toContain(INSPECT);
+      expect(offered[0]).not.toContain(OPACITY);
+      expect(offered[1]).toEqual(expect.arrayContaining([INSPECT, OPACITY]));
+      expect(offered.flat()).not.toContain(READ);
+      expect(offered.flat()).not.toContain(REPLACE);
+      expect(delivered).toEqual([
+        { kind: "inspect" },
+        { kind: "set-opacity", revision: targetId, opacity: 0.5 },
+      ]);
+      expect(toolResults).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            status: "succeeded",
+            structured: expect.objectContaining({
+              kind: "inspection",
+              revision: targetId,
+              total: 2,
+            }),
+          }),
+          expect.objectContaining({
+            status: "succeeded",
+            structured: { kind: "applied", path: pathInView, saved: false },
+          }),
+        ])
+      );
+      expect((await ipc.transcriptPage(event, id)).messages).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            role: "user",
+            text: "Change this selection.",
+            svgSelection: true,
+          }),
+        ])
+      );
+      await expect(send(targetId)).resolves.toMatchObject({
+        inputId: receipt.inputId,
+        turnId: receipt.turnId,
+      });
+      await expect(send(randomUUID())).rejects.toThrow(
+        "submission_editor_tool_context_changed"
+      );
+      await expect(send()).rejects.toThrow(
+        "submission_editor_tool_context_changed"
+      );
+      expect(delivered).toHaveLength(2);
     } finally {
       try {
         await chat?.close();

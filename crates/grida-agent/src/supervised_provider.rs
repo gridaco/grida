@@ -16,6 +16,8 @@ use uuid::Uuid;
 
 pub(crate) const CAPABILITY: &str = "co.grida/provider/egress";
 pub(crate) const ROUTES: &str = "co.grida/provider/routes";
+pub(crate) const PREDICTION_ROUTE: &str = "co.grida/provider/prediction-route";
+pub(crate) const TURN_CAPABILITIES: &str = "co.grida/provider/turn-capabilities";
 const UPLOAD_CHUNK: usize = 64 * 1024;
 const READ_CHUNK: usize = 32 * 1024;
 const REQUEST_LIMIT: usize = 8 * 1024 * 1024;
@@ -83,6 +85,7 @@ impl SupervisedProvider {
         &self,
         connection_id: Option<String>,
         model: agent_kit_core::ModelId,
+        purpose: Option<RoutePurpose>,
     ) -> Result<ProviderRoute> {
         let unavailable = || Error::new(ErrorKind::Unavailable, "chat_selection_route_unavailable");
         let client = match &*self.connection.lock().unwrap() {
@@ -94,12 +97,36 @@ impl SupervisedProvider {
                 .send_request(Resolve {
                     connection_id,
                     model,
+                    purpose,
                 })
                 .block_task()
                 .await
         })
         .await
         .map_err(|_| unavailable())?
+        .map_err(|_| unavailable())
+    }
+
+    pub(crate) async fn turn_capabilities(
+        &self,
+        route_id: Option<Uuid>,
+        model: agent_kit_core::ModelId,
+    ) -> Result<grida_agent_master::turn_options::Offer> {
+        let unavailable =
+            || Error::new(ErrorKind::Unavailable, "chat_turn_capabilities_unavailable");
+        let client = match &*self.connection.lock().unwrap() {
+            Connection::Attached(client) => client.clone(),
+            _ => return Err(unavailable()),
+        };
+        tokio::time::timeout(Duration::from_secs(15), async {
+            client
+                .send_request(TurnCapabilities { route_id, model })
+                .block_task()
+                .await
+        })
+        .await
+        .map_err(|_| unavailable())?
+        .map(|reply| reply.0)
         .map_err(|_| unavailable())
     }
 
@@ -371,7 +398,37 @@ struct Cancel {
 struct Resolve {
     connection_id: Option<String>,
     model: agent_kit_core::ModelId,
+    #[serde(flatten)]
+    purpose: Option<RoutePurpose>,
 }
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[serde(
+    tag = "purpose",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum RoutePurpose {
+    ComposerPrediction {
+        /// The verified foreground exchange's supervisor handle. The process
+        /// launch, including a named launch, has no alternate route handle.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        source_route_id: Option<Uuid>,
+    },
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
+#[request(method = "_co.grida/provider/turnCapabilities", response = TurnCapabilitiesReply)]
+#[serde(rename_all = "camelCase")]
+struct TurnCapabilities {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    route_id: Option<Uuid>,
+    model: agent_kit_core::ModelId,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
+#[serde(transparent)]
+struct TurnCapabilitiesReply(grida_agent_master::turn_options::Offer);
 
 /// Private supervisor descriptor. Endpoints and credential custody are supplied by
 /// the same owner that supplied the launch configuration, never by a prompt.

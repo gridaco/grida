@@ -45,8 +45,26 @@ pub(crate) type SpawnSession = dyn Fn(PreparedProcess, SessionOptions, Cancellat
     + Send
     + Sync;
 
+pub(crate) enum FiniteLaunch {
+    Confined,
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    Network(Box<super::network::CommandMediator>),
+}
+
+pub(crate) enum FiniteCommand {
+    Confined(agent_kit_sandbox::RunningProcess),
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    Network(super::network::NetworkCommand),
+}
+
+pub(crate) type SpawnFiniteCommand =
+    dyn Fn(PreparedProcess, FiniteLaunch, CancellationToken) -> Result<FiniteCommand> + Send + Sync;
+
 /// What the host authorizes for one `exec_command` call.
 pub(crate) struct AuthorizedProcess {
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    pub network_home: Option<PathBuf>,
+    pub spawn_finite: Option<Arc<SpawnFiniteCommand>>,
     pub scope: ProcessScope,
     /// The capture the approved action was bound to.
     pub expected: Fingerprint,
@@ -147,6 +165,7 @@ impl ProcessTools {
             sessions,
             session,
             false,
+            false,
         )
     }
 
@@ -156,6 +175,7 @@ impl ProcessTools {
         sessions: Arc<ProcessSessions>,
         session: SessionId,
         unconfined: bool,
+        allow_command_network: bool,
         resolve: Arc<ResolveProcess>,
     ) -> Result<Self> {
         Self::with_authority(
@@ -165,6 +185,7 @@ impl ProcessTools {
             sessions,
             session,
             unconfined,
+            allow_command_network,
         )
     }
 
@@ -175,6 +196,7 @@ impl ProcessTools {
         sessions: Arc<ProcessSessions>,
         session: SessionId,
         unconfined: bool,
+        allow_command_network: bool,
     ) -> Result<Self> {
         if !(1..=64 * 1024).contains(&limits.max_input_bytes)
             || !(1..=64 * 1024).contains(&limits.max_output_bytes)
@@ -195,7 +217,7 @@ impl ProcessTools {
         });
         Ok(Self {
             exec: Arc::new(ExecCommand {
-                definition: exec_definition(scoped, unconfined, limits)?,
+                definition: exec_definition(scoped, unconfined, allow_command_network, limits)?,
                 shared: shared.clone(),
             }),
             write: Arc::new(WriteStdin {
@@ -214,6 +236,7 @@ impl ProcessTools {
 fn exec_definition(
     scoped: bool,
     unconfined: bool,
+    allow_command_network: bool,
     limits: CommandLimits,
 ) -> Result<ToolDefinition> {
     let mut schema = json!({
@@ -237,6 +260,14 @@ fn exec_definition(
         schema["properties"]["directory"] = json!({"type": "string", "description": "ID of a configured directory grant. Omit for the primary directory, including when workdir points to one of its subfolders."});
         schema["required"] = json!(["cmd", "access"]);
         description.push_str(" Select read or read_write access explicitly. The working directory must be inside the selected directory.");
+    }
+    if allow_command_network {
+        schema["properties"]["network"] = json!({
+            "type":"object", "properties":{"host":{"type":"string"},"port":{"type":"integer","minimum":1,"maximum":65535}},
+            "required":["host","port"], "additionalProperties":false,
+            "description":"Request one TCP connection to an exact public DNS host and port for this command. Use curl or another client that honors the supplied SOCKS5 proxy URL. Omit tty and yield_time_ms. The command ends within 30 seconds."
+        });
+        description.push_str(" On request, a one-action approval permits a single proxied connection. Raw sockets stay denied.");
     }
     Ok(ToolDefinition {
         id: ToolId::new(EXEC_COMMAND)?,
@@ -275,6 +306,7 @@ fn write_definition(limits: CommandLimits) -> Result<ToolDefinition> {
 #[serde(deny_unknown_fields)]
 pub(crate) struct ExecArguments {
     pub(crate) cmd: String,
+    pub(crate) network: Option<super::CommandNetworkDestination>,
     pub(crate) workdir: Option<PathBuf>,
     #[serde(default)]
     pub(crate) tty: bool,
@@ -298,6 +330,15 @@ impl ExecArguments {
                 "command_access_invalid",
             ));
         }
+        if let Some(destination) = &command.network {
+            if !scoped || !command.supports_finite() {
+                return Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    "command_network_requires_finite_pipes",
+                ));
+            }
+            destination.validate()?;
+        }
         if command.cmd.trim().is_empty() || command.cmd.contains('\0') {
             return Err(invalid());
         }
@@ -314,16 +355,29 @@ impl ExecArguments {
         Ok(command)
     }
 
+    pub(crate) fn supports_finite(&self) -> bool {
+        !self.tty && self.yield_time_ms.is_none()
+    }
+
     /// `<shell> -c <cmd>` in the named or default directory, starting from
     /// the host's environment.
-    pub(crate) fn spec(&self, root: &Path, environment: &BTreeMap<String, String>) -> ProcessSpec {
+    pub(crate) fn spec(
+        &self,
+        root: &Path,
+        environment: &BTreeMap<String, String>,
+        finite: bool,
+    ) -> ProcessSpec {
         ProcessSpec {
             executable: shell(environment),
             arguments: vec!["-c".into(), self.cmd.clone()],
             cwd: self.workdir.clone().unwrap_or_else(|| root.to_owned()),
             environment: environment.clone(),
             stdin: Vec::new(),
-            timeout: SPECIFICATION_TIMEOUT,
+            timeout: if finite {
+                Duration::from_secs(30)
+            } else {
+                SPECIFICATION_TIMEOUT
+            },
             max_output_bytes: RETAINED_OUTPUT_BYTES,
         }
     }
@@ -486,6 +540,14 @@ impl ExecCommand {
                 root.clone(),
             ),
             Authority::Authorized(resolve) => match resolve(invocation) {
+                Ok(authority) if authority.spawn_finite.is_some() => {
+                    return self
+                        .run_finite(authority, arguments, context, maximum)
+                        .await;
+                }
+                Ok(_) if arguments.network.is_some() => {
+                    return ToolOutcome::failed("command_network_unavailable");
+                }
                 Ok(authority) => (
                     authority.scope,
                     Some((authority.expected, authority.spawn)),
@@ -496,7 +558,7 @@ impl ExecCommand {
             },
         };
         let unconfined = matches!(scope, ProcessScope::Unconfined(_));
-        let spec = arguments.spec(&root, &environment);
+        let spec = arguments.spec(&root, &environment, false);
         let cwd = spec.cwd.clone();
         let launch = match shared
             .sessions
@@ -612,6 +674,121 @@ impl ExecCommand {
             ),
             Err(error) => ToolOutcome::failed(&error.code),
         }
+    }
+}
+
+impl ExecCommand {
+    async fn run_finite(
+        &self,
+        authority: AuthorizedProcess,
+        arguments: ExecArguments,
+        context: &InvocationContext,
+        maximum: usize,
+    ) -> ToolOutcome {
+        let started = Instant::now();
+        let budget = output_budget(arguments.max_output_tokens, maximum);
+        let spec = arguments.spec(&authority.root, &authority.environment, true);
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        let network_deadline = authority.scope.valid_until().min(started + spec.timeout);
+        let Some(spawn) = authority.spawn_finite else {
+            return ToolOutcome::failed("command_finite_unavailable");
+        };
+        let sandbox = self.shared.sandbox.clone();
+        if context.cancellation.is_cancelled() {
+            return cancelled();
+        }
+        let launch = match self
+            .shared
+            .sessions
+            .admit_attempt(&self.shared.session, &context.attempt)
+        {
+            Ok(launch) => launch,
+            Err(error) => return ToolOutcome::failed(&error.code),
+        };
+        let stop = launch.stop();
+        let _on_drop = stop.clone().drop_guard();
+        let launch_stop = stop.clone();
+        let prepare = move || {
+            let prepared = authority
+                .scope
+                .prepare(&sandbox, spec)
+                .map_err(|e| Error::new(e.kind, "command_preparation_refused"))?;
+            if prepared.capture_fingerprint()? != authority.expected {
+                return Err(Error::new(ErrorKind::Conflict, "command_capture_changed"));
+            }
+            if launch_stop.is_cancelled() {
+                return Err(Error::new(ErrorKind::InvalidState, "command_cancelled"));
+            }
+            let launch = match arguments.network {
+                #[cfg(any(target_os = "macos", target_os = "linux"))]
+                Some(destination) => {
+                    let home = authority.network_home.ok_or_else(|| {
+                        Error::new(ErrorKind::Unavailable, "command_network_unavailable")
+                    })?;
+                    FiniteLaunch::Network(super::network::CommandMediator::bind(
+                        &home,
+                        destination,
+                        network_deadline,
+                    )?)
+                }
+                #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+                Some(_) => {
+                    return Err(Error::new(
+                        ErrorKind::Unavailable,
+                        "command_network_unavailable",
+                    ));
+                }
+                None => FiniteLaunch::Confined,
+            };
+            spawn(prepared, launch, launch_stop)
+        };
+        let mut worker = launch.supervise_finite(async move {
+            let command = tokio::task::spawn_blocking(prepare)
+                .await
+                .map_err(|_| Error::new(ErrorKind::Uncertain, "command_launch_unverified"))??;
+            match command {
+                FiniteCommand::Confined(command) => Ok(super::FiniteEvidence {
+                    process: command.finish().await?,
+                    transfer_limit_exceeded: false,
+                }),
+                #[cfg(any(target_os = "macos", target_os = "linux"))]
+                FiniteCommand::Network(command) => command.finish().await,
+            }
+        });
+        let result = tokio::select! {
+            result = &mut worker => result,
+            _ = context.cancellation.cancelled() => {
+                stop.cancel();
+                worker.await
+            }
+        };
+        let finite = match result {
+            Ok(Ok(finite)) => finite,
+            Ok(Err(error)) if error.code == "command_cancelled" => return cancelled(),
+            Ok(Err(error)) if error.kind != ErrorKind::Uncertain => {
+                return ToolOutcome::failed(&error.code);
+            }
+            _ => return ToolOutcome::uncertain(),
+        };
+        let ending = finite.ending();
+        let evidence = finite.process;
+        let mut captured = output::Captured::default();
+        for output in [evidence.stdout, evidence.stderr] {
+            captured.push(agent_kit_sandbox::SessionRead {
+                output,
+                ..Default::default()
+            });
+        }
+        let mut outcome = output::outcome(
+            ending.status,
+            started.elapsed(),
+            &Standing::Ended(&ending),
+            &captured,
+            budget,
+            maximum,
+        );
+        outcome.truncated |= evidence.output_truncated;
+        outcome
     }
 }
 
@@ -879,6 +1056,22 @@ mod tests {
     fn exec_arguments_are_bounded_and_carry_no_host_controls() {
         assert!(exec(json!({"cmd": "npm test"}), false).is_ok());
         assert!(exec(json!({"cmd": "ls", "access": "read"}), true).is_ok());
+        let network = json!({"host":"updates.example","port":443});
+        assert!(
+            exec(
+                json!({"cmd":"curl", "access":"read", "network":network}),
+                true
+            )
+            .unwrap()
+            .supports_finite()
+        );
+        for (field, value) in [("tty", json!(true)), ("yield_time_ms", json!(500))] {
+            let mut input = json!({"cmd":"curl", "access":"read"});
+            input[field] = value;
+            assert!(!exec(input.clone(), true).unwrap().supports_finite());
+            input["network"] = network.clone();
+            assert!(exec(input, true).is_err());
+        }
         for (invalid, scoped) in [
             (json!({"cmd": ""}), false),
             (json!({"cmd": "  "}), false),
@@ -951,7 +1144,7 @@ mod tests {
             false,
         )
         .unwrap()
-        .spec(Path::new("/project"), &environment("/bin/sh"));
+        .spec(Path::new("/project"), &environment("/bin/sh"), false);
         assert_eq!(spec.arguments, ["-c", "echo hi"]);
         assert_eq!(spec.cwd, PathBuf::from("/project"));
         assert!(spec.stdin.is_empty());

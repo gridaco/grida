@@ -99,16 +99,36 @@ workbench returns an empty view. A detached or replaced workbench is unavailable
 An unverified reply supplies no editor data. The binding grants no filesystem
 access or document mutation.
 
-The disposable Desktop export uses the same `surface_list_open` definition,
-snapshot validation, and domain result through its authenticated MCP listener.
+Desktop Main registers eligible operations with their source identity,
+definition and handler. A registration generation belongs to that source
+and endpoint. The host retains the captured endpoint, registrations and tool
+definitions with accepted input. Source replacement retires the previous
+generation even when the replacement has identical definitions. Revoking
+one source leaves other grants available on the same endpoint. Main checks
+the captured source, generation and definition revision before invocation.
+Native discovery first presents one bounded summary per extension. A query
+spanning several extensions returns
+their summaries so the model can choose a source. A source-specific query or
+an exact tool lookup can reveal captured definitions, which become available
+on the model request after search. A concurrent invocation from the request
+that performed the lookup still uses
+that request's original inventory. A continued turn keeps the recorded
+definitions even after the source disconnects. Calls to that source report
+unavailable before dispatch. Execution requires the exact captured source
+generation and live endpoint.
+
+The default disposable Desktop export grants only `surface_list_open` and
+uses the same definition, snapshot validation, and domain result through its
+authenticated MCP listener.
 The launcher selects an exact registered workspace and Main binds its first
 admitted workbench frame independently of chat. A bounded reverse stdio read
 asks Main for that frame's current published view on each tool call. Loss of
 the frame withdraws the view for the lifetime of the export. Losing the private
 stdio connection closes the listener.
 
-When the same workbench offers presentation, `surface_open` asks that exact
-frame to open a workspace artifact. Main binds the request to a call identity
+When the same workbench offers presentation, `workbench_show` asks that exact
+frame to show a workspace artifact as a file target. The workbench chooses
+the viewer. Main binds the request to a call identity
 and the frame's last published view. The editor validates the target and
 checks the view again before changing tabs. A dispatch receipt confirms Main
 accepted the send to the captured frame. Observed display requires separate
@@ -120,14 +140,20 @@ browser catalog. The existing tool host captures the endpoint in Act and
 preserves it throughout the accepted input. Main owns page admission,
 document and viewport guards, and the actual guest. Background pages remain
 within their creating scope, and workbench calls use the exact authorized
-tab. Browser close and scope cleanup retire owned background pages.
-Observations from a revoked or replaced endpoint are discarded.
+tab. `browser_close` and scope cleanup retire owned background pages.
+`workbench_close_browser_tab` requests closure of a visible browser tab.
+Browser and browser-enabled Workbench calls use the negotiated private MCP
+carrier with the captured Browser lease. The same Browser operation definitions
+and lease dispatcher serve the opt-in external profile, whose wire names and
+schemas remain stable. Older accepted turns keep their captured definitions
+and dispatch contract. Observations from a revoked or replaced endpoint are
+discarded.
 
-The browser opt-in for the external export adds a bounded, correlated private
-request path and normal MCP image content. The read-only export keeps its
-existing operation. Native capture media is scoped to the owning tool result.
-A lost reply after a browser mutation remains uncertain. Repeating a call is
-a new operation.
+Both paths use bounded MCP JPEG image content. Native chat validates the
+image and, when the model connection accepts tool images, prepares it as
+PNG in retained media scoped to the owning tool result. A lost reply after
+a browser mutation remains uncertain. Repeating a call starts a new
+operation.
 
 Workspace turns with `editorPresentation` receive primary-artifact checkpoint
 guidance even when `editorBrowserTools` enables the browser catalog.
@@ -135,13 +161,28 @@ A file reveal through the trusted workbench remains auxiliary when its reply is
 unconfirmed. URL opens, tab selection and explicit focus retain ordinary
 uncertain-outcome handling.
 
-The SVG text binding captures one plain selected text node at immediate Act
-submission. The renderer owns the loaded editor, tab and selection identity.
+The SVG text binding captures one plain selected text node when an eligible
+Act input is submitted or queued. The renderer owns the loaded editor, tab
+and selection identity.
 `svg_read_selected_text` supplies the text and its opaque revision.
 `svg_replace_selected_text` verifies that same capture and calls the editor's
 undoable text command. The result reports the live edit separately from disk
 save. The editor's normal Save command retains its existing mtime precondition.
 An unverified mutation reply remains uncertain and the bridge does not replay it.
+
+The SVG selection contribution captures the active editor and all selected
+objects or vector points for an eligible Act input. `svg_inspect_selection`
+returns the scoped file path, capture revision, and paged locators of the live
+editor buffer. Each page carries up to 32 items and 28 KiB of encoded JSON.
+Element locators are zero-based element-child paths from the document root.
+Point locators use zero-based ordinals in the editor's vector model. A cursor
+belongs to that capture. Each omitted locator identifies its original position
+in the selection. Optional tags and authored IDs are included only when they
+fit the label limit and contain valid Unicode. `svg_set_selection_opacity`
+checks the inspected revision and applies the existing undoable opacity command
+to the captured objects. An invalidated capture or closed editor yields a stale
+or unavailable result. An unverified mutation reply stays uncertain. The editor
+owns Save.
 
 The document tool defines the meaning of its document, selection, and content
 arguments. It returns its own domain result or error. A tool that requires a

@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import fx from "../src/fx-extension.json" with { type: "json" };
 import { stageNativeAgent } from "./native-agent-package.mjs";
 
 import { stageBundledPrograms } from "./bundled-programs.mjs";
@@ -62,7 +63,7 @@ if (process.platform !== "win32") {
       force: true,
     });
     stageNativeAgent(resources, artifacts, process.platform, process.arch);
-    fs.rmSync(path.join(resources, "bundled-programs"), {
+    fs.rmSync(path.join(resources, fx.resourceDirectory), {
       recursive: true,
       force: true,
     });

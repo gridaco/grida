@@ -4,7 +4,7 @@ use super::*;
 use crate::command::CommandSupervisor;
 use crate::permissions::{
     ApprovalDecision, ApprovalRequest, PermissionCapture, PermissionProfile, TurnPermissions,
-    approval_answer, is_approval, read_approval,
+    is_approval, read_approval,
 };
 use agent_kit_core::ScopeId;
 use agent_kit_core::turn::{ControlRevision, TurnState};
@@ -14,6 +14,8 @@ use agent_kit_core::turn::{ControlRevision, TurnState};
 pub struct PendingApproval {
     pub wait_id: agent_kit_core::WaitId,
     pub request: ApprovalRequest,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub reviewing: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub review_failure: Option<grida_agent_master::approval_review::AskReason>,
 }
@@ -426,8 +428,24 @@ impl Host {
                                 "approval_binding_changed",
                             ));
                         }
+                        let deferred_review = grida_agent_master::approval_review::recorded_review(
+                            state,
+                            &request.operation,
+                            request.action,
+                            request.scope,
+                        )?
+                        .filter(|review| {
+                            state.is_suspended()
+                                || grida_agent_master::approval_review::failure_reason(review)
+                                    .is_some()
+                        })
+                        .map(|review| review.record.id.clone());
                         Ok((
-                            approval_answer(wait, decision)?,
+                            crate::permissions::manual_approval_answer(
+                                wait,
+                                decision,
+                                deferred_review,
+                            )?,
                             state.outcome().is_none()
                                 && state.controls().admits_work()
                                 && state.waits().values().all(|other| {
@@ -451,6 +469,121 @@ impl Host {
     }
 }
 
+#[derive(Clone, Debug, Serialize)]
+pub(crate) struct ApprovalReview {
+    decision: &'static str,
+    action: String,
+}
+
+pub(super) fn approval_review_facts(state: &TurnState) -> Result<Vec<ApprovalReview>> {
+    let mut reviews = Vec::new();
+    use crate::permissions::{ApprovalEffect, ReviewResolution};
+    for wait in state
+        .waits()
+        .values()
+        .filter(|wait| !wait.withdrawn && is_approval(wait))
+    {
+        let request = read_approval(wait)?;
+        let Some(review) = grida_agent_master::approval_review::recorded_review(
+            state,
+            &request.operation,
+            request.action,
+            request.scope,
+        )?
+        else {
+            continue;
+        };
+        let decision = if wait.answer.is_some() {
+            match crate::permissions::review_resolution(wait, &request, &review.record.id)? {
+                Some(ReviewResolution::Applied(ApprovalDecision::ApproveOnce)) => "approved",
+                Some(ReviewResolution::Applied(ApprovalDecision::Decline)) => "declined",
+                Some(ReviewResolution::Deferred) => "needs_human",
+                None => continue,
+            }
+        } else if state.controls().admits_work()
+            && !state.is_suspended()
+            && grida_agent_master::approval_review::failure_reason(review).is_none()
+        {
+            "reviewing"
+        } else {
+            "needs_human"
+        };
+        let action = match request.effect {
+            ApprovalEffect::Read { relative_path, .. } => {
+                request.root.join(relative_path).display().to_string()
+            }
+            ApprovalEffect::Command {
+                finite: true,
+                network,
+                command,
+                cwd,
+                filesystem,
+                ..
+            } => {
+                let destination = network.map_or_else(
+                    || "Network denied".to_owned(),
+                    |destination| format!("Network {}:{}", destination.host, destination.port),
+                );
+                match filesystem {
+                    Some(fs) => {
+                        let reads = if fs.disk_read {
+                            "Disk reads outside protected paths".to_owned()
+                        } else {
+                            format!(
+                                "Read roots {}",
+                                fs.read_roots
+                                    .iter()
+                                    .chain(&fs.runtime_roots)
+                                    .chain(&fs.write_roots)
+                                    .cloned()
+                                    .collect::<Vec<_>>()
+                                    .join(", ")
+                            )
+                        };
+                        let mut writes = fs.write_roots;
+                        if fs.private_temp_write {
+                            writes.push("private temporary directory".into());
+                        }
+                        format!(
+                            "{destination} · {reads} · Write roots {} · in {} · {command}",
+                            writes.join(", "),
+                            fs.resolved_cwd
+                        )
+                    }
+                    None => format!(
+                        "{destination} · Filesystem details unavailable · in {} · {command}",
+                        cwd.display()
+                    ),
+                }
+            }
+            _ => continue,
+        };
+        // Actions are display labels. Remove control and bidirectional formatting
+        // characters so the label cannot change the framing of adjacent UI.
+        let mut action: String = action.chars().map(|c| {
+            if c.is_control() || matches!(c, '\u{061c}' | '\u{200e}' | '\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}') { '�' } else { c }
+        }).collect();
+        if action.len() > 4096 {
+            action.truncate(action.floor_char_boundary(4096 - '…'.len_utf8()));
+            action.push('…');
+        }
+        let call = state
+            .operations()
+            .get(&request.operation)
+            .and_then(|record| record.record.source_call.as_ref());
+        let position = state
+            .history()
+            .records()
+            .iter()
+            .flat_map(|HistoryRecord::Message(message)| &message.content)
+            .position(|part| matches!(part, Content::ToolCall(tool) if Some(&tool.id) == call))
+            .unwrap_or(usize::MAX);
+        reviews.push((position, ApprovalReview { decision, action }));
+    }
+    reviews.sort_by_key(|(position, _)| *position);
+    Ok(reviews.into_iter().map(|(_, review)| review).collect())
+}
+
 pub(super) fn pending_approvals(state: &TurnState) -> Result<Approvals> {
     let approvals = state
         .waits()
@@ -461,14 +594,21 @@ pub(super) fn pending_approvals(state: &TurnState) -> Result<Approvals> {
             if request.session != state.binding().session || request.turn != state.binding().turn {
                 return Err(problem(ErrorKind::InvalidState, "approval_binding_changed"));
             }
+            let review = grida_agent_master::approval_review::recorded_review(
+                state,
+                &request.operation,
+                request.action,
+                request.scope,
+            )?;
+            let review_failure =
+                review.and_then(grida_agent_master::approval_review::failure_reason);
             Ok(PendingApproval {
                 wait_id: wait.id.clone(),
-                review_failure: grida_agent_master::approval_review::recorded_failure(
-                    state,
-                    &request.operation,
-                    request.action,
-                    request.scope,
-                )?,
+                reviewing: review.is_some()
+                    && review_failure.is_none()
+                    && state.controls().admits_work()
+                    && !state.is_suspended(),
+                review_failure,
                 request,
             })
         })

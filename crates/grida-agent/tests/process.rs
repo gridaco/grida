@@ -36,6 +36,12 @@ mod delegation;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[path = "process/deletion.rs"]
 mod deletion;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[path = "process/desktop_fx_discovery.rs"]
+mod desktop_fx_discovery;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[path = "process/desktop_tools.rs"]
+mod desktop_tools;
 #[cfg(unix)]
 #[path = "process/effort.rs"]
 mod effort;
@@ -71,6 +77,9 @@ mod operating_regime;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[path = "process/outbound_mcp.rs"]
 mod outbound_mcp;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[path = "process/prediction.rs"]
+mod prediction;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[path = "process/processes.rs"]
 mod processes;
@@ -172,6 +181,8 @@ enum Reply {
     GeminiSigned(&'static str),
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     ResponsesSigned(&'static str),
+    #[cfg(unix)]
+    ResponsesEvents(Vec<Value>),
     #[cfg(unix)]
     Release(&'static str, tokio::sync::oneshot::Receiver<()>),
     /// Hold a selected fixture response until an independent observation ends.
@@ -578,6 +589,14 @@ fn fixture_body(reply: Reply, protocol: ProviderProtocol) -> String {
     let (text, finish) = match reply {
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         Reply::Credential(_, _) => unreachable!("credential override is handled before the body"),
+        #[cfg(unix)]
+        Reply::ResponsesEvents(events) => {
+            assert_eq!(protocol, ProviderProtocol::Responses);
+            return events
+                .into_iter()
+                .map(|event| format!("data: {event}\n\n"))
+                .collect();
+        }
         Reply::Finished(text) => (text, Some("stop")),
         Reply::Hold(text) => (text, None),
         Reply::Stop(reason) => ("", Some(reason)),

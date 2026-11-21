@@ -39,7 +39,8 @@ export type DesktopBrowserToolLease = Readonly<{
   invoke(
     operation: string,
     args: unknown,
-    signal: AbortSignal
+    signal: AbortSignal,
+    expiresAtMs?: number
   ): Promise<BrowserAutomationResult>;
   close(): void;
 }>;
@@ -223,14 +224,18 @@ export class DesktopBrowserTools {
     const scope: BrowserAutomationScope = { id, sender, frame, live };
     return {
       ready: live,
-      invoke: async (operation, args, signal) => {
-        if (signal.aborted) return refused("canceled");
+      invoke: async (operation, args, signal, expiresAtMs) => {
+        if (
+          signal.aborted ||
+          (expiresAtMs !== undefined && expiresAtMs <= Date.now())
+        )
+          return refused("canceled");
         if (!live()) return refused("owner_revoked");
         if (operation === "surface_list_open" || operation === "surface_open") {
           try {
             return operation === "surface_list_open"
               ? this.list(scope, args)
-              : this.open(scope, args, signal);
+              : this.open(scope, args, signal, expiresAtMs);
           } catch {
             return operation === "surface_list_open"
               ? refused("target_missing")
@@ -306,7 +311,8 @@ export class DesktopBrowserTools {
   private open(
     scope: BrowserAutomationScope,
     args: unknown,
-    signal: AbortSignal
+    signal: AbortSignal,
+    expiresAtMs = Infinity
   ): BrowserAutomationResult {
     const request = record(args);
     const target = record(request?.target);
@@ -354,10 +360,11 @@ export class DesktopBrowserTools {
       }
       path = file[0];
     } else return refused("invalid_arguments");
-    if (signal.aborted || !scope.live()) return refused("owner_revoked");
+    if (signal.aborted || expiresAtMs <= Date.now()) return refused("canceled");
+    if (!scope.live()) return refused("owner_revoked");
     scope.frame.send(IPC_CHANNELS.WORKSPACE_OPEN_AUTOMATION_FILE, {
       path,
-      expiresAtMs: Date.now() + 2000,
+      expiresAtMs: Math.min(expiresAtMs, Date.now() + 2000),
     });
     if (focus) {
       try {

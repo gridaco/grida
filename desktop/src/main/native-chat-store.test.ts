@@ -244,7 +244,7 @@ describe.skipIf(!supported)("Native chat store", () => {
       const origin = "https://editor.fixture.invalid";
       const target = randomUUID();
       const offers: string[][] = [];
-      const toolReplies: unknown[] = [];
+      let toolReplies: unknown[] = [];
       const connection = await NativeGatewayConnection.open({
         origin,
         account: {
@@ -267,33 +267,39 @@ describe.skipIf(!supported)("Native chat store", () => {
             );
             const event = (delta: object, finish_reason: string | null) =>
               `data: ${JSON.stringify({ id: "fixture", choices: [{ index: 0, delta, finish_reason }] })}\n\n`;
-            const tool = offers.length === 1;
-            const delta = tool
+            const searching = offers.length === 1;
+            const calling = offers.length <= 2;
+            const delta = calling
               ? {
                   tool_calls: [
                     {
                       index: 0,
-                      id: "replace",
+                      id: searching ? "search" : "replace",
                       type: "function",
-                      function: {
-                        name: "svg_replace_selected_text",
-                        arguments: JSON.stringify({
-                          revision: target,
-                          text: "Changed",
-                        }),
-                      },
+                      function: searching
+                        ? {
+                            name: "tool_search",
+                            arguments: JSON.stringify({
+                              query: "selected SVG text and open files",
+                            }),
+                          }
+                        : {
+                            name: "svg_replace_selected_text",
+                            arguments: JSON.stringify({
+                              revision: target,
+                              text: "Changed",
+                            }),
+                          },
                     },
                   ],
                 }
               : { content: "The selected text changed." };
-            toolReplies.push(
-              ...request.messages.filter(
-                (message: { role: string }) => message.role === "tool"
-              )
+            toolReplies = request.messages.filter(
+              (message: { role: string }) => message.role === "tool"
             );
             return new Response(
               event(delta, null) +
-                event({}, tool ? "tool_calls" : "stop") +
+                event({}, calling ? "tool_calls" : "stop") +
                 "data: [DONE]\n\n",
               { headers: { "content-type": "text/event-stream" } }
             );
@@ -435,16 +441,23 @@ describe.skipIf(!supported)("Native chat store", () => {
         );
         expect(toolReplies).toEqual([
           expect.objectContaining({
+            content: expect.stringContaining(
+              '"name":"svg_replace_selected_text"'
+            ),
+          }),
+          expect.objectContaining({
             content: expect.stringContaining('"saved":false'),
           }),
         ]);
-        expect(offers[0]).toEqual(
-          expect.arrayContaining([
-            "svg_replace_selected_text",
-            "svg_read_selected_text",
-            "surface_list_open",
-          ])
-        );
+        expect(offers[0]).toContain("tool_search");
+        const workbenchTools = [
+          "svg_replace_selected_text",
+          "svg_read_selected_text",
+          "workbench_list_tabs",
+        ];
+        for (const name of workbenchTools)
+          expect(offers[0]).not.toContain(name);
+        expect(offers[1]).toEqual(expect.arrayContaining(workbenchTools));
         for (const offer of offers)
           for (const denied of [
             "read_file",
@@ -452,7 +465,9 @@ describe.skipIf(!supported)("Native chat store", () => {
             "search_text",
             "exec_command",
             "write_stdin",
+            "surface_list_open",
             "surface_open",
+            "workbench_show",
             "spawn_agent",
           ])
             expect(offer).not.toContain(denied);
@@ -481,7 +496,7 @@ describe.skipIf(!supported)("Native chat store", () => {
         expect(
           await invoke(() => ipc.transcript(event, reopened.attachmentId))
         ).not.toHaveLength(0);
-        expect(offers).toHaveLength(2);
+        expect(offers).toHaveLength(3);
       } finally {
         await owners.close();
         connection.close();

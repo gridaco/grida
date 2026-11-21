@@ -11,14 +11,11 @@ import {
 import path from "node:path";
 import { DesktopBrowserHost } from "./browser-host";
 import { DesktopBrowserTools } from "./desktop-browser-tools";
-import { BundledPrograms } from "./bundled-programs";
-import { FxViewer } from "./fx-viewer";
-import { FxWorkspaceFiles } from "./fx-workspace-files";
-import { NativeDesktopProfile } from "./native-desktop-profile";
+import { FxExtension } from "./fx-extension";
 import type { BrowserHistory } from "./browser-history";
 import type { BrowserDownloads } from "./browser-downloads";
 import { URL } from "node:url";
-import { ProtectedRoots, type RecentStore } from "@grida/daemon/server";
+import type { RecentStore } from "@grida/daemon/server";
 import {
   IPC_CHANNELS,
   type ConfirmOptions,
@@ -61,6 +58,10 @@ import {
   unavailableChatGptOAuth,
   type ChatGptOAuthCoordinator,
 } from "./chatgpt-oauth";
+import {
+  isPersonalizationChange,
+  type DesktopPersonalization,
+} from "./desktop-personalization";
 import type { NativeAgentHooks } from "./native-agent-hooks";
 import { ipc_admission, type DesktopIpcRole } from "./ipc-admission";
 import { ipc_sender } from "./ipc-sender";
@@ -105,6 +106,7 @@ type RegisterIpcHandlersOptions = {
   chat_catalog?: DesktopChatCatalog;
   open_restored_chat?: (workspaceId: string, sessionId: string) => boolean;
   global_hooks?: NativeAgentHooks;
+  personalization?: DesktopPersonalization;
   recent_files?: Pick<RecentStore, "list" | "touch" | "pin" | "forget">;
   document_files?: NativeDocumentFiles;
   resolve_document_window?: (id: string) => BrowserWindow | undefined;
@@ -122,6 +124,7 @@ type RegisterIpcHandlersOptions = {
     workspaceId: string
   ) => Promise<NativeWelcomeWorkspace>;
   native_chat_disabled?: boolean;
+  supports_automatic_approval_review?: () => Promise<boolean>;
   native_chat_selections?: NativeChatSelections;
   forget_native_workspace?: (workspaceId: string) => Promise<void>;
   resolve_native_deck?: (workspaceId: string) => Promise<WorkspaceMediaGrant>;
@@ -175,49 +178,9 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     workspaceExists: async (id) =>
       !!(await servicesSidecarClient.findWorkspace(id)),
   });
-  let fxProgram: ReturnType<typeof BundledPrograms.resolve> | undefined;
-  let fxProtected: ProtectedRoots | undefined;
-  const fxViewer = new FxViewer(
-    async (workspaceId) => {
-      const workspace = await servicesSidecarClient.findWorkspace(workspaceId);
-      if (workspace?.id !== workspaceId) return undefined;
-      fxProtected ??= NativeDesktopProfile.selected()
-        ? NativeDesktopProfile.protectedRoots(app)
-        : new ProtectedRoots(
-            NativeDesktopProfile.ordinaryChatProtectedPaths(app)
-          );
-      return fxProtected.overlaps(workspace.root)
-        ? undefined
-        : FxViewer.projectDirectory(workspace.root);
-    },
-    async (args, signal) => {
-      fxProgram ??= BundledPrograms.resolve(
-        NativeDesktopProfile.resourcesPath(app),
-        "grida-fx"
-      ).catch(() => {
-        fxProgram = undefined;
-        return undefined;
-      });
-      const program = await fxProgram;
-      return program && !signal.aborted
-        ? FxViewer.run(program.path, args, signal)
-        : null;
-    }
-  );
-  const browserTools = new DesktopBrowserTools(browserHost, fxViewer);
-  const fxFiles = new FxWorkspaceFiles(browserTools, {
-    list: servicesSidecarClient.readWorkspaceDirectory,
-    bytes: async (workspaceId, relativePath, signal) => {
-      const result = await servicesSidecarClient.readWorkspaceFile(
-        workspaceId,
-        relativePath,
-        "bytes",
-        signal
-      );
-      if (!("base64" in result)) throw new Error("workspace_file_unavailable");
-      return result;
-    },
-  });
+  const fx = new FxExtension(() => app, servicesSidecarClient);
+  const browserTools = new DesktopBrowserTools(browserHost, fx.viewer);
+  const fxFiles = fx.files(browserTools);
   options.on_browser_tools?.(browserTools);
   const nativeChat = new NativeChatIpc(
     EDITOR_ORIGIN,
@@ -301,7 +264,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     },
     options.native_chat_selections,
     browserTools,
-    options.resolve_welcome_chat_workspace
+    options.resolve_welcome_chat_workspace,
+    options.personalization
   );
   options.on_native_chat?.(nativeChat);
   const externalAgent = new NativeExternalRunIpc(
@@ -599,10 +563,38 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   guarded(IPC_CHANNELS.NATIVE_CHAT_PROFILES, (event) =>
     nativeChat.profiles(event)
   );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_AUTOMATIC_REVIEW,
+    (_event, ...args: unknown[]) => {
+      if (args.length) throw new Error("native_chat_permission_mode_invalid");
+      return options.supports_automatic_approval_review?.() ?? false;
+    }
+  );
   guarded(IPC_CHANNELS.WELCOME_CHAT_PROFILES, (event, ...args: unknown[]) => {
     if (args.length) throw new Error("native_chat_profiles_invalid");
     return nativeChat.welcomeProfiles(event);
   });
+  guarded(
+    IPC_CHANNELS.WELCOME_CHAT_TURN_CAPABILITIES,
+    (event, ...args: unknown[]) => {
+      if (args.length !== 2) throw new Error("native_chat_selection_invalid");
+      return nativeChat.welcomeTurnCapabilities(event, args[0], args[1]);
+    }
+  );
+  guarded(
+    IPC_CHANNELS.WELCOME_CHAT_PREPARE_AUTOMATIC_REVIEW,
+    async (event, ...args: unknown[]) => {
+      if (args.length !== 1)
+        throw new Error("native_chat_permission_mode_invalid");
+      if (!(await options.supports_automatic_approval_review?.()))
+        throw new Error("native_chat_permission_mode_unavailable");
+      return nativeChat.prepareWelcomePermission(
+        event,
+        args[0],
+        "approve_for_me"
+      );
+    }
+  );
   guarded(
     IPC_CHANNELS.WELCOME_CHAT_PREPARE_FULL_ACCESS,
     (event, ...args: unknown[]) => {
@@ -701,6 +693,10 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         review
       )
   );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_TURN_CAPABILITIES,
+    (event, target: unknown) => nativeChat.turnCapabilities(event, target)
+  );
   guarded(IPC_CHANNELS.NATIVE_CHAT_SELECTION, (event, target: unknown) =>
     nativeChat.selection(event, target)
   );
@@ -717,7 +713,15 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_CREATE_FROM_DRAFT,
-    (event, draftId: unknown) => nativeChat.createFromDraft(event, draftId)
+    (event, ...args: unknown[]) => {
+      if (
+        args.length < 1 ||
+        args.length > 2 ||
+        (args.length === 2 && args[1] !== true)
+      )
+        throw new Error("native_chat_selection_invalid");
+      return nativeChat.createFromDraft(event, args[0], args[1]);
+    }
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_SUBAGENT_ACTIVITY,
@@ -824,7 +828,9 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       effort?: unknown,
       svgTargetId?: unknown,
       selectionRevision?: unknown,
-      editorContextId?: unknown
+      editorContextId?: unknown,
+      editorToolContextId?: unknown,
+      webSearch?: unknown
     ) =>
       nativeChat.submit(
         event,
@@ -835,13 +841,20 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         effort,
         svgTargetId,
         selectionRevision,
-        editorContextId
+        editorContextId,
+        editorToolContextId,
+        webSearch
       )
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT_RESULT,
     (event, attachmentId: string, callId: unknown, result: unknown) =>
       nativeChat.replyEditorSvgText(event, attachmentId, callId, result)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_SELECTION_RESULT,
+    (event, attachmentId: string, callId: unknown, result: unknown) =>
+      nativeChat.replyEditorSvgSelection(event, attachmentId, callId, result)
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_ENQUEUE,
@@ -854,7 +867,9 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       effort?: unknown,
       svgTargetId?: unknown,
       selectionRevision?: unknown,
-      editorContextId?: unknown
+      editorContextId?: unknown,
+      editorToolContextId?: unknown,
+      webSearch?: unknown
     ) =>
       nativeChat.enqueue(
         event,
@@ -865,7 +880,9 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         effort,
         svgTargetId,
         selectionRevision,
-        editorContextId
+        editorContextId,
+        editorToolContextId,
+        webSearch
       )
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_EFFORT, (event) =>
@@ -901,7 +918,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       regime?: unknown,
       effort?: unknown,
       selectionRevision?: unknown,
-      editorContextId?: unknown
+      editorContextId?: unknown,
+      webSearch?: unknown
     ) =>
       nativeChat.submitWithLibrarySelection(
         event,
@@ -911,7 +929,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         regime,
         effort,
         selectionRevision,
-        editorContextId
+        editorContextId,
+        webSearch
       )
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_FILE, (event) =>
@@ -969,6 +988,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     IPC_CHANNELS.NATIVE_CHAT_SET_PRESENTED,
     (event, id: string, visible: unknown) =>
       nativeChat.setPresented(event, id, visible)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_PREDICT_PROMPT,
+    (event, id: string, observation: string) =>
+      nativeChat.predictPrompt(event, id, observation)
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_TURN_SUMMARY,
@@ -1408,6 +1432,79 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     if (!options.global_hooks) throw new Error("native_hooks_unavailable");
     return options.global_hooks;
   };
+  const personalization = options.personalization;
+  const broadcastSettings = (channel: IpcChannel, state: unknown) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      try {
+        if (window.isDestroyed() || window.webContents.isDestroyed()) continue;
+        const url = window.webContents.mainFrame.url;
+        const pathname = ipc_sender.pathname(url);
+        const role = options.resolve_ipc_role(window);
+        if (
+          role &&
+          pathname &&
+          ipc_sender.isAllowed(url, EDITOR_ORIGIN) &&
+          ipc_admission.allows({
+            role,
+            pathname,
+            channel,
+          })
+        ) {
+          window.webContents.send(channel, state);
+        }
+      } catch {
+        // A closing renderer cannot block the update in other workspaces.
+      }
+    }
+  };
+  personalization?.onChange((state) =>
+    broadcastSettings(IPC_CHANNELS.COMPOSER_PREDICTIONS_CHANGED, state)
+  );
+  personalization?.onPersonalizationChange((state) =>
+    broadcastSettings(IPC_CHANNELS.PERSONALIZATION_CHANGED, state)
+  );
+  guarded(IPC_CHANNELS.PERSONALIZATION_GET, (_event, ...args: unknown[]) => {
+    if (args.length) throw new Error("personalization_preference_invalid");
+    if (!personalization) throw new Error("personalization_unavailable");
+    return personalization.getPersonalization();
+  });
+  guarded(
+    IPC_CHANNELS.PERSONALIZATION_SET,
+    (event, change: unknown, ...args: unknown[]) => {
+      if (args.length || !isPersonalizationChange(change))
+        throw new Error("personalization_preference_invalid");
+      if (!personalization) throw new Error("personalization_unavailable");
+      return windowRequest(
+        event,
+        "personalization settings denied",
+        (_signal, check) => personalization.setPersonalization(change, check),
+        (_window, url) => ipc_sender.pathname(url) === "/desktop/settings"
+      );
+    }
+  );
+  guarded(
+    IPC_CHANNELS.COMPOSER_PREDICTIONS_GET,
+    (_event, ...args: unknown[]) => {
+      if (args.length)
+        throw new Error("composer_predictions_preference_invalid");
+      if (!personalization) throw new Error("composer_predictions_unavailable");
+      return personalization.get();
+    }
+  );
+  guarded(
+    IPC_CHANNELS.COMPOSER_PREDICTIONS_SET,
+    (event, enabled: unknown, ...args: unknown[]) => {
+      if (typeof enabled !== "boolean" || args.length)
+        throw new Error("composer_predictions_preference_invalid");
+      if (!personalization) throw new Error("composer_predictions_unavailable");
+      return windowRequest(
+        event,
+        "composer predictions settings denied",
+        (_signal, check) => personalization.set(enabled, check),
+        (_window, url) => ipc_sender.pathname(url) === "/desktop/settings"
+      );
+    }
+  );
   guarded(IPC_CHANNELS.GLOBAL_HOOKS_INSPECT, (event, ...args: unknown[]) =>
     globalHooksOwner(event, args).configuration()
   );

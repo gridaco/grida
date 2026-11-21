@@ -1,7 +1,7 @@
 //! Resolve the private supervisor's provider for one submission or retained turn.
 //! The store, scheduler and controls remain shared across these Host clones.
 use super::*;
-use crate::supervised_provider::{ProviderRoute, SupervisedProvider};
+use crate::supervised_provider::{ProviderRoute, RoutePurpose, SupervisedProvider};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -21,6 +21,9 @@ impl From<&ChatSelection> for Selection {
 
 pub(super) struct Routes {
     supervisor: SupervisedProvider,
+    input_routes: bool,
+    prediction_route: bool,
+    turn_capabilities: bool,
     launch: Arc<Execution>,
     tools: Option<Arc<host_tools::HostTools>>,
     image_generation: Option<image_generation::DesktopImageGeneration>,
@@ -32,10 +35,19 @@ fn route_changed() -> Error {
 }
 
 impl Host {
-    pub(crate) fn attach_routes(&self, supervisor: SupervisedProvider) -> Result<()> {
+    pub(crate) fn attach_routes(
+        &self,
+        supervisor: SupervisedProvider,
+        input_routes: bool,
+        prediction_route: bool,
+        turn_capabilities: bool,
+    ) -> Result<()> {
         self.routes
             .set(Routes {
                 supervisor,
+                input_routes,
+                prediction_route,
+                turn_capabilities,
                 launch: self.execution.clone().ok_or_else(route_changed)?,
                 tools: self.host_tools.clone(),
                 image_generation: self.desktop_image_generation.clone(),
@@ -51,6 +63,7 @@ impl Host {
     pub(crate) fn image_connection(&self) -> Option<image_generation::ImageConnection> {
         self.routes
             .get()
+            .filter(|routes| routes.input_routes)
             .map(|routes| routes.media.clone())
             .or_else(|| {
                 self.desktop_image_generation
@@ -64,7 +77,7 @@ impl Host {
     }
 
     pub(crate) fn has_routes(&self) -> bool {
-        self.routes.get().is_some()
+        self.routes.get().is_some_and(|routes| routes.input_routes)
     }
 
     pub(super) async fn for_selection(
@@ -83,6 +96,66 @@ impl Host {
             self.resolve_route(session_configuration(&view)?.inherited_route)
                 .await
         }
+    }
+
+    /// Resolve an ordinary user turn before taking the admission lock. The
+    /// selection revision is checked again when the resulting input is captured.
+    pub(super) async fn for_foreground(
+        &self,
+        session: &SessionId,
+        context: &SubmissionContext,
+    ) -> Result<(Self, RequestOptions)> {
+        let Some(revision) = context.selection_revision else {
+            if context.web_search {
+                return Err(problem(
+                    ErrorKind::Unsupported,
+                    "web_search_selection_required",
+                ));
+            }
+            return Ok((
+                self.for_selection(session, None).await?,
+                RequestOptions::default(),
+            ));
+        };
+        let view = self.store.inspect(session.clone()).await?;
+        let selection = self.selected_provider(&view, revision)?;
+        let host = self.resolve_route(Some((&selection).into())).await?;
+        let mut options = RequestOptions {
+            speed: selection.speed,
+            web_search: context.web_search,
+            ..RequestOptions::default()
+        };
+        if !options.is_default() {
+            let config = session_configuration(&view)?;
+            if config.side.is_some() || config.subagent.is_some() || config.worker.is_some() {
+                return Err(problem(
+                    ErrorKind::Unsupported,
+                    "chat_turn_options_unsupported",
+                ));
+            }
+            let routes = self
+                .routes
+                .get()
+                .filter(|r| r.turn_capabilities)
+                .ok_or_else(|| problem(ErrorKind::Unsupported, "chat_turn_options_unsupported"))?;
+            let offer = routes
+                .supervisor
+                .turn_capabilities(host.route_id, selection.model)
+                .await?;
+            options = offer.resolve(options)?;
+            if !options.is_default()
+                && !matches!(
+                    host.execution()?.authorization.credential,
+                    Credential::SupervisedChatGpt(_)
+                )
+            {
+                return Err(problem(
+                    ErrorKind::Unsupported,
+                    "chat_turn_options_unsupported",
+                ));
+            }
+        }
+        Ok((host, options))
     }
 
     /// Choose a route for a new derived session before taking admission. The
@@ -111,9 +184,43 @@ impl Host {
     }
 
     async fn resolve_route(&self, selection: Option<Selection>) -> Result<Self> {
-        let Some(routes) = self.routes.get() else {
+        if !self.has_routes() {
             return Ok(self.clone());
-        };
+        }
+        self.resolve_for(selection, None).await
+    }
+
+    /// An optional model request inherits the completed turn's credential
+    /// owner. A loopback endpoint can serve its own model directly. A hosted
+    /// request needs explicit same-owner resolution of the product's economy model.
+    pub(super) async fn for_prediction(&self) -> Result<Self> {
+        let source = self.execution()?;
+        if matches!(&source.authorization.credential, Credential::Http(http) if http.is_loopback() && http.is_direct())
+        {
+            return Ok(self.clone());
+        }
+        if !self
+            .routes
+            .get()
+            .is_some_and(|routes| routes.prediction_route)
+        {
+            return Err(route_changed());
+        }
+        let selection = self.selected_route.clone().unwrap_or_else(|| Selection {
+            connection_id: None,
+            model: source.config.model.clone(),
+        });
+        let local = matches!(&source.authorization.credential, Credential::Http(http) if http.is_loopback());
+        let target = grida_agent_master::prediction::model(&selection.model, local)?;
+        self.resolve_for(Some(selection), Some(target)).await
+    }
+
+    async fn resolve_for(
+        &self,
+        selection: Option<Selection>,
+        prediction_model: Option<ModelId>,
+    ) -> Result<Self> {
+        let routes = self.routes.get().ok_or_else(route_changed)?;
         let mut host = self.clone();
         host.execution = Some(routes.launch.clone());
         host.host_tools = routes.tools.clone();
@@ -123,9 +230,15 @@ impl Host {
         let Some(selection) = selection else {
             return Ok(host);
         };
+        let purpose = prediction_model
+            .as_ref()
+            .map(|_| RoutePurpose::ComposerPrediction {
+                source_route_id: self.route_id,
+            });
+        let expected_model = prediction_model.unwrap_or_else(|| selection.model.clone());
         let descriptor = routes
             .supervisor
-            .resolve(selection.connection_id, selection.model.clone())
+            .resolve(selection.connection_id, selection.model, purpose)
             .await?;
         let retained = routes.launch.retained_inputs.clone();
         let limit = |value: Option<u64>| -> Result<u64> {
@@ -141,7 +254,7 @@ impl Host {
         };
         let (id, mut execution) = match descriptor {
             ProviderRoute::Launch { model, .. }
-                if model == selection.model && model == routes.launch.config.model =>
+                if model == expected_model && model == routes.launch.config.model =>
             {
                 return Ok(host);
             }
@@ -157,7 +270,7 @@ impl Host {
                 llama_cpp_input_count,
                 reasoning,
                 image_generation_binding,
-            } if model == selection.model => {
+            } if model == expected_model => {
                 let supervisor = routes
                     .supervisor
                     .routed(route_id, configured_endpoint_key.as_deref())?;
@@ -205,7 +318,7 @@ impl Host {
                 scope,
                 max_output_tokens,
                 gateway_billing,
-            } if model == selection.model => {
+            } if model == expected_model => {
                 let connection = Arc::new(crate::gg::SupervisedGg::new(
                     &endpoint,
                     &scope,
@@ -231,7 +344,7 @@ impl Host {
                 model,
                 endpoint,
                 scope,
-            } if model == selection.model => {
+            } if model == expected_model => {
                 let connection = Arc::new(crate::chatgpt_subscription::SupervisedChatGpt::new(
                     &endpoint,
                     &model,
@@ -268,7 +381,7 @@ impl Host {
         input: &Submission,
         mismatch: &'static str,
     ) -> Result<Self> {
-        if self.routes.get().is_none() {
+        if !self.has_routes() {
             return Ok(self.clone());
         }
         #[derive(Deserialize)]
@@ -295,7 +408,7 @@ impl Host {
     }
 
     pub(crate) async fn for_turn(&self, session: &SessionId, turn: &TurnId) -> Result<Self> {
-        if self.routes.get().is_none() {
+        if !self.has_routes() {
             return Ok(self.clone());
         }
         let inputs = self
@@ -349,7 +462,7 @@ impl Host {
     }
 
     pub(super) async fn check_new_submission(&self, view: &SessionView) -> Result<()> {
-        if self.routes.get().is_some()
+        if self.has_routes()
             && self.selected_route.is_some()
             && session_configuration(view)?.subagent.is_none()
         {

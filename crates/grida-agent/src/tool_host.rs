@@ -20,14 +20,14 @@ const MAX_CALL_DURATION: Duration = Duration::from_secs(120);
 const MAX_CAPABILITY_BYTES: usize = 512 * 1024;
 const CALL_EVIDENCE_SCHEMA: &str = "grida.agent.tool-host.call";
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct CapabilityDefinition {
     pub tool: ToolDefinition,
     pub output_schema: Value,
     pub effect: CapabilityEffect,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CapabilityEffect {
     Read,

@@ -83,7 +83,21 @@ mandatory. User-owned programs require a separate custody contract.
 Desktop reads ordered `[[hooks]]` definitions only from the user-owned global
 `$GRIDA_HOME/config.toml` (default `~/.grida/config.toml`). This global source is
 separate from the per-host context-defaults file described above. The current
-global schema requires `schema_version = 1`; it supports hooks only. Workspace
+global schema requires `schema_version = 1`. Settings → Personalization and
+hand edits use the same global file. The top-level `web_search` key accepts
+`"automatic"` or `"disabled"`. Automatic offers search in eligible chats and
+is the default when the key is omitted. Disabled blocks hosted search.
+Eligible ChatGPT Subscription requests use live access when search is
+permitted. Desktop reads legacy `"live"` as automatic and legacy
+`"on_demand"`, `"cached"`, and `"indexed"` as disabled.
+
+Desktop ignores the retired `[features].fast_mode` key. Response speed comes
+from the chat’s saved selection and the model connection’s current offer.
+The boolean `[desktop].composer-predictions-enabled` defaults to false.
+Edits from Settings preserve unrelated fields, comments and hook trust.
+[Desktop settings](../../../docs/agent/desktop-settings.md).
+
+Workspace
 `hooks.json` registries are ignored, preserved on disk, and never promoted to
 global authority. Settings > Hooks inspects the source and reviews new or changed
 definitions through native confirmation. Private receipts retain approved

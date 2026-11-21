@@ -12,8 +12,8 @@ use agent_client_protocol::{Client, Result};
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::inference::InferenceUpdate;
 use agent_kit_core::messages::{
-    Content, Message, MessagePhase, OutcomeStatus, ResultContent, Role, ToolArguments, ToolCall,
-    ToolResult,
+    Content, Message, MessagePhase, OutcomeStatus, ProviderEvidence, ResultContent, Role,
+    SearchAction, SearchStatus, ToolArguments, ToolCall, ToolResult, UrlCitation,
 };
 use agent_kit_core::turn::OperationOutcome;
 use agent_kit_core::{ChangeId, MessageId};
@@ -227,11 +227,21 @@ impl Projection {
             {
                 text_meta["svgTextSelection"] = json!(true);
             }
+            if message.role == Role::User
+                && turn.is_some()
+                && input_facts.editor_tool_contexts.contains(&message.id)
+            {
+                text_meta["editorToolContext"] = json!(true);
+            }
             if message_context
                 && message.role == Role::User
                 && let Some(parts) = input_facts.display_parts.get(&message.id)
             {
                 text_meta["displayParts"] = json!(parts);
+            }
+            let citations = citations(&message);
+            if !citations.is_empty() {
+                text_meta["citations"] = citation_metadata(&citations);
             }
             let text_metadata = self.metadata(Some((TRANSCRIPT_WINDOW, text_meta)), &meta);
             self.chunk_with(
@@ -250,6 +260,19 @@ impl Projection {
                 .and_then(|turn| facts.get(turn))
                 .and_then(|turn| turn.status);
             for part in &message.content {
+                if let Content::ProviderEvidence(ProviderEvidence::WebSearch { status, action }) =
+                    part
+                {
+                    let mut attribution = meta.clone();
+                    attribution.as_object_mut().expect("object").remove("phase");
+                    let (update, metadata) =
+                        hosted_activity(&message.id, *status, action.as_ref(), true, attribution);
+                    let notification = SessionNotification::new(self.session.clone(), update).meta(
+                        self.metadata(Some((TRANSCRIPT_WINDOW, metadata.clone())), &metadata),
+                    );
+                    delivery.send(connection, notification).await?;
+                    continue;
+                }
                 let Content::ToolCall(call) = part else {
                     continue;
                 };
@@ -459,9 +482,9 @@ impl Projection {
         mut text: &str,
         mut metadata: serde_json::Map<String, Value>,
     ) -> Result<()> {
-        let mut has_display_parts = metadata
-            .get(TRANSCRIPT_WINDOW)
-            .is_some_and(|facts| facts.get("displayParts").is_some());
+        let mut has_display_parts = metadata.get(TRANSCRIPT_WINDOW).is_some_and(|facts| {
+            facts.get("displayParts").is_some() || facts.get("citations").is_some()
+        });
         while !text.is_empty() || has_display_parts {
             let end = text.floor_char_boundary(MAX_CHUNK_BYTES.min(text.len()));
             let (part, remaining) = text.split_at(end);
@@ -477,6 +500,7 @@ impl Projection {
             if has_display_parts {
                 if let Some(Value::Object(facts)) = metadata.get_mut(TRANSCRIPT_WINDOW) {
                     facts.remove("displayParts");
+                    facts.remove("citations");
                 }
                 has_display_parts = false;
             }
@@ -534,6 +558,16 @@ const ACTIVITY_RECORD_BYTES: usize = 64;
 
 pub(super) fn visible_record_bytes(record: &HistoryRecord) -> usize {
     let HistoryRecord::Message(message) = record;
+    let evidence_bytes: usize = message
+        .content
+        .iter()
+        .filter_map(|part| match part {
+            Content::ProviderEvidence(value) => {
+                Some(serde_json::to_vec(value).map_or(0, |bytes| bytes.len()))
+            }
+            _ => None,
+        })
+        .sum();
     let activity = message
         .content
         .iter()
@@ -555,6 +589,7 @@ pub(super) fn visible_record_bytes(record: &HistoryRecord) -> usize {
         })
         .sum::<usize>();
     visible_parts(message).map(|part| part.len()).sum::<usize>()
+        + evidence_bytes
         + activity * ACTIVITY_RECORD_BYTES
         + attachments
         + usize::from(message_context::has_context(message)) * message_context::MAX_BYTES
@@ -562,13 +597,20 @@ pub(super) fn visible_record_bytes(record: &HistoryRecord) -> usize {
 
 /// Recorded outcome and wall-clock interval for a replayed turn.
 /// `goal_start` marks a turn whose input started a goal.
-pub(super) fn turn_facts(turn: &ReplayTurn, goal_start: bool) -> Value {
+pub(super) fn turn_facts(
+    turn: &ReplayTurn,
+    goal_start: bool,
+    reviews: &[crate::host::ApprovalReview],
+) -> Value {
     let mut facts = json!({
         "turnId": turn.id,
         "status": turn.status,
         "startedAtMs": turn.started_ms,
         "settledAtMs": turn.settled_ms,
     });
+    if !reviews.is_empty() {
+        facts["approvalReviews"] = json!(reviews);
+    }
     if goal_start {
         facts["goalStart"] = json!(true);
     }
@@ -600,6 +642,49 @@ pub(super) fn turn_facts(turn: &ReplayTurn, goal_start: bool) -> Value {
 pub(super) enum Outcome {
     Running,
     Finished(OutcomeStatus),
+}
+
+pub(super) fn citations(message: &Message) -> Vec<UrlCitation> {
+    message
+        .content
+        .iter()
+        .filter_map(|part| match part {
+            Content::ProviderEvidence(ProviderEvidence::UrlCitation(citation)) => {
+                Some(citation.clone())
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+pub(super) fn citation_metadata(citations: &[UrlCitation]) -> Value {
+    Value::Array(citations.iter().map(|citation| json!({
+        "url": citation.url, "title":citation.title, "startIndex":citation.start_index, "endIndex":citation.end_index
+    })).collect())
+}
+
+pub(super) fn hosted_activity(
+    message: &MessageId,
+    status: SearchStatus,
+    action: Option<&SearchAction>,
+    settled: bool,
+    mut meta: Value,
+) -> (SessionUpdate, Value) {
+    let (status, outcome) = match status {
+        SearchStatus::Completed => (ToolCallStatus::Completed, "succeeded"),
+        SearchStatus::Failed => (ToolCallStatus::Failed, "failed"),
+        SearchStatus::InProgress if !settled => (ToolCallStatus::InProgress, "running"),
+        SearchStatus::Unknown | SearchStatus::InProgress => (ToolCallStatus::Failed, "uncertain"),
+    };
+    meta["messageId"] = json!(message);
+    meta["activity"] = json!("search");
+    meta["source"] = json!("provider");
+    meta["outcome"] = json!(outcome);
+    let update = AcpToolCall::new(message.as_str().to_owned(), "web_search".to_owned())
+        .kind(ToolKind::Search)
+        .status(status)
+        .raw_input(action.map(|action| json!(action)));
+    (SessionUpdate::ToolCall(update), meta)
 }
 
 /// One tool call as a standard ACP tool-call update plus Grida attribution.
@@ -878,24 +963,25 @@ mod compaction_fact_tests {
                 Some(account(Some("Earlier cart work."))),
             ),
             false,
+            &[],
         );
         assert_eq!(
             facts["compaction"],
             json!({"summary": "Earlier cart work.", "automatic": true})
         );
-        let manual = turn_facts(&turn("manual", Some(account(Some("Summary.")))), false);
+        let manual = turn_facts(&turn("manual", Some(account(Some("Summary.")))), false, &[]);
         assert_eq!(manual["compaction"]["automatic"], false);
     }
 
     #[test]
     fn other_turns_carry_no_compaction() {
         assert!(
-            turn_facts(&turn("t", None), false)
+            turn_facts(&turn("t", None), false, &[])
                 .get("compaction")
                 .is_none()
         );
         assert!(
-            turn_facts(&turn("t", Some(account(None))), false)
+            turn_facts(&turn("t", Some(account(None))), false, &[])
                 .get("compaction")
                 .is_none(),
             "a failed compaction has no summary to show"

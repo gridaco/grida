@@ -251,6 +251,7 @@ pub(super) struct Prepared {
     /// Canonical protected paths carved out of the granted locations.
     protected: Vec<(PathBuf, DeniedAccess)>,
     disk_read: bool,
+    broker_socket: Option<PathBuf>,
     placeholders: process::Placeholders,
 }
 
@@ -527,6 +528,8 @@ impl Installation {
             private_temp: temporary.path().to_owned(),
             task,
             #[cfg(target_os = "linux")]
+            broker_password: None,
+            #[cfg(target_os = "linux")]
             host_namespaces: wire::namespaces()
                 .map_err(|_| refused(ErrorKind::Unavailable, "sandbox_namespace_unavailable"))?,
         };
@@ -548,6 +551,7 @@ impl Installation {
             revision: scope.revision.clone(),
             protected,
             disk_read: scope.disk_read,
+            broker_socket: None,
             placeholders: process::Placeholders::default(),
         };
         prepared.measure_setup_frame()?;
@@ -746,6 +750,52 @@ impl Prepared {
         check_executable(bound, executable, file).map_err(|_| changed())
     }
 
+    pub(super) fn filesystem_grants(&self) -> Result<FilesystemGrants> {
+        if self.support.backend == Backend::Unconfined {
+            return Err(refused(
+                ErrorKind::Unsupported,
+                "sandbox_unconfined_filesystem",
+            ));
+        }
+        let process = self
+            .process
+            .as_ref()
+            .ok_or_else(|| refused(ErrorKind::InvalidState, "sandbox_capture_process_required"))?;
+        let mut grants = FilesystemGrants {
+            disk_read: self.disk_read,
+            read_roots: Vec::new(),
+            write_roots: Vec::new(),
+            runtime_roots: Vec::new(),
+            resolved_executable: process.executable.path().to_owned(),
+            resolved_cwd: process.cwd.path().to_owned(),
+        };
+        for location in &self.locations {
+            let bound = location.bound.path();
+            if bound == self.temporary.path() {
+                continue;
+            }
+            let paths = match location.access {
+                Access::Read => &mut grants.read_roots,
+                Access::Write => &mut grants.write_roots,
+                Access::Runtime => &mut grants.runtime_roots,
+            };
+            paths.push(bound.to_owned());
+            #[cfg(target_os = "linux")]
+            if bound != location.destination {
+                paths.push(location.destination.clone());
+            }
+        }
+        for paths in [
+            &mut grants.read_roots,
+            &mut grants.write_roots,
+            &mut grants.runtime_roots,
+        ] {
+            paths.sort();
+            paths.dedup();
+        }
+        Ok(grants)
+    }
+
     pub(super) fn capture_fingerprint(&self) -> Result<Fingerprint> {
         let Task::Command {
             executable,
@@ -865,6 +915,60 @@ impl Prepared {
         } else {
             Err(refused(ErrorKind::Conflict, "sandbox_working_root_changed"))
         }
+    }
+
+    // Only the trusted host can add this broker after its admission barrier.
+    // Retain every filesystem denial and grant connect only to its exact vnode path.
+    pub(super) fn spawn_with_proxy(
+        mut self,
+        socket: &Path,
+        expected_socket: &Path,
+        password: &str,
+        cancellation: CancellationToken,
+    ) -> Result<Running> {
+        use std::os::unix::fs::FileTypeExt;
+        let invalid = || refused(ErrorKind::Unavailable, "sandbox_network_broker_unavailable");
+        let target = socket.canonicalize().map_err(|_| invalid())?;
+        if self.support.backend == Backend::Unconfined
+            || target != expected_socket
+            || !self
+                .protected
+                .iter()
+                .any(|(p, access)| *access == DeniedAccess::ReadWrite && target.starts_with(p))
+            || !fs::symlink_metadata(&target).is_ok_and(|m| m.file_type().is_socket())
+            || !socket.to_str().is_some_and(|s| {
+                s.bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b"/_-.".contains(&b))
+            })
+            || password.len() != 32
+            || !password.bytes().all(|v| v.is_ascii_hexdigit())
+        {
+            return Err(invalid());
+        }
+        #[cfg(target_os = "macos")]
+        {
+            let Task::Command { environment, .. } = &mut self.launch.task else {
+                return Err(invalid());
+            };
+            let url = format!("socks5h://grida:{password}@localhost{}", socket.display());
+            environment.retain(|key, _| !key.to_ascii_lowercase().ends_with("_proxy"));
+            for key in [
+                "all_proxy",
+                "ALL_PROXY",
+                "http_proxy",
+                "HTTPS_PROXY",
+                "https_proxy",
+            ] {
+                environment.insert(key.into(), url.clone());
+            }
+        }
+        #[cfg(target_os = "linux")]
+        {
+            self.launch.broker_password = Some(password.to_owned());
+        }
+        self.broker_socket = Some(target);
+        self.measure_setup_frame()?;
+        self.spawn(cancellation)
     }
 
     pub(super) fn spawn(self, cancellation: CancellationToken) -> Result<Running> {

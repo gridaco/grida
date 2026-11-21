@@ -1,13 +1,15 @@
 //! GRIDA-SEC-004 — tool-host authority belongs to the captured endpoints and turn.
 
 use super::{Host, problem};
-use crate::editor_surfaces::{LIST_OPEN, READ_TEXT, REPLACE_TEXT};
+use crate::editor_surfaces::mcp::GrantKind;
+use crate::editor_surfaces::{LIST_OPEN, LegacyToolScope, READ_TEXT, REPLACE_TEXT};
 use crate::mcp_client::McpClient;
 use crate::surface_tools::{OPEN_SURFACE, headless_surface};
 use crate::tool_host::{CapabilityGrant, ToolHost};
 use agent_kit_core::authority::{
     AuthorityBinding, AuthorityRequest, AuthorityValidator, GrantSelection,
 };
+use agent_kit_core::inference::ToolOffer;
 use agent_kit_core::tools::Inventory;
 use agent_kit_core::turn::TurnBinding;
 use agent_kit_core::{
@@ -20,6 +22,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 const HEADLESS_BINDING: &str = "grida-headless-surface-v1";
+const DESKTOP_TOOLS_PRINCIPAL: &str = "desktop-tool-extension";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub(super) struct Capture {
@@ -33,6 +36,7 @@ pub(super) struct HostTools {
     capture: Capture,
     grants: BTreeMap<ToolId, CapabilityGrant>,
     principal: &'static str,
+    desktop_discovery: bool,
 }
 
 impl Host {
@@ -130,29 +134,54 @@ impl HostTools {
     pub(super) fn editor(
         surface: ToolHost,
         lease: BindingId,
-        present: bool,
-        svg_text: bool,
-        browser: bool,
+        scope: &LegacyToolScope,
+        desktop_discovery: bool,
     ) -> Result<Self> {
-        let mut capabilities = if browser {
-            crate::browser_tools::NAMES.to_vec()
+        let mut capabilities = if scope.browser {
+            crate::browser_tools::names(scope.workbench_tools).to_vec()
         } else {
-            let mut capabilities = vec![LIST_OPEN];
-            if present {
+            let mut capabilities = Vec::new();
+            if scope.inventory {
+                capabilities.push(LIST_OPEN);
+            }
+            if scope.presentation {
                 capabilities.push(presentation::OPEN);
             }
             capabilities
         };
-        if svg_text {
+        if scope.svg_target.is_some() {
             capabilities.extend([READ_TEXT, REPLACE_TEXT]);
         }
-        Self::with_local(
-            None,
-            Some(surface),
-            &capabilities,
-            lease,
-            presentation::PRINCIPAL,
-        )
+        let mut owner = Self::local(surface, lease, presentation::PRINCIPAL, &capabilities)?;
+        owner.desktop_discovery = desktop_discovery;
+        Ok(owner)
+    }
+
+    pub(super) fn desktop(
+        host: ToolHost,
+        source: &BindingId,
+        endpoint: &BindingId,
+        kind: GrantKind,
+        ids: &[&str],
+    ) -> Result<Self> {
+        let identity = Fingerprint::of(&(source, endpoint))?.to_hex();
+        let lease = BindingId::new(format!("desktop-tools/{identity}"))?;
+        let principal = match kind {
+            GrantKind::Extension => DESKTOP_TOOLS_PRINCIPAL,
+            GrantKind::Presentation => presentation::PRINCIPAL,
+        };
+        let mut owner = Self::local(host, lease, principal, ids)?;
+        owner.desktop_discovery = true;
+        Ok(owner)
+    }
+
+    pub(super) fn local(
+        host: ToolHost,
+        lease: BindingId,
+        principal: &'static str,
+        ids: &[&str],
+    ) -> Result<Self> {
+        Self::with_local(None, Some(host), ids, lease, principal)
     }
 
     pub(super) fn image_generation(
@@ -213,6 +242,7 @@ impl HostTools {
             capture,
             grants,
             principal,
+            desktop_discovery: false,
         })
     }
 
@@ -271,6 +301,17 @@ pub(super) struct TurnTools {
 impl TurnTools {
     pub(super) fn handles(&self, selection: &GrantSelection) -> bool {
         self.selections.values().any(|entry| entry == selection)
+    }
+
+    pub(super) fn desktop_discovery_offers(&self) -> Result<Vec<ToolOffer>> {
+        if !self.owner.desktop_discovery {
+            return Ok(Vec::new());
+        }
+        self.owner
+            .grants
+            .values()
+            .map(|grant| grant.describe()?.tool.offer())
+            .collect()
     }
 
     pub(super) fn insert(

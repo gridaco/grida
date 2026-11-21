@@ -62,12 +62,13 @@ guidance as context.
 
 ## Work in a project
 
-Open a folder in Grida Desktop and open its chat pane. The **Default** access
-shown in the composer lets the agent read and edit files in this project and
-run commands in a sandbox without asking; other folders and the internet are
-off. To let this chat use user-accessible files and the internet, open
-**Default**, choose **Full access**, and confirm the in-app dialog. New chats
-still begin with Default. Type `@` to mention a file, for example “Summarize @README.md and list
+Open a folder in Grida Desktop and open its chat pane. A new chat starts in
+**Auto** when available. The agent reads and edits files in the project and
+runs commands in a sandbox. The chat’s model reviews eligible requests for
+extra access. Choose **Ask for approval** in the access picker to review them
+yourself. Choose **Full access** and confirm the dialog to allow ordinary-user
+filesystem and network access for commands.
+Type `@` to mention a file, for example “Summarize @README.md and list
 the open TODOs.” A mention gives the agent the file's path; it reads the
 file's current contents when it needs them. To investigate without changing
 anything, type `/plan` or choose **+ → Plan mode** before you send.
@@ -78,6 +79,11 @@ its chat. Ask about files inside the deck by name while you work in the slide
 editor. A deck opened from inside a project has its own saved chats and can
 reach only the files within the deck.
 [Edit selected text](#edit-selected-text-in-an-svg-or-slide)
+[Work with an SVG selection](#work-with-an-svg-selection)
+
+## Continue from a suggested prompt
+
+With **Settings → Personalization → Suggested prompts** enabled, a follow-up may appear in faint text in your empty composer after a reply. Press **Tab** to accept it, edit the draft, and send it when ready. You can start typing immediately, including while Grida is generating a suggestion. [Costs and configuration](./desktop-settings.md#suggest-the-next-prompt)
 
 ## Attach an image
 
@@ -148,13 +154,28 @@ is not a saved copy, so moving or deleting the folder can make it unavailable.
 If your installed Desktop build cannot accept folder references, the drop
 shows an update message and keeps the draft and current attachment.
 
+## Work with an SVG selection
+
+Open an SVG or a slide in Desktop, then select objects or points on a path.
+Send an **Act** message that refers to the selection, such as “Set these two
+shapes to 50% opacity.” The marker above the composer shows when the selection
+will go with your message. The sent message keeps a marker for that capture.
+
+The agent can inspect the selected objects or path points in the live editor.
+Opacity edits apply to the selected objects in one Undo step. Use **Save** in
+the editor to write the change to disk.
+
+A queued message keeps the selection you sent. Switching tabs or slides,
+changing the selection, or editing the document can make that capture stale.
+Select the targets again and send a new message. **Plan** messages omit the
+selection.
+
 ## Edit selected text in an SVG or slide
 
 Open an SVG or a slide in Desktop and select one plain text element. Without
 the **Plan** badge, send a message asking the agent to read or replace it, for
-example “Make this heading shorter.” The composer shows **SVG text selection**
-when the selection can go with your message. Look above the sent message to
-see whether it carried the selection. The change appears in the editor and can
+example “Make this heading shorter.” Look for the selection marker above the
+composer and the sent message. The change appears in the editor and can
 be undone there; use the editor's **Save** command to write it to disk. If
 another program has changed the file, the save dialog handles the conflict.
 

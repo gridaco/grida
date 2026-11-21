@@ -86,15 +86,23 @@ jobs:
       - name: Verify package and make unsigned installers
         run: pnpm run make --arch="${{ matrix.arch }}"
 
-      - name: Verify chat recovery with the packaged native host
+      - name: Verify chat recovery and tool bindings with the packaged native host
         if: matrix.image == 'macos-26' && matrix.arch == 'arm64'
         shell: bash
         run: |
           export GRIDA_DESKTOP_TEST_NATIVE_RESOURCES="$PWD/out/Grida-darwin-arm64/Grida.app/Contents/Resources"
+          export GRIDA_DESKTOP_TEST_ELECTRON=1
           test -d "$GRIDA_DESKTOP_TEST_NATIVE_RESOURCES"
           pnpm exec vitest run \
+            src/main/browser-automation.electron.test.ts \
             src/main/live-chat-catalog.test.ts \
             src/main/native-agent-command-profile.test.ts \
             src/main/native-chat-ipc.test.ts \
             src/main/native-agent-chat.test.ts \
-            src/main/native-chat-store.test.ts
+            src/main/native-agent-process.test.ts \
+            src/main/native-chat-store.test.ts \
+            src/main/native-desktop-mcp.test.ts \
+            src/main/native-editor-mcp-export.test.ts \
+            src/main/native-editor-surfaces.test.ts \
+            src/main/native-gateway-connection.test.ts \
+            src/main/native-gateway-svg-text.test.ts

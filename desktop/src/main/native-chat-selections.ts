@@ -3,7 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { NativeChatEffort } from "@grida/desktop-bridge";
+import type { NativeChatEffort, NativeChatSpeed } from "@grida/desktop-bridge";
 
 const MAX_BYTES = 2 * 1024 * 1024;
 const MAX_DRAFTS = 128;
@@ -20,6 +20,7 @@ export namespace NativeChatSelections {
     connectionId: string | null;
     model: string;
     effort: NativeChatEffort;
+    speed?: NativeChatSpeed;
   }>;
   export type Target = Readonly<{ sessionId: string } | { draftId: string }>;
   export type View = Readonly<{
@@ -29,6 +30,7 @@ export namespace NativeChatSelections {
       profileId: string | null;
       modelId: string;
       effort: NativeChatEffort;
+      speed?: NativeChatSpeed;
     }> | null;
     available: boolean;
   }>;
@@ -88,6 +90,7 @@ type Draft = {
   welcome?: true;
 };
 type Intent = {
+  preserveDefault?: true;
   workspaceId: string;
   sessionId: string;
   expectedRevision: number;
@@ -238,7 +241,11 @@ export class NativeChatSelections {
     target: NativeChatSelections.Target,
     expectedRevision: number,
     operationId: string,
-    choice: { profileId: string | null; effort: NativeChatEffort },
+    choice: {
+      profileId: string | null;
+      effort: NativeChatEffort;
+      speed?: NativeChatSpeed;
+    },
     check: () => void = () => {}
   ): Promise<NativeChatSelections.View> {
     return this.exclusive(async () => {
@@ -252,17 +259,23 @@ export class NativeChatSelections {
         choice.effort === "standard" ? "medium" : choice.effort;
       effort(chosenEffort);
       await this.recoverPending();
-      const selected = {
+      const pair = {
         ...(await this.options.choice(workspaceId, choice.profileId)),
         effort: chosenEffort,
       };
-      selection(selected);
+      if (choice.speed !== undefined) validateSpeed(choice.speed);
+      const selectedWithSpeed = (previous: Selection | null): Selection => {
+        const speed = choice.speed ?? previous?.speed;
+        return { ...pair, ...(speed && speed !== "standard" && { speed }) };
+      };
       check();
-      if (selected.connectionId !== choice.profileId) throw invalid();
+      if (pair.connectionId !== choice.profileId) throw invalid();
       if ("draftId" in target) {
         identity(target.draftId);
         const old = this.state.drafts[target.draftId];
         if (!old || old.workspaceId !== workspaceId) throw invalid();
+        const selected = selectedWithSpeed(old.selection);
+        selection(selected);
         if (old.promotion)
           throw new Error("native_chat_draft_creation_pending");
         if (old.operationId === operationId) {
@@ -282,19 +295,14 @@ export class NativeChatSelections {
         };
         await this.save({
           ...this.state,
-          defaults: selected,
+          defaults: speedOnly(old.selection, selected)
+            ? this.state.defaults
+            : pair,
           drafts: { ...this.state.drafts, [target.draftId]: next },
         });
         return this.view(workspaceId, target, next.revision, selected);
       }
       sessionIdentity(target.sessionId);
-      const pending: Intent = {
-        workspaceId,
-        sessionId: target.sessionId,
-        expectedRevision,
-        operationId,
-        selection: selected,
-      };
       // An operation already committed before this invocation is an observation,
       // not another explicit edit. It must not become the newest app default.
       const old = record(
@@ -304,12 +312,23 @@ export class NativeChatSelections {
       );
       if (old.status === "retired")
         throw new Error("native_chat_selection_retired");
+      const head = readSnapshot(
+        await this.options.query(workspaceId, target.sessionId, "inspect"),
+        target.sessionId
+      );
+      const selected = selectedWithSpeed(head.selection);
+      selection(selected);
+      const pending: Intent = {
+        workspaceId,
+        sessionId: target.sessionId,
+        expectedRevision,
+        operationId,
+        selection: selected,
+        ...(head.selection &&
+          speedOnly(head.selection, selected) && { preserveDefault: true }),
+      };
       if (old.status === "committed") {
         const receipt = readReceipt(old.receipt, pending);
-        const head = readSnapshot(
-          await this.options.query(workspaceId, target.sessionId, "inspect"),
-          target.sessionId
-        );
         if (
           head.revision !== receipt.revision ||
           !head.selection ||
@@ -334,11 +353,24 @@ export class NativeChatSelections {
     });
   }
 
+  /** Resolve a Welcome choice without creating or updating a draft. */
+  async resolveNewChatChoice(workspaceId: string, profileId: string | null) {
+    workspace(workspaceId);
+    profile(profileId);
+    const selected = await this.options.choice(workspaceId, profileId);
+    if (selected.connectionId !== profileId) throw invalid();
+    return selected;
+  }
+
   /** Persist stable creation and first-input identities before creating a session. */
   prepareNewChat(
     workspaceId: string,
     draftId: string,
-    choice: { profileId: string | null; effort: NativeChatEffort },
+    choice: {
+      profileId: string | null;
+      effort: NativeChatEffort;
+      speed?: NativeChatSpeed;
+    },
     check: () => void
   ) {
     return this.exclusive(async () => {
@@ -349,6 +381,7 @@ export class NativeChatSelections {
       const chosenEffort =
         choice.effort === "standard" ? "medium" : choice.effort;
       effort(chosenEffort);
+      if (choice.speed !== undefined) validateSpeed(choice.speed);
       await this.recoverPending();
       await this.recoverWelcomeCreations();
       this.requireReceiptCapacity();
@@ -360,16 +393,19 @@ export class NativeChatSelections {
       )
         throw new Error("native_chat_draft_limit");
       const selected = {
-        ...(await this.options.choice(workspaceId, choice.profileId)),
+        ...(await this.resolveNewChatChoice(workspaceId, choice.profileId)),
         effort: chosenEffort,
+        ...(choice.speed &&
+          choice.speed !== "standard" && {
+            speed: choice.speed,
+          }),
       };
       selection(selected);
-      if (selected.connectionId !== choice.profileId) throw invalid();
       const promotion = chatCreation(draftId);
       check();
       await this.save({
         ...this.state,
-        defaults: selected,
+        defaults: defaultPair(selected),
         drafts: {
           ...this.state.drafts,
           [draftId]: {
@@ -390,12 +426,15 @@ export class NativeChatSelections {
   prepareCreation(
     workspaceId: string,
     draftId: string,
-    check: () => void = () => {}
+    check: () => void = () => {},
+    initialApproval?: "automatic" | "manual"
   ): Promise<{
     sessionId: string;
     requestId: string;
     firstInputId: string;
     selection: Selection;
+    initialPermissionMode?: "approve_for_me" | "restricted";
+    verifyManualApproval?: true;
   }> {
     return this.exclusive(async () => {
       check();
@@ -416,16 +455,35 @@ export class NativeChatSelections {
           current.model !== draft.selection.model
         )
           throw new Error("native_chat_selection_unavailable");
-        const promotion = chatCreation(draftId);
+        const promotion = chatCreation(
+          draftId,
+          initialApproval === "automatic"
+        );
         check();
         await this.save({
           ...this.state,
           drafts: { ...this.state.drafts, [draftId]: { ...draft, promotion } },
         });
       }
+      const promotion = this.state.drafts[draftId].promotion!;
+      // Old and Manual promotions keep their original IDs. An Auto promotion
+      // binds that decision to its native creation request without changing
+      // the on-disk draft format or reinterpreting an in-flight legacy draft.
+      const automaticReview =
+        promotion.requestId === creationIdentity(draftId, "request-auto");
+      const completed = this.state.completed?.includes(draftId);
       return {
-        ...this.state.drafts[draftId].promotion!,
+        ...promotion,
         selection: { ...draft.selection },
+        ...(automaticReview &&
+          !completed && {
+            initialPermissionMode:
+              initialApproval === "manual" ? "restricted" : "approve_for_me",
+          }),
+        ...(completed &&
+          initialApproval === "manual" && {
+            verifyManualApproval: true as const,
+          }),
       };
     });
   }
@@ -557,7 +615,9 @@ export class NativeChatSelections {
       }
       await this.save({
         ...this.state,
-        defaults: committed.selection,
+        defaults: pending.preserveDefault
+          ? this.state.defaults
+          : defaultPair(committed.selection),
         pending: null,
         acknowledgments: addAcknowledgment(this.state.acknowledgments, {
           workspaceId,
@@ -637,6 +697,7 @@ export class NativeChatSelections {
         profileId: selected.connectionId,
         modelId: selected.model,
         effort: selected.effort,
+        ...(selected.speed && { speed: selected.speed }),
       },
       available,
     };
@@ -743,14 +804,30 @@ function selection(value: unknown): asserts value is Selection {
   const v = record(value);
   profile(v.connectionId);
   effort(v.effort);
+  if (v.speed !== undefined) validateSpeed(v.speed);
   if (
     typeof v.model !== "string" ||
     !MODEL.test(v.model) ||
-    Object.keys(v).length !== 3
+    Object.keys(v).length !== 3 + Number(v.speed !== undefined)
   )
     throw invalid();
 }
+export function validateSpeed(
+  value: unknown
+): asserts value is NativeChatSpeed {
+  if (value !== "standard" && value !== "fast" && value !== "ultrafast")
+    throw invalid();
+}
+function defaultPair({ connectionId, model, effort }: Selection): Selection {
+  return { connectionId, model, effort };
+}
+function speedOnly(a: Selection, b: Selection): boolean {
+  return samePair(a, b) && (a.speed ?? "standard") !== (b.speed ?? "standard");
+}
 function same(a: Selection, b: Selection): boolean {
+  return samePair(a, b) && (a.speed ?? "standard") === (b.speed ?? "standard");
+}
+function samePair(a: Selection, b: Selection): boolean {
   return (
     a.connectionId === b.connectionId &&
     a.model === b.model &&
@@ -866,13 +943,19 @@ function parseState(value: unknown): State {
     identity(p.operationId);
     advancingRevision(p.expectedRevision);
     selection(p.selection);
-    keys(p, [
-      "workspaceId",
-      "sessionId",
-      "expectedRevision",
-      "operationId",
-      "selection",
-    ]);
+    if (p.preserveDefault !== undefined && p.preserveDefault !== true)
+      throw invalid();
+    keys(
+      p,
+      [
+        "workspaceId",
+        "sessionId",
+        "expectedRevision",
+        "operationId",
+        "selection",
+      ],
+      ["preserveDefault"]
+    );
   }
   if (
     !Array.isArray(v.acknowledgments) ||
@@ -890,7 +973,7 @@ function parseState(value: unknown): State {
 }
 function creationIdentity(
   draftId: string,
-  purpose: "session" | "request" | "input"
+  purpose: "session" | "request" | "request-auto" | "input"
 ): string {
   const bytes = createHash("sha256")
     .update(`grida.desktop.chat-draft.v1\0${draftId}\0${purpose}`)
@@ -901,10 +984,13 @@ function creationIdentity(
   const hex = bytes.toString("hex");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
-function chatCreation(draftId: string) {
+function chatCreation(draftId: string, automaticReview = false) {
   return {
     sessionId: creationIdentity(draftId, "session"),
-    requestId: creationIdentity(draftId, "request"),
+    requestId: creationIdentity(
+      draftId,
+      automaticReview ? "request-auto" : "request"
+    ),
     firstInputId: creationIdentity(draftId, "input"),
   };
 }

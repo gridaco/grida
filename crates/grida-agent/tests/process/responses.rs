@@ -263,6 +263,7 @@ async fn private_client_sees_the_retry_deadline_and_can_stop_before_dispatch() {
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 mod subscription_history {
     use super::super::approvals::{Fixture, Stdio as PrivateStdio};
+    use super::super::prediction::{ECONOMY_MODEL, ECONOMY_ROUTE};
     use super::*;
     use base64::{Engine as _, engine::general_purpose::STANDARD};
     use std::collections::{BTreeMap, VecDeque};
@@ -288,6 +289,7 @@ mod subscription_history {
         endpoint: &'static str,
         alternate_route: Option<String>,
         alternate_account: Option<char>,
+        prediction_route: Option<(Value, Option<Value>)>,
         // Saved named key and expected synthetic authorization for the alternate HTTP route.
         alternate_key: Option<(std::path::PathBuf, &'static str)>,
         replies: VecDeque<Reply>,
@@ -363,6 +365,7 @@ mod subscription_history {
                     .contains(&"provider/routes")
                     .then(|| uuid::Uuid::new_v4().to_string()),
                 alternate_account: None,
+                prediction_route: None,
                 alternate_key: None,
                 replies: replies.into(),
                 exchanges: BTreeMap::new(),
@@ -424,6 +427,20 @@ mod subscription_history {
 
         async fn on_frame(&mut self, frame: Value) {
             match frame["method"].as_str() {
+                Some("_co.grida/provider/resolve") if !frame["params"]["purpose"].is_null() => {
+                    let (expected, route) = self
+                        .prediction_route
+                        .as_ref()
+                        .expect("prediction routing was offered");
+                    assert_eq!(&frame["params"], expected, "{frame}");
+                    if let Some(route) = route {
+                        self.client.respond(&frame["id"], route.clone()).await;
+                    } else {
+                        self.client
+                            .reject(&frame["id"], "prediction_model_unavailable")
+                            .await;
+                    }
+                }
                 Some("_co.grida/provider/resolve") => {
                     let model = frame["params"]["model"].as_str().unwrap();
                     let route_id = self
@@ -451,13 +468,27 @@ mod subscription_history {
                     };
                     self.client.respond(&frame["id"], route).await;
                 }
+                Some("_co.grida/provider/turnCapabilities") => {
+                    let expected = match frame["params"]["routeId"].as_str() {
+                        Some(route) if Some(route) == self.alternate_route.as_deref() => SECOND,
+                        None | Some(LAUNCH_ROUTE) => &self.model,
+                        _ => panic!("unexpected capability route {frame}"),
+                    };
+                    assert_eq!(frame["params"]["model"], expected);
+                    self.client
+                        .respond(
+                            &frame["id"],
+                            json!({"status":"available","speeds":["fast"],"webSearch":true}),
+                        )
+                        .await;
+                }
                 Some("_co.grida/provider/exchange") => self.exchange(frame).await,
                 Some("_co.grida/provider/cancel") => {
                     self.cancelled += 1;
                     self.exchanges
                         .remove(frame["params"]["id"].as_str().unwrap());
                 }
-                Some("session/update") => self.updates.push(frame["params"]["update"].clone()),
+                Some("session/update") => self.updates.push(frame["params"].clone()),
                 _ => {}
             }
         }
@@ -467,6 +498,7 @@ mod subscription_history {
             let id = params["id"].as_str().unwrap().to_owned();
             let (model, endpoint) = match params["routeId"].as_str() {
                 None | Some(LAUNCH_ROUTE) => (self.model.as_str(), self.endpoint),
+                Some(ECONOMY_ROUTE) => (ECONOMY_MODEL, ENDPOINT),
                 Some(id)
                     if Some(id) == self.alternate_route.as_deref()
                         && self.alternate_account.is_some() =>
@@ -981,6 +1013,7 @@ mod subscription_history {
         let transcript: Vec<_> = worker
             .updates
             .iter()
+            .map(|notification| &notification["update"])
             .filter(|update| {
                 matches!(
                     update["sessionUpdate"].as_str(),
@@ -999,6 +1032,416 @@ mod subscription_history {
                 "Third input",
                 "Third answer"
             ]
+        );
+        worker.close().await;
+    }
+
+    #[tokio::test]
+    async fn subscription_search_streams_activity_then_restores_the_same_cited_answer() {
+        use super::super::lifecycle::prompt_request;
+        let fixture = Fixture::new(false);
+        let model = "openai/gpt-6.1-sol";
+        let capabilities = [
+            "provider/routes",
+            "provider/turn-capabilities",
+            "session/selection",
+            "session/updates",
+            "session/transcript-window",
+            "session/activity-order",
+        ];
+        let reply = Reply::ResponsesEvents(vec![
+            json!({"type":"response.web_search_call.searching","item_id":"ws_1"}),
+            json!({"type":"response.output_item.done","output_index":0,"item":{"type":"web_search_call","id":"ws_1","status":"completed","action":{"type":"search","query":"release date"}}}),
+            json!({"type":"response.output_item.done","output_index":1,"item":{"type":"message","id":"msg_1","role":"assistant","status":"completed","phase":"final_answer","content":[{"type":"output_text","text":"Release notes","annotations":[{"type":"url_citation","url":"https://example.org/release","title":"Release notes","start_index":0,"end_index":7}]}]}}),
+            json!({"type":"response.completed","response":{"status":"completed"}}),
+        ]);
+        let mut worker =
+            Worker::start(&fixture, model, Some('a'), vec![reply], &capabilities).await;
+        let session = "search-subscription";
+        let created = worker.request("_co.grida/session/selection/create",json!({
+            "cwd":fixture.primary,"sessionId":session,"requestId":"create","selection":{"connectionId":"a".repeat(64),"model":model,"effort":"medium","speed":"fast"}
+        })).await;
+        assert_eq!(created["result"]["revision"], 1, "{created}");
+        worker.load(&fixture, session).await;
+        let mut input = prompt_request(session, "search", "Find the release notes.");
+        input["_meta"] = json!({"co.grida/selectionRevision":1,"co.grida/webSearch":true});
+        let accepted = worker.request("_co.grida/session/submit", input).await;
+        assert!(accepted.get("error").is_none(), "{accepted}");
+        worker.idle(session).await;
+        let inspected = worker
+            .request(
+                "_co.grida/session/input",
+                json!({"sessionId":session,"inputId":"search"}),
+            )
+            .await;
+        assert_eq!(
+            inspected["result"]["settings"]["webSearch"], true,
+            "{inspected}"
+        );
+        assert!(inspected["result"]["receipt"].get("webSearch").is_none());
+        let wire = &worker.requests[0];
+        assert_eq!(worker.requests.len(), 1);
+        assert_eq!(wire["service_tier"], "priority");
+        let tools = wire["tools"].as_array().unwrap();
+        assert!(tools.iter().any(|tool| tool["type"] == "function"));
+        assert!(tools.contains(&json!({"type":"web_search","external_web_access":true})));
+        let assert_evidence = |notifications: &[Value], key: &str| {
+            let searches: Vec<_> = notifications
+                .iter()
+                .filter(|v| v["update"]["title"] == "web_search" && !v["_meta"][key].is_null())
+                .collect();
+            assert!(!searches.is_empty(), "{notifications:?}");
+            let last = searches.last().unwrap();
+            assert_eq!(last["_meta"][key]["source"], "provider");
+            assert_eq!(last["_meta"][key]["outcome"], "succeeded");
+            assert_eq!(last["update"]["rawInput"]["query"], "release date");
+            let id = &last["update"]["toolCallId"];
+            assert!(
+                searches
+                    .iter()
+                    .all(|item| &item["update"]["toolCallId"] == id)
+            );
+            let answer = notifications
+                .iter()
+                .find(|v| v["_meta"][key]["citations"].is_array())
+                .expect("a cited answer");
+            assert_eq!(answer["update"]["content"]["text"], "Release notes");
+            assert_eq!(
+                answer["_meta"][key]["citations"],
+                json!([{"url":"https://example.org/release","title":"Release notes","startIndex":0,"endIndex":7}])
+            );
+            id.clone()
+        };
+        let live_id = assert_evidence(&worker.updates, "co.grida/session/updates");
+        worker.close().await;
+
+        let mut restored = Worker::start(&fixture, model, Some('a'), vec![], &capabilities).await;
+        let window = "co.grida/session/transcript-window";
+        let attached = restored.request("session/load",json!({"cwd":fixture.primary,"sessionId":session,"mcpServers":[],"_meta":{window:{"kind":"attach"}}})).await;
+        assert!(attached.get("error").is_none(), "{attached}");
+        let page = restored.request("session/load",json!({"cwd":fixture.primary,"sessionId":session,"mcpServers":[],"_meta":{window:{"kind":"read","requestId":"restore"}}})).await;
+        assert!(page.get("error").is_none(), "{page}");
+        assert_eq!(assert_evidence(&restored.updates, window), live_id);
+        assert!(restored.requests.is_empty());
+        restored.updates.clear();
+        restored.load(&fixture, session).await;
+        assert!(
+            restored
+                .updates
+                .iter()
+                .any(|frame| frame["update"]["content"]["text"] == "Release notes")
+        );
+        assert!(
+            restored
+                .updates
+                .iter()
+                .all(|frame| frame["update"]["sessionUpdate"] != "tool_call"
+                    && !frame.to_string().contains("example.org"))
+        );
+        restored.close().await;
+    }
+
+    #[tokio::test]
+    async fn predictions_resolve_the_economy_model_on_the_selected_subscription_and_use_portable_history()
+     {
+        use super::super::lifecycle::prompt_request;
+        let fixture = Fixture::new(false);
+        std::fs::write(
+            fixture.primary.join("note.txt"),
+            "Use mulberry for the heading.",
+        )
+        .unwrap();
+        let session = "predict-on-selected-subscription";
+        let mut worker = Worker::start(
+            &fixture,
+            FIRST,
+            Some('a'),
+            vec![
+                Reply::Tool("read_file", r#"{"path":"note.txt"}"#),
+                Reply::ResponsesSigned("Original response."),
+                Reply::Finished("Use the summary."),
+                Reply::Finished("A new reply."),
+            ],
+            &[
+                "provider/routes",
+                "provider/prediction-route",
+                "provider/turn-capabilities",
+                "session/selection",
+                "session/predict-prompt",
+            ],
+        )
+        .await;
+        worker.alternate_account = Some('b');
+        let created = worker
+            .request(
+                "_co.grida/session/selection/create",
+                json!({
+                    "cwd":fixture.primary,"sessionId":session,"requestId":"create",
+                    "selection":{"connectionId":"b".repeat(64),"model":SECOND,"effort":"medium","speed":"fast"}
+                }),
+            )
+            .await;
+        assert_eq!(created["result"]["revision"], 1, "{created}");
+        worker.load(&fixture, session).await;
+        let mut input = prompt_request(session, "source", "Prepare a summary.");
+        input["_meta"] = json!({"co.grida/selectionRevision":1,"co.grida/webSearch":true});
+        let accepted = worker.request("_co.grida/session/submit", input).await;
+        let turn = accepted["result"]["turnId"].as_str().unwrap();
+        let before = worker.idle(session).await;
+        assert_eq!(worker.requests.len(), 2);
+        for foreground in &worker.requests {
+            assert_eq!(foreground["service_tier"], "priority");
+            assert!(
+                foreground["tools"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|tool| tool["type"] == "web_search")
+            );
+        }
+        let request = json!({"sessionId":session,"turnId":turn});
+        let source = json!({
+            "connectionId": "b".repeat(64), "model": SECOND,
+            "purpose": "composerPrediction", "sourceRouteId": worker.alternate_route.as_ref().unwrap()
+        });
+        let offer = |model: &str, account: char| {
+            json!({"kind":"chatgpt","routeId":ECONOMY_ROUTE,"model":model,
+                "endpoint":ENDPOINT,"scope":account.to_string().repeat(64)})
+        };
+        worker.alternate_account = Some('c');
+        let refused = worker
+            .request("_co.grida/session/predict-prompt", request.clone())
+            .await;
+        assert!(
+            refused["error"].is_null() && refused["result"]["text"].is_null(),
+            "{refused}"
+        );
+        assert_eq!(worker.requests.len(), 2);
+        worker.alternate_account = Some('b');
+        for denied in [
+            None,
+            Some(offer(ECONOMY_MODEL, 'c')),
+            Some(offer(SECOND, 'b')),
+        ] {
+            worker.prediction_route = Some((source.clone(), denied));
+            let skipped = worker
+                .request("_co.grida/session/predict-prompt", request.clone())
+                .await;
+            assert!(
+                skipped["error"].is_null() && skipped["result"]["text"].is_null(),
+                "{skipped}"
+            );
+            assert!(skipped["result"].get("modelId").is_none(), "{skipped}");
+            assert_eq!(
+                worker.requests.len(),
+                2,
+                "unavailable, foreign and premium offers spend nothing"
+            );
+        }
+        worker.prediction_route = Some((source, Some(offer(ECONOMY_MODEL, 'b'))));
+        let prediction = worker
+            .request("_co.grida/session/predict-prompt", request.clone())
+            .await;
+        let result = &prediction["result"];
+        assert_eq!(result["text"], "Use the summary.", "{prediction}");
+        assert_eq!(result["modelId"], ECONOMY_MODEL);
+        assert!(result.get("gatewayBilling").is_none());
+        let counts = result["tokenUsage"]["reported"].as_array().unwrap();
+        for (category, tokens) in [("input", "5"), ("output", "3")] {
+            assert!(
+                counts
+                    .iter()
+                    .any(|row| row["category"] == category && row["tokens"] == tokens),
+                "{counts:?}"
+            );
+        }
+        assert!(!counts.iter().any(|row| row["category"] == "cached_input"));
+        assert_eq!(worker.requests.len(), 3);
+        let wire = &worker.requests[2];
+        assert!(wire.get("service_tier").is_none());
+        assert_eq!(
+            wire["model"],
+            ECONOMY_MODEL.strip_prefix("openai/").unwrap()
+        );
+        assert!(
+            wire["tools"].is_null() || wire["tools"] == json!([]),
+            "{wire}"
+        );
+        let context = wire["input"].to_string();
+        assert!(
+            context.contains("Original response.")
+                && context.contains("Prepare a summary.")
+                && context.contains("Earlier tool call (history only)")
+                && context.contains("Use mulberry for the heading.")
+                && !context.contains("encrypted_content")
+                && !context.contains("private-openai"),
+            "{context}"
+        );
+        let duplicate = worker
+            .request("_co.grida/session/predict-prompt", request)
+            .await;
+        assert!(
+            duplicate["error"].is_null()
+                && duplicate["result"]["text"].is_null()
+                && duplicate["result"]["modelId"].is_null()
+        );
+        assert_eq!(worker.requests.len(), 3);
+        assert_eq!(worker.idle(session).await, before);
+        let mut second = prompt_request(session, "second", "Review the summary.");
+        second["_meta"] = json!({"co.grida/selectionRevision":1});
+        let accepted = worker.request("_co.grida/session/submit", second).await;
+        let turn = accepted["result"]["turnId"].as_str().unwrap();
+        worker.idle(session).await;
+        assert_eq!(
+            worker.requests[3]["model"],
+            SECOND.strip_prefix("openai/").unwrap()
+        );
+        assert!(
+            worker.requests[3]["input"]
+                .to_string()
+                .contains("encrypted_content")
+        );
+        let changed = worker.request("_co.grida/session/selection/update", json!({
+            "cwd":fixture.primary,"sessionId":session,"expectedRevision":1,"operationId":"switch",
+            "selection":{"connectionId":"a".repeat(64),"model":FIRST,"effort":"medium"}
+        })).await;
+        assert_eq!(changed["result"]["revision"], 2, "{changed}");
+        let stale = worker
+            .request(
+                "_co.grida/session/predict-prompt",
+                json!({"sessionId":session,"turnId":turn}),
+            )
+            .await;
+        assert!(
+            stale["error"].is_null() && stale["result"]["text"].is_null(),
+            "{stale}"
+        );
+        assert_eq!(worker.requests.len(), 4);
+        worker.close().await;
+    }
+
+    #[tokio::test]
+    async fn a_subscription_prediction_requires_its_route_offer_and_preserves_same_model_reasoning()
+    {
+        for (model, negotiate) in [(FIRST, false), (ECONOMY_MODEL, true)] {
+            let fixture = Fixture::new(false);
+            let mut capabilities = vec!["provider/routes", "session/predict-prompt"];
+            let mut replies = vec![Reply::ResponsesSigned("Original response.")];
+            if negotiate {
+                capabilities.push("provider/prediction-route");
+                replies.push(Reply::Finished("Review the summary."));
+            }
+            let mut worker =
+                Worker::start(&fixture, model, Some('a'), replies, &capabilities).await;
+            let created = worker
+                .request(
+                    "session/new",
+                    json!({"cwd":fixture.primary,"mcpServers":[]}),
+                )
+                .await;
+            let session = created["result"]["sessionId"].as_str().unwrap();
+            let reply = worker.request("session/prompt", json!({"sessionId":session,"prompt":[{"type":"text","text":"Prepare a summary."}]})).await;
+            assert_eq!(reply["result"]["stopReason"], "end_turn", "{reply}");
+            let snapshot = worker.idle(session).await;
+            if negotiate {
+                worker.prediction_route = Some((
+                    json!({"connectionId":null,"model":model,"purpose":"composerPrediction"}),
+                    Some(json!({"kind":"launch","routeId":LAUNCH_ROUTE,"model":model})),
+                ));
+            }
+            let request = json!({"sessionId":session,"turnId":snapshot["latest"]["turnId"]});
+            let prediction = worker
+                .request("_co.grida/session/predict-prompt", request)
+                .await;
+            let result = &prediction["result"];
+            assert!(prediction["error"].is_null(), "{prediction}");
+            if negotiate {
+                assert_eq!(result["text"], "Review the summary.", "{prediction}");
+                assert_eq!(result["modelId"], ECONOMY_MODEL);
+                assert_eq!(worker.requests.len(), 2);
+                let context = worker.requests[1]["input"].to_string();
+                assert!(
+                    context.contains("Original response.") && context.contains("encrypted_content"),
+                    "{context}"
+                );
+            } else {
+                assert!(
+                    result["text"].is_null() && result["modelId"].is_null(),
+                    "{prediction}"
+                );
+                assert_eq!(worker.requests.len(), 1);
+            }
+            worker.close().await;
+        }
+    }
+
+    #[tokio::test]
+    async fn archiving_a_chat_during_prediction_route_resolution_prevents_dispatch() {
+        let fixture = Fixture::new(false);
+        let mut worker = Worker::start(
+            &fixture,
+            FIRST,
+            Some('a'),
+            vec![Reply::Finished("I prepared the outline.")],
+            &[
+                "provider/prediction-route",
+                "session/predict-prompt",
+                "session/organize",
+            ],
+        )
+        .await;
+        let created = worker
+            .request(
+                "session/new",
+                json!({"cwd":fixture.primary,"mcpServers":[]}),
+            )
+            .await;
+        let session = created["result"]["sessionId"].as_str().unwrap();
+        worker.prompt(session, "Prepare the outline.").await;
+        let snapshot = worker.idle(session).await;
+
+        let prediction = worker
+            .client
+            .send(
+                "_co.grida/session/predict-prompt",
+                json!({"sessionId":session,"turnId":snapshot["latest"]["turnId"]}),
+            )
+            .await;
+        let resolve = worker.client.read_reply().await;
+        assert_eq!(resolve["method"], "_co.grida/provider/resolve");
+        assert_eq!(
+            resolve["params"],
+            json!({"connectionId":null,"model":FIRST,"purpose":"composerPrediction"})
+        );
+
+        let archived = worker
+            .request(
+                "_co.grida/session/organize",
+                json!({"sessionId":session,"revision":0,"title":null,"archived":true}),
+            )
+            .await;
+        assert_eq!(archived["result"]["archived"], true, "{archived}");
+        worker
+            .client
+            .respond(
+                &resolve["id"],
+                json!({
+                    "kind": "chatgpt", "model": ECONOMY_MODEL, "routeId": ECONOMY_ROUTE,
+                    "endpoint": ENDPOINT, "scope": "a".repeat(64)
+                }),
+            )
+            .await;
+        let skipped = worker.client.read_reply().await;
+        assert_eq!(
+            skipped["id"], prediction,
+            "archiving must prevent a provider exchange, received {}",
+            skipped["method"]
+        );
+        assert!(
+            skipped["error"].is_null()
+                && skipped["result"]["text"].is_null()
+                && skipped["result"]["modelId"].is_null(),
+            "{skipped}"
         );
         worker.close().await;
     }
@@ -1270,6 +1713,7 @@ mod subscription_history {
         let attached = worker
             .updates
             .iter()
+            .map(|notification| &notification["update"])
             .find(|update| {
                 update["sessionUpdate"] == "user_message_chunk"
                     && update["content"]["type"] == "resource_link"

@@ -1,13 +1,16 @@
 // GRIDA-SEC-004 / GRIDA-SEC-014 — explicitly reviewed executable hooks in private Main state.
 import { createHash } from "node:crypto";
-import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
-import { constants } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { promisify } from "node:util";
 import { atomicWrite } from "@grida/daemon/server";
-import { parse as parseToml } from "smol-toml";
+import {
+  boundedFile,
+  sourceDirectory,
+  noAcl,
+  readGlobalConfig,
+  parseGlobalConfig,
+} from "./native-agent-files";
 import type { NativeWorkspaceSelection } from "./native-agent-permissions";
 import type {
   NativeGlobalHookInspection,
@@ -26,7 +29,6 @@ const EVENTS: readonly NativeHookEvent[] = [
 ];
 const MAX_FILE = 64 * 1024;
 const MAX_EXECUTABLE = 128 * 1024 * 1024;
-const execute = promisify(execFile);
 const reviews = new WeakMap<
   object,
   { owner: NativeAgentHooks; captured: Stored }
@@ -392,44 +394,9 @@ export class NativeAgentHooks {
   }
 
   private async readSource(): Promise<{ exists: boolean; hooks: Stored[] }> {
-    try {
-      await sourceDirectory(this.directory);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT")
-        return { exists: false, hooks: [] };
-      throw error;
-    }
-    let bytes: Buffer;
-    try {
-      bytes = await boundedFile(
-        this.configPath,
-        MAX_FILE,
-        false,
-        false,
-        false,
-        true
-      );
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT")
-        return { exists: false, hooks: [] };
-      throw error;
-    }
-    let value: Record<string, unknown>;
-    try {
-      value = record(
-        parseToml(new TextDecoder("utf-8", { fatal: true }).decode(bytes))
-      );
-    } catch {
-      throw new Error("native_hooks_toml_invalid");
-    }
-    if (
-      Object.keys(value).some(
-        (key) => !["schema_version", "hooks"].includes(key)
-      ) ||
-      value.schema_version !== 1 ||
-      (value.hooks !== undefined && !Array.isArray(value.hooks))
-    )
-      throw new Error("native_hooks_schema_invalid");
+    const bytes = await readGlobalConfig(this.directory);
+    if (bytes === null) return { exists: false, hooks: [] };
+    const { table: value } = parseGlobalConfig(bytes);
     const entries = value.hooks ?? [];
     if (!Array.isArray(entries) || entries.length > 8)
       throw new Error("native_hooks_count_invalid");
@@ -555,52 +522,6 @@ async function verifyPin(value: Pin, system = false): Promise<void> {
   )
     throw new Error("native_hook_executable_changed");
 }
-async function boundedFile(
-  location: string,
-  maximum: number,
-  privateFile: boolean,
-  executable = false,
-  system = false,
-  userOwned = false
-): Promise<Buffer> {
-  const handle = await fs.open(
-    location,
-    constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK
-  );
-  try {
-    const stat = await handle.stat();
-    if (
-      !stat.isFile() ||
-      stat.size > maximum ||
-      (privateFile &&
-        (stat.uid !== process.geteuid?.() ||
-          (stat.mode & 0o7777) !== 0o600 ||
-          stat.nlink !== 1)) ||
-      (userOwned &&
-        (stat.uid !== process.geteuid?.() ||
-          (stat.mode & 0o022) !== 0 ||
-          stat.nlink !== 1)) ||
-      (executable &&
-        ((stat.mode & 0o022) !== 0 || (stat.mode & 0o111) === 0)) ||
-      (system && stat.uid !== 0)
-    )
-      throw invalid();
-    if (privateFile || userOwned) await noAcl(location);
-    const data = Buffer.alloc(stat.size + 1);
-    const { bytesRead } = await handle.read(data, 0, data.length, 0);
-    const after = await handle.stat();
-    if (
-      bytesRead !== stat.size ||
-      after.size !== stat.size ||
-      after.mtimeMs !== stat.mtimeMs ||
-      after.ctimeMs !== stat.ctimeMs
-    )
-      throw invalid();
-    return data.subarray(0, bytesRead);
-  } finally {
-    await handle.close();
-  }
-}
 /**
  * Where private command temporary parents live: the user's temporary
  * directory, kept outside the system's shared `/tmp`. A read-write command may
@@ -617,19 +538,6 @@ async function commandTemporaryRoot(): Promise<string> {
     throw new Error("native_command_temporary_root_unavailable");
   return fallback;
 }
-/** Global config needs integrity, not secret-directory permissions. Existing
- * Grida homes may be 0755; definitions and private receipts remain owner-writable. */
-async function sourceDirectory(location: string): Promise<void> {
-  const stat = await fs.lstat(location);
-  if (
-    !stat.isDirectory() ||
-    stat.uid !== process.geteuid?.() ||
-    (stat.mode & 0o022) !== 0 ||
-    (await fs.realpath(location)) !== location
-  )
-    throw invalid();
-  await noAcl(location);
-}
 async function privateDirectory(location: string): Promise<void> {
   const stat = await fs.lstat(location);
   if (
@@ -640,14 +548,6 @@ async function privateDirectory(location: string): Promise<void> {
   )
     throw invalid();
   await noAcl(location);
-}
-async function noAcl(location: string): Promise<void> {
-  if (process.platform !== "darwin") return;
-  const result = await execute("/bin/ls", ["-lde", location], {
-    maxBuffer: 8192,
-    env: { LC_ALL: "C", PATH: "/usr/bin:/bin" },
-  });
-  if (/^\s*\d+:/m.test(result.stdout)) throw invalid();
 }
 function info({ executable, ...value }: Stored): NativeHookInfo {
   return Object.freeze({
@@ -730,7 +630,7 @@ function hookDiagnostic(error: unknown): string {
     case "native_hooks_toml_invalid":
       return "config.toml is not valid UTF-8 TOML. Correct its syntax and reload.";
     case "native_hooks_schema_invalid":
-      return "Use schema_version = 1 and ordered [[hooks]] tables. Other global configuration fields are not supported yet.";
+      return "Use schema_version = 1, ordered [[hooks]] tables, and [desktop] for Desktop preferences.";
     case "native_hooks_count_invalid":
       return "Configure at most eight hooks.";
     case "native_hooks_fields_invalid":

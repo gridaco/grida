@@ -30,6 +30,7 @@ export namespace NativeProviderSelection {
       | "model"
       | "credentialHome"
       | "configuredEndpointKey"
+      | "configuredEndpointId"
       | "imageGeneration"
       | "llamaCppInputCount"
       | "subagents"
@@ -60,7 +61,18 @@ export namespace NativeProviderSelection {
 
   /** Whether `endpoint` is the base URL of a built-in stored-key provider. */
   export function isBuiltInEndpoint(endpoint: string): boolean {
-    return Object.values<string>(builtInEndpoints).includes(endpoint);
+    return builtInProviderId(endpoint) !== undefined;
+  }
+
+  export function builtInProviderId(endpoint: string): string | undefined {
+    return Object.entries(builtInEndpoints).find(
+      ([, url]) => url === endpoint
+    )?.[0];
+  }
+
+  export function isLoopbackEndpoint(endpoint: string): boolean {
+    const url = URL.parse(endpoint);
+    return !!url && isLoopbackHost(url.hostname);
   }
 
   export async function builtInByok(
@@ -165,6 +177,7 @@ export namespace NativeProviderSelection {
       provider: "openai-compatible",
       endpoint,
       model,
+      configuredEndpointId: config.id,
       ...(llamaCppInputCount && { llamaCppInputCount }),
       ...(credentialHome && {
         credentialHome,

@@ -6,6 +6,7 @@ pub mod compaction;
 pub mod configuration;
 pub mod conversation_seed;
 pub mod delegation;
+pub mod discovery;
 pub mod effort;
 pub mod file_reference;
 pub mod goals;
@@ -13,12 +14,14 @@ pub mod history;
 pub mod hooks;
 pub mod image_attachment;
 pub mod lifecycle_hooks;
+pub mod prediction;
 pub mod presentation;
 pub mod questions;
 pub mod retained_file;
 mod retry;
 pub mod side_chat;
 pub mod subagents;
+pub mod turn_options;
 pub mod usage;
 pub mod wakeups;
 
@@ -26,7 +29,7 @@ use agent_kit_core::authority::GrantSelection;
 use agent_kit_core::history::{HistoryPosition, HistoryRecord};
 use agent_kit_core::inference::{
     FailureKind, InferenceFailure, InferenceOutcome, InferenceRequest, InferenceStatus,
-    PreparedRequest, Provider,
+    PreparedRequest, Provider, ToolOffer,
 };
 use agent_kit_core::messages::{Content, Message, OutcomeStatus, Provenance, ProvenanceKind, Role};
 use agent_kit_core::tools::InventorySnapshot;
@@ -36,13 +39,14 @@ use agent_kit_core::turn::{
 };
 use agent_kit_core::{
     BoxFuture, Envelope, Error, ErrorKind, Fingerprint, MessageId, OperationId, Result, SchemaId,
+    ToolId,
 };
 use agent_kit_runtime::{
     CompletionDraft, FinishOutcome, InvokeOutcome, OperationKey, StepPlan, SuspendOutcome,
     SuspensionDraft, Turn, TurnView,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::num::NonZeroU64;
 use std::sync::Arc;
 
@@ -102,6 +106,11 @@ pub struct MasterConfig {
     /// None selects the provider's own reasoning default.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<agent_kit_core::inference::ReasoningEffort>,
+    #[serde(
+        default,
+        skip_serializing_if = "agent_kit_core::inference::RequestOptions::is_default"
+    )]
+    pub request_options: agent_kit_core::inference::RequestOptions,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -183,6 +192,7 @@ pub struct Master {
     config: MasterConfig,
     provider: Arc<dyn Provider>,
     tools: InventorySnapshot,
+    discovery: Option<discovery::Catalog>,
     authority: MasterAuthority,
     history: Vec<Message>,
     input_limit: Option<NonZeroU64>,
@@ -226,6 +236,8 @@ struct ConfigurationIdentity<'a> {
     lifecycle_hooks: Option<&'a lifecycle_hooks::LifecycleHooks>,
     #[serde(skip_serializing_if = "Option::is_none")]
     delegation: Option<&'a delegation::Policy>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    discovery: Option<&'a discovery::Catalog>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -245,6 +257,8 @@ struct Continuation {
     retry: Option<retry::AdmissionRetry>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     effort: Option<effort::Policy>,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    discovered: BTreeSet<ToolId>,
 }
 
 impl Continuation {
@@ -300,6 +314,7 @@ impl Master {
             config,
             provider,
             tools,
+            discovery: None,
             authority,
             history: Vec::new(),
             input_limit: None,
@@ -318,6 +333,14 @@ impl Master {
     /// Supply an immutable projection of preceding conversation turns.
     pub fn with_history(mut self, history: Vec<Message>) -> Self {
         self.history = history;
+        self
+    }
+
+    /// Defer the captured extension tools until a settled search selects them.
+    pub fn with_discovery(mut self, catalog: discovery::Catalog) -> Self {
+        self.config.instructions.push_str("\n\n");
+        self.config.instructions.push_str(&catalog.instructions());
+        self.discovery = Some(catalog);
         self
     }
 
@@ -459,8 +482,13 @@ impl Master {
                     .map_or(0, effort::Policy::reserved_child_generation_steps),
             )?
         };
-        let reviewer = self.approval_reviewer.as_ref().filter(|_| max_steps > 1);
-        let max_steps = max_steps - u32::from(reviewer.is_some());
+        let allowance = self.approval_reviewer.as_ref().map_or(0, |reviewer| {
+            reviewer
+                .allowance(max_steps)
+                .min(max_steps.saturating_sub(1))
+        });
+        let reviewer = self.approval_reviewer.as_ref().filter(|_| allowance > 0);
+        let max_steps = max_steps - allowance;
         let mut continuation = self.continuation(&turn)?;
         self.accept_input(&mut turn, input).await?;
         Self::retain_orphaned_work(&turn, &turn.view()).await?;
@@ -662,7 +690,7 @@ impl Master {
             let prepared = delay.and(checked).and_then(|_| {
                 let request = match &continuation.request {
                     Some(request) => request.clone(),
-                    None => self.prepare(&input_view)?,
+                    None => self.prepare(&input_view, &continuation.discovered)?,
                 };
                 if let Some(retry) = retry {
                     retry.verify_request(&request)?;
@@ -712,13 +740,29 @@ impl Master {
                 )
                 .await?;
             }
+            let tools = match &self.discovery {
+                Some(_) => {
+                    let mut offered = request.request().tools.iter().collect::<Vec<_>>();
+                    offered.sort_unstable_by(|left, right| left.id.cmp(&right.id));
+                    let ids = offered.iter().map(|offer| offer.id.clone()).collect();
+                    let captured = self.tools.select(&ids)?;
+                    if !captured.offers()?.iter().eq(offered) {
+                        return Err(Error::new(
+                            ErrorKind::Conflict,
+                            "discovery_inventory_changed",
+                        ));
+                    }
+                    captured
+                }
+                None => self.tools.clone(),
+            };
             let step = turn
                 .step(StepPlan {
                     key: OperationKey::new(step_key.clone())?,
                     request,
                     inference_grants: self.authority.inference.clone(),
                     tool_grants: self.authority.tools.clone(),
-                    tools: self.tools.clone(),
+                    tools,
                 })
                 .await;
             let step = match step {
@@ -803,7 +847,7 @@ impl Master {
                     && continuation.request_history == Some(current.state.history().position())
                     && let Some(reviewer) = reviewer
                     && reviewer
-                        .review(&turn.operations(), &current, &deferred)
+                        .review_with_allowance(&turn.operations(), &current, &deferred, allowance)
                         .await?
                 {
                     continue;
@@ -955,6 +999,9 @@ impl Master {
                 .transpose()?
                 .and_then(|account| account.delegation)
                 .is_some_and(|evidence| evidence.has_pending());
+            if let Some(discovery) = &self.discovery {
+                discovery.activate(&step.tools, &mut continuation.discovered);
+            }
             let mut history = step.history;
             if provisional_answer {
                 for HistoryRecord::Message(message) in &mut history {
@@ -1100,6 +1147,7 @@ impl Master {
                 .as_ref()
                 .map(|execution| &execution.hooks),
             delegation: self.delegation.as_ref(),
+            discovery: self.discovery.as_ref(),
         })?;
         let view = turn.view();
         match view.state.checkpoint() {
@@ -1114,6 +1162,7 @@ impl Master {
                 hook_diagnostics: Vec::new(),
                 retry: None,
                 effort: self.effort.clone(),
+                discovered: BTreeSet::new(),
             }),
             Some(envelope) => {
                 let value: Continuation = decode(CONTINUATION_SCHEMA, envelope)?;
@@ -1217,7 +1266,15 @@ impl Master {
         Ok(RequestRefresh::Retired)
     }
 
-    fn prepare(&self, view: &TurnView) -> Result<PreparedRequest> {
+    fn offers(&self, discovered: &BTreeSet<ToolId>) -> Result<Vec<ToolOffer>> {
+        let mut offers = self.tools.offers()?;
+        if let Some(discovery) = &self.discovery {
+            offers.retain(|offer| !discovery.deferred(&offer.id) || discovered.contains(&offer.id));
+        }
+        Ok(offers)
+    }
+
+    fn prepare(&self, view: &TurnView, discovered: &BTreeSet<ToolId>) -> Result<PreparedRequest> {
         let mut messages = Vec::new();
         if !self.config.instructions.is_empty() {
             messages.push(Message {
@@ -1310,9 +1367,9 @@ impl Master {
         let request = self.provider.prepare(InferenceRequest {
             model: self.config.model.clone(),
             messages,
-            tools: self.tools.offers()?,
+            tools: self.offers(discovered)?,
             max_output_tokens: self.config.max_output_tokens,
-            extension: None,
+            extension: self.config.request_options.extension()?,
             reasoning: self.config.reasoning,
         })?;
         match self.input_limit {

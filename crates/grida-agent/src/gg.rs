@@ -191,6 +191,17 @@ pub(crate) fn spending_receipt(
     retained_billing_receipt(scope, &retained.request_id, receipt)
 }
 
+/// The terminal charge for one inference. Its proof must name both the
+/// dispatched request and the Gateway account that authorized it.
+pub(crate) fn outcome_billing(
+    scope: Fingerprint,
+    outcome: &InferenceOutcome,
+) -> GatewayBillingRead {
+    attempt_request_id(outcome)
+        .and_then(|id| retained_billing_receipt(scope, id, outcome.terminal_receipt.as_ref()?))
+        .unwrap_or(GatewayBillingRead::Unavailable)
+}
+
 fn owns_retained_inference(owner: &ProviderBinding, operation: &OperationState) -> bool {
     let OperationInput::Inference(request) = &operation.record.input else {
         return false;
@@ -227,11 +238,9 @@ fn retained_billing(
                 }
                 _ => None,
             };
-            let billing = retained
-                .and_then(|(id, outcome)| {
-                    retained_billing_receipt(scope, id, outcome.terminal_receipt.as_ref()?)
-                })
-                .unwrap_or(GatewayBillingRead::Unavailable);
+            let billing = retained.map_or(GatewayBillingRead::Unavailable, |(_, outcome)| {
+                outcome_billing(scope, outcome)
+            });
             attempts.push(GatewayBillingAttempt {
                 operation_id: operation.record.id.clone(),
                 attempt_id: attempt.id.clone(),
@@ -495,7 +504,7 @@ fn gateway_billing_receipt(
     .ok()
 }
 
-fn attempt_request_id(outcome: &InferenceOutcome) -> Option<&str> {
+pub(crate) fn attempt_request_id(outcome: &InferenceOutcome) -> Option<&str> {
     if outcome
         .failure
         .as_ref()

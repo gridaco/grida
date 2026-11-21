@@ -2,15 +2,18 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { NativeAgentChat } from "./native-agent-chat";
+import { NativeCommandProfiles } from "./native-agent-command-profile";
 import { NativeAgentGoals } from "./native-agent-goals";
 import {
   NativeAgentProcess,
+  PREDICT_PROMPT,
   TRANSCRIPT_WINDOW,
   type NativeAgentLaunch,
 } from "./native-agent-process";
 import { NativeGatewayConnection } from "./native-gateway-connection";
+import { NativeProviderRoutes } from "./native-provider-routes";
 import { NativeInputImages } from "./native-input-images";
 import { NativeToolImages } from "./native-tool-images";
 import { NativeQueuedMessages } from "./native-queued-messages";
@@ -18,7 +21,11 @@ import { NativeSelectedImages } from "./native-selected-images";
 import { NativeSubagentActivity } from "./native-subagent-activity";
 import { NativeActivityOrder } from "./native-activity-order";
 import { NativeEditorSurfaceEndpoints } from "./native-editor-surfaces";
+import { NativeEditorSvgText } from "@grida/desktop-bridge";
+import { NativeEditorSvgReplies } from "./native-editor-svg-replies";
+import { NativeDesktopTools } from "./native-desktop-tools";
 import { NativeChatTitle } from "./native-chat-title";
+import type { DesktopBrowserToolLease } from "./desktop-browser-tools";
 
 function state() {
   const root = fs.mkdtempSync(
@@ -47,7 +54,8 @@ function fixture(
   source: string,
   initializationVersion = 1,
   capabilities?: Record<string, number | null>,
-  imageInput = false
+  imageInput = false,
+  startup = ""
 ) {
   const directory = state();
   const resources = path.join(directory.root, "native-agent");
@@ -57,6 +65,7 @@ function fixture(
     path.join(resources, "grida-agent"),
     `#!${process.execPath}
 const fs = require('node:fs');
+${startup}
 const readline = require('node:readline');
 const lines = readline.createInterface({input:process.stdin});
 const send = (value) => process.stdout.write(JSON.stringify({jsonrpc:'2.0',...value})+'\\n');
@@ -86,6 +95,101 @@ lines.on('close', () => fs.writeFileSync(${JSON.stringify(receipt)}, 'eof'));
 }
 
 describe.skipIf(process.platform === "win32")("Native agent process", () => {
+  it("gates scoped requests on the installed executable and retries failed probes", async () => {
+    const test = fixture(
+      `
+      if (request.method === 'fixture/argv') send({id:request.id,result:process.argv.slice(2)});
+      if (request.method === '_co.grida/session/snapshot') send({id:request.id,result:{sessionId:'session',sessionRevision:1,current:{turnId:'turn',controlRevision:1}}});
+      if (request.method === '_co.grida/session/approvals') send({id:request.id,result:{sessionId:'session',turnId:'turn',controlRevision:1,approvals:[{waitId:'wait',request:{session:'session',turn:'turn',directory:'external-file',root:'/',effect:{kind:'read',tool:'read_file',relative_path:'example/report.txt'}}}]}});
+      `,
+      1,
+      {},
+      false,
+      `
+      const help = fs.readFileSync(__dirname+'/help', 'utf8');
+      if (process.argv.slice(2).join(' ') === 'serve --help') {
+        fs.appendFileSync(__dirname+'/probes', 'p');
+        if (help === 'failed') process.exit(1);
+        process.stdout.write(help);
+        process.exit(0);
+      }
+      if (!help.includes('      --allow-scoped-approvals') && process.argv.includes('--allow-scoped-approvals')) process.exit(2);
+      `
+    );
+    const root = fs.realpathSync(test.root);
+    const project = path.join(root, "project");
+    const resources = path.join(root, "native-agent");
+    const executable = path.join(resources, "grida-agent");
+    const help = path.join(resources, "help");
+    fs.mkdirSync(project, { mode: 0o700 });
+    const command = vi
+      .spyOn(NativeCommandProfiles, "launch")
+      .mockResolvedValue({
+        helper: { path: "/bin/true", sha256: Array(32).fill(0) },
+        runtimePaths: [],
+        temporaryParent: root,
+        diskRead: true,
+        environment: {},
+      });
+    const options: NativeAgentLaunch = {
+      ...test.options,
+      workspace: {
+        id: "workspace",
+        primary: { id: "project", name: "Project", path: project },
+        additionalReadRoots: [],
+        protectedPaths: [],
+        allowScopedAccess: true,
+      },
+    };
+    async function check(supported: boolean, probes: number) {
+      const agent = await NativeAgentProcess.start(options);
+      try {
+        const args = (await agent.request("fixture/argv", {})) as string[];
+        expect(args.includes("--allow-scoped-approvals")).toBe(supported);
+        expect(
+          fs.readFileSync(path.join(resources, "probes"), "utf8")
+        ).toHaveLength(probes);
+        const result = await agent
+          .permissions!.list("session", "turn")
+          .catch((error: Error) => error.message);
+        const expectedRead = expect.objectContaining({
+          tool: "read_file",
+          relativePath: "example/report.txt",
+        });
+        expect(result).toEqual(
+          supported ? [expectedRead] : "native_agent_approval_invalid"
+        );
+        return args[args.indexOf("--permission-profile") + 1];
+      } finally {
+        await agent.close();
+      }
+    }
+    try {
+      await expect(
+        NativeAgentProcess.supportsScopedApprovals(project)
+      ).resolves.toBe(false);
+      fs.writeFileSync(help, "failed");
+      const profile = await check(false, 1);
+      fs.writeFileSync(help, "      --other-option\n");
+      await expect(
+        NativeAgentProcess.supportsScopedApprovals(root)
+      ).resolves.toBe(false);
+      expect(await check(false, 2)).toBe(profile);
+      expect(await check(false, 2)).toBe(profile);
+      fs.writeFileSync(help, "      --allow-scoped-approvals\n");
+      fs.copyFileSync(executable, executable + ".update");
+      fs.renameSync(executable + ".update", executable);
+      await expect(
+        NativeAgentProcess.supportsScopedApprovals(root)
+      ).resolves.toBe(true);
+      expect(await check(true, 3)).toBe(profile);
+      expect(await check(true, 3)).toBe(profile);
+    } finally {
+      command.mockRestore();
+      test.close();
+    }
+  });
+
   it("projects the same captured tool image during live updates and replay and reads only its exact result", async () => {
     const bytes = Buffer.alloc(300 * 1024, 7);
     bytes.set([137, 80, 78, 71, 13, 10, 26, 10]);
@@ -181,6 +285,43 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
     }
   );
 
+  it("checks retry search permission against the accepted input while receipt observation stays independent", async () => {
+    const test = fixture(
+      `
+      if (request.method === "session/new") return send({id:request.id,result:{sessionId:"chat"}});
+      if (request.method !== "_co.grida/session/input") throw Error("unexpected request");
+      const {sessionId,inputId}=request.params;
+      const result = {receipt:{sessionId,inputId,inputPosition:1,turnId:null,disposition:"queued"}};
+      if(inputId!=="legacy-worker") result.settings = inputId==="search" ? {webSearch:true} : {};
+      send({id:request.id,result});
+    `,
+      1,
+      {}
+    );
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        ...test.options,
+        cwd: fs.realpathSync(test.root),
+      });
+      const session = await chat.create();
+      for (const id of ["search", "legacy-record", "legacy-worker"]) {
+        const enabled = id === "search";
+        const receipt = await chat.inputReceipt(session, id);
+        expect(receipt).not.toHaveProperty("webSearch");
+        await expect(chat.inputReceipt(session, id, enabled)).resolves.toEqual(
+          receipt
+        );
+        await expect(chat.inputReceipt(session, id, !enabled)).rejects.toThrow(
+          "submission_web_search_changed"
+        );
+      }
+    } finally {
+      await chat?.close();
+      test.close();
+    }
+  });
+
   it("preserves retained message and individual call order across live chunks, replay and older pages", async () => {
     const test = fixture(
       `
@@ -199,11 +340,12 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
         send({id:request.id,result:{_meta:{[window]:{requestId:read.requestId,view:1,older:null,turns:[{turnId:'older-turn',status:'succeeded',startedAtMs:1,settledAtMs:2}]}}}}); return;
       }
       const live=(update,extra,fact)=>send({method:'session/update',params:{sessionId:'chat',_meta:{'co.grida/session/updates':{turnId:'live-turn',...extra,...fact},[ordered]:{turnId:'live-turn',...fact}},update}});
-      live({sessionUpdate:'agent_message_chunk',messageId:'live-message',content:{type:'text',text:'Later'}},{offsetBytes:0,replace:false},{activityOrder:8});
-      live({sessionUpdate:'tool_call',toolCallId:'live-call',title:'read_file',kind:'read',status:'completed'},{messageId:'live-container',activity:'read',outcome:'succeeded'},{activityOrder:4});
+      const citations=[{url:'https://example.org/reference',title:'Reference',startIndex:0,endIndex:5},{url:'javascript:wrong()',startIndex:0,endIndex:3}];
+      live({sessionUpdate:'agent_message_chunk',messageId:'live-message',content:{type:'text',text:'Later'}},{offsetBytes:0,replace:true,citations},{activityOrder:8});
+      live({sessionUpdate:'tool_call',toolCallId:'live-call',title:'web_search',kind:'search',status:'completed'},{messageId:'live-container',activity:'search',source:'provider',outcome:'succeeded'},{activityOrder:4});
       live({sessionUpdate:'agent_message_chunk',messageId:'live-message',content:{type:'text',text:' grows'}},{offsetBytes:5,replace:false},{activityOrder:8});
       send({method:'session/update',params:{sessionId:'chat',_meta:meta({activityOrder:1}),update:{sessionUpdate:'user_message_chunk',messageId:'request',content:{type:'resource_link',name:'report.txt',uri:'file:///workspace/report.txt',mimeType:'text/plain',size:4}}}});
-      text('work','First ',{activityOrder:2},{phase:'progress'});
+      text('work','First ',{activityOrder:2},{phase:'progress',citations});
       text('work','message.',{activityOrder:2},{phase:'progress'});
       send({method:'session/update',params:{sessionId:'chat',_meta:meta({activityOrder:4},{messageId:'work',activity:'read',outcome:'succeeded'}),update:{sessionUpdate:'tool_call',toolCallId:'call',title:'read_file',kind:'read',status:'completed'}}});
       text('tool-only','',{});
@@ -231,7 +373,16 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
       const work = page.messages.find(
         (message) => message.messageId === "work"
       )!;
+      const citations = [
+        {
+          url: "https://example.org/reference",
+          title: "Reference",
+          startIndex: 0,
+          endIndex: 5,
+        },
+      ];
       expect(work).toMatchObject({
+        citations,
         text: "First message.",
         activityOrder: 2,
         activity: [{ callId: "call", activityOrder: 4 }],
@@ -270,7 +421,8 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
           turnId: "live-turn",
           text: "Later",
           offsetBytes: 0,
-          replace: false,
+          replace: true,
+          citations,
           activityOrder: 8,
         },
         {
@@ -279,8 +431,9 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
           turnId: "live-turn",
           activity: {
             callId: "live-call",
-            title: "read_file",
-            kind: "read",
+            title: "web_search",
+            kind: "search",
+            source: "provider",
             outcome: "succeeded",
             activityOrder: 4,
           },
@@ -929,6 +1082,38 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
     }
   });
 
+  it("cancels a held composer prediction before preparing a model switch", async () => {
+    const test = fixture(
+      `
+      if (request.method === '_${PREDICT_PROMPT}') {
+        globalThis.prediction = request.id;
+      } else if (request.method === '$/cancel_request' && request.params.requestId === globalThis.prediction) {
+        globalThis.cancelled = true;
+      } else if (request.method === '_co.grida/session/model-change' && globalThis.cancelled) {
+        send({id:globalThis.prediction,result:{text:'A late suggestion.'}});
+        send({id:request.id,result:{prepared:true}});
+      } else { throw new Error('unexpected prediction or switch order'); }
+      `,
+      1,
+      { [PREDICT_PROMPT]: 1, "co.grida/session/model-change": 1 }
+    );
+    const agent = await NativeAgentProcess.start(test.options);
+    try {
+      const prediction = agent.request(`_${PREDICT_PROMPT}`, {
+        sessionId: "chat",
+        turnId: "finished",
+      });
+      await Promise.all([
+        expect(prediction).rejects.toThrow("native_chat_prediction_cancelled"),
+        agent.prepareModelChange(),
+      ]);
+      expect(agent.modelChangePending).toBe(true);
+    } finally {
+      await agent.close();
+      test.close();
+    }
+  });
+
   it("does not seal the worker while a prior ACP admission is unresolved", async () => {
     const test = fixture(
       `if (request.method !== 'fixture/held') throw new Error('unexpected transition');`,
@@ -1341,6 +1526,172 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
     }
   );
 
+  it.each([true, false])(
+    "negotiates prediction separately from foreground model switching on a fixed worker (economy routing %s)",
+    async (supported) => {
+      const test = fixture(
+        `
+      if (request.method === '_${PREDICT_PROMPT}') {
+        globalThis.prediction = request.id;
+      } else if (request.method === 'fixture/finish') {
+        send({id:globalThis.prediction,result:{text:'A late suggestion.'}});
+        send({id:request.id,result:{}});
+      } else if (request.method === 'fixture/worker') {
+        send({id: 'worker-' + request.id, ...request.params});
+      } else if (String(request.id).startsWith('worker-')) {
+        send({id: Number(request.id.slice(7)), result: request.result ?? {error: request.error.message}});
+      }`,
+        1,
+        { [NativeProviderRoutes.predictionCapability]: supported ? 1 : null }
+      );
+      const lookup = vi.fn<NativeProviderRoutes.PredictionLookup>(
+        async (source) => ({ ...source, model: "economy" })
+      );
+      let agent: NativeAgentProcess | undefined;
+      try {
+        const endpoint = "https://fixture.test/v1";
+        const billing = vi.fn<NativeGatewayConnection["readJobBilling"]>(
+          async () => ({ kind: "settled", chargedMills: "1" })
+        );
+        agent = await NativeAgentProcess.start({
+          ...test.options,
+          endpoint,
+          providerNetwork: {
+            prepare: () => async () =>
+              new Response("data: ok", {
+                headers: { "content-type": "text/event-stream" },
+              }),
+          },
+          gatewayScope: "a".repeat(64),
+          gatewayJobBilling: billing,
+          lookupPredictionRoute: lookup,
+        });
+        expect(agent.acceptsInputRoutes).toBe(false);
+        expect(agent.acceptsPromptPrediction).toBe(supported);
+        const worker = (method: string, params: Record<string, unknown>) =>
+          agent!.request("fixture/worker", { method, params });
+        const selection = { connectionId: null, model: test.options.model };
+        expect(
+          await worker(NativeProviderRoutes.resolveMethod, selection)
+        ).toHaveProperty("error");
+        const turn = {
+          sessionId: "chat",
+          turnId: "finished",
+        };
+        const permission = new AbortController();
+        const pending = agent.request(
+          `_${PREDICT_PROMPT}`,
+          turn,
+          20_000,
+          permission.signal
+        );
+        void pending.catch(() => {});
+        const target = (await worker(NativeProviderRoutes.resolveMethod, {
+          ...selection,
+          purpose: "composerPrediction",
+        })) as { routeId?: string };
+        expect(lookup).toHaveBeenCalledTimes(supported ? 1 : 0);
+        expect(target).toMatchObject(
+          supported
+            ? {
+                kind: "gateway",
+                model: "economy",
+                endpoint,
+              }
+            : { error: "Method not found" }
+        );
+        if (!supported) return;
+        const id = randomUUID();
+        expect(
+          await worker("_co.grida/provider/exchange", {
+            id,
+            routeId: target.routeId,
+            action: "open",
+            target: endpoint + "/chat/completions",
+            headers: [
+              ["content-type", "application/json"],
+              ["accept", "text/event-stream"],
+            ],
+            initial: Buffer.from("{}").toString("base64"),
+            timeoutMs: 1000,
+            maxResponseBytes: 32,
+          })
+        ).toEqual({ status: "accepted" });
+        expect(
+          await worker("_co.grida/provider/exchange", {
+            id,
+            routeId: target.routeId,
+            action: "dispatch",
+          })
+        ).toMatchObject({ status: "ready" });
+        const read = { id, routeId: target.routeId, action: "read" };
+        expect(await worker("_co.grida/provider/exchange", read)).toMatchObject(
+          { status: "chunk" }
+        );
+        expect(await worker("_co.grida/provider/exchange", read)).toEqual({
+          status: "end",
+        });
+        expect(
+          await worker(NativeGatewayConnection.readJobBillingMethod, {
+            requestId: "req_fixture",
+            routeId: randomUUID(),
+          })
+        ).toEqual({ kind: "unavailable" });
+        expect(billing).not.toHaveBeenCalled();
+        const reading = Promise.withResolvers<void>();
+        const settle = Promise.withResolvers<void>();
+        billing.mockImplementationOnce(async () => {
+          reading.resolve();
+          await settle.promise;
+          return { kind: "settled", chargedMills: "1" };
+        });
+        const receipt = worker(NativeGatewayConnection.readJobBillingMethod, {
+          requestId: "req_fixture",
+          routeId: target.routeId,
+        });
+        await reading.promise;
+        lookup.mockImplementationOnce(async (source) => ({
+          ...source,
+          model: "economy",
+          maxOutputTokens: 64,
+        }));
+        const next = await worker(NativeProviderRoutes.resolveMethod, {
+          ...selection,
+          purpose: "composerPrediction",
+        });
+        expect(next).toMatchObject({ model: "economy", maxOutputTokens: 64 });
+        permission.abort();
+        // The worker still owns the cancelled operation. Its delayed resolver
+        // cannot take the permission of a new opt-in before it acknowledges.
+        expect(
+          await agent.request(
+            `_${PREDICT_PROMPT}`,
+            turn,
+            1000,
+            new AbortController().signal
+          )
+        ).toEqual({ text: null });
+        expect(
+          await worker(NativeProviderRoutes.resolveMethod, {
+            ...selection,
+            purpose: "composerPrediction",
+          })
+        ).toEqual({ error: "Provider route unavailable" });
+        settle.resolve();
+        expect(await receipt).toEqual({ kind: "settled", chargedMills: "1" });
+        expect(billing).toHaveBeenCalledOnce();
+        await agent.request("fixture/finish", {});
+        expect(await pending).toEqual({ text: null });
+      } finally {
+        try {
+          await agent?.close();
+        } finally {
+          test.close();
+        }
+      }
+    }
+  );
+
   it("retains an open launch exchange while the next model uses its own revocable network authority", async () => {
     const test = fixture(
       `
@@ -1542,6 +1893,625 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
     }
   });
 
+  it.each([true, false])(
+    "scopes Desktop MCP discovery and calls to an exact endpoint (negotiated: %s)",
+    async (negotiated) => {
+      const test = fixture(
+        `
+        if (request.method === 'fixture/reverse') {
+          if (requested['${NativeDesktopTools.capability}'] !== 1) throw Error('missing capability');
+          globalThis.reverse = request.id;
+          send({id:'reverse',...request.params});
+        } else if (request.id === 'reverse') {
+          send({id:globalThis.reverse,result:request});
+        }
+      `,
+        1,
+        { [NativeDesktopTools.capability]: negotiated ? 1 : null }
+      );
+      let agent: NativeAgentProcess | undefined;
+      try {
+        agent = await NativeAgentProcess.start({
+          ...test.options,
+          providerNetwork: { prepare: () => null },
+        });
+        const current = agent;
+        let valid = true;
+        const lease = current.registerEditorSurfaces(
+          "chat",
+          { active: "/initial.svg", open: ["/initial.svg"], truncated: false },
+          () => {
+            if (!valid) throw new Error("owner revoked");
+          },
+          undefined
+        )!;
+        const endpointId = lease.selection().editorEndpointId;
+        const identity = { sessionId: "chat", endpointId };
+        const reverse = (method: string, params: object) =>
+          current.request("fixture/reverse", { method, params });
+        const list = { jsonrpc: "2.0", id: "list", method: "tools/list" };
+        const reply = (message: object, owner = identity) =>
+          reverse(NativeDesktopTools.method, {
+            ...owner,
+            message,
+            timeoutMs: 2000,
+            expiresAtMs: Date.now() + 2000,
+          });
+        const legacy = !negotiated
+          ? await reverse(NativeEditorSurfaceEndpoints.readMethod, identity)
+          : undefined;
+        const expectedLegacy = expect.objectContaining({
+          result: expect.objectContaining({
+            ...identity,
+            available: true,
+            active: "/initial.svg",
+          }),
+        });
+        expect(legacy).toEqual(negotiated ? undefined : expectedLegacy);
+        const listReply = await reply(list);
+        expect(listReply).toMatchObject(
+          negotiated
+            ? {
+                result: {
+                  ...identity,
+                  message: {
+                    jsonrpc: "2.0",
+                    id: "list",
+                    result: {
+                      resultType: "complete",
+                      tools: [
+                        {
+                          name: "surface_list_open",
+                          annotations: { readOnlyHint: true },
+                          inputSchema: {
+                            type: "object",
+                            additionalProperties: false,
+                          },
+                          outputSchema: { type: "object" },
+                          _meta: { "co.grida/definitionRevision": 2 },
+                        },
+                      ],
+                    },
+                  },
+                },
+              }
+            : { error: { code: -32601 } }
+        );
+        if (!negotiated) return;
+        const call = (revision: number, args = {}) => ({
+          jsonrpc: "2.0",
+          id: "call",
+          method: "tools/call",
+          params: {
+            name: "surface_list_open",
+            arguments: args,
+            _meta: {
+              "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+              "co.grida/definitionRevision": revision,
+            },
+          },
+        });
+        await expect(reply(call(3))).resolves.toMatchObject({
+          result: { message: { id: "call", error: { code: -32002 } } },
+        });
+        await expect(
+          reply(call(2, { path: "/initial.svg" }))
+        ).resolves.toMatchObject({
+          result: {
+            message: {
+              id: "call",
+              result: {
+                resultType: "complete",
+                isError: true,
+                content: [
+                  { type: "text", text: "invalid_editor_surface_arguments" },
+                ],
+              },
+            },
+          },
+        });
+        lease.update({ active: null, open: ["/later.svg"], truncated: true });
+        await expect(reply(call(2))).resolves.toMatchObject({
+          result: {
+            ...identity,
+            message: {
+              jsonrpc: "2.0",
+              id: "call",
+              result: {
+                resultType: "complete",
+                content: [],
+                isError: false,
+                _meta: { "co.grida/truncated": true },
+                structuredContent: {
+                  interactive: true,
+                  active: null,
+                  open: ["/later.svg"],
+                  truncated: true,
+                },
+              },
+            },
+          },
+        });
+        await expect(
+          reply(list, { ...identity, sessionId: "other-chat" })
+        ).resolves.toMatchObject({
+          result: { message: { id: "list", error: { code: -32001 } } },
+        });
+        valid = false;
+        const replacement = current.registerEditorSurfaces(
+          "chat",
+          {
+            active: "/replacement.svg",
+            open: ["/replacement.svg"],
+            truncated: false,
+          },
+          () => {},
+          undefined
+        )!;
+        await expect(reply(call(2))).resolves.toMatchObject({
+          result: {
+            ...identity,
+            message: { id: "call", error: { code: -32001 } },
+          },
+        });
+        const next = {
+          sessionId: "chat",
+          endpointId: replacement.selection().editorEndpointId,
+        };
+        expect(next.endpointId).not.toBe(endpointId);
+        await expect(reply(list, next)).resolves.toMatchObject({
+          result: {
+            ...next,
+            message: {
+              result: {
+                tools: [
+                  {
+                    name: "surface_list_open",
+                    _meta: { "co.grida/definitionRevision": 2 },
+                  },
+                ],
+              },
+            },
+          },
+        });
+        await expect(reply(call(2), next)).resolves.toMatchObject({
+          result: {
+            ...next,
+            message: {
+              result: { structuredContent: { active: "/replacement.svg" } },
+            },
+          },
+        });
+      } finally {
+        try {
+          await agent?.close();
+        } finally {
+          test.close();
+        }
+      }
+    }
+  );
+
+  it("discovers and dispatches SVG text and artifact presentation under their separate scopes", async () => {
+    const test = fixture(
+      `
+        if (request.method === 'fixture/reverse') {
+          globalThis.reverse = request.id;
+          send({id:'scoped',method:'${NativeDesktopTools.method}',params:request.params});
+        } else if (request.id === 'scoped') {
+          send({id:globalThis.reverse,result:request});
+        }
+      `,
+      1,
+      {
+        [NativeEditorSurfaceEndpoints.openCapability]: null,
+        [NativeEditorSurfaceEndpoints.svgTextCapability]: null,
+      }
+    );
+    const agent = await NativeAgentProcess.start({
+      ...test.options,
+      providerNetwork: { prepare: () => null },
+    });
+    try {
+      const target = randomUUID();
+      const presented: string[] = [];
+      const changes: string[] = [];
+      let onPresentation: (() => void) | undefined;
+      const lease = agent.registerEditorSurfaces(
+        "chat",
+        { active: "/initial.svg", open: ["/initial.svg"], truncated: false },
+        () => {},
+        (request) => {
+          presented.push(request.path);
+          onPresentation?.();
+        },
+        1,
+        async ({ targetId, operation }) => {
+          expect(targetId).toBe(target);
+          if (operation.kind === "read")
+            return {
+              kind: "read",
+              path: "/initial.svg",
+              revision: target,
+              text: "Original",
+            };
+          changes.push(operation.text);
+          return { kind: "applied", path: "/initial.svg", saved: false };
+        }
+      )!;
+      const endpointId = lease.selection(target).editorEndpointId;
+      const svg = { svgTargetId: target };
+      const presentation = { presentation: true };
+      const request = (
+        message: object,
+        scope?: object,
+        expiresAtMs = Date.now() + 2000
+      ) =>
+        agent.request("fixture/reverse", {
+          sessionId: "chat",
+          endpointId,
+          scope,
+          message,
+          timeoutMs: 2000,
+          expiresAtMs,
+        });
+      const list = (scope?: object) =>
+        request({ jsonrpc: "2.0", id: "list", method: "tools/list" }, scope);
+      const call = (
+        name: string,
+        revision: number,
+        args: object,
+        scope?: object,
+        id = randomUUID(),
+        expiresAtMs?: number
+      ) =>
+        request(
+          {
+            jsonrpc: "2.0",
+            id,
+            method: "tools/call",
+            params: {
+              name,
+              arguments: args,
+              _meta: { "co.grida/definitionRevision": revision },
+            },
+          },
+          scope,
+          expiresAtMs
+        );
+      const names = (tools: string[]) => ({
+        result: {
+          message: { result: { tools: tools.map((name) => ({ name })) } },
+        },
+      });
+      await expect(list()).resolves.toMatchObject(names(["surface_list_open"]));
+      await expect(list(svg)).resolves.toMatchObject(
+        names([
+          "surface_list_open",
+          "svg_read_selected_text",
+          "svg_replace_selected_text",
+        ])
+      );
+      await expect(list(presentation)).resolves.toMatchObject(
+        names(["surface_list_open", "surface_open"])
+      );
+      await expect(
+        list({ ...svg, presentation: false })
+      ).resolves.toMatchObject({
+        error: { code: -32602 },
+      });
+      await expect(
+        call("surface_open", 2, { path: "/initial.svg" }, svg)
+      ).resolves.toMatchObject({
+        result: { message: { error: { code: -32602 } } },
+      });
+      expect(presented).toEqual([]);
+      const expired = Date.now() - 1;
+      const deadlineElapsed = {
+        result: {
+          message: {
+            error: { code: -32004, message: "desktop_tool_deadline_elapsed" },
+          },
+        },
+      };
+      await expect(
+        call(
+          "surface_open",
+          2,
+          { path: "/initial.svg" },
+          presentation,
+          randomUUID(),
+          expired
+        )
+      ).resolves.toMatchObject(deadlineElapsed);
+      await expect(
+        call(
+          "svg_replace_selected_text",
+          1,
+          { revision: target, text: "Expired" },
+          svg,
+          randomUUID(),
+          expired
+        )
+      ).resolves.toMatchObject(deadlineElapsed);
+      expect(presented).toEqual([]);
+      expect(changes).toEqual([]);
+      const id = randomUUID();
+      for (const _ of [0, 1])
+        await expect(
+          call("surface_open", 2, { path: "/initial.svg" }, presentation, id)
+        ).resolves.toMatchObject({
+          result: {
+            message: {
+              result: {
+                structuredContent: {
+                  path: "/initial.svg",
+                  requested: true,
+                  reason: "dispatched",
+                },
+              },
+            },
+          },
+        });
+      expect(presented).toEqual(["/initial.svg"]);
+      await expect(
+        call("svg_read_selected_text", 1, {}, svg)
+      ).resolves.toMatchObject({
+        result: {
+          message: {
+            result: {
+              structuredContent: {
+                kind: "read",
+                path: "/initial.svg",
+                revision: target,
+                text: "Original",
+              },
+            },
+          },
+        },
+      });
+      await expect(
+        call(
+          "svg_replace_selected_text",
+          1,
+          { revision: randomUUID(), text: "Wrong" },
+          svg
+        )
+      ).resolves.toMatchObject({
+        result: {
+          message: {
+            result: {
+              isError: true,
+              content: [{ type: "text", text: "svg_text_revision_changed" }],
+            },
+          },
+        },
+      });
+      expect(changes).toEqual([]);
+      await expect(
+        call(
+          "svg_replace_selected_text",
+          1,
+          { revision: target, text: "Updated" },
+          svg
+        )
+      ).resolves.toMatchObject({
+        result: {
+          message: {
+            result: {
+              structuredContent: {
+                kind: "applied",
+                path: "/initial.svg",
+                saved: false,
+              },
+            },
+          },
+        },
+      });
+      expect(changes).toEqual(["Updated"]);
+
+      const delivered = Promise.withResolvers<void>();
+      const stdin = agent["child"].stdin;
+      const padding = "fixture/pad";
+      const emptyFrame = Buffer.byteLength(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          method: padding,
+          params: { text: "" },
+        }) + "\n"
+      );
+      onPresentation = () => {
+        stdin.cork();
+        agent.notify(padding, { text: "x".repeat(1024 * 1024 - emptyFrame) });
+        delivered.resolve();
+      };
+      const pending = call(
+        "surface_open",
+        2,
+        { path: "/second.svg" },
+        presentation
+      );
+      await Promise.race([delivered.promise, pending]);
+      expect(stdin.writableLength).toBe(1024 * 1024);
+      lease.close();
+      stdin.uncork();
+      await expect(pending).resolves.toMatchObject({
+        result: { message: { error: { code: -32603 } } },
+      });
+      expect(presented).toEqual(["/initial.svg", "/second.svg"]);
+      await expect(list(svg)).resolves.toMatchObject({
+        result: { message: { error: { code: -32001 } } },
+      });
+    } finally {
+      agent["child"].stdin.uncork();
+      await agent.close();
+      test.close();
+    }
+  });
+
+  it("cancels the exact pending private SVG reply and discards late renderer evidence", async () => {
+    const test = fixture(
+      `
+        if (request.method === 'fixture/start') {
+          send({id:'pending',method:'${NativeDesktopTools.method}',params:request.params});
+          send({id:request.id,result:{}});
+        } else if (request.method === 'fixture/cancel') {
+          send({method:'$/cancel_request',params:{requestId:'pending'}});
+          send({id:request.id,result:{}});
+        } else if (request.method === 'fixture/observed') {
+          send({id:request.id,result:{replied:globalThis.replied === true}});
+        } else if (request.id === 'pending') {
+          globalThis.replied = true;
+        }
+      `,
+      1,
+      {}
+    );
+    const agent = await NativeAgentProcess.start({
+      ...test.options,
+      providerNetwork: { prepare: () => null },
+    });
+    const sent = Promise.withResolvers<void>();
+    const settled = Promise.withResolvers<void>();
+    const replies = new NativeEditorSvgReplies(
+      NativeEditorSvgText.result,
+      "native_chat_svg_text_unverified"
+    );
+    try {
+      const target = randomUUID();
+      const callId = randomUUID();
+      const lease = agent.registerEditorSurfaces(
+        "chat",
+        { active: "/initial.svg", open: ["/initial.svg"], truncated: false },
+        () => {},
+        undefined,
+        undefined,
+        (request, signal) =>
+          replies
+            .dispatch("attachment", request, () => sent.resolve(), signal)
+            .finally(() => settled.resolve())
+      )!;
+      await agent.request("fixture/start", {
+        sessionId: "chat",
+        endpointId: lease.selection(target).editorEndpointId,
+        scope: { svgTargetId: target },
+        timeoutMs: 2000,
+        expiresAtMs: Date.now() + 2000,
+        message: {
+          jsonrpc: "2.0",
+          id: callId,
+          method: "tools/call",
+          params: {
+            name: "svg_replace_selected_text",
+            arguments: { revision: target, text: "Sent" },
+            _meta: { "co.grida/definitionRevision": 1 },
+          },
+        },
+      });
+      await sent.promise;
+      await agent.request("fixture/cancel", {});
+      await settled.promise;
+      expect(() =>
+        replies.respond("attachment", callId, {
+          kind: "applied",
+          path: "/initial.svg",
+          saved: false,
+        })
+      ).toThrow("native_chat_svg_text_unverified");
+      await expect(agent.request("fixture/observed", {})).resolves.toEqual({
+        replied: false,
+      });
+    } finally {
+      await agent.close();
+      test.close();
+    }
+  });
+
+  it("keeps the legacy SVG text grant when the native host omits the editor context capability", async () => {
+    const test = fixture("", 1, {
+      [NativeEditorSurfaceEndpoints.toolContextCapability]: null,
+    });
+    const agent = await NativeAgentProcess.start({
+      ...test.options,
+      providerNetwork: { prepare: () => null },
+    });
+    try {
+      const svgText = randomUUID();
+      const lease = agent.registerEditorSurfaces(
+        "chat",
+        { active: "/initial.svg", open: ["/initial.svg"], truncated: false },
+        () => {},
+        undefined,
+        undefined,
+        async () => ({ kind: "unavailable" }),
+        undefined,
+        async () => ({ kind: "stale" })
+      )!;
+      expect(agent.acceptsEditorToolContext).toBe(false);
+      expect(
+        lease.selection(svgText, { targetId: randomUUID(), inputId: "input" })
+      ).toEqual({
+        editorEndpointId: expect.any(String),
+        editorSvgTargetId: svgText,
+      });
+    } finally {
+      await agent.close();
+      test.close();
+    }
+  });
+
+  it("settles the SVG reply when the owner is released during send", async () => {
+    const replies = new NativeEditorSvgReplies(
+      NativeEditorSvgText.result,
+      "native_chat_svg_text_unverified"
+    );
+    const scope = new AbortController();
+    const callId = randomUUID();
+    await expect(
+      replies.dispatch(
+        "attachment",
+        {
+          callId,
+          expiresAtMs: Date.now() + 1000,
+        },
+        () => {
+          scope.abort();
+          throw new Error("native_chat_scope_changed");
+        },
+        scope.signal
+      )
+    ).rejects.toThrow("native_chat_svg_text_unverified");
+    expect(() =>
+      replies.respond("attachment", callId, { kind: "unavailable" })
+    ).toThrow("native_chat_svg_text_unverified");
+  });
+
+  it("rejects a renderer reply after the deadline even if the expiry timer has not run", async () => {
+    let now = 1000;
+    const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
+    try {
+      const replies = new NativeEditorSvgReplies(
+        NativeEditorSvgText.result,
+        "native_chat_svg_text_unverified"
+      );
+      const callId = randomUUID();
+      const pending = replies.dispatch(
+        "attachment",
+        { callId, expiresAtMs: 2000 },
+        () => {}
+      );
+      now = 2000;
+      replies.respond("attachment", callId, {
+        kind: "applied",
+        path: "/initial.svg",
+        saved: false,
+      });
+      await expect(pending).rejects.toThrow("native_chat_svg_text_unverified");
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
   it.each([{ backpressure: false }, { backpressure: true }])(
     "rejects an excess browser operation (backpressure: $backpressure)",
     async ({ backpressure }) => {
@@ -1647,19 +2617,48 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
     }
   );
 
-  it.each([{ revoked: false }, { revoked: true }])(
-    "delivers a browser capture through stdin pressure (owner revoked: $revoked)",
-    async ({ revoked }) => {
+  it.each([
+    { carrier: "legacy", revoked: false },
+    { carrier: "legacy", revoked: true },
+    { carrier: "mcp", revoked: false },
+    { carrier: "mcp", revoked: true },
+    { carrier: "registered MCP", revoked: false },
+    { carrier: "registered MCP", revoked: true },
+  ])(
+    "delivers a $carrier browser capture through stdin pressure (owner revoked: $revoked)",
+    async ({ carrier, revoked }) => {
       const callId = "00000000-0000-4000-8000-000000000001";
+      const shared = carrier !== "legacy";
+      const sources = carrier === "registered MCP";
+      const methodName = shared
+        ? NativeDesktopTools.method
+        : NativeEditorSurfaceEndpoints.browserMethod;
+      const params = shared
+        ? `scope:{browser:true${sources ? ",sources:true" : ""}},expiresAtMs:Date.now()+5000,message:{
+            jsonrpc:'2.0',id:'${callId}',method:'tools/call',params:{
+              name:'browser_capture',arguments:{},_meta:{'co.grida/definitionRevision':1${sources ? ", 'co.grida/source': request.params.source" : ""}}
+            }
+          }`
+        : `callId:'${callId}',operation:'browser_capture',arguments:{}`;
       const test = fixture(
         `
       if (request.method === 'fixture/ping') {
         globalThis.ping = request.id;
+      } else if (request.method === 'fixture/list') {
+        if (requested['${NativeDesktopTools.sourcesCapability}'] !== 1) throw Error('missing source capability');
+        globalThis.list = request.id;
+        send({id:'list',method:'${NativeDesktopTools.method}',params:{
+          sessionId:'session',endpointId:request.params.endpointId,
+          timeoutMs:5000,expiresAtMs:Date.now()+5000,scope:{sources:true,browser:true},
+          message:{jsonrpc:'2.0',id:'list',method:'tools/list'}
+        }});
+      } else if (request.method === undefined && request.id === 'list') {
+        send({id:globalThis.list,result:request.result.message});
       } else if (request.method === 'fixture/capture') {
         globalThis.capture = request.id;
-        send({id:'capture',method:'${NativeEditorSurfaceEndpoints.browserMethod}',params:{
+        send({id:'capture',method:'${methodName}',params:{
           sessionId:'session',endpointId:request.params.endpointId,
-          callId:'${callId}',operation:'browser_capture',arguments:{},timeoutMs:5000
+          timeoutMs:5000,${params}
         }});
       } else if (request.method === undefined && request.id === 'capture') {
         send({id:globalThis.capture,result:request.result});
@@ -1710,9 +2709,50 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
           }
         );
         const { editorEndpointId: endpointId } = lease!.selection();
+        const catalog = sources
+          ? ((await agent.request("fixture/list", {
+              endpointId,
+            })) as NativeDesktopTools.Reply)
+          : undefined;
+        const source =
+          catalog &&
+          NativeDesktopTools.listedSources(catalog).find(
+            ({ id }) => id === "browser"
+          );
+        const descriptors =
+          catalog && "result" in catalog && Array.isArray(catalog.result.tools)
+            ? catalog.result.tools.filter(({ name }) =>
+                ["workbench_list_tabs", "browser_capture"].includes(name)
+              )
+            : [];
+        const expectedDescriptors = [
+          {
+            name: "workbench_list_tabs",
+            _meta: {
+              "co.grida/source": {
+                id: "workbench",
+                generation: expect.any(String),
+              },
+              "co.grida/resultDisposition": true,
+            },
+          },
+          {
+            name: "browser_capture",
+            _meta: {
+              "co.grida/source": {
+                ...source,
+                id: "browser",
+                generation: expect.any(String),
+              },
+              "co.grida/resultDisposition": true,
+              "co.grida/resultMimeType": "image/jpeg",
+            },
+          },
+        ];
+        expect(descriptors).toMatchObject(sources ? expectedDescriptors : []);
         const replies = Promise.all([
           agent.request("fixture/ping", {}, 3000),
-          agent.request("fixture/capture", { endpointId }, 3000),
+          agent.request("fixture/capture", { endpointId, source }, 3000),
         ]);
         await Promise.race([entered.promise, replies]);
         complete.resolve();
@@ -1721,15 +2761,38 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
         expect(stdin.writableLength).toBe(frameLimit);
         if (revoked) lease!.close();
         stdin.uncork();
+        const disposition = revoked ? "unknown" : "dispatched_verified";
+        const result = revoked
+          ? { disposition, error: "outcome_unknown" }
+          : { disposition };
         await expect(replies).resolves.toEqual([
           { pong: true },
           {
             sessionId: "session",
             endpointId,
-            callId,
-            result: revoked
-              ? { disposition: "unknown", error: "outcome_unknown" }
-              : { disposition: "dispatched_verified", image },
+            ...(shared
+              ? {
+                  message: {
+                    jsonrpc: "2.0",
+                    id: callId,
+                    result: {
+                      resultType: "complete",
+                      _meta: { "co.grida/disposition": disposition },
+                      isError: revoked,
+                      structuredContent: result,
+                      content: revoked
+                        ? [{ type: "text", text: "outcome_unknown" }]
+                        : [
+                            {
+                              type: "image",
+                              mimeType: image.mimeType,
+                              data: image.base64,
+                            },
+                          ],
+                    },
+                  },
+                }
+              : { callId, result: revoked ? result : { ...result, image } }),
           },
         ]);
       } finally {
@@ -2027,6 +3090,367 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
 });
 
 const packaged = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
+
+function packagedToolResponse(
+  index: number,
+  call: { name: string; arguments: object } | undefined
+): Response {
+  const item = call
+    ? {
+        type: "function_call",
+        id: `fc_tool_fixture_${index}`,
+        call_id: `call_tool_fixture_${index}`,
+        name: call.name,
+        arguments: JSON.stringify(call.arguments),
+        status: "completed",
+      }
+    : {
+        type: "message",
+        id: "tool_fixture_message",
+        role: "assistant",
+        status: "completed",
+        content: [
+          {
+            type: "output_text",
+            text: "Finished tool fixture.",
+            annotations: [],
+          },
+        ],
+      };
+  const frames = [
+    { type: "response.output_item.done", output_index: 0, item },
+    {
+      type: "response.completed",
+      response: {
+        status: "completed",
+        usage: { input_tokens: 5, output_tokens: 3 },
+      },
+    },
+  ];
+  return new Response(
+    frames.map((frame) => `data: ${JSON.stringify(frame)}\n\n`).join(""),
+    { headers: { "content-type": "text/event-stream" } }
+  );
+}
+
+it.runIf(Boolean(packaged) && process.platform !== "win32")(
+  "keeps same-named Main sources isolated through the packaged MCP carrier",
+  async () => {
+    const directory = state();
+    const root = fs.realpathSync(directory.root);
+    const cwd = path.join(root, "workspace");
+    fs.mkdirSync(cwd, { mode: 0o700 });
+    const firstName = "desktop_fixture_first__status";
+    const secondName = "desktop_fixture_second__status";
+    const calls = [
+      {
+        name: "tool_search",
+        arguments: { query: firstName, source: "fixture-first" },
+      },
+      { name: firstName, arguments: {} },
+      {
+        name: "tool_search",
+        arguments: { query: secondName, source: "fixture-second" },
+      },
+      { name: secondName, arguments: {} },
+      { name: firstName, arguments: {} },
+      { name: secondName, arguments: {} },
+    ];
+    const offers: string[][] = [];
+    const results: { call_id: string; output: string }[] = [];
+    const operation = (text: string) =>
+      vi.fn<NativeDesktopTools.Tool["invoke"]>(() => ({
+        content: [{ type: "text", text }],
+      }));
+    const oldFirst = operation("first source, original registration");
+    const newFirst = operation("first source, replacement registration");
+    const second = operation("second source");
+    const definition = {
+      name: "status",
+      description: "Look up status.",
+      inputSchema: { type: "object" },
+    };
+    const source = (
+      id: string,
+      description: string,
+      invoke: NativeDesktopTools.Tool["invoke"]
+    ) => ({
+      id,
+      description,
+      tools: [{ definition, revision: 1, invoke }],
+    });
+    let replace: (() => void) | undefined;
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        ...launch(packaged!, path.join(root, "state")),
+        cwd,
+        provider: "responses",
+        providerNetwork: {
+          prepare: () => async (body) => {
+            const request = JSON.parse(body.toString());
+            const call = calls[offers.length];
+            offers.push(
+              (request.tools ?? []).map((tool: { name: string }) => tool.name)
+            );
+            if (offers.length === 5) replace?.();
+            if (!call)
+              results.push(
+                ...request.input.filter(
+                  (item: { type: string }) =>
+                    item.type === "function_call_output"
+                )
+              );
+            return packagedToolResponse(offers.length, call);
+          },
+        },
+      });
+      const session = await chat.create();
+      const lease = chat.registerEditorSurfaces(
+        session,
+        { active: null, open: [], truncated: false },
+        () => {},
+        undefined
+      )!;
+      const first = lease.registerToolSource(
+        source("fixture-first", "First local device status.", oldFirst)
+      );
+      lease.registerToolSource(
+        source("fixture-second", "Second local device status.", second)
+      );
+      replace = () => {
+        first.close();
+        lease.registerToolSource(
+          source("fixture-first", "First local device status.", newFirst)
+        );
+      };
+      await chat.submit(
+        session,
+        "source-collision",
+        "Check both devices",
+        "act",
+        lease.selection()
+      );
+      const active = chat;
+      await vi.waitFor(
+        async () => {
+          expect((await active.observe(session)).latest?.status).toBe(
+            "succeeded"
+          );
+        },
+        { timeout: 8000 }
+      );
+      expect(offers).toHaveLength(7);
+      expect(offers[0]).not.toContain(firstName);
+      expect(offers[0]).not.toContain(secondName);
+      expect(offers[1]).toContain(firstName);
+      expect(offers[1]).not.toContain(secondName);
+      expect(offers[3]).toContain(secondName);
+      expect(oldFirst).toHaveBeenCalledTimes(1);
+      expect(newFirst).not.toHaveBeenCalled();
+      expect(second).toHaveBeenCalledTimes(2);
+      const outcomes = results.map(({ output }) => JSON.parse(output));
+      expect(outcomes[1]).toMatchObject({
+        status: "succeeded",
+        content: ["first source, original registration"],
+      });
+      expect(outcomes[3]).toMatchObject({
+        status: "succeeded",
+        content: ["second source"],
+      });
+      expect(outcomes[4]).toMatchObject({
+        status: "failed",
+        content: ["editor_surface_endpoint_unavailable"],
+      });
+      expect(outcomes[5]).toMatchObject({
+        status: "succeeded",
+        content: ["second source"],
+      });
+    } finally {
+      try {
+        await chat?.close();
+      } finally {
+        directory.close();
+      }
+    }
+  },
+  15_000
+);
+
+it.runIf(Boolean(packaged) && process.platform !== "win32")(
+  "discovers Browser, presents a tab, and retains a capture through the packaged MCP carrier",
+  async () => {
+    const directory = state();
+    const root = fs.realpathSync(directory.root);
+    const cwd = path.join(root, "workspace");
+    fs.mkdirSync(cwd, { mode: 0o700 });
+    const jpeg = fs.readFileSync(
+      new URL("../../../fixtures/images/512.jpg", import.meta.url)
+    );
+    const capture = {
+      target: { kind: "workbench", tabId: "visible-tab" },
+      documentId: "visible-document",
+    };
+    const calls = [
+      {
+        name: "tool_search",
+        arguments: { query: "browser help workbench show" },
+      },
+      {
+        name: "tool_search",
+        arguments: { query: "browser_help", source: "browser" },
+      },
+      { name: "browser_help", arguments: { topic: "targets" } },
+      {
+        name: "tool_search",
+        arguments: { query: "workbench_show", source: "workbench" },
+      },
+      {
+        name: "workbench_show",
+        arguments: { target: { kind: "url", url: "https://example.test/" } },
+      },
+      {
+        name: "tool_search",
+        arguments: { query: "browser_capture", source: "browser" },
+      },
+      { name: "browser_capture", arguments: capture },
+    ];
+    const offers: string[][] = [];
+    const bodies: string[] = [];
+    const invoke = vi.fn<DesktopBrowserToolLease["invoke"]>();
+    invoke
+      .mockResolvedValueOnce({
+        disposition: "not_dispatched",
+        data: { topic: "targets", text: "Use surface_list_open." },
+      })
+      .mockResolvedValueOnce({
+        disposition: "dispatched_verified",
+        data: {
+          admission: "accepted",
+          presentation: "requested",
+          tabId: capture.target.tabId,
+        },
+      })
+      .mockResolvedValueOnce({
+        disposition: "dispatched_verified",
+        data: { documentId: capture.documentId },
+        image: { mimeType: "image/jpeg", base64: jpeg.toString("base64") },
+      });
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        ...launch(packaged!, path.join(root, "state")),
+        cwd,
+        provider: "responses",
+        model: "gpt-6.1-sol",
+        providerNetwork: {
+          prepare: () => async (body) => {
+            const text = body.toString();
+            const request = JSON.parse(text);
+            const names = (request.tools ?? []).map(
+              (tool: { name: string }) => tool.name
+            );
+            const call = calls[offers.length];
+            bodies.push(text);
+            offers.push(names);
+            return packagedToolResponse(offers.length, call);
+          },
+        },
+      });
+      const session = await chat.create();
+      const lease = chat.registerEditorSurfaces(
+        session,
+        { active: null, open: [], truncated: false },
+        () => {},
+        () => {
+          throw new Error("browser_presentation_must_use_browser_owner");
+        },
+        1,
+        undefined,
+        { ready: () => true, invoke, close: () => {} }
+      )!;
+      await chat.submit(
+        session,
+        "browser-discovery",
+        "Show me the example site and capture it",
+        "act",
+        lease.selection()
+      );
+      const active = chat;
+      await vi.waitFor(
+        async () => {
+          expect((await active.observe(session)).latest?.status).toBe(
+            "succeeded"
+          );
+        },
+        { timeout: 8000 }
+      );
+      expect(offers).toHaveLength(8);
+      expect(offers[0]).toContain("tool_search");
+      expect(offers[0]).not.toContain("browser_help");
+      expect(offers[0]).not.toContain("workbench_show");
+      expect(offers[1]).not.toContain("browser_help");
+      expect(offers[1]).not.toContain("workbench_show");
+      expect(offers[2]).toContain("browser_help");
+      expect(offers[4]).toContain("workbench_show");
+      expect(offers[6]).toContain("browser_capture");
+      expect(invoke.mock.calls.map((args) => args.slice(0, 2))).toEqual([
+        ["browser_help", { topic: "targets" }],
+        [
+          "surface_open",
+          { target: { kind: "url", url: "https://example.test/" } },
+        ],
+        ["browser_capture", capture],
+      ]);
+      expect(bodies[3]).toContain("Use workbench_list_tabs.");
+      const page = await chat.transcriptPage(session);
+      const images = page.messages.flatMap((message) =>
+        (message.activity ?? []).flatMap((item) => item.output?.images ?? [])
+      );
+      expect(images).toMatchObject([
+        { previewId: expect.any(String), mimeType: "image/png" },
+      ]);
+      const image = images[0];
+      const png = Buffer.from(
+        await chat.readToolImage(session, image.previewId)
+      );
+      expect(png.length).toBe(image.size);
+      expect(png.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+      const width = png.readUInt32BE(16);
+      const height = png.readUInt32BE(20);
+      expect(width).toBeGreaterThan(0);
+      expect(width).toBeLessThanOrEqual(512);
+      expect(height).toBe(width);
+      const captureResult = JSON.parse(bodies[7]).input.find(
+        (item: { call_id?: string; type: string }) =>
+          item.type === "function_call_output" &&
+          item.call_id === "call_tool_fixture_7"
+      );
+      expect(JSON.parse(captureResult.output[0].text)).toMatchObject({
+        status: "succeeded",
+        structured: {
+          disposition: "dispatched_verified",
+          documentId: capture.documentId,
+          nativeImage: { width, height },
+        },
+      });
+      expect(captureResult.output[1].image_url).toBe(
+        `data:image/png;base64,${png.toString("base64")}`
+      );
+      const otherSession = await chat.create();
+      await expect(
+        chat.readToolImage(otherSession, image.previewId)
+      ).rejects.toThrow("tool_image_unavailable");
+    } finally {
+      try {
+        await chat?.close();
+      } finally {
+        directory.close();
+      }
+    }
+  },
+  15_000
+);
 
 it.runIf(Boolean(packaged))(
   "starts the packaged native executable and opens an ACP session",

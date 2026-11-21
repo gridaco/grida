@@ -25,6 +25,9 @@ describe("Desktop preload agent seam", () => {
     );
     expect(native).toMatch(/onEditorSurfaceOpen: \(attachmentId, open\) => \{/);
     expect(native).toMatch(/onEditorSvgText: \(attachmentId, invoke\) => \{/);
+    expect(native).toMatch(
+      /onEditorSvgSelection: \(attachmentId, invoke\) => \{/
+    );
     expect(preloadSource).toContain("contextBridge.exposeInMainWorld");
     expect(preloadSource).not.toContain("new Proxy(");
   });
@@ -173,36 +176,6 @@ describe("Desktop preload agent seam", () => {
     expect(preloadSource).toContain("subscriber.onUpdate(payload.update)");
     expect(preloadSource).toContain(
       'window.addEventListener("pagehide", clearNativeChatDelivery)'
-    );
-  });
-
-  it("preserves effort, SVG and selection slots when forwarding editor context", () => {
-    const submission = preloadSource.match(
-      /submitInRegime:\s*\(([^)]*)\)\s*=>\s*nativeChatInvoke\(([\s\S]*?)\),/
-    );
-    expect(submission?.[1]).toMatch(
-      /\beffort,\s*editorSvgTargetId,\s*selectionRevision,\s*editorContextId\s*$/
-    );
-    expect(submission?.[2]).toMatch(
-      /editorContextId !== undefined\s*\?\s*\[effort, editorSvgTargetId, selectionRevision, editorContextId\]/
-    );
-    expect(submission?.[2]).toMatch(
-      /selectionRevision !== undefined\s*\?\s*\[effort, editorSvgTargetId, selectionRevision\]/
-    );
-    expect(submission?.[2]).toMatch(
-      /editorSvgTargetId !== undefined\s*\?\s*\[effort, editorSvgTargetId\]\s*:\s*effort === undefined\s*\?\s*\[\]\s*:\s*\[effort\]/
-    );
-  });
-
-  it("forwards a Library selection revision only when supplied, preserving the effort slot", () => {
-    const submission = preloadSource.match(
-      /submitWithLibrarySelection:\s*\(([^)]*)\)\s*=>\s*nativeChatInvoke\(([\s\S]*?)\),/
-    );
-    expect(submission?.[1]).toMatch(
-      /effort,\s*selectionRevision,\s*editorContextId\s*$/
-    );
-    expect(submission?.[2]).toMatch(
-      /IPC_CHANNELS\.NATIVE_CHAT_SUBMIT_LIBRARY_SELECTION,\s*attachmentId,\s*inputId,\s*text,\s*operatingRegime,\s*effort,\s*\.\.\.\(editorContextId !== undefined\s*\?\s*\[selectionRevision, editorContextId\]\s*:\s*selectionRevision === undefined\s*\?\s*\[\]\s*:\s*\[selectionRevision\]\)/
     );
   });
 

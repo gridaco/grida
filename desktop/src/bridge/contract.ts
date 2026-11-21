@@ -88,6 +88,12 @@ export const IPC_CHANNELS = {
   ARCHIVES_LIST: "grida:archives:list",
   ARCHIVES_UNARCHIVE: "grida:archives:unarchive",
   ARCHIVES_OPEN_RESTORED: "grida:archives:open-restored",
+  PERSONALIZATION_GET: "grida:personalization:get",
+  PERSONALIZATION_SET: "grida:personalization:set",
+  PERSONALIZATION_CHANGED: "grida:personalization:changed",
+  COMPOSER_PREDICTIONS_GET: "grida:composer-predictions:get",
+  COMPOSER_PREDICTIONS_SET: "grida:composer-predictions:set",
+  COMPOSER_PREDICTIONS_CHANGED: "grida:composer-predictions:changed",
   GLOBAL_HOOKS_INSPECT: "grida:hooks:inspect",
   GLOBAL_HOOKS_RELOAD: "grida:hooks:reload",
   GLOBAL_HOOKS_REVIEW: "grida:hooks:review",
@@ -110,6 +116,9 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_PROFILES: "grida:native-chat:profiles",
   NATIVE_CHAT_SELECT_PROFILE: "grida:native-chat:select-profile",
   WELCOME_CHAT_PROFILES: "grida:welcome:chat-profiles",
+  WELCOME_CHAT_TURN_CAPABILITIES: "grida:welcome:chat-turn-capabilities",
+  WELCOME_CHAT_PREPARE_AUTOMATIC_REVIEW:
+    "grida:welcome:chat-prepare-automatic-review",
   WELCOME_CHAT_PREPARE_FULL_ACCESS: "grida:welcome:chat-prepare-full-access",
   WELCOME_CHAT_ANSWER_FULL_ACCESS: "grida:welcome:chat-answer-full-access",
   WELCOME_CHAT_START_FULL_ACCESS: "grida:welcome:chat-start-full-access",
@@ -133,12 +142,15 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_CONTROL_SUBAGENT_CHILD:
     "grida:native-chat:control-subagent-child",
   NATIVE_CHAT_CREATE: "grida:native-chat:create",
+  NATIVE_CHAT_ACCEPTS_AUTOMATIC_REVIEW:
+    "grida:native-chat:accepts-automatic-review",
   NATIVE_CHAT_ACCEPTS_PERMISSION_MODE:
     "grida:native-chat:accepts-permission-mode",
   NATIVE_CHAT_REVIEW_PERMISSION_MODE:
     "grida:native-chat:review-permission-mode",
   NATIVE_CHAT_PERMISSION_MODE: "grida:native-chat:permission-mode",
   NATIVE_CHAT_SET_PERMISSION_MODE: "grida:native-chat:set-permission-mode",
+  NATIVE_CHAT_TURN_CAPABILITIES: "grida:native-chat:turn-capabilities",
   NATIVE_CHAT_SELECTION: "grida:native-chat:selection",
   NATIVE_CHAT_UPDATE_SELECTION: "grida:native-chat:update-selection",
   NATIVE_CHAT_CREATE_FROM_DRAFT: "grida:native-chat:create-from-draft",
@@ -152,6 +164,9 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_EDITOR_SVG_TEXT: "grida:native-chat:editor-svg-text",
   NATIVE_CHAT_EDITOR_SVG_TEXT_RESULT:
     "grida:native-chat:editor-svg-text-result",
+  NATIVE_CHAT_EDITOR_SVG_SELECTION: "grida:native-chat:editor-svg-selection",
+  NATIVE_CHAT_EDITOR_SVG_SELECTION_RESULT:
+    "grida:native-chat:editor-svg-selection-result",
   NATIVE_CHAT_CAPTURE_EDITOR_CONTEXT:
     "grida:native-chat:capture-editor-context",
   NATIVE_CHAT_SUBMIT: "grida:native-chat:submit",
@@ -184,6 +199,7 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_INPUT_RECEIPT: "grida:native-chat:input-receipt",
   NATIVE_CHAT_OBSERVE: "grida:native-chat:observe",
   NATIVE_CHAT_SET_PRESENTED: "grida:native-chat:set-presented",
+  NATIVE_CHAT_PREDICT_PROMPT: "grida:native-chat:predict-prompt",
   NATIVE_CHAT_TURN_SUMMARY: "grida:native-chat:turn-summary",
   NATIVE_CHAT_READ_ARTIFACT: "grida:native-chat:read-artifact",
   NATIVE_CHAT_READ_ATTACHMENT_PREVIEW:

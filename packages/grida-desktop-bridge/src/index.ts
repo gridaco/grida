@@ -69,6 +69,7 @@ export * from "./native-chat-message-context";
 export type * from "./native-external-agent";
 export type * from "./native-subagents";
 export { NativeEditorSurfaces } from "./native-editor-surfaces";
+export { NativeEditorSvgSelection } from "./native-editor-svg-selection";
 export { NativeEditorSvgText } from "./native-editor-svg-text";
 export type {
   NativeEditorSurfaceOpen,
@@ -280,6 +281,24 @@ export type DesktopArchivedChatPage = Readonly<{
   unavailableWorkspaces?: readonly string[];
 }>;
 
+export type DesktopPersonalizationSettings = Readonly<{
+  suggestedPrompts: boolean;
+  /** The existing IPC value "live" represents automatic search. */
+  webSearch: "disabled" | "live";
+  revision: number;
+}>;
+
+export type DesktopPersonalizationChange =
+  | Readonly<{ suggestedPrompts: boolean }>
+  | Readonly<{ webSearch: DesktopPersonalizationSettings["webSearch"] }>
+  /** Older renderers use "onDemand" to turn automatic search off. */
+  | Readonly<{ webSearch: "onDemand" }>;
+
+export type DesktopComposerPredictionSettings = Readonly<{
+  enabled: boolean;
+  revision: number;
+}>;
+
 export type DesktopBridge = {
   protocol: typeof DESKTOP_BRIDGE_PROTOCOL;
   app: { version: string; platform: string };
@@ -288,6 +307,24 @@ export type DesktopBridge = {
   browser?: DesktopBrowser.Bridge;
   handshake: () => Promise<HandshakeResponse>;
   nativeChat?: DesktopNativeChat;
+  /** User-wide preferences shared by Settings and regular workspace chats. */
+  personalization?: {
+    get(): Promise<DesktopPersonalizationSettings>;
+    set(
+      change: DesktopPersonalizationChange
+    ): Promise<DesktopPersonalizationSettings>;
+    onChange(
+      listener: (settings: DesktopPersonalizationSettings) => void
+    ): () => void;
+  };
+  /** User-wide Desktop preference. Only the Settings window can change it. */
+  composerPredictions?: {
+    get(): Promise<DesktopComposerPredictionSettings>;
+    set(enabled: boolean): Promise<DesktopComposerPredictionSettings>;
+    onChange(
+      listener: (value: DesktopComposerPredictionSettings) => void
+    ): () => void;
+  };
   /** Metadata discovery for Home and the workbench. Older hosts omit this capability. */
   chatCatalog?: {
     list(query?: DesktopChatCatalogQuery): Promise<DesktopChatCatalogPage>;

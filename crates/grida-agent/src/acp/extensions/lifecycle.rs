@@ -50,6 +50,7 @@ struct Enqueue {
     #[serde(default)]
     editor_browser_tools: bool,
     editor_svg_target_id: Option<BindingId>,
+    editor_tool_context_id: Option<BindingId>,
     editor_context: Option<EditorObservation>,
     message_context: Option<MessageContext>,
 }
@@ -220,6 +221,7 @@ pub(super) fn handlers(
                         request.editor_presentation,
                         request.editor_browser_tools,
                         request.editor_svg_target_id.as_ref(),
+                        request.editor_tool_context_id.as_ref(),
                         false,
                     )?;
                     let mut parts = identified_prompt(
@@ -249,6 +251,10 @@ pub(super) fn handlers(
                                 reasoning: request.reasoning,
                             },
                             SubmissionContext {
+                                web_search: selection::web_search(
+                                    request.meta.as_ref(),
+                                    &enqueue.1,
+                                )?,
                                 initial_title: initial_title(&enqueue.1, request.initial_title)?,
                                 selection_revision: selection::revision(
                                     request.meta.as_ref(),
@@ -258,6 +264,7 @@ pub(super) fn handlers(
                                 editor_presentation: request.editor_presentation,
                                 editor_browser_tools: request.editor_browser_tools,
                                 editor_svg_target: request.editor_svg_target_id,
+                                editor_tool_context_id: request.editor_tool_context_id,
                                 ..SubmissionContext::default()
                             },
                         )

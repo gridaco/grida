@@ -4,6 +4,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -41,6 +42,7 @@ import {
   type NativeChatInitialComposer,
   type NativeChatFirstInput,
 } from "@/lib/agent-chat/native-chat-controller";
+import { useDesktopBridge } from "@/lib/desktop/bridge";
 import { PanelIsPresented } from "./workbench-panel-content";
 import { subscribeToNativeNotificationFocus } from "@/lib/desktop/agent-focus-session";
 import {
@@ -82,14 +84,7 @@ const NO_COMMANDS: ComposerCatalog["commands"] = [];
 const MAX_DRAFT_BYTES = 512 * 1024;
 const readNoActivity = () => null;
 const subscribeNoActivity = () => () => {};
-const readNoSvgSelection = () => false;
-const APPROVAL_ACTION = {
-  read_file: "Read file",
-  list_files: "List folder",
-  search_text: "Search files",
-  write_file: "Replace file",
-  edit_file: "Edit file",
-} as const;
+const readNoSvgSelection = () => undefined;
 const selectionMemory = {
   getItem: (key: string) => window.localStorage.getItem(key),
   setItem: (key: string, value: string) =>
@@ -565,9 +560,9 @@ function NativeChatPane({
     (awaitingProfiles && state.profileReadError) ||
     (selectionRead === "failed" && state.profileError) ||
     null;
-  const svgTextSelected = useSyncExternalStore(
-    controller.subscribeToComposerSvgText,
-    controller.readComposerSvgText,
+  const editorSelection = useSyncExternalStore(
+    controller.subscribeToComposerEditorSelection,
+    controller.readComposerEditorSelection,
     readNoSvgSelection
   );
   const subagentActivity = useSyncExternalStore(
@@ -604,6 +599,30 @@ function NativeChatPane({
   const [libraryScope, setLibraryScope] = useState<number | null>(null);
   const activityOpen = !subagentsInTabs && !!subagentActivity?.open;
   const panelPresented = useContext(PanelIsPresented);
+  const desktop = useDesktopBridge();
+  const preferences = desktop?.composerPredictions;
+  const personalization = desktop?.personalization;
+  useEffect(
+    () => controller.connectPersonalization(personalization),
+    [controller, personalization]
+  );
+  const prediction = controller.composerPrediction;
+  useEffect(() => prediction.connect(preferences), [prediction, preferences]);
+  useLayoutEffect(() => {
+    const report = () =>
+      prediction.setPresented(
+        !controller.fixedSession &&
+          panelPresented &&
+          !activityOpen &&
+          !document.hidden
+      );
+    report();
+    document.addEventListener("visibilitychange", report);
+    return () => {
+      document.removeEventListener("visibilitychange", report);
+      prediction.setPresented(false);
+    };
+  }, [prediction, controller, panelPresented, activityOpen]);
   const conversationPane = useRef<HTMLDivElement>(null);
   const attachmentId = controller.presentedAttachmentId;
   useEffect(() => {
@@ -655,7 +674,11 @@ function NativeChatPane({
   );
   const queued = snapshot?.queuedInputs ?? 0;
   const streamingControlsOnly = running && !bridge.enqueue;
-  const error = state.error ?? state.approvalError ?? state.questionError;
+  const error =
+    state.error ??
+    state.approvalError ??
+    state.questionError ??
+    controller.turnOptionsError;
 
   const selectedProfile =
     state.profiles?.saved.find((p) => p.id === state.profiles?.active) ??
@@ -894,6 +917,7 @@ function NativeChatPane({
                   <NativeTurnActivity
                     key={block.turnId}
                     block={block}
+                    approvalReviews={records.get(block.turnId)?.approvalReviews}
                     renderMessage={renderMessage}
                     loadToolImage={controller.readToolImage}
                     subagentEvents={subagentActivity?.events.filter(
@@ -1027,31 +1051,10 @@ function NativeChatPane({
         )}
         {approval && (
           <AgentApprovalPrompt
-            description={
-              approval.tool === "write_file" || approval.tool === "edit_file"
-                ? "The agent is asking to change its settings file."
-                : "The agent is asking for additional read access."
-            }
-            detail={
-              <div className="mt-1 max-h-24 overflow-y-auto break-all font-mono text-xs text-foreground/80">
-                <div>
-                  {APPROVAL_ACTION[approval.tool]}{" "}
-                  {reviewText(approval.relativePath || ".")}
-                </div>
-                <div>Folder {reviewText(approval.root)}</div>
-                {approval.query !== undefined && (
-                  <div>Search {reviewText(approval.query)}</div>
-                )}
-              </div>
-            }
-            acceptLabel="Allow once"
-            declineLabel="Decline"
+            approval={approval}
             disabled={state.acting}
-            onDecision={(allowed) =>
-              controller.answerApproval(
-                approval.reviewId,
-                allowed ? "approve_once" : "decline"
-              )
+            onDecision={(decision) =>
+              controller.answerApproval(approval.reviewId, decision)
             }
           />
         )}
@@ -1210,7 +1213,7 @@ function NativeChatPane({
             composer mounted so model reattachment preserves its popovers. */}
           <AgentComposer
             access={{
-              mode: state.permissionMode?.mode ?? "restricted",
+              mode: controller.composerPermissionMode,
               loading:
                 state.permissionModeLoading ||
                 (!state.scope &&
@@ -1218,6 +1221,12 @@ function NativeChatPane({
                   !recovery &&
                   controller.supportsPermissionModeRead),
               available: state.permissionModeAvailable,
+              fullAccess:
+                state.permissionMode?.available.includes("full_access"),
+              automaticReview: state.permissionMode
+                ? state.permissionMode.available.includes("approve_for_me")
+                : state.draftAutomaticReviewAvailable &&
+                  state.permissionModeAvailable,
               uncertain: state.permissionModeUncertain,
               onRetry: () => void controller.checkPermissionMode(),
               busy:
@@ -1230,6 +1239,7 @@ function NativeChatPane({
               onChange: (mode) => void controller.selectPermissionMode(mode),
             }}
             draft={controller.composerDraft()}
+            prediction={prediction}
             editing={
               state.queueDraft
                 ? {
@@ -1301,7 +1311,7 @@ function NativeChatPane({
               (!!state.draftMessageContext.displayParts.length ||
                 !!state.attachmentDraft)
             }
-            selectionContext={svgTextSelected ? "svg-text" : undefined}
+            selectionContext={editorSelection}
             onAttachmentTransfer={transferAttachment}
             awaitSubmission
             canSubmit={
@@ -1408,6 +1418,17 @@ function NativeChatPane({
               },
               refreshError: state.profileReadError,
               effort: state.effort,
+              speed:
+                bridge.turnCapabilities &&
+                !controller.fixedSession &&
+                !state.goalIntent
+                  ? {
+                      value: state.speed,
+                      capabilities: state.turnCapabilities,
+                      onChange: (speed) => controller.selectSpeed(speed),
+                      refresh: () => void controller.refreshTurnCapabilities(),
+                    }
+                  : undefined,
               ultraAvailable: controller.ultraAvailability,
               ultraOffered: controller.offers("delegation"),
               goal: state.goalIntent,
@@ -1490,11 +1511,4 @@ async function readLibraryPng(
   const source = await readLibraryAttachment(id);
   if (!source) throw new Error("library_image_unavailable");
   return encodeLibraryPng(source, maxBytes);
-}
-
-function reviewText(value: string): string {
-  return JSON.stringify(value).replace(
-    /[\u007f-\u009f\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069]/g,
-    (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`
-  );
 }
