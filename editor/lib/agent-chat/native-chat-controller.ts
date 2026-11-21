@@ -6755,12 +6755,17 @@ export class NativeChatController {
     answer: NativeChatQuestionAnswer
   ): Promise<boolean> {
     const scope = this.scope;
+    const attachment = scope?.attachment;
+    const turnId = scope?.observation?.snapshot.current?.turnId;
+    const send = this.bridge.answerQuestion?.bind(this.bridge);
     const question = this.view.questions.find(
       (entry) => entry.questionId === questionId
     );
     if (
-      !scope?.attachment ||
-      !this.bridge.answerQuestion ||
+      !scope ||
+      !attachment ||
+      !turnId ||
+      !send ||
       !question ||
       !this.view.questionReady ||
       this.view.acting
@@ -6770,16 +6775,35 @@ export class NativeChatController {
       this.update({ error: "The answer exceeds the 4 KiB limit." });
       return false;
     }
+    const ownsAttachment = () =>
+      this.owns(scope) && scope.attachment === attachment;
     this.update({ acting: true, error: null });
     try {
-      await this.bridge.answerQuestion(
-        scope.attachment.attachmentId,
-        question.reviewId,
-        answer
-      );
+      try {
+        await send(attachment.attachmentId, question.reviewId, answer);
+      } catch (error) {
+        if (!questionAnswerRevisionChanged(error)) throw error;
+        // These conflicts reject before the native host records the answer.
+        // An observation already in flight can still describe that old basis.
+        await scope.refreshing;
+        if (!ownsAttachment()) return false;
+        await this.refresh(scope);
+        if (!ownsAttachment()) return false;
+        const renewed = this.view.questions.find(
+          (entry) => entry.questionId === questionId
+        );
+        if (scope.observation?.snapshot.current?.turnId !== turnId)
+          throw new Error("question_no_longer_answerable");
+        if (!this.view.questionReady || scope.observationUnavailable)
+          throw error;
+        if (!renewed || !sameQuestionPrompt(question, renewed))
+          throw new Error("question_no_longer_answerable");
+        if (renewed.reviewId === question.reviewId) throw error;
+        await send(attachment.attachmentId, renewed.reviewId, answer);
+      }
       // A poll already in flight may have inspected the turn before acceptance.
       await scope.refreshing;
-      if (this.owns(scope)) {
+      if (ownsAttachment()) {
         scope.replay = true;
         this.update({
           questions: this.view.questions.filter(
@@ -6790,7 +6814,7 @@ export class NativeChatController {
       }
       return true;
     } catch (error) {
-      if (this.owns(scope))
+      if (ownsAttachment())
         this.update({
           error:
             error instanceof Error &&
@@ -8526,6 +8550,28 @@ function supportsSubagents(
     typeof bridge.createSubagent === "function" &&
     typeof bridge.assignSubagent === "function" &&
     typeof bridge.stopSubagent === "function"
+  );
+}
+
+function questionAnswerRevisionChanged(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    /\b(stale_session_revision|stale_control_revision|stale_journal_change|history_position_changed)\b/.test(
+      error.message
+    )
+  );
+}
+
+function sameQuestionPrompt(
+  left: NativeChatQuestion,
+  right: NativeChatQuestion
+): boolean {
+  return (
+    left.style === right.style &&
+    left.expiresWithTurn === right.expiresWithTurn &&
+    left.question === right.question &&
+    left.options.length === right.options.length &&
+    left.options.every((option, index) => option === right.options[index])
   );
 }
 

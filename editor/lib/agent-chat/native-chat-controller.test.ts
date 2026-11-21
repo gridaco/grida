@@ -2072,6 +2072,202 @@ it("queues separately and uses the new review token for the same question", asyn
   controller.disconnect();
 });
 
+function questionAnswerFixture() {
+  const { bridge, controller, running } = fixture();
+  running.add("chat-a");
+  const question = {
+    questionId: "edition-question",
+    reviewId: "edition-review-original",
+    style: "nonblocking",
+    expiresWithTurn: true,
+    question: "Which edition?",
+    options: ["Screen", "Print"],
+  } as const;
+  const reply = { kind: "choice", index: 1 } as const;
+  let revision = 2;
+  let questions: Awaited<
+    ReturnType<NonNullable<DesktopNativeChat["questions"]>>
+  > = [question];
+  const observe = bridge.observe.bind(bridge);
+  const observation = vi.fn<DesktopNativeChat["observe"]>(async (id) => {
+    const current = await observe(id);
+    return {
+      observationId: `${current.observationId}-${revision}`,
+      snapshot: {
+        ...current.snapshot,
+        sessionRevision: revision,
+        current: current.snapshot.current && {
+          ...current.snapshot.current,
+          historyPosition: revision,
+        },
+      },
+    };
+  });
+  bridge.observe = observation;
+  bridge.questions = vi.fn<NonNullable<DesktopNativeChat["questions"]>>(
+    async () => questions
+  );
+  const answer = vi.fn<NonNullable<DesktopNativeChat["answerQuestion"]>>(
+    async () => {
+      questions = [];
+      revision++;
+      return {
+        sessionId: "chat-a",
+        turnId: "turn-chat-a",
+        requestId: "answer",
+        sessionRevision: revision,
+        journalPosition: 2,
+      };
+    }
+  );
+  bridge.answerQuestion = answer;
+  return {
+    answer,
+    controller,
+    observation,
+    question,
+    reply,
+    changeQuestion(next: typeof questions) {
+      revision++;
+      questions = next;
+    },
+  };
+}
+
+it.each([
+  "stale_session_revision",
+  "stale_control_revision",
+  "stale_journal_change",
+  "history_position_changed",
+])(
+  "rechecks a stale question after an in-flight observation and retries on %s",
+  async (code) => {
+    const { answer, controller, observation, question, reply, changeQuestion } =
+      questionAnswerFixture();
+    await controller.select("chat-a");
+    const original = controller.read().observation!;
+    const stale = Promise.withResolvers<NativeChatObservation>();
+    observation.mockReturnValueOnce(stale.promise);
+    controller.checkObservation();
+
+    const refreshed = { ...question, reviewId: "edition-review-current" };
+    changeQuestion([refreshed]);
+    answer.mockRejectedValueOnce(new Error(code));
+    const submitted = controller.answerQuestion(question.questionId, reply);
+    try {
+      expect(answer).toHaveBeenCalledExactlyOnceWith(
+        "chat-a",
+        question.reviewId,
+        reply
+      );
+      stale.resolve(original);
+      await expect(submitted).resolves.toBe(true);
+      expect(answer.mock.calls).toEqual([
+        ["chat-a", question.reviewId, reply],
+        ["chat-a", refreshed.reviewId, reply],
+      ]);
+      expect(controller.read().questions).toEqual([]);
+      expect(controller.read().error).toBeNull();
+    } finally {
+      stale.resolve(original);
+      await submitted;
+      controller.disconnect();
+    }
+  }
+);
+
+it.each([
+  "expired",
+  "different prompt",
+  "reordered options",
+  "different style",
+] as const)(
+  "does not reapply an answer when the refreshed question has %s",
+  async (change) => {
+    const { answer, controller, question, reply, changeQuestion } =
+      questionAnswerFixture();
+    await controller.select("chat-a");
+    const next = {
+      ...question,
+      reviewId: "edition-review-current",
+      ...(change === "different prompt" && { question: "Which format?" }),
+      ...(change === "reordered options" && { options: ["Print", "Screen"] }),
+      ...(change === "different style" && {
+        style: "answer_dependent" as const,
+      }),
+    };
+    changeQuestion(change === "expired" ? [] : [next]);
+    answer.mockRejectedValueOnce(new Error("history_position_changed"));
+    try {
+      await expect(
+        controller.answerQuestion(question.questionId, reply)
+      ).resolves.toBe(false);
+      expect(answer).toHaveBeenCalledExactlyOnceWith(
+        "chat-a",
+        question.reviewId,
+        reply
+      );
+      expect(controller.read().questions).toEqual(
+        change === "expired" ? [] : [next]
+      );
+    } finally {
+      controller.disconnect();
+    }
+  }
+);
+
+it("does not retry an answer after the user switches chats", async () => {
+  const { answer, controller, question, reply } = questionAnswerFixture();
+  await controller.select("chat-a");
+  const decision =
+    Promise.withResolvers<
+      Awaited<ReturnType<NonNullable<DesktopNativeChat["answerQuestion"]>>>
+    >();
+  answer.mockReturnValueOnce(decision.promise);
+  const submitted = controller.answerQuestion(question.questionId, reply);
+  try {
+    await controller.select("chat-b");
+    decision.reject(new Error("stale_session_revision"));
+    await expect(submitted).resolves.toBe(false);
+    expect(answer).toHaveBeenCalledExactlyOnceWith(
+      "chat-a",
+      question.reviewId,
+      reply
+    );
+    expect(controller.read().selected).toBe("chat-b");
+    expect(controller.read().error).toBeNull();
+  } finally {
+    decision.reject(new Error("stale_session_revision"));
+    await submitted;
+    controller.disconnect();
+  }
+});
+
+it("does not automatically send a new question answer after an uncertain response", async () => {
+  const { answer, controller, question, reply, changeQuestion } =
+    questionAnswerFixture();
+  await controller.select("chat-a");
+  const refreshed = { ...question, reviewId: "edition-review-current" };
+  changeQuestion([refreshed]);
+  answer.mockRejectedValueOnce(
+    new Error("connection closed before the response")
+  );
+  try {
+    await expect(
+      controller.answerQuestion(question.questionId, reply)
+    ).resolves.toBe(false);
+    expect(answer).toHaveBeenCalledExactlyOnceWith(
+      "chat-a",
+      question.reviewId,
+      reply
+    );
+    expect(controller.read().questions).toEqual([refreshed]);
+    expect(controller.read().error).toContain("Couldn't confirm the answer");
+  } finally {
+    controller.disconnect();
+  }
+});
+
 it("keeps ordinary turns quiet when question inspection is absent or fails", async () => {
   const { bridge, controller, running } = fixture();
   running.add("chat-a");

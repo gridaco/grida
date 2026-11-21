@@ -774,6 +774,11 @@ required and optional replies, expiry, recovery and CLI dispositions. The
 coexist with running work and that settlement clears it. Desktop verifies
 the corresponding [notification routing](../../../desktop/src/main/agent-notifications.test.ts)
 and [main and side chat interactions](../../../editor/scaffolds/desktop/workbench/native-chat-focus.browser.tsx).
+The [chat controller tests](../../../editor/lib/agent-chat/native-chat-controller.test.ts)
+exercise a pending question whose review expires as independent work advances.
+One click renews the same question and retries after a definite revision
+conflict. A changed or closed question, a different attachment, or an
+uncertain response cannot authorize a fresh answer.
 
 The product supports slash commands, explicit skill mentions, branching, and
 earlier-message revision through its composer and control layer, all over the
