@@ -15,9 +15,9 @@ covered_by: []
 ## Behavior
 
 The deck sidebar shows slide thumbnails above the active slide’s layer tree.
-Layers starts at 96 px high, leaving most of the sidebar for thumbnails.
-The Layers header collapses the pane to just its header and restores its
-previous height when opened again.
+Layers starts collapsed, leaving most of the sidebar for thumbnails. The
+Layers header opens the pane at 160 px the first time. It restores its previous
+height on later openings.
 The two panes scroll independently. The divider between them changes their
 heights, and the divider next to the slide changes the sidebar width. Both
 dividers stay in place when the active slide changes. Selecting an object on
@@ -28,7 +28,8 @@ menu as right-clicking its row in Layers.
 ## Steps
 
 1. Open a Desktop deck with two or more slides whose contents differ. Verify
-   Layers opens as a short pane beneath the thumbnails.
+   only the Layers header is visible. Click it and verify the pane opens at
+   160 px.
 2. Select an object and drag the divider next to the slide left and right.
    Verify that the sidebar and slide resize together and the object stays
    selected. Focus the divider and verify Left and Right also resize it.

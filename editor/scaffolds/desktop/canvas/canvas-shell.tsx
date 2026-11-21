@@ -235,9 +235,7 @@ export function DesktopCanvasShell({
           <aside className="flex h-full min-w-0 flex-col">
             <SlideListFocusScope className="h-full">
               <SlideSidebar
-                layersCollapsible
-                defaultLayersSize="96px"
-                minLayersSize="48px"
+                collapsibleLayers={{ openHeight: 160, minHeight: 48 }}
                 slides={
                   <SlideStrip
                     pages={pages}

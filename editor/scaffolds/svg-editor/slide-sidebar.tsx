@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 import { usePanelRef } from "react-resizable-panels";
 import {
@@ -12,19 +12,17 @@ import {
 export function SlideSidebar({
   slides,
   layers,
-  defaultLayersSize = "40%",
-  minLayersSize = "10%",
-  layersCollapsible = false,
+  collapsibleLayers,
 }: {
   slides: ReactNode;
   layers: ReactNode;
-  defaultLayersSize?: string;
-  minLayersSize?: string;
-  layersCollapsible?: boolean;
+  /** Start with the Layers header only. Heights are in CSS pixels. */
+  collapsibleLayers?: { openHeight: number; minHeight: number };
 }) {
   const layersPanel = usePanelRef();
   const layersId = useId();
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(!!collapsibleLayers);
+  const lastOpenHeight = useRef<number | undefined>(undefined);
 
   return (
     <ResizablePanelGroup orientation="vertical" className="min-h-0 flex-1">
@@ -32,30 +30,39 @@ export function SlideSidebar({
       <ResizableHandle aria-label="Resize slides and layers" />
       <ResizablePanel
         panelRef={layersPanel}
-        defaultSize={defaultLayersSize}
-        minSize={minLayersSize}
-        collapsible={layersCollapsible}
-        collapsedSize={layersCollapsible ? "1.75rem" : undefined}
+        defaultSize={collapsibleLayers ? "1.75rem" : "40%"}
+        minSize={collapsibleLayers?.minHeight ?? "10%"}
+        collapsible={!!collapsibleLayers}
+        collapsedSize={collapsibleLayers ? "1.75rem" : undefined}
         groupResizeBehavior={
-          layersCollapsible ? "preserve-pixel-size" : undefined
+          collapsibleLayers ? "preserve-pixel-size" : undefined
         }
         onResize={
-          layersCollapsible
-            ? () => setCollapsed(layersPanel.current?.isCollapsed() ?? false)
+          collapsibleLayers
+            ? ({ inPixels }) => {
+                const panel = layersPanel.current;
+                if (!panel || inPixels === 0) return;
+                const isCollapsed = panel.isCollapsed();
+                if (!isCollapsed) lastOpenHeight.current = inPixels;
+                setCollapsed(isCollapsed);
+              }
             : undefined
         }
       >
         <div className="flex h-full min-h-0 flex-col">
           <h2 className="shrink-0 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
-            {layersCollapsible ? (
+            {collapsibleLayers ? (
               <button
                 type="button"
                 aria-expanded={!collapsed}
                 aria-controls={layersId}
                 onClick={() => {
                   const panel = layersPanel.current;
-                  if (panel?.isCollapsed()) panel.expand();
-                  else panel?.collapse();
+                  if (panel?.isCollapsed()) {
+                    panel.resize(
+                      lastOpenHeight.current ?? collapsibleLayers.openHeight
+                    );
+                  } else panel?.collapse();
                 }}
                 className="group flex h-7 w-full items-center gap-1.5 px-3 text-left hover:bg-muted focus-visible:outline-ring focus-visible:-outline-offset-2"
               >
