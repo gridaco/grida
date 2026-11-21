@@ -20,6 +20,7 @@ type FakeImage = {
   toJPEG: Mock<(quality: number) => Buffer>;
 };
 type FakeContents = EventEmitter & {
+  ipc: EventEmitter;
   id: number;
   url: string;
   mainFrame: { url: string };
@@ -125,6 +126,7 @@ afterEach(async () => {
 vi.mock("electron", async () => {
   const { EventEmitter } = await import("node:events");
   class Contents extends EventEmitter {
+    ipc = new EventEmitter();
     id = mock.next++;
     url = "https://grida.co/desktop/workspace?id=eac20941e6a410aa";
     mainFrame = { url: this.url };
@@ -322,6 +324,8 @@ async function fixture(
       editorOrigin: "https://grida.co",
       history,
       downloads,
+      decodeFavicon: async (dataUrl) =>
+        DesktopBrowser.parseFavicon({ dataUrl }),
       admitWindow: () => admitted,
       workspaceExists: async () => true,
     });
@@ -1434,6 +1438,11 @@ it("publishes icon cache changes through ordinary page revisions without changin
   const first = f.host.snapshot(f.event, f.attached.attachmentId);
   expect(f.host.favicon(f.event, f.target(page))).toBeNull();
   guest.emit("page-favicon-updated", {}, [faviconDataUrl]);
+  await vi.waitFor(() =>
+    expect(f.host.favicon(f.event, f.target(page))).toEqual({
+      dataUrl: faviconDataUrl,
+    })
+  );
   const changed = f.host.snapshot(f.event, f.attached.attachmentId);
   expect(changed.revision).toBeGreaterThan(first.revision);
   expect(DesktopBrowser.parseSnapshot(changed)).not.toBeNull();
@@ -1533,7 +1542,7 @@ it.each([
   }
 );
 
-it("revokes a late old-document icon again when the replacement document commits", async () => {
+it("ignores late native icon events while a replacement document is committing", async () => {
   const f = await fixture();
   const page = f.create();
   const guest = mock.guests.at(-1)!;
@@ -1543,9 +1552,7 @@ it("revokes a late old-document icon again when the replacement document commits
     isSameDocument: false,
   });
   guest.emit("page-favicon-updated", {}, [faviconDataUrl]);
-  expect(f.host.favicon(f.event, f.target(page))).toEqual({
-    dataUrl: faviconDataUrl,
-  });
+  expect(f.host.favicon(f.event, f.target(page))).toBeNull();
   guest.url = "https://next.example/page";
   guest.emit("did-navigate", {}, guest.url);
   expect(f.host.favicon(f.event, f.target(page))).toBeNull();
@@ -1560,6 +1567,44 @@ it("revokes a late old-document icon again when the replacement document commits
     )
   );
   expect(f.host.favicon(f.event, f.target(page))).toBeNull();
+  f.host.closeAll();
+});
+
+it("accepts favicon metadata only from the current guest frame and document nonce", async () => {
+  const f = await fixture();
+  const page = f.create();
+  const guest = mock.guests.at(-1)!;
+  guest.mainFrame.url = guest.url;
+  const channel = "grida:browser-guest:favicons";
+  const top = { sender: guest, senderFrame: guest.mainFrame };
+  const candidates = [{ url: faviconDataUrl, type: "image/png", sizes: "" }];
+  guest.emit("dom-ready");
+  const token = guest.send.mock.lastCall![1];
+  guest.ipc.emit(
+    channel,
+    { ...top, senderFrame: { ...top.senderFrame } },
+    token,
+    candidates
+  );
+  guest.ipc.emit(channel, top, "wrong-token", candidates);
+  expect(guest.session!.fetch).not.toHaveBeenCalled();
+  expect(f.host.favicon(f.event, f.target(page))).toBeNull();
+  guest.ipc.emit(channel, top, token, candidates);
+  await vi.waitFor(() =>
+    expect(f.host.favicon(f.event, f.target(page))).not.toBeNull()
+  );
+  guest.emit("did-navigate", {}, guest.url, 200);
+  guest.emit("dom-ready");
+  const next = guest.send.mock.lastCall![1];
+  expect(next).not.toBe(token);
+  guest.ipc.emit(channel, top, token, candidates);
+  await Promise.resolve();
+  expect(f.host.favicon(f.event, f.target(page))).toBeNull();
+  expect(guest.session!.fetch).not.toHaveBeenCalled();
+  guest.ipc.emit(channel, top, next, candidates);
+  await vi.waitFor(() =>
+    expect(f.host.favicon(f.event, f.target(page))).not.toBeNull()
+  );
   f.host.closeAll();
 });
 

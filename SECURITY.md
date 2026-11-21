@@ -4693,12 +4693,15 @@ caller is the actual privileged top-level workbench document.
    navigation lifetime before publishing pixels. Hover images are transient
    display data; the presentation neither persists them nor polls for updates.
    An optional favicon read returns only bounded raster data for the owned
-   guest's current document. Icon URLs come from that guest's native metadata;
-   callers cannot request arbitrary URLs. Fetches use its isolated session
-   without cookies/authentication, validate each HTTP(S) redirect, and bound
-   candidates, time and bytes. Raster bytes are validated without decoding in
-   Main. Navigation/teardown aborts requests and discards late results. The
-   workbench loads only the returned image data, never remote favicon URLs.
+   guest's current document. Icon URLs come from Chromium or from the
+   guest's isolated preload, scoped to the exact top frame and document nonce.
+   Callers cannot request arbitrary URLs. Fetches use the isolated guest
+   session without cookies or authentication and validate each HTTP(S) redirect.
+   Candidate count, response bytes and time are bounded. One lazy sandbox
+   decodes images without network or application access and returns validated
+   PNG data to Main. Cacheable results are held only for the current document.
+   Navigation and teardown abort requests and discard late results. The
+   workbench loads only the returned image data.
    Optional versioned history reads expose only bounded, validated URL/title/
    last-visit snapshots to exact admitted workspace or Settings documents.
    Main records actual successful guest navigations; renderers cannot insert
@@ -4789,12 +4792,14 @@ outside that tool surface. Users can open DevTools for an actual owned page.
   preparation, workspace containment, and immutable verified raster snapshots.
 - `desktop/src/main/browser-favicon.ts` and its tests — bounded, isolated
   favicon fetching and document-lifetime cache.
+- `desktop/src/main/browser-favicon-decoder.ts` — image-only Chromium
+  sandbox and bounded raster output.
 - `desktop/src/main/browser-legacy-profiles.ts` and its tests — narrowly
   recognized legacy browser cleanup without account/provider partition access.
 - `desktop/src/main/browser-history.ts` and its tests — bounded shared history,
   private persistence and ordered removal/clear barriers.
-- `desktop/src/browser-guest-preload.ts` and its tests — approved isolated,
-  one-use native link intent without a website-exposed Grida bridge.
+- `desktop/src/browser-guest-preload.ts` and its tests — isolated one-use
+  native link intent and document-scoped favicon metadata.
 - `desktop/src/main/browser-site-policy.ts` and its tests — actual frame origins,
   native website consent/choosers, session grants and scoped development TLS.
 - `desktop/src/main/browser-auth-dialog.ts` and its tests — isolated native

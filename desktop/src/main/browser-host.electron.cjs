@@ -1,13 +1,19 @@
 // GRIDA-SEC-016 — stock DOM guests, loopback fixtures and private profiles only.
-const { app, BrowserWindow, nativeImage } = require("electron");
+const { app, BrowserWindow, nativeImage, nativeTheme } = require("electron");
 const fs = require("node:fs");
 const http = require("node:http");
 const path = require("node:path");
 const assert = require("node:assert/strict");
 const { pathToFileURL } = require("node:url");
 const { DesktopBrowserHost } = require(process.argv[2]);
+const {
+  faviconFixture,
+  colors,
+  cases,
+} = require("./browser-favicon.fixtures.cjs");
 const resultPath = process.argv[3];
 const downloadOnly = process.argv[5] === "download";
+const faviconOnly = process.argv[5] === "favicon";
 process.umask(0o077);
 app.commandLine.appendSwitch("use-mock-keychain");
 app.setPath("userData", process.argv[4]);
@@ -32,7 +38,7 @@ process.on("uncaughtException", fail);
 process.on("unhandledRejection", fail);
 setTimeout(
   () => fail(new Error(`browser fixture deadline: ${phase}`)),
-  15_000
+  faviconOnly ? 25_000 : 15_000
 ).unref();
 // This mirrors Main's early observer: no host/lease means no guest, and the
 // actual creation object must match the actual did-attach-webview object.
@@ -50,7 +56,8 @@ app.on("web-contents-created", (_event, contents) => {
 const waitFor = async (predicate) => {
   const deadline = Date.now() + 5000;
   while (!(await predicate())) {
-    if (Date.now() > deadline) throw new Error("browser proof timed out");
+    if (Date.now() > deadline)
+      throw new Error(`browser proof timed out: ${phase}`);
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
 };
@@ -93,6 +100,117 @@ const mount = async (window, attachmentId, page, id) => {
   await waitFor(() => !pageFor(window, attachmentId, page.id).loading);
   return guest;
 };
+async function proveFavicons(
+  window,
+  attachmentId,
+  page,
+  guest,
+  origin,
+  requests
+) {
+  const event = eventFor(window);
+  const target = targetFor(attachmentId, page);
+  const navigate = async (pathname, destination = origin) => {
+    mark("favicon " + pathname);
+    const url = destination + pathname;
+    host.navigate(event, { ...target, url });
+    await waitFor(() => guest.getURL() === url);
+  };
+  const pixels = (tab) => {
+    const icon = host.favicon(event, tab);
+    if (!icon) return null;
+    assert.match(icon.dataUrl, /^data:image\/png;base64,/);
+    const image = nativeImage.createFromDataURL(icon.dataUrl);
+    assert.deepEqual(image.getSize(), { width: 32, height: 32 });
+    const bitmap = image.toBitmap();
+    const center = (16 * 32 + 16) * 4;
+    return [bitmap[center + 2], bitmap[center + 1], bitmap[center]];
+  };
+  const matches = (tab, color) => pixels(tab)?.join() === colors[color].join();
+  const expectIcon = async (color, tab = target) => {
+    try {
+      await waitFor(() => matches(tab, color));
+    } catch (cause) {
+      throw new Error(
+        `Expected ${color}, saw ${pixels(tab)}. Requests: ${[...requests.keys()].join(", ")}`,
+        { cause }
+      );
+    }
+  };
+  nativeTheme.themeSource = "light";
+  for (const [pathname, , color] of cases) {
+    await navigate(pathname);
+    await expectIcon(color);
+    if (pathname === "/icons/theme") {
+      nativeTheme.themeSource = "dark";
+      await expectIcon("green");
+      nativeTheme.themeSource = "light";
+    }
+  }
+  await navigate("/icons/inline");
+  await expectIcon("blue");
+  const transparent = nativeImage.createFromDataURL(
+    host.favicon(event, target).dataUrl
+  );
+  assert.equal(transparent.toBitmap()[3], 0);
+  await navigate("/icons/live");
+  await expectIcon("blue");
+  const mutate = (js) => {
+    mark("favicon " + js);
+    return guest.executeJavaScript(js + ";true");
+  };
+  const href = (color) => mutate(`current.href = "/art/${color}.svg?live"`);
+  await href("green");
+  await expectIcon("green");
+  await href("blue");
+  await expectIcon("blue");
+  const reads = requests.get("/art/green.svg");
+  await href("green");
+  await expectIcon("green");
+  assert.equal(requests.get("/art/green.svg"), reads);
+  await mutate('current.type = "image/tiff"');
+  await expectIcon("purple");
+  await mutate('current.type = "image/svg+xml"');
+  await expectIcon("green");
+  await mutate(
+    'current.insertAdjacentHTML("afterend", \'<link id="alternate" rel="icon" sizes="32x32" href="/art/red.png">\')'
+  );
+  await expectIcon("red");
+  await mutate('alternate.sizes = "128x128"');
+  await expectIcon("green");
+  await mutate('current.media = "(prefers-color-scheme: dark)"');
+  await expectIcon("red");
+  await mutate('current.media = ""');
+  await expectIcon("green");
+  await mutate("current.remove();alternate.remove()");
+  await expectIcon("purple");
+  await mutate(
+    'document.head.insertAdjacentHTML("beforeend", \'<link rel="icon" href="/art/blue.svg">\')'
+  );
+  await expectIcon("blue");
+  await navigate("/icons/live#same-document");
+  assert.ok(matches(target, "blue"));
+  const peer = host.create(event, { attachmentId, url: origin + "/icons/gif" });
+  const peerTarget = targetFor(attachmentId, peer);
+  await mount(window, attachmentId, peer, "favicon-peer");
+  await expectIcon("green", peerTarget);
+  assert.ok(matches(target, "blue"));
+  await navigate("/icons/slow");
+  await waitFor(() => requests.has("/art/slow.svg"));
+  const noFallback = await serve(
+    faviconFixture({ conventional: false }).handler
+  );
+  await navigate("/icons/fallback", noFallback);
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  assert.equal(pixels(target), null);
+  assert.ok(matches(peerTarget, "green"));
+  return {
+    fixtureCases: cases.length,
+    mutations: true,
+    isolatedTabs: true,
+    staleResponseDiscarded: true,
+  };
+}
 app
   .whenReady()
   .then(async () => {
@@ -106,28 +224,35 @@ app
         ", 'ran')"
     );
     let finishDownload;
-    const guestOrigin = await serve((request, response) => {
-      if (request.url === "/download") {
-        finishDownload = () => {
-          response.writeHead(200, {
-            "Content-Type": "text/plain",
-            "Content-Disposition": 'attachment; filename="browser-proof.txt"',
-          });
-          response.end("download routing fixture");
-        };
-        return;
-      }
-      response.setHeader(
-        "Content-Type",
-        request.url === "/animation.js" ? "text/javascript" : "text/html"
-      );
-      response.setHeader("Content-Security-Policy", "frame-ancestors 'none'");
-      response.setHeader("X-Frame-Options", "DENY");
-      response.end(
-        request.url === "/animation.js"
-          ? "window.frame=0;function tick(){window.frame++;document.querySelector('canvas').getContext('2d').fillRect(window.frame%200,0,1,20);requestAnimationFrame(tick)}tick();"
-          : request.url === "/automation"
-            ? `<html><title>Automation fixture</title><body style="margin:0;background:#ff6227"><form><input id="value" aria-label="Value"><button id="save">Save</button></form><output></output><script>
+    const favicon = faviconOnly ? faviconFixture() : null;
+    const guestOrigin = await serve(
+      favicon?.handler ??
+        ((request, response) => {
+          if (request.url === "/download") {
+            finishDownload = () => {
+              response.writeHead(200, {
+                "Content-Type": "text/plain",
+                "Content-Disposition":
+                  'attachment; filename="browser-proof.txt"',
+              });
+              response.end("download routing fixture");
+            };
+            return;
+          }
+          response.setHeader(
+            "Content-Type",
+            request.url === "/animation.js" ? "text/javascript" : "text/html"
+          );
+          response.setHeader(
+            "Content-Security-Policy",
+            "frame-ancestors 'none'"
+          );
+          response.setHeader("X-Frame-Options", "DENY");
+          response.end(
+            request.url === "/animation.js"
+              ? "window.frame=0;function tick(){window.frame++;document.querySelector('canvas').getContext('2d').fillRect(window.frame%200,0,1,20);requestAnimationFrame(tick)}tick();"
+              : request.url === "/automation"
+                ? `<html><title>Automation fixture</title><body style="margin:0;background:#ff6227"><form><input id="value" aria-label="Value"><button id="save">Save</button></form><output></output><script>
                 const field = document.querySelector('input');
                 let inputTrusted = false, clickTrusted = false, count = 0;
                 field.oninput = event => { inputTrusted = event.isTrusted; };
@@ -137,9 +262,10 @@ app
                   document.querySelector('output').value = JSON.stringify({value:field.value,inputTrusted,clickTrusted,count:++count});
                 };
               </script></body></html>`
-            : '<html><title>Unframeable guest</title><body style="margin:0;background:#ff0000"><input id="input" aria-label="Editable text"><canvas width="200" height="20"></canvas><script src="/animation.js"></script></body></html>'
-      );
-    });
+                : '<html><title>Unframeable guest</title><body style="margin:0;background:#ff0000"><input id="input" aria-label="Editable text"><canvas width="200" height="20"></canvas><script src="/animation.js"></script></body></html>'
+          );
+        })
+    );
     const origin = await serve((_request, response) => {
       response.setHeader("Content-Type", "text/html");
       // Same default-src/frame policy as Desktop; no permissive frame-src.
@@ -152,7 +278,7 @@ app
       );
     });
     const window = new BrowserWindow({
-      show: !downloadOnly,
+      show: !downloadOnly && !faviconOnly,
       width: 800,
       height: 600,
       webPreferences: {
@@ -198,6 +324,21 @@ app
     });
     const request = targetFor(attachmentId, page);
     let guest = await mount(window, attachmentId, page, "guest");
+    if (favicon) {
+      const evidence = await proveFavicons(
+        window,
+        attachmentId,
+        page,
+        guest,
+        guestOrigin,
+        favicon.requests
+      );
+      fs.writeFileSync(resultPath, JSON.stringify(evidence));
+      host.closeAll();
+      for (const server of servers) server.close();
+      app.exit(0);
+      return;
+    }
     if (downloadOnly) {
       mark("delayed foreground download confirmation");
       let scopeLive = true;

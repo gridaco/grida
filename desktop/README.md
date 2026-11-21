@@ -551,3 +551,11 @@ pnpm --dir desktop typecheck
 
 Use `@grida/ai-host` tests for retained-service behavior. Use desktop tests for Electron
 adapter behavior.
+
+Run the shared browser favicon fixtures in Electron and an installed Chrome
+from the repository root. Both use disposable profiles and a loopback server.
+
+```bash
+GRIDA_DESKTOP_TEST_ELECTRON=1 pnpm --dir desktop exec vitest run src/main/browser-host.electron.test.ts
+node desktop/scripts/verify-browser-favicons-chrome.cjs
+```

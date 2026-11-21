@@ -41,3 +41,90 @@ function link(event: MouseEvent): void {
 }
 window.addEventListener("click", link);
 window.addEventListener("auxclick", link);
+
+// Report the document's eligible icons, including removals Chromium may omit.
+if (window.top === window) {
+  let token: string;
+  let last = "";
+  let queued = false;
+  let head: HTMLHeadElement | null = null;
+  const queries = new Map<string, MediaQueryList>();
+  const observer = new MutationObserver(schedule);
+
+  function schedule(): void {
+    if (queued) return;
+    queued = true;
+    queueMicrotask(publish);
+  }
+
+  function publish(): void {
+    queued = false;
+    if (head !== document.head) {
+      head = document.head;
+      observer.disconnect();
+      observer.observe(document.documentElement, { childList: true });
+      if (head)
+        observer.observe(head, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ["href", "rel", "type", "sizes", "media"],
+        });
+    }
+    const active = new Set<string>();
+    const candidates = [];
+    const links = document.head?.querySelectorAll<HTMLLinkElement>(
+      'link[rel~="icon" i][href]'
+    );
+    // Inspect the last bounded set, preserving the HTML order for ties.
+    for (
+      let i = Math.max(0, (links?.length ?? 0) - 8);
+      links && i < links.length;
+      i++
+    ) {
+      const node = links[i];
+      if (
+        !node.getAttribute("href")?.trim() ||
+        node.media.length > 256 ||
+        node.type.length > 64
+      )
+        continue;
+      if (node.media) {
+        active.add(node.media);
+        let query = queries.get(node.media);
+        if (!query) {
+          query = matchMedia(node.media);
+          query.addEventListener("change", schedule);
+          queries.set(node.media, query);
+        }
+        if (!query.matches) continue;
+      }
+      const url = node.href;
+      if (!url || url.length > (url.startsWith("data:") ? 87_448 : 8192))
+        continue;
+      candidates.push({
+        url,
+        type: node.type,
+        sizes: node.sizes.value.slice(0, 256),
+      });
+    }
+    for (const [media, query] of queries) {
+      if (active.has(media)) continue;
+      query.removeEventListener("change", schedule);
+      queries.delete(media);
+    }
+    const key = JSON.stringify(candidates);
+    if (key === last) return;
+    last = key;
+    ipcRenderer.send("grida:browser-guest:favicons", token, candidates);
+  }
+
+  ipcRenderer.on(
+    "grida:browser-guest:observe-favicons",
+    (_event, next: string) => {
+      if (next !== token) last = "";
+      token = next;
+      schedule();
+    }
+  );
+}

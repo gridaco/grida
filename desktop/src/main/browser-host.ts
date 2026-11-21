@@ -23,6 +23,7 @@ import { DesktopBrowser } from "@grida/desktop-bridge";
 import { IPC_CHANNELS } from "../bridge/contract";
 import { ipc_sender } from "./ipc-sender";
 import { BrowserFavicon } from "./browser-favicon";
+import { BrowserFaviconDecoder } from "./browser-favicon-decoder";
 import { BrowserLegacyProfiles } from "./browser-legacy-profiles";
 import type { BrowserHistory } from "./browser-history";
 import { BrowserSitePolicy } from "./browser-site-policy";
@@ -160,6 +161,7 @@ export class DesktopBrowserHost {
   readonly #pendingAttach = new Map<number, symbol>();
   readonly #mounts = new Map<string, Mount>();
   readonly #acceptedMounts = new Map<number, Mount>();
+  readonly #faviconDecoder = new BrowserFaviconDecoder();
 
   constructor(
     readonly options: {
@@ -168,6 +170,7 @@ export class DesktopBrowserHost {
       workspaceExists(workspaceId: string): Promise<boolean>;
       history?: BrowserHistory;
       downloads?: BrowserDownloads;
+      decodeFavicon?: BrowserFaviconDecoder["decode"];
     }
   ) {
     options.history?.subscribe((change) => this.#publishHistory(change));
@@ -594,6 +597,7 @@ export class DesktopBrowserHost {
       browserSession,
       favicon: new BrowserFavicon({
         session: browserSession,
+        decode: this.options.decodeFavicon ?? this.#faviconDecoder.decode,
         current: () =>
           this.#live(owner) &&
           owner.pages.get(id) === page &&
@@ -1123,6 +1127,7 @@ export class DesktopBrowserHost {
   closeAll(): void {
     this.#pendingAttach.clear();
     for (const owner of this.#owners.values()) this.#retire(owner);
+    this.#faviconDecoder.close();
   }
 
   #shell(event: Sender): BrowserWindow {
@@ -1281,7 +1286,13 @@ export class DesktopBrowserHost {
     return browserSession;
   }
   #load(owner: Owner, page: Page, url: string): void {
-    page.favicon.clear();
+    const previous = page.guest?.getURL();
+    if (
+      !previous ||
+      previous === url ||
+      previous.split("#")[0] !== url.split("#")[0]
+    )
+      page.favicon.clear();
     page.navigation++;
     page.rendered = false;
     page.state.url = url;
@@ -1299,6 +1310,8 @@ export class DesktopBrowserHost {
     });
   }
   #observe(owner: Owner, page: Page, contents: WebContents): void {
+    // Undefined while the previous document is being replaced.
+    let iconToken: string | null | undefined = null;
     let documentVisit: {
       url: string;
       finished: boolean;
@@ -1375,6 +1388,7 @@ export class DesktopBrowserHost {
       }
       page.navigation++;
       if (!details.isSameDocument) {
+        iconToken = undefined;
         page.favicon.clear();
         page.rendered = false;
         if (owner.background) owner.background.blocker = null;
@@ -1405,7 +1419,12 @@ export class DesktopBrowserHost {
     contents.on("did-start-loading", refresh);
     contents.on("did-stop-loading", () => {
       refresh();
-      if (current() && !page.state.loading && !page.state.failure)
+      if (
+        current() &&
+        iconToken === null &&
+        !page.state.loading &&
+        !page.state.failure
+      )
         page.favicon.ensure(contents.getURL());
     });
     contents.on("did-navigate", (_event, url, status) => {
@@ -1430,6 +1449,7 @@ export class DesktopBrowserHost {
           : null;
       // Old-document icon events can be queued after navigation start while
       // getURL() still reports the old page. A full commit revokes them again.
+      iconToken = null;
       page.favicon.clear();
       refresh();
     });
@@ -1453,6 +1473,8 @@ export class DesktopBrowserHost {
     });
     contents.on("did-navigate-in-page", (_event, url, isMainFrame) => {
       refresh();
+      if (isMainFrame && current() && iconToken)
+        contents.send("grida:browser-guest:observe-favicons", iconToken);
       if (
         !current() ||
         !isMainFrame ||
@@ -1489,8 +1511,35 @@ export class DesktopBrowserHost {
         );
       refresh();
     });
+    contents.on("dom-ready", () => {
+      if (!current() || !DesktopBrowser.normalizeUrl(contents.getURL())) return;
+      iconToken = randomUUID();
+      contents.send("grida:browser-guest:observe-favicons", iconToken);
+    });
+    contents.ipc.on(
+      "grida:browser-guest:favicons",
+      (event, token, candidates) => {
+        if (
+          !current() ||
+          !iconToken ||
+          token !== iconToken ||
+          event.sender !== contents ||
+          !event.senderFrame ||
+          event.senderFrame !== contents.mainFrame ||
+          event.senderFrame.url !== contents.getURL() ||
+          !Array.isArray(candidates) ||
+          candidates.length > 8
+        )
+          return;
+        page.favicon.update(candidates, contents.getURL());
+      }
+    );
     contents.on("page-favicon-updated", (_event, candidates) => {
-      if (current()) page.favicon.update(candidates, contents.getURL());
+      if (!current()) return;
+      if (iconToken)
+        contents.send("grida:browser-guest:observe-favicons", iconToken);
+      else if (iconToken === null)
+        page.favicon.update(candidates, contents.getURL());
     });
     contents.on("focus", () => {
       if (!page.active) this.#blur(owner, page);
@@ -2650,6 +2699,8 @@ export class DesktopBrowserHost {
   async #closePage(owner: Owner, page: Page): Promise<void> {
     if (!owner.pages.delete(page.state.id)) return;
     page.favicon.clear();
+    if (![...this.#owners.values()].some((owner) => owner.pages.size))
+      this.#faviconDecoder.close();
     if (owner.thumbnail?.page === page) owner.thumbnail = null;
 
     this.#blur(owner, page);

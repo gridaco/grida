@@ -13,7 +13,7 @@ const require = createRequire(import.meta.url);
 
 const skipElectron = process.env.GRIDA_DESKTOP_TEST_ELECTRON !== "1";
 
-async function runBrowserProof(scenario: "browser" | "download") {
+async function runBrowserProof(scenario: "browser" | "download" | "favicon") {
   const directory = await fs.mkdtemp(
     path.join(os.tmpdir(), "grida-browser-proof-")
   );
@@ -74,7 +74,7 @@ async function runBrowserProof(scenario: "browser" | "download") {
       ],
       {
         env: environment,
-        timeout: 20_000,
+        timeout: scenario === "favicon" ? 29_000 : 20_000,
         killSignal: "SIGKILL",
         maxBuffer: 1024 * 1024,
       }
@@ -118,4 +118,17 @@ it.skipIf(skipElectron)(
     });
   },
   30_000
+);
+
+it.skipIf(skipElectron)(
+  "renders and updates real favicon pixels without leaking them across guest documents or tabs",
+  async () => {
+    expect(await runBrowserProof("favicon")).toEqual({
+      fixtureCases: 8,
+      mutations: true,
+      isolatedTabs: true,
+      staleResponseDiscarded: true,
+    });
+  },
+  35_000
 );

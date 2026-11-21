@@ -91,6 +91,13 @@ fetch or application authority. Large generated locations may use a bounded
 display marker. They are excluded from history, saved layouts, reopening,
 external handoff and favicon acquisition.
 
+Browser tabs display standard website favicons. The current top-level
+document supplies eligible icon candidates, including media-dependent links.
+An undecodable candidate falls through to another candidate and then the
+site's conventional icon. The tab shows a globe if neither works. Link and
+media changes can update the icon without reloading the page. Each tab owns
+its icon for the lifetime of its document.
+
 Explicit navigation, persisted addresses and whole-page default-browser handoff
 admit absolute HTTP(S), including local servers, without embedded credentials or control
 characters. File, executable and private application destinations remain
