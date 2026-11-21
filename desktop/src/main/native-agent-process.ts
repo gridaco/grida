@@ -109,7 +109,6 @@ export type NativeAgentLaunch = {
   inputRouteConnectionId?: string | null;
   lookupProviderRoute?: NativeProviderRoutes.Lookup;
   lookupPredictionRoute?: NativeProviderRoutes.PredictionLookup;
-  fastModeEnabled?: () => Promise<boolean>;
   gatewayScope?: string;
   gatewayJobBilling?: NativeGatewayConnection["readJobBilling"];
   subscriptionScope?: string;
@@ -687,8 +686,7 @@ export class NativeAgentProcess {
             options.inputRouteConnectionId ?? null,
             options,
             options.lookupProviderRoute,
-            options.lookupPredictionRoute,
-            options.fastModeEnabled
+            options.lookupPredictionRoute
           )
         : undefined;
     const capabilities: Record<string, 1> = {

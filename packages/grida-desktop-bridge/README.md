@@ -93,6 +93,11 @@ On the Welcome screen, `welcomeProfiles()` lists the saved-endpoint and
 built-in provider-key connections a first chat can choose before its
 workspace opens. It starts nothing; the opened workspace selects the choice
 as a new connection.
+The optional `welcomeTurnCapabilities(workspaceId, profileId)` previews
+response speed and search availability for that destination and route. It
+reports the effective connection and model or returns null when the route
+cannot be resolved. It grants no chat access. The workspace verifies the
+current route and capabilities when applying the first message's choices.
 When all three optional Welcome Full access methods exist, the app can
 prepare an expiring review for one new chat in the selected registered
 workspace. Answer it in the same Welcome frame. With
@@ -101,14 +106,18 @@ navigation that changes only the `preset` query parameter. An omitted flag
 means navigation revokes the review. Confirmed reservations
 survive the review timeout and can be revoked before use. Answering creates no
 chat. Start consumes the confirmation once, applies Full access to the
-returned chat with the requested model and effort, and sends no input. Open
+returned chat with the requested model, effort, and optional per-chat speed,
+and sends no input. Open
 that exact session in the selected workspace to attach and submit through the
 ordinary API. The confirmation does not authorize another window, workspace,
 or chat.
 
 For automatic review, call `acceptsAutomaticApprovalReview()` to check the
 installed executable before showing the choice on Home or in a new workspace
-draft. If supported, `prepareWelcomeAutomaticReview(workspaceId)` reserves
+draft. With `defaultsToAutomaticReview`, new project chats start in Auto
+when their live worker supports it. Pass `true` as the second argument to
+`createFromDraft` to keep a new chat in manual approval mode.
+If supported, `prepareWelcomeAutomaticReview(workspaceId)` reserves
 that mode. The same frame-bound answer and start methods consume it. The
 receiving workspace verifies the exact mode and chat before sending the first
 message. An attached chat reports its choices through `permissionMode`.
@@ -287,8 +296,9 @@ and attachment boundaries. Inspection remains read-only and starts no work.
 New hosts optionally expose `acceptsPermissionMode()`, `permissionMode(attachmentId)`
 and `setPermissionMode(attachmentId, expectedRevision, requestId, mode, review)`. Offer
 Full access only when the capability is true and the native state includes
-`full_access` in its available modes. Default (`restricted`) keeps its existing
-filesystem and command-network restrictions. Full access deliberately removes
+`full_access` in its available modes. **Ask for approval** (`restricted`) and
+**Auto** (`approve_for_me`) keep the filesystem and command-network restrictions.
+Full access deliberately removes
 command confinement and ordinary approval prompts; OS-user file permissions
 still apply. `reviewPermissionMode` issues a short-lived intent for the exact
 attached chat, revision and request. The owned React confirmation shows the
@@ -296,14 +306,17 @@ native chat title and friendly project name, then answers that intent. Cancel
 returns null and changes nothing. Main rechecks the attachment and the native
 host performs revision admission; a navigated or foreign frame cannot finish
 the grant. This is confirmation in the trusted app UI, not an independent OS
-user-presence proof against a compromised eligible renderer. The native owner persists this per-chat
-choice separately from model/effort defaults; new chats begin restricted.
+user-presence proof against a compromised eligible renderer. The native owner
+persists this per-chat choice separately from model and effort defaults. New
+Desktop project chats use **Auto** where the host offers it and **Ask for
+approval** otherwise. Existing chats with no saved choice stay in **Ask for
+approval**.
 Current hosts apply changes to newly accepted work. Running and queued work
 keep their captures. Some older hosts report a busy chat. Stable request IDs bind retries to the original decision. Queries and
-changes start no inference. Older hosts omit methods or return false; keep
-the Default presentation and withhold the selection action.
+changes start no inference. Older hosts that omit methods or return false use
+the **Ask for approval** presentation without a selection action.
 
-An attached chat can offer **Approve for me** when its available modes contain
+An attached chat can offer **Auto** when its available modes contain
 `approve_for_me`. Selecting it delegates eligible individual decisions and
 preserves command confinement. A private review can leave the original wait
 open for an exact manual answer. Pending approvals may carry `reviewFailure`.

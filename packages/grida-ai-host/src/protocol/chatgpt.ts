@@ -135,8 +135,6 @@ export type ChatGptTurnCapabilities = Readonly<{
     | "reauthenticationRequired";
   speeds: readonly ("fast" | "ultrafast")[];
   webSearch: boolean;
-  fastModeDisabled?: true;
-  webSearchMode?: "cached" | "indexed";
 }>;
 
 export type ChatGptSubscriptionAccount = {

@@ -1213,7 +1213,7 @@ function NativeChatPane({
             composer mounted so model reattachment preserves its popovers. */}
           <AgentComposer
             access={{
-              mode: state.permissionMode?.mode ?? "restricted",
+              mode: controller.composerPermissionMode,
               loading:
                 state.permissionModeLoading ||
                 (!state.scope &&
@@ -1379,27 +1379,6 @@ function NativeChatPane({
                       onSelect: () => setLibraryScope(state.scope),
                     }
                   : undefined,
-              webSearch: {
-                active: state.webSearch,
-                offered:
-                  controller.webSearchAllowed &&
-                  state.turnCapabilities?.webSearch === true,
-                unavailable:
-                  controller.webSearchAllowed &&
-                  (state.turnCapabilities?.status === "unavailable" ||
-                    state.turnCapabilities?.status ===
-                      "reauthenticationRequired")
-                    ? state.turnCapabilities.status
-                    : undefined,
-                refresh: () => void controller.refreshTurnCapabilities(),
-                disabled:
-                  state.acting ||
-                  state.submitting ||
-                  state.goalIntent ||
-                  state.steering,
-                removeDisabled: state.acting || state.submitting,
-                onChange: (active) => controller.selectWebSearch(active),
-              },
               goal: {
                 active: state.goalIntent,
                 offered: !!bridge.startGoal && controller.offers("goals"),
@@ -1440,7 +1419,6 @@ function NativeChatPane({
               refreshError: state.profileReadError,
               effort: state.effort,
               speed:
-                controller.fastModeEnabled &&
                 bridge.turnCapabilities &&
                 !controller.fixedSession &&
                 !state.goalIntent

@@ -14,9 +14,9 @@ Desktop has no agent chat.
 
 ## What the agent can do in Desktop
 
-Desktop chat in a project uses the **Default** access, shown in the composer.
-The agent reads and edits files in the project and runs commands there in a
-sandbox without asking. For example, ask “Run the tests and fix what fails.”
+With **Auto** or **Ask for approval**, the agent can read and edit files in
+the project and run commands there in a sandbox without asking. For example,
+ask “Run the tests and fix what fails.” The composer shows the current mode.
 
 - Desktop reads your login shell's environment from your home folder so
   commands can find your usual tools. If shell startup stalls, Desktop uses
@@ -35,13 +35,16 @@ sandbox without asking. For example, ask “Run the tests and fix what fails.”
 
 ## Choose who reviews extra access
 
-In a project chat, open **Default** in the composer. Leave **Default** selected
-to review requests yourself, or choose **Approve for me** to let the chat's
-model review eligible actions on your behalf. You can also select it on Home
-for a new project chat. The choice applies to messages accepted after the
-change. Reopen a chat to see its saved choice. If the host stops offering
-**Approve for me**, the chat returns to **Default** when you open it or send
-another message. You can select **Approve for me** again when it becomes available.
+New project chats begin in **Auto** when the native host supports it. The
+chat’s model reviews eligible requests for extra access and asks you when it
+needs a decision. Where Auto is unavailable, the chat begins in
+**Ask for approval**. Older chats without a saved choice continue to ask you.
+
+Open the access picker on Home or in a project chat and choose
+**Ask for approval** to review every request for extra access yourself.
+A choice is saved for that chat and applies to messages accepted after the
+change. If Auto becomes unavailable for a chat, the chat switches to
+**Ask for approval**. Select **Auto** again when it becomes available.
 
 For example, ask the agent to read a particular text file outside the project
 and include its absolute path. The file tool can request one read of that
@@ -68,9 +71,9 @@ access choices.
 
 ## Choose Full access
 
-In a project's chat composer, open **Default** and choose **Full access**.
+In a project’s chat composer, open the access picker and choose **Full access**.
 Confirm the in-app dialog for that chat. You can make the choice before
-sending its first message; opening the chat does not start the agent.
+sending its first message.
 
 Full access lets the agent run commands without the filesystem or network
 sandbox. It can fetch resources, install packages, change existing Git
@@ -79,18 +82,18 @@ includes readable credentials and Grida's own state. It does not grant
 administrator privileges, supply missing service credentials or automatically
 configure a program's proxy support.
 
-The choice belongs to that chat and survives reopening. Other chats keep their
-own choice, and new chats begin with Default. You can change access while a
-turn is running or messages are queued. The new access applies to messages
-you send after the change. A running turn, an earlier queued message and a
-subagent keep the access granted for their work.
+The choice belongs to that chat and survives reopening. You can change access
+while a turn is running or messages are queued. The new access applies to
+messages you send after the change. A running turn, an earlier queued message
+and a subagent keep the access granted for their work.
 
 To end earlier Full-access work immediately, stop the running turn and remove
 any Full-access messages still in the queue. Check **Processes** for commands
-you also want to stop. A new Default turn cannot send input to an existing
-Full-access terminal.
+you also want to stop. Sending input to an existing Full-access terminal
+requires a turn with Full access.
 
-Choose **Default** again to restore restricted access for subsequent work.
+Choose **Auto** or **Ask for approval** to restore sandboxed access for
+subsequent work.
 **Plan** continues to withhold commands and file changes in every mode.
 Process output, cancellation and cleanup reporting remain available in Full
 access, but an unconfined program can escape normal process-group cleanup;
@@ -100,17 +103,19 @@ On Home, choosing **Full access** opens the same confirmation immediately.
 Confirm to select Full access for the new chat in your chosen project. You can
 keep drafting and change the model or effort before sending. On supported
 Desktop builds, switching Home presets keeps that approval for the same
-project. Cancel keeps the draft and Default access. Changing the project
-resets access to Default.
+project. Cancel keeps the draft and the previous mode. Changing the project
+uses the destination’s new-chat default.
 
 Full access needs a compatible native Desktop build. Earlier builds that offer
 the picker can require the chat and its processes to finish before changing access.
-Builds without the picker use Default.
+Builds without the picker ask you to review requests for extra access.
 
 ## What the agent cannot reach
 
-With Default access, changes outside the project still require an existing
-write grant. A one-file read grants no access to neighboring files. Confined commands need a separate grant for each network destination. You can also attach a file to a message.
+With **Auto** or **Ask for approval**, changes outside the project require an
+existing write grant. A one-file read grants no access to neighboring files.
+Confined commands need a separate grant for each network destination. You can
+also attach a file to a message.
 [Attach an image or a file](./getting-started.md#attach-an-image)
 
 A question the agent asks about what you want is separate from access: answer

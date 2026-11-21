@@ -888,6 +888,57 @@ describe("NativeChatSelections", () => {
     }
   );
 
+  it("keeps the pending promotion's access default across coordinator restarts", async () => {
+    const configured = options();
+    let owner = await NativeChatSelections.open(configured);
+    const manualId = randomUUID(),
+      automaticId = randomUUID();
+    await owner.read("workspace", null, manualId);
+    await owner.read("workspace", null, automaticId);
+    const manual = await owner.prepareCreation(
+      "workspace",
+      manualId,
+      undefined,
+      "manual"
+    );
+    const automatic = await owner.prepareCreation(
+      "workspace",
+      automaticId,
+      undefined,
+      "automatic"
+    );
+    expect(manual.initialPermissionMode).toBeUndefined();
+    expect(automatic.initialPermissionMode).toBe("approve_for_me");
+    owner = await NativeChatSelections.open(configured);
+    expect(
+      await owner.prepareCreation("workspace", manualId, undefined, "automatic")
+    ).toEqual(manual);
+    expect(
+      await owner.prepareCreation("workspace", automaticId, undefined, "manual")
+    ).toEqual({ ...automatic, initialPermissionMode: "restricted" });
+    expect(
+      await owner.prepareCreation(
+        "workspace",
+        automaticId,
+        undefined,
+        "automatic"
+      )
+    ).toEqual(automatic);
+    await owner.finishCreation("workspace", automaticId);
+    const completed = await owner.prepareCreation(
+      "workspace",
+      automaticId,
+      undefined,
+      "automatic"
+    );
+    expect(completed.initialPermissionMode).toBeUndefined();
+    expect(completed.requestId).toBe(automatic.requestId);
+    expect(completed.firstInputId).toBe(automatic.firstInputId);
+    expect(
+      await owner.prepareCreation("workspace", automaticId, undefined, "manual")
+    ).toEqual({ ...completed, verifyManualApproval: true });
+  });
+
   it("leaves an in-flight Welcome creation to its current owner", async () => {
     const configured = options();
     const query = vi.fn<NativeChatSelections.Options["query"]>(

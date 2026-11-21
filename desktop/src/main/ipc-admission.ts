@@ -164,6 +164,7 @@ export namespace ipc_admission {
         // no workspace attachment or input capability.
         if (
           channel === IPC_CHANNELS.WELCOME_CHAT_PROFILES ||
+          channel === IPC_CHANNELS.WELCOME_CHAT_TURN_CAPABILITIES ||
           channel === IPC_CHANNELS.WELCOME_CHAT_PREPARE_FULL_ACCESS ||
           channel === IPC_CHANNELS.WELCOME_CHAT_PREPARE_AUTOMATIC_REVIEW ||
           channel === IPC_CHANNELS.WELCOME_CHAT_ANSWER_FULL_ACCESS ||

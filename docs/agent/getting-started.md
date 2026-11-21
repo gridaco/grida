@@ -62,14 +62,13 @@ guidance as context.
 
 ## Work in a project
 
-Open a folder in Grida Desktop and open its chat pane. The **Default** access
-shown in the composer lets the agent read and edit files in this project and
-run commands in a sandbox. You review requests to read an outside file or
-connect a finite command to a specific network destination. Open **Default**
-and choose **Approve for me** to delegate eligible decisions to the chat’s
-model. Choose **Full access** and confirm the dialog to allow ordinary-user
-filesystem and network access for commands. New chats
-still begin with Default. Type `@` to mention a file, for example “Summarize @README.md and list
+Open a folder in Grida Desktop and open its chat pane. A new chat starts in
+**Auto** when available. The agent reads and edits files in the project and
+runs commands in a sandbox. The chat’s model reviews eligible requests for
+extra access. Choose **Ask for approval** in the access picker to review them
+yourself. Choose **Full access** and confirm the dialog to allow ordinary-user
+filesystem and network access for commands.
+Type `@` to mention a file, for example “Summarize @README.md and list
 the open TODOs.” A mention gives the agent the file's path; it reads the
 file's current contents when it needs them. To investigate without changing
 anything, type `/plan` or choose **+ → Plan mode** before you send.

@@ -575,6 +575,13 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     return nativeChat.welcomeProfiles(event);
   });
   guarded(
+    IPC_CHANNELS.WELCOME_CHAT_TURN_CAPABILITIES,
+    (event, ...args: unknown[]) => {
+      if (args.length !== 2) throw new Error("native_chat_selection_invalid");
+      return nativeChat.welcomeTurnCapabilities(event, args[0], args[1]);
+    }
+  );
+  guarded(
     IPC_CHANNELS.WELCOME_CHAT_PREPARE_AUTOMATIC_REVIEW,
     async (event, ...args: unknown[]) => {
       if (args.length !== 1)
@@ -706,7 +713,15 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_CREATE_FROM_DRAFT,
-    (event, draftId: unknown) => nativeChat.createFromDraft(event, draftId)
+    (event, ...args: unknown[]) => {
+      if (
+        args.length < 1 ||
+        args.length > 2 ||
+        (args.length === 2 && args[1] !== true)
+      )
+        throw new Error("native_chat_selection_invalid");
+      return nativeChat.createFromDraft(event, args[0], args[1]);
+    }
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_SUBAGENT_ACTIVITY,

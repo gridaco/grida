@@ -37,8 +37,7 @@ export class SettingsPersonalization {
     }): DesktopPersonalizationSettings => ({
       suggestedPrompts: value.enabled,
       revision: value.revision,
-      fastMode: false,
-      webSearch: "onDemand",
+      webSearch: "disabled",
     });
     return new SettingsPersonalization({
       get: async () => snapshot(await api.get()),

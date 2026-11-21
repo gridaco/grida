@@ -54,8 +54,7 @@ export class NativeProviderRoutes {
     private readonly connectionId: string | null,
     private readonly launch: NativeProviderRouteLaunch,
     private readonly lookup?: NativeProviderRoutes.Lookup,
-    private readonly predict?: NativeProviderRoutes.PredictionLookup,
-    private readonly fastModeEnabled?: () => Promise<boolean>
+    private readonly predict?: NativeProviderRoutes.PredictionLookup
   ) {}
 
   /** Exactly the same custody and limits apply at process launch and per-input selection. */
@@ -207,15 +206,8 @@ export class NativeProviderRoutes {
         : this.resolved.get(id)?.launch;
     if (!launch || launch.model !== params.model)
       throw new Error("native_chat_profile_unavailable");
-    if (!launch.subscriptionScope) {
-      const enabled = await this.fastModeEnabled?.();
-      return {
-        status: "unsupported",
-        speeds: [],
-        webSearch: false,
-        ...(enabled === false && { fastModeDisabled: true }),
-      };
-    }
+    if (!launch.subscriptionScope)
+      return { status: "unsupported", speeds: [], webSearch: false };
     if (!launch.subscriptionCapabilities)
       return { status: "unavailable", speeds: [], webSearch: false };
     const result = await launch.subscriptionCapabilities();

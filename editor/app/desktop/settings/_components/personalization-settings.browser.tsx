@@ -25,16 +25,19 @@ afterEach(() => {
 
 it("persists each chat preference, reflects an external edit, and restores it on reopen", async () => {
   let value: DesktopPersonalizationSettings = {
-    fastMode: true,
     suggestedPrompts: false,
-    webSearch: "onDemand",
+    webSearch: "live",
     revision: 0,
   };
   const listeners = new Set<(value: DesktopPersonalizationSettings) => void>();
   const api: NonNullable<DesktopBridge["personalization"]> = {
     get: async () => value,
     set: async (change) => {
-      value = { ...value, ...change, revision: value.revision + 1 };
+      const requested =
+        "webSearch" in change && change.webSearch === "onDemand"
+          ? { webSearch: "disabled" as const }
+          : change;
+      value = { ...value, ...requested, revision: value.revision + 1 };
       for (const listener of listeners) listener(value);
       return value;
     },
@@ -46,35 +49,36 @@ it("persists each chat preference, reflects an external edit, and restores it on
     },
   };
   await mount({ api });
-  const fast = page.getByRole("switch", { name: "Fast mode" });
   const suggestions = page.getByRole("switch", { name: "Suggested prompts" });
-  const search = page.getByRole("combobox", { name: "Web search" });
-  await expect.element(fast).toBeChecked();
-  await act(() => fast.click());
+  const search = page.getByRole("switch", { name: "Web search" });
+  await expect
+    .element(page.getByRole("switch", { name: "Fast mode" }))
+    .not.toBeInTheDocument();
   await act(() => suggestions.click());
-  await expect.element(search).toHaveValue("onDemand");
-  for (const mode of [
-    "live",
-    "indexed",
-    "cached",
-    "disabled",
-    "onDemand",
-  ] as const) {
-    await act(() => search.selectOptions(mode));
-    await expect.element(search).toHaveValue(mode);
-    expect(value.webSearch).toBe(mode);
-  }
-  expect(value).toMatchObject({ fastMode: false, suggestedPrompts: true });
+  await expect.element(search).toBeChecked();
+  await act(() => search.click());
+  await expect.element(search).not.toBeChecked();
+  expect(value.webSearch).toBe("disabled");
+  await act(() => search.click());
+  await expect.element(search).toBeChecked();
+  expect(value.webSearch).toBe("live");
+
+  expect(value.suggestedPrompts).toBe(true);
   await act(async () => {
-    await api.set({ webSearch: "cached" });
+    await api.set({ webSearch: "disabled" });
   });
-  await expect.element(search).toHaveValue("cached");
+  await expect.element(search).not.toBeChecked();
   act(() => root.unmount());
   expect(listeners.size).toBe(0);
   await mount({ api });
-  await expect.element(fast).not.toBeChecked();
   await expect.element(suggestions).toBeChecked();
-  await expect.element(search).toHaveValue("cached");
+  await expect.element(search).not.toBeChecked();
+  expect(value.webSearch).toBe("disabled");
+
+  await act(async () => {
+    await api.set({ webSearch: "live" });
+  });
+  await expect.element(search).toBeChecked();
 });
 
 it("keeps Suggested prompts usable on a Desktop build with just the predictions bridge", async () => {
@@ -94,10 +98,7 @@ it("keeps Suggested prompts usable on a Desktop build with just the predictions 
   expect(set).toHaveBeenCalledWith(true);
   await expect.element(suggestions).toBeChecked();
   await expect
-    .element(page.getByRole("switch", { name: "Fast mode" }))
-    .not.toBeInTheDocument();
-  await expect
-    .element(page.getByRole("combobox", { name: "Web search" }))
+    .element(page.getByRole("switch", { name: "Web search" }))
     .not.toBeInTheDocument();
 });
 
@@ -110,8 +111,7 @@ it("opens the Personalization category for a saved Chat settings link", async ()
     personalization: {
       get: async () => ({
         suggestedPrompts: false,
-        fastMode: true,
-        webSearch: "onDemand",
+        webSearch: "disabled",
         revision: 0,
       }),
       onChange: () => () => {},
@@ -133,8 +133,8 @@ it("opens the Personalization category for a saved Chat settings link", async ()
       .element(page.getByRole("heading", { name: "Personalization" }))
       .toBeVisible();
     await expect
-      .element(page.getByRole("switch", { name: "Fast mode" }))
-      .toBeChecked();
+      .element(page.getByRole("switch", { name: "Web search" }))
+      .toBeEnabled();
   } finally {
     window.history.replaceState(
       null,

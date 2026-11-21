@@ -282,16 +282,17 @@ export type DesktopArchivedChatPage = Readonly<{
 }>;
 
 export type DesktopPersonalizationSettings = Readonly<{
-  fastMode: boolean;
   suggestedPrompts: boolean;
-  webSearch: "onDemand" | "disabled" | "cached" | "indexed" | "live";
+  /** The existing IPC value "live" represents automatic search. */
+  webSearch: "disabled" | "live";
   revision: number;
 }>;
 
 export type DesktopPersonalizationChange =
-  | Readonly<{ fastMode: boolean }>
   | Readonly<{ suggestedPrompts: boolean }>
-  | Readonly<{ webSearch: DesktopPersonalizationSettings["webSearch"] }>;
+  | Readonly<{ webSearch: DesktopPersonalizationSettings["webSearch"] }>
+  /** Older renderers use "onDemand" to turn automatic search off. */
+  | Readonly<{ webSearch: "onDemand" }>;
 
 export type DesktopComposerPredictionSettings = Readonly<{
   enabled: boolean;

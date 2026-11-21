@@ -13,7 +13,9 @@ One host process constructs the subscription host with these options:
 - `post` — the host's narrow request callback for the two fixed destinations,
   the token endpoint and the subscription Responses endpoint. It returns the
   provider response, or `null` when the host refuses or cannot dispatch;
-- `getModels` — optional, fixed authenticated GET of the subscription model offer; and
+- `getModels` — optional, fixed authenticated GET of the subscription model offer;
+- `turnPreferences` — optional callback that supplies the current
+  `webSearchAllowed` permission; and
 - `configuration` — a `ChatGptProviderConfig` containing:
 
 - the exact authorization and token endpoints;
@@ -118,14 +120,16 @@ connection, which attaches the credential headers above.
 The connection refuses any body that departs from the native request shape:
 the captured model, streaming, `store: false`, string `instructions`, and
 encrypted reasoning as the only included field. Alongside ordinary functions
-it can offer one `web_search` tool on a compatible model. Cached search sets
-`external_web_access: false`. Live and indexed search set it to true, and
-indexed search additionally requires `indexed_web_access: true`. Accelerated speed uses `service_tier: "priority"`
-or `"ultrafast"`. The credential owner verifies optional features before
-dispatch and checks the current Desktop preference again on each POST attempt.
-A stricter search preference can block a previously accepted request. A connection
-captured under a replaced account lineage answers `401` without dispatch, and
-a new capture yields a different scope.
+it can offer one `web_search` tool on a compatible model. New search requests
+set `external_web_access: true`. The validator also accepts previously
+captured cache-only and index-gated requests with their original limits.
+Accelerated speed uses `service_tier: "priority"` or `"ultrafast"` and
+requires an offer for the captured account and model. The credential owner
+checks current search permission on each POST attempt that includes search.
+Revoking search permission or failing to read it can block a previously
+accepted request that uses search. A connection captured under a replaced
+account lineage answers `401` without dispatch, and a new capture yields
+a different scope.
 
 Grida session and renderer ids remain namespaced (`openai/gpt-…`). The native
 host maps the closed supported set to the bare model names required by the

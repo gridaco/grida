@@ -69,11 +69,12 @@ select it again. [Use durable client operations](./clients.md#use-durable-client
 
 ## Use the tools available to the task
 
-A Desktop workspace chat on macOS and Linux runs under the **Default** access
-shown in the composer. The agent reads, creates and edits files in the project
-and runs commands there in a sandbox without asking each time; its commands
-can read elsewhere on your computer but cannot write outside the project or
-reach the internet. Turn on the **Plan** badge (**+ → Plan mode** or `/plan`)
+With **Auto** or **Ask for approval**, a Desktop workspace chat on macOS and
+Linux can read, create and edit files in the project and run commands there
+in a sandbox without asking each time. Commands can read elsewhere on your
+computer. The sandbox limits writes to the project and a temporary directory,
+and the agent needs approval to connect a command to a public destination.
+Turn on the **Plan** badge (**+ → Plan mode** or `/plan`)
 when you want it to investigate without changing anything. Skills add
 guidance but never add access. [Understand agent permissions](./permissions.md)
 
@@ -103,20 +104,15 @@ Current limits:
 
 ## Search the web for one message
 
-In a regular Desktop workspace chat using **GPT-6.2 Sol** on a connected
-**ChatGPT Subscription**, the default **On demand** setting lets you open **+** and choose **Web search**. Send your
-question. This gives the model permission to search for that message. You
-can turn it off before sending. If sending fails before the chat accepts the
-message, your draft keeps the choice.
-
-If Desktop cannot check search availability, open **+** and choose **Web
-search** to check again. Once search is available, choose it to add it to your
-message. If the menu asks you to sign in, reconnect your ChatGPT subscription.
+With **GPT-6.2 Sol** on a connected **ChatGPT Subscription**, the agent can
+search the live web when a question needs current information. Ask a question
+from Home or in a workspace chat, or ask directly, for example “Search the
+web for today’s forecast in Seoul.” **Settings → Personalization → Web search**
+controls this across workspaces and is on by default.
 
 When the model searches, the chat shows the reported search activity. Open a
 cited source from the reply to read it. Sources remain available when you
-reopen the chat. A reply can have no citations. In **Settings → Personalization**,
-choose an automatic search mode or turn search off across your chats.
+reopen the chat. A reply can have no citations.
 [Web search preferences](./desktop-settings.md#personalization)
 
 ## Use tools from a local MCP server

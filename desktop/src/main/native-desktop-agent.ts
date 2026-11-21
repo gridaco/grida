@@ -236,9 +236,12 @@ export class NativeDesktopAgent {
       const { userDataPath, network } = await nativeAgentSubscriptionSettings();
       const { NativeChatGptHost } = await import("./native-chatgpt-host");
       const host = new NativeChatGptHost(userDataPath, network, () =>
-        personalization
-          .getPersonalization()
-          .catch(() => ({ fastMode: false, webSearch: "disabled" as const }))
+        personalization.getPersonalization().then(
+          ({ webSearch }) => ({
+            webSearchAllowed: webSearch !== "disabled",
+          }),
+          () => ({ webSearchAllowed: false })
+        )
       );
       const oauth = createChatGptOAuthCoordinator({
         ceremony: host,
@@ -1339,11 +1342,6 @@ export class NativeDesktopAgent {
       ),
       ...(workspaceConfiguration && {
         lookupProviderRoute: this.inputRouteLookup(workspace),
-        fastModeEnabled: () =>
-          this.personalization.getPersonalization().then(
-            (p) => p.fastMode,
-            () => false
-          ),
       }),
       hooks: workspaceConfiguration
         ? await NativeAgentHooks.open(this.store.hooksHome, root)

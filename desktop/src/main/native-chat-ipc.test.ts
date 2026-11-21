@@ -3614,6 +3614,11 @@ describe("Welcome Full access review", () => {
     effort: "high",
   } as const;
   const DIRECTORY = { device: "1", inode: "2", birthTimeNs: "3" };
+  const OFFER = {
+    status: "available",
+    speeds: ["fast"],
+    webSearch: true,
+  } as const;
 
   async function welcomePermissionSetup() {
     const directory = fs.mkdtempSync(
@@ -3625,6 +3630,9 @@ describe("Welcome Full access review", () => {
       async ({ sessionId }) => ({ id: sessionId })
     );
     const choose = vi.fn<NativeChatProfileOwner["select"]>(async () => {});
+    const turnCapabilities = vi.fn<
+      NonNullable<NativeChatProfileOwner["turnCapabilities"]>
+    >(async () => OFFER);
     const ensure = vi.fn<(id: string, check?: () => void) => Promise<void>>(
       async () => {}
     );
@@ -3654,6 +3662,7 @@ describe("Welcome Full access review", () => {
     Object.assign(chat, {
       acceptsSelection: true,
       acceptsPermissionMode: true,
+      acceptsTurnCapabilities: true,
       createSelected: create,
       setPermissionMode: setPermission,
       permissionMode,
@@ -3666,22 +3675,33 @@ describe("Welcome Full access review", () => {
       userDataPath: directory,
       choice: async (_workspaceId, connectionId) => ({
         connectionId,
-        model: "fixture-model",
+        model: connectionId === null ? "default-model" : "fixture-model",
       }),
       query,
     });
+    const resolveChat = vi.fn<
+      (
+        _sender: unknown,
+        workspaceId: string,
+        profileId?: string
+      ) => ActiveNativeChat | null
+    >((_sender, workspaceId, profileId) => ({
+      workspaceId,
+      directoryIdentity: DIRECTORY,
+      profileId: profileId ?? null,
+      chat,
+    }));
     const ipc = new NativeChatIpc(
       ORIGIN,
-      (_sender, workspaceId, profileId) => ({
-        workspaceId,
-        directoryIdentity: DIRECTORY,
-        profileId: profileId ?? null,
-        chat,
-      }),
+      resolveChat,
       { admits: () => true, ensure },
       undefined,
       undefined,
-      { list: async () => ({ choices: [], saved: [] }), select: choose },
+      {
+        list: async () => ({ choices: [], saved: [] }),
+        select: choose,
+        turnCapabilities,
+      },
       undefined,
       false,
       undefined,
@@ -3693,9 +3713,13 @@ describe("Welcome Full access review", () => {
     );
     return {
       ...window,
+      chat,
       ipc,
       create,
       choose,
+      resolveChat,
+      turnCapabilities,
+      selections,
       ensure,
       resolveWorkspace,
       setPermission,
@@ -3705,6 +3729,113 @@ describe("Welcome Full access review", () => {
       directory,
     };
   }
+
+  it("previews the exact new chat choice without creating or selecting a chat", async () => {
+    const f = await welcomePermissionSetup();
+    try {
+      f.resolveChat.mockReturnValue(null);
+      await expect(
+        f.ipc.welcomeTurnCapabilities(f.event, WORKSPACE, PROFILE)
+      ).resolves.toEqual({
+        profileId: PROFILE,
+        modelId: "fixture-model",
+        ...OFFER,
+      });
+      await expect(
+        f.ipc.welcomeTurnCapabilities(f.event, WORKSPACE, null)
+      ).resolves.toEqual({
+        profileId: null,
+        modelId: "default-model",
+        ...OFFER,
+      });
+      expect(f.turnCapabilities.mock.calls).toEqual([
+        [WORKSPACE, PROFILE, "fixture-model"],
+        [WORKSPACE, null, "default-model"],
+      ]);
+      expect(f.ensure).not.toHaveBeenCalled();
+      expect(f.choose).not.toHaveBeenCalled();
+      expect(f.create).not.toHaveBeenCalled();
+      expect(fs.readdirSync(f.directory)).toEqual([]);
+    } finally {
+      fs.rmSync(f.directory, { recursive: true, force: true });
+    }
+  });
+
+  it("withholds newer turn options when the running worker cannot use them", async () => {
+    const f = await welcomePermissionSetup();
+    try {
+      Object.assign(f.chat, { acceptsTurnCapabilities: false });
+      await expect(
+        f.ipc.welcomeTurnCapabilities(f.event, WORKSPACE, PROFILE)
+      ).resolves.toEqual({
+        profileId: PROFILE,
+        modelId: "fixture-model",
+        status: "unsupported",
+        speeds: [],
+        webSearch: false,
+      });
+      expect(f.turnCapabilities).not.toHaveBeenCalled();
+      const review = await confirmedReview(f);
+      await expect(
+        f.ipc.startWelcomeFullAccess(f.event, review.reviewId, {
+          ...CHOICE,
+          speed: "fast",
+        })
+      ).rejects.toThrow("native_chat_selection_unsupported");
+      expect(f.create).not.toHaveBeenCalled();
+      expect(f.setPermission).not.toHaveBeenCalled();
+    } finally {
+      fs.rmSync(f.directory, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects previews outside the exact Welcome frame and drops replaced destinations", async () => {
+    const f = await welcomePermissionSetup();
+    try {
+      await expect(
+        f.ipc.welcomeTurnCapabilities(
+          windowAt(WORKSPACE_URL).event,
+          WORKSPACE,
+          PROFILE
+        )
+      ).rejects.toThrow("native_chat_scope_changed");
+      await expect(
+        f.ipc.welcomeTurnCapabilities(f.event, WORKSPACE, "forged-profile")
+      ).rejects.toThrow("native_chat_selection_invalid");
+      expect(f.resolveWorkspace).not.toHaveBeenCalled();
+      f.resolveWorkspace
+        .mockResolvedValueOnce({
+          workspaceId: WORKSPACE,
+          workspaceName: "Example project",
+          directoryIdentity: DIRECTORY,
+        })
+        .mockResolvedValueOnce({
+          workspaceId: WORKSPACE,
+          workspaceName: "Example project",
+          directoryIdentity: { ...DIRECTORY, inode: "changed" },
+        });
+      await expect(
+        f.ipc.welcomeTurnCapabilities(f.event, WORKSPACE, PROFILE)
+      ).resolves.toBeNull();
+      const reply = Promise.withResolvers<typeof OFFER>();
+      f.turnCapabilities.mockReturnValueOnce(reply.promise);
+      const preview = f.ipc.welcomeTurnCapabilities(
+        f.event,
+        WORKSPACE,
+        PROFILE
+      );
+      await vi.waitFor(() =>
+        expect(f.turnCapabilities).toHaveBeenCalledTimes(2)
+      );
+      f.contents.emit("did-start-navigation", { isMainFrame: true });
+      reply.resolve(OFFER);
+      await expect(preview).rejects.toThrow("native_chat_scope_changed");
+      expect(f.ensure).not.toHaveBeenCalled();
+      expect(f.create).not.toHaveBeenCalled();
+    } finally {
+      fs.rmSync(f.directory, { recursive: true, force: true });
+    }
+  });
 
   it("binds the Welcome automatic review choice to the reserved chat", async () => {
     const f = await welcomePermissionSetup();
@@ -3813,7 +3944,7 @@ describe("Welcome Full access review", () => {
     }
   );
 
-  it("approves without creating a chat and starts once with the model and effort supplied at send time", async () => {
+  it("approves without creating a chat and starts once with the model, effort, and speed supplied at send time", async () => {
     const f = await welcomePermissionSetup();
     try {
       const review = await f.ipc.prepareWelcomeFullAccess(f.event, WORKSPACE);
@@ -3834,7 +3965,10 @@ describe("Welcome Full access review", () => {
         .spyOn(Date, "now")
         .mockReturnValue(Date.now() + 600_000);
       const result = await f.ipc
-        .startWelcomeFullAccess(f.event, review.reviewId, CHOICE)
+        .startWelcomeFullAccess(f.event, review.reviewId, {
+          ...CHOICE,
+          speed: "fast",
+        })
         .finally(() => longDraft.mockRestore());
       expect(result).toEqual({
         sessionId: expect.any(String),
@@ -3853,7 +3987,13 @@ describe("Welcome Full access review", () => {
           connectionId: PROFILE,
           model: "fixture-model",
           effort: "high",
+          speed: "fast",
         },
+      });
+      expect(f.selections.readDefaults()).toEqual({
+        connectionId: PROFILE,
+        model: "fixture-model",
+        effort: "high",
       });
       expect(f.setPermission).toHaveBeenCalledExactlyOnceWith(
         { id: result!.sessionId },
@@ -3963,6 +4103,8 @@ describe("Welcome Full access review", () => {
   it.each([
     { ...CHOICE, effort: "very-high" },
     { ...CHOICE, effort: undefined },
+    { ...CHOICE, speed: "unknown" },
+    { ...CHOICE, speed: undefined },
     { ...CHOICE, sessionId: "caller-supplied" },
     { ...CHOICE, workspaceId: "/arbitrary/path" },
   ])(
@@ -3973,7 +4115,9 @@ describe("Welcome Full access review", () => {
         const review = await confirmedReview(f);
         await expect(
           f.ipc.startWelcomeFullAccess(f.event, review.reviewId, request)
-        ).rejects.toThrow(/native_chat_(permission_mode|effort)_invalid/);
+        ).rejects.toThrow(
+          /native_chat_(permission_mode|effort|selection)_invalid/
+        );
         expect(f.resolveWorkspace).toHaveBeenCalledOnce();
         expect(f.create).not.toHaveBeenCalled();
       } finally {
@@ -4034,14 +4178,21 @@ describe("Welcome Full access review", () => {
         new Error("native_agent_request_timeout")
       );
       const review = await confirmedReview(f);
+      const choice = { ...CHOICE, speed: "fast" } as const;
       await expect(
-        f.ipc.startWelcomeFullAccess(f.event, review.reviewId, CHOICE)
+        f.ipc.startWelcomeFullAccess(f.event, review.reviewId, choice)
       ).rejects.toThrow("native_chat_permission_mode_unverified");
       const [{ sessionId }] = f.create.mock.calls[0];
       await expect(
         f.ipc.startWelcomeFullAccess(f.event, review.reviewId, {
-          ...CHOICE,
+          ...choice,
           effort: "low",
+        })
+      ).rejects.toThrow("native_chat_permission_mode_review_changed");
+      await expect(
+        f.ipc.startWelcomeFullAccess(f.event, review.reviewId, {
+          ...choice,
+          speed: "ultrafast",
         })
       ).rejects.toThrow("native_chat_permission_mode_review_changed");
       f.permissionMode.mockResolvedValueOnce({
@@ -4051,7 +4202,7 @@ describe("Welcome Full access review", () => {
         available: ["restricted", "full_access"],
       });
       await expect(
-        f.ipc.startWelcomeFullAccess(f.event, review.reviewId, CHOICE)
+        f.ipc.startWelcomeFullAccess(f.event, review.reviewId, choice)
       ).resolves.toEqual({ sessionId, profileId: PROFILE });
       expect(f.create).toHaveBeenCalledOnce();
       expect(f.setPermission.mock.calls).toEqual([
@@ -4259,6 +4410,194 @@ describe("saved selection IPC", () => {
       finishCreation: vi.fn<NativeChatSelections["finishCreation"]>(),
     } as unknown as NativeChatSelections;
   }
+
+  function draftPromotion() {
+    const selections = owner();
+    const draftId = randomUUID();
+    const creation = {
+      requestId: randomUUID(),
+      sessionId: randomUUID(),
+      firstInputId: randomUUID(),
+      selection: {
+        connectionId: null,
+        model: "model-a",
+        effort: "medium" as const,
+      },
+    };
+    vi.mocked(selections.prepareCreation).mockImplementation(
+      async (_workspaceId, _draftId, _check, initialApproval) => ({
+        ...creation,
+        ...(initialApproval === "automatic" && {
+          initialPermissionMode: "approve_for_me" as const,
+        }),
+      })
+    );
+    const f = setup(undefined, undefined, undefined, undefined, selections);
+    const permission = {
+      sessionId: creation.sessionId,
+      revision: 0,
+      mode: "restricted",
+      available: ["restricted", "approve_for_me", "full_access"],
+    } as const;
+    const auto = {
+      ...permission,
+      revision: 1,
+      mode: "approve_for_me",
+    } as const;
+    const readPermission = vi.fn<NonNullable<typeof f.chat.permissionMode>>(
+      async () => permission
+    );
+    const changePermission = vi.fn<
+      NonNullable<typeof f.chat.setPermissionMode>
+    >(async () => auto);
+    const create = vi.fn<NonNullable<typeof f.chat.createSelected>>(
+      async () => ({ id: creation.sessionId })
+    );
+    Object.assign(f.chat, {
+      createSelected: create,
+      acceptsPermissionMode: true,
+      permissionMode: readPermission,
+      setPermissionMode: changePermission,
+    });
+    return {
+      ...f,
+      selections,
+      creation,
+      draftId,
+      permission,
+      auto,
+      readPermission,
+      changePermission,
+      create,
+    };
+  }
+
+  it("initializes Auto before issuing the new project chat's attachment", async () => {
+    const f = draftPromotion();
+    const pending = Promise.withResolvers<typeof f.auto>();
+    f.changePermission.mockReturnValueOnce(pending.promise);
+    const creation = f.ipc.createFromDraft(f.first.event, f.draftId);
+    await vi.waitFor(() => expect(f.changePermission).toHaveBeenCalledOnce());
+    expect(f.changePermission).toHaveBeenCalledWith(
+      { id: f.creation.sessionId },
+      0,
+      f.creation.requestId,
+      "approve_for_me"
+    );
+    expect(f.selections.finishCreation).not.toHaveBeenCalled();
+    pending.resolve(f.auto);
+    await expect(creation).resolves.toMatchObject({
+      sessionId: f.creation.sessionId,
+      firstInputId: f.creation.firstInputId,
+    });
+    expect(f.selections.finishCreation).toHaveBeenCalledOnce();
+  });
+
+  it("keeps explicit Manual, unavailable Auto, and an already selected mode", async () => {
+    const f = draftPromotion();
+    await expect(
+      f.ipc.createFromDraft(f.first.event, f.draftId, "full_access")
+    ).rejects.toThrow("native_chat_selection_invalid");
+    expect(f.create).not.toHaveBeenCalled();
+    await f.ipc.createFromDraft(f.first.event, f.draftId, true);
+    expect(f.readPermission).not.toHaveBeenCalled();
+    f.readPermission.mockResolvedValueOnce({
+      ...f.permission,
+      available: ["restricted", "full_access"],
+    });
+    await f.ipc.createFromDraft(f.first.event, f.draftId);
+    f.readPermission.mockResolvedValueOnce({ ...f.permission, revision: 2 });
+    await f.ipc.createFromDraft(f.first.event, f.draftId);
+    expect(f.changePermission).not.toHaveBeenCalled();
+  });
+
+  it("keeps an unverified creation retry on the same permission operation", async () => {
+    const f = draftPromotion();
+    const missing = new Error("native_agent_request_timeout");
+    f.changePermission.mockRejectedValueOnce(missing);
+    await expect(
+      f.ipc.createFromDraft(f.first.event, f.draftId)
+    ).rejects.toThrow(missing);
+    expect(f.selections.finishCreation).not.toHaveBeenCalled();
+    f.changePermission.mockRejectedValueOnce(missing);
+    f.readPermission
+      .mockResolvedValueOnce(f.permission)
+      .mockResolvedValueOnce(f.auto);
+    await expect(
+      f.ipc.createFromDraft(f.first.event, f.draftId)
+    ).resolves.toMatchObject({ sessionId: f.creation.sessionId });
+    expect(f.changePermission.mock.calls).toEqual([
+      [{ id: f.creation.sessionId }, 0, f.creation.requestId, "approve_for_me"],
+      [{ id: f.creation.sessionId }, 0, f.creation.requestId, "approve_for_me"],
+    ]);
+    expect(f.selections.finishCreation).toHaveBeenCalledOnce();
+  });
+
+  it.each([false, true])(
+    "keeps Ask on the same unresolved promotion when Auto commits first: %s",
+    async (autoCommitted) => {
+      const f = draftPromotion();
+      const missing = new Error("native_agent_request_timeout");
+      f.changePermission.mockRejectedValueOnce(missing);
+      await expect(
+        f.ipc.createFromDraft(f.first.event, f.draftId)
+      ).rejects.toThrow(missing);
+      vi.mocked(f.selections.prepareCreation).mockResolvedValueOnce({
+        ...f.creation,
+        initialPermissionMode: "restricted",
+      });
+      const revision = autoCommitted ? 1 : 0;
+      if (autoCommitted) {
+        f.changePermission.mockRejectedValueOnce(
+          new Error("permission_mode_revision_changed")
+        );
+        f.readPermission
+          .mockResolvedValueOnce(f.permission)
+          .mockResolvedValueOnce(f.auto);
+      }
+      f.changePermission.mockResolvedValueOnce({
+        ...f.permission,
+        revision: revision + 1,
+      });
+      await expect(
+        f.ipc.createFromDraft(f.first.event, f.draftId, true)
+      ).resolves.toMatchObject({
+        sessionId: f.creation.sessionId,
+        firstInputId: f.creation.firstInputId,
+      });
+      expect(f.changePermission.mock.calls[1]).toEqual([
+        { id: f.creation.sessionId },
+        0,
+        `manual/${f.creation.requestId}/0`,
+        "restricted",
+      ]);
+      expect(f.changePermission).toHaveBeenLastCalledWith(
+        { id: f.creation.sessionId },
+        revision,
+        `manual/${f.creation.requestId}/${revision}`,
+        "restricted"
+      );
+      expect(f.selections.finishCreation).toHaveBeenCalledOnce();
+    }
+  );
+
+  it("checks the existing permission on completed promotions retried as Ask", async () => {
+    const f = draftPromotion();
+    vi.mocked(f.selections.prepareCreation).mockResolvedValue({
+      ...f.creation,
+      verifyManualApproval: true,
+    });
+    f.readPermission.mockResolvedValueOnce(f.auto);
+    await expect(
+      f.ipc.createFromDraft(f.first.event, f.draftId, true)
+    ).rejects.toThrow("native_chat_permission_mode_initial_choice_changed");
+    expect(f.selections.finishCreation).not.toHaveBeenCalled();
+    f.readPermission.mockResolvedValueOnce({ ...f.permission, revision: 2 });
+    await expect(
+      f.ipc.createFromDraft(f.first.event, f.draftId, true)
+    ).resolves.toMatchObject({ sessionId: f.creation.sessionId });
+    expect(f.changePermission).not.toHaveBeenCalled();
+  });
 
   it("keeps Standard chat available when an older attached worker lacks optional turn capabilities", async () => {
     const read = vi.fn<NativeChatSelections["read"]>(async () => state());

@@ -18,26 +18,32 @@ import {
 const PREDICTIONS = "composer-predictions-enabled";
 const MAX_BYTES = 64 * 1024;
 type Choices = Omit<DesktopPersonalizationSettings, "revision">;
+type Change = Exclude<DesktopPersonalizationChange, { webSearch: "onDemand" }>;
 const defaults: Choices = {
-  fastMode: true,
-  webSearch: "onDemand",
+  webSearch: "live",
   suggestedPrompts: false,
 };
 const denied: Choices = {
-  fastMode: false,
   webSearch: "disabled",
   suggestedPrompts: false,
 };
 
-function isSearchMode(
-  value: unknown
-): value is Exclude<Choices["webSearch"], "onDemand"> {
-  return (
-    value === "disabled" ||
-    value === "cached" ||
-    value === "indexed" ||
-    value === "live"
-  );
+function searchPreference(value: unknown): Choices["webSearch"] {
+  switch (value) {
+    case undefined:
+      return defaults.webSearch;
+    case "automatic":
+    case "live":
+      return "live";
+    // Retired policies require a new opt-in before granting automatic search.
+    case "disabled":
+    case "on_demand":
+    case "cached":
+    case "indexed":
+      return "disabled";
+    default:
+      throw new Error("personalization_config_invalid");
+  }
 }
 
 export function isPersonalizationChange(
@@ -48,9 +54,9 @@ export function isPersonalizationChange(
   if (entries.length !== 1) return false;
   const [[key, next]] = entries;
   return (
-    ((key === "suggestedPrompts" || key === "fastMode") &&
-      typeof next === "boolean") ||
-    (key === "webSearch" && (next === "onDemand" || isSearchMode(next)))
+    (key === "suggestedPrompts" && typeof next === "boolean") ||
+    (key === "webSearch" &&
+      (next === "onDemand" || next === "disabled" || next === "live"))
   );
 }
 
@@ -61,26 +67,9 @@ function source(bytes: Buffer | null) {
   const prediction = desktop?.[PREDICTIONS];
   if (prediction !== undefined && typeof prediction !== "boolean")
     throw new Error("composer_predictions_config_invalid");
-  const features = table.features;
-  if (
-    features !== undefined &&
-    (!features ||
-      typeof features !== "object" ||
-      Array.isArray(features) ||
-      features instanceof Date)
-  )
-    throw new Error("personalization_config_invalid");
-  const fast = features?.fast_mode;
-  const search = table.web_search;
-  if (
-    (fast !== undefined && typeof fast !== "boolean") ||
-    (search !== undefined && !isSearchMode(search))
-  )
-    throw new Error("personalization_config_invalid");
   const choices: Choices = {
     suggestedPrompts: prediction ?? defaults.suggestedPrompts,
-    fastMode: fast ?? defaults.fastMode,
-    webSearch: search ?? defaults.webSearch,
+    webSearch: searchPreference(table.web_search),
   };
   return {
     text,
@@ -101,40 +90,25 @@ function keyIs(key: AST.TOMLKey, ...path: string[]): boolean {
 }
 
 /** Edit one TOML assignment while preserving comments, sibling keys and inline tables. */
-function edit(
-  current: ReturnType<typeof source>,
-  change: DesktopPersonalizationChange
-): string {
+function edit(current: ReturnType<typeof source>, change: Change): string {
   const { text, table } = current;
   const body = parseTOML(text, { tomlVersion: "1.1" }).body[0].body;
   const newline = text.includes("\r\n") ? "\r\n" : "\n";
   const replace = (start: number, end: number, insertion: string) =>
     text.slice(0, start) + insertion + text.slice(end);
   if ("webSearch" in change) {
-    if (current.choices.webSearch === change.webSearch) return text;
+    const value = change.webSearch === "live" ? "automatic" : "disabled";
+    if (table.web_search === value) return text;
     const field = body.find(
       (e) => e.type === "TOMLKeyValue" && keyIs(e.key, "web_search")
     );
-    if (field?.type === "TOMLKeyValue") {
-      if (change.webSearch !== "onDemand")
-        return replace(...field.value.range, JSON.stringify(change.webSearch));
-      // Preserve an inline comment. Otherwise remove the entire assignment
-      // line, so switching back and forth never accumulates blank lines.
-      const start = text.lastIndexOf("\n", field.range[0] - 1) + 1;
-      const nextLine = text.indexOf("\n", field.range[1]);
-      const end = nextLine < 0 ? text.length : nextLine + 1;
-      return text.slice(field.range[1], end).trim()
-        ? replace(...field.range, "")
-        : replace(start, end, "");
-    }
-    return change.webSearch === "onDemand"
-      ? text
-      : `web_search = ${JSON.stringify(change.webSearch)}${newline}${text}`;
+    if (field?.type === "TOMLKeyValue")
+      return replace(...field.value.range, JSON.stringify(value));
+    return `web_search = ${JSON.stringify(value)}${newline}${text}`;
   }
-  const [section, key, value] =
-    "fastMode" in change
-      ? (["features", "fast_mode", change.fastMode] as const)
-      : (["desktop", PREDICTIONS, change.suggestedPrompts] as const);
+  const section = "desktop";
+  const key = PREDICTIONS;
+  const value = change.suggestedPrompts;
   const assignment = `${key} = ${value}`;
   for (const entry of body) {
     if (entry.type === "TOMLTable" && keyIs(entry.key, section)) {
@@ -253,17 +227,20 @@ export class DesktopPersonalization {
     return this.serialize(async () => {
       if (!isPersonalizationChange(change))
         throw new Error("personalization_preference_invalid");
+      const requested: Change =
+        "webSearch" in change && change.webSearch === "onDemand"
+          ? { webSearch: "disabled" }
+          : change;
       const { bytes: before, current } = await this.readSource();
       check();
-      const text = edit(current, change);
+      const text = edit(current, requested);
       if (current.text === text) return this.choices;
       const next = Buffer.from((current.bom ? "\uFEFF" : "") + text);
       if (next.byteLength > MAX_BYTES)
         throw new Error("personalization_config_edit_invalid");
       const updated = source(next).choices;
-      const expected = { ...current.choices, ...change };
+      const expected = { ...current.choices, ...requested };
       if (
-        updated.fastMode !== expected.fastMode ||
         updated.suggestedPrompts !== expected.suggestedPrompts ||
         updated.webSearch !== expected.webSearch
       )
@@ -329,7 +306,6 @@ export class DesktopPersonalization {
       for (const listener of this.listeners) listener(this.state);
     }
     if (
-      next.fastMode !== this.choices.fastMode ||
       next.suggestedPrompts !== this.choices.suggestedPrompts ||
       next.webSearch !== this.choices.webSearch
     ) {

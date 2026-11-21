@@ -116,7 +116,6 @@ describe("global config.toml hooks", () => {
       source + "\n[desktop]\ncomposer-predictions-enabled = true\n"
     );
     await setting.setPersonalization({ webSearch: "live" });
-    await setting.setPersonalization({ fastMode: false });
     const after = await NativeAgentHooks.open(f.home, f.otherWorkspace);
     expect(await after.inspect(active)).toEqual(await before.inspect(active));
     expect(await fs.readFile(receipt)).toEqual(trusted);

@@ -2,6 +2,7 @@ import { Skeleton } from "@app/ui/components/skeleton";
 import { cn } from "@app/ui/lib/utils";
 
 export const composerAccessLabelClassName = "hidden @[26rem]:inline";
+export const composerAccessReviewLabel = "Ask for approval";
 
 export function ComposerControlSkeleton({
   kind,
@@ -25,7 +26,7 @@ export function ComposerControlSkeleton({
           model ? "min-w-0 flex-1" : "min-w-3.5"
         )}
       >
-        {/* The hidden label reserves the same text, icon and gap as Default. */}
+        {/* Reserve the text, icon and gap for the manual review label. */}
         {!model && (
           <span
             className={cn(
@@ -33,7 +34,7 @@ export function ComposerControlSkeleton({
               composerAccessLabelClassName
             )}
           >
-            Default
+            {composerAccessReviewLabel}
           </span>
         )}
       </Skeleton>

@@ -127,18 +127,21 @@ limits; use a new message for the expanded image workflow.
 
 ### Choose a response speed
 
-In a regular workspace chat using **ChatGPT Subscription**, open the model
-picker and choose a **Speed**. Each chat starts at **Standard**. **Fast** and
-**Ultrafast** appear when the selected model and your account offer them.
-Faster speeds use more of your ChatGPT allowance. You can set effort separately.
-Turn **Fast mode** off in **Settings → Personalization** to use Standard across
-chats while keeping their saved speed choices.
+On Home or in a workspace chat using **ChatGPT Subscription**, open the model
+picker and click the lightning bolt in the upper-left corner of the effort
+panel. If you’re viewing the model list, select **Back to effort**. New chats use
+**Standard** by default. Select **Fast** or **Ultrafast** when your account
+and the selected model offer them. The lightning bolt is disabled when no
+faster speed is available. Faster speeds use more of your ChatGPT allowance.
+You can set effort separately.
 
 Grida remembers the speed for that chat, including an unsent draft. A message
 already in the queue keeps the speed and model it had when you sent it.
-If Grida can’t check available speeds, choose **Retry availability** in the
-picker or switch to **Standard**. If your subscription needs a new sign-in,
-reconnect it in Settings.
+Choosing a speed on Home applies it to the new chat that opens in the project.
+If Grida can’t check available speeds, choose **Retry availability** below the
+effort controls. If your saved speed is unavailable, select **Standard** from
+the speed menu or choose **Use Standard** if the lightning bolt is disabled.
+If your subscription needs a new sign-in, reconnect it in Settings.
 
 ## Known limits
 

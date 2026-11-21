@@ -101,6 +101,7 @@ export namespace welcome_message {
         key(workspaceId),
         JSON.stringify({
           ...settings,
+          requestId: crypto.randomUUID(),
           ...(attachment && {
             attachment: {
               token,
@@ -129,6 +130,39 @@ export namespace welcome_message {
   ): WelcomeMessage | null {
     try {
       return parse(storage?.getItem(key(workspaceId)) ?? null);
+    } catch {
+      return null;
+    }
+  }
+
+  /** Hold the identity of one handoff while its chat and selected options are prepared. */
+  export function pending(
+    workspaceId: string,
+    storage:
+      | Pick<Storage, "getItem" | "removeItem">
+      | undefined = sessionStorageOrUndefined()
+  ): Readonly<{
+    message: WelcomeMessage;
+    waiting: () => boolean;
+    take: () => WelcomeMessage | null;
+  }> | null {
+    try {
+      if (!storage) return null;
+      const raw = storage.getItem(key(workspaceId));
+      const message = parse(raw);
+      if (!message) return null;
+      const waiting = () => {
+        try {
+          return storage.getItem(key(workspaceId)) === raw;
+        } catch {
+          return false;
+        }
+      };
+      return {
+        message,
+        waiting,
+        take: () => (waiting() ? takeMessage(workspaceId, storage) : null),
+      };
     } catch {
       return null;
     }
@@ -181,10 +215,12 @@ function parse(raw: string | null): WelcomeMessage | null {
     return null;
   const {
     effort,
+    turnOptions: rawTurnOptions,
     operatingRegime,
     goal,
     preparedSessionId,
     preparedMode,
+    manualApproval,
     attachment,
     missingAttachment: missing,
   } = value as Record<string, unknown>;
@@ -195,6 +231,9 @@ function parse(raw: string | null): WelcomeMessage | null {
     )
   )
     return null;
+  const turnOptions =
+    rawTurnOptions === undefined ? undefined : parseTurnOptions(rawTurnOptions);
+  if (rawTurnOptions !== undefined && !turnOptions) return null;
   if (
     operatingRegime !== undefined &&
     operatingRegime !== "act" &&
@@ -211,6 +250,11 @@ function parse(raw: string | null): WelcomeMessage | null {
   if (
     preparedMode !== undefined &&
     (preparedMode !== "approve_for_me" || !preparedSessionId)
+  )
+    return null;
+  if (
+    manualApproval !== undefined &&
+    (manualApproval !== true || preparedSessionId)
   )
     return null;
   let resource: NativeChatInitialComposer["attachment"];
@@ -248,12 +292,43 @@ function parse(raw: string | null): WelcomeMessage | null {
     ...(effort !== undefined && {
       effort: effort as NativeChatInitialComposer["effort"],
     }),
+    ...(turnOptions && { turnOptions }),
     ...(operatingRegime !== undefined && { operatingRegime }),
     ...(goal !== undefined && { goal }),
     ...(preparedSessionId !== undefined && { preparedSessionId }),
     ...(preparedMode === "approve_for_me" && { preparedMode }),
+    ...(manualApproval === true && { manualApproval }),
     ...(resource && { attachment: resource }),
     ...(missingAttachment && { missingAttachment }),
+  };
+}
+
+function parseTurnOptions(
+  value: unknown
+): NativeChatInitialComposer["turnOptions"] {
+  if (!value || typeof value !== "object") return;
+  const { profileId, modelId, speed, webSearch } = value as Record<
+    string,
+    unknown
+  >;
+  if (
+    (profileId !== null &&
+      (typeof profileId !== "string" || !PROFILE_ID.test(profileId))) ||
+    typeof modelId !== "string" ||
+    !modelId.trim() ||
+    (speed !== undefined &&
+      speed !== "standard" &&
+      speed !== "fast" &&
+      speed !== "ultrafast") ||
+    (webSearch !== undefined && webSearch !== true) ||
+    (speed === undefined && webSearch === undefined)
+  )
+    return;
+  return {
+    profileId,
+    modelId,
+    ...(speed && { speed }),
+    ...(webSearch && { webSearch }),
   };
 }
 

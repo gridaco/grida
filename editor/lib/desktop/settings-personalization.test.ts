@@ -5,7 +5,7 @@ import type {
 } from "@grida/desktop-bridge";
 import { SettingsPersonalization } from "./settings-personalization";
 
-const defaults = { fastMode: true, webSearch: "onDemand" } as const;
+const defaults = { webSearch: "disabled" } as const;
 
 it("preserves a newer global change when a delayed read or save resolves", async () => {
   const read = Promise.withResolvers<DesktopPersonalizationSettings>();

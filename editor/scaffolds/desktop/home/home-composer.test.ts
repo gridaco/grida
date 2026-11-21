@@ -45,7 +45,187 @@ function fullAccess() {
   return { access, review, prepared };
 }
 
+const fastPreview = {
+  profileId: "a".repeat(64),
+  modelId: "gpt-6.2-sol",
+  status: "available",
+  speeds: ["fast"],
+  webSearch: true,
+} as const satisfies HomeComposer.CapabilityPreview;
+
 describe("HomeComposer", () => {
+  it("defaults new chats to Auto without preparing access on Home", async () => {
+    const { composer, host } = setup();
+    composer.connectAutomaticReview(async () => true, true);
+    await vi.waitFor(() =>
+      expect(composer.read().permissionMode).toBe("approve_for_me")
+    );
+    await composer.submit(input, host);
+    expect(vi.mocked(host.stash).mock.calls[0][1]).not.toHaveProperty(
+      "preparedSessionId"
+    );
+    expect(vi.mocked(host.stash).mock.calls[0][1]).not.toHaveProperty(
+      "manualApproval"
+    );
+  });
+
+  it("carries Ask for approval to the first chat and preserves it when Full access is canceled", async () => {
+    const { composer, host } = setup();
+    const { access } = fullAccess();
+    const destination = { workspace, defaultWorkspace: host.defaultWorkspace };
+    composer.connectAutomaticReview(async () => true, true);
+    await vi.waitFor(() =>
+      expect(composer.read().permissionMode).toBe("approve_for_me")
+    );
+    composer.selectPermissionMode("restricted", destination, access);
+    composer.selectPermissionMode("full_access", destination, access);
+    composer.answerPermissionReview(false);
+    expect(composer.read().permissionMode).toBe("restricted");
+    await composer.submit(input, host);
+    expect(host.stash).toHaveBeenCalledWith(
+      workspace.id,
+      expect.objectContaining({ manualApproval: true })
+    );
+    expect(composer.read().permissionMode).toBe("approve_for_me");
+  });
+
+  it("retries automatic review discovery after an early admission rejection", async () => {
+    const { composer } = setup();
+    const probe = vi.fn<() => Promise<boolean>>();
+    probe.mockRejectedValueOnce(new Error("forbidden"));
+    probe.mockResolvedValueOnce(true);
+    composer.connectAutomaticReview(probe);
+    await Promise.resolve();
+    expect(composer.read().automaticReviewAvailable).toBe(false);
+    composer.refreshAutomaticReview();
+    await vi.waitFor(() =>
+      expect(composer.read().automaticReviewAvailable).toBe(true)
+    );
+    expect(composer.read().permissionMode).toBe("restricted");
+  });
+
+  it("hands off the selected speed to the exact prepared chat", async () => {
+    const { composer, host } = setup();
+    const { access, review, prepared } = fullAccess();
+    composer.connectTurnCapabilities(
+      workspace.id,
+      prepared.profileId,
+      async () => fastPreview
+    );
+    await composer.refreshTurnCapabilities();
+    composer.selectSpeed("fast");
+    composer.selectPermissionMode(
+      "approve_for_me",
+      { workspace, defaultWorkspace: host.defaultWorkspace },
+      { ...access, prepareAutomatic: async () => review }
+    );
+    await vi.waitFor(() =>
+      expect(composer.read().permissionMode).toBe("approve_for_me")
+    );
+    await composer.submit({ ...input, profileId: prepared.profileId }, host);
+    expect(access.start).toHaveBeenCalledWith(review.reviewId, {
+      workspaceId: workspace.id,
+      profileId: prepared.profileId,
+      speed: "fast",
+    });
+    expect(host.stash).toHaveBeenCalledWith(
+      workspace.id,
+      expect.objectContaining({
+        preparedSessionId: prepared.sessionId,
+        turnOptions: {
+          profileId: prepared.profileId,
+          modelId: fastPreview.modelId,
+          speed: "fast",
+        },
+      })
+    );
+  });
+
+  it("ignores a stale capability read and clears speed when the intended route changes", async () => {
+    const { composer, host } = setup();
+    const read = vi
+      .fn<HomeComposer.CapabilityRead>()
+      .mockResolvedValue(fastPreview);
+    composer.connectTurnCapabilities(workspace.id, null, read);
+    await composer.refreshTurnCapabilities();
+    composer.selectSpeed("fast");
+    const stale = Promise.withResolvers<HomeComposer.CapabilityPreview>();
+    read.mockReturnValueOnce(stale.promise);
+    const previous = composer.refreshTurnCapabilities();
+    const unsupported = {
+      ...fastPreview,
+      profileId: null,
+      modelId: "local",
+      status: "unsupported",
+      speeds: [],
+      webSearch: false,
+    } as const;
+    composer.connectTurnCapabilities("default", null, async () => unsupported);
+    await composer.refreshTurnCapabilities();
+    stale.resolve(fastPreview);
+    await previous;
+    expect(composer.read()).toMatchObject({
+      turnCapabilities: unsupported,
+      speed: undefined,
+    });
+    await composer.submit({ ...input, target: null }, host);
+    expect(vi.mocked(host.stash).mock.calls[0][1]).not.toHaveProperty(
+      "turnOptions"
+    );
+  });
+
+  it("keeps the draft if the default project changes before sending chosen turn options", async () => {
+    const { composer, host } = setup();
+    composer.connectTurnCapabilities(
+      workspace.id,
+      null,
+      async () => fastPreview
+    );
+    await composer.refreshTurnCapabilities();
+    composer.selectSpeed("fast");
+    await expect(
+      composer.submit({ ...input, target: null }, host)
+    ).rejects.toThrow(
+      "Choose the message options again for this project and model."
+    );
+    expect(host.stash).not.toHaveBeenCalled();
+    expect(host.open).not.toHaveBeenCalled();
+    expect(composer.read().speed).toBe("fast");
+  });
+
+  it("stages a supported speed for the default connection", async () => {
+    const { composer, host } = setup();
+    composer.connectTurnCapabilities(
+      workspace.id,
+      null,
+      async () => fastPreview
+    );
+    await composer.refreshTurnCapabilities();
+    expect(composer.read().speed).toBeUndefined();
+    composer.selectSpeed("fast");
+    await composer.submit(input, host);
+    expect(vi.mocked(host.stash).mock.calls[0][1].turnOptions).toEqual({
+      profileId: fastPreview.profileId,
+      modelId: fastPreview.modelId,
+      speed: "fast",
+    });
+  });
+
+  it("hands off a request to search the web as an ordinary message", async () => {
+    const { composer, host } = setup();
+    composer.connectTurnCapabilities(
+      workspace.id,
+      null,
+      async () => fastPreview
+    );
+    await composer.refreshTurnCapabilities();
+    const text = "Search the web for the forecast in Seoul.";
+    await composer.submit({ ...input, text, prompt: text }, host);
+    const message = vi.mocked(host.stash).mock.calls[0][1];
+    expect(message.text).toBe(text);
+    expect(message).not.toHaveProperty("turnOptions");
+  });
+
   it("inherits saved effort without overriding the person's explicit choice", () => {
     const { composer } = setup();
     composer.initializeEffort("high");

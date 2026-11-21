@@ -161,67 +161,71 @@ it("shares one file and serialized writer between all Personalization choices", 
   const first = await owner.getPersonalization();
   expect(first).toEqual({
     revision: 0,
-    fastMode: true,
     suggestedPrompts: false,
-    webSearch: "onDemand",
+    webSearch: "live",
   });
   expect(first).toBe(owner.personalizationSnapshot);
   const prediction = owner.set(true);
-  const fast = owner.setPersonalization({ fastMode: false });
-  const search = owner.setPersonalization({ webSearch: "indexed" });
+  const search = owner.setPersonalization({ webSearch: "disabled" });
   const allowed = await prediction;
-  expect((await fast).webSearch).toBe("onDemand");
   expect(await search).toEqual({
-    revision: 3,
-    fastMode: false,
+    revision: 2,
     suggestedPrompts: true,
-    webSearch: "indexed",
+    webSearch: "disabled",
   });
+  expect(await fs.readFile(file, "utf8")).toContain('web_search = "disabled"');
   expect(owner.capture(allowed.revision)?.aborted).toBe(false);
   const reopened = new DesktopPersonalization(file);
   expect(await reopened.getPersonalization()).toMatchObject({
-    fastMode: false,
     suggestedPrompts: true,
-    webSearch: "indexed",
+    webSearch: "disabled",
   });
-  await owner.setPersonalization({ webSearch: "onDemand" });
-  expect(await fs.readFile(file, "utf8")).not.toContain("web_search");
+  await owner.setPersonalization({ webSearch: "live" });
+  expect(await fs.readFile(file, "utf8")).toContain('web_search = "automatic"');
   expect(await reopened.getPersonalization()).toMatchObject({
-    webSearch: "onDemand",
+    webSearch: "live",
   });
 });
 
-it.each(["disabled", "cached", "indexed", "live"] as const)(
-  "round trips the %s Codex mode, preserving TOML comments and neighboring keys",
-  async (webSearch) => {
+it.each([
+  ["disabled", "disabled"],
+  ["automatic", "live"],
+] as const)(
+  "writes the %s search policy, preserving TOML comments and neighboring keys",
+  async (policy, webSearch) => {
     const initial =
       '\uFEFFschema_version = 1\r\n"web_search" = "live" # permission\r\nfeatures = { sibling = true, fast_mode = false }\r\n[[hooks]]\r\nid = "review"\r\n';
     await fs.writeFile(file, initial);
     await owner.setPersonalization({ webSearch });
     expect(await fs.readFile(file, "utf8")).toBe(
-      initial.replace('"live"', JSON.stringify(webSearch))
+      initial.replace('"live"', JSON.stringify(policy))
     );
-    await owner.setPersonalization({ fastMode: true });
-    expect(await fs.readFile(file, "utf8")).toBe(
-      initial
-        .replace('"live"', JSON.stringify(webSearch))
-        .replace("fast_mode = false", "fast_mode = true")
-    );
-    await owner.setPersonalization({ webSearch: "onDemand" });
+    await owner.setPersonalization({ webSearch: "disabled" });
     expect(await owner.getPersonalization()).toMatchObject({
-      fastMode: true,
-      webSearch: "onDemand",
+      webSearch: "disabled",
     });
-    expect(await fs.readFile(file, "utf8")).toContain("# permission\r\n");
+    expect(await fs.readFile(file, "utf8")).toBe(
+      initial.replace('"live"', '"disabled"')
+    );
   }
 );
 
 it.each([
-  "web_search = true",
-  'web_search = "onDemand"',
-  'features = "off"',
-  '[features]\nfast_mode = "false"',
-])(
+  ["on_demand", "disabled"],
+  ["live", "live"],
+  ["cached", "disabled"],
+  ["indexed", "disabled"],
+] as const)(
+  "reads %s as %s without rewriting the source",
+  async (policy, webSearch) => {
+    const initial = `schema_version = 1\nweb_search = "${policy}"\n`;
+    await fs.writeFile(file, initial);
+    expect(await owner.getPersonalization()).toMatchObject({ webSearch });
+    expect(await fs.readFile(file, "utf8")).toBe(initial);
+  }
+);
+
+it.each(["web_search = true", 'web_search = "onDemand"'])(
   "fails closed on invalid personalization without replacing the hand edit",
   async (fragment) => {
     await owner.setPersonalization({ suggestedPrompts: true });
@@ -234,7 +238,6 @@ it.each([
     expect(token?.aborted).toBe(true);
     expect(owner.personalizationSnapshot).toMatchObject({
       webSearch: "disabled",
-      fastMode: false,
       suggestedPrompts: false,
     });
     await expect(
@@ -244,7 +247,25 @@ it.each([
   }
 );
 
-it("watches external search and speed edits independently of the legacy predictions listener", async () => {
+it.each([
+  'features = "off"',
+  '[features]\nfast_mode = "false"',
+  "features.fast_mode = false",
+])("ignores and preserves a retired feature key (%s)", async (fragment) => {
+  const original = `schema_version = 1\nweb_search = "automatic"\n${fragment}\n`;
+  await fs.writeFile(file, original);
+  expect(await owner.getPersonalization()).toEqual({
+    webSearch: "live",
+    suggestedPrompts: false,
+    revision: 0,
+  });
+  await owner.set(true);
+  expect(await fs.readFile(file, "utf8")).toBe(
+    original + "\n[desktop]\ncomposer-predictions-enabled = true\n"
+  );
+});
+
+it("watches external search edits independently of the legacy predictions listener", async () => {
   await owner.set(true);
   const permission = owner.capture(owner.snapshot.revision);
   const changed =
@@ -253,15 +274,21 @@ it("watches external search and speed edits independently of the legacy predicti
   const old = owner.onChange(() => {});
   old();
   try {
+    const previous = await owner.getPersonalization();
     await fs.writeFile(
       file,
-      'schema_version = 1\nweb_search = "cached"\nfeatures.fast_mode = false\ndesktop.composer-predictions-enabled = true\n'
+      'schema_version = 1\nweb_search = "automatic"\nfeatures.fast_mode = false\ndesktop.composer-predictions-enabled = true\n'
+    );
+    expect(await owner.getPersonalization()).toBe(previous);
+    expect(changed).not.toHaveBeenCalled();
+    await fs.writeFile(
+      file,
+      'schema_version = 1\nweb_search = "disabled"\nfeatures.fast_mode = false\ndesktop.composer-predictions-enabled = true\n'
     );
     await vi.waitFor(
       () =>
         expect(changed).toHaveBeenCalledWith({
-          webSearch: "cached",
-          fastMode: false,
+          webSearch: "disabled",
           suggestedPrompts: true,
           revision: 2,
         }),
@@ -273,10 +300,16 @@ it("watches external search and speed edits independently of the legacy predicti
   }
 });
 
-it("restores the original source when an added search policy returns to on demand", async () => {
+it("treats a legacy renderer's on-demand write as disabling search", async () => {
   const original = "# My config\r\nschema_version = 1\r\n";
   await fs.writeFile(file, original);
   await owner.setPersonalization({ webSearch: "live" });
-  await owner.setPersonalization({ webSearch: "onDemand" });
-  expect(await fs.readFile(file, "utf8")).toBe(original);
+  expect(
+    await owner.setPersonalization({ webSearch: "onDemand" })
+  ).toMatchObject({
+    webSearch: "disabled",
+  });
+  expect(await fs.readFile(file, "utf8")).toBe(
+    'web_search = "disabled"\r\n' + original
+  );
 });

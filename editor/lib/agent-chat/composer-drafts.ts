@@ -28,8 +28,6 @@ import {
 export type ComposerDraftModes = Readonly<{
   plan?: true;
   goal?: true;
-  /** Selected profile/model for search, or false to skip automatic search for this message. */
-  webSearch?: string | false;
 }>;
 
 export type ComposerDraftAttachment =
@@ -161,7 +159,6 @@ export class ComposerDrafts {
         this.read(target) !== null ||
         modes.plan ||
         modes.goal ||
-        modes.webSearch !== undefined ||
         this.readMessageContext(target) ||
         (await this.readAttachment(target)) ||
         (await this.readPending(target));
@@ -272,8 +269,6 @@ export class ComposerDrafts {
           JSON.stringify(current.messageContext)
       )
         this.writeMessageContext(key, null);
-      if (this.readModes(key).webSearch !== undefined)
-        this.writeModes(key, { ...this.readModes(key), webSearch: undefined });
       if (this.blobs) await this.blobs.delete(this.pendingKey(key));
       this.storage?.removeItem(ComposerDrafts.pendingPrefix + key);
       if (this.pending.get(key)?.inputId === inputId)
@@ -310,10 +305,6 @@ export class ComposerDrafts {
       const modes: ComposerDraftModes = {
         ...(parsed.plan === true && { plan: true }),
         ...(parsed.goal === true && { goal: true }),
-        ...((typeof parsed.webSearch === "string" ||
-          parsed.webSearch === false) && {
-          webSearch: parsed.webSearch,
-        }),
       };
       this.modes.set(key, modes);
       return modes;
@@ -326,11 +317,10 @@ export class ComposerDrafts {
     const value: ComposerDraftModes = {
       ...(modes.plan && { plan: true }),
       ...(modes.goal && { goal: true }),
-      ...(modes.webSearch !== undefined && { webSearch: modes.webSearch }),
     };
     this.modes.set(key, value);
     try {
-      if (!value.plan && !value.goal && value.webSearch === undefined)
+      if (!value.plan && !value.goal)
         this.storage?.removeItem(ComposerDrafts.modesPrefix + key);
       else
         this.storage?.setItem(
@@ -479,12 +469,7 @@ export class ComposerDrafts {
       }
       const modes = this.readModes(from);
       const target = this.readModes(to);
-      if (
-        (modes.plan || modes.goal || modes.webSearch !== undefined) &&
-        !target.plan &&
-        !target.goal &&
-        target.webSearch === undefined
-      ) {
+      if ((modes.plan || modes.goal) && !target.plan && !target.goal) {
         this.writeModes(to, modes);
         this.writeModes(from, {});
       }

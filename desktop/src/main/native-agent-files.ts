@@ -117,6 +117,7 @@ export function parseGlobalConfig(bytes: Buffer) {
           "hooks",
           "desktop",
           "web_search",
+          // Preserve the retired feature table in existing config files.
           "features",
         ].includes(key)
     ) ||

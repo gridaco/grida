@@ -116,6 +116,7 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_PROFILES: "grida:native-chat:profiles",
   NATIVE_CHAT_SELECT_PROFILE: "grida:native-chat:select-profile",
   WELCOME_CHAT_PROFILES: "grida:welcome:chat-profiles",
+  WELCOME_CHAT_TURN_CAPABILITIES: "grida:welcome:chat-turn-capabilities",
   WELCOME_CHAT_PREPARE_AUTOMATIC_REVIEW:
     "grida:welcome:chat-prepare-automatic-review",
   WELCOME_CHAT_PREPARE_FULL_ACCESS: "grida:welcome:chat-prepare-full-access",

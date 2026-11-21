@@ -903,10 +903,10 @@ pixels through this reader, with no additional filesystem or model grant.
   [physical config reads](desktop/src/main/native-agent-files.ts) and
   [prediction route resolution](desktop/src/main/native-prediction-route.ts)
   keep the user opt-in, config integrity and the authorized connection in Main.
-  Settings alone can edit global search mode, accelerated speed availability and
-  suggested prompts. Main rechecks the frame before replacing the file, serializes
-  writes across all three preferences, and checks for concurrent hand edits.
-  Invalid source revokes optional capabilities and preserves the original file.
+  Settings alone can edit global search mode and suggested prompts. Main rechecks
+  the frame before replacing the file, serializes preference writes, and checks
+  for concurrent hand edits. Invalid source revokes hosted search permission and
+  suggestions and preserves the original file.
   Turning predictions off revokes pending model lookup and provider dispatch
   for that opt-in across all Desktop windows.
   The [native prediction host](crates/grida-agent/src/host/prediction.rs)
@@ -2956,9 +2956,10 @@ trusted merely because it is “local.”
    Responses validator accepts only the supported tier values and a single
    hosted search declaration alongside local functions. Cached search forbids external access,
    indexed search requires the provider index gate and live search allows external access.
-   The credential owner enforces the current preference and then rechecks the
-   captured account immediately before each authenticated generation attempt,
-   including token-refresh retries. Standard inference needs no catalog read.
+   The credential owner enforces current hosted-search permission for requests
+   that include search and rechecks the captured account immediately before
+   each authenticated generation attempt, including token-refresh retries.
+   Standard inference without search needs no catalog read.
    The private native launch carries the opaque scope and selected model.
    Its stdio transport grants only the exact generation route and sends no
    credentials. The in-process Desktop owner exposes the OAuth ceremony as

@@ -2,7 +2,6 @@
 
 import type { ComponentProps, ReactNode } from "react";
 import {
-  GlobeIcon,
   GoalIcon,
   ImageIcon,
   LibraryIcon,
@@ -58,26 +57,6 @@ export function AgentComposer({
       disabled: actions.goal.disabled || actions.goal.active,
       onSelect: () => actions.goal?.onChange(true),
     });
-  const webSearch = actions.webSearch;
-  if (webSearch?.offered || webSearch?.unavailable)
-    menu.push({
-      id: "webSearch",
-      title: "Web search",
-      description:
-        webSearch.unavailable === "reauthenticationRequired"
-          ? "Sign in to ChatGPT again to search the web"
-          : webSearch.unavailable
-            ? "Check availability again"
-            : "Search the web for this message",
-      icon: <GlobeIcon />,
-      disabled:
-        webSearch.disabled ||
-        webSearch.unavailable === "reauthenticationRequired" ||
-        (!webSearch.unavailable && webSearch.active),
-      onSelect: webSearch.unavailable
-        ? webSearch.refresh
-        : () => webSearch.onChange(true),
-    });
   if (actions.plan && actions.plan.offered !== false)
     menu.push({
       id: "plan",
@@ -91,14 +70,6 @@ export function AgentComposer({
     });
 
   const chips: AgentComposerTools.Intent[] = [];
-  if (actions.webSearch?.active)
-    chips.push({
-      id: "webSearch",
-      label: "Web search",
-      icon: <GlobeIcon />,
-      disabled: actions.webSearch.removeDisabled,
-      onRemove: () => actions.webSearch?.onChange(false),
-    });
   if (actions.plan?.active)
     chips.push({
       id: "plan",
@@ -180,10 +151,6 @@ export namespace AgentComposer {
     image?: Action;
     library?: Action;
     plan?: Mode;
-    webSearch?: Mode & {
-      unavailable?: "unavailable" | "reauthenticationRequired";
-      refresh(): void;
-    };
     goal?: Mode;
   }>;
   export type Props = Omit<

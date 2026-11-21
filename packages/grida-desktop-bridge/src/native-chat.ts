@@ -88,6 +88,10 @@ export type NativeChatSpeed = "standard" | "fast" | "ultrafast";
 export type NativeChatTurnCapabilities =
   import("@grida/ai-host").ChatGptTurnCapabilities;
 
+/** A new chat's effective connection and model, resolved without opening it. */
+export type NativeWelcomeTurnCapabilities = NativeChatTurnCapabilities &
+  Readonly<{ profileId: string | null; modelId: string }>;
+
 /** Saved choices contain public identities only; never credentials or paths. */
 export type NativeChatSelection = Readonly<{
   profileId: string | null;
@@ -1090,6 +1094,11 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
    * workspace opens, with nothing active or saved. Listing starts nothing.
    */
   welcomeProfiles?(): Promise<NativeChatProfileCatalog | null>;
+  /** On Welcome only: inspect a new chat's selected route without opening it. */
+  welcomeTurnCapabilities?(
+    workspaceId: string,
+    profileId: string | null
+  ): Promise<NativeWelcomeTurnCapabilities | null>;
   /** The review survives same-document Welcome navigation changing only the preset. */
   readonly welcomeFullAccessAcrossPresets?: true;
   /** Reserve automatic review for a new project chat on Welcome. */
@@ -1109,6 +1118,7 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
       workspaceId: string;
       profileId: string | null;
       effort?: NativeChatEffort;
+      speed?: NativeChatSpeed;
     }>
   ): Promise<Readonly<{ sessionId: string; profileId: string | null }>>;
   /** Inspect reviewed definitions and retained results without running handlers. */
@@ -1119,6 +1129,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   selectProfile?(selection: NativeChatProfileSelection): Promise<void>;
   /** This native build can select a bounded automatic reviewer for workspace chat. */
   acceptsAutomaticApprovalReview?(): Promise<boolean>;
+  /** New project drafts start with automatic review when the live host supports it. */
+  readonly defaultsToAutomaticReview?: true;
   /** Whether this workspace supports native permission selection. */
   acceptsPermissionMode?(): Promise<boolean>;
   permissionMode?(attachmentId: string): Promise<NativeChatPermissionState>;
@@ -1177,7 +1189,10 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   ): Promise<boolean>;
   create(): Promise<NativeChatAttachment>;
   /** Reopening the same draft reuses its durable destination and first input. */
-  createFromDraft?(draftId: string): Promise<NativeChatDraftAttachment>;
+  createFromDraft?(
+    draftId: string,
+    manualApproval?: true
+  ): Promise<NativeChatDraftAttachment>;
   commands?(attachmentId: string): Promise<readonly NativeChatCommand[]>;
   runCommand?(
     attachmentId: string,

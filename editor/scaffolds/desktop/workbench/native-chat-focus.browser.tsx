@@ -12,6 +12,7 @@ import type {
   NativeChatMessage,
   NativeChatPage,
   NativeChatProfileCatalog,
+  NativeChatTurnCapabilities,
   NativeChatTurnRecord,
   NativeChatUpdate,
 } from "@grida/desktop-bridge";
@@ -38,7 +39,23 @@ afterEach(() => {
   for (const root of roots.splice(0)) act(() => root.unmount());
   for (const side of sides.splice(0)) side.disconnect();
   document.body.replaceChildren();
+  vi.unstubAllGlobals();
 });
+
+function enableAutomaticSearch() {
+  vi.stubGlobal("grida", {
+    protocol: DESKTOP_BRIDGE_PROTOCOL,
+    window: {},
+    personalization: {
+      get: async (): Promise<DesktopPersonalizationSettings> => ({
+        suggestedPrompts: false,
+        webSearch: "live",
+        revision: 1,
+      }),
+      onChange: () => () => {},
+    },
+  });
+}
 
 async function setup(
   overrides: Partial<DesktopNativeChat> = {},
@@ -836,9 +853,12 @@ it("shows review progress and its decision in the open chat while the turn keeps
     .toBeVisible();
 });
 
-it("selects ChatGPT speed, authorizes one search, and reopens the answer’s sources", async () => {
+it("selects ChatGPT speed, offers web search automatically, and reopens the answer’s sources", async () => {
+  enableAutomaticSearch();
   let speed: "standard" | "fast" | "ultrafast" = "standard";
   let revision = 1;
+  const savedSpeedDiscovery = Promise.withResolvers<"unavailable">();
+  const recheckSpeed = vi.fn<() => void>();
   let receive: (update: NativeChatUpdate) => void = () => {};
   let firstSession: string | undefined;
   let running = false;
@@ -896,6 +916,7 @@ it("selects ChatGPT speed, authorizes one search, and reopens the answer’s sou
   );
   const f = await setup({
     profiles: async () => ({ active: null, saved: [], choices: [] }),
+    selectProfile: vi.fn<NonNullable<DesktopNativeChat["selectProfile"]>>(),
     selection: async (target) => ({
       target,
       revision,
@@ -908,11 +929,21 @@ it("selects ChatGPT speed, authorizes one search, and reopens the answer’s sou
       },
     }),
     updateSelection: update,
-    turnCapabilities: async () => ({
-      status: "available",
-      speeds: ["fast", "ultrafast"],
-      webSearch: true,
-    }),
+    turnCapabilities: async () => {
+      if (revision === 2 && recheckSpeed.mock.calls.length === 0) {
+        recheckSpeed();
+        return {
+          status: await savedSpeedDiscovery.promise,
+          speeds: [],
+          webSearch: false,
+        };
+      }
+      return {
+        status: "available",
+        speeds: ["fast", "ultrafast"],
+        webSearch: true,
+      };
+    },
     submitInRegime: submit,
     subscribe: async (_id, listener) => {
       receive = listener;
@@ -990,24 +1021,93 @@ it("selects ChatGPT speed, authorizes one search, and reopens the answer’s sou
   await act(async () =>
     page.getByRole("combobox", { name: "Model connection" }).click()
   );
+  const picker = page.getByRole("combobox", {
+    name: /^(Model connection|Select effort)$/,
+  });
+  await expect.element(picker).not.toHaveAttribute("aria-description");
+  const speedButton = page.getByRole("button", { name: "Response speed" });
+  const fast = page.getByRole("menuitemradio", { name: /^Fast Faster/ });
+  const ultrafast = page.getByRole("menuitemradio", { name: /^Ultrafast/ });
+  await expect.element(speedButton).toBeEnabled();
+  const bolt = speedButton
+    .element()
+    .querySelector("svg path")
+    ?.getAttribute("d");
+  expect(bolt).toBeTruthy();
+  const effortPanel = page.getByTestId("native-effort-panel");
+  const triggerBounds = speedButton.element().getBoundingClientRect();
+  const panelBounds = effortPanel.element().getBoundingClientRect();
+  expect(triggerBounds.left - panelBounds.left).toBeLessThan(24);
+  expect(triggerBounds.top - panelBounds.top).toBeLessThan(24);
+  await act(async () => speedButton.click());
   await expect
-    .element(page.getByRole("button", { name: "Standard", exact: true }))
-    .toHaveAttribute("aria-pressed", "true");
-  await click("Fast");
+    .element(page.getByRole("menu", { name: "Response speed" }))
+    .toHaveAttribute("data-side", "right");
+  await expect
+    .element(page.getByRole("menuitemradio", { name: /^Standard/ }))
+    .toHaveAttribute("aria-checked", "true");
+  await expect.element(ultrafast).toBeEnabled();
+  await act(async () => fast.click());
   await expect.poll(() => speed).toBe("fast");
   await expect
-    .element(
-      page.getByText("Faster speeds use more of your ChatGPT allowance.")
-    )
-    .toBeVisible();
+    .element(picker)
+    .toHaveAttribute("aria-description", "Fast response speed");
+  expect(picker.element().querySelectorAll("svg")).toHaveLength(1);
+  expect(picker.element().querySelector("svg path")?.getAttribute("d")).toBe(
+    bolt
+  );
+  await expect.poll(() => recheckSpeed.mock.calls.length).toBeGreaterThan(0);
+  const availabilityError = page.getByText(
+    /couldn’t verify these ChatGPT options/i
+  );
+  const resetSpeed = page.getByRole("button", { name: "Use Standard" });
+  await expect.element(availabilityError).not.toBeInTheDocument();
+  await expect.element(resetSpeed).not.toBeInTheDocument();
+  await expect.element(fast).not.toBeInTheDocument();
+  await act(async () => speedButton.click());
+  await expect.element(fast).toHaveAttribute("aria-checked", "true");
   await act(async () => userEvent.keyboard("{Escape}"));
-  await click("Add to message");
+  await expect.element(fast).not.toBeInTheDocument();
+  await expect.element(speedButton).toHaveFocus();
+  await expect.element(effortPanel).toBeVisible();
+  await act(async () => savedSpeedDiscovery.resolve("unavailable"));
+  await expect.element(availabilityError).toBeVisible();
+  await expect.element(resetSpeed).toBeEnabled();
   await act(async () =>
-    page.getByRole("option", { name: /Web search/ }).click()
+    effortPanel.getByRole("button", { name: "Default model" }).click()
   );
   await expect
-    .element(page.getByRole("button", { name: "Remove web search" }))
+    .element(page.getByPlaceholder("Search all models…"))
     .toBeVisible();
+  await expect.element(speedButton).not.toBeInTheDocument();
+  await expect.element(resetSpeed).not.toBeInTheDocument();
+  await expect
+    .element(page.getByRole("button", { name: "Retry availability" }))
+    .not.toBeInTheDocument();
+  await click("Back to effort");
+  await expect.element(speedButton).toBeDisabled();
+  await click("Retry availability");
+  await expect.element(speedButton).toBeEnabled();
+  await expect.element(availabilityError).not.toBeInTheDocument();
+  await act(async () => speedButton.click());
+  await act(async () => ultrafast.click());
+  await expect.poll(() => speed).toBe("ultrafast");
+  await expect
+    .element(speedButton)
+    .toHaveAttribute("aria-description", "Ultrafast response speed");
+  const layers = speedButton.element().querySelectorAll("svg path");
+  expect(layers).toHaveLength(2);
+  const rearBolt = layers[0].getAttribute("d");
+  expect(rearBolt).toBeTruthy();
+  expect(bolt).toContain(rearBolt);
+  expect(rearBolt).not.toBe(bolt);
+  expect(layers[1].getAttribute("d")).toBe(bolt);
+  await act(async () => userEvent.keyboard("{Escape}"));
+  await expect
+    .element(picker)
+    .toHaveAttribute("aria-description", "Ultrafast response speed");
+  expect(picker.element().querySelectorAll("svg")).toHaveLength(1);
+  expect(picker.element().querySelectorAll("svg path")).toHaveLength(2);
   await act(async () => {
     await userEvent.fill(f.composer, "Find the forecast");
     f.composer.focus();
@@ -1015,9 +1115,6 @@ it("selects ChatGPT speed, authorizes one search, and reopens the answer’s sou
   });
   await expect.poll(() => submit.mock.calls.length).toBe(1);
   expect(submit.mock.calls[0]?.[10]).toBe(true);
-  await expect
-    .element(page.getByRole("button", { name: "Remove web search" }))
-    .not.toBeInTheDocument();
   const emitSearch = (outcome: "running" | "succeeded") =>
     act(async () =>
       receive({
@@ -1059,13 +1156,12 @@ it("selects ChatGPT speed, authorizes one search, and reopens the answer’s sou
     await userEvent.keyboard("{Enter}");
   });
   await expect.poll(() => submit.mock.calls.length).toBe(2);
-  expect(submit.mock.calls[1]?.[10]).toBeUndefined();
+  expect(submit.mock.calls[1]?.[10]).toBe(true);
 });
 
-it("applies Personalization changes to the composer and skips automatic search for one message", async () => {
+it("keeps automatic search out of the composer and speed independent of the search preference", async () => {
   let receive: (next: DesktopPersonalizationSettings) => void = () => {};
   const prefs = {
-    fastMode: false,
     webSearch: "live",
     suggestedPrompts: false,
     revision: 1,
@@ -1109,83 +1205,90 @@ it("applies Personalization changes to the composer and skips automatic search f
       }),
       submitInRegime: submit,
     });
-    const remove = page.getByRole("button", { name: "Remove web search" });
-    await expect.element(remove).toBeVisible();
-    await act(async () => remove.click());
+    await click("Add to message");
+    await expect
+      .element(page.getByRole("option", { name: /Plan mode/ }))
+      .toBeVisible();
+    await expect
+      .element(page.getByRole("option", { name: /Web search/i }))
+      .not.toBeInTheDocument();
+    await act(async () => userEvent.keyboard("{Escape}"));
+    await act(async () =>
+      receive({ ...prefs, revision: 2, webSearch: "disabled" })
+    );
     await act(async () => {
-      await userEvent.fill(f.composer, "Use the conversation");
+      await userEvent.fill(f.composer, "Search the web for the forecast");
       f.composer.focus();
       await userEvent.keyboard("{Enter}");
     });
     await expect.poll(() => submit.mock.calls.length).toBe(1);
     expect(submit.mock.calls[0][10]).toBeUndefined();
-    await expect.element(remove).toBeVisible();
-    await act(async () =>
-      receive({ ...prefs, revision: 2, webSearch: "disabled", fastMode: true })
-    );
-    await expect.element(remove).not.toBeInTheDocument();
     await act(async () =>
       page.getByRole("combobox", { name: "Model connection" }).click()
     );
-    await expect
-      .element(page.getByRole("button", { name: "Fast", exact: true }))
-      .toHaveAttribute("aria-pressed", "true");
-    await act(async () =>
-      receive({ ...prefs, revision: 3, webSearch: "disabled", fastMode: false })
-    );
-    await expect
-      .element(page.getByRole("button", { name: "Fast", exact: true }))
-      .not.toBeInTheDocument();
+    const speedButton = page.getByRole("button", { name: "Response speed" });
+    const fast = page.getByRole("menuitemradio", { name: /^Fast Faster/ });
+    await expect.element(speedButton).toBeEnabled();
+    await act(async () => speedButton.click());
+    await expect.element(fast).toHaveAttribute("aria-checked", "true");
   } finally {
     vi.unstubAllGlobals();
   }
 });
 
 describe("Composer control loading", () => {
-  it("retries search discovery with fast mode off without opting the message in", async () => {
-    vi.stubGlobal("grida", {
-      protocol: DESKTOP_BRIDGE_PROTOCOL,
-      personalization: {
-        get: async () => ({
-          fastMode: false,
-          webSearch: "onDemand",
-          suggestedPrompts: false,
-          revision: 1,
-        }),
-        onChange: () => () => {},
-      },
+  it("waits quietly for availability when opening a saved Fast chat", async () => {
+    const availability = Promise.withResolvers<NativeChatTurnCapabilities>();
+    const f = await setup({
+      selection: async (target) => ({
+        target,
+        revision: 1,
+        available: true,
+        selection: {
+          profileId: null,
+          modelId: "gpt-6.2-sol",
+          effort: "medium",
+          speed: "fast",
+        },
+      }),
+      turnCapabilities: () => availability.promise,
     });
-    try {
-      let available = false;
-      await setup({
-        turnCapabilities: async () => ({
-          status: available ? "available" : "unavailable",
-          speeds: [],
-          webSearch: available,
-        }),
-      });
-      await click("Add to message");
-      const retry = page.getByRole("option", {
-        name: /Web search.*Check availability again/,
-      });
-      await expect.element(retry).toBeVisible();
-      available = true;
-      await act(async () => retry.click());
-      const chip = page.getByRole("button", { name: "Remove web search" });
-      await expect.element(chip).not.toBeInTheDocument();
-      await click("Add to message");
-      await act(async () =>
-        page.getByRole("option", { name: /Web search.*Search the web/ }).click()
-      );
-      await expect.element(chip).toBeVisible();
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    await act(async () => userEvent.fill(f.composer, "Keep writing"));
+    const send = page.getByRole("button", { name: "Send", exact: true });
+    await expect.element(send).toBeDisabled();
+    await expect
+      .element(page.getByText(/couldn’t verify these ChatGPT options/i))
+      .not.toBeInTheDocument();
+
+    await act(async () =>
+      page.getByRole("combobox", { name: "Model connection" }).click()
+    );
+    const speed = page.getByRole("button", { name: "Response speed" });
+    await expect.element(speed).toBeDisabled();
+    await expect
+      .element(page.getByRole("button", { name: "Use Standard" }))
+      .not.toBeInTheDocument();
+
+    await act(async () =>
+      availability.resolve({
+        status: "available",
+        speeds: ["fast"],
+        webSearch: false,
+      })
+    );
+    await expect.element(send).toBeEnabled();
+    await expect.element(speed).toBeEnabled();
+    await act(async () => speed.click());
+    await expect
+      .element(page.getByRole("menuitemradio", { name: /^Fast Faster/ }))
+      .toHaveAttribute("aria-checked", "true");
   });
 
-  it("retries unavailable ChatGPT options, ignores a stale discovery response, and hides empty offers", async () => {
+  it("retries unavailable ChatGPT options, ignores a stale response, and disables speed on unsupported models", async () => {
+    enableAutomaticSearch();
     const pending = Promise.withResolvers<void>();
-    let mode: "unavailable" | "pending" | "offered" | "empty" = "unavailable";
+    let mode: "unavailable" | "pending" | "offered" | "unsupported" =
+      "unavailable";
     const read = vi.fn<NonNullable<DesktopNativeChat["turnCapabilities"]>>(
       async () => {
         if (mode === "unavailable")
@@ -1193,7 +1296,7 @@ describe("Composer control loading", () => {
         if (mode === "offered")
           return { status: "available", speeds: ["fast"], webSearch: true };
         if (mode === "pending") await pending.promise;
-        return { status: "available", speeds: [], webSearch: false };
+        return { status: "unsupported", speeds: [], webSearch: false };
       }
     );
     await setup({
@@ -1213,35 +1316,32 @@ describe("Composer control loading", () => {
     await expect.poll(() => read.mock.calls.length).toBeGreaterThan(initial);
     const retry = page.getByRole("button", { name: "Retry availability" });
     await expect.element(retry).toBeVisible();
-    const fast = page.getByRole("button", { name: "Fast", exact: true });
-    await expect.element(fast).not.toBeInTheDocument();
+    const speedButton = page.getByRole("button", { name: "Response speed" });
+    await expect.element(speedButton).toBeDisabled();
     mode = "offered";
     await act(async () => retry.click());
+    await expect.element(speedButton).toBeEnabled();
+    await act(async () => speedButton.click());
+    const fast = page.getByRole("menuitemradio", { name: /^Fast Faster/ });
     await expect.element(fast).toBeEnabled();
     await act(async () => pending.resolve());
     await expect.element(fast).toBeEnabled();
     await expect
-      .element(page.getByRole("button", { name: "Ultrafast", exact: true }))
-      .not.toBeInTheDocument();
+      .element(page.getByRole("menuitemradio", { name: /^Ultrafast/ }))
+      .toBeDisabled();
     await close();
-    await click("Add to message");
-    const search = page.getByRole("option", { name: /Web search/ });
-    await expect.element(search).toBeVisible();
-    await close();
+    await expect.element(speedButton).toHaveFocus();
+    await act(async () =>
+      page.getByRole("combobox", { name: "Select effort" }).click()
+    );
+    await expect.element(speedButton).not.toBeInTheDocument();
 
-    mode = "empty";
+    mode = "unsupported";
     await open();
     await expect.element(page.getByTestId("native-effort-panel")).toBeVisible();
-    await expect
-      .element(page.getByRole("group", { name: "Speed" }))
-      .not.toBeInTheDocument();
+    await expect.element(speedButton).toBeDisabled();
     await expect.element(fast).not.toBeInTheDocument();
     await close();
-    await click("Add to message");
-    await expect
-      .element(page.getByRole("option", { name: /Plan mode/ }))
-      .toBeVisible();
-    await expect.element(search).not.toBeInTheDocument();
   });
 
   it("waits for the saved selection even when the catalog has already loaded empty", async () => {
@@ -1348,7 +1448,9 @@ describe("Composer control loading", () => {
         return "subscription";
       },
     });
-    const defaultAccess = page.getByRole("button", { name: "Access: Default" });
+    const defaultAccess = page.getByRole("button", {
+      name: "Access: Ask for approval",
+    });
     const width = (element: Element) => element.getBoundingClientRect().width;
     await expect.element(defaultAccess).toBeVisible();
     const wideWidth = width(defaultAccess.element());
@@ -1364,7 +1466,7 @@ describe("Composer control loading", () => {
     f.container.style.removeProperty("width");
     expect(width(checking.element())).toBeCloseTo(wideWidth);
     await expect
-      .element(page.getByRole("button", { name: "Access: Default" }))
+      .element(page.getByRole("button", { name: "Access: Ask for approval" }))
       .not.toBeInTheDocument();
     expect(f.composer.isContentEditable).toBe(true);
     await act(async () => pending.resolve());

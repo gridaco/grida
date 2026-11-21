@@ -431,14 +431,14 @@ Unverified cleanup blocks a replacement run.
 
 ## Run a confined command
 
-Desktop workspace chats on macOS and Linux run commands in the project under
-the **Default** preset. [Understand agent permissions](./permissions.md)
+Desktop workspace chats on macOS and Linux run commands in a project sandbox
+with **Auto** or **Ask for approval**. [Understand agent permissions](./permissions.md)
 
 Headless hosts can run commands on macOS and Linux when the launcher supplies
 a reviewed permission profile and native helper. Each command runs through
 the user's shell (`sh`, `bash`, `zsh` or `dash`, otherwise `/bin/sh`) with the
-selected directory access and a separate temporary scope. Direct networking is
-denied under Default. A launcher that enables scoped approvals can admit one
+selected directory access and a separate temporary scope. The sandbox blocks
+direct networking. A launcher that enables scoped approvals can admit one
 brokered destination for a finite command after a per-action decision. Explicit
 Full access runs commands with ordinary-user filesystem and network access.
 Plan withholds command tools in every mode. [Choose Full access](./permissions.md#choose-full-access)

@@ -6,46 +6,9 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import type {
-  DesktopBridge,
-  DesktopPersonalizationSettings,
-} from "@grida/desktop-bridge";
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@app/ui/components/native-select";
+import type { DesktopBridge } from "@grida/desktop-bridge";
 import { Switch } from "@app/ui/components/switch";
 import { SettingsPersonalization } from "@/lib/desktop/settings-personalization";
-
-const searchModes = {
-  disabled: {
-    label: "Off",
-    description: "Keep web search off for all messages.",
-  },
-  onDemand: {
-    label: "On demand",
-    description:
-      "Choose Web search in the composer for the messages that need it.",
-  },
-  cached: {
-    label: "Cached",
-    description:
-      "Let the agent search pre-indexed results on supported models.",
-  },
-  indexed: {
-    label: "Indexed",
-    description:
-      "Let the agent fetch live pages when the search index allows it.",
-  },
-  live: {
-    label: "Live",
-    description:
-      "Let the agent search the live web when a message needs current information.",
-  },
-} satisfies Record<
-  DesktopPersonalizationSettings["webSearch"],
-  { label: string; description: string }
->;
 
 export function PersonalizationSettings({
   api,
@@ -106,6 +69,7 @@ function PreferenceRows({
     controller.read
   );
   const preference = state.preference;
+  const webSearch = preference?.webSearch;
   const disabled = !preference || state.saving;
   if (state.unavailable)
     return (
@@ -116,21 +80,6 @@ function PreferenceRows({
   return (
     <>
       <div className="divide-y border-y">
-        {!legacy && (
-          <PreferenceRow
-            id="fast-mode"
-            label="Fast mode"
-            description="Show faster response speeds for eligible ChatGPT subscription models. Faster speeds use more of your allowance."
-          >
-            <Switch
-              id="fast-mode"
-              aria-describedby="fast-mode-description"
-              disabled={disabled}
-              checked={preference?.fastMode ?? false}
-              onCheckedChange={(fastMode) => void controller.set({ fastMode })}
-            />
-          </PreferenceRow>
-        )}
         <PreferenceRow
           id="suggested-prompts"
           label="Suggested prompts"
@@ -150,40 +99,25 @@ function PreferenceRows({
           <PreferenceRow
             id="web-search"
             label="Web search"
-            description={
-              preference
-                ? searchModes[preference.webSearch].description
-                : "Choose when supported ChatGPT subscription models may search the web."
-            }
+            description="Let the agent search the web when it needs current information."
           >
-            <NativeSelect
+            <Switch
               id="web-search"
-              size="sm"
               aria-describedby="web-search-description"
-              value={preference?.webSearch ?? ""}
               disabled={disabled}
-              onChange={(event) => {
-                const mode = event.currentTarget
-                  .value as DesktopPersonalizationSettings["webSearch"];
-                if (Object.hasOwn(searchModes, mode))
-                  void controller.set({ webSearch: mode });
-              }}
-            >
-              {!preference && (
-                <NativeSelectOption value="">Loading…</NativeSelectOption>
-              )}
-              {Object.entries(searchModes).map(([value, mode]) => (
-                <NativeSelectOption key={value} value={value}>
-                  {mode.label}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
+              checked={webSearch === "live"}
+              onCheckedChange={(automatic) =>
+                void controller.set({
+                  webSearch: automatic ? "live" : "disabled",
+                })
+              }
+            />
           </PreferenceRow>
         )}
       </div>
       {legacy && (
         <p className="text-sm text-muted-foreground">
-          Update Desktop to configure fast mode and web search.
+          Update Desktop to configure web search.
         </p>
       )}
       {state.error && (

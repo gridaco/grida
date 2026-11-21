@@ -404,10 +404,14 @@ selected-turn offer discovery. The worker calls
 and namespaced `model`. The supervisor replies with `status`, offered accelerated
 `speeds`, and a `webSearch` boolean. Status is `available`, `unsupported`,
 `unavailable`, or `reauthenticationRequired`. The credential owner checks the
-selected subscription identity and its authenticated model listing. An optional
-`fastModeDisabled: true` selects Standard without editing the chat ledger.
-An optional `webSearchMode` of `cached` or `indexed` narrows hosted search
-for an enabled input. Older captures with search enabled use live access.
+selected subscription identity and its authenticated model listing. For
+compatibility with older supervisors, the worker accepts
+`fastModeDisabled: true` as a request to use Standard without changing the
+chat’s saved selection.
+Desktop offers live access for new inputs that permit search. The worker
+still accepts an optional `webSearchMode` of `cached` or `indexed` from older
+supervisors and preserves that restriction in accepted inputs. Search captures
+without an access mode use live access.
 
 For regular `session/submit` and `session/enqueue`, a client can send
 `_meta["co.grida/webSearch"] = true` with the selection revision to permit
@@ -1113,7 +1117,11 @@ private supervising stdio connection. It grants no authority by itself. The
 trusted launcher enables the available choices. Full access and automatic review have independent opt-ins.
 
 - `_co.grida/session/permission-mode` takes `{cwd, sessionId}` and returns
-  `{sessionId, revision, mode, available}`. An unselected chat starts at revision 0 in `restricted`. Read `available` before offering `approve_for_me` or `full_access`.
+  `{sessionId, revision, mode, available}`. An unselected chat starts at
+  revision 0 in the trusted launch's initial mode, which defaults to
+  `restricted`. Read `available` before offering `approve_for_me` or
+  `full_access`. Desktop labels these choices **Ask for approval**, **Auto**,
+  and **Full access**, respectively.
 - `_co.grida/session/permission-mode/update` takes
   `{cwd, sessionId, expectedRevision, requestId, mode}` and returns the state
   plus `requestId`. An exact retry observes the committed receipt. Conflicting

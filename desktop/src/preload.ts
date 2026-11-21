@@ -702,11 +702,12 @@ const bridge: DesktopBridge = {
       return location.href === href ? target : null;
     },
     list: (cursor) => nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_LIST, cursor),
-    ...((location.pathname === "/desktop/workspace" ||
-      location.pathname === "/desktop/welcome") && {
-      acceptsAutomaticApprovalReview: () =>
-        nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_AUTOMATIC_REVIEW),
-    }),
+    acceptsAutomaticApprovalReview: () =>
+      location.pathname === "/desktop/workspace" ||
+      location.pathname === "/desktop/welcome"
+        ? nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_AUTOMATIC_REVIEW)
+        : Promise.resolve(false),
+    defaultsToAutomaticReview: true,
     acceptsPermissionMode: () =>
       nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PERMISSION_MODE),
     permissionMode: (attachmentId) =>
@@ -739,12 +740,22 @@ const bridge: DesktopBridge = {
         operationId,
         choice
       ),
-    createFromDraft: (draftId) =>
-      nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_CREATE_FROM_DRAFT, draftId),
+    createFromDraft: (draftId, manualApproval) =>
+      nativeChatInvoke(
+        IPC_CHANNELS.NATIVE_CHAT_CREATE_FROM_DRAFT,
+        draftId,
+        ...(manualApproval === true ? [manualApproval] : [])
+      ),
     ...(!selectedDocumentChatRoute() && {
       profiles: () => nativeChatInvoke(IPC_CHANNELS.NATIVE_CHAT_PROFILES),
       welcomeProfiles: () =>
         nativeChatInvoke(IPC_CHANNELS.WELCOME_CHAT_PROFILES),
+      welcomeTurnCapabilities: (workspaceId, profileId) =>
+        nativeChatInvoke(
+          IPC_CHANNELS.WELCOME_CHAT_TURN_CAPABILITIES,
+          workspaceId,
+          profileId
+        ),
       welcomeFullAccessAcrossPresets: true as const,
       prepareWelcomeAutomaticReview: (workspaceId) =>
         nativeChatInvoke(

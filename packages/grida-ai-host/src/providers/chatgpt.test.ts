@@ -183,11 +183,10 @@ describe("ChatGptProvider", () => {
     expect(request).toHaveBeenCalledTimes(2);
   });
 
-  it("checks the current search and speed preferences again at dispatch", async () => {
+  it("checks current search permission independently of offered response speeds", async () => {
     await connection("preferences");
     const wire = "gpt-6.2-sol";
-    let webSearch: "cached" | "indexed" | "live" | "disabled" = "live";
-    let fastMode = true;
+    let webSearchAllowed = true;
     const request = vi.fn<typeof fetch>(async (_, init) =>
       init?.method === "GET"
         ? Response.json({
@@ -201,48 +200,72 @@ describe("ChatGptProvider", () => {
           })
         : completedResponse(wire)
     );
-    const bound = await runtime(request, true, async () => ({
-      webSearch,
-      fastMode,
-    })).captureNative("openai/gpt-6.2-sol");
+    const readPreferences = vi.fn<() => Promise<{ webSearchAllowed: boolean }>>(
+      async () => ({ webSearchAllowed })
+    );
+    const bound = await runtime(request, true, readPreferences).captureNative(
+      "openai/gpt-6.2-sol"
+    );
     const send = (tool: Record<string, unknown>) =>
       bound.request(
         nativeBody({ model: wire, tools: [{ type: "web_search", ...tool }] }),
         new AbortController().signal
       );
-    await expect(bound.capabilities()).resolves.toMatchObject({
+    await expect(bound.capabilities()).resolves.toEqual({
+      status: "available",
       webSearch: true,
       speeds: ["fast"],
     });
-    webSearch = "indexed";
-    await expect(send({ external_web_access: true })).rejects.toThrow(
-      "chat_turn_preference_changed"
-    );
+    const declarations = [
+      { external_web_access: true },
+      { external_web_access: false },
+      { external_web_access: true, indexed_web_access: true },
+    ];
+    for (const declaration of declarations) {
+      await expect(send(declaration)).resolves.toMatchObject({ status: 200 });
+      // Validate and forward the originally captured request before checking
+      // that a later opt-out blocks the same declaration.
+      const sent = request.mock.calls.at(-1)?.[1]?.body as ArrayBuffer;
+      expect(JSON.parse(new TextDecoder().decode(sent)).tools).toEqual([
+        { type: "web_search", ...declaration },
+      ]);
+      readPreferences
+        .mockResolvedValueOnce({ webSearchAllowed: true })
+        .mockResolvedValueOnce({ webSearchAllowed: false });
+      await expect(send(declaration)).rejects.toThrow(
+        "chat_turn_preference_changed"
+      );
+    }
+    webSearchAllowed = false;
+    const searchDisabled = {
+      status: "available",
+      webSearch: false,
+      speeds: ["fast"],
+    };
+    await expect(bound.capabilities()).resolves.toEqual(searchDisabled);
+    readPreferences.mockRejectedValueOnce(new Error("settings unavailable"));
+    await expect(bound.capabilities()).resolves.toEqual(searchDisabled);
+    for (const declaration of declarations) {
+      await expect(send(declaration)).resolves.toBeNull();
+    }
+    const signal = new AbortController().signal;
+    const searchChecks = readPreferences.mock.calls.length;
     await expect(
-      send({ external_web_access: true, indexed_web_access: true })
-    ).resolves.toMatchObject({ status: 200 });
-    webSearch = "cached";
-    await expect(
-      send({ external_web_access: true, indexed_web_access: true })
-    ).rejects.toThrow("chat_turn_preference_changed");
-    await expect(send({ external_web_access: false })).resolves.toMatchObject({
+      bound.request(
+        nativeBody({ model: wire, service_tier: "ultrafast" }),
+        signal
+      )
+    ).resolves.toBeNull();
+    const speedBody = nativeBody({ model: wire, service_tier: "priority" });
+    await expect(bound.request(speedBody, signal)).resolves.toMatchObject({
       status: 200,
     });
-    fastMode = false;
-    webSearch = "disabled";
-    await expect(bound.capabilities()).resolves.toMatchObject({
-      webSearch: false,
-      speeds: [],
-      fastModeDisabled: true,
-    });
-    await expect(send({ external_web_access: false })).resolves.toBeNull();
-    const speedBody = nativeBody({ model: wire, service_tier: "priority" });
-    await expect(
-      bound.request(speedBody, new AbortController().signal)
-    ).resolves.toBeNull();
+    expect(readPreferences).toHaveBeenCalledTimes(searchChecks);
+    const sent = request.mock.calls.at(-1)?.[1]?.body as ArrayBuffer;
+    expect(Buffer.from(sent).equals(speedBody)).toBe(true);
     expect(
       request.mock.calls.filter(([, init]) => init?.method === "POST")
-    ).toHaveLength(2);
+    ).toHaveLength(declarations.length + 1);
   });
 
   it("refuses a captured credential replaced during the dispatch preference check", async () => {
@@ -253,7 +276,7 @@ describe("ChatGptProvider", () => {
         ? Response.json({ models: [{ slug: wire, visibility: "list" }] })
         : completedResponse(wire)
     );
-    const preferences = { fastMode: true, webSearch: "live" } as const;
+    const preferences = { webSearchAllowed: true } as const;
     const readPreferences = vi.fn<() => Promise<typeof preferences>>();
     readPreferences
       .mockResolvedValueOnce(preferences)
@@ -294,8 +317,7 @@ describe("ChatGptProvider", () => {
       return new Response(null, { status: 401 });
     });
     const bound = await runtime(request, true, async () => ({
-      fastMode: true,
-      webSearch: enabled ? "live" : "disabled",
+      webSearchAllowed: enabled,
     })).captureNative("openai/gpt-6.2-sol");
     const body = nativeBody({
       model: wire,

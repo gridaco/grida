@@ -239,12 +239,13 @@ exercise selected-account discovery, persistence and actual queued execution thr
 a staged native worker. A queued search uses its accepted model, effort and speed
 after a later selection edit. The next Standard message omits both options, and
 reopening the chat restores the cited source without generating another response.
-The same worker fixtures edit the user’s global TOML, verify the exact cached
-and indexed search declarations, and restore an accelerated speed after Fast
-mode is enabled again. Credential-owner fixtures cover opting out during a
+The same worker fixtures edit the user’s global TOML and verify that a saved
+accelerated speed still reaches the provider with the retired setting present
+and hosted search turned off. They also check that older restrictive search
+settings grant no search. Credential-owner fixtures cover opting out during a
 token refresh and replacing the account during the final preference read.
 The [Personalization settings interaction](../../../editor/app/desktop/settings/_components/personalization-settings.browser.tsx)
-covers every search choice, both switches, and preference changes that arrive
+covers both switches and preference changes that arrive
 while an older read is pending.
 The [Responses adapter fixtures](../../agent-kit-providers/tests/responses.rs) cover
 mixed hosted and local tools, duplicate search evidence and safe citations.
@@ -937,10 +938,13 @@ Full access is a separate explicit execution choice, independent of automatic
 review. Restricted work must retain its original capture after a host gains
 the ability to offer Full access. A per-chat change governs later admissions.
 An active turn retains access to its own terminal after the user selects
-Default. A subsequent restricted turn cannot drive that Full-access terminal.
+**Ask for approval** or **Auto**. Only a subsequent Full-access turn can
+drive that terminal.
 The supervisor retains the ability to stop it. Reopening preserves the selection but
 does not authorize a launch that lacks Full access capability. New Desktop
-chats remain restricted. The owning headless regressions are
+project chats use sandboxed access with automatic review when supported and
+manual review otherwise. Existing chats retain their saved choice, and older
+chats without one use manual review. The owning headless regressions are
 [permission-mode process tests](../tests/process/full_access.rs): local HTTP,
 outside-project file access, restoration of restricted denial, per-chat and
 restart continuity, and actual npm acquisition with a writable external cache
@@ -960,7 +964,7 @@ platform qualification must identify which OS was actually exercised.
 | A review decision is committed just before restart                 | Restore its action binding and consumption state before dispatch |
 | An allowed network destination is used for a sensitive operation   | Product policy can still require semantic review of the action   |
 
-A user can select **Approve for me**, request an exact external file, and see
+A user can select **Auto**, request an exact external file, and see
 the file read once or the request return for manual review. Changing the file
 while a decision is pending invalidates it. Earlier instructions in the same
 chat remain relevant to later actions. A confined command retried with a
@@ -971,10 +975,10 @@ If one action needs human input, another eligible action in the same response
 can still receive its own review within the turn's allowance. A connected
 Desktop chat shows a pending review and its verdict while the turn is running.
 Manual decisions remain available across the host's command-size range.
-Withdrawing the launcher's reviewer opt-in returns new work to Default and
-preserves earlier selection receipts. Finite command cleanup remains owned
-through shutdown, and a transfer beyond the broker's byte limit reports an
-incomplete result.
+Withdrawing the launcher's reviewer opt-in returns new work to
+**Ask for approval** and preserves earlier selection receipts. Finite command
+cleanup remains owned through shutdown, and a transfer beyond the broker's byte
+limit reports an incomplete result.
 The [built-host review cases](../tests/process/approvals/reviewer.rs) exercise
 both scopes and count real command starts. The Linux qualification also
 serves a response from the approved hostname inside an isolated network

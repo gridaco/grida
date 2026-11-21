@@ -302,8 +302,7 @@ it("restricts prediction writes to the live Settings frame and broadcasts only t
 it("allows Personalization edits only from the live Settings frame", async () => {
   const state = {
     revision: 0,
-    fastMode: true,
-    webSearch: "onDemand",
+    webSearch: "disabled",
     suggestedPrompts: false,
   } as const;
   const owner = {
@@ -333,16 +332,18 @@ it("allows Personalization edits only from the live Settings frame", async () =>
   ).toThrow("denied");
   f.mainFrame.url = "https://fixture.invalid/desktop/settings";
   expect(
-    await f.hook(IPC_CHANNELS.PERSONALIZATION_SET, { webSearch: "cached" })
+    await f.hook(IPC_CHANNELS.PERSONALIZATION_SET, { webSearch: "live" })
   ).toEqual(state);
   expect(owner.setPersonalization).toHaveBeenCalledWith(
-    { webSearch: "cached" },
+    { webSearch: "live" },
     expect.any(Function)
   );
   for (const invalid of [
-    { fastMode: 1 },
+    { fastMode: false },
+    { webSearch: "cached" },
+    { webSearch: "indexed" },
     { webSearch: "online" },
-    { suggestedPrompts: true, fastMode: true },
+    { suggestedPrompts: true, webSearch: "live" },
     null,
   ]) {
     expect(() => f.hook(IPC_CHANNELS.PERSONALIZATION_SET, invalid)).toThrow(
@@ -355,7 +356,7 @@ it("allows Personalization edits only from the live Settings frame", async () =>
     return state;
   });
   await expect(
-    f.hook(IPC_CHANNELS.PERSONALIZATION_SET, { fastMode: false })
+    f.hook(IPC_CHANNELS.PERSONALIZATION_SET, { suggestedPrompts: true })
   ).rejects.toThrow("denied");
 });
 

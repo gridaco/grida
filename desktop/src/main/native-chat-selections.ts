@@ -353,11 +353,24 @@ export class NativeChatSelections {
     });
   }
 
+  /** Resolve a Welcome choice without creating or updating a draft. */
+  async resolveNewChatChoice(workspaceId: string, profileId: string | null) {
+    workspace(workspaceId);
+    profile(profileId);
+    const selected = await this.options.choice(workspaceId, profileId);
+    if (selected.connectionId !== profileId) throw invalid();
+    return selected;
+  }
+
   /** Persist stable creation and first-input identities before creating a session. */
   prepareNewChat(
     workspaceId: string,
     draftId: string,
-    choice: { profileId: string | null; effort: NativeChatEffort },
+    choice: {
+      profileId: string | null;
+      effort: NativeChatEffort;
+      speed?: NativeChatSpeed;
+    },
     check: () => void
   ) {
     return this.exclusive(async () => {
@@ -368,6 +381,7 @@ export class NativeChatSelections {
       const chosenEffort =
         choice.effort === "standard" ? "medium" : choice.effort;
       effort(chosenEffort);
+      if (choice.speed !== undefined) validateSpeed(choice.speed);
       await this.recoverPending();
       await this.recoverWelcomeCreations();
       this.requireReceiptCapacity();
@@ -379,16 +393,19 @@ export class NativeChatSelections {
       )
         throw new Error("native_chat_draft_limit");
       const selected = {
-        ...(await this.options.choice(workspaceId, choice.profileId)),
+        ...(await this.resolveNewChatChoice(workspaceId, choice.profileId)),
         effort: chosenEffort,
+        ...(choice.speed &&
+          choice.speed !== "standard" && {
+            speed: choice.speed,
+          }),
       };
       selection(selected);
-      if (selected.connectionId !== choice.profileId) throw invalid();
       const promotion = chatCreation(draftId);
       check();
       await this.save({
         ...this.state,
-        defaults: selected,
+        defaults: defaultPair(selected),
         drafts: {
           ...this.state.drafts,
           [draftId]: {
@@ -409,12 +426,15 @@ export class NativeChatSelections {
   prepareCreation(
     workspaceId: string,
     draftId: string,
-    check: () => void = () => {}
+    check: () => void = () => {},
+    initialApproval?: "automatic" | "manual"
   ): Promise<{
     sessionId: string;
     requestId: string;
     firstInputId: string;
     selection: Selection;
+    initialPermissionMode?: "approve_for_me" | "restricted";
+    verifyManualApproval?: true;
   }> {
     return this.exclusive(async () => {
       check();
@@ -435,16 +455,35 @@ export class NativeChatSelections {
           current.model !== draft.selection.model
         )
           throw new Error("native_chat_selection_unavailable");
-        const promotion = chatCreation(draftId);
+        const promotion = chatCreation(
+          draftId,
+          initialApproval === "automatic"
+        );
         check();
         await this.save({
           ...this.state,
           drafts: { ...this.state.drafts, [draftId]: { ...draft, promotion } },
         });
       }
+      const promotion = this.state.drafts[draftId].promotion!;
+      // Old and Manual promotions keep their original IDs. An Auto promotion
+      // binds that decision to its native creation request without changing
+      // the on-disk draft format or reinterpreting an in-flight legacy draft.
+      const automaticReview =
+        promotion.requestId === creationIdentity(draftId, "request-auto");
+      const completed = this.state.completed?.includes(draftId);
       return {
-        ...this.state.drafts[draftId].promotion!,
+        ...promotion,
         selection: { ...draft.selection },
+        ...(automaticReview &&
+          !completed && {
+            initialPermissionMode:
+              initialApproval === "manual" ? "restricted" : "approve_for_me",
+          }),
+        ...(completed &&
+          initialApproval === "manual" && {
+            verifyManualApproval: true as const,
+          }),
       };
     });
   }
@@ -934,7 +973,7 @@ function parseState(value: unknown): State {
 }
 function creationIdentity(
   draftId: string,
-  purpose: "session" | "request" | "input"
+  purpose: "session" | "request" | "request-auto" | "input"
 ): string {
   const bytes = createHash("sha256")
     .update(`grida.desktop.chat-draft.v1\0${draftId}\0${purpose}`)
@@ -945,10 +984,13 @@ function creationIdentity(
   const hex = bytes.toString("hex");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
-function chatCreation(draftId: string) {
+function chatCreation(draftId: string, automaticReview = false) {
   return {
     sessionId: creationIdentity(draftId, "session"),
-    requestId: creationIdentity(draftId, "request"),
+    requestId: creationIdentity(
+      draftId,
+      automaticReview ? "request-auto" : "request"
+    ),
     firstInputId: creationIdentity(draftId, "input"),
   };
 }

@@ -71,6 +71,7 @@ beforeEach(() => {
 it("discovers features only on the selected live subscription receipt without starting a worker", async () => {
   const f = await subscriptionDesktop();
   try {
+    await f.setSearchPolicy("automatic");
     const offers = await f.agent.welcomeProfiles();
     const sol = offers.choices.find(({ model }) => model === "GPT-6.2 Sol")!;
     const model = "openai/gpt-6.2-sol";
@@ -260,6 +261,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       };
     });
     try {
+      await fixture.setSearchPolicy("automatic");
       const profiles = await fixture.agent.welcomeProfiles();
       expect(profiles.choices.some((p) => p.connection === "OpenRouter")).toBe(
         true
@@ -370,6 +372,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
     const f = await subscriptionDesktop();
     let release: (() => void) | undefined;
     try {
+      await f.setSearchPolicy("automatic");
       const { choices } = await f.agent.welcomeProfiles();
       const sol = choices.find(
         (p) =>
@@ -591,6 +594,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
   async () => {
     const f = await subscriptionDesktop();
     try {
+      await f.setSearchPolicy("automatic");
       f.getModels.mockImplementation(
         async () => new Response(null, { status: 503 })
       );
@@ -665,18 +669,11 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
 );
 
 it.runIf(Boolean(resources) && process.platform !== "win32")(
-  "applies TOML search access to native requests and preserves a chat’s speed through a global opt-out",
+  "keeps selected Fast with a retired TOML flag and applies Web search policy separately",
   async () => {
     const f = await subscriptionDesktop();
     try {
-      const filename = f.agent.globalHooks.configPath;
-      const edit = (mode: string, fast: boolean) =>
-        fs.writeFile(
-          filename,
-          `schema_version = 1\nweb_search = "${mode}"\n[features]\nfast_mode = ${fast}\n`,
-          { mode: 0o600 }
-        );
-      await edit("cached", false);
+      await f.setSearchPolicy(undefined, false);
       const choice = (await f.agent.welcomeProfiles()).choices.find(
         (p) =>
           p.connection === "ChatGPT Subscription" && p.model === "GPT-6.2 Sol"
@@ -720,30 +717,35 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         );
         return JSON.parse(f.dispatch.mock.calls.at(-1)![0].toString());
       };
+      const searchDenied =
+        /chat_turn_options_unsupported|chat_web_search_unavailable/;
       let body = await send(true);
-      expect(body).not.toHaveProperty("service_tier");
+      expect(body.service_tier).toBe("priority");
       expect(body.tools).toContainEqual({
         type: "web_search",
-        external_web_access: false,
+        external_web_access: true,
       });
-      await edit("indexed", true);
+      await f.setSearchPolicy("automatic", false);
       body = await send(true);
       expect(body.service_tier).toBe("priority");
       expect(body.tools).toContainEqual({
         type: "web_search",
         external_web_access: true,
-        indexed_web_access: true,
       });
-      await edit("disabled", false);
-      await expect(send(true)).rejects.toThrow(
-        /chat_turn_options_unsupported|chat_web_search_unavailable/
-      );
       body = await send();
-      expect(body).not.toHaveProperty("service_tier");
+      expect(body.tools).not.toContainEqual(
+        expect.objectContaining({ type: "web_search" })
+      );
+      for (const policy of ["on_demand", "cached", "indexed", "disabled"]) {
+        await f.setSearchPolicy(policy, false);
+        await expect(send(true)).rejects.toThrow(searchDenied);
+      }
+      body = await send();
+      expect(body.service_tier).toBe("priority");
       expect(
         body.tools.every((t: { type: string }) => t.type === "function")
       ).toBe(true);
-      expect(f.dispatch).toHaveBeenCalledTimes(3);
+      expect(f.dispatch).toHaveBeenCalledTimes(4);
     } finally {
       await f.close();
     }
@@ -1253,6 +1255,18 @@ async function subscriptionDesktop() {
     accountHttp,
     get agent() {
       return agent;
+    },
+    setSearchPolicy(policy: string | undefined, legacyFastMode?: boolean) {
+      const search = policy === undefined ? "" : `web_search = "${policy}"\n`;
+      const legacy =
+        legacyFastMode === undefined
+          ? ""
+          : `[features]\nfast_mode = ${legacyFastMode}\n`;
+      return fs.writeFile(
+        agent.globalHooks.configPath,
+        `schema_version = 1\n${search}${legacy}`,
+        { mode: 0o600 }
+      );
     },
     async reopen() {
       await agent.close();

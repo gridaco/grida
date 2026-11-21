@@ -159,19 +159,20 @@ A broader retry is a distinct action with a fresh decision. Available file and n
 
 ## Presets
 
-| Preset         | Sandbox level   | Approval mode | Reviewer           | Summary                                                                         |
-| -------------- | --------------- | ------------- | ------------------ | ------------------------------------------------------------------------------- |
-| Read only      | Read-only       | On request    | Person             | Reads the project; asks to edit files or use the network.                       |
-| Default        | Workspace-write | On request    | Person             | Reads, edits and runs commands in the project; asks for network or other files. |
-| Approve for me | Workspace-write | On request    | Automatic reviewer | As Default; an automatic reviewer answers approval requests within limits.      |
-| Full access    | Full access     | Never         | —                  | No sandbox and no questions.                                                    |
+| Preset           | Sandbox level   | Approval mode | Reviewer           | Summary                                                                      |
+| ---------------- | --------------- | ------------- | ------------------ | ---------------------------------------------------------------------------- |
+| Read only        | Read-only       | On request    | Person             | Reads the project and asks to edit files or use the network.                 |
+| Ask for approval | Workspace-write | On request    | Person             | Runs within the project and asks the person to approve extra access.         |
+| Auto             | Workspace-write | On request    | Automatic reviewer | Runs within the project and delegates eligible requests to a bounded review. |
+| Full access      | Full access     | Never         | —                  | No sandbox and no questions.                                                 |
 
-**Default is the default** for a project the person opened. Models handle
-editing and running commands inside a project well, and asking for each step
-costs more attention than it protects. A project the person has not marked as
-trusted starts as Read only.
+New Desktop project chats start in **Auto** when the host supports it and
+**Ask for approval** otherwise. A prior chat retains its saved selection.
+An older chat without a saved selection starts in **Ask for approval**.
+Project reads, edits, and confined commands can run without a review in
+either mode. A project awaiting trust starts as Read only.
 
-Selecting **Approve for me** delegates individual decisions within the same
+**Auto** delegates individual decisions within the same
 workspace sandbox. The reviewer can decide an outside-file read explicitly
 named by the person, or a supported finite command with its exact executable,
 arguments, working directory, filesystem scope and optional destination.
@@ -209,7 +210,7 @@ remain recoverable without new model work.
 
 ## Conformance scenarios
 
-| Situation                                            | Default preset                                      |
+| Situation                                            | Ask for approval                                    |
 | ---------------------------------------------------- | --------------------------------------------------- |
 | Edit a file in the project                           | Runs.                                               |
 | Initialize a repository in a project without one     | Runs, confined.                                     |

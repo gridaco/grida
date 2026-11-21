@@ -54,13 +54,8 @@ export type ChatGptProviderRuntime = Readonly<{
   config: ChatGptProviderConfig;
   credentials: ChatGptCredentialManager;
   catalog?: ChatGptModels;
-  /** The host owns the preference and rereads it at dispatch, including authentication retries. */
-  turnPreferences?: () => Promise<
-    Readonly<{
-      fastMode: boolean;
-      webSearch: "disabled" | "onDemand" | "cached" | "indexed" | "live";
-    }>
-  >;
+  /** Search permission is checked again before dispatch, including authentication retries. */
+  turnPreferences?: () => Promise<Readonly<{ webSearchAllowed: boolean }>>;
 }>;
 
 export type NativeChatGptConnection = Readonly<{
@@ -194,23 +189,18 @@ export namespace ChatGptProvider {
         );
       }
     };
+    const searchAllowed = async (): Promise<boolean> => {
+      if (!runtime.turnPreferences) return true;
+      try {
+        return (await runtime.turnPreferences()).webSearchAllowed === true;
+      } catch {
+        return false;
+      }
+    };
     const capabilities = async (): Promise<ChatGptTurnCapabilities> => {
-      const prefs = await runtime.turnPreferences?.();
-      if (!prefs) return catalogOffer();
-      if (!prefs.fastMode && prefs.webSearch === "disabled")
-        return {
-          ...noSubscriptionFeatures("unsupported"),
-          fastModeDisabled: true,
-        };
+      const webSearchAllowed = await searchAllowed();
       const offer = await catalogOffer();
-      return {
-        ...offer,
-        ...(!prefs.fastMode && { speeds: [], fastModeDisabled: true as const }),
-        webSearch: offer.webSearch && prefs.webSearch !== "disabled",
-        ...((prefs.webSearch === "cached" || prefs.webSearch === "indexed") && {
-          webSearchMode: prefs.webSearch,
-        }),
-      };
+      return webSearchAllowed ? offer : { ...offer, webSearch: false };
     };
     return Object.freeze({
       scope,
@@ -233,7 +223,9 @@ export namespace ChatGptProvider {
         const options = nativeOptions(bytes, wireModel);
         if (!options) return null;
         if (options.speed || options.webSearch) {
-          const offer = await capabilities();
+          const offer = options.webSearch
+            ? await capabilities()
+            : await catalogOffer();
           if (
             offer.status !== "available" ||
             (options.speed && !offer.speeds.includes(options.speed)) ||
@@ -257,22 +249,8 @@ export namespace ChatGptProvider {
             connection.access,
             async (credential) => {
               signal.throwIfAborted();
-              if (
-                runtime.turnPreferences &&
-                (options.speed || options.webSearch)
-              ) {
-                const prefs = await runtime.turnPreferences();
-                if (
-                  (options.speed && !prefs.fastMode) ||
-                  (options.webSearch &&
-                    (prefs.webSearch === "disabled" ||
-                      (prefs.webSearch === "cached" &&
-                        options.webSearch !== "cached") ||
-                      (prefs.webSearch === "indexed" &&
-                        options.webSearch === "live")))
-                )
-                  throw new Error("chat_turn_preference_changed");
-              }
+              if (options.webSearch && !(await searchAllowed()))
+                throw new Error("chat_turn_preference_changed");
               await connection.validate();
               signal.throwIfAborted();
               return await requestWithCredential(
@@ -321,7 +299,7 @@ function nativeOptions(
 ):
   | {
       speed?: "fast" | "ultrafast";
-      webSearch?: "cached" | "indexed" | "live";
+      webSearch: boolean;
     }
   | undefined {
   let body: Record<string, unknown>;
@@ -369,7 +347,7 @@ function nativeOptions(
     )
   )
     return;
-  let webSearch: "cached" | "indexed" | "live" | undefined;
+  let webSearch = false;
   for (const tool of body.tools ?? []) {
     if (!tool || typeof tool !== "object" || Array.isArray(tool)) return;
     if (tool.type === "function") continue;
@@ -382,11 +360,8 @@ function nativeOptions(
       webSearch
     )
       return;
-    webSearch = !tool.external_web_access
-      ? "cached"
-      : tool.indexed_web_access
-        ? "indexed"
-        : "live";
+    // Retained native inputs can still carry an exact legacy search declaration.
+    webSearch = true;
   }
   return {
     speed: body.service_tier === "priority" ? "fast" : body.service_tier,

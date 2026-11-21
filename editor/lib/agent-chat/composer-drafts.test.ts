@@ -287,16 +287,16 @@ describe("durable pending composer sends", () => {
   });
 
   it.each([JSON.stringify(["profile", "model"]), false] as const)(
-    "keeps the draft search choice %j through promotion and restart until its exact receipt arrives",
+    "ignores the former draft search choice %j while retaining the frozen submission",
     async (webSearch) => {
       const storage = new MemoryStorage(),
         blobs = new MemoryBlobs();
       const drafts = new ComposerDrafts(storage, blobs);
-      const modes = {
-        plan: true,
-        webSearch,
-      } as const;
-      drafts.writeModes("w:new", modes);
+      storage.setItem(
+        ComposerDrafts.modesPrefix + "w:new",
+        JSON.stringify({ plan: true, webSearch })
+      );
+      expect(drafts.readModes("w:new")).toEqual({ plan: true });
       const submission = {
         ...pending,
         ...(webSearch && { webSearch: true as const }),
@@ -305,10 +305,10 @@ describe("durable pending composer sends", () => {
       await drafts.move("w:new", "w:created");
       const reopened = new ComposerDrafts(storage, blobs);
       expect(reopened.readModes("w:another")).toEqual({});
-      expect(reopened.readModes("w:created")).toEqual(modes);
+      expect(reopened.readModes("w:created")).toEqual({ plan: true });
       expect(await reopened.readPending("w:created")).toEqual(submission);
       await reopened.completePending("w:created", "unrelated");
-      expect(reopened.readModes("w:created")).toEqual(modes);
+      expect(reopened.readModes("w:created")).toEqual({ plan: true });
       await reopened.completePending("w:created", submission.inputId);
       expect(new ComposerDrafts(storage, blobs).readModes("w:created")).toEqual(
         {

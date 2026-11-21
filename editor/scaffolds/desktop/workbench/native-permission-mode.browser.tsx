@@ -1,4 +1,4 @@
-import { act, useSyncExternalStore } from "react";
+import { act, useEffect, useSyncExternalStore } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
@@ -168,7 +168,7 @@ async function click(name: string | RegExp) {
 }
 
 async function openReview() {
-  await click("Access: Default");
+  await click("Access: Ask for approval");
   await click(/^Full access/);
   await expect.element(page.getByRole("alertdialog")).toBeVisible();
   await expect
@@ -184,7 +184,7 @@ async function openReview() {
     .not.toBeInTheDocument();
 }
 
-it("opens the Home dialog on selection before Desktop answers and sends without a second prompt", async () => {
+it("retries Home approval discovery on open and confirms Full access once before sending", async () => {
   (
     globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
   ).IS_REACT_ACT_ENVIRONMENT = true;
@@ -195,8 +195,13 @@ it("opens the Home dialog on selection before Desktop answers and sends without 
     Promise.withResolvers<
       Awaited<ReturnType<HomeComposer.AccessHost["prepare"]>>
     >();
+  const approvalAvailability = Promise.withResolvers<boolean>();
+  const probe = vi.fn<() => Promise<boolean>>(async () => true);
+  probe.mockRejectedValueOnce(new Error("Home admission pending"));
+  probe.mockReturnValueOnce(approvalAvailability.promise);
   const access = {
     prepare: () => pending.promise,
+    prepareAutomatic: () => pending.promise,
     answer: vi.fn<HomeComposer.AccessHost["answer"]>(async () => {}),
     start: vi.fn<HomeComposer.AccessHost["start"]>(async () => ({
       sessionId: CHAT,
@@ -210,6 +215,7 @@ it("opens the Home dialog on selection before Desktop answers and sends without 
   } satisfies HomeComposer.Host;
   function Home() {
     const view = useSyncExternalStore(composer.subscribe, composer.read);
+    useEffect(() => composer.connectAutomaticReview(probe), []);
     return (
       <section aria-label="Home" className="mx-auto mt-64 max-w-lg">
         <AgentComposerInput
@@ -237,8 +243,10 @@ it("opens the Home dialog on selection before Desktop answers and sends without 
               access={{
                 mode: view.permissionMode,
                 available: true,
+                automaticReview: view.automaticReviewAvailable,
                 staged: true,
                 busy: view.busy || view.permissionBusy,
+                onOpen: composer.refreshAutomaticReview,
                 onChange: (mode) =>
                   composer.selectPermissionMode(
                     mode,
@@ -261,11 +269,17 @@ it("opens the Home dialog on selection before Desktop answers and sends without 
   const root = createRoot(container);
   resources.push({ root });
   await act(async () => root.render(<Home />));
+  expect(probe).toHaveBeenCalledTimes(1);
   const input = container.querySelector<HTMLElement>(
     '[contenteditable="true"]'
   )!;
   await act(async () => userEvent.fill(input, "First message"));
-  await click("Access: Default");
+  await click("Access: Ask for approval");
+  expect(probe).toHaveBeenCalledTimes(2);
+  const approve = page.getByRole("button", { name: /^Auto\b/ });
+  await expect.element(approve).not.toBeInTheDocument();
+  await act(async () => approvalAvailability.resolve(true));
+  await expect.element(approve).toBeEnabled();
   await click(/^Full access/);
   const dialog = page.getByRole("alertdialog");
   await expect.element(dialog).toHaveAccessibleName("Enable Full access?");
@@ -288,7 +302,7 @@ it("opens the Home dialog on selection before Desktop answers and sends without 
     })
   );
   expect(access.answer).toHaveBeenCalledExactlyOnceWith("review-token", false);
-  await click("Access: Default");
+  await click("Access: Ask for approval");
   await click(/^Full access/);
   await expect.element(dialog).toBeVisible();
   await click("Enable Full access");
@@ -375,7 +389,7 @@ it("keeps the picker closed through compact confirmation, cancellation and exact
 it("closes the picker immediately before a delayed Full access review and changes nothing yet", async () => {
   const held = Promise.withResolvers<void>();
   const f = await setup(false, { holdReview: held.promise });
-  await click("Access: Default");
+  await click("Access: Ask for approval");
   await click(/^Full access/);
   await expect
     .element(page.getByText("Access for new messages"))
@@ -388,7 +402,7 @@ it("closes the picker immediately before a delayed Full access review and change
   await click("Cancel");
 });
 
-it("closes the picker when Default is selected and needs no warning confirmation", async () => {
+it("closes the picker when Ask for approval is selected and needs no warning confirmation", async () => {
   const f = await setup();
   await openReview();
   await click("Enable Full access");
@@ -396,7 +410,7 @@ it("closes the picker when Default is selected and needs no warning confirmation
     .poll(() => f.controller.read().permissionMode?.mode)
     .toBe("full_access");
   await click("Access: Full access");
-  await click(/^Default/);
+  await click(/^Ask for approval/);
   await expect
     .element(page.getByText("Access for new messages"))
     .not.toBeInTheDocument();
@@ -465,10 +479,10 @@ it("selects automatic review for this chat when the host advertises it", async (
   const { bridge, setPermissionMode } = await setup(false, {
     automaticReview: true,
   });
-  await click("Access: Default");
-  await click(/^Approve for me/);
+  await click("Access: Ask for approval");
+  await click(/^Auto\b/);
   await expect
-    .element(page.getByRole("button", { name: "Access: Approve for me" }))
+    .element(page.getByRole("button", { name: "Access: Auto" }))
     .toBeVisible();
   expect(setPermissionMode).toHaveBeenCalledWith(
     CHAT,
@@ -482,16 +496,16 @@ it("selects automatic review for this chat when the host advertises it", async (
 
 it("omits automatic review on a two-mode host", async () => {
   await setup();
-  await click("Access: Default");
-  expect(
-    page.getByRole("button", { name: /^Approve for me/ }).elements()
-  ).toHaveLength(0);
+  await click("Access: Ask for approval");
+  expect(page.getByRole("button", { name: /^Auto\b/ }).elements()).toHaveLength(
+    0
+  );
 });
 
 it("keeps Full access disabled on older hosts", async () => {
   await setup(true);
   await page
-    .getByRole("button", { name: "Access: Default", exact: true })
+    .getByRole("button", { name: "Access: Ask for approval", exact: true })
     .click();
   await expect
     .element(page.getByRole("button", { name: /^Full access/ }))
