@@ -10,6 +10,9 @@ an account, or a model.
 
 ## Examples
 
+- **Question batch** opens a three-question request. Pick an option to
+  advance, skip or revisit an item, then submit on the last question.
+  **Reset** brings back the batch.
 - **Question** shows the production prompt above the composer. Select a
   choice or type a custom answer. **Streaming** replays local commentary so
   you can test typing while the transcript updates. Close the question to

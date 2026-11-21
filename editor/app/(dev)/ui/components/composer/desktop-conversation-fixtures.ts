@@ -13,6 +13,7 @@ export namespace DesktopConversationFixtures {
     | "text"
     | "question"
     | "blocking-question"
+    | "question-batch"
     | "multiple-questions"
     | "attachments"
     | "svg-selection"
@@ -133,6 +134,46 @@ export namespace DesktopConversationFixtures {
           question: "How many copies should the printer prepare?",
           options: [],
           style: "answer_dependent",
+        },
+      ],
+    },
+    {
+      id: "question-batch",
+      messages: [handoutRequest],
+      questions: [
+        {
+          questionId: "handout-batch",
+          reviewId: "handout-batch",
+          style: "answer_dependent",
+          questions: [
+            {
+              id: "format",
+              header: "Format",
+              question: question.question,
+              options: [
+                { label: "Compact", description: "One folded sheet" },
+                {
+                  label: "Large print",
+                  description: "Larger type and more space",
+                },
+              ],
+            },
+            {
+              id: "map",
+              header: "Map",
+              question: "Should the map show the accessible entrance?",
+              options: [
+                { label: "Include it" },
+                { label: "Show the tour route only" },
+              ],
+            },
+            {
+              id: "copies",
+              header: "Copies",
+              question: "How many copies should the printer prepare?",
+              options: [{ label: "50 copies" }, { label: "100 copies" }],
+            },
+          ],
         },
       ],
     },

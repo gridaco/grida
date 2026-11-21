@@ -114,13 +114,17 @@ questions also offer Skip to close the card.
 transient UI state as the collapsibles); the **committed** answer leaves through
 `onSubmit` with the React-free `QuestionSurvey`, and the surface delivers it to
 the agent. `submitDisabled` gates the submission while the surface refreshes
-the review. In a batch, Back and Next preserve each draft and stay available
-while the review refreshes. Submit confirms skipping any unanswered questions
-before sending the batch. An optional batch can be submitted from any step.
-Within the card, keys 1–9 select numbered choices. Enter on a choice or in the
-custom field invokes Next or Submit. Shift+Enter inserts a line break in the
-custom field. The kit never touches the transport. A native reply displays the
-host-attributed question above the person's answer in one bubble. The finished turn's **Worked**
+the review. In a batch, the arrows in the question counter stay available
+while the review refreshes. Next preserves an answer or skips a blank question.
+Skip clears the current answer and moves forward when possible. On the last
+question, Submit, Skip, and double-clicking a choice all request submission.
+The card asks for confirmation if any questions are still unanswered.
+Picking a single choice advances to the next question when there is one.
+Keys 1–9 activate numbered choices. In a batch write-in, Enter advances from
+an earlier question and adds a line on the last question. Shift+Enter adds a
+line in any write-in. The kit never touches the transport. A native reply
+displays the host-attributed question above the person's answer in one bubble.
+The finished turn's **Worked**
 disclosure contains the reply. Survey-shaped tool outputs keep their
 read-only `AnsweredQuestionSummary`.
 

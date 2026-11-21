@@ -9,6 +9,14 @@ export default function ComposerPage() {
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-12 px-4 py-8 sm:px-6">
       <h1 className="text-2xl font-semibold">Composer playground</h1>
+      <Example id="question-batch" title="Question batch">
+        <p className="text-sm text-muted-foreground">
+          Pick an option to advance. Use the arrows to revisit questions. On the
+          last question, select Submit, double-click an option, or choose Skip
+          to submit without a final answer.
+        </p>
+        <DesktopComposerDemo scenario="question-batch" />
+      </Example>
       <Example id="question" title="Question">
         <DesktopComposerDemo scenario="question" />
       </Example>

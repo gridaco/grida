@@ -210,14 +210,30 @@ describe("QuestionSurvey — validation & stepping", () => {
 
   it("revisits unanswered questions without changing other answers", () => {
     const last = QuestionSurvey.from(NATIVE_BATCH)
-      .next()
-      .next()
+      .goTo(2)
       .setWriteIn(2, "A saved draft");
     expect(last.unanswered).toEqual([0, 1]);
     const first = last.goTo(last.unanswered[0]);
     expect(first.step).toBe(0);
     expect(first.next().back().step).toBe(0);
     expect(first.next().next().writeInFor(2)).toBe("A saved draft");
+  });
+
+  it("skips a blank question on Next and keeps answers when moving forward", () => {
+    const middle = QuestionSurvey.from(NATIVE_BATCH).next();
+    expect(middle.step).toBe(1);
+    expect(middle.isSkipped(0)).toBe(true);
+    expect(middle.unanswered).toEqual([1, 2]);
+
+    const last = middle.setWriteIn(1, "Gallery").next();
+    expect(last.step).toBe(2);
+    expect(last.next()).toBe(last);
+    expect(last.back().writeInFor(1)).toBe("Gallery");
+    expect(last.skipCurrent().batchAnswers()).toEqual([
+      { id: "color", answer: { kind: "skipped" } },
+      { id: "sections", answer: { kind: "text", text: "Gallery" } },
+      { id: "other", answer: { kind: "skipped" } },
+    ]);
   });
 
   it("next / back clamp to range and isLast is correct", () => {

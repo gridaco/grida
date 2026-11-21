@@ -7,7 +7,6 @@ import ComposerPage from "./page";
 import { DesktopComposerDemo } from "./desktop-demo";
 import { DesktopComposerFixtures as fixtures } from "./desktop-fixtures";
 import { AgentComposerInput } from "@/scaffolds/desktop/shared/agent-composer-input";
-import { QuestionPrompt } from "@/kits/agent-chat";
 
 // These examples exercise Desktop layout and chat IPC with local fixtures.
 vi.mock("@/app/(library)/library/attachment", () => ({
@@ -389,46 +388,68 @@ it("keeps a question write-in focused during streaming and shows the accepted an
   expect(conversation(container).textContent).toContain("Use a folded sheet");
 });
 
-it("selects numbered choices by key and advances survey questions with Enter", async () => {
-  const submit = vi.fn<(output: unknown) => void>();
-  const first = "Which format should the handout use?";
-  const last = "How many copies should the printer prepare?";
-  await mountDemo(
-    <QuestionPrompt
-      input={{
-        questions: [
-          {
-            question: first,
-            options: [{ label: "Compact" }, { label: "Large print" }],
-          },
-          { question: last },
-        ],
-      }}
-      onSubmit={(survey) => submit(survey.buildOutput())}
-    />
-  );
-  const largePrint = page.getByRole("radio", { name: "Large print" });
-  await act(async () => {
-    await page.getByRole("radio", { name: "Compact" }).click();
-    await userEvent.keyboard("2");
-  });
-  await expect.element(largePrint).toHaveFocus();
-  await expect.element(largePrint).toHaveAttribute("aria-checked", "true");
-  expect(submit).not.toHaveBeenCalled();
+it.each([
+  ["Submit", "100 copies"],
+  ["Double-click", "50 copies"],
+  ["Skip", "Skipped"],
+] as const)(
+  "submits the question batch from the final step with %s",
+  async (action, expected) => {
+    const container = await mountConversationDemo({
+      scenario: "question-batch",
+    });
+    const status = (step: number) =>
+      page.getByText(`${step} of 3`, { exact: true });
+    await expect.element(status(1)).toBeVisible();
+    await expect
+      .element(page.getByText("Format", { exact: true }))
+      .not.toBeInTheDocument();
+    await act(async () =>
+      page.getByRole("button", { name: /Compact/ }).click()
+    );
+    await expect.element(status(2)).toBeVisible();
+    await expect
+      .element(page.getByText("Map", { exact: true }))
+      .not.toBeInTheDocument();
 
-  await act(async () => userEvent.keyboard("{Enter}"));
-  await expect.element(page.getByRole("group", { name: last })).toHaveFocus();
-  const writeIn = page.getByRole("textbox", { name: last });
-  await act(async () => {
-    await writeIn.click();
-    await userEvent.keyboard("12");
-  });
-  await expect.element(writeIn).toHaveValue("12");
-  await act(async () => userEvent.keyboard("{Enter}"));
-  expect(submit).toHaveBeenCalledExactlyOnceWith({
-    answers: [["Large print"], ["12"]],
-  });
-});
+    await clickButton("Previous question");
+    await expect.element(status(1)).toBeVisible();
+    await act(async () => userEvent.keyboard("2"));
+    await expect.element(status(2)).toBeVisible();
+    await clickButton("Skip");
+    await expect.element(status(3)).toBeVisible();
+    await expect
+      .element(page.getByText("Copies", { exact: true }))
+      .not.toBeInTheDocument();
+
+    const copies = page.getByRole("radio", { name: "100 copies" });
+    await act(async () => copies.click());
+    await expect.element(copies).toHaveAttribute("aria-checked", "true");
+    await expect.element(status(3)).toBeVisible();
+    if (action === "Double-click") {
+      await act(async () =>
+        page.getByRole("radio", { name: "50 copies" }).dblClick()
+      );
+    } else {
+      await clickButton(action);
+    }
+    await expect
+      .element(page.getByText("I’ll use your answers to prepare the handout."))
+      .toBeVisible();
+    await expect.element(status(3)).not.toBeInTheDocument();
+    await act(async () => page.getByRole("button", { name: /Worked/ }).click());
+    const replies = [...conversation(container).querySelectorAll("blockquote")];
+    const answerTo = (question: string) =>
+      replies.find((reply) => reply.textContent === question)?.parentElement
+        ?.textContent;
+    expect(answerTo("Which format should the handout use?")).toContain(
+      "Large print"
+    );
+    expect(answerTo("How many copies should the printer prepare?")).toContain(
+      expected
+    );
+  }
+);
 
 async function clickButton(name: string) {
   await act(async () =>

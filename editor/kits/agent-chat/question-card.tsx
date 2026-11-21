@@ -22,7 +22,13 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { getToolName } from "ai";
-import { MessageCircleQuestionIcon, PencilIcon, XIcon } from "lucide-react";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  MessageCircleQuestionIcon,
+  PencilIcon,
+  XIcon,
+} from "lucide-react";
 import { RadioGroup } from "radix-ui";
 import { cn } from "@app/ui/lib/utils";
 import { Button } from "@app/ui/components/button";
@@ -153,15 +159,22 @@ export function QuestionPrompt({
     restoreFocus.current = true;
     setSurvey(next);
   };
-  // The single-question card preserves its separate skip shortcut.
-  const onSkip = () => {
-    if (dismissal) return changeClosed(true);
-    finalize(survey.skipCurrent());
-  };
-  const requestSubmit = () => {
-    if (!canSubmit) return;
-    if (survey.canSubmit) finalize(survey);
+  const requestSubmit = (answers = survey) => {
+    if (busy || (!answers.multiStep && !answers.canSubmit)) return;
+    setSurvey(answers);
+    if (answers.canSubmit) finalize(answers);
     else setConfirmingSkips(true);
+  };
+  const onSkip = () => {
+    if (survey.multiStep) {
+      const skipped = survey.skipCurrent();
+      if (hasNext) showStep(skipped.next());
+      else requestSubmit(skipped);
+    } else if (dismissal) {
+      changeClosed(true);
+    } else {
+      finalize(survey.skipCurrent());
+    }
   };
   const advance = () => {
     if (submitted) return;
@@ -222,7 +235,7 @@ export function QuestionPrompt({
     );
   }
 
-  // Radix prevents Enter on radio items, so handle submission in capture.
+  // Radix prevents Enter on radio items and checkboxes.
   const handleChoiceKey = (event: KeyboardEvent<HTMLDivElement>) => {
     const { key, target } = event;
     if (
@@ -240,21 +253,23 @@ export function QuestionPrompt({
       return;
     }
 
-    if (
-      key === "Enter" &&
-      target.closest('[role="radio"], [role="checkbox"]')
-    ) {
+    const focusedChoice = target.closest<HTMLButtonElement>(
+      '[role="radio"], [role="checkbox"]'
+    );
+    if (key === "Enter" && focusedChoice) {
       event.preventDefault();
       event.stopPropagation();
-      if (!event.repeat) advance();
+      if (!event.repeat) {
+        if (survey.multiStep && !hasNext) focusedChoice.click();
+        else advance();
+      }
       return;
     }
 
     if (q.multi_select || !/^[1-9]$/.test(key)) return;
-    const option =
-      event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]')[
-        Number(key) - 1
-      ];
+    const option = event.currentTarget.querySelectorAll<HTMLButtonElement>(
+      "[data-question-choice]"
+    )[Number(key) - 1];
     if (!option) return;
     event.preventDefault();
     event.stopPropagation();
@@ -263,6 +278,66 @@ export function QuestionPrompt({
       option.click();
     }
   };
+
+  const singleChoices =
+    !q.multi_select &&
+    options.map((opt, index) => {
+      const selected = survey.pickedFor(qi)[0] === opt.label;
+      const props = {
+        "aria-keyshortcuts": index < 9 ? String(index + 1) : undefined,
+        "data-question-choice": "",
+        className: cn(
+          "w-full text-start outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+          optionRowClassName(selected, submitted)
+        ),
+      };
+      const label = (
+        <>
+          <span
+            aria-hidden
+            className={cn(
+              "grid h-5 min-w-5 shrink-0 place-items-center rounded-sm border bg-muted px-1 leading-none text-muted-foreground tabular-nums",
+              selected && "border-primary bg-primary text-primary-foreground"
+            )}
+          >
+            {index + 1}
+          </span>
+          <span className="flex min-w-0 flex-col wrap-anywhere">
+            <span>{opt.label}</span>
+            {opt.description && (
+              <span className="text-muted-foreground">{opt.description}</span>
+            )}
+          </span>
+        </>
+      );
+
+      // These choices are actions. Moving keyboard focus to one must not advance.
+      return hasNext ? (
+        <button
+          {...props}
+          key={index}
+          type="button"
+          disabled={submitted}
+          aria-pressed={selected}
+          onClick={() => showStep(survey.togglePick(qi, opt.label).next())}
+        >
+          {label}
+        </button>
+      ) : (
+        <RadioGroup.Item
+          {...props}
+          key={index}
+          value={opt.label}
+          onDoubleClick={
+            survey.multiStep
+              ? () => requestSubmit(survey.togglePick(qi, opt.label))
+              : undefined
+          }
+        >
+          {label}
+        </RadioGroup.Item>
+      );
+    });
 
   return (
     <AgentPromptCard
@@ -286,14 +361,48 @@ export function QuestionPrompt({
       }}
     >
       <div className="flex min-h-6 items-center gap-2 px-2 text-muted-foreground">
-        <MessageCircleQuestionIcon className="size-4" />
-        Question
+        {survey.multiStep ? (
+          <div
+            role="group"
+            aria-label="Question navigation"
+            className="ms-auto flex items-center gap-1"
+          >
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Previous question"
+              disabled={submitted || survey.step === 0}
+              onClick={() => showStep(survey.back())}
+            >
+              <ChevronLeftIcon aria-hidden />
+            </Button>
+            <span className="tabular-nums">
+              {survey.step + 1} of {survey.count}
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Next question"
+              disabled={submitted || !hasNext}
+              onClick={advance}
+            >
+              <ChevronRightIcon aria-hidden />
+            </Button>
+          </div>
+        ) : (
+          <>
+            <MessageCircleQuestionIcon className="size-4" />
+            Question
+          </>
+        )}
         {dismissal && (
           <Button
             type="button"
             variant="ghost"
             size="icon-xs"
-            className="ms-auto"
+            className={survey.multiStep ? undefined : "ms-auto"}
             aria-label="Close question"
             disabled={submitted}
             onClick={() => changeClosed(true)}
@@ -302,68 +411,34 @@ export function QuestionPrompt({
           </Button>
         )}
       </div>
-      <div className="flex min-h-0 flex-col gap-1 overflow-y-auto px-2">
-        {(q.header || survey.multiStep) && (
-          <div className="flex items-center justify-between gap-2">
-            <span className="min-w-0 wrap-anywhere text-muted-foreground">
-              {q.header}
-            </span>
-            {survey.multiStep && (
-              <span className="shrink-0 text-muted-foreground tabular-nums">
-                Question {survey.step + 1} of {survey.count}
-              </span>
-            )}
-          </div>
-        )}
-        <p id={questionId} className="wrap-anywhere">
-          {q.question}
-        </p>
-      </div>
+      <p id={questionId} className="min-h-0 overflow-y-auto wrap-anywhere px-2">
+        {q.question}
+      </p>
 
       {hasOptions && (
         <div className="-m-1 min-h-0 overflow-y-auto p-1">
           {!q.multi_select ? (
-            <RadioGroup.Root
-              aria-labelledby={questionId}
-              value={survey.pickedFor(qi)[0] ?? ""}
-              onValueChange={(label) => setSurvey(survey.togglePick(qi, label))}
-              disabled={submitted}
-              className="grid gap-0.5"
-            >
-              {options.map((opt, oi) => {
-                const selected = survey.pickedFor(qi)[0] === opt.label;
-                return (
-                  <RadioGroup.Item
-                    key={oi}
-                    value={opt.label}
-                    aria-keyshortcuts={oi < 9 ? String(oi + 1) : undefined}
-                    className={cn(
-                      "w-full text-start outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
-                      optionRowClassName(selected, submitted)
-                    )}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={cn(
-                        "grid h-5 min-w-5 shrink-0 place-items-center rounded-sm border bg-muted px-1 leading-none text-muted-foreground tabular-nums",
-                        selected &&
-                          "border-primary bg-primary text-primary-foreground"
-                      )}
-                    >
-                      {oi + 1}
-                    </span>
-                    <span className="flex min-w-0 flex-col wrap-anywhere">
-                      <span>{opt.label}</span>
-                      {opt.description && (
-                        <span className="text-muted-foreground">
-                          {opt.description}
-                        </span>
-                      )}
-                    </span>
-                  </RadioGroup.Item>
-                );
-              })}
-            </RadioGroup.Root>
+            hasNext ? (
+              <div
+                role="group"
+                aria-labelledby={questionId}
+                className="grid gap-0.5"
+              >
+                {singleChoices}
+              </div>
+            ) : (
+              <RadioGroup.Root
+                aria-labelledby={questionId}
+                value={survey.pickedFor(qi)[0] ?? ""}
+                onValueChange={(label) =>
+                  setSurvey(survey.togglePick(qi, label))
+                }
+                disabled={submitted}
+                className="grid gap-0.5"
+              >
+                {singleChoices}
+              </RadioGroup.Root>
+            )
           ) : (
             <div
               role="group"
@@ -424,6 +499,7 @@ export function QuestionPrompt({
             onKeyDown={(event) => {
               if (
                 event.key !== "Enter" ||
+                (survey.multiStep && !hasNext) ||
                 event.shiftKey ||
                 event.nativeEvent.isComposing ||
                 event.keyCode === 229
@@ -459,53 +535,27 @@ export function QuestionPrompt({
         </div>
 
         <div className="ml-auto flex h-10 shrink-0 items-center gap-1.5">
-          {survey.multiStep && survey.step > 0 && (
-            <Button
-              type="button"
-              variant="outline"
-              size="xs"
-              className={questionTextClassName}
-              onClick={() => showStep(survey.back())}
-              disabled={submitted}
-            >
-              Back
-            </Button>
-          )}
-          {!survey.multiStep && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              className={questionTextClassName}
-              onClick={onSkip}
-              disabled={dismissal ? submitted : busy}
-            >
-              Skip
-            </Button>
-          )}
-          {hasNext && (
-            <Button
-              type="button"
-              variant={dismissal ? "outline" : "default"}
-              size="xs"
-              className={questionTextClassName}
-              onClick={advance}
-              disabled={submitted}
-            >
-              Next
-            </Button>
-          )}
-          {(!hasNext || dismissal) && (
-            <Button
-              type="button"
-              size="xs"
-              className={questionTextClassName}
-              onClick={requestSubmit}
-              disabled={!canSubmit}
-            >
-              Submit
-            </Button>
-          )}
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            className={questionTextClassName}
+            onClick={onSkip}
+            disabled={
+              hasNext || (!survey.multiStep && dismissal) ? submitted : busy
+            }
+          >
+            Skip
+          </Button>
+          <Button
+            type="button"
+            size="xs"
+            className={questionTextClassName}
+            onClick={advance}
+            disabled={hasNext ? submitted : !canSubmit}
+          >
+            {hasNext ? "Next" : "Submit"}
+          </Button>
         </div>
       </div>
     </AgentPromptCard>

@@ -77,13 +77,16 @@ position stay the same. Older runtimes offer editing for plain text only.
 Goals cannot be edited; remove the queued goal and send a new one instead.
 
 If the current turn asks a question, answer it in its card. Use Shift+Enter
-to add a line in a custom answer. For a set of questions, use **Back** and
-**Next** in any order. Your selections and custom answers stay in place. When
-you **Submit**, you can go back to an unanswered question or confirm that you
-want to skip the remaining questions.
+to add a line in a custom answer. For a set of questions, use the arrows around
+the question counter to go back or forward. Selecting an option advances to
+the next question when there is one. **Next** keeps your answer and skips the
+question if it is blank. **Skip** skips the current question even if it has
+an answer. On the last question, use **Submit**, double-click an option to
+submit it, or use **Skip** to submit with that question skipped. If earlier
+questions are still unanswered, you can go back or confirm skipping them.
 
 A required question or set waits for your submission. An optional question or
-set lets the agent keep working. You can submit an optional set at any step.
+set lets the agent keep working.
 Use the close button to put the card away. The chat shows an **Answer question**
 or **Answer questions** button while the request is open. The agent gives you
 time to reply before proceeding on a stated assumption. The card expires when

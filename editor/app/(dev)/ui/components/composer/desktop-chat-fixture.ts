@@ -751,8 +751,49 @@ export class DesktopChatFixture {
         (question) => question.reviewId === reviewId
       );
       if (!question) throw new Error("question_no_longer_answerable");
+      if ("questions" in question && answer.kind === "batch") {
+        const replies = question.questions.map((item) => {
+          const picked = answer.answers.find(
+            ({ id }) => id === item.id
+          )?.answer;
+          const text =
+            picked?.kind === "choice"
+              ? item.options[picked.index]?.label
+              : picked?.kind === "text"
+                ? picked.text
+                : picked?.kind === "skipped"
+                  ? "The user skipped this question."
+                  : undefined;
+          if (text === undefined)
+            throw new Error("fixture_invalid_question_answer");
+          return {
+            waitId: question.questionId,
+            id: item.id,
+            question: item.question,
+            answer: text,
+            ...(picked?.kind === "skipped" && { skipped: true as const }),
+          };
+        });
+        this.questions = this.questions.filter((entry) => entry !== question);
+        this.messages = [
+          ...this.messages,
+          {
+            messageId: `${reviewId}-reply`,
+            role: "user",
+            turnId: this.liveTurnId,
+            text: replies
+              .map((reply) => `${reply.question}\n${reply.answer}`)
+              .join("\n\n"),
+            questionReplies: replies,
+          },
+        ];
+        return this.finishRequest(
+          reviewId,
+          "I’ll use your answers to prepare the handout."
+        );
+      }
       if ("questions" in question || answer.kind === "batch")
-        throw new Error("fixture_only_supports_single_questions");
+        throw new Error("fixture_invalid_question_answer");
       this.questions = this.questions.filter((entry) => entry !== question);
       if (answer.kind === "skipped" && question.style === "answer_dependent")
         return this.finishRequest(

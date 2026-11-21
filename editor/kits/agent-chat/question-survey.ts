@@ -164,8 +164,14 @@ export class QuestionSurvey {
       : this;
   }
 
+  /** Move forward, recording a skip when the current question is blank. */
   next(): QuestionSurvey {
-    return this.goTo(this.step + 1);
+    if (this.step + 1 >= this.count) return this;
+    const current =
+      this.isAnswered(this.step) || this.isSkipped(this.step)
+        ? this
+        : this.skipCurrent();
+    return current.goTo(this.step + 1);
   }
   back(): QuestionSurvey {
     return this.goTo(this.step - 1);
